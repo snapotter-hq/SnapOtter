@@ -1,11 +1,130 @@
 ---
 description: "Notes de version et historique des versions de SnapOtter. Découvrez les nouveautés, les améliorations et les correctifs de chaque version."
-i18n_source_hash: 9020073f127e
+i18n_source_hash: d3c5fc4c6b75
 i18n_provenance: human
-i18n_output_hash: 5d63753731ab
+i18n_output_hash: eea7d08bc967
 ---
 
 # Journal des modifications {#changelog}
+
+## v2.2.0 {#v2-2-0}
+
+L'essentiel de la 2.2 relève du durcissement. Un non-administrateur disposant d'un rôle `users:manage` délégué pouvait prendre le contrôle d'une instance, et tous les points de terminaison d'outils s'avéraient dépourvus de leur vérification de permission. Mettez à niveau si vous avez plus d'un utilisateur.
+
+Le reste, c'est la longue traîne de l'auto-hébergement : des téléchargements qui démarraient et ne se terminaient jamais, des préréglages qui cassaient dès l'ajout d'un second fichier, des conteneurs qui bouclaient sur un plantage pendant que Postgres démarrait encore. Deux nouveaux outils ont aussi fait leur apparition. La documentation et le site web sont désormais traduits en 21 langues, et l'interface respecte enfin les contrastes WCAG AA.
+
+> [!IMPORTANT]
+> Si vous avez accordé `users:manage` à un non-administrateur via un rôle personnalisé, ce rôle pouvait prendre le contrôle de comptes administrateurs sur les versions 2.0.0 à 2.1.0. Détails dans la section Sécurité.
+
+### Sécurité {#v2-2-0-security}
+
+- **Élévation de privilèges via un rôle `users:manage` délégué (GHSA-9xgh-95qh-2x7h).** Un non-administrateur disposant de `users:manage` via un rôle personnalisé pouvait réinitialiser le mot de passe d'un compte plus privilégié, ou le supprimer, y compris un administrateur intégré, et prendre le contrôle de l'instance. La réinitialisation de mot de passe et la suppression de compte vérifient désormais l'autorité de l'appelant sur la cible, de sorte qu'un rôle délégué ne peut pas agir au-delà de son propre niveau. Concerné : 2.0.0 à 2.1.0. Signalé par 李春来 (Chunlai Li). (#616)
+- **Chaque point de terminaison d'outil est désormais protégé.** L'accès aux outils était appliqué route par route, si bien que les 45 routes écrites à la main devaient toutes se souvenir du même appel, et aucune ne le faisait. Un rôle dépourvu de `tools:use` pouvait encore exécuter image-to-pdf, erase-object, upscale, sign-pdf et les autres. La vérification réside maintenant dans un unique preHandler indexé sur la route correspondante, ce qui couvre les sous-chemins et toute route ajoutée par la suite. (#646)
+- **La limitation de débit était contournable sur les installations Docker.** L'image livrait `TRUST_PROXY=true`, l'IP cliente provenait donc d'un en-tête de requête et un `X-Forwarded-For` falsifié franchissait le limiteur de connexion. La valeur par défaut est désormais une liste de réseaux privés de confiance. (#649)
+- **Les écritures de paramètres sont vérifiées paramètre par paramètre**, et non une fois à l'entrée, et l'importation de configuration est désormais transactionnelle afin qu'une clé rejetée ne laisse pas une configuration à moitié appliquée. (#618)
+- **Les noms de fichiers de la bibliothèque ne peuvent pas sortir de leur racine de stockage.** Un nom stocké fabriqué, qu'un import SQLite 1.x malveillant recopie tel quel, pouvait lire ou supprimer des fichiers en dehors du répertoire des fichiers. Accessible uniquement après qu'un opérateur a importé une base SQLite 1.x fournie par un attaquant, seul chemin qui permet de choisir un nom stocké. Signalé par @Alpastx. (GHSA-55w2-8cqf-w969, #600)
+- **L'annulation de tâche applique la propriété**, un utilisateur authentifié ne peut donc plus annuler la tâche d'un autre utilisateur par son identifiant. Signalé par @Alpastx. (GHSA-wqxf-gj2p-689x, #599)
+- **Un nouvel audit de toute l'arborescence 2.0 a révélé ce qui restait ouvert** : une assertion SAML capturée pouvait être rejouée, un défi MFA survivait à n'importe quel nombre de codes erronés, la recherche de clé d'API à chaque requête était un balayage complet de table, `MAX_WORKSPACE_SIZE_GB` était une configuration morte, et l'assainisseur SVG laissait passer des href `javascript:` sans guillemets. (#620)
+- **Neuf CVE divulguées corrigées** : fast-uri, svgo, sharp et tar de manière transitive (#619), plus Pillow 12.3.0 (#517). Le décodage RAW sur arm64 compile désormais LibRaw 0.22.2 depuis les sources au lieu de lier une copie système non corrigée. (#649)
+
+### Nouvelles fonctionnalités {#v2-2-0-new-features}
+
+- **Recadrage arrondi** : masques en carré arrondi et en squircle façon iOS, avec un réglage du rayon des coins. Pensé pour les favicons et les icônes d'application. (#602)
+- **Supprimer l'arrière-plan d'un GIF** : retirez l'arrière-plan d'un GIF animé, d'un WebP ou d'un APNG image par image et récupérez une animation transparente. (#502)
+- **Lasso et mode haute qualité pour l'effaceur d'objets** : tracez une boucle libre au lieu de peindre chaque pixel, et installez en option un bundle de remplissage par diffusion pour des remplissages plus propres sur de grandes zones. (#503, #566)
+- **Enregistrer comme nouveau fichier, ou remplacer.** Modifier un fichier de la bibliothèque remplaçait auparavant silencieusement l'original. Vous choisissez désormais à chaque modification, et l'option par défaut conserve l'original. (#564, #577)
+- **Préréglages de rapport d'aspect dans l'outil Redimensionner.** Choisissez 1:1, 4:3 ou 16:9 et les deux dimensions restent verrouillées, sans agrandissement. (#530)
+- **OCR à deux niveaux** : un niveau rapide intégré à l'image qui fonctionne hors ligne sans téléchargement, et un moteur plus précis qui s'installe à la demande. (#519)
+- **Tapez n'importe où pour rechercher.** Commencez à écrire sur le tableau de bord ou la page d'accueil et votre saisie apparaît dans le champ de recherche. (#644)
+- **Documentation et site web en 21 langues** : le site de documentation, les pages d'accueil et la référence API sont désormais tous traduits, comme l'interface de l'application. Un nouveau guide de déploiement pour ressources limitées couvre Raspberry Pi et les machines à 2 Go. (#548)
+- **Noms d'outils plus clairs** : 18 noms ambigus précisent désormais leur objet, si bien que « Compress » devient « Compress Image ». Les identifiants et les routes des outils sont inchangés, donc aucun favori ne casse. (#520)
+
+### Améliorations {#v2-2-0-improvements}
+
+- **Contrastes WCAG AA dans toute l'interface** : la palette a été réaccordée pour que l'orange vif reste sur les remplissages tandis que le texte et les libellés utilisent des jetons d'encre accessibles, et les 57 indicateurs de focus franchissent désormais le seuil de 3:1 pour les éléments non textuels. (#567, #574)
+- **Agrandissement et suppression d'arrière-plan ne semblent plus figés** : la barre de progression avance pendant l'inférence au lieu de rester bloquée à 30 %, et les deux outils préviennent désormais qu'un hôte sans GPU est bien plus lent. (#605, #608)
+- **Les messages d'expiration nomment la vraie cause** et tiennent compte des hôtes CPU uniquement au lieu de blâmer le téléversement. (#596)
+- **SnapOtter attend Postgres et Redis au démarrage** au lieu de boucler sur un plantage, aussi bien dans Compose que dans l'image tout-en-un. Une installation Proxmox LXC redémarrait 76 fois avant cela. (#537, #595)
+- **Les téléchargements survivent à un reverse proxy** : SnapOtter demande à nginx et aux proxys compatibles de ne pas mettre en mémoire tampon les réponses de fichiers, ce qui est la raison habituelle d'un téléchargement auto-hébergé qui démarre et ne se termine jamais. (#604, #607)
+- **La compression de PDF s'approche de la taille cible**, et le dit honnêtement quand une cible est hors de portée. (#522)
+- **Les commandes des outils restent accessibles sur mobile** maintenant que les enveloppes de l'application se dimensionnent selon la fenêtre d'affichage dynamique. (#559)
+- **La conversion audio expose désormais un réglage de fréquence d'échantillonnage.** (#561)
+- **Les administrateurs peuvent assouplir la longueur minimale du mot de passe**, jusqu'à 1 pour une instance sur réseau local de confiance. (#543)
+- **La MFA est en libre-service**, le verrouillage de la politique est corrigé, et les connexions OIDC ou SAML obtiennent un vrai défi MFA au lieu d'un blocage net. (#531, #536)
+- **Un simple `Error: Error` nomme désormais sa cause.** Les échecs d'encodage Sharp, les sorties du sidecar IA, la sortie non JSON du sidecar de documents et les échecs de suppression d'arrière-plan arrivaient tous avec la raison effacée. (#532, #534, #535, #538, #612)
+- **La boîte de dialogue d'aide est traduite.** Ses libellés de raccourcis et son texte de prise en main étaient codés en dur en anglais alors que des traductions terminées dormaient inutilisées dans les 21 fichiers de langue. (#647)
+
+### Corrections de bogues {#v2-2-0-bug-fixes}
+
+- **Les fichiers HEIC d'iPhone étaient rejetés** comme illisibles avant d'atteindre le décodeur qui les gère. (#631)
+- **Les préréglages de conversion échouaient sur un second fichier** : jpg-to-pdf et ses équivalents image-to-pdf, plus pdf-to-png, pdf-to-jpg et pdf-to-tiff, renvoyaient tous `Tool not found` dès que vous téléversiez deux fichiers. (#633, #643)
+- **Les préréglages de conversion PDF perdaient leur bouton de téléchargement.** (#629)
+- **Un délai de traitement illimité n'était pas respecté**, et les flux de progression bloqués se rétablissent désormais au lieu de laisser l'interface en attente. (#638)
+- **Les téléchargements restaient suspendus au lieu d'échouer** quand un fichier stocké s'avérait plus court que sa longueur enregistrée. (#617)
+- **Les outils de pages PDF échouaient sur les fichiers courts et chiffrés** : Supprimer des pages partait par défaut sur une plage qui n'existe dans aucun document de moins de six pages, et les PDF protégés par mot de passe échouaient avec un message obscur dans le worker. (#594)
+- **PDF vers texte renvoyait silencieusement un fichier vide** pour les PDF numérisés. L'outil vous oriente désormais vers l'OCR et sert le texte en UTF-8. (#603)
+- **PDF vers Word perdait les blocs de texte colorés** et les découpait sur la page. (#500)
+- **L'effaceur d'objets laissait des rémanences fantômes** et floutait les petits objets dans les images haute résolution. (#501)
+- **La stabilisation vidéo produisait une sortie illisible** sans faststart. (#593)
+- **Réparations de l'éditeur d'images** : rotation, miroir, redimensionnement, niveaux, courbes, filtres et verrouillage des calques. (#597)
+- **Signer un PDF affichait un canevas vide** au lieu d'indiquer pourquoi un PDF n'avait pas pu être chargé. (#545)
+- **La bibliothèque de fichiers enregistrait des dimensions 0x0** et sautait les aperçus des téléversements HEIC, RAW et PSD. (#636, #637)
+- **L'installation de plusieurs bundles d'IA** laissait le virtualenv partagé en versions multiples et cassait discrètement trois outils. (#649)
+- **La conversion en JXL aux qualités 1 à 4 renvoyait une erreur 500**, et un ffmpeg manquant vous était signalé comme un téléversement corrompu. (#649)
+- **Une panne Postgres passagère laissait les tâches terminées en suspens**, avec leur sortie sur le disque et aucune ligne pointant vers elle. Un réconciliateur reprend désormais ce travail au lieu de l'abandonner. (#649)
+- **Un point de terminaison Redis qui changeait d'adresse bloquait tous les consommateurs** alors que les vérifications d'état répondaient toujours 200. (#649)
+- **Correctifs du site web et de la documentation** : les liens localisés ne perdent plus les fragments `#` ni ne passent `zh-CN` en minuscules, la navigation de la documentation reste dans la fenêtre d'affichage sur tablette, et aucun des deux sites n'appelle plus l'API GitHub depuis votre navigateur. (#516, #562, #570, #560)
+
+### Notes de mise à niveau {#v2-2-0-upgrade-notes}
+
+Rien à migrer, mais deux valeurs par défaut livrées ont changé :
+
+- **`TRUST_PROXY` vaut désormais `loopback,linklocal,uniquelocal`** au lieu de faire confiance à tous les pairs. Les réseaux Docker bridge et Compose se situent dans cette plage, la plupart des installations n'ont donc rien à changer. Si votre reverse proxy atteint SnapOtter depuis une adresse publique, définissez `TRUST_PROXY` explicitement, sinon la limitation de débit et les journaux d'audit attribueront chaque requête au proxy.
+- **`MAX_AI_JOBS_PER_USER` est fixé à 5** tâches IA mono-fichier simultanées par utilisateur. Les exécutions IA par lots et par pipeline restent sans plafond.
+
+Nouveaux réglages facultatifs : `DB_STARTUP_TIMEOUT_MS`, `SUBPROCESS_MEMORY_LIMIT_MB` (désactivé par défaut) et `GIF_BG_MAX_FRAMES`.
+
+### Remerciements {#v2-2-0-acknowledgements}
+
+Une bonne partie de cette version a commencé comme le rapport de bogue de quelqu'un d'autre.
+
+Code et contributions :
+
+- **@mvanhorn** ❤️ : a réécrit l'échec d'expiration de la suppression d'arrière-plan en un message qui dit quoi faire, au lieu d'une simple expiration. (#518, #494)
+- **@EuanTop** ❤️ : a restauré l'action de téléchargement sur les pages des préréglages de conversion PDF en faisant renvoyer le contrat de résultat d'outil standard à la route synchrone. (#629, #623)
+- **@harshjainnn** ❤️ : a diagnostiqué le téléchargement qui démarre et ne se termine jamais, et proposé la piste de la réinitialisation de socket sur laquelle le correctif a été bâti. (#617, #590)
+
+Divulgations de sécurité :
+
+- **李春来 (Chunlai Li)** ❤️ ([@laijunyue](https://github.com/laijunyue)) : a divulgué en privé l'élévation de privilèges via un rôle `users:manage` délégué, avec une analyse complète de la source au puits et une chaîne d'exploitation fonctionnelle. (GHSA-9xgh-95qh-2x7h, #616)
+- **@Alpastx** ❤️ (Alpesh Bhagwatkar) : a divulgué un IDOR authentifié sur l'annulation de tâche, et une traversée de répertoire dans les noms de fichiers stockés de la bibliothèque, atteignable après un import SQLite 1.x malveillant, avec une preuve de concept fonctionnelle pour chacun. (#599, #600)
+
+Rapports de bogues :
+
+- **@riz467** ❤️ : de vrais fichiers HEIC d'iPhone rejetés à la validation, avec la cause racine identifiée dans le rapport. (#622)
+- **@coupej** ❤️ : des pages de préréglages PDF bloquées indéfiniment, et jpg-to-pdf qui échouait dès l'ajout d'un second fichier. Deux bogues distincts, correctement séparés. (#623, #627)
+- **@linuxuser1** ❤️ : `PROCESSING_TIMEOUT_S=0` documenté comme illimité mais plafonné à cinq minutes. (#630)
+- **@bezibaerchen** ❤️ : la conversion audio masquait le réglage de fréquence d'échantillonnage que sa propre description promettait. (#558)
+- **@hell-toupee** ❤️ : le bundle OCR précis qui échouait à s'installer avec une erreur `libpaddle`. (#505)
+- **@Michael1260** ❤️ et **@And-CSH** ❤️ : ont confirmé indépendamment l'échec d'installation de l'OCR et établi que l'extraction manuelle fonctionne alors que le programme d'installation intégré ne fonctionne pas, ce qui a circonscrit le bogue au programme d'installation. (#505)
+- **@TomErnst1972** ❤️ : l'activation de la politique exigeant la MFA enfermait un administrateur hors de sa propre instance. (#515)
+- **@thokich** ❤️ : l'effacement d'objets produisait des remplissages flous et inutilisables, ce qui a motivé à la fois la réécriture du remplissage HD et le bundle haute qualité facultatif. (#141)
+- **@Hennie-git** ❤️ : une installation Proxmox LXC redémarrant 76 fois contre un Postgres qui n'acceptait pas encore les connexions. (community-scripts/ProxmoxVE#15796)
+- **MickLesk** ❤️ (Proxmox VE community-scripts) : a qualifié ce rapport en temps réel et produit le diagnostic sur lequel le correctif de démarrage a été bâti. (#537)
+
+Demandes de fonctionnalités et retours :
+
+- **@LECOQQ** ❤️ : a demandé d'assouplir la complexité des mots de passe sur une installation de serveur domestique. (#136)
+- **@killervette42** ❤️ : a demandé une application communautaire Unraid, désormais publiée sur le magasin Unraid CA. (#96)
+- **@alienatedsec** ❤️ : a signalé que le correctif de retour au CPU en cas d'échec GPU était enfoui dans un ticket fermé et introuvable, ce qui explique qu'il figure désormais dans la documentation de déploiement. (#490, #587)
+- **@neilp316** ❤️ : a confirmé l'échec GPU Blackwell sur une RTX 5060 et tracé un chemin de mise à niveau CUDA 12.8 fonctionnel. (#120)
+- **@Roiki11** ❤️ : a plaidé pour un stockage partagé avec des références de chemins plutôt qu'un transfert de fichiers HTTP pour le calcul IA hors machine. (#189)
+
+Merci également aux membres de la communauté qui ont signalé ces points sur Discord et par e-mail, et dont nous n'avons pas noté les noms : la demande de recadrage en squircle (#602), le téléchargement image-to-PDF qui démarrait et ne se terminait jamais (#604, #607), l'outil Supprimer des pages qui se bloquait (#594), le texte arabe absent de pdf-to-text (#603), et le diagnostic derrière le retour au CPU d'ONNX (#490).
+
+[Diff complet sur GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.1.0...v2.2.0)
+
+---
 
 ## v2.0.0 {#v2-0-0}
 

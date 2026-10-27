@@ -1,7 +1,7 @@
 ---
 description: "Referens för AI-motorn med alla lokala ML-verktyg. Bakgrundsborttagning, uppskalning, OCR, ansiktsdetektering, fotorestaurering och mer."
-i18n_output_hash: 73c354201c5c
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: dee9a6647e0e
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -64,15 +64,16 @@ Docker-avbildningen levereras med applikationen plus den gemensamma körtidsmilj
 
 De flesta AI-verktyg kräver ett eller flera funktionspaket innan de kan köras. Administratörsgränssnittet installerar dessa med hjälp av `POST /api/v1/admin/tools/:toolId/features/install`, vilket löser hela paketlistan, hoppar över paket som redan är installerade och köar endast de saknade nedladdningarna. Till exempel, aktivering av Passfoto på en ny instans köer `background-removal` och `face-detection`; aktivera det efter att bakgrundsborttagning redan är installerat köer endast `face-detection`. OCR är undantaget eftersom `fast` inte behöver något pack; installera dess valfria exakta körtid genom UI eller `POST /api/v1/admin/features/ocr/install`.
 
-| Paket | Storlek | Delad beroendegrupp | Verktyg som använder det |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet bakgrundsmattning | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | MediaPipe ansiktsdetektering och landmärken | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa inpainting/outpainting och DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, brusreducering | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | pipeline för reparation av repor och restaurering | restore-photo |
-| `ocr` | ~208-234 MiB nedladdning / ~409-488 MiB installerad | Tillval RapidOCR 3.9.1, ONNX Runtime 1.20.1 och stiftade PP-OCR-modeller | ocr, ocr-pdf (endast `balanced` och `best`) |
-| `transcription` | ~600 MB | faster-whisper tal-till-text-modeller | transcribe-audio, auto-subtitles |
+| Paket | Storlek | Minsta CPU-minne | Delad beroendegrupp | Verktyg som använder det |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (~2,5 GB ledigt) | rembg / BiRefNet bakgrundsmattning | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (~0,5 GB ledigt) | MediaPipe ansiktsdetektering och landmärken | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (~2 GB ledigt) | LaMa inpainting/outpainting och DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB ledigt) | högkvalitativ inpainting med Stable Diffusion 1.5 | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (~2,5 GB ledigt) | RealESRGAN, GFPGAN / CodeFormer, brusreducering | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB ledigt) | pipeline för reparation av repor och restaurering | restore-photo |
+| `ocr` | ~208-234 MiB nedladdning / ~409-488 MiB installerad | 4 GiB konfigurerat effektivt minne (`fast` körs på 2 GB) | Tillval RapidOCR 3.9.1, ONNX Runtime 1.20.1 och stiftade PP-OCR-modeller | ocr, ocr-pdf (endast `balanced` och `best`) |
+| `transcription` | ~600 MB | 4 GB RAM (~2 GB ledigt) | faster-whisper tal-till-text-modeller | transcribe-audio, auto-subtitles |
 
 Verktyg med beroenden över flera paket:
 
@@ -82,6 +83,27 @@ Verktyg med beroenden över flera paket:
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Detekterar ansikten innan GFPGAN- eller CodeFormer-förbättring körs på de valda ansiktsregionerna. |
 
 Ett verktyg är endast tillgängligt när alla dess nödvändiga buntar är installerade, förutom OCR: dess inbyggda `fast`-nivå förblir tillgänglig utan det valfria OCR-paketet. Delinstallationer är giltiga och hanteras inkrementellt: installerade paket återanvänds, saknade paket visas som nedladdningar och installationer i kö körs en i taget så att den delade Python-miljön inte ändras samtidigt.
+
+### Installera alla paket på en gång {#installing-every-bundle-at-once}
+
+Under Inställningar > AI-funktioner finns knappen **Installera alla** som köar varje paket som värden kan köra. Den hoppar över allt som redan är installerat, hoppar över paket som rapporteras vara inkompatibla med värden och gör ett nytt försök med ett misslyckat paket innan den går vidare. För en vanlig instans är den knappen hela svaret, och inget av det nedan behövs.
+
+Räkna med disken först. Tillsammans är paketen ungefär 20-25 GB installerade, och de hamnar i `/data/ai` på datavolymen i stället för i avbildningen, så de överlever `docker compose down` och att containern skapas om. Du installerar dem en gång per värd, inte en gång per uppgradering.
+
+För oövervakad provisionering där ingen kommer att klicka på något, POST:a varje paket till installationsslutpunkten med en administratörs-API-nyckel. Servern köar dem, så skicka alla åtta utan att vänta:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Varje anrop returnerar `202` med ett `jobId` och en `queued`-flagga: `false` för den som startar direkt, `true` för resten. Ett paket som redan är installerat returnerar `409` och kan ignoreras, vilket gör loopen körbar igen. Polla `GET /api/v1/features` för förloppet; varje paket läses som `installed` när körningen är klar.
+
+Två saker att förvänta sig. Paketet `ocr` kör en förkontroll av värdkompatibilitet och vägrar värdar under sitt signerade minimum, så det kan misslyckas medan de andra sju lyckas (se [Exakt OCR runtime installation](#accurate-ocr-runtime-installation)). Och `POST /api/v1/admin/features/reset` returnerar `409` medan en installation pågår, så en körning som är halvvägs måste bli klar eller containern måste startas om innan miljön kan rensas.
 
 ### Exakt OCR runtime installation {#accurate-ocr-runtime-installation}
 
@@ -167,12 +189,12 @@ Gör bakgrunden oskarp samtidigt som motivet hålls skarpt.
 
 | Parameter | Typ | Standard | Beskrivning |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | När `quality` och `engine` utelämnas väljer SnapOtter den bästa tillgängliga nivån i ordningen `best`, `balanced`, `fast`. För koreanska väljs aldrig `fast`; `best`, sedan `balanced` används, annars returneras installations- eller kompatibilitetsfelet för den exakta körmiljön. |
-| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Standard på för Best |
-| `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; den laddar inte PaddlePaddle |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
+| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast stöder inte `ko` |
+| `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
+| `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
 
-Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och korrekt körtid/modellversioner när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` istället för att köra `fast` tyst.
+Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och korrekt körtid/modellversioner när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` i stället för att köra `fast` tyst. Explicit Fast eller det äldre `tesseract` med koreanska returnerar `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` och hänvisning till det exakta paketet innan ett jobb köas.
 
 ## PDF-OCR {#pdf-ocr}
 
@@ -183,13 +205,13 @@ Extraherar text från inskannade PDF-dokument med AI-driven OCR, sida för sida.
 
 | Parameter | Typ | Standard | Beskrivning |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | När `quality` och `engine` utelämnas väljer SnapOtter den bästa tillgängliga nivån i ordningen `best`, `balanced`, `fast`. För koreanska väljs aldrig `fast`; `best`, sedan `balanced` används, annars returneras installations- eller kompatibilitetsfelet för den exakta körmiljön. |
-| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
+| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast stöder inte `ko` |
 | `pages` | string | `"all"` | Sidval: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Standard på för Best |
-| `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; den laddar inte PaddlePaddle |
+| `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
+| `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
 
-Samma regel om ingen nedgradering gäller för PDF OCR. PDF sidor rastreras före igenkänning, och en begäran kan välja högst 50 sidor.
+Samma regler om ingen nedgradering och koreansk kompatibilitet gäller för PDF-OCR. PDF-sidor rastreras före igenkänning, och en begäran kan välja högst 50 sidor.
 
 ## Oskärp ansikten / PII {#face-pii-blur}
 
@@ -357,7 +379,7 @@ Minst en utökningsriktning måste vara större än 0.
 | `sensitivity` | number (0-1) | `0.5` | Tröskel för ansiktsdetektering |
 | `threshold` | integer (0-255) | `30` | Tröskel för bakgrundsdetektering (trimläge) |
 | `padToSquare` | boolean | `false` | Fyll ut trimmat resultat till en kvadrat |
-| `padColor` | string | `"#ffffff"` | Bakgrundsfärg för kvadratisk utfyllnad |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Bakgrundsfärg för kvadratisk utfyllnad |
 | `targetSize` | integer | - | Målstorlek för utfyllt utdata (pixlar) |
 | `quality` | integer (1-100) | - | Utdatakvalitet |
 

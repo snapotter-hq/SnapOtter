@@ -1,8 +1,8 @@
 ---
 description: "ปรับใช้ SnapOtter สู่โปรดักชันด้วย Docker ความต้องการฮาร์ดแวร์ การตั้งค่า GPU และคอนฟิก reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: ba36e2dd62d1
+i18n_output_hash: 841ed25bbdce
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,15 @@ curl http://localhost:1349/api/v1/health
 
 สองสิ่งที่สำคัญสำหรับทุกพร็อกซีด้านล่าง: อนุญาตเนื้อหาคำขอขนาดใหญ่ (อัปโหลด) และไม่บัฟเฟอร์การตอบสนอง พร็อกซีบัฟเฟอร์การตอบสนองจะทำลายความคืบหน้าของ SSE และทำให้การดาวน์โหลดไฟล์ขนาดใหญ่ "เริ่มต้นแต่ไม่สิ้นสุด" อย่างเห็นได้ชัด เนื่องจากพร็อกซีจะเก็บไฟล์ทั้งหมดก่อนที่จะส่งต่อ SnapOtter ส่ง `X-Accel-Buffering: no` ในการดาวน์โหลด ดังนั้น nginx สตรีมสิ่งเหล่านั้นแม้ว่าการบัฟเฟอร์จะถูกทิ้งไว้ที่อื่น แต่พรอกซีอื่นที่ไม่ใช่ nginx จำเป็นต้องปิดใช้งานการบัฟเฟอร์การตอบสนองอย่างชัดเจน (แสดงอยู่ในการกำหนดค่าแต่ละรายการด้านล่าง) หากการดาวน์โหลดค้างกลางคัน พร็อกซีการบัฟเฟอร์ที่อยู่ด้านหน้าคือสิ่งแรกที่ต้องตรวจสอบ
 
+หมายเหตุเกี่ยวกับ HSTS: API ส่ง `Strict-Transport-Security` มากับทุกการตอบสนองด้วยตัวเอง พร็อกซีที่ส่งต่อส่วนหัวการตอบสนองผ่านไป (คอนฟิกทั้งหมดด้านล่างทำเช่นนั้น) จึงไม่ต้องตั้งค่า HSTS ของตัวเอง คุณจะต้องคงส่วนหัวนั้นไว้หรือเพิ่มกลับที่เอดจ์ก็ต่อเมื่อพร็อกซีของคุณถูกตั้งค่าให้ตัดหรือเขียนทับส่วนหัวการตอบสนองจากต้นทางเท่านั้น
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # แสดง HTTP ธรรมดาไว้เพื่อความกระชับ ให้ยุติ TLS ในบล็อกเซิร์ฟเวอร์
+    # `listen 443 ssl` ของคุณเอง ส่วนหัว Strict-Transport-Security ที่ API ส่ง
+    # จะผ่านไปพร้อมการตอบสนองที่พร็อกซีทุกครั้ง จึงไม่ต้องใช้ add_header ที่นั่น
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +528,37 @@ server {
 }
 ```
 
+### Deploying under a subpath {#subpath}
+
+หากต้องการให้บริการที่ `https://example.com/snapotter` ให้ตั้ง `BASE_PATH=/snapotter` ในสภาพแวดล้อมของคอนเทนเนอร์ SnapOtter แล้วรีสตาร์ต ไฟล์ Compose อย่างเป็นทางการสำหรับ CPU และ GPU ก็รับ `BASE_PATH` จากเชลล์หรือไฟล์ `.env` ของ Compose ด้วย อิมเมจเดียวกันใช้ได้กับทุกพาธ ไม่ต้องสร้างฟรอนต์เอนด์ใหม่
+
+`BASE_PATH` รับส่วนที่คั่นด้วยเครื่องหมายทับซึ่งมีตัวอักษร ตัวเลข `_` หรือ `-` รวมถึงพาธซ้อนกันอย่าง `/apps/snapotter` เครื่องหมายทับปิดท้ายไม่บังคับ ปล่อยว่างไว้ (ค่าเริ่มต้น) หรือตั้งเป็น `/` สำหรับการปรับใช้ที่ราก
+
+ในบล็อกเซิร์ฟเวอร์ HTTPS ของ Nginx ที่มีอยู่ ให้ใช้:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+ตัวอย่างนี้คงคำนำหน้าไว้ พร็อกซีที่ตัด `/snapotter` ออกก่อนส่งต่อก็รองรับเช่นกัน health check ภายในยังใช้ `/api/v1/health` ได้ สำหรับ OIDC หรือ SAML ให้ตั้ง `EXTERNAL_URL=https://example.com/snapotter` ด้วย และอัปเดต callback URL ของผู้ให้บริการตัวตนให้มี `/snapotter/api/auth/oidc/callback` หรือ `/snapotter/api/auth/saml/callback` ตามลำดับ
+
+สคริปต์ API ยังทำงานได้เหมือนเดิม: URL ในการตอบกลับ API เช่น `downloadUrl` ของเครื่องมือ ขึ้นต้นด้วย `/api/` ไม่ว่า `BASE_PATH` จะเป็นอะไร ให้ต่อท้ายกับ base URL ของอินสแตนซ์คุณ (`https://example.com/snapotter` + `/api/v1/download/...`) แทนที่จะแปลงจากรากโดเมน
+
+เปิด UI ผ่าน URL ที่มีคำนำหน้า (`https://example.com/snapotter`) เบราว์เซอร์ที่เข้ามาโดยไม่มีคำนำหน้าจะถูกพาไปที่นั่นโดยอัตโนมัติ มีเพียงคำขอ API เท่านั้นที่คาดว่าจะมาถึงแอปโดยไม่มีคำนำหน้า หากบันทึกระบุว่า `Requests arrive under /snapotter/ but BASE_PATH is empty` แสดงว่าพร็อกซีของคุณส่งต่อคำนำหน้าที่ `BASE_PATH` ไม่ได้ประกาศไว้: ตั้ง `BASE_PATH` ให้เป็นคำนำหน้านั้น หรือตัดคำนำหน้าออกที่พร็อกซี
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. เพิ่ม Proxy Host ใหม่
@@ -530,6 +566,8 @@ server {
 3. ตั้ง Scheme เป็น `http`, Forward Hostname เป็น `SnapOtter` (หรือ IP ของคอนเทนเนอร์), Forward Port เป็น `1349`
 4. เปิดใช้การรองรับ WebSocket
 5. ในส่วน Advanced ให้เพิ่ม: `client_max_body_size 500M;` และ `proxy_buffering off;`
+
+ส่วนหัว `Strict-Transport-Security` ของ API ผ่าน NPM ไปตามเดิม สวิตช์ HSTS ในแท็บ SSL จึงเป็นตัวเลือกเสริมบนนั้น
 
 ### Traefik {#traefik}
 
@@ -546,6 +584,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik ส่งต่อส่วนหัวการตอบสนองจากต้นทางโดยไม่เปลี่ยนแปลง ส่วนหัว `Strict-Transport-Security` ของ API จึงไปถึงเบราว์เซอร์โดยไม่ต้องมีมิดเดิลแวร์ `headers` หากคุณมีมิดเดิลแวร์ที่เขียนส่วนหัวการตอบสนองใหม่อยู่แล้ว ตรวจสอบให้แน่ใจว่ามันคงส่วนหัวนั้นไว้
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +600,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` ปิดใช้งานการบัฟเฟอร์การตอบสนอง ซึ่งจำเป็นสำหรับเหตุการณ์ความคืบหน้าของ SSE (การประมวลผลเป็นชุด เครื่องมือ AI การติดตั้งคุณสมบัติ) และสำหรับการดาวน์โหลดไฟล์ขนาดใหญ่เพื่อสตรีมผ่านแทนที่จะหยุดชะงัก การหมดเวลาแบบขยายทำให้การอัพโหลดไฟล์ขนาดใหญ่เสร็จสิ้นโดยไม่ต้อง Caddy ปิดการเชื่อมต่อก่อนกำหนด
+`flush_interval -1` ปิดใช้งานการบัฟเฟอร์การตอบสนอง ซึ่งจำเป็นสำหรับเหตุการณ์ความคืบหน้าของ SSE (การประมวลผลเป็นชุด เครื่องมือ AI การติดตั้งคุณสมบัติ) และสำหรับการดาวน์โหลดไฟล์ขนาดใหญ่เพื่อสตรีมผ่านแทนที่จะหยุดชะงัก การหมดเวลาแบบขยายทำให้การอัพโหลดไฟล์ขนาดใหญ่เสร็จสิ้นโดยไม่ต้อง Caddy ปิดการเชื่อมต่อก่อนกำหนด Caddy ยังส่งต่อส่วนหัว `Strict-Transport-Security` ของ API ไปโดยไม่แตะต้อง จึงไม่จำเป็นต้องใช้ไดเรกทีฟ `header` สำหรับ HSTS
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +609,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 หมายเหตุ: Cloudflare มีขีดจำกัดการอัปโหลด 100 MB บนแผนฟรี ตั้งค่า `MAX_UPLOAD_SIZE_MB=100` ให้ตรงกัน
+
+อุโมงค์ส่งต่อส่วนหัวการตอบสนองของ API รวมถึง `Strict-Transport-Security` ด้วย จึงไม่จำเป็นต้องตั้งค่า HSTS ในแดชบอร์ด (การตั้งค่า HSTS ที่เอดจ์ของ Cloudflare เองเป็นตัวเลือกเสริมบนนั้น)
+
+## Troubleshooting {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" right after a failed first start {#eai-again-after-failed-first-start}
+
+หาก `docker compose up -d` ครั้งแรกสุดล้มเหลวกลางทาง (พอร์ตถูกใช้อยู่เป็นสาเหตุปกติ) การลอง `up -d` ใหม่แบบธรรมดาอาจเริ่มคอนเทนเนอร์แอปโดยไม่เชื่อมต่อกับเครือข่ายของ compose จากนั้นแอปจะวนซ้ำการแครชด้วย:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+ขณะที่ `docker ps` แสดงว่า postgres สุขภาพดี ข้อผิดพลาดนี้เป็นเรื่องจริงแต่ชี้ไปที่คอนเทนเนอร์ผิด: หากไม่มีเครือข่าย DNS สำหรับชื่อโฮสต์ `postgres` จะแปลงไม่ได้เลย และนโยบายรีสตาร์ตจะเล่นความล้มเหลวเดิมซ้ำตลอดไป
+
+แก้สิ่งที่ทำให้การเริ่มครั้งแรกเสีย (โดยปกติคือทำให้พอร์ตว่าง) จากนั้นบังคับให้คอนเทนเนอร์แอปถูกสร้างใหม่เพื่อเชื่อมต่อกับเครือข่ายอีกครั้ง:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: reachable from other devices, not from the PC itself {#windows-wsl2-loopback}
+
+เมื่อ Docker ทำงานภายใน WSL2 (การตั้งค่า Windows ปกติ) สแตกอาจเข้าถึงได้จากทุกเครื่องอื่นในเครือข่ายของคุณ ขณะที่ `http://localhost:1349` หมดเวลาบนโฮสต์ Windows เอง แม้จะเปิดโหมดเครือข่ายแบบ mirrored ของ WSL แล้วก็ตาม พอร์ตจะไม่ปรากฏใน `netstat` ของ Windows และไม่มีอะไรผิดปกติกับคอนเทนเนอร์
+
+เปิดแอปจากอุปกรณ์อื่น หรือจากภายในดิสโทรโดยใช้ที่อยู่ของมันเอง (`hostname -I` ในเชลล์ WSL) หากการส่งต่อ localhost บังเอิญทำงานได้ใน WSL เวอร์ชันของคุณ ก็ถือเป็นโบนัสมากกว่าสิ่งที่ควรพึ่งพา
 
 ## CI/CD {#ci-cd}
 

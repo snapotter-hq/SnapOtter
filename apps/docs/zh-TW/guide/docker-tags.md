@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter Docker 映像標籤、GPU 效能基準、版本鎖定，以及 AMD64 與 ARM64 的多平台支援。"
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: 1e0a57772b89
 i18n_hash_version: 2

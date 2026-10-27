@@ -1,6 +1,6 @@
 ---
 description: "PDF-Dateigröße durch Komprimierung eingebetteter Bilder verringern."
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: 8c3efda683e2
 ---

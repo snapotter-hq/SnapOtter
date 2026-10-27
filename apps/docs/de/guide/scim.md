@@ -1,8 +1,8 @@
 ---
 description: "Richten Sie SCIM-2.0-Provisionierung ein, um Benutzer und Gruppen von Ihrem Identitätsanbieter mit SnapOtter zu synchronisieren. Behandelt Okta, Azure AD / Entra ID und benutzerdefinierte Integrationen."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 1d2bc3b76da5
+i18n_output_hash: 5ae7f1f3f8ab
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ Der IdP sendet mehr als 1000 Anfragen pro Minute. Das passiert typischerweise w�
 ### Benutzer wurden deprovisioniert, aber nicht aus der UI entfernt {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE ist eine sanfte Deaktivierung. Deaktivierte Benutzer erscheinen weiterhin in der Admin-Benutzerliste mit einem deaktivierten Status. Das ist so beabsichtigt, damit ihre Daten erhalten bleiben. Ihre Rolle wird als `disabled:<original-role>` angezeigt.
+
+### `externalId`-Filter findet einen Benutzer nicht, der sich per OIDC oder SAML anmeldet {#recover-scim-ids-in-oidc-or-saml-users}
+
+Bevor der `externalId` von SCIM eine eigene Spalte bekam (`users.scim_external_id`), schrieb ein SCIM `PUT` oder `PATCH` auf einen Benutzer, der bereits über eine OIDC- oder SAML-Anmeldung verknüpft war, die SCIM-ID in die Anmeldeidentität dieses Benutzers. Die Upgrade-Migration kann diesen Wert nicht von einem echten OIDC-Subject oder einer SAML-NameID unterscheiden und lässt diese Benutzer daher unangetastet. Für sie liefert `filter=externalId eq "..."` nichts zurück, bis der IdP eine weitere Aktualisierung sendet, die `externalId` mitführt.
+
+Wenn Sie nicht auf den IdP warten möchten, kann das Audit-Log die ID belegen. SCIM schreibt eine `SCIM_USER_PROVISIONED`-Zeile mit der `externalId`, mit der es jeden Benutzer angelegt hat. Sobald Sie auf einem Release mit der Spalte `scim_external_id` sind, öffnen Sie `psql` gegen die SnapOtter-Datenbank (der [Leitfaden zur Kontowiederherstellung](./account-recovery.md#older-images-and-fallbacks) zeigt, wie das für beide Setups geht) und lassen sich die Benutzer als Vorschau anzeigen, deren Anmeldeidentität noch dieser ID entspricht:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Wenn die Liste richtig aussieht, kopieren Sie die ID in die SCIM-Spalte. Führen Sie das innerhalb von `BEGIN;` aus und prüfen Sie die zurückgegebenen Zeilen, bevor Sie `COMMIT;` ausführen:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Ein zweiter Lauf findet nichts mehr. Die Aktualisierung lässt `external_id` unverändert, weil einige IdPs (darunter Okta) dieselbe ID sowohl als OIDC-`sub` als auch als SCIM-`externalId` senden, und für sie würde ein Löschen die OIDC-Anmeldung brechen. Ein Benutzer, dessen `external_id` tatsächlich die verirrte SCIM-ID ist, scheitert bereits an der Subject-Prüfung. Mit aktiviertem `OIDC_AUTO_LINK_USERS` (oder `SAML_AUTO_LINK_USERS`) verknüpft ihn die nächste Anmeldung mit verifizierter E-Mail so oder so neu.
+
+Einige Benutzer bleiben außer Reichweite und bekommen die ID bei der nächsten Aktualisierung des IdP wieder:
+
+- Benutzer, deren Anmeldeverknüpfung die SCIM-ID ersetzt hat und die danach keinen SCIM-Schreibvorgang mehr erhalten haben, weil ihre `external_id` nicht mehr zur Audit-Zeile passt
+- Benutzer, deren Audit-Zeile zur Provisionierung die Aufbewahrungsfrist bereits bereinigt hat
+- Benutzer, deren `externalId` der IdP nach dem Anlegen geändert hat (Update-Zeilen halten fest, welche Felder sich geändert haben, nicht ihre Werte)
+- zwei Benutzer mit derselben ID, die die Abfrage überspringt, damit der eindeutige Index nicht abbricht; die Vorschau ohne ihre letzte Klausel listet sie auf, und welcher von beiden die ID besitzt, ist Ihre Entscheidung

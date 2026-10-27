@@ -1,6 +1,6 @@
 ---
 description: "Motiv-, ansikts- och entropimedveten beskärning som ramar in bilder intelligent med hjälp av Sharp och AI-ansiktsdetektering."
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: 34495f017691
 ---

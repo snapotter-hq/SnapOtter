@@ -1,7 +1,7 @@
 ---
 description: "使用内置 Tesseract 或可选的高精度 RapidOCR 运行时从本地图像中提取文本。"
 i18n_output_hash: b452e084e28a
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

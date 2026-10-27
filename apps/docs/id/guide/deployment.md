@@ -1,8 +1,8 @@
 ---
 description: "Deploy SnapOtter ke produksi dengan Docker. Persyaratan perangkat keras, penyiapan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: 5f4c54af9c3d
+i18n_output_hash: 37d1789c3f28
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,16 @@ Ada dua hal yang perlu diketahui sebelum Anda mulai mengukur IP klien. Docker De
 
 Ada dua hal yang penting untuk setiap proxy di bawah ini: izinkan badan permintaan yang besar (unggahan), dan jangan melakukan buffering terhadap tanggapan. Proksi buffering respons menghentikan kemajuan SSE dan, yang lebih terlihat, membuat pengunduhan file besar "mulai tetapi tidak pernah selesai", karena proksi menyimpan seluruh file sebelum meneruskannya. SnapOtter mengirimkan `X-Accel-Buffering: no` pada unduhan sehingga nginx mengalirkannya meskipun buffering dibiarkan di tempat lain, namun proxy selain nginx memerlukan buffering respons yang dinonaktifkan secara eksplisit (ditunjukkan pada setiap konfigurasi di bawah). Jika pengunduhan terhenti di tengah jalan, proxy buffering di depan adalah hal pertama yang harus diperiksa.
 
+Catatan tentang HSTS: API mengirim `Strict-Transport-Security` pada setiap respons dengan sendirinya, jadi proxy yang meneruskan header respons apa adanya (semua konfigurasi di bawah ini melakukannya) tidak memerlukan penyiapan HSTS sendiri. Hanya jika proxy Anda dikonfigurasi untuk menghapus atau menimpa header respons upstream, Anda perlu mempertahankan header tersebut atau menambahkannya kembali di edge.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # HTTP biasa ditampilkan agar ringkas. Lakukan terminasi TLS di blok
+    # server `listen 443 ssl` Anda sendiri; header Strict-Transport-Security
+    # yang dikirim API diteruskan pada setiap respons yang diproksikan, jadi
+    # tidak perlu add_header di sana.
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +529,37 @@ server {
 }
 ```
 
+### Men-deploy di bawah subpath {#subpath}
+
+Untuk menyajikan `https://example.com/snapotter`, setel `BASE_PATH=/snapotter` di lingkungan kontainer SnapOtter lalu mulai ulang. File Compose CPU dan GPU resmi juga menerima `BASE_PATH` dari shell Anda atau file `.env` Compose. Image yang sama berfungsi di jalur mana pun; tidak perlu membangun ulang frontend.
+
+`BASE_PATH` menerima segmen yang dipisahkan garis miring berisi huruf, angka, `_`, atau `-`, termasuk jalur bertingkat seperti `/apps/snapotter`. Garis miring di akhir bersifat opsional. Biarkan kosong (default), atau setel `/`, untuk deployment di root.
+
+Di blok server HTTPS Nginx yang sudah ada, gunakan:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+Contoh ini mempertahankan prefiks. Proxy yang menghapus `/snapotter` sebelum meneruskan juga didukung. Pemeriksaan kesehatan internal dapat tetap menggunakan `/api/v1/health`. Untuk OIDC atau SAML, setel juga `EXTERNAL_URL=https://example.com/snapotter` dan perbarui URL callback penyedia identitas agar menyertakan `/snapotter/api/auth/oidc/callback` atau `/snapotter/api/auth/saml/callback`.
+
+Skrip API tetap berfungsi tanpa perubahan: URL dalam respons API, seperti `downloadUrl` milik sebuah tool, dimulai dengan `/api/` apa pun nilai `BASE_PATH`. Tambahkan URL tersebut ke URL dasar instance Anda (`https://example.com/snapotter` + `/api/v1/download/...`) alih-alih me-resolve-nya terhadap root domain.
+
+Buka UI melalui URL berprefiks (`https://example.com/snapotter`). Browser yang datang tanpa prefiks akan diarahkan ke sana secara otomatis; hanya permintaan API yang diperkirakan mencapai aplikasi tanpa prefiks. Jika log mengatakan `Requests arrive under /snapotter/ but BASE_PATH is empty`, proxy Anda meneruskan prefiks yang tidak dideklarasikan `BASE_PATH`: setel `BASE_PATH` ke prefiks tersebut, atau hapus prefiks di proxy.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Tambahkan Proxy Host baru
@@ -530,6 +567,8 @@ server {
 3. Atur Scheme ke `http`, Forward Hostname ke `SnapOtter` (atau IP kontainer Anda), Forward Port ke `1349`
 4. Aktifkan dukungan WebSocket
 5. Di bawah Advanced, tambahkan: `client_max_body_size 500M;` dan `proxy_buffering off;`
+
+Header `Strict-Transport-Security` dari API diteruskan oleh NPM apa adanya; toggle HSTS di tab SSL bersifat opsional di atasnya.
 
 ### Traefik {#traefik}
 
@@ -546,6 +585,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik meneruskan header respons upstream tanpa perubahan, sehingga header `Strict-Transport-Security` dari API mencapai browser tanpa middleware `headers`. Jika Anda sudah menjalankan middleware yang menulis ulang header respons, pastikan middleware tersebut membiarkan header itu tetap utuh.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +601,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` menonaktifkan buffering respons, yang diperlukan untuk peristiwa kemajuan SSE (pemrosesan batch, alat AI, pemasangan fitur) dan untuk pengunduhan file besar agar dapat dilakukan streaming alih-alih terhenti. Batas waktu yang diperpanjang memungkinkan pengunggahan file besar selesai tanpa Caddy menutup koneksi lebih awal.
+`flush_interval -1` menonaktifkan buffering respons, yang diperlukan untuk peristiwa kemajuan SSE (pemrosesan batch, alat AI, pemasangan fitur) dan untuk pengunduhan file besar agar dapat dilakukan streaming alih-alih terhenti. Batas waktu yang diperpanjang memungkinkan pengunggahan file besar selesai tanpa Caddy menutup koneksi lebih awal. Caddy juga meneruskan header `Strict-Transport-Security` dari API tanpa diubah, jadi tidak ada direktif `header` yang diperlukan untuk HSTS.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +610,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 Catatan: Cloudflare memiliki batas unggahan 100 MB pada paket gratis. Atur `MAX_UPLOAD_SIZE_MB=100` agar cocok.
+
+Tunnel meneruskan header respons API, termasuk `Strict-Transport-Security`, jadi tidak diperlukan konfigurasi HSTS di dasbor (pengaturan HSTS edge milik Cloudflare sendiri bersifat opsional di atasnya).
+
+## Pemecahan masalah {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" tepat setelah start pertama yang gagal {#eai-again-after-failed-first-start}
+
+Jika `docker compose up -d` yang pertama gagal di tengah jalan (port yang sudah digunakan adalah penyebab umumnya), percobaan ulang `up -d` biasa dapat memulai kontainer aplikasi tanpa melampirkannya ke jaringan compose. Aplikasi lalu mengalami crash-loop dengan:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+sementara `docker ps` menunjukkan postgres sehat. Error itu nyata tetapi menunjuk kontainer yang salah: tanpa jaringan, DNS untuk hostname `postgres` tidak dapat di-resolve sama sekali, dan kebijakan restart mengulang kegagalan yang sama terus-menerus.
+
+Perbaiki apa pun yang membuat start pertama gagal (biasanya: bebaskan port), lalu paksa kontainer aplikasi dibuat ulang agar terhubung kembali ke jaringan:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: dapat dijangkau dari perangkat lain, tetapi tidak dari PC itu sendiri {#windows-wsl2-loopback}
+
+Dengan Docker yang berjalan di dalam WSL2 (pengaturan Windows yang umum), stack dapat dijangkau dari setiap mesin lain di jaringan Anda sementara `http://localhost:1349` timeout di host Windows itu sendiri, bahkan dengan mode jaringan mirror WSL diaktifkan. Port tersebut tidak pernah muncul di `netstat` Windows, dan tidak ada yang salah dengan kontainer.
+
+Buka aplikasi dari perangkat lain, atau dari dalam distro menggunakan alamatnya sendiri (`hostname -I` di shell WSL). Jika penerusan localhost kebetulan berfungsi pada versi WSL Anda, anggap itu sebagai bonus, bukan sesuatu yang diandalkan.
 
 ## CI/CD {#ci-cd}
 

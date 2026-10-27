@@ -1,6 +1,6 @@
 ---
 description: "Kombinera en eller flera bilder till ett PDF-dokument med alternativ för sidstorlek, orientering och målfilstorlek."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: c8a36bb65a34
 ---

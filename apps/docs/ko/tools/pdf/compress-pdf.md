@@ -1,6 +1,6 @@
 ---
 description: "내장된 이미지를 압축하여 PDF 파일 크기를 줄입니다."
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: 0d4bcd6775bc
 ---

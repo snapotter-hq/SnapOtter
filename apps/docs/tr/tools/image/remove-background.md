@@ -1,8 +1,8 @@
 ---
 description: "İsteğe bağlı efektlerle (bulanıklık, gölge, gradyan, özel arka plan) yapay zeka destekli arka plan kaldırma."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 59966a2154c6
+i18n_output_hash: 08c2679cef4e
 ---
 
 # Arka Planı Kaldır {#remove-background}
@@ -19,20 +19,12 @@ i18n_output_hash: 59966a2154c6
 
 ## Parametreler {#parameters}
 
+Aşama 1 arka planı kaldırır ve saydam PNG maskesini ve orijinal görüntüyü önbelleğe alır. Arka plan değiştirme, bulanıklık, açılır gölge ve çıktı biçimi dönüştürme [Aşama 2'de (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) uygulanır (ya da `remove-background` bir işlem hattı adımı veya toplu iş olarak çalıştırıldığında); bu alanları Aşama 1'e geçirmek 400 döndürür.
+
 | Parametre | Tür | Zorunlu | Varsayılan | Açıklama |
 |-----------|------|----------|---------|-------------|
 | file | file | Evet | - | Görsel dosyası (çok parçalı) |
 | model | string | Hayır | - | Kullanılacak yapay zeka model çeşidi |
-| backgroundType | string | Hayır | `"transparent"` | Şunlardan biri: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Hayır | - | Düz arka plan için hex rengi |
-| gradientColor1 | string | Hayır | - | Birinci gradyan rengi |
-| gradientColor2 | string | Hayır | - | İkinci gradyan rengi |
-| gradientAngle | number | Hayır | - | Derece cinsinden gradyan açısı |
-| blurEnabled | boolean | Hayır | - | Arka plan bulanıklık efektini etkinleştir |
-| blurIntensity | number | Hayır | - | Bulanıklık yoğunluğu (0-100) |
-| shadowEnabled | boolean | Hayır | - | Özne üzerinde açılır gölgeyi etkinleştir |
-| shadowOpacity | number | Hayır | - | Gölge opaklığı (0-100) |
-| outputFormat | string | Hayır | - | Çıktı biçimi: `png`, `webp` veya `avif` |
 | edgeRefine | integer | Hayır | - | Kenar iyileştirme seviyesi (0-3) |
 | decontaminate | boolean | Hayır | - | Kenarlardan renk taşmasını kaldır |
 
@@ -41,7 +33,7 @@ i18n_output_hash: 59966a2154c6
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Yanıt {#response}
@@ -91,24 +83,24 @@ Yapay zeka modelini yeniden çalıştırmadan arka plan efektlerini yeniden uygu
 | Parametre | Tür | Zorunlu | Varsayılan | Açıklama |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Evet | - | Efekt ayarlarını içeren JSON (aşağıya bakın) |
-| backgroundImage | file | Hayır | - | Özel arka plan görseli (backgroundType `image` olduğunda) |
+| backgroundImage | file | `backgroundType` değeri `image` olduğunda zorunlu | - | Özel arka plan görseli |
 
 #### Ayarlar JSON alanları {#settings-json-fields}
 
-| Alan | Tür | Zorunlu | Açıklama |
-|-------|------|----------|-------------|
-| jobId | string | Evet | Aşama 1'den iş kimliği |
-| filename | string | Evet | Aşama 1'den orijinal dosya adı |
-| backgroundType | string | Hayır | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Hayır | Düz arka plan için hex rengi |
-| gradientColor1 | string | Hayır | Birinci gradyan rengi |
-| gradientColor2 | string | Hayır | İkinci gradyan rengi |
-| gradientAngle | number | Hayır | Derece cinsinden gradyan açısı |
-| blurEnabled | boolean | Hayır | Arka plan bulanıklığını etkinleştir |
-| blurIntensity | number | Hayır | Bulanıklık yoğunluğu (0-100) |
-| shadowEnabled | boolean | Hayır | Açılır gölgeyi etkinleştir |
-| shadowOpacity | number | Hayır | Gölge opaklığı (0-100) |
-| outputFormat | string | Hayır | `png`, `webp` veya `avif` |
+| Alan | Tür | Zorunlu | Varsayılan | Açıklama |
+|-------|------|----------|---------|-------------|
+| jobId | string | Evet | - | Aşama 1'den iş kimliği |
+| filename | string | Evet | - | Aşama 1'den orijinal dosya adı |
+| backgroundType | string | Hayır | `"transparent"` | Şunlardan biri: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | `backgroundType` değeri `color` olduğunda zorunlu | - | Hex renk: `#RRGGBB` veya `#RGB` (`#` isteğe bağlı) |
+| gradientColor1 | string | `backgroundType` değeri `gradient` olduğunda zorunlu | - | Birinci gradyan rengi, `backgroundColor` gibi hex |
+| gradientColor2 | string | `backgroundType` değeri `gradient` olduğunda zorunlu | - | İkinci gradyan rengi, `backgroundColor` gibi hex |
+| gradientAngle | number | Hayır | - | Derece cinsinden gradyan açısı |
+| blurEnabled | boolean | Hayır | - | Öznenin arkasındaki orijinal arka planı bulanıklaştır (`backgroundType: "blur"` bunu zımnen içerir) |
+| blurIntensity | number | Hayır | - | Bulanıklık yoğunluğu (0-100) |
+| shadowEnabled | boolean | Hayır | - | Özne üzerinde açılır gölgeyi etkinleştir |
+| shadowOpacity | number | Hayır | `35` | Gölge opaklığı (0-100); `shadowEnabled` true olduğunda kullanılır |
+| outputFormat | string | Hayır | `"png"` | Çıktı biçimi: `png`, `webp` veya `avif` |
 
 ### Örnek İstek {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Hata: Arka Plan Kaldırma Süresi Doldu (410) {#error-background-removal-expired-410}
+
+Efektler uç noktası, Aşama 1'in `jobId` için sakladığı maskeden ve orijinal görselden çalışır. Saklanan çıktılar bir süre sonra temizlenir, bu yüzden iki çağrı arasında çok fazla zaman geçerse bunlar yok olur. Aşama 1'i aynı görselle yeniden çalıştırın ve döndürdüğü `jobId` değerini kullanın.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Saklanan bir dosyayı adlandıramayan bir `jobId` veya `filename` (bir yol ayırıcı, `..`, boş bir dize) 400 yanıtı verir.
 
 ## Notlar {#notes}
 

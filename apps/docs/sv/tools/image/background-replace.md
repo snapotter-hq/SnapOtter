@@ -1,6 +1,6 @@
 ---
 description: "Ersätt en bilds bakgrund med en enfärgad färg eller gradient med hjälp av AI."
-i18n_source_hash: 930fe8890e55
+i18n_source_hash: 03d2298daaa3
 i18n_provenance: human
 i18n_output_hash: 75ab367fd65d
 ---

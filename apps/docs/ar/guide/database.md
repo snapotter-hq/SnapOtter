@@ -1,6 +1,6 @@
 ---
 description: "مخطط قاعدة بيانات PostgreSQL، والجداول، وعمليات الترحيل، وإجراءات النسخ الاحتياطي في SnapOtter."
-i18n_source_hash: a68264552836
+i18n_source_hash: 331b11cd21d1
 i18n_provenance: machine
 i18n_output_hash: 2ee3b1bee0e9
 i18n_hash_version: 2

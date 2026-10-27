@@ -1,7 +1,7 @@
 ---
 description: "अंतर्निहित Tesseract या वैकल्पिक उच्च-सटीकता RapidOCR रनटाइम के साथ स्थानीय रूप से छवियों से पाठ निकालें।"
 i18n_output_hash: 79d324d33cc9
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

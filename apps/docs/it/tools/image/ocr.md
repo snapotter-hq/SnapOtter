@@ -1,7 +1,7 @@
 ---
 description: "Estrai testo dalle immagini localmente con Tesseract integrato o il runtime RapidOCR opzionale ad alta precisione."
 i18n_output_hash: 5c65c73856f7
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

@@ -1,8 +1,8 @@
 ---
 description: "Thiết lập cung cấp tài khoản SCIM 2.0 để đồng bộ người dùng và nhóm từ nhà cung cấp danh tính của bạn sang SnapOtter. Bao gồm Okta, Azure AD / Entra ID, và các tích hợp tùy chỉnh."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: cef23f72b1ff
+i18n_output_hash: b712eae4eaec
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP đang gửi hơn 1000 yêu cầu mỗi phút. Điều này thường xảy r
 ### Người dùng bị hủy cung cấp nhưng không bị xóa khỏi giao diện {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE là một quá trình vô hiệu hóa mềm. Người dùng bị vô hiệu hóa vẫn xuất hiện trong danh sách người dùng của admin với trạng thái đã tắt. Đây là thiết kế có chủ đích để dữ liệu của họ được bảo toàn. Vai trò của họ hiển thị là `disabled:<original-role>`.
+
+### Bộ lọc `externalId` bỏ sót người dùng đăng nhập bằng OIDC hoặc SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+Trước khi `externalId` của SCIM có cột riêng (`users.scim_external_id`), một thao tác `PUT` hoặc `PATCH` của SCIM trên một người dùng đã được liên kết qua đăng nhập OIDC hoặc SAML sẽ ghi id SCIM vào danh tính đăng nhập của người dùng đó. Bản di trú nâng cấp không thể phân biệt giá trị đó với một subject OIDC thật hoặc NameID SAML, nên nó để yên những người dùng đó. Với họ, `filter=externalId eq "..."` không trả về gì cho đến khi IdP gửi một cập nhật khác mang `externalId`.
+
+Nếu bạn không muốn chờ IdP, nhật ký kiểm toán có thể xác nhận id. SCIM ghi một hàng `SCIM_USER_PROVISIONED` với `externalId` mà nó đã tạo cho mỗi người dùng. Khi bạn đã ở bản phát hành có cột `scim_external_id`, hãy mở `psql` kết nối đến cơ sở dữ liệu SnapOtter ([hướng dẫn khôi phục tài khoản](./account-recovery.md#older-images-and-fallbacks) chỉ cách cho cả hai thiết lập) và xem trước những người dùng có danh tính đăng nhập vẫn bằng id đó:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Nếu danh sách có vẻ đúng, hãy sao chép id vào cột SCIM. Chạy nó bên trong `BEGIN;` và kiểm tra các hàng được trả về trước khi `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Lần chạy thứ hai sẽ không khớp gì. Bản cập nhật giữ nguyên `external_id`, vì một số IdP (trong đó có Okta) gửi cùng một id cho cả `sub` của OIDC và `externalId` của SCIM, và với họ thì việc xóa nó sẽ phá vỡ đăng nhập OIDC. Một người dùng có `external_id` thực sự là id SCIM lạc đã không khớp subject. Khi bật `OIDC_AUTO_LINK_USERS` (hoặc `SAML_AUTO_LINK_USERS`), lần đăng nhập tiếp theo của họ với email đã xác minh sẽ liên kết lại họ theo cách nào đi nữa.
+
+Một số người dùng vẫn nằm ngoài tầm với và lấy lại id từ cập nhật tiếp theo của IdP:
+
+- những người dùng mà liên kết đăng nhập của họ đã thay thế id SCIM và không có lần ghi SCIM nào sau đó, vì `external_id` của họ không còn khớp với hàng kiểm toán
+- những người dùng mà thời hạn lưu giữ nhật ký kiểm toán đã xóa mất hàng cung cấp của họ
+- những người dùng mà IdP đã thay đổi `externalId` sau khi tạo họ (các hàng cập nhật ghi lại trường nào đã thay đổi, không ghi giá trị)
+- hai người dùng cùng giữ một id, mà truy vấn bỏ qua để chỉ mục duy nhất không làm hỏng nó; bản xem trước không có mệnh đề cuối sẽ liệt kê họ, và việc ai sở hữu id là quyết định của bạn

@@ -1,7 +1,7 @@
 ---
 description: "AI 引擎参考，涵盖所有本地 ML 工具。抠图、放大、OCR、人脸检测、照片修复等。"
-i18n_output_hash: bf13c82eb496
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: ff4f3f1c541b
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -21,6 +21,7 @@ NVIDIA CUDA 由支持它的运行时自动检测和使用。 OCR 在每个主机
 快速 OCR 支持 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支持韩语 (`ko`)。韩语需要精确 OCR 包以及 `balanced` 或 `best`。该包可在官方 Linux amd64 和 arm64 容器上运行；即使是 NVIDIA 主机，OCR 仍使用 CPU。不受支持的系统会返回明确的兼容性错误，绝不会静默回退到 `fast`。韩语与 `fast` 或旧版 `tesseract` 别名的组合会在入队前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒绝。
 :::
 <!-- korean-ocr-contract:end -->
+
 ## 架构 {#architecture}
 
 ```
@@ -64,15 +65,16 @@ Docker 镜像随附应用程序以及通用运行时。大型模型归档会按�
 
 大多数人工智能工具都需要一个或多个功能包才能运行。 管理 UI 通过 `POST /api/v1/admin/tools/:toolId/features/install` 工具安装这些包，它解析完整的捆绑包列表，跳过已安装的捆绑包，并仅对缺少的下载进行排队。 例如，在新实例队列 `background-removal` 和 `face-detection` 上启用 Passport Photo； 在已安装后台删除后启用它仅排队 `face-detection`。 OCR 是例外，因为 `fast` 不需要包装； 通过 UI 或 `POST /api/v1/admin/features/ocr/install` 安装其可选的精确运行时。
 
-| 功能包 | 大小 | 共享依赖组 | 使用它的工具 |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet 抠图 | remove-background、passport-photo、transparency-fixer、background-replace、blur-background |
-| `face-detection` | 200-300 MB | MediaPipe 人脸检测与关键点 | blur-faces、red-eye-removal、smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa 图像修复/外扩与 DDColor | erase-object、colorize、ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN、GFPGAN / CodeFormer、降噪 | upscale、enhance-faces、noise-removal |
-| `photo-restoration` | 4-5 GB | 划痕修复与修复流水线 | restore-photo |
-| `ocr` | ~208-234 MiB 下载 / ~409-488 MiB 安装 | 可选 RapidOCR 3.9.1、ONNX Runtime 1.20.1 和固定 PP-OCR 型号 | ocr、ocr-pdf（仅限 `balanced` 和 `best`） |
-| `transcription` | ~600 MB | faster-whisper 语音转文本模型 | transcribe-audio、auto-subtitles |
+| 功能包 | 大小 | CPU 内存下限 | 共享依赖组 | 使用它的工具 |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM（约 2.5 GB 可用） | rembg / BiRefNet 抠图 | remove-background、passport-photo、transparency-fixer、background-replace、blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM（约 0.5 GB 可用） | MediaPipe 人脸检测与关键点 | blur-faces、red-eye-removal、smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM（约 2 GB 可用） | LaMa 图像修复/外扩与 DDColor | erase-object、colorize、ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM（约 6 GB 可用） | Stable Diffusion 1.5 高质量图像修复 | erase-object（`qualityMode: "hq"`） |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM（约 2.5 GB 可用） | RealESRGAN、GFPGAN / CodeFormer、降噪 | upscale、enhance-faces、noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM（约 3 GB 可用） | 划痕修复与修复流水线 | restore-photo |
+| `ocr` | ~208-234 MiB 下载 / ~409-488 MiB 安装 | 4 GiB 配置的有效内存（`fast` 可在 2 GB 上运行） | 可选 RapidOCR 3.9.1、ONNX Runtime 1.20.1 和固定 PP-OCR 模型 | ocr、ocr-pdf（仅限 `balanced` 和 `best`） |
+| `transcription` | ~600 MB | 4 GB RAM（约 2 GB 可用） | faster-whisper 语音转文本模型 | transcribe-audio、auto-subtitles |
 
 具有跨包依赖的工具：
 
@@ -83,7 +85,28 @@ Docker 镜像随附应用程序以及通用运行时。大型模型归档会按�
 
 仅当安装了工具所需的所有捆绑包（OCR 除外）后，该工具才可用：其内置 `fast` 层在没有可选 OCR 包的情况下仍然可用。 部分安装是有效的，并且是增量处理的：已安装的捆绑包被重用，丢失的捆绑包显示为下载，排队安装一次运行一个，因此共享的 Python 环境不会同时修改。
 
-### 准确的 OCR 运行时安装{#accurate-ocr-runtime-installation}
+### 一次性安装所有功能包 {#installing-every-bundle-at-once}
+
+设置中的 AI 功能页面有一个 **Install All** 按钮，会排队安装主机能够运行的所有功能包。它会跳过已经安装的内容，跳过被报告为与主机不兼容的功能包，并对失败的功能包重试一次后再继续。对于普通实例，这个按钮就是全部答案，下面的内容都不需要。
+
+先规划好磁盘空间。所有功能包安装后合计约 20-25 GB，它们会存放在数据卷的 `/data/ai` 中，而不是镜像里，因此能在 `docker compose down` 和重新创建容器后保留下来。每台主机只需安装一次，而不是每次升级都安装。
+
+在无人值守、没有人会去点击按钮的预配场景中，可以使用管理员 API 密钥将每个功能包 POST 到安装端点。服务器会将它们排队，因此可以一次性发送全部八个，无需等待：
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+每次调用都会返回 `202`，并带有 `jobId` 和 `queued` 标志：立即开始的那个为 `false`，其余为 `true`。已经安装的功能包会返回 `409`，可以安全忽略，因此这个循环可以重复运行。轮询 `GET /api/v1/features` 获取进度；运行结束时每个功能包都会显示 `installed`。
+
+有两件事需要提前了解。`ocr` 功能包会运行主机兼容性预检，并拒绝低于其签名最低要求的主机，因此它可能失败，而其他七个成功（参见[准确的 OCR 运行时安装](#accurate-ocr-runtime-installation)）。另外，只要有安装正在进行，`POST /api/v1/admin/features/reset` 就会返回 `409`，因此进行到一半的运行必须完成，或者必须重启容器，才能清空环境。
+
+### 准确的 OCR 运行时安装 {#accurate-ocr-runtime-installation}
 
 准确的 OCR 包是官方 Linux amd64 或 Linux arm64 容器的特定于平台的运行时。 amd64 构建使用 Python 3.12； arm64 版本使用 Python 3.11。 两个版本都通过 ONNX Runtime 的 `CPUExecutionProvider` 运行 RapidOCR，因此同一包可在仅 CPU 和 NVIDIA Docker 主机上运行。 准确的运行时需要至少 4 GiB 的有效内存：配置的容器 cgroup 限制，否则为主机内存。 低于该签名兼容性最低值的系统在下载前会被拒绝。 此要求不适用于内置 Fast OCR。 Bare-metal 构建被拒绝，因为它们的 libc 和 Python ABI 无法安全推断； 当主机提供 Tesseract 和 Ghostscript 时，快速 OCR 保持可用。
 
@@ -163,16 +186,16 @@ Docker 镜像随附应用程序以及通用运行时。大型模型归档会按�
 ## OCR / 文本提取 {#ocr-text-extraction}
 
 **工具路由：** `ocr`  
-**型号：** Tesseract (`fast`)； RapidOCR 与 PP-OCRv6 小型号（`balanced`）；具有校准变体评分的 PP-OCRv6 中型模型 (`best`)
+**模型：** Tesseract（`fast`）；使用 PP-OCRv6 小型模型的 RapidOCR（`balanced`）；使用 PP-OCRv6 中型模型并带有校准变体评分的 `best`
 
 | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态的 | 省略 `quality` 和 `engine` 时，SnapOtter 会按 `best`、`balanced`、`fast` 的顺序选择可用的最高质量层。韩语绝不会选择 `fast`；它会使用 `best`，其次是 `balanced`，否则返回精确运行时的安装或兼容性错误。 |
-| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko` |
-| `enhance` | 布尔值 | 取决于层级 | 提高局部对比度。快速直接应用；仅当校准得分提高 OCR 时，准确的等级才会保留变体。默认为“最佳” |
-| `engine` | 细绳 | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不加载 PaddlePaddle |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
+| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。快速层不支持 `ko` |
+| `enhance` | boolean | 取决于层级 | 提高局部对比度。快速层直接应用；精确层级只有在校准评分能改善 OCR 时才保留该变体。Best 默认开启 |
+| `engine` | string | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不会加载 PaddlePaddle |
 
-返回提取的文本以及来源元数据：引擎、请求的和实际的质量、设备、提供商、降级状态、警告和准确的运行时/模型版本（如果适用）。 明确的质量要求永远不会退回到另一层。 如果 `balanced` 或 `best` 不可用，则 API 返回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是静默运行 `fast`。
+返回提取的文本以及来源元数据：引擎、请求的和实际的质量、设备、提供商、降级状态、警告，以及适用时的精确运行时/模型版本。显式指定的质量层级绝不会回退到其他层级。如果 `balanced` 或 `best` 不可用，API 会返回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是静默运行 `fast`。显式指定 Fast 或旧版 `tesseract` 并搭配韩语时，会在作业入队前返回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"` 以及精确包的指引。
 
 ## PDF OCR {#pdf-ocr}
 
@@ -183,13 +206,13 @@ Docker 镜像随附应用程序以及通用运行时。大型模型归档会按�
 
 | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态的 | 省略 `quality` 和 `engine` 时，SnapOtter 会按 `best`、`balanced`、`fast` 的顺序选择可用的最高质量层。韩语绝不会选择 `fast`；它会使用 `best`，其次是 `balanced`，否则返回精确运行时的安装或兼容性错误。 |
-| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
+| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。快速层不支持 `ko` |
 | `pages` | string | `"all"` | 页面选择：`"all"`、`"1-3"`、`"1,3,5"` |
-| `enhance` | 布尔值 | 取决于层级 | 提高局部对比度。快速直接应用；仅当校准得分提高 OCR 时，准确的等级才会保留变体。默认为“最佳” |
-| `engine` | 细绳 | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不加载 PaddlePaddle |
+| `enhance` | boolean | 取决于层级 | 提高局部对比度。快速层直接应用；精确层级只有在校准评分能改善 OCR 时才保留该变体。Best 默认开启 |
+| `engine` | string | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不会加载 PaddlePaddle |
 
-同样的不降级规则适用于 PDF OCR。 PDF 页面在识别前会进行光栅化处理，一次请求最多可以选择50个页面。
+同样的不降级与韩语兼容性规则也适用于 PDF OCR。PDF 页面在识别前会先栅格化，单次请求最多可选择 50 页。
 
 ## 人脸 / PII 模糊 {#face-pii-blur}
 
@@ -357,7 +380,7 @@ Docker 镜像随附应用程序以及通用运行时。大型模型归档会按�
 | `sensitivity` | number (0-1) | `0.5` | 人脸检测阈值 |
 | `threshold` | integer (0-255) | `30` | 背景检测阈值（trim 模式） |
 | `padToSquare` | boolean | `false` | 将裁剪结果补齐为正方形 |
-| `padColor` | string | `"#ffffff"` | 正方形补齐的背景颜色 |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | 正方形补齐的背景颜色 |
 | `targetSize` | integer | - | 补齐输出的目标尺寸（像素） |
 | `quality` | integer (1-100) | - | 输出质量 |
 

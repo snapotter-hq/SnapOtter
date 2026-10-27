@@ -1,6 +1,6 @@
 ---
 description: "गुणवत्ता स्तर के अनुसार या किसी लक्षित फ़ाइल आकार तक छवि फ़ाइल आकार कम करें।"
-i18n_source_hash: 342c5cf1f864
+i18n_source_hash: e1cc52597983
 i18n_provenance: human
 i18n_output_hash: 1f185a4e5191
 ---

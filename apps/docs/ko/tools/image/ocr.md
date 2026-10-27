@@ -1,7 +1,7 @@
 ---
 description: "내장된 Tesseract 또는 선택적인 고정밀 RapidOCR 런타임을 사용하여 이미지에서 로컬로 텍스트를 추출합니다."
 i18n_output_hash: 8320ed5125e7
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

@@ -187,7 +187,7 @@
   "faq.q3.q": "Heb ik een internetverbinding nodig?",
   "faq.q4.a": "Geen kunstmatige limieten. Je kunt zoveel bestanden verwerken als je wilt, van elke grootte. De enige beperking zijn de hardwarebronnen van je server.",
   "faq.q4.q": "Zijn er beperkingen op bestandsgrootte of gebruik?",
-  "faq.q5.a": "SnapOtter bevat 19 lokale AI-tools voor het verwijderen van achtergronden, upscalen, OCR, transcriptie, gezichtsherkenning, inkleuren, ruisverwijdering, fotorestauratie en meer. Alle modellen draaien op je eigen hardware.",
+  "faq.q5.a": "SnapOtter bevat 19 lokale AI-tools voor achtergrondverwijdering, upscaling, OCR, transcriptie, gezichtsdetectie, inkleuring, ruisverwijdering, fotorestauratie en meer. Alle modellen draaien op je eigen hardware (2 GB RAM draait de niet-AI-tools, Fast OCR en gezichtsdetectie; CPU AI-bundels vereisen 4 GB+ RAM, of 8 GB voor HQ-inpainting).",
   "faq.q5.q": "Welke AI-functies zijn inbegrepen?",
   "faq.q6.a": "Anonieme productanalyses staan standaard aan en bevatten nooit je bestanden of hun inhoud. Zet het op elk moment uit met een schakelaar voor beheerders onder Instellingen > Systeem > Privacy.",
   "faq.q6.q": "Verzamelt SnapOtter analysegegevens?",

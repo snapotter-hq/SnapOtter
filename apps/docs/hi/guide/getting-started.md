@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter को एक ही कमांड में Docker के साथ इंस्टॉल करें। इसमें Docker Compose सेटअप, सोर्स से बिल्ड करना, और एक पूर्ण फ़ीचर अवलोकन शामिल है।"
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: 16dd84c66bc6
 i18n_hash_version: 2

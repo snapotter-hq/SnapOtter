@@ -1,6 +1,6 @@
 ---
 description: "Các thẻ image Docker của SnapOtter, benchmark GPU, ghim phiên bản và hỗ trợ đa nền tảng cho AMD64 và ARM64."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: 912c4849a48b
 i18n_hash_version: 2

@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter Docker-image-tags, GPU-benchmarks, versievastzetting en multiplatformondersteuning voor AMD64 en ARM64."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: 7d7635cbf7a2
 i18n_hash_version: 2

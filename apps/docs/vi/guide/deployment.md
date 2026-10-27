@@ -1,8 +1,8 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production với Docker. Yêu cầu phần cứng, cài đặt GPU, và cấu hình reverse proxy cho Nginx, Traefik, và Cloudflare."
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: 661a8ffded8e
+i18n_output_hash: da48d69dd40e
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,15 @@ Có hai điều cần biết trước khi bạn bắt tay đo IP của client. D
 
 Hai điều quan trọng đối với mọi proxy bên dưới: cho phép nội dung yêu cầu lớn (tải lên) và không đệm phản hồi. Proxy đệm phản hồi sẽ phá vỡ tiến trình SSE và rõ ràng hơn là khiến quá trình tải xuống tệp lớn "bắt đầu nhưng không bao giờ kết thúc", vì proxy giữ toàn bộ tệp trước khi chuyển nó đi. SnapOtter gửi `X-Accel-Buffering: no` khi tải xuống để nginx truyền phát chúng ngay cả khi bộ đệm được để ở nơi khác, nhưng các proxy khác ngoài nginx cần tắt bộ đệm phản hồi một cách rõ ràng (hiển thị trong từng cấu hình bên dưới). Nếu quá trình tải xuống bị đình trệ giữa chừng, proxy đệm ở phía trước là điều đầu tiên cần kiểm tra.
 
+Một lưu ý về HSTS: API tự gửi `Strict-Transport-Security` trên mỗi phản hồi, nên một proxy truyền nguyên các header phản hồi (mọi cấu hình bên dưới đều làm vậy) không cần thiết lập HSTS riêng. Chỉ khi proxy của bạn được cấu hình để loại bỏ hoặc ghi đè các header phản hồi từ upstream thì bạn mới cần giữ lại header đó hoặc thêm lại nó ở biên.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # Hiển thị HTTP thuần cho gọn. Hãy kết thúc TLS trong khối máy chủ
+    # `listen 443 ssl` của riêng bạn; header Strict-Transport-Security mà API gửi
+    # được truyền qua với mọi phản hồi được proxy, nên không cần add_header ở đó.
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +528,37 @@ server {
 }
 ```
 
+### Triển khai dưới đường dẫn con {#subpath}
+
+Để phục vụ `https://example.com/snapotter`, hãy đặt `BASE_PATH=/snapotter` trong môi trường container SnapOtter và khởi động lại nó. Các tệp Compose CPU và GPU chính thức cũng chấp nhận `BASE_PATH` từ shell hoặc tệp `.env` của Compose. Cùng một image hoạt động ở bất kỳ đường dẫn nào; không cần xây dựng lại frontend.
+
+`BASE_PATH` chấp nhận các phân đoạn phân tách bằng dấu gạch chéo chứa chữ cái, chữ số, `_` hoặc `-`, bao gồm các đường dẫn lồng nhau như `/apps/snapotter`. Dấu gạch chéo cuối là tùy chọn. Để trống (mặc định), hoặc đặt `/`, cho triển khai ở gốc.
+
+Trong khối máy chủ HTTPS Nginx hiện có của bạn, hãy dùng:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+Ví dụ này giữ nguyên tiền tố. Các proxy loại bỏ `/snapotter` trước khi chuyển tiếp cũng được hỗ trợ. Các kiểm tra sức khỏe nội bộ có thể tiếp tục dùng `/api/v1/health`. Đối với OIDC hoặc SAML, hãy đặt thêm `EXTERNAL_URL=https://example.com/snapotter` và cập nhật URL callback của nhà cung cấp danh tính để bao gồm `/snapotter/api/auth/oidc/callback` hoặc `/snapotter/api/auth/saml/callback` tương ứng.
+
+Các script API tiếp tục hoạt động không thay đổi: URL trong phản hồi API, chẳng hạn `downloadUrl` của một công cụ, bắt đầu bằng `/api/` bất kể `BASE_PATH` là gì. Hãy nối chúng vào URL gốc của thực thể (`https://example.com/snapotter` + `/api/v1/download/...`) thay vì phân giải chúng theo gốc miền.
+
+Mở giao diện qua URL có tiền tố (`https://example.com/snapotter`). Trình duyệt truy cập mà không có tiền tố sẽ được tự động chuyển đến đó; chỉ các yêu cầu API mới được mong đợi đến ứng dụng mà không có tiền tố. Nếu nhật ký hiển thị `Requests arrive under /snapotter/ but BASE_PATH is empty`, proxy của bạn đang chuyển tiếp một tiền tố mà `BASE_PATH` không khai báo: hãy đặt `BASE_PATH` thành tiền tố đó, hoặc loại bỏ tiền tố tại proxy.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Thêm một Proxy Host mới
@@ -530,6 +566,8 @@ server {
 3. Đặt Scheme thành `http`, Forward Hostname thành `SnapOtter` (hoặc IP container của bạn), Forward Port thành `1349`
 4. Bật hỗ trợ WebSocket
 5. Trong mục Advanced, thêm: `client_max_body_size 500M;` và `proxy_buffering off;`
+
+Header `Strict-Transport-Security` của API được truyền qua NPM nguyên vẹn; công tắc HSTS trên tab SSL là tùy chọn thêm vào đó.
 
 ### Traefik {#traefik}
 
@@ -546,6 +584,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik chuyển tiếp nguyên vẹn các header phản hồi từ upstream, nên header `Strict-Transport-Security` của API đến được trình duyệt mà không cần middleware `headers`. Nếu bạn đã chạy một middleware viết lại các header phản hồi, hãy đảm bảo nó giữ nguyên header đó.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +600,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` vô hiệu hóa bộ đệm phản hồi, cần thiết cho các sự kiện tiến trình SSE (xử lý hàng loạt, công cụ AI, cài đặt tính năng) và để tải xuống tệp lớn để truyền phát thay vì bị đình trệ. Thời gian chờ kéo dài cho phép hoàn tất quá trình tải lên tệp lớn mà không cần Caddy đóng kết nối sớm.
+`flush_interval -1` vô hiệu hóa bộ đệm phản hồi, cần thiết cho các sự kiện tiến trình SSE (xử lý hàng loạt, công cụ AI, cài đặt tính năng) và để tải xuống tệp lớn để truyền phát thay vì bị đình trệ. Thời gian chờ kéo dài cho phép hoàn tất quá trình tải lên tệp lớn mà không cần Caddy đóng kết nối sớm. Caddy cũng truyền nguyên header `Strict-Transport-Security` của API, nên không cần chỉ thị `header` nào cho HSTS.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +609,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 Lưu ý: Cloudflare có giới hạn tải lên 100 MB trên các gói miễn phí. Đặt `MAX_UPLOAD_SIZE_MB=100` cho khớp.
+
+Đường hầm chuyển tiếp các header phản hồi của API, bao gồm cả `Strict-Transport-Security`, nên không cần cấu hình HSTS nào trong dashboard (thiết lập HSTS ở biên của chính Cloudflare là tùy chọn thêm vào).
+
+## Khắc phục sự cố {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" ngay sau lần khởi động đầu tiên thất bại {#eai-again-after-failed-first-start}
+
+Nếu lần `docker compose up -d` đầu tiên thất bại giữa chừng (lý do thường gặp là một cổng đã được sử dụng), việc thử lại bằng `up -d` thông thường có thể khởi động container ứng dụng mà không gắn nó vào mạng compose. Ứng dụng sau đó sẽ lặp đi lặp lại việc khởi động lại với:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+trong khi `docker ps` cho thấy postgres khỏe mạnh. Lỗi là thật nhưng chỉ sai container: nếu không có mạng, DNS cho tên máy chủ `postgres` hoàn toàn không thể phân giải, và chính sách khởi động lại sẽ lặp lại lỗi tương tự mãi mãi.
+
+Hãy sửa nguyên nhân khiến lần khởi động đầu tiên thất bại (thường là: giải phóng cổng), rồi buộc container ứng dụng được tạo lại để nó gắn lại vào mạng:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: truy cập được từ thiết bị khác, nhưng không từ chính PC {#windows-wsl2-loopback}
+
+Khi Docker chạy bên trong WSL2 (thiết lập Windows thông thường), ngăn xếp có thể truy cập được từ mọi máy khác trên mạng của bạn trong khi `http://localhost:1349` hết thời gian chờ trên chính máy chủ Windows, ngay cả khi chế độ mạng phản chiếu (mirrored networking) của WSL được bật. Cổng không bao giờ xuất hiện trong `netstat` của Windows, và không có gì sai với các container.
+
+Hãy mở ứng dụng từ một thiết bị khác, hoặc từ bên trong bản phân phối bằng địa chỉ của chính nó (`hostname -I` trong shell WSL). Nếu chuyển tiếp localhost tình cờ hoạt động trên phiên bản WSL của bạn, hãy coi đó là điểm cộng chứ không phải thứ để dựa vào.
 
 ## CI/CD {#ci-cd}
 

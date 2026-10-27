@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutla kurun. Docker Compose kurulumu, kaynaktan derleme ve tam özellik genel bakışı içerir."
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: aea71ee46492
 i18n_hash_version: 2

@@ -1,6 +1,6 @@
 ---
 description: "Pasang SnapOtter dengan Docker dalam satu perintah. Termasuk penyiapan Docker Compose, membangun dari sumber, dan gambaran lengkap fitur."
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: fbe4a9bf48c8
 i18n_hash_version: 2

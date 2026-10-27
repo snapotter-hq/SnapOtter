@@ -1,8 +1,8 @@
 ---
 description: "مولّد صور جوازات السفر وبطاقات الهوية المدعوم بالذكاء الاصطناعي مع كشف الوجه وإزالة الخلفية وترتيب أوراق الطباعة."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 455734f143be
+i18n_output_hash: c82018ebf46d
 ---
 
 # صورة جواز السفر {#passport-photo}
@@ -92,7 +92,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | documentType | string | لا | `"passport"` | نوع المستند (من مواصفات الدولة) |
 | bgColor | string | لا | `"#FFFFFF"` | لون الخلفية بصيغة hex |
 | printLayout | string | لا | `"none"` | تخطيط ورق الطباعة: `none`، `4x6`، `a4` |
-| maxFileSizeKb | number | لا | `0` | قيد أقصى حجم للملف بالكيلوبايت (0 = بلا حد) |
+| maxFileSizeKb | number | لا | `0` | قيد أقصى حجم للملف بالكيلوبايت، حيث 1 كيلوبايت = 1000 بايت (0 = بلا حد) |
 | dpi | number | لا | `300` | دقة الإخراج DPI (72-1200) |
 | customWidthMm | number | لا | - | عرض الصورة المخصص بالمليمتر (يتجاوز مواصفات الدولة) |
 | customHeightMm | number | لا | - | ارتفاع الصورة المخصص بالمليمتر (يتجاوز مواصفات الدولة) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### خطأ: انتهت صلاحية التحليل (410) {#error-analysis-expired-410}
+
+يعمل Generate من الصورة منزوعة الخلفية التي خزّنها analyze لـ `jobId`. تُنظَّف المخرجات المخزَّنة بعد فترة، لذا إذا مرّ وقت طويل بين الاستدعاءين، تكون تلك الصورة قد ذهبت. استدعِ analyze مرة أخرى بالصورة نفسها واستخدم `jobId` الذي يعيده.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+`jobId` أو `filename` لا يستطيع تسمية ملف مخزَّن (فاصل مسار، أو `..`، أو نص فارغ) يعيد 400.
+
 ---
 
 ### المسار الأساسي {#base-route}
@@ -170,4 +183,4 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 - حقل `preview` في استجابة التحليل هو صورة PNG مُرمَّزة بترميز base64 (أقصى عرض 800 بكسل) للعرض السريع.
 - تتضمن مواصفات الدول أبعاد المستند ونسب ارتفاع الرأس وتموضع خط العين استنادًا إلى المتطلبات الرسمية لصور جوازات السفر.
 - يولّد خيار `printLayout` ورقة مرتّبة على ورق مقاس 4x6 بوصة أو A4 مع فواصل بمقدار 2 مليمتر بين الصور.
-- عند ضبط `maxFileSizeKb`، يُضغط الإخراج بشكل تكراري ليناسب حد الحجم.
+- عند ضبط `maxFileSizeKb`، تُخفَّض جودة JPEG في الإخراج خطوة بخطوة حتى يناسب الحجم. حجم البكسل ثابت وفق مواصفات الدولة، لذا إذا لم تكن الصورة مناسبة حتى عند أدنى جودة، يُرجع `/generate` رمز 422 مع رسالة توضح ذلك، بدلًا من ملف يتجاوز الحد.

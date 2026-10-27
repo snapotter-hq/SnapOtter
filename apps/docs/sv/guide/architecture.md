@@ -1,6 +1,6 @@
 ---
 description: "Monorepo-struktur, app- och paketarkitektur, förfrågningslivscykel och resursavtryck för SnapOtter."
-i18n_source_hash: 50e076925c4b
+i18n_source_hash: 9a22dc09e976
 i18n_provenance: human
 i18n_output_hash: 4691aa895e15
 i18n_hash_version: 2

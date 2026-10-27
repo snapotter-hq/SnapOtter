@@ -187,7 +187,7 @@
   "faq.q3.q": "Czy potrzebuję połączenia z internetem?",
   "faq.q4.a": "Bez sztucznych limitów. Możesz przetwarzać dowolną liczbę plików o dowolnym rozmiarze. Jedynym ograniczeniem są zasoby sprzętowe Twojego serwera.",
   "faq.q4.q": "Czy są jakieś ograniczenia rozmiaru plików lub użycia?",
-  "faq.q5.a": "SnapOtter zawiera 19 lokalnych narzędzi AI do usuwania tła, powiększania, OCR, transkrypcji, wykrywania twarzy, koloryzacji, usuwania szumów, renowacji zdjęć i więcej. Wszystkie modele działają na Twoim sprzęcie.",
+  "faq.q5.a": "SnapOtter zawiera 19 lokalnych narzędzi AI do usuwania tła, skalowania w górę, OCR, transkrypcji, wykrywania twarzy, koloryzacji, usuwania szumów, renowacji zdjęć i nie tylko. Wszystkie modele działają na Twoim sprzęcie (2 GB RAM wystarcza dla narzędzi bez AI, Fast OCR i wykrywania twarzy; pakiety AI dla CPU wymagają 4 GB+ RAM lub 8 GB do inpaintingu HQ).",
   "faq.q5.q": "Jakie funkcje AI są dostępne?",
   "faq.q6.a": "Anonimowa analityka produktu jest domyślnie włączona i nigdy nie obejmuje Twoich plików ani ich zawartości. Wyłączysz ją w dowolnej chwili jednym kliknięciem przełącznika administratora w Ustawieniach > System > Prywatność.",
   "faq.q6.q": "Czy SnapOtter zbiera jakiekolwiek dane analityczne?",

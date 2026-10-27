@@ -1,8 +1,8 @@
 ---
 description: "AI-aangedreven achtergrondverwijdering met optionele effecten (vervaging, schaduw, verloop, aangepaste achtergrond)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: b93aa329e2fa
+i18n_output_hash: 9d0a3f509290
 ---
 
 # Remove Background {#remove-background}
@@ -19,20 +19,12 @@ AI-aangedreven achtergrondverwijdering met optionele effecten (vervaging, schadu
 
 ## Parameters {#parameters}
 
+Fase 1 verwijdert de achtergrond en slaat het transparante PNG-masker en de originele afbeelding op in de cache. Achtergrondvervanging, vervaging, slagschaduw en conversie van het uitvoerformaat worden toegepast in [Fase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (of wanneer je `remove-background` als pijplijnstap of batchtaak uitvoert); als je die velden aan Fase 1 meegeeft, krijg je een 400.
+
 | Parameter | Type | Vereist | Standaard | Beschrijving |
 |-----------|------|----------|---------|-------------|
 | file | file | Ja | - | Afbeeldingsbestand (multipart) |
 | model | string | Nee | - | Te gebruiken AI-modelvariant |
-| backgroundType | string | Nee | `"transparent"` | Een van: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nee | - | Hex-code voor een effen achtergrond |
-| gradientColor1 | string | Nee | - | Eerste verloopkleur |
-| gradientColor2 | string | Nee | - | Tweede verloopkleur |
-| gradientAngle | number | Nee | - | Verloophoek in graden |
-| blurEnabled | boolean | Nee | - | Achtergrondvervagingseffect inschakelen |
-| blurIntensity | number | Nee | - | Vervagingsintensiteit (0-100) |
-| shadowEnabled | boolean | Nee | - | Slagschaduw op het onderwerp inschakelen |
-| shadowOpacity | number | Nee | - | Ondoorzichtigheid van de schaduw (0-100) |
-| outputFormat | string | Nee | - | Uitvoerformaat: `png`, `webp` of `avif` |
 | edgeRefine | integer | Nee | - | Niveau van randverfijning (0-3) |
 | decontaminate | boolean | Nee | - | Kleurdoorbloeding aan de randen verwijderen |
 
@@ -41,7 +33,7 @@ AI-aangedreven achtergrondverwijdering met optionele effecten (vervaging, schadu
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -91,24 +83,24 @@ Past achtergrondeffecten opnieuw toe zonder het AI-model opnieuw te draaien. Geb
 | Parameter | Type | Vereist | Standaard | Beschrijving |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Ja | - | JSON met effectinstellingen (zie hieronder) |
-| backgroundImage | file | Nee | - | Aangepaste achtergrondafbeelding (wanneer backgroundType `image` is) |
+| backgroundImage | file | Vereist wanneer `backgroundType` `image` is | - | Aangepaste achtergrondafbeelding |
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Veld | Type | Vereist | Beschrijving |
-|-------|------|----------|-------------|
-| jobId | string | Ja | Job-ID uit Fase 1 |
-| filename | string | Ja | Oorspronkelijke bestandsnaam uit Fase 1 |
-| backgroundType | string | Nee | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nee | Hex-code voor een effen achtergrond |
-| gradientColor1 | string | Nee | Eerste verloopkleur |
-| gradientColor2 | string | Nee | Tweede verloopkleur |
-| gradientAngle | number | Nee | Verloophoek in graden |
-| blurEnabled | boolean | Nee | Achtergrondvervaging inschakelen |
-| blurIntensity | number | Nee | Vervagingsintensiteit (0-100) |
-| shadowEnabled | boolean | Nee | Slagschaduw inschakelen |
-| shadowOpacity | number | Nee | Ondoorzichtigheid van de schaduw (0-100) |
-| outputFormat | string | Nee | `png`, `webp` of `avif` |
+| Veld | Type | Vereist | Standaard | Beschrijving |
+|-------|------|----------|---------|-------------|
+| jobId | string | Ja | - | Job-ID uit Fase 1 |
+| filename | string | Ja | - | Oorspronkelijke bestandsnaam uit Fase 1 |
+| backgroundType | string | Nee | `"transparent"` | Een van: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Vereist wanneer `backgroundType` `color` is | - | Hex-kleur: `#RRGGBB` of `#RGB` (de `#` is optioneel) |
+| gradientColor1 | string | Vereist wanneer `backgroundType` `gradient` is | - | Eerste verloopkleur, hex zoals `backgroundColor` |
+| gradientColor2 | string | Vereist wanneer `backgroundType` `gradient` is | - | Tweede verloopkleur, hex zoals `backgroundColor` |
+| gradientAngle | number | Nee | - | Verloophoek in graden |
+| blurEnabled | boolean | Nee | - | Vervaag de originele achtergrond achter het onderwerp (`backgroundType: "blur"` impliceert dit) |
+| blurIntensity | number | Nee | - | Vervagingsintensiteit (0-100) |
+| shadowEnabled | boolean | Nee | - | Slagschaduw op het onderwerp inschakelen |
+| shadowOpacity | number | Nee | `35` | Dekking van de schaduw (0-100), gebruikt wanneer `shadowEnabled` true is |
+| outputFormat | string | Nee | `"png"` | Uitvoerformaat: `png`, `webp` of `avif` |
 
 ### Example Request {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Fout: achtergrondverwijdering verlopen (410) {#error-background-removal-expired-410}
+
+Het effects-endpoint werkt met het masker en het origineel dat Fase 1 voor `jobId` heeft opgeslagen. Opgeslagen uitvoer wordt na verloop van tijd opgeruimd, dus als er te veel tijd tussen de twee aanroepen zit, zijn ze weg. Voer Fase 1 opnieuw uit met dezelfde afbeelding en gebruik de `jobId` die het teruggeeft.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Een `jobId` of `filename` die geen opgeslagen bestand kan aanwijzen (een padscheidingsteken, `..`, een lege string) antwoordt met 400.
 
 ## Notes {#notes}
 

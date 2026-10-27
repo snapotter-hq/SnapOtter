@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter의 PostgreSQL 데이터베이스 스키마, 테이블, 마이그레이션, 백업 절차."
-i18n_source_hash: a68264552836
+i18n_source_hash: 331b11cd21d1
 i18n_provenance: machine
 i18n_output_hash: 469f8d270e1f
 i18n_hash_version: 2

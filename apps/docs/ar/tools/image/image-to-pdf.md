@@ -1,6 +1,6 @@
 ---
 description: "دمج صورة واحدة أو أكثر في مستند PDF مع خيارات حجم الصفحة والاتجاه وحجم الملف المستهدف."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: a56718b49ca3
 ---

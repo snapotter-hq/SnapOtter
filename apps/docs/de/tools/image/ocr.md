@@ -1,7 +1,7 @@
 ---
 description: "Extrahieren Sie Text lokal aus Bildern mit dem integrierten Tesseract oder der optionalen hochpräzisen RapidOCR-Laufzeitumgebung."
 i18n_output_hash: 7455d3e3f8ff
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

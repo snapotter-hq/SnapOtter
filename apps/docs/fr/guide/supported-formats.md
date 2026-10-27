@@ -1,6 +1,6 @@
 ---
 description: "Formats de fichiers pris en charge dans toutes les modalités - plus de 55 formats d'image en entrée, vidéo, audio, PDF et formats de fichiers."
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: 36025f0773ef
 ---

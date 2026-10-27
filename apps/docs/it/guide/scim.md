@@ -1,8 +1,8 @@
 ---
 description: "Configura il provisioning SCIM 2.0 per sincronizzare utenti e gruppi dal tuo provider di identità a SnapOtter. Copre Okta, Azure AD / Entra ID e integrazioni personalizzate."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: d6bde5a4dbac
+i18n_output_hash: ab6a2dbf049a
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ L'IdP sta inviando più di 1000 richieste al minuto. Questo accade tipicamente d
 ### Utenti deprovisionati ma non rimossi dalla UI {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE è una disattivazione soft. Gli utenti disattivati compaiono ancora nell'elenco utenti admin con uno stato disabilitato. Questo è intenzionale, in modo da preservare i loro dati. Il loro ruolo appare come `disabled:<original-role>`.
+
+### Il filtro `externalId` non trova un utente che accede con OIDC o SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+Prima che `externalId` di SCIM avesse una propria colonna (`users.scim_external_id`), un `PUT` o `PATCH` SCIM su un utente già collegato tramite accesso OIDC o SAML scriveva l'id SCIM nell'identità di accesso di quell'utente. La migrazione di aggiornamento non è in grado di distinguere quel valore da un vero subject OIDC o NameID SAML, quindi lascia quegli utenti invariati. Per loro, `filter=externalId eq "..."` non restituisce nulla finché l'IdP non invia un altro aggiornamento che contiene `externalId`.
+
+Se preferisci non aspettare l'IdP, il log di audit può attestare l'id. SCIM scrive una riga `SCIM_USER_PROVISIONED` con l'`externalId` con cui ha creato ogni utente. Una volta passato a una release che include la colonna `scim_external_id`, apri `psql` sul database SnapOtter (la [guida al recupero dell'account](./account-recovery.md#older-images-and-fallbacks) mostra come fare per entrambe le configurazioni) e visualizza in anteprima gli utenti la cui identità di accesso coincide ancora con quell'id:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Se l'elenco sembra corretto, copia l'id nella colonna SCIM. Esegui l'operazione dentro `BEGIN;` e controlla le righe restituite prima di eseguire `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Una seconda esecuzione non trova più nulla. L'aggiornamento lascia `external_id` com'è, perché alcuni IdP (tra cui Okta) inviano lo stesso id sia come `sub` OIDC sia come `externalId` SCIM, e per loro cancellarlo interromperebbe l'accesso OIDC. Un utente il cui `external_id` è davvero l'id SCIM estraneo non supera comunque la corrispondenza del subject. Con `OIDC_AUTO_LINK_USERS` (o `SAML_AUTO_LINK_USERS`) attivo, il suo accesso successivo con un'email verificata lo ricollega in ogni caso.
+
+Alcuni utenti restano fuori portata e riprendono l'id dall'aggiornamento successivo dell'IdP:
+
+- utenti il cui collegamento di accesso ha sostituito l'id SCIM e che non hanno ricevuto successive scritture SCIM, poiché il loro `external_id` non corrisponde più alla riga di audit
+- utenti la cui riga di provisioning è già stata eliminata dalla conservazione del log di audit
+- utenti il cui `externalId` è stato modificato dall'IdP dopo la creazione (le righe di aggiornamento registrano quali campi sono cambiati, non i loro valori)
+- due utenti che condividono lo stesso id, che la query salta per evitare che l'indice univoco la interrompa; l'anteprima senza la sua ultima clausola li elenca, e stabilire quale dei due possiede l'id spetta a te

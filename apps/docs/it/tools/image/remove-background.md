@@ -1,8 +1,8 @@
 ---
 description: "Rimozione dello sfondo basata sull'AI con effetti opzionali (sfocatura, ombra, gradiente, sfondo personalizzato)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 48bebed76372
+i18n_output_hash: dad99fea9f5b
 ---
 
 # Remove Background {#remove-background}
@@ -19,20 +19,12 @@ Rimozione dello sfondo basata sull'AI con effetti opzionali (sfocatura, ombra, g
 
 ## Parameters {#parameters}
 
+La Fase 1 rimuove lo sfondo e memorizza in cache la maschera PNG trasparente e l'immagine originale. La sostituzione dello sfondo, la sfocatura, l'ombra esterna e la conversione del formato di output vengono applicate nella [Fase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (oppure quando `remove-background` viene eseguito come passaggio di una pipeline o come job batch); passare questi campi alla Fase 1 restituisce 400.
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | File immagine (multipart) |
 | model | string | No | - | Variante del modello AI da usare |
-| backgroundType | string | No | `"transparent"` | Uno tra: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | - | Colore esadecimale per lo sfondo pieno |
-| gradientColor1 | string | No | - | Primo colore del gradiente |
-| gradientColor2 | string | No | - | Secondo colore del gradiente |
-| gradientAngle | number | No | - | Angolo del gradiente in gradi |
-| blurEnabled | boolean | No | - | Abilita l'effetto di sfocatura dello sfondo |
-| blurIntensity | number | No | - | Intensità della sfocatura (0-100) |
-| shadowEnabled | boolean | No | - | Abilita l'ombra esterna sul soggetto |
-| shadowOpacity | number | No | - | Opacità dell'ombra (0-100) |
-| outputFormat | string | No | - | Formato di output: `png`, `webp`, o `avif` |
 | edgeRefine | integer | No | - | Livello di rifinitura dei bordi (0-3) |
 | decontaminate | boolean | No | - | Rimuovi lo sbordamento di colore dai bordi |
 
@@ -41,7 +33,7 @@ Rimozione dello sfondo basata sull'AI con effetti opzionali (sfocatura, ombra, g
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -91,24 +83,24 @@ Riapplica gli effetti di sfondo senza rieseguire il modello AI. Usa la maschera 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | JSON con le impostazioni degli effetti (vedi sotto) |
-| backgroundImage | file | No | - | Immagine di sfondo personalizzata (quando backgroundType è `image`) |
+| backgroundImage | file | Obbligatorio quando `backgroundType` è `image` | - | Immagine di sfondo personalizzata (quando backgroundType è `image`) |
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| jobId | string | Yes | ID del job dalla Fase 1 |
-| filename | string | Yes | Nome file originale dalla Fase 1 |
-| backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | Colore esadecimale per lo sfondo pieno |
-| gradientColor1 | string | No | Primo colore del gradiente |
-| gradientColor2 | string | No | Secondo colore del gradiente |
-| gradientAngle | number | No | Angolo del gradiente in gradi |
-| blurEnabled | boolean | No | Abilita la sfocatura dello sfondo |
-| blurIntensity | number | No | Intensità della sfocatura (0-100) |
-| shadowEnabled | boolean | No | Abilita l'ombra esterna |
-| shadowOpacity | number | No | Opacità dell'ombra (0-100) |
-| outputFormat | string | No | `png`, `webp`, o `avif` |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Yes | - | ID del job dalla Fase 1 |
+| filename | string | Yes | - | Nome file originale dalla Fase 1 |
+| backgroundType | string | No | `"transparent"` | `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Obbligatorio quando `backgroundType` è `color` | - | Colore esadecimale per lo sfondo pieno: `#RRGGBB` o `#RGB` (il `#` è facoltativo) |
+| gradientColor1 | string | Obbligatorio quando `backgroundType` è `gradient` | - | Primo colore del gradiente, esadecimale come `backgroundColor` |
+| gradientColor2 | string | Obbligatorio quando `backgroundType` è `gradient` | - | Secondo colore del gradiente, esadecimale come `backgroundColor` |
+| gradientAngle | number | No | - | Angolo del gradiente in gradi |
+| blurEnabled | boolean | No | - | Sfoca lo sfondo originale dietro il soggetto (`backgroundType: "blur"` lo implica) |
+| blurIntensity | number | No | - | Intensità della sfocatura (0-100) |
+| shadowEnabled | boolean | No | - | Abilita l'ombra esterna |
+| shadowOpacity | number | No | `35` | Opacità dell'ombra (0-100), usata quando `shadowEnabled` è true |
+| outputFormat | string | No | `"png"` | `png`, `webp`, o `avif` |
 
 ### Example Request {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Error: Background Removal Expired (410) {#error-background-removal-expired-410}
+
+L'endpoint degli effetti lavora sulla maschera e sull'originale che la Fase 1 ha memorizzato per `jobId`. Gli output memorizzati vengono eliminati dopo un certo periodo, quindi se passa troppo tempo tra le due chiamate non sono più disponibili. Esegui di nuovo la Fase 1 con la stessa immagine e usa il `jobId` che restituisce.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Un `jobId` o `filename` che non può indicare un file memorizzato (un separatore di percorso, `..`, una stringa vuota) restituisce 400.
 
 ## Notes {#notes}
 

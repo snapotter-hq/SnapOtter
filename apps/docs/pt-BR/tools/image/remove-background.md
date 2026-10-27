@@ -1,8 +1,8 @@
 ---
 description: "Remoção de fundo com IA e efeitos opcionais (desfoque, sombra, gradiente, fundo personalizado)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 998b4b037b62
+i18n_output_hash: d09f1a45f019
 ---
 
 # Remover Fundo {#remove-background}
@@ -19,20 +19,12 @@ Remoção de fundo com IA e efeitos opcionais (desfoque, sombra, gradiente, fund
 
 ## Parâmetros {#parameters}
 
+A Fase 1 remove o fundo e armazena em cache a máscara PNG transparente e a imagem original. A substituição do fundo, o desfoque, a sombra projetada e a conversão do formato de saída são aplicados na [Fase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (ou ao executar `remove-background` como etapa de pipeline ou job em lote); passar esses campos para a Fase 1 retorna 400.
+
 | Parâmetro | Tipo | Obrigatório | Padrão | Descrição |
 |-----------|------|----------|---------|-------------|
 | file | file | Sim | - | Arquivo de imagem (multipart) |
 | model | string | Não | - | Variante do modelo de IA a usar |
-| backgroundType | string | Não | `"transparent"` | Um de: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Não | - | Cor hexadecimal para fundo sólido |
-| gradientColor1 | string | Não | - | Primeira cor do gradiente |
-| gradientColor2 | string | Não | - | Segunda cor do gradiente |
-| gradientAngle | number | Não | - | Ângulo do gradiente em graus |
-| blurEnabled | boolean | Não | - | Ativar efeito de desfoque no fundo |
-| blurIntensity | number | Não | - | Intensidade do desfoque (0-100) |
-| shadowEnabled | boolean | Não | - | Ativar sombra projetada no assunto |
-| shadowOpacity | number | Não | - | Opacidade da sombra (0-100) |
-| outputFormat | string | Não | - | Formato de saída: `png`, `webp` ou `avif` |
 | edgeRefine | integer | Não | - | Nível de refinamento de bordas (0-3) |
 | decontaminate | boolean | Não | - | Remove o sangramento de cor das bordas |
 
@@ -95,20 +87,20 @@ Reaplica os efeitos de fundo sem reexecutar o modelo de IA. Usa a máscara e o o
 
 #### Campos do JSON de configurações {#settings-json-fields}
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|----------|-------------|
-| jobId | string | Sim | ID do job da Fase 1 |
-| filename | string | Sim | Nome do arquivo original da Fase 1 |
-| backgroundType | string | Não | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Não | Cor hexadecimal para fundo sólido |
-| gradientColor1 | string | Não | Primeira cor do gradiente |
-| gradientColor2 | string | Não | Segunda cor do gradiente |
-| gradientAngle | number | Não | Ângulo do gradiente em graus |
-| blurEnabled | boolean | Não | Ativar desfoque de fundo |
-| blurIntensity | number | Não | Intensidade do desfoque (0-100) |
-| shadowEnabled | boolean | Não | Ativar sombra projetada |
-| shadowOpacity | number | Não | Opacidade da sombra (0-100) |
-| outputFormat | string | Não | `png`, `webp` ou `avif` |
+| Campo | Tipo | Obrigatório | Padrão | Descrição |
+|-------|------|----------|---------|-------------|
+| jobId | string | Sim | - | ID do job da Fase 1 |
+| filename | string | Sim | - | Nome do arquivo original da Fase 1 |
+| backgroundType | string | Não | `"transparent"` | `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Não | - | Cor hexadecimal para fundo sólido |
+| gradientColor1 | string | Não | - | Primeira cor do gradiente |
+| gradientColor2 | string | Não | - | Segunda cor do gradiente |
+| gradientAngle | number | Não | - | Ângulo do gradiente em graus |
+| blurEnabled | boolean | Não | - | Ativar desfoque de fundo |
+| blurIntensity | number | Não | - | Intensidade do desfoque (0-100) |
+| shadowEnabled | boolean | Não | - | Ativar sombra projetada |
+| shadowOpacity | number | Não | `35` | Opacidade da sombra (0-100) |
+| outputFormat | string | Não | `"png"` | `png`, `webp` ou `avif` |
 
 ### Exemplo de Requisição {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Erro: Remoção de fundo expirada (410) {#error-background-removal-expired-410}
+
+O endpoint de efeitos funciona a partir da máscara e do original que a Fase 1 armazenou para `jobId`. As saídas armazenadas são limpas depois de um tempo, então se passar tempo demais entre as duas chamadas, elas não existem mais. Execute a Fase 1 novamente com a mesma imagem e use o `jobId` que ela retorna.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Um `jobId` ou `filename` que não consegue nomear um arquivo armazenado (um separador de caminho, `..`, uma string vazia) responde 400.
 
 ## Notas {#notes}
 

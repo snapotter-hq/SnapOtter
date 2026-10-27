@@ -1,8 +1,8 @@
 ---
 description: "انشر SnapOtter في بيئة الإنتاج باستخدام Docker. متطلبات العتاد وإعداد GPU وإعدادات الوكيل العكسي لـ Nginx و Traefik و Cloudflare."
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: f61512a98aa3
+i18n_output_hash: c66572adae90
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,15 @@ curl http://localhost:1349/api/v1/health
 
 هناك شيئان مهمان لكل وكيل أدناه: السماح بنصوص الطلبات الكبيرة (التحميلات)، وعدم تخزين الاستجابات مؤقتًا. يعطل وكيل التخزين المؤقت للاستجابة تقدم SSE، وبشكل أكثر وضوحًا، يجعل تنزيل ملف كبير "يبدأ ولكن لا ينتهي أبدًا"، لأن الوكيل يحتفظ بالملف بأكمله قبل تمريره. يرسل SnapOtter `X-Accel-Buffering: no` عند التنزيلات، لذا يقوم nginx ببثها حتى لو تم ترك التخزين المؤقت في مكان آخر، لكن الوكلاء بخلاف nginx يحتاجون إلى تعطيل التخزين المؤقت للاستجابة بشكل صريح (كما هو موضح في كل تكوين أدناه). إذا توقف التنزيل جزئيًا، فإن وكيل التخزين المؤقت الموجود في المقدمة هو أول شيء يجب التحقق منه.
 
+ملاحظة حول HSTS: يرسل API الترويسة `Strict-Transport-Security` في كل استجابة بنفسه، لذا لا يحتاج أي وكيل يمرّر ترويسات الاستجابة كما هي (وجميع التكوينات أدناه تفعل ذلك) إلى أي إعداد HSTS خاص به. ولا تحتاج إلى الحفاظ على الترويسة أو إعادة إضافتها عند الحافة إلا إذا كان وكيلك مضبوطًا على إزالة ترويسات الاستجابة القادمة من المصدر أو تجاوزها.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # يُعرض HTTP العادي للاختصار. أنهِ TLS في كتلة خادم `listen 443 ssl`
+    # الخاصة بك؛ فترويسة Strict-Transport-Security التي يرسلها API تمرّ
+    # مع كل استجابة يمرّرها الوكيل، لذا لا حاجة إلى add_header هناك.
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +528,37 @@ server {
 }
 ```
 
+### النشر تحت مسار فرعي {#subpath}
+
+لخدمة `https://example.com/snapotter`، عيّن `BASE_PATH=/snapotter` في بيئة حاوية SnapOtter وأعد تشغيلها. تقبل ملفات Compose الرسمية للمعالج المركزي وGPU أيضًا `BASE_PATH` من صدفتك أو من ملف `.env` الخاص بـ Compose. الصورة نفسها تعمل بأي مسار؛ لا حاجة إلى إعادة بناء الواجهة الأمامية.
+
+يقبل `BASE_PATH` مقاطع مفصولة بشرطة مائلة تحتوي حروفًا أو أرقامًا أو `_` أو `-`، بما في ذلك مسارات متداخلة مثل `/apps/snapotter`. الشرطة المائلة اللاحقة اختيارية. اتركه فارغًا (الافتراضي)، أو عيّن `/`، للنشر على الجذر.
+
+في كتلة خادم Nginx HTTPS الموجودة لديك، استخدم:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+يحافظ هذا المثال على البادئة. الوكلاء الذين يزيلون `/snapotter` قبل التمرير مدعومون أيضًا. ويمكن لفحوص الصحة الداخلية أن تظل تستخدم `/api/v1/health`. بالنسبة إلى OIDC أو SAML، عيّن أيضًا `EXTERNAL_URL=https://example.com/snapotter` وحدّث عناوين URL للاستدعاء الراجع لدى موفّر الهوية لتشمل `/snapotter/api/auth/oidc/callback` أو `/snapotter/api/auth/saml/callback` على الترتيب.
+
+تظل سكربتات API تعمل دون تغيير: عناوين URL في استجابات API، مثل `downloadUrl` لأداة، تبدأ بـ `/api/` مهما كان `BASE_PATH`. ألحقها بعنوان URL الأساسي لنسختك (`https://example.com/snapotter` + `/api/v1/download/...`) بدلًا من حلّها مقابل جذر النطاق.
+
+افتح الواجهة عبر عنوان URL ذي البادئة (`https://example.com/snapotter`). المتصفح الذي يصل بلا بادئة يُوجَّه إلى هناك تلقائيًا؛ طلبات API وحدها هي المتوقع أن تصل إلى التطبيق بلا بادئة. إذا قالت السجلات `Requests arrive under /snapotter/ but BASE_PATH is empty`، فإن وكيلك يمرّر بادئة لا يعلنها `BASE_PATH`: عيّن `BASE_PATH` إليها، أو أزل البادئة عند الوكيل.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. أضف مضيف وكيل جديد
@@ -530,6 +566,8 @@ server {
 3. عيّن المخطط إلى `http`، واسم مضيف التوجيه إلى `SnapOtter` (أو عنوان IP الخاص بحاويتك)، ومنفذ التوجيه إلى `1349`
 4. فعّل دعم WebSocket
 5. ضمن الإعدادات المتقدمة، أضف: `client_max_body_size 500M;` و `proxy_buffering off;`
+
+تمرّ ترويسة `Strict-Transport-Security` الخاصة بـ API عبر NPM كما هي؛ ومفتاح HSTS في تبويب SSL اختياري إضافةً إليها.
 
 ### Traefik {#traefik}
 
@@ -546,6 +584,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+يمرّر Traefik ترويسات الاستجابة القادمة من المصدر دون تغيير، لذا تصل ترويسة `Strict-Transport-Security` الخاصة بـ API إلى المتصفحات دون برمجية وسيطة `headers`. وإذا كنت تشغّل بالفعل برمجية وسيطة تعيد كتابة ترويسات الاستجابة، فتأكد من أنها تُبقي تلك الترويسة سليمة.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +600,7 @@ images.example.com {
 }
 ```
 
-يقوم `flush_interval -1` بتعطيل التخزين المؤقت للاستجابة، وهو أمر مطلوب لأحداث تقدم SSE (معالجة الدفعات، وأدوات الذكاء الاصطناعي، وعمليات تثبيت الميزات) ولتنزيلات الملفات الكبيرة للتدفق من خلالها بدلاً من المماطلة. تسمح المهلات الممتدة بإكمال عمليات تحميل الملفات الكبيرة دون إغلاق Caddy الاتصال مبكرًا.
+يقوم `flush_interval -1` بتعطيل التخزين المؤقت للاستجابة، وهو أمر مطلوب لأحداث تقدم SSE (معالجة الدفعات، وأدوات الذكاء الاصطناعي، وعمليات تثبيت الميزات) ولتنزيلات الملفات الكبيرة للتدفق من خلالها بدلاً من المماطلة. تسمح المهلات الممتدة بإكمال عمليات تحميل الملفات الكبيرة دون إغلاق Caddy الاتصال مبكرًا. كما يمرّر Caddy ترويسة `Strict-Transport-Security` الخاصة بـ API دون مساس، لذا لا حاجة إلى توجيه `header` من أجل HSTS.
 
 ### أنفاق Cloudflare {#cloudflare-tunnels}
 
@@ -569,6 +609,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 ملاحظة: لدى Cloudflare حد رفع قدره 100 ميجابايت على الخطط المجانية. عيّن `MAX_UPLOAD_SIZE_MB=100` ليطابق ذلك.
+
+يمرّر النفق ترويسات استجابة API، بما فيها `Strict-Transport-Security`، لذا لا حاجة إلى أي إعداد HSTS في لوحة التحكم (إعداد HSTS على حافة Cloudflare نفسها اختياري إضافةً إلى ذلك).
+
+## استكشاف الأخطاء وإصلاحها {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" مباشرةً بعد أول إقلاع فاشل {#eai-again-after-failed-first-start}
+
+إذا فشل أول `docker compose up -d` جزئيًا (والسبب المعتاد منفذ مستخدم بالفعل)، فقد تؤدي إعادة محاولة `up -d` العادية إلى تشغيل حاوية التطبيق دون ربطها بشبكة compose. عندئذٍ تدخل الحاوية في حلقة تعطّل مع:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+بينما يُظهر `docker ps` أن postgres سليم. الخطأ حقيقي لكنه يشير إلى الحاوية الخطأ: بدون الشبكة، لا يمكن حل DNS لاسم المضيف `postgres` إطلاقًا، وتعيد سياسة إعادة التشغيل الفشل نفسه إلى الأبد.
+
+أصلح ما كسر الإقلاع الأول (عادةً: أفرغ المنفذ)، ثم أجبر حاوية التطبيق على إعادة الإنشاء لتُعاد ربطها بالشبكة:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: يمكن الوصول من أجهزة أخرى، لا من الجهاز نفسه {#windows-wsl2-loopback}
+
+عند تشغيل Docker داخل WSL2 (إعداد Windows المعتاد)، قد تكون الحزمة قابلة للوصول من كل جهاز آخر على شبكتك بينما تنتهي مهلة `http://localhost:1349` على مضيف Windows نفسه، حتى مع تفعيل وضع الشبكات المتطابق في WSL. لا يظهر المنفذ أبدًا في `netstat` على Windows، ولا شيء خطأ في الحاويات.
+
+افتح التطبيق من جهاز آخر، أو من داخل التوزيعة باستخدام عنوانها (`hostname -I` في صدفة WSL). وإذا حدث أن عمل تمرير localhost على إصدار WSL لديك، فاعتبره مكافأة لا أمرًا تعتمد عليه.
 
 ## CI/CD {#ci-cd}
 

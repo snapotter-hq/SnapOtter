@@ -1,8 +1,8 @@
 ---
 description: "Tất cả các biến môi trường của SnapOtter kèm giá trị mặc định. Cấu hình xác thực, lưu trữ, mô hình AI, phân tích và hơn thế."
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: 6ca5e3aa0223
+i18n_output_hash: 899694c2c039
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ Mọi cấu hình được thực hiện qua các biến môi trường. Mỗi b
 | Biến | Mặc định | Mô tả |
 |---|---|---|
 | `PORT` | `1349` | Cổng máy chủ lắng nghe. |
+| `BASE_PATH` | (trống) | Đường dẫn triển khai công khai, ví dụ `/snapotter`. Để trống hoặc `/` sẽ phục vụ tại gốc miền. Áp dụng khi chạy; không cần dựng lại image. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Số yêu cầu tối đa mỗi phút cho mỗi IP. Đặt thành 0 để tắt giới hạn tốc độ. |
 | `CORS_ORIGIN` | (trống) | Danh sách các origin được phép cho CORS, phân tách bằng dấu phẩy, hoặc để trống chỉ cho phép cùng origin. |
 | `LOG_LEVEL` | `info` | Mức độ chi tiết của nhật ký. Một trong: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -40,7 +41,8 @@ Hai giá trị boolean bên dưới chỉ chấp nhận `true` và `false`. Bấ
 | Biến | Mặc định | Mô tả |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` hoặc `s3`. S3 và MinIO cần một giấy phép có tính năng s3_storage cùng các biến `S3_*` bên dưới. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Chuỗi kết nối PostgreSQL. Ngăn xếp Compose trỏ biến này tới dịch vụ `postgres` của nó; hãy để nó không được đặt (cùng với `REDIS_URL`) để dùng chế độ nhúng. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Chuỗi kết nối PostgreSQL, và là kết nối mà mọi yêu cầu được phục vụ trên đó. Từ 2.3.0 trở đi, hãy đặt thêm `DATABASE_MIGRATION_URL` và biến này trở thành vai trò runtime có đặc quyền tối thiểu, chỉ giữ quyền DML trên các bảng của ứng dụng và không có gì khác. Ngăn xếp Compose trỏ biến này tới dịch vụ `postgres` của nó; hãy để nó không được đặt (cùng với `REDIS_URL`) để dùng chế độ nhúng. |
+| `DATABASE_MIGRATION_URL` | (trống) | Có từ 2.3.0; image 2.2.0 bỏ qua biến này và cần `DATABASE_URL` chỉ định chủ sở hữu cơ sở dữ liệu. Kết nối đặc quyền, chỉ dùng trong lúc khởi động để chạy migration và cấp vai trò runtime, rồi đóng trước yêu cầu đầu tiên. Để trống và SnapOtter chạy một vai trò duy nhất, với `DATABASE_URL` đảm nhận cả hai việc. Xem [Vai trò đặc quyền tối thiểu](/vi/guide/database#least-privilege-roles). |
 | `REDIS_URL` | `redis://localhost:6379` | Chuỗi kết nối Redis (dùng cho các hàng đợi công việc BullMQ). Compose trỏ biến này tới dịch vụ `redis` của nó. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Thư mục cho các tệp tạm thời trong quá trình xử lý. Được dọn dẹp tự động. Image đặt thành `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Thư mục cho các tệp người dùng bền vững (ảnh đã tải lên, kết quả đã lưu). Image đặt thành `/data/files`. |
@@ -74,6 +76,8 @@ Chạy image mà không có `DATABASE_URL` và không có `REDIS_URL` thì nó k
 |---|---|---|
 | `EMBEDDED` | `auto` | Tự động bật khi cả `DATABASE_URL` và `REDIS_URL` đều không được đặt. Đặt thành `0` để tắt nó (ứng dụng khi đó thất bại nhanh nếu không có `DATABASE_URL`/`REDIS_URL` bên ngoài nào được đặt, thay vì âm thầm khởi động một cơ sở dữ liệu trong container). |
 | `REDIS_MAXMEMORY` | `512mb` | Giới hạn bộ nhớ cho Redis nhúng (chỉ chế độ nhúng). Hãy hạ nó xuống trên các máy chủ bị hạn chế bộ nhớ như Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Số giây quá trình khởi động chờ Redis nhúng trả lời `PING` trước khi bỏ cuộc. Hết thời gian chờ thì container dừng và ghi lý do vào nhật ký, thay vì treo. Số nguyên giây từ 1 đến 999999; không có giá trị không giới hạn, vì chờ mãi mãi chính là lỗi mà giới hạn này sinh ra để ngăn. Chỉ tăng nó nếu một máy chủ chậm chạm giới hạn này. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Tương tự, dành cho PostgreSQL nhúng. Đồng hồ bắt đầu sau khi `initdb` của lần khởi động đầu tiên hoàn tất, nên nó bao phủ việc khởi động máy chủ và phục hồi sau sự cố thay vì tạo cơ sở dữ liệu ban đầu. |
 
 Nâng cấp từ 1.x: đặt `snapotter.db` cũ của bạn tại `/data/snapotter.db` trong volume và chế độ nhúng nhập nó vào PostgreSQL nhúng ở lần khởi động đầu tiên. Việc nhập chạy một lần; các lần khởi động sau bỏ qua nó.
 
@@ -93,6 +97,23 @@ Lưu ý về đo lường từ xa: chế độ nhúng thừa hưởng mặc đ�
 | `MAX_CANVAS_PIXELS` | `0` (không giới hạn) | Kích thước khung vẽ tối đa tính bằng pixel cho các ảnh đầu ra. Đặt thành 0 để không giới hạn. |
 | `MAX_SVG_SIZE_MB` | `50` | Tệp SVG lớn nhất được chấp nhận trước khi làm sạch, tính bằng megabyte. `0` ở đây hành xử khác với các hàng xung quanh. Nó gỡ bỏ hoàn toàn giới hạn kích thước trước khi phân tích thay vì nâng giới hạn lên, nên hãy luôn đặt giá trị cho biến này. |
 | `MAX_PDF_PAGES` | `0` (không giới hạn) | Số trang PDF tối đa cho việc chuyển đổi PDF-to-image. Đặt thành 0 để không giới hạn. |
+
+### Các engine {#engines}
+
+SnapOtter tra cứu từng binary xử lý trên `$PATH` bên trong container, vì vậy các biến này để trống trừ khi bạn gắn một bản dựng của riêng mình.
+
+| Biến | Mặc định | Mô tả |
+|---|---|---|
+| `FFMPEG_PATH` | (trống) | Đường dẫn đến binary `ffmpeg` đứng sau các công cụ video và âm thanh. |
+| `FFPROBE_PATH` | (trống) | Đường dẫn đến `ffprobe`, công cụ đọc tệp phương tiện trước khi chúng được xử lý. Trỏ nó đến cùng bản dựng với `FFMPEG_PATH`. |
+| `QPDF_PATH` | (trống) | Đường dẫn đến `qpdf`, được các công cụ PDF sử dụng và để kiểm tra các PDF được tải lên. |
+| `SOFFICE_PATH` | (trống) | Đường dẫn đến `soffice` của LibreOffice, được dùng cho chuyển đổi tài liệu văn phòng. |
+| `PDFCPU_PATH` | (trống) | Đường dẫn đến `pdfcpu`, được một số công cụ PDF sử dụng. |
+| `SNAPOTTER_HW_ACCEL` | (trống) | Họ bộ mã hóa video phần cứng, `nvenc` hoặc `vaapi`. Để trống sẽ mã hóa bằng phần mềm. |
+
+`SNAPOTTER_HW_ACCEL` cần một ffmpeg được biên dịch với họ bộ mã hóa đó, và ffmpeg trong image không có cả hai. Với binary của chính image, cài đặt sẽ quay về mã hóa phần mềm và thông báo điều đó trong nhật ký khởi động. Để sử dụng nó, hãy gắn bản dựng ffmpeg của riêng bạn, trỏ `FFMPEG_PATH` và `FFPROBE_PATH` đến nó, và cấp thiết bị GPU cho container. Đối với `nvenc`, hãy đặt thêm `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: image chỉ yêu cầu `compute,utility`, và nếu không có `video`, runtime NVIDIA không gắn thư viện mã hóa, nên bộ mã hóa được liệt kê nhưng mọi lần mã hóa đều thất bại. Một đường dẫn ghi đè không tồn tại hoặc không thể thực thi cũng được nêu tên trong nhật ký khởi động, và mọi công việc cần binary đó sẽ thất bại cho đến khi bạn sửa đường dẫn hoặc bỏ đặt biến.
+
+Các tệp Compose được phát hành truyền tất cả sáu biến từ `.env`, nên chỉ cần đặt chúng ở đó là đủ.
 
 ### Dọn dẹp {#cleanup}
 

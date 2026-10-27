@@ -1,6 +1,6 @@
 ---
 description: "Så bidrar du till SnapOtter. Buggrapporter, funktionsförslag, pull requests och CLA-krav."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: b0a61ebb3e0d
 i18n_hash_version: 2

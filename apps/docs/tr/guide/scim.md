@@ -1,8 +1,8 @@
 ---
 description: "Kullanıcıları ve grupları kimlik sağlayıcınızdan SnapOtter'a senkronize etmek için SCIM 2.0 sağlamayı kurun. Okta, Azure AD / Entra ID ve özel entegrasyonları kapsar."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 5a0157d3e079
+i18n_output_hash: 8435d1bafddd
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP dakikada 1000'den fazla istek gönderiyor. Bu genellikle büyük bir ilk sen
 ### Kullanıcılar sağlaması kaldırıldı ancak arayüzden kaldırılmadı {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE bir yumuşak devre dışı bırakmadır. Devre dışı bırakılan kullanıcılar admin kullanıcı listesinde devre dışı durumla görünmeye devam eder. Bu, verilerinin korunması için tasarım gereğidir. Rolleri `disabled:<original-role>` olarak görünür.
+
+### `externalId` filtresi OIDC veya SAML ile oturum açan bir kullanıcıyı atlıyor {#recover-scim-ids-in-oidc-or-saml-users}
+
+SCIM `externalId` kendi sütununu (`users.scim_external_id`) almadan önce, bir OIDC veya SAML oturum açmasının zaten bağladığı bir kullanıcı üzerinde yapılan SCIM `PUT` veya `PATCH` işlemi SCIM kimliğini o kullanıcının oturum açma kimliğine yazıyordu. Yükseltme geçişi bu değeri gerçek bir OIDC subject'inden veya SAML NameID'sinden ayırt edemediği için o kullanıcılara dokunmaz. Onlar için, IdP `externalId` taşıyan başka bir güncelleme gönderene kadar `filter=externalId eq "..."` hiçbir şey döndürmez.
+
+IdP'yi beklemek istemiyorsanız, denetim günlüğü kimliği doğrulayabilir. SCIM, her kullanıcıyı hangi `externalId` ile oluşturduğunu içeren bir `SCIM_USER_PROVISIONED` satırı yazar. `scim_external_id` sütununu içeren bir sürüme geçtiğinizde, SnapOtter veritabanına `psql` ile bağlanın ([hesap kurtarma kılavuzu](./account-recovery.md#older-images-and-fallbacks) her iki kurulum için nasıl yapılacağını gösterir) ve oturum açma kimliği hâlâ o kimliğe eşit olan kullanıcıları önizleyin:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Liste doğru görünüyorsa, kimliği SCIM sütununa kopyalayın. `BEGIN;` içinde çalıştırın ve `COMMIT;` yapmadan önce dönen satırları kontrol edin:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+İkinci çalıştırma hiçbir şeyle eşleşmez. Güncelleme `external_id` değerini olduğu gibi bırakır, çünkü bazı IdP'ler (aralarında Okta da var) aynı kimliği hem OIDC `sub` hem de SCIM `externalId` olarak gönderir ve onlar için temizlemek OIDC oturum açmasını bozar. `external_id` değeri gerçekten başıboş SCIM kimliği olan bir kullanıcı zaten subject eşleşmesinde başarısız olur. `OIDC_AUTO_LINK_USERS` (veya `SAML_AUTO_LINK_USERS`) açıkken, doğrulanmış bir e-postayla yapacakları bir sonraki oturum açma onları her iki durumda da yeniden bağlar.
+
+Bazı kullanıcılar erişilemez kalır ve kimliği IdP'nin bir sonraki güncellemesinden yeniden alır:
+
+- oturum açma bağlantısı SCIM kimliğinin yerini alan ve sonrasında hiçbir SCIM yazımı almayan kullanıcılar, çünkü artık `external_id` değerleri denetim satırıyla eşleşmiyor
+- sağlama satırı denetim saklama süresi tarafından zaten temizlenmiş kullanıcılar
+- `externalId` değerini IdP'nin oluşturduktan sonra değiştirdiği kullanıcılar (güncelleme satırları hangi alanların değiştiğini kaydeder, değerlerini değil)
+- aynı kimliği taşıyan iki kullanıcı; sorgu, benzersiz dizinin iptal olmaması için bunları atlar. Son koşulu olmadan yapılan önizleme onları listeler ve kimliğin hangisine ait olduğuna siz karar verirsiniz

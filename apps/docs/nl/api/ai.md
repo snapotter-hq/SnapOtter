@@ -1,7 +1,7 @@
 ---
 description: "AI-engine-referentie met alle lokale ML-tools. Achtergrondverwijdering, upscaling, OCR, gezichtsdetectie, fotorestauratie en meer."
-i18n_output_hash: 6c642f2518a9
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: 16ab8891ec80
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -15,12 +15,6 @@ Intel/AMD iGPU-versnelling via VA-API, Quick Sync of OpenCL wordt vandaag niet o
 
 19 Python-sidecar-AI-tools verdeeld over vier modaliteiten (afbeelding, audio, video, document), plus 2 tools met optionele AI-mogelijkheden. Alle modellen draaien lokaal: na de eerste modeldownload is er geen internet vereist.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Compatibiliteit voor Koreaanse OCR
-Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`). Koreaans vereist het nauwkeurige OCR-pakket en `balanced` of `best`. Het pakket werkt in officiële Linux amd64- en arm64-containers, ook op NVIDIA-hosts waar OCR op de CPU blijft draaien. Niet-ondersteunde systemen krijgen een expliciete compatibiliteitsfout en vallen nooit stil terug op `fast`. Koreaans met `fast` of de oude alias `tesseract` wordt vóór het in de wachtrij plaatsen geweigerd met `FEATURE_INCOMPATIBLE` en `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Architectuur {#architecture}
 
 ```
@@ -62,17 +56,18 @@ AI-modellen worden per gedeelde dependency-stack gebundeld, niet één archief p
 
 De Docker-image levert de applicatie plus de gedeelde runtime. Grote modelarchieven worden op aanvraag gedownload naar het persistente `/data/ai`-volume en vervolgens hergebruikt door elke tool die ze nodig heeft. Als een bundel al geïnstalleerd is omdat een andere tool deze nodig had, downloadt het inschakelen van een nieuwe afhankelijke tool die bundel niet opnieuw.
 
-De meeste AI-tools hebben een of meer functiebundels nodig voordat ze kunnen worden uitgevoerd. De beheerdersinterface installeert deze per tool via `POST /api/v1/admin/tools/:toolId/features/install`, die de volledige bundellijst oplost, bundels overslaat die al zijn geïnstalleerd en alleen de ontbrekende downloads in de wachtrij plaatst. Als u bijvoorbeeld Passport Photo inschakelt op een nieuw exemplaar, staan ​​de wachtrijen `background-removal` en `face-detection` in; inschakelen nadat Achtergrondverwijdering al is geïnstalleerd, alleen wachtrijen `face-detection`. OCR is de uitzondering omdat `fast` geen pakket nodig heeft; installeer de optionele nauwkeurige runtime via de gebruikersinterface of `POST /api/v1/admin/features/ocr/install`.
+De meeste AI-tools hebben een of meer functiebundels nodig voordat ze kunnen worden uitgevoerd. De beheerdersinterface installeert deze per tool via `POST /api/v1/admin/tools/:toolId/features/install`, die de volledige bundellijst oplost, bundels overslaat die al zijn geïnstalleerd en alleen de ontbrekende downloads in de wachtrij plaatst. Als je Passport Photo bijvoorbeeld op een nieuwe instance inschakelt, worden `background-removal` en `face-detection` in de wachtrij gezet; schakel je het in nadat Achtergrondverwijdering al is geïnstalleerd, dan wordt alleen `face-detection` in de wachtrij gezet. OCR is de uitzondering omdat `fast` geen pakket nodig heeft; installeer de optionele nauwkeurige runtime via de gebruikersinterface of `POST /api/v1/admin/features/ocr/install`.
 
-| Bundel | Grootte | Gedeelde dependency-groep | Tools die het gebruiken |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet-achtergrondmatting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | MediaPipe-gezichtsdetectie en -landmarks | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa inpainting/outpainting en DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | krasreparatie- en restauratiepijplijn | restore-photo |
-| `ocr` | ~208-234 MiB downloaden / ~409-488 MiB geïnstalleerd | Optionele RapidOCR 3.9.1-, ONNX Runtime 1.20.1- en vastgezette PP-OCR-modellen | ocr, ocr-pdf (alleen `balanced` en `best`) |
-| `transcription` | ~600 MB | faster-whisper spraak-naar-tekst-modellen | transcribe-audio, auto-subtitles |
+| Bundel | Grootte | Minimaal CPU-geheugen | Gedeelde dependency-groep | Tools die het gebruiken |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (~2,5 GB vrij) | rembg / BiRefNet-achtergrondmatting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (~0,5 GB vrij) | MediaPipe-gezichtsdetectie en -landmarks | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (~2 GB vrij) | LaMa inpainting/outpainting en DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB vrij) | Inpainting van hoge kwaliteit met Stable Diffusion 1.5 | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (~2,5 GB vrij) | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB vrij) | krasreparatie- en restauratiepijplijn | restore-photo |
+| `ocr` | ~208-234 MiB downloaden / ~409-488 MiB geïnstalleerd | 4 GiB effectief geheugen volgens de configuratie (`fast` draait op 2 GB) | Optionele RapidOCR 3.9.1-, ONNX Runtime 1.20.1- en vastgezette PP-OCR-modellen | ocr, ocr-pdf (alleen `balanced` en `best`) |
+| `transcription` | ~600 MB | 4 GB RAM (~2 GB vrij) | faster-whisper spraak-naar-tekst-modellen | transcribe-audio, auto-subtitles |
 
 Tools met bundeloverschrijdende afhankelijkheden:
 
@@ -83,9 +78,36 @@ Tools met bundeloverschrijdende afhankelijkheden:
 
 Een tool is alleen beschikbaar als alle vereiste bundels zijn geïnstalleerd, behalve OCR: de ingebouwde `fast`-laag blijft beschikbaar zonder het optionele OCR-pakket. Gedeeltelijke installaties zijn geldig en worden stapsgewijs afgehandeld: geïnstalleerde bundels worden hergebruikt, ontbrekende bundels worden weergegeven als downloads en installaties in de wachtrij worden één voor één uitgevoerd, zodat de gedeelde Python-omgeving niet tegelijkertijd wordt gewijzigd.
 
+### Alle bundels in één keer installeren {#installing-every-bundle-at-once}
+
+Onder Instellingen → AI-functies staat een knop **Alles installeren** die elke bundel in de wachtrij zet die de host kan draaien. Hij slaat alles over wat al geïnstalleerd is, slaat bundels over die als incompatibel met de host worden gemeld en probeert een mislukte bundel één keer opnieuw voordat hij verdergaat. Voor een normale instance is die knop het hele antwoord en is niets hieronder nodig.
+
+Begroot eerst de schijfruimte. Bij elkaar zijn de bundels ongeveer 20-25 GB geïnstalleerd, en ze belanden in `/data/ai` op het datavolume in plaats van in de image, dus ze overleven `docker compose down` en het opnieuw aanmaken van de container. Je installeert ze één keer per host, niet één keer per upgrade.
+
+Voor onbeheerde provisioning waarbij niemand op een knop gaat klikken, POST je elke bundel naar het installatie-endpoint met een admin-API-sleutel. De server zet ze in de wachtrij, dus stuur alle acht zonder te wachten:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Elke aanroep geeft `202` terug met een `jobId` en een `queued`-vlag: `false` voor degene die direct start, `true` voor de rest. Een bundel die al geïnstalleerd is, geeft `409` terug en kun je veilig negeren, waardoor je de lus opnieuw kunt uitvoeren. Poll `GET /api/v1/features` voor de voortgang; elke bundel staat op `installed` als de run klaar is.
+
+Twee dingen die je kunt verwachten. De `ocr`-bundel voert een preflight op hostcompatibiliteit uit en weigert hosts onder het ondertekende minimum, dus hij kan mislukken terwijl de andere zeven slagen (zie [Nauwkeurige OCR runtime-installatie](#accurate-ocr-runtime-installation)). En `POST /api/v1/admin/features/reset` geeft `409` terug zolang er een installatie loopt, dus een run die al bezig is moet eerst klaar zijn, of de container moet opnieuw worden gestart voordat de omgeving kan worden gewist.
+
 ### Nauwkeurige OCR runtime-installatie {#accurate-ocr-runtime-installation}
 
-Het nauwkeurige OCR-pakket is een platformspecifieke runtime voor de officiële Linux amd64 of Linux arm64-container. De amd64-build maakt gebruik van Python 3.12; de arm64-build maakt gebruik van Python 3.11. Beide builds draaien RapidOCR via ONNX Runtime's `CPUExecutionProvider`, dus hetzelfde pakket werkt alleen op CPU- en NVIDIA Docker-hosts. De nauwkeurige runtime vereist minimaal 4 GiB effectief geheugen: de geconfigureerde container cgroup-limiet, anders hostgeheugen. Een systeem onder het ondertekende compatibiliteitsminimum wordt vóór het downloaden afgewezen. Deze vereiste geldt niet voor ingebouwde Fast OCR. Bare-metal-builds worden afgewezen omdat hun libc en Python ABI niet veilig kunnen worden afgeleid; Snelle OCR blijft beschikbaar wanneer de host Tesseract en Ghostscript biedt.
+Het nauwkeurige OCR-pakket is een platformspecifieke runtime voor de officiële Linux amd64 of Linux arm64-container. De amd64-build maakt gebruik van Python 3.12; de arm64-build maakt gebruik van Python 3.11. Beide builds draaien RapidOCR via ONNX Runtime's `CPUExecutionProvider`, dus hetzelfde pakket werkt zowel op hosts met alleen een CPU als op NVIDIA Docker-hosts. De nauwkeurige runtime vereist minimaal 4 GiB effectief geheugen: de geconfigureerde container cgroup-limiet, anders hostgeheugen. Een systeem onder het ondertekende compatibiliteitsminimum wordt vóór het downloaden afgewezen. Deze vereiste geldt niet voor ingebouwde Fast OCR. Bare-metal-builds worden afgewezen omdat hun libc en Python ABI niet veilig kunnen worden afgeleid; Snelle OCR blijft beschikbaar wanneer de host Tesseract en Ghostscript biedt. Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`). Koreaans vereist daarom een ondersteunde nauwkeurige runtime en een `balanced`- of `best`-niveau; niet-ondersteunde hosts krijgen een expliciete incompatibiliteitsrespons in plaats van een stille terugval op `fast`.
+
+<!-- korean-ocr-contract:start -->
+::: info Compatibiliteit voor Koreaanse OCR
+Fast OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`). Koreaans vereist het nauwkeurige OCR-pakket en `balanced` of `best`. Het pakket draait in officiële Linux amd64- en arm64-containers, ook op NVIDIA-hosts nog steeds op de CPU. Niet-ondersteunde systemen krijgen een expliciete compatibiliteitsfout en geen stille terugval op `fast`. Koreaans met `fast` of de oude alias `tesseract` wordt vóór het in de wachtrij plaatsen geweigerd met `FEATURE_INCOMPATIBLE` en `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 
 Het optionele artefact is ongeveer 208-234 MiB gecomprimeerd en 409-488 MiB geëxtraheerd, afhankelijk van de architectuur. De ondertekende index bindt de exacte gecomprimeerde en geëxtraheerde bytetellingen die door het installatieprogramma worden afgedwongen. Ingebouwde Tesseract voegt ongeveer 25 MiB toe aan de officiële image en heeft geen bestanden nodig in `/data/ai`.
 
@@ -167,12 +189,12 @@ Vervaagt de achtergrond terwijl het onderwerp scherp blijft.
 
 | Parameter | Type | Standaard | Beschrijving |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Als `quality` en `engine` zijn weggelaten, kiest SnapOtter de beste beschikbare laag in deze volgorde: `best`, `balanced`, `fast`. Voor Koreaans wordt `fast` nooit gekozen; het gebruikt `best`, daarna `balanced`, of geeft een installatie- of compatibiliteitsfout voor de nauwkeurige runtime terug. |
-| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | Booleaans | Niveau-afhankelijk | Verbeter het lokale contrast. Snel past het direct toe; nauwkeurige niveaus behouden de variant alleen als de gekalibreerde score OCR verbetert. Standaard ingeschakeld voor Beste |
-| `engine` | snaar | - | Verouderde compatibiliteitsalias. Wijst `tesseract` toe aan `fast` en de oude `paddleocr`-waarde aan `balanced`; PaddlePaddle wordt niet geladen |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verwerkingsniveau. Als `quality` ontbreekt, wordt het hoogste beschikbare niveau in deze volgorde gekozen: `best`, `balanced`, `fast`. Voor Koreaans wordt `fast` nooit gekozen; zonder een nauwkeurig niveau retourneert de API de installatie- of compatibiliteitsfout voor de nauwkeurige runtime. |
+| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast ondersteunt `ko` niet |
+| `enhance` | boolean | Niveau-afhankelijk | Verbeter het lokale contrast. Fast past het direct toe; nauwkeurige niveaus behouden de variant alleen als de gekalibreerde score OCR verbetert. Standaard ingeschakeld voor `best` |
+| `engine` | string | - | Verouderde compatibiliteitsalias. Wijst `tesseract` toe aan `fast` en de oude `paddleocr`-waarde aan `balanced`; PaddlePaddle wordt niet geladen |
 
-Retourneert geëxtraheerde tekst plus metagegevens over de herkomst: engine, gevraagde en werkelijke kwaliteit, apparaat, provider, degradatiestatus, waarschuwingen en nauwkeurige runtime-/modelversies, indien van toepassing. Expliciete kwaliteitsverzoeken vallen nooit terug naar een ander niveau. Als `balanced` of `best` niet beschikbaar is, retourneert API `FEATURE_NOT_INSTALLED` of `FEATURE_INCOMPATIBLE` in plaats van `fast` stil uit te voeren.
+Retourneert geëxtraheerde tekst plus metagegevens over de herkomst: engine, gevraagde en werkelijke kwaliteit, apparaat, provider, degradatiestatus, waarschuwingen en nauwkeurige runtime-/modelversies, indien van toepassing. Expliciete kwaliteitsverzoeken vallen nooit terug naar een ander niveau. Als `balanced` of `best` niet beschikbaar is, retourneert de API `FEATURE_NOT_INSTALLED` of `FEATURE_INCOMPATIBLE` in plaats van `fast` stil uit te voeren. Een expliciete keuze voor Fast of de oude `tesseract` met Koreaans retourneert `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` en richtlijnen voor het nauwkeurige pakket voordat er een taak in de wachtrij wordt geplaatst.
 
 ## PDF-OCR {#pdf-ocr}
 
@@ -183,13 +205,13 @@ Extraheert tekst uit gescande PDF-documenten met AI-gestuurde OCR, pagina voor p
 
 | Parameter | Type | Standaard | Beschrijving |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Als `quality` en `engine` zijn weggelaten, kiest SnapOtter de beste beschikbare laag in deze volgorde: `best`, `balanced`, `fast`. Voor Koreaans wordt `fast` nooit gekozen; het gebruikt `best`, daarna `balanced`, of geeft een installatie- of compatibiliteitsfout voor de nauwkeurige runtime terug. |
-| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verwerkingsniveau. Als `quality` ontbreekt, wordt het hoogste beschikbare niveau in deze volgorde gekozen: `best`, `balanced`, `fast`. Voor Koreaans wordt `fast` nooit gekozen; zonder een nauwkeurig niveau retourneert de API de installatie- of compatibiliteitsfout voor de nauwkeurige runtime. |
+| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast ondersteunt `ko` niet |
 | `pages` | string | `"all"` | Paginaselectie: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | Booleaans | Niveau-afhankelijk | Verbeter het lokale contrast. Snel past het direct toe; nauwkeurige niveaus behouden de variant alleen als de gekalibreerde score OCR verbetert. Standaard ingeschakeld voor Beste |
-| `engine` | snaar | - | Verouderde compatibiliteitsalias. Wijst `tesseract` toe aan `fast` en de oude `paddleocr`-waarde aan `balanced`; PaddlePaddle wordt niet geladen |
+| `enhance` | boolean | Niveau-afhankelijk | Verbeter het lokale contrast. Fast past het direct toe; nauwkeurige niveaus behouden de variant alleen als de gekalibreerde score OCR verbetert. Standaard ingeschakeld voor `best` |
+| `engine` | string | - | Verouderde compatibiliteitsalias. Wijst `tesseract` toe aan `fast` en de oude `paddleocr`-waarde aan `balanced`; PaddlePaddle wordt niet geladen |
 
-Dezelfde regel zonder downgrade is van toepassing op PDF OCR. PDF-pagina's worden vóór herkenning gerasterd, en één verzoek kan maximaal 50 pagina's selecteren.
+Dezelfde regels voor het niet terugvallen op een lager niveau en de Koreaanse compatibiliteit gelden voor PDF-OCR. PDF-pagina's worden vóór herkenning gerasterd, en één verzoek kan maximaal 50 pagina's selecteren.
 
 ## Gezicht / PII vervagen {#face-pii-blur}
 
@@ -357,7 +379,7 @@ Ten minste één uitbreidingsrichting moet groter zijn dan 0.
 | `sensitivity` | number (0-1) | `0.5` | Gezichtsdetectiedrempel |
 | `threshold` | integer (0-255) | `30` | Achtergronddetectiedrempel (trimmodus) |
 | `padToSquare` | boolean | `false` | Getrimd resultaat opvullen tot een vierkant |
-| `padColor` | string | `"#ffffff"` | Achtergrondkleur voor vierkante opvulling |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Achtergrondkleur voor vierkante opvulling |
 | `targetSize` | integer | - | Doelgrootte voor opgevulde uitvoer (pixels) |
 | `quality` | integer (1-100) | - | Uitvoerkwaliteit |
 

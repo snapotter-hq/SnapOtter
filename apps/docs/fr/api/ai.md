@@ -1,7 +1,7 @@
 ---
 description: "Référence du moteur d'IA avec tous les outils de ML locaux. Suppression d'arrière-plan, agrandissement, OCR, détection de visages, restauration de photos, et plus encore."
-i18n_output_hash: 7656c1512117
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: ac4d060d6181
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -64,15 +64,16 @@ L'image Docker contient l'application ainsi que l'environnement d'exécution com
 
 La plupart des outils d'IA nécessitent un ou plusieurs ensembles de fonctionnalités avant de pouvoir s'exécuter. L'interface utilisateur d'administration les installe par outil via `POST /api/v1/admin/tools/:toolId/features/install`, qui résout la liste complète des bundles, ignore les bundles déjà installés et met en file d'attente uniquement les téléchargements manquants. Par exemple, l'activation de Passport Photo sur une nouvelle instance met en file d'attente `background-removal` et `face-detection` ; l'activer une fois la suppression de l'arrière-plan déjà installée ne met en file d'attente que `face-detection`. OCR est l'exception car `fast` n'a pas besoin de pack ; installez son environnement d'exécution précis en option via l'interface utilisateur ou `POST /api/v1/admin/features/ocr/install`.
 
-| Groupe | Taille | Groupe de dépendances partagé | Outils qui l'utilisent |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 Go | détourage d'arrière-plan rembg / BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 Mo | détection de visages et points de repère MediaPipe | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 Go | remplissage/extension par LaMa et DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 Go | RealESRGAN, GFPGAN / CodeFormer, débruitage | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 Go | pipeline de réparation des rayures et de restauration | restore-photo |
-| `ocr` | ~208-234 MiB téléchargé / ~409-488 MiB installé | Modèles RapidOCR 3.9.1, ONNX Runtime 1.20.1 et PP-OCR épinglés en option | ocr, ocr-pdf (`balanced` et `best` uniquement) |
-| `transcription` | ~600 Mo | modèles de reconnaissance vocale faster-whisper | transcribe-audio, auto-subtitles |
+| Groupe | Taille | Plancher de mémoire CPU | Groupe de dépendances partagé | Outils qui l'utilisent |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 Go | 4 Go de RAM (~2,5 Go libres) | détourage d'arrière-plan rembg / BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 Mo | 2 Go de RAM (~0,5 Go libres) | détection de visages et points de repère MediaPipe | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 Go | 4 Go de RAM (~2 Go libres) | remplissage/extension par LaMa et DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 Go | 8 Go de RAM (~6 Go libres) | remplissage de haute qualité par Stable Diffusion 1.5 | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 Go | 4 Go de RAM (~2,5 Go libres) | RealESRGAN, GFPGAN / CodeFormer, débruitage | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 Go | 4 Go de RAM (~3 Go libres) | pipeline de réparation des rayures et de restauration | restore-photo |
+| `ocr` | ~208-234 MiB téléchargé / ~409-488 MiB installé | 4 GiB de mémoire effective configurée (`fast` fonctionne avec 2 Go) | Modèles RapidOCR 3.9.1, ONNX Runtime 1.20.1 et PP-OCR épinglés en option | ocr, ocr-pdf (`balanced` et `best` uniquement) |
+| `transcription` | ~600 Mo | 4 Go de RAM (~2 Go libres) | modèles de reconnaissance vocale faster-whisper | transcribe-audio, auto-subtitles |
 
 Outils avec des dépendances multi-groupes :
 
@@ -82,6 +83,27 @@ Outils avec des dépendances multi-groupes :
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Détecte les visages avant d'exécuter l'amélioration GFPGAN ou CodeFormer sur les régions de visage sélectionnées. |
 
 Un outil n'est disponible que lorsque tous ses bundles requis sont installés, à l'exception de OCR : son niveau `fast` intégré reste disponible sans le pack OCR en option. Les installations partielles sont valides et sont gérées de manière incrémentielle : les bundles installés sont réutilisés, les bundles manquants sont affichés sous forme de téléchargements et les installations en file d'attente s'exécutent une par une afin que l'environnement Python partagé ne soit pas modifié simultanément.
+
+### Installer tous les bundles d'un coup {#installing-every-bundle-at-once}
+
+Dans **Paramètres → Fonctionnalités IA**, le bouton **Tout installer** met en file d'attente tous les bundles que l'hôte peut exécuter. Il ignore tout ce qui est déjà installé, ignore les bundles signalés comme incompatibles avec l'hôte et réessaie une fois un bundle en échec avant de passer au suivant. Pour une instance normale, ce bouton est la réponse complète, et rien de ce qui suit n'est nécessaire.
+
+Prévoyez d'abord l'espace disque. Ensemble, les bundles occupent environ 20 à 25 Go une fois installés, et ils sont stockés dans `/data/ai` sur le volume de données plutôt que dans l'image, si bien qu'ils survivent à un `docker compose down` et à la recréation du conteneur. Vous les installez une fois par hôte, pas une fois par mise à niveau.
+
+Pour un provisionnement sans surveillance, où personne ne cliquera sur quoi que ce soit, envoyez chaque bundle au point de terminaison d'installation avec une clé d'API d'administration. Le serveur les met en file d'attente, vous pouvez donc envoyer les huit sans attendre :
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Chaque appel renvoie `202` avec un `jobId` et un indicateur `queued` : `false` pour celui qui démarre immédiatement, `true` pour les autres. Un bundle déjà installé renvoie `409` et peut être ignoré sans risque, ce qui rend la boucle rejouable. Interrogez `GET /api/v1/features` pour suivre la progression ; une fois l'exécution terminée, chaque bundle affiche `installed`.
+
+Deux choses à prévoir. Le bundle `ocr` exécute une vérification préalable de compatibilité avec l'hôte et refuse les hôtes en dessous de son minimum signé, si bien qu'il peut échouer alors que les sept autres réussissent (voir [Installation précise du runtime OCR](#accurate-ocr-runtime-installation)). Et `POST /api/v1/admin/features/reset` renvoie `409` tant qu'une installation est en cours : une exécution partielle doit donc aller au bout, ou le conteneur doit être redémarré, avant que l'environnement puisse être effacé.
 
 ### Installation précise du runtime OCR {#accurate-ocr-runtime-installation}
 
@@ -357,7 +379,7 @@ Au moins une direction d'extension doit être supérieure à 0.
 | `sensitivity` | number (0-1) | `0.5` | Seuil de détection de visages |
 | `threshold` | integer (0-255) | `30` | Seuil de détection de l'arrière-plan (mode rognage) |
 | `padToSquare` | boolean | `false` | Compléter le résultat rogné pour obtenir un carré |
-| `padColor` | string | `"#ffffff"` | Couleur d'arrière-plan pour le remplissage carré |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Couleur d'arrière-plan pour le remplissage carré |
 | `targetSize` | integer | - | Taille cible pour la sortie complétée (pixels) |
 | `quality` | integer (1-100) | - | Qualité de sortie |
 

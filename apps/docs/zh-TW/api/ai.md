@@ -1,19 +1,19 @@
 ---
 description: "AI 引擎參考，涵蓋所有本機 ML 工具。去背、放大、OCR、人臉偵測、相片修復等。"
-i18n_output_hash: 4e37d784676e
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: 7a0476b48ec2
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
 # AI 引擎參考 {#ai-engine-reference}
 
-`@snapotter/ai` 套件協調本機工具和 Python 運行時以進行本機 ML 操作。 大多數 ML 工具使用持久的 Python sidecar 來實現快速熱啟動。 OCR 是故意分開的： `fast` 呼叫本機 Tesseract 二進位文件， 儘管 `balanced` 和 `best` 使用專用的持久化 JSONL  dispatcher 固定到活動的不可變的 RapidOCR 新一代 `/data/ai/v3`。 每個請求都包含一個 generation lease。 在升級期間，SnapOtter 在啟動之前在候選者上運行 smoke test，自動切換到新的 dispatcher，然後在 garbage collection 之前耗盡舊代。
+`@snapotter/ai` 套件負責協調原生工具與 Python 執行環境，以完成本機 ML 操作。大多數 ML 工具使用常駐的 Python sidecar，以獲得快速的暖啟動。OCR 則是刻意分開的：`fast` 會呼叫原生 Tesseract 二進位檔，而 `balanced` 與 `best` 則使用專用的常駐 JSONL dispatcher，固定使用 `/data/ai/v3` 下目前作用中的不可變 RapidOCR 世代。每個請求都會持有世代租約。升級期間，SnapOtter 會先在候選版本上執行 smoke test，再以原子操作切換到新的 dispatcher，接著在垃圾回收前將舊世代排空。
 
-NVIDIA CUDA 由支援它的運行時自動檢測和使用。 OCR 在每個主機上使用 CPU，包括具有 NVIDIA GPU 的系統，避免 CUDA 和該工具的驅動程式耦合。
+NVIDIA CUDA 會自動偵測，並由支援它的執行環境使用。OCR 在所有主機上都使用 CPU，包括配備 NVIDIA GPU 的系統，藉此避免這個工具與 CUDA 及驅動程式產生耦合。
 
-目前不支援透過 VA-API、Quick Sync 或 OpenCL 進行 Intel/AMD iGPU 的 AI 推論加速。除非有支援 CUDA 的 NVIDIA GPU 可用，否則將 `/dev/dri` 對映進容器並不會加速這些 Python sidecar 工具。
+目前不支援透過 VA-API、Quick Sync 或 OpenCL 加速 Intel/AMD iGPU 的 AI 推論。除非有支援 CUDA 的 NVIDIA GPU，否則將 `/dev/dri` 對映進容器並不會加速這些 Python sidecar 工具。
 
-19 個 Python sidecar AI 工具，橫跨四種模態（image、audio、video、document），另有 2 個具備選用 AI 功能的工具。所有模型都在本機執行，初次下載模型後即不需要網際網路。
+19 個 Python sidecar AI 工具，涵蓋四種模態（影像、音訊、影片、文件），另有 2 個具備選用 AI 功能的工具。所有模型都在本機執行，初次下載模型後即不需要網際網路。
 
 
 <!-- korean-ocr-contract:start -->
@@ -62,17 +62,18 @@ AI 模型是依共用相依堆疊來封裝，而非每個工具一個封存檔�
 
 Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔會在需要時下載到常駐的 `/data/ai` 磁碟區，之後由所有需要它的工具重複使用。如果某個套件包已因另一個工具的需要而安裝，啟用一個新的相依工具並不會再次下載該套件包。
 
-大多數人工智慧工具都需要一個或多個功能包才能運作。 管理 UI 透過 `POST /api/v1/admin/tools/:toolId/features/install` 工具安裝這些包，它解析完整的捆綁包列表，跳過已安裝的捆綁包，並僅對缺少的下載進行排隊。 例如，在新實例佇列 `background-removal` 和 `face-detection` 上啟用 Passport Photo； 在已安裝背景刪除後啟用它僅排隊 `face-detection`。 OCR 是例外，因為 `fast` 不需要包裝； 透過 UI 或 `POST /api/v1/admin/features/ocr/install` 安裝其選購的精確執行時間。
+大多數 AI 工具在執行前都需要一個或多個功能套件包。管理介面會以工具為單位，透過 `POST /api/v1/admin/tools/:toolId/features/install` 安裝這些套件包；該端點會解析完整套件包清單、略過已安裝的套件包，並只將缺少的下載排入佇列。舉例來說，在全新執行個體上啟用 Passport Photo 會排入 `background-removal` 與 `face-detection`；若 Background Removal 已安裝後才啟用，則只會排入 `face-detection`。OCR 是例外，因為 `fast` 不需要任何套件包；可透過介面或 `POST /api/v1/admin/features/ocr/install` 安裝其選用的精確執行環境。
 
-| 套件包 | 大小 | 共用相依群組 | 使用它的工具 |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet 背景去背 | remove-background、passport-photo、transparency-fixer、background-replace、blur-background |
-| `face-detection` | 200-300 MB | MediaPipe 人臉偵測與特徵點 | blur-faces、red-eye-removal、smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa 影像修補/外延與 DDColor | erase-object、colorize、ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN、GFPGAN / CodeFormer、去雜訊 | upscale、enhance-faces、noise-removal |
-| `photo-restoration` | 4-5 GB | 刮痕修復與修復流程 | restore-photo |
-| `ocr` | ~208-234 MiB 下載 / ~409-488 MiB 安裝 | 選配 RapidOCR 3.9.1、ONNX Runtime 1.20.1 和固定 PP-OCR 型號 | ocr、ocr-pdf（僅限 `balanced` 和 `best`） |
-| `transcription` | ~600 MB | faster-whisper 語音轉文字模型 | transcribe-audio、auto-subtitles |
+| 套件包 | 大小 | CPU 記憶體下限 | 共用相依群組 | 使用它的工具 |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM（約 2.5 GB 可用） | rembg / BiRefNet 背景去背 | remove-background、passport-photo、transparency-fixer、background-replace、blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM（約 0.5 GB 可用） | MediaPipe 人臉偵測與特徵點 | blur-faces、red-eye-removal、smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM（約 2 GB 可用） | LaMa 影像修補/外延與 DDColor | erase-object、colorize、ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM（約 6 GB 可用） | Stable Diffusion 1.5 高品質影像修補 | erase-object（`qualityMode: "hq"`） |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM（約 2.5 GB 可用） | RealESRGAN、GFPGAN / CodeFormer、去雜訊 | upscale、enhance-faces、noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM（約 3 GB 可用） | 刮痕修復與修復流程 | restore-photo |
+| `ocr` | ~208-234 MiB 下載 / ~409-488 MiB 安裝 | 4 GiB 已設定的有效記憶體（`fast` 可在 2 GB 上執行） | 選配 RapidOCR 3.9.1、ONNX Runtime 1.20.1 和固定 PP-OCR 模型 | ocr、ocr-pdf（僅限 `balanced` 和 `best`） |
+| `transcription` | ~600 MB | 4 GB RAM（約 2 GB 可用） | faster-whisper 語音轉文字模型 | transcribe-audio、auto-subtitles |
 
 具有跨套件包相依性的工具：
 
@@ -81,17 +82,38 @@ Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔�
 | `passport-photo` | `background-removal`、`face-detection` | 先移除背景，再用人臉特徵點依護照與身分證照片規則框住裁切範圍。 |
 | `enhance-faces` | `upscale-enhance`、`face-detection` | 在對選定的人臉區域執行 GFPGAN 或 CodeFormer 增強之前，先偵測人臉。 |
 
-只有在安裝了工具所需的所有捆綁包（OCR 除外）後，工具才可用：其內建 `fast` 層在沒有選購 OCR 包的情況下仍然可用。 部分安裝是有效的，並且是增量處理的：已安裝的捆綁包被重用，丟失的捆綁包顯示為下載，排隊安裝一次運行一個，因此共享的 Python 環境不會同時修改。
+只有在工具所需的所有套件包都安裝後，工具才可使用；OCR 除外：其內建 `fast` 層在沒有選用 OCR 套件包的情況下仍可使用。部分安裝是有效的，且會以增量方式處理：已安裝的套件包會重複使用、缺少的套件包會顯示為待下載，而排入佇列的安裝一次只執行一個，以免共用的 Python 環境被同時修改。
 
-### 準確的 OCR 運行時安裝{#accurate-ocr-runtime-installation}
+### 一次安裝所有套件包 {#installing-every-bundle-at-once}
 
-準確的 OCR 套件是官方 Linux amd64 或 Linux arm64 容器的特定於平台的運行時。 amd64 建置使用 Python 3.12； arm64 版本使用 Python 3.11。 兩個版本都透過 ONNX Runtime 的 `CPUExecutionProvider` 運行 RapidOCR， 因此，相同的套件適用於僅 CPU 和 NVIDIA Docker 主機。 準確的運行時需要至少 4 GiB 的有效記憶體：配置的容器 cgroup 限制，否則為主機記憶體。 低於該簽章相容性最低值的系統在下載前會被拒絕。 此要求不適用於內建 Fast OCR。 Bare-metal 建置被拒絕，因為它們的 libc 和 Python ABI 無法安全推斷； 當主機提供 Tesseract 和 Ghostscript 時，快速 OCR 保持可用。
+**設定 → AI 功能**頁面有一個 **全部安裝** 按鈕，會把所有主機可執行的套件包排入佇列。它會略過已安裝的項目、略過回報與主機不相容的套件包，並在繼續之前將失敗的套件包重試一次。對一般執行個體來說，這個按鈕就能解決一切，以下內容都不需要。
 
-選用工件大約壓縮 208-234 MiB 並提取 409-488 MiB，具體取決於架構。 簽章索引綁定安裝程式強制執行的精確壓縮和提取位元組計數。 內建 Tesseract 在官方鏡像上增加了約25個 MiB，並且不需要`/data/ai`中的檔案。
+請先規劃磁碟空間。所有套件包合計安裝後約為 20-25 GB，而且會存放在資料磁碟區的 `/data/ai`，而不是映像檔中，因此能在 `docker compose down` 與容器重建後保留下來。每台主機只需安裝一次，而不是每次升級都安裝一次。
 
-線上安裝會取得已簽署的版本索引以及目前平台的精確內容尋址工件。 SnapOtter 在原子啟動新世代之前驗證 Ed25519 索引簽章、工件大小、SHA-256 摘要、模型摘要、路徑、檔案模式和暫存 smoke test。 失敗的安裝會使先前的健康生成保持活動狀態。
+若需要在無人看管的情況下佈建，沒有人會去點任何按鈕，請使用管理員 API 金鑰將每個套件包 POST 到安裝端點。伺服器會將它們排入佇列，因此可以一次送出全部八個，不必等待：
 
-對於氣隙安裝，請使用名為 `index` 和 `archive` 的多部分欄位將版本的 `ocr-runtime-index.json` 和相符的 OCR 執行時間存檔上傳到 `POST /api/v1/admin/features/import`。 離線導入應用與線上安裝相同的簽名、哈希、提取、相容性和冒煙測試檢查； 沒有可信任簽名索引的檔案將被拒絕。
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+每次呼叫都會傳回 `202` 以及 `jobId` 和 `queued` 旗標：立即啟動的那一個為 `false`，其餘為 `true`。已安裝的套件包會傳回 `409`，可以安全忽略，這讓迴圈可以重複執行。使用 `GET /api/v1/features` 輪詢進度；執行完成後，每個套件包都會顯示 `installed`。
+
+有兩件事可以預期。`ocr` 套件包會執行主機相容性預檢，並拒絕低於其簽署最低需求的主機，因此它可能失敗而其餘七個成功（參見[精確 OCR 執行環境安裝](#accurate-ocr-runtime-installation)）。另外，只要有安裝正在進行，`POST /api/v1/admin/features/reset` 就會傳回 `409`，因此執行到一半的安裝必須先完成，或必須重新啟動容器，才能清除環境。
+
+### 精確 OCR 執行環境安裝 {#accurate-ocr-runtime-installation}
+
+精確 OCR 套件是專供官方 Linux amd64 或 Linux arm64 容器使用的平台專屬執行環境。amd64 建置使用 Python 3.12，arm64 建置則使用 Python 3.11。兩者都透過 ONNX Runtime 的 `CPUExecutionProvider` 執行 RapidOCR，因此同一套件也可在僅有 CPU 的主機與 NVIDIA Docker 主機上運作。精確執行環境至少需要 4 GiB 的有效記憶體：也就是容器已設定的 cgroup 上限，若未設定則以主機記憶體為準。低於此簽署相容性下限的系統會在下載前遭到拒絕。這項需求不適用於內建 Fast OCR。裸機建置會遭到拒絕，因為其 libc 與 Python ABI 無法安全推斷；若主機提供 Tesseract 與 Ghostscript，Fast OCR 仍可使用。Fast 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 與 `ja`，但不支援韓語（`ko`）。因此韓語需要受支援的精確執行環境，以及 `balanced` 或 `best` 層級；不受支援的主機會收到明確的相容性錯誤回應，而不是默默退回 Fast。
+
+選用產物的壓縮大小約為 208-234 MiB，解壓後約為 409-488 MiB，視架構而定。簽署索引會綁定安裝程式強制執行的確切壓縮與解壓位元組數。內建 Tesseract 會為官方映像檔增加約 25 MiB，且不需要在 `/data/ai` 中放置任何檔案。
+
+線上安裝會取得已簽署的發行索引，以及目前平台對應的確切內容定址產物。SnapOtter 會驗證 Ed25519 索引簽章、產物大小、SHA-256 摘要、模型摘要、路徑、檔案模式，以及暫存 smoke test，之後才以原子操作啟用新世代。安裝失敗時，先前健康的世代會保持啟用。
+
+若要在氣隙環境中安裝，請將該發行的 `ocr-runtime-index.json` 與相符的 OCR 執行環境封存檔一併上傳到 `POST /api/v1/admin/features/import`，並使用名為 `index` 與 `archive` 的 multipart 欄位。離線匯入會套用與線上安裝相同的簽章、雜湊、解壓、相容性與 smoke test 檢查；沒有受信任簽署索引的封存檔會遭到拒絕。
 
 ---
 
@@ -163,16 +185,16 @@ Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔�
 ## OCR / 文字擷取 {#ocr-text-extraction}
 
 **工具路由：** `ocr`  
-**型號：** Tesseract （`fast`）； RapidOCR 和 PP-OCRv6 小型型號（`balanced`）； PP-OCRv6 具有校準變數評分的中等模型（`best`）
+**模型：** Tesseract（`fast`）；RapidOCR 搭配 PP-OCRv6 小型模型（`balanced`）；PP-OCRv6 中型模型並搭配校準變體評分（`best`）
 
 | 參數 | 型別 | 預設值 | 說明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態的 | 省略 `quality` 和 `engine` 時，SnapOtter 會依 `best`、`balanced`、`fast` 的順序選擇可用的最高品質層。韓語絕不會選擇 `fast`；它會使用 `best`，其次是 `balanced`，否則傳回精確執行階段的安裝或相容性錯誤。 |
-| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko` |
-| `enhance` | 布林值 | 取決於層級 | 提高局部對比。快速直接應用；僅當校準得分提高 OCR 時，準確的等級才會保留變體。預設為“最佳” |
-| `engine` | 細繩 | - | 已棄用的兼容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不載入 PaddlePaddle |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
+| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。Fast 不支援 `ko` |
+| `enhance` | boolean | 取決於層級 | 提升局部對比。Fast 會直接套用；精確層級只有在校準評分能改善 OCR 時才會保留該變體。Best 預設為開啟 |
+| `engine` | string | - | 已棄用的相容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不會載入 PaddlePaddle |
 
-傳回提取的文字以及來源元資料：引擎、請求的和實際的品質、設備、提供者、降級狀態、警告和準確的運行時/模型版本（如果適用）。 明確的品質要求永遠不會退回到另一層。 如果 `balanced` 或 `best` 不可用，則 API 傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是靜默執行 `fast`。
+傳回擷取的文字，以及來源中繼資料：引擎、要求的品質與實際品質、裝置、提供者、降級狀態、警告，以及適用時的精確執行環境/模型版本。明確指定品質時，絕不會退回其他層級。若 `balanced` 或 `best` 無法使用，API 會傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是默默執行 `fast`。明確指定 Fast，或使用舊版 `tesseract` 別名搭配韓語時，會在作業排入佇列前傳回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`，以及精確套件的指引。
 
 ## PDF OCR {#pdf-ocr}
 
@@ -183,13 +205,13 @@ Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔�
 
 | 參數 | 型別 | 預設值 | 說明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態的 | 省略 `quality` 和 `engine` 時，SnapOtter 會依 `best`、`balanced`、`fast` 的順序選擇可用的最高品質層。韓語絕不會選擇 `fast`；它會使用 `best`，其次是 `balanced`，否則傳回精確執行階段的安裝或相容性錯誤。 |
-| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
+| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。Fast 不支援 `ko` |
 | `pages` | string | `"all"` | 頁面選取：`"all"`、`"1-3"`、`"1,3,5"` |
-| `enhance` | 布林值 | 取決於層級 | 提高局部對比。快速直接應用；僅當校準得分提高 OCR 時，準確的等級才會保留變體。預設為“最佳” |
-| `engine` | 細繩 | - | 已棄用的兼容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不載入 PaddlePaddle |
+| `enhance` | boolean | 取決於層級 | 提升局部對比。Fast 會直接套用；精確層級只有在校準評分能改善 OCR 時才會保留該變體。Best 預設為開啟 |
+| `engine` | string | - | 已棄用的相容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不會載入 PaddlePaddle |
 
-同樣的不降級規則適用於 PDF OCR。 PDF 頁面在辨識前會進行光柵化處理，一次要求最多可以選擇50個頁面。
+PDF OCR 也適用相同的不降級與韓語相容性規則。PDF 頁面會在辨識前先點陣化，且一次請求最多可選取 50 頁。
 
 ## 人臉 / PII 模糊 {#face-pii-blur}
 
@@ -273,7 +295,7 @@ Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔�
 **工具路由：** `passport-photo`  
 **模型：** MediaPipe 人臉特徵點 + BiRefNet 去背
 
-兩階段工作流程：分析（偵測人臉 + 移除背景），接著產生（裁切、調整大小、平舖）。支援橫跨 6 個地區的 37+ 個國家。
+兩階段工作流程：分析（偵測人臉 + 移除背景），接著產生（裁切、調整大小、平鋪）。支援橫跨 6 個地區的 37+ 個國家。
 
 ### 階段 1：分析 {#phase-1-analyze}
 
@@ -295,7 +317,7 @@ Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔�
 | `documentType` | string | `"passport"` | 文件類型 |
 | `bgColor` | string | `"#FFFFFF"` | 背景顏色十六進位色碼 |
 | `printLayout` | string | `"none"` | 列印版面配置：`none`、`4x6`、`a4`、`letter` |
-| `maxFileSizeKb` | number | `0` | 檔案大小上限（KB）（0 = 無限制） |
+| `maxFileSizeKb` | number | `0` | 檔案大小上限（KB；0 = 無限制） |
 | `dpi` | number (72-1200) | `300` | 輸出 DPI |
 | `customWidthMm` | number | - | 自訂寬度（mm）（覆寫國家規格） |
 | `customHeightMm` | number | - | 自訂高度（mm）（覆寫國家規格） |
@@ -357,7 +379,7 @@ Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔�
 | `sensitivity` | number (0-1) | `0.5` | 人臉偵測門檻 |
 | `threshold` | integer (0-255) | `30` | 背景偵測門檻（trim 模式） |
 | `padToSquare` | boolean | `false` | 將修剪後的結果補齊為正方形 |
-| `padColor` | string | `"#ffffff"` | 正方形補齊的背景顏色 |
+| `padColor` | string（`#rrggbb`） | `"#ffffff"` | 正方形補齊的背景顏色 |
 | `targetSize` | integer | - | 補齊輸出的目標尺寸（像素） |
 | `quality` | integer (1-100) | - | 輸出品質 |
 
@@ -448,7 +470,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/transparency-fixer \
 ### 內容感知調整大小（接縫裁減） {#content-aware-resize-seam-carving}
 
 **工具路由：** `content-aware-resize`  
-**引擎：** Go `caire` 二進位檔（非 Python，無 GPU 效益）
+**引擎：** Go `caire` 二進位檔（非 Python，GPU 無法加速）
 
 透過移除低能量接縫來智慧調整影像大小，保留重要內容。
 

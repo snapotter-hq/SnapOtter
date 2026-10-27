@@ -1,6 +1,6 @@
 ---
 description: "Vilken anonym användningsdata SnapOtter samlar in, när den skickas och hur man stänger av instansomfattande produktanalys."
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 59a586e4d3ef
 ---

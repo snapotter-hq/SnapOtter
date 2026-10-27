@@ -1,6 +1,6 @@
 ---
 description: "Schema del database PostgreSQL, tabelle, migrazioni e procedure di backup per SnapOtter."
-i18n_source_hash: a68264552836
+i18n_source_hash: 331b11cd21d1
 i18n_provenance: machine
 i18n_output_hash: fdef77ac4a47
 i18n_hash_version: 2

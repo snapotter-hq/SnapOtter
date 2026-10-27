@@ -1,6 +1,6 @@
 ---
 description: "Welke anonieme gebruiksgegevens SnapOtter verzamelt, wanneer die worden verstuurd, en hoe je instance-brede productanalytics uitschakelt."
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: b5dad7c63a7d
 ---

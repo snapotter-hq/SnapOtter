@@ -1,6 +1,6 @@
 ---
 description: "Jak wnieść wkład w SnapOtter. Zgłoszenia błędów, propozycje funkcji, pull requesty i wymagania CLA."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: b6b9b3b7dca6
 i18n_hash_version: 2

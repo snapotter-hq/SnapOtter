@@ -1,7 +1,7 @@
 ---
 description: "Dokumentacja silnika AI ze wszystkimi lokalnymi narzędziami ML. Usuwanie tła, powiększanie, OCR, wykrywanie twarzy, renowacja zdjęć i więcej."
-i18n_output_hash: ed5274f5be30
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: 1fdd20c038d6
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -62,17 +62,18 @@ Modele AI są pakowane według współdzielonego stosu zależności, a nie jako 
 
 Obraz Docker dostarcza aplikację oraz wspólne środowisko uruchomieniowe. Duże archiwa modeli są pobierane na żądanie do trwałego woluminu `/data/ai`, a następnie ponownie wykorzystywane przez każde narzędzie, które ich potrzebuje. Jeśli pakiet jest już zainstalowany, ponieważ inne narzędzie go potrzebowało, włączenie nowego zależnego narzędzia nie powoduje ponownego pobrania tego pakietu.
 
-Większość narzędzi AI wymaga jednego lub więcej pakietów funkcji, zanim będą mogły zostać uruchomione. Interfejs administratora instaluje je za pomocą narzędzia `POST /api/v1/admin/tools/:toolId/features/install`, które rozpoznaje pełną listę pakietów, pomija już zainstalowane pakiety i umieszcza w kolejce tylko brakujące pliki do pobrania. Na przykład włączenie zdjęcia paszportowego w kolejkach świeżych instancji `background-removal` i `face-detection`; włączenie go po usunięciu tła jest już zainstalowanych kolejek tylko `face-detection`. OCR jest wyjątkiem, ponieważ `fast` nie wymaga pakietu; zainstaluj opcjonalne dokładne środowisko wykonawcze za pośrednictwem interfejsu użytkownika lub `POST /api/v1/admin/features/ocr/install`.
+Większość narzędzi AI wymaga jednego lub więcej pakietów funkcji, zanim będą mogły zostać uruchomione. Interfejs administratora instaluje je za pomocą narzędzia `POST /api/v1/admin/tools/:toolId/features/install`, które rozpoznaje pełną listę pakietów, pomija już zainstalowane pakiety i umieszcza w kolejce tylko brakujące pliki do pobrania. Na przykład włączenie narzędzia Zdjęcie paszportowe na świeżej instancji kolejkuje `background-removal` i `face-detection`; włączenie go, gdy Usuwanie tła jest już zainstalowane, kolejkuje tylko `face-detection`. OCR jest wyjątkiem, ponieważ `fast` nie wymaga pakietu; zainstaluj opcjonalne dokładne środowisko wykonawcze za pośrednictwem interfejsu użytkownika lub `POST /api/v1/admin/features/ocr/install`.
 
-| Pakiet | Rozmiar | Współdzielona grupa zależności | Narzędzia, które go używają |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | matting tła rembg / BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | wykrywanie twarzy i punktów charakterystycznych MediaPipe | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | inpainting/outpainting LaMa oraz DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, odszumianie | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | naprawa rys i potok renowacji | restore-photo |
-| `ocr` | ~208-234 MiB pobierz / ~409-488 MiB zainstalowany | Opcjonalne modele RapidOCR 3.9.1, ONNX Runtime 1.20.1 i przypinane PP-OCR | ocr, ocr-pdf (tylko `balanced` i `best`) |
-| `transcription` | ~600 MB | modele mowy na tekst faster-whisper | transcribe-audio, auto-subtitles |
+| Pakiet | Rozmiar | Minimalna pamięć RAM | Współdzielona grupa zależności | Narzędzia, które go używają |
+|--------|------|------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (~2,5 GB wolne) | matting tła rembg / BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (~0,5 GB wolne) | wykrywanie twarzy i punktów charakterystycznych MediaPipe | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (~2 GB wolne) | inpainting/outpainting LaMa oraz DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB wolne) | inpainting wysokiej jakości oparty na Stable Diffusion 1.5 | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (~2,5 GB wolne) | RealESRGAN, GFPGAN / CodeFormer, odszumianie | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB wolne) | naprawa rys i potok renowacji | restore-photo |
+| `ocr` | ~208-234 MiB pobierane / ~409-488 MiB po instalacji | 4 GiB skonfigurowanej efektywnej pamięci (`fast` działa na 2 GB) | Opcjonalne modele RapidOCR 3.9.1, ONNX Runtime 1.20.1 i przypięte modele PP-OCR | ocr, ocr-pdf (tylko `balanced` i `best`) |
+| `transcription` | ~600 MB | 4 GB RAM (~2 GB wolne) | modele mowy na tekst faster-whisper | transcribe-audio, auto-subtitles |
 
 Narzędzia z zależnościami międzypakietowymi:
 
@@ -83,11 +84,32 @@ Narzędzia z zależnościami międzypakietowymi:
 
 Narzędzie jest dostępne tylko wtedy, gdy zainstalowane są wszystkie wymagane pakiety, z wyjątkiem OCR: jego wbudowana warstwa `fast` pozostaje dostępna bez opcjonalnego pakietu OCR. Instalacje częściowe są ważne i obsługiwane przyrostowo: zainstalowane pakiety są ponownie wykorzystywane, brakujące pakiety są wyświetlane jako pliki do pobrania, a instalacje w kolejce są uruchamiane pojedynczo, więc współdzielone środowisko Python nie jest modyfikowane jednocześnie.
 
+### Instalowanie wszystkich pakietów naraz {#installing-every-bundle-at-once}
+
+W **Ustawieniach → Funkcje AI** znajduje się przycisk **Zainstaluj wszystkie**, który kolejkuje każdy pakiet, jaki host może uruchomić. Pomija wszystko, co jest już zainstalowane, pomija pakiety zgłoszone jako niezgodne z hostem i ponawia raz nieudaną instalację pakietu, zanim przejdzie dalej. W typowej instancji ten przycisk wystarcza i nic z poniższych kroków nie jest potrzebne.
+
+Najpierw zaplanuj miejsce na dysku. Razem pakiety zajmują po instalacji około 20-25 GB i trafiają do `/data/ai` na woluminie danych, a nie do obrazu, więc przetrwają `docker compose down` i odtworzenie kontenera. Instalujesz je raz na host, a nie raz na aktualizację.
+
+Do bezobsługowego wdrożenia, w którym nikt nie będzie nic klikał, wyślij każdy pakiet do punktu końcowego instalacji z kluczem API administratora. Serwer kolejkuje je, więc wyślij wszystkie osiem bez czekania:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Każde wywołanie zwraca `202` wraz z `jobId` i flagą `queued`: `false` dla tego, które startuje natychmiast, `true` dla pozostałych. Pakiet, który jest już zainstalowany, zwraca `409` i można go bezpiecznie zignorować, dzięki czemu pętlę można uruchamiać wielokrotnie. Postęp sprawdzaj przez `GET /api/v1/features`; po zakończeniu przebiegu każdy pakiet ma stan `installed`.
+
+Na dwie rzeczy warto się przygotować. Pakiet `ocr` wykonuje wstępną kontrolę zgodności z hostem i odrzuca hosty poniżej swojego podpisanego minimum, więc może się nie udać, podczas gdy pozostałe siedem zadziała (zobacz [Dokładna instalacja środowiska wykonawczego OCR](#accurate-ocr-runtime-installation)). A `POST /api/v1/admin/features/reset` zwraca `409`, dopóki trwa jakakolwiek instalacja, więc częściowo wykonany przebieg musi się zakończyć albo kontener trzeba zrestartować, zanim będzie można wyczyścić środowisko.
+
 ### Dokładna instalacja środowiska wykonawczego OCR {#accurate-ocr-runtime-installation}
 
-Dokładny pakiet OCR to specyficzne dla platformy środowisko uruchomieniowe dla oficjalnego kontenera Linux amd64 lub Linux arm64. Kompilacja amd64 wykorzystuje Python 3.12; kompilacja arm64 wykorzystuje Python 3.11. Obie kompilacje działają od RapidOCR do ONNX Runtime `CPUExecutionProvider`, więc ten sam pakiet działa na hostach wyposażonych tylko w procesor i NVIDIA Docker. Dokładny czas działania wymaga co najmniej 4 GiB efektywnej pamięci: skonfigurowany limit kontenera cgroup, w przeciwnym razie pamięć hosta. System poniżej podpisanego minimum zgodności jest odrzucany przed pobraniem. Wymaganie to nie dotyczy wbudowanego Fast OCR. Kompilacje Bare-metal są odrzucane, ponieważ nie można bezpiecznie wywnioskować ich libc i Python ABI; Szybki OCR pozostaje dostępny, gdy host udostępnia Tesseract i Ghostscript.
+Dokładny pakiet OCR to specyficzne dla platformy środowisko uruchomieniowe dla oficjalnego kontenera Linux amd64 lub Linux arm64. Kompilacja amd64 używa Pythona 3.12, a kompilacja arm64 Pythona 3.11. Obie kompilacje uruchamiają RapidOCR przez `CPUExecutionProvider` ONNX Runtime, więc ten sam pakiet działa na hostach z samym CPU i na hostach NVIDIA Docker. Dokładne środowisko wymaga co najmniej 4 GiB efektywnej pamięci: skonfigurowanego limitu cgroup kontenera, a w przeciwnym razie pamięci hosta. System poniżej tego podpisanego minimum zgodności jest odrzucany przed pobraniem. Wymóg ten nie dotyczy wbudowanego Szybkiego OCR. Kompilacje bare-metal są odrzucane, ponieważ nie można bezpiecznie wywnioskować ich libc i ABI Pythona; Szybki OCR pozostaje dostępny, gdy host udostępnia Tesseract i Ghostscript. Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie koreański (`ko`). Koreański wymaga więc obsługiwanego dokładnego środowiska i poziomu `balanced` lub `best`; nieobsługiwane hosty otrzymują jawną odpowiedź o niezgodności zamiast cichego przejścia na Szybki OCR.
 
-Opcjonalny artefakt to około 208-234 skompresowany MiB i wyodrębniony 409-488 MiB, w zależności od architektury. Podpisany indeks wiąże dokładną liczbę skompresowanych i wyodrębnionych bajtów wymuszonych przez instalatora. Wbudowany Tesseract dodaje około 25 MiB do oficjalnego obrazu i nie wymaga żadnych plików w `/data/ai`.
+Opcjonalny artefakt ma około 208-234 MiB po kompresji i 409-488 MiB po rozpakowaniu, w zależności od architektury. Podpisany indeks wiąże dokładną liczbę skompresowanych i rozpakowanych bajtów wymuszaną przez instalatora. Wbudowany Tesseract dodaje około 25 MiB do oficjalnego obrazu i nie wymaga żadnych plików w `/data/ai`.
 
 Instalacja online pobiera podpisany indeks wersji i dokładny artefakt adresowany do treści dla bieżącej platformy. SnapOtter weryfikuje sygnaturę indeksu Ed25519, rozmiar artefaktu, podsumowanie SHA-256, podsumowania modelu, ścieżki, tryby plików i etapową smoke test przed atomową aktywacją nowej generacji. Nieudana instalacja pozostawia aktywną poprzednią, zdrową generację.
 
@@ -167,12 +189,12 @@ Rozmywa tło, zachowując ostrość obiektu.
 
 | Parametr | Typ | Domyślnie | Opis |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Gdy pominięto `quality` i `engine`, SnapOtter wybiera najlepszy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego nigdy nie wybiera `fast`; używa `best`, następnie `balanced`, albo zwraca błąd instalacji lub zgodności dokładnego środowiska. |
-| `language` | string | `"auto"` | Język: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | wartość logiczna | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Najlepsze |
-| `engine` | smyczkowy | - | Przestarzały alias zgodności. Mapuje `tesseract` na `fast` i starszą wartość `paddleocr` na `balanced`; nie ładuje PaddlePaddle |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Poziom przetwarzania. Gdy `quality` jest pominięte, wybierany jest najwyższy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego nigdy nie wybiera `fast`; bez dokładnego poziomu zwraca błąd nakazujący instalację dokładnego środowiska albo błąd zgodności |
+| `language` | string | `"auto"` | Język: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast nie obsługuje `ko` |
+| `enhance` | boolean | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Najlepsze |
+| `engine` | string | - | Przestarzały alias zgodności. Mapuje `tesseract` na `fast` i starszą wartość `paddleocr` na `balanced`; nie ładuje PaddlePaddle |
 
-Zwraca wyodrębniony tekst oraz metadane pochodzenia: silnik, żądaną i rzeczywistą jakość, urządzenie, dostawcę, stan degradacji, ostrzeżenia i dokładne wersje środowiska wykonawczego/modelu, jeśli ma to zastosowanie. Wyraźne żądania jakości nigdy nie przechodzą na inny poziom. Jeżeli `balanced` lub `best` jest niedostępne, API zwraca `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE` zamiast cichego działania `fast`.
+Zwraca wyodrębniony tekst oraz metadane pochodzenia: silnik, żądaną i rzeczywistą jakość, urządzenie, dostawcę, stan degradacji, ostrzeżenia i dokładne wersje środowiska wykonawczego/modelu, jeśli ma to zastosowanie. Wyraźne żądania jakości nigdy nie przechodzą na inny poziom. Jeżeli `balanced` lub `best` jest niedostępne, API zwraca `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE` zamiast cichego działania `fast`. Jawne użycie Fast lub starszego `tesseract` z językiem koreańskim zwraca `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` i wskazówkę dotyczącą dokładnego pakietu, zanim zadanie trafi do kolejki.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -183,13 +205,13 @@ Wyodrębnia tekst ze skanowanych dokumentów PDF przy użyciu OCR wspieranego pr
 
 | Parametr | Typ | Domyślnie | Opis |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Gdy pominięto `quality` i `engine`, SnapOtter wybiera najlepszy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego nigdy nie wybiera `fast`; używa `best`, następnie `balanced`, albo zwraca błąd instalacji lub zgodności dokładnego środowiska. |
-| `language` | string | `"auto"` | Język: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Poziom przetwarzania. Gdy `quality` jest pominięte, wybierany jest najwyższy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego nigdy nie wybiera `fast`; bez dokładnego poziomu zwraca błąd nakazujący instalację dokładnego środowiska albo błąd zgodności |
+| `language` | string | `"auto"` | Język: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast nie obsługuje `ko` |
 | `pages` | string | `"all"` | Wybór stron: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | wartość logiczna | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Najlepsze |
-| `engine` | smyczkowy | - | Przestarzały alias zgodności. Mapuje `tesseract` na `fast` i starszą wartość `paddleocr` na `balanced`; nie ładuje PaddlePaddle |
+| `enhance` | boolean | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Najlepsze |
+| `engine` | string | - | Przestarzały alias zgodności. Mapuje `tesseract` na `fast` i starszą wartość `paddleocr` na `balanced`; nie ładuje PaddlePaddle |
 
-Ta sama zasada zakazu zmiany wersji ma zastosowanie do PDF OCR. Strony PDF są rasteryzowane przed rozpoznaniem, a jedno żądanie może wybrać maksymalnie 50 stron.
+Te same zasady braku przechodzenia na niższy poziom i zgodności z językiem koreańskim mają zastosowanie do OCR PDF. Strony PDF są rasteryzowane przed rozpoznaniem, a jedno żądanie może wybrać maksymalnie 50 stron.
 
 ## Rozmycie twarzy / danych osobowych {#face-pii-blur}
 
@@ -357,7 +379,7 @@ Co najmniej jeden kierunek rozszerzenia musi być większy niż 0.
 | `sensitivity` | number (0-1) | `0.5` | Próg wykrywania twarzy |
 | `threshold` | integer (0-255) | `30` | Próg wykrywania tła (tryb przycinania) |
 | `padToSquare` | boolean | `false` | Dopełnij przycięty wynik do kwadratu |
-| `padColor` | string | `"#ffffff"` | Kolor tła dla dopełnienia kwadratowego |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Kolor tła dla dopełnienia kwadratowego |
 | `targetSize` | integer | - | Docelowy rozmiar dla dopełnionego wyjścia (piksele) |
 | `quality` | integer (1-100) | - | Jakość wyjściowa |
 

@@ -1128,9 +1128,9 @@
     "stale": false
   },
   "faq.q5.a": {
-    "sourceHash": "0c404c4b7ba8",
+    "sourceHash": "f838bd495679",
     "provenance": "machine",
-    "outputHash": "eb0664d05bbb",
+    "outputHash": "cb851a4bbbc5",
     "stale": false
   },
   "faq.q5.q": {
@@ -1950,16 +1950,16 @@
     "stale": false
   },
   "home.metaDescription": {
-    "sourceHash": "",
+    "sourceHash": "0bdf920ee18c",
     "provenance": "human",
-    "outputHash": "",
-    "stale": true
+    "outputHash": "09da45513c83",
+    "stale": false
   },
   "home.metaTitle": {
-    "sourceHash": "",
+    "sourceHash": "89afd0597e8c",
     "provenance": "human",
-    "outputHash": "",
-    "stale": true
+    "outputHash": "79071d9e416b",
+    "stale": false
   },
   "home.openSource.discord": {
     "sourceHash": "62d97f750910",

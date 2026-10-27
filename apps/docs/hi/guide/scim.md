@@ -1,8 +1,8 @@
 ---
 description: "अपने identity provider से SnapOtter में users और groups को sync करने के लिए SCIM 2.0 provisioning सेट करें। Okta, Azure AD / Entra ID, और custom integrations को कवर करता है।"
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 83a5e7e5383c
+i18n_output_hash: 0d998fbf9e85
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP प्रति मिनट 1000 से अधिक requests भेज र
 ### Users deprovisioned but not removed from the UI {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE एक soft deactivation है। निष्क्रिय किए गए users अभी भी admin user सूची में disabled status के साथ दिखाई देते हैं। यह डिज़ाइन के अनुसार है ताकि उनका data संरक्षित रहे। उनकी role `disabled:<original-role>` के रूप में दिखाई देती है।
+
+### OIDC या SAML से साइन इन करने वाले उपयोगकर्ता के लिए `externalId` फ़िल्टर चूक जाता है {#recover-scim-ids-in-oidc-or-saml-users}
+
+इससे पहले कि SCIM के `externalId` का अपना कॉलम (`users.scim_external_id`) होता, किसी ऐसे उपयोगकर्ता पर SCIM `PUT` या `PATCH` — जिसे OIDC या SAML साइन-इन पहले ही लिंक कर चुका था — SCIM id को उस उपयोगकर्ता की साइन-इन पहचान में लिख देता था। अपग्रेड माइग्रेशन उस मान को असली OIDC subject या SAML NameID से अलग नहीं पहचान सकता, इसलिए वह उन उपयोगकर्ताओं को छोड़ देता है। उनके लिए `filter=externalId eq "..."` तब तक कुछ नहीं लौटाता जब तक IdP `externalId` लेकर कोई और अपडेट न भेजे।
+
+यदि आप IdP की प्रतीक्षा नहीं करना चाहते, तो ऑडिट लॉग इस id की पुष्टि कर सकता है। SCIM एक `SCIM_USER_PROVISIONED` पंक्ति लिखता है जिसमें वह `externalId` होता है जिसके साथ उसने हर उपयोगकर्ता बनाया। एक बार जब आप ऐसी रिलीज़ पर हों जिसमें `scim_external_id` कॉलम है, तो SnapOtter डेटाबेस के विरुद्ध `psql` खोलें ([खाता पुनर्प्राप्ति गाइड](/hi/guide/account-recovery#older-images-and-fallbacks) दोनों सेटअप के लिए दिखाती है) और उन उपयोगकर्ताओं का पूर्वावलोकन करें जिनकी साइन-इन पहचान अब भी उस id के बराबर है:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+यदि सूची सही लगती है, तो id को SCIM कॉलम में कॉपी करें। इसे `BEGIN;` के भीतर चलाएँ और `COMMIT;` करने से पहले लौटाई गई पंक्तियाँ जाँचें:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+दूसरा रन कुछ भी मेल नहीं करता। अपडेट `external_id` को जैसा है वैसा छोड़ देता है, क्योंकि कुछ IdP (उनमें Okta भी) वही id OIDC `sub` और SCIM `externalId` दोनों के रूप में भेजते हैं, और उनके लिए इसे साफ़ करना OIDC साइन-इन तोड़ देगा। जिस उपयोगकर्ता का `external_id` वास्तव में भटका हुआ SCIM id है, वह subject मिलान में पहले ही विफल हो चुका है। `OIDC_AUTO_LINK_USERS` (या `SAML_AUTO_LINK_USERS`) चालू होने पर, सत्यापित ईमेल के साथ उनका अगला साइन-इन उन्हें किसी भी तरह फिर से जोड़ देता है।
+
+कुछ उपयोगकर्ता पहुँच से बाहर रह जाते हैं और IdP के अगले अपडेट से id फिर से ले लेते हैं:
+
+- ऐसे उपयोगकर्ता जिनके साइन-इन लिंक ने SCIM id की जगह ले ली है और जिनके बाद कोई SCIM लेखन नहीं हुआ, क्योंकि उनका `external_id` अब ऑडिट पंक्ति से मेल नहीं खाता
+- ऐसे उपयोगकर्ता जिनकी provisioning पंक्ति ऑडिट प्रतिधारण द्वारा पहले ही हटा दी गई है
+- ऐसे उपयोगकर्ता जिनका `externalId` बनाने के बाद IdP ने बदल दिया (अपडेट पंक्तियाँ दर्ज करती हैं कि कौन से फ़ील्ड बदले, उनके मान नहीं)
+- दो उपयोगकर्ता जिनके पास एक ही id है, जिन्हें क्वेरी छोड़ देती है ताकि unique index उसे न रोके; अंतिम क्लॉज़ के बिना पूर्वावलोकन उन्हें सूचीबद्ध करता है, और id किसका है यह आपका निर्णय है

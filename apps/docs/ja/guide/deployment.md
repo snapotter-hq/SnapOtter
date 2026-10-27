@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter を Docker で本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare 向けのリバースプロキシ設定を扱います。"
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: b3b304700876
+i18n_output_hash: 1dd30ed66f5c
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,15 @@ curl http://localhost:1349/api/v1/health
 
 以下のすべてのプロキシについて 2 つのことが重要です。それは、大きなリクエスト本文 (アップロード) を許可することと、応答をバッファリングしないことです。応答バッファリング プロキシは SSE の進行を中断し、より目に見えて大きなファイルのダウンロードが「開始されるが終了しない」ことになります。これは、プロキシがファイル全体を引き渡す前に保持するためです。 SnapOtter はダウンロード時に `X-Accel-Buffering: no` を送信するため、他の場所でバッファリングがオンのままであっても nginx はそれらをストリーミングしますが、nginx 以外のプロキシでは応答バッファリングを明示的に無効にする必要があります (以下の各構成に示されています)。ダウンロードが途中で停止した場合、最初に確認する必要があるのは、前面にあるバッファリング プロキシです。
 
+HSTS についての補足: API はすべての応答で `Strict-Transport-Security` を自身で送信するため、応答ヘッダーをそのまま通すプロキシ（以下の設定はすべて該当します）では、HSTS のための設定は不要です。プロキシが上流の応答ヘッダーを削除または上書きするように設定されている場合に限り、ヘッダーを保持するか、エッジで再び追加する必要があります。
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # 簡潔さのため平文 HTTP を示しています。TLS はご自身の `listen 443 ssl`
+    # サーバーブロックで終端してください。API が送信する Strict-Transport-Security
+    # ヘッダーはプロキシされるすべての応答にそのまま通るため、そこに add_header は不要です。
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +528,37 @@ server {
 }
 ```
 
+### サブパス配下でのデプロイ {#subpath}
+
+`https://example.com/snapotter` で提供するには、SnapOtter コンテナの環境変数に `BASE_PATH=/snapotter` を設定して再起動します。公式の CPU および GPU Compose ファイルも、シェルまたは Compose の `.env` ファイルから `BASE_PATH` を受け取ります。同じイメージがどのパスでも動作し、フロントエンドの再ビルドは不要です。
+
+`BASE_PATH` は、英字、数字、`_`、`-` を含むスラッシュ区切りのセグメントを受け付け、`/apps/snapotter` のようなネストしたパスも指定できます。末尾のスラッシュは任意です。ルート配置では空のまま（デフォルト）にするか、`/` を設定してください。
+
+既存の Nginx HTTPS サーバー ブロックでは、次のようにします:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+この例はプレフィックスを保持します。転送前に `/snapotter` を削除するプロキシにも対応しています。内部のヘルスチェックは引き続き `/api/v1/health` を使用できます。OIDC または SAML を使う場合は、`EXTERNAL_URL=https://example.com/snapotter` も設定し、ID プロバイダーのコールバック URL をそれぞれ `/snapotter/api/auth/oidc/callback` または `/snapotter/api/auth/saml/callback` を含むように更新してください。
+
+API スクリプトは変更なしで動作し続けます。ツールの `downloadUrl` など API レスポンス内の URL は、`BASE_PATH` に関係なく `/api/` で始まります。ドメイン ルートに対して解決するのではなく、インスタンスのベース URL に追加してください（`https://example.com/snapotter` + `/api/v1/download/...`）。
+
+UI はプレフィックス付きの URL（`https://example.com/snapotter`）で開いてください。プレフィックスなしでアクセスしたブラウザは自動的にそこへ送られます。プレフィックスなしでアプリに到達してよいのは API リクエストだけです。ログに `Requests arrive under /snapotter/ but BASE_PATH is empty` と表示される場合、プロキシが `BASE_PATH` で宣言していないプレフィックスを転送しています。`BASE_PATH` にその値を設定するか、プロキシ側でプレフィックスを削除してください。
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. 新しい Proxy Host を追加します
@@ -530,6 +566,8 @@ server {
 3. Scheme を `http`、Forward Hostname を `SnapOtter`（またはコンテナの IP）、Forward Port を `1349` に設定します
 4. WebSocket サポートを有効にします
 5. Advanced の下に次を追加します: `client_max_body_size 500M;` と `proxy_buffering off;`
+
+API の `Strict-Transport-Security` ヘッダーは NPM をそのまま通過します。SSL タブの HSTS トグルは、それに加えて設定してもよい任意の項目です。
 
 ### Traefik {#traefik}
 
@@ -546,6 +584,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik は上流の応答ヘッダーを変更せずに転送するため、API の `Strict-Transport-Security` ヘッダーは `headers` ミドルウェアなしでブラウザーに届きます。応答ヘッダーを書き換えるミドルウェアをすでに運用している場合は、そのヘッダーをそのまま残すようにしてください。
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +600,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` は、応答バッファリングを無効にします。これは、SSE の進行状況イベント (バッチ処理、AI ツール、機能のインストール) と、大きなファイルのダウンロードが停止せずにストリーミングするために必要です。タイムアウトを延長すると、Caddy が接続を早期に閉じることなく、大きなファイルのアップロードを完了できます。
+`flush_interval -1` は、応答バッファリングを無効にします。これは、SSE の進行状況イベント (バッチ処理、AI ツール、機能のインストール) と、大きなファイルのダウンロードが停止せずにストリーミングするために必要です。タイムアウトを延長すると、Caddy が接続を早期に閉じることなく、大きなファイルのアップロードを完了できます。Caddy も API の `Strict-Transport-Security` ヘッダーをそのまま通すため、HSTS のための `header` ディレクティブは不要です。
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +609,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 注意: Cloudflare は無料プランで 100 MB のアップロード上限があります。それに合わせて `MAX_UPLOAD_SIZE_MB=100` を設定してください。
+
+トンネルは `Strict-Transport-Security` を含む API の応答ヘッダーを転送するため、ダッシュボードでの HSTS 設定は不要です（Cloudflare 自身のエッジ HSTS 設定は、それに加えて任意で有効にできます）。
+
+## トラブルシューティング {#troubleshooting}
+
+### 初回起動の失敗直後に "Postgres not reachable: EAI_AGAIN" が出る {#eai-again-after-failed-first-start}
+
+最初の `docker compose up -d` が途中で失敗した場合（よくあるのはポートがすでに使用されているケース）、そのまま `up -d` を再試行すると、アプリ コンテナが compose ネットワークに接続されないまま起動することがあります。するとアプリは次のエラーでクラッシュループします:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+`docker ps` では postgres が healthy と表示されます。エラー自体は本物ですが、指しているコンテナが違います。ネットワークに接続されていないため `postgres` ホスト名の DNS がまったく解決できず、再起動ポリシーが同じ失敗を永遠に繰り返します。
+
+最初の起動を妨げた原因（通常はポートの解放）を解消してから、アプリ コンテナを強制的に再作成し、ネットワークに再接続させます:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: 他のデバイスからは到達できるが、PC 自身からは到達できない {#windows-wsl2-loopback}
+
+Docker を WSL2 内で実行している場合（Windows でよくある構成）、ネットワーク上の他のすべてのマシンからはスタックに到達できるのに、Windows ホスト自身では `http://localhost:1349` がタイムアウトすることがあります。WSL のミラーリング ネットワーク モードを有効にしていても同じです。ポートは Windows の `netstat` に現れず、コンテナ側に問題はありません。
+
+別のデバイスから、またはディストリビューション内から自身のアドレス（WSL シェルで `hostname -I`）を使ってアプリを開いてください。お使いの WSL バージョンで localhost 転送がたまたま動作する場合は、それを前提とせず、ボーナス程度に考えてください。
 
 ## CI/CD {#ci-cd}
 

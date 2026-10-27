@@ -1,6 +1,6 @@
 ---
 description: "Combineer een of meer afbeeldingen tot een PDF-document met opties voor paginagrootte, oriëntatie en doelbestandsgrootte."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: fdf3d681ccbe
 ---

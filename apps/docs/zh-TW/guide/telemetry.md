@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter 會收集哪些匿名使用資料、何時傳送，以及如何關閉整個執行個體的產品分析。"
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 2f233be10af9
 ---

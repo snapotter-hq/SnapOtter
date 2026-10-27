@@ -187,7 +187,7 @@
   "faq.q3.q": "İnternet bağlantısına ihtiyacım var mı?",
   "faq.q4.a": "Yapay sınırlar yok. İstediğiniz kadar dosyayı, istediğiniz boyutta işleyebilirsiniz. Tek kısıtlama sunucunuzun donanım kaynaklarıdır.",
   "faq.q4.q": "Dosya boyutu veya kullanım sınırlaması var mı?",
-  "faq.q5.a": "SnapOtter; arka plan kaldırma, büyütme, OCR, transkripsiyon, yüz algılama, renklendirme, gürültü giderme, fotoğraf restorasyonu ve daha fazlası için 19 yerel yapay zeka aracı içerir. Tüm modeller kendi donanımınızda çalışır.",
+  "faq.q5.a": "SnapOtter; arka plan kaldırma, büyütme, OCR, transkripsiyon, yüz algılama, renklendirme, gürültü giderme, fotoğraf restorasyonu ve daha fazlası için 19 yerel yapay zeka aracı içerir. Tüm modeller kendi donanımınızda çalışır (2 GB RAM, yapay zeka dışı araçları, Fast OCR'ı ve yüz algılamayı çalıştırır; CPU yapay zeka paketleri 4 GB+ RAM veya HQ inpainting için 8 GB gerektirir).",
   "faq.q5.q": "Hangi yapay zeka özellikleri dahildir?",
   "faq.q6.a": "Anonim ürün analitiği varsayılan olarak açıktır ve dosyalarınızı veya içeriklerini asla içermez. Ayarlar > Sistem > Gizlilik bölümünden tek tıkla yönetici anahtarıyla dilediğiniz zaman kapatabilirsiniz.",
   "faq.q6.q": "SnapOtter herhangi bir analitik veri topluyor mu?",

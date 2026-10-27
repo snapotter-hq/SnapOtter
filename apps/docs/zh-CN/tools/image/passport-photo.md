@@ -1,8 +1,8 @@
 ---
 description: "基于 AI 的护照和证件照生成器，具备人脸检测、背景去除和打印排版拼贴功能。"
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 8f1a76094628
+i18n_output_hash: aa0a2a733146
 ---
 
 # 护照照片 {#passport-photo}
@@ -92,7 +92,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | documentType | string | 否 | `"passport"` | 证件类型（来自国家规格） |
 | bgColor | string | 否 | `"#FFFFFF"` | 背景颜色十六进制值 |
 | printLayout | string | 否 | `"none"` | 打印纸张排版：`none`、`4x6`、`a4` |
-| maxFileSizeKb | number | 否 | `0` | 最大文件大小限制（KB，0 = 无限制） |
+| maxFileSizeKb | number | 否 | `0` | 最大文件大小（KB，其中 1 KB = 1000 字节）（0 = 无限制） |
 | dpi | number | 否 | `300` | 输出 DPI（72-1200） |
 | customWidthMm | number | 否 | - | 自定义照片宽度（毫米，覆盖国家规格） |
 | customHeightMm | number | 否 | - | 自定义照片高度（毫米，覆盖国家规格） |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### 错误：分析已过期（410） {#error-analysis-expired-410}
+
+Generate 端点会基于 analyze 为 `jobId` 存储的去背景图像工作。存储的输出会在一段时间后被清理，因此如果两次调用之间间隔太久，那张图片就已不存在。请用同一张照片再次调用 analyze，并使用它返回的 `jobId`。
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+无法指代已存储文件的 `jobId` 或 `filename`（包含路径分隔符、`..` 或空字符串）会返回 400。
+
 ---
 
 ### 基础路由 {#base-route}
@@ -170,4 +183,4 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 - 分析响应中的 `preview` 字段是一张 base64 编码的 PNG（最大宽度 800px），用于快速显示。
 - 国家规格包含证件尺寸、头部高度比例以及基于官方护照照片要求的视线定位。
 - `printLayout` 选项会在 4x6 英寸或 A4 纸上生成拼贴排版，照片之间留有 2mm 的间隙。
-- 设置 `maxFileSizeKb` 时，输出会经过迭代压缩以符合大小限制。
+- 设置 `maxFileSizeKb` 时，输出的 JPEG 质量会逐步降低，直到符合大小限制。像素尺寸由国家/地区规格固定，因此如果降到最低质量仍不符合限制，`/generate` 会返回 422 并说明原因，而不是返回一个超出限制的文件。

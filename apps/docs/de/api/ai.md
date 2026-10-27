@@ -1,7 +1,7 @@
 ---
 description: "KI-Engine-Referenz mit allen lokalen ML-Werkzeugen. Hintergrundentfernung, Hochskalierung, OCR, Gesichtserkennung, Fotorestaurierung und mehr."
-i18n_output_hash: 015ad29c4981
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: 33295375ea44
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -64,15 +64,16 @@ Das Docker-Image liefert die Anwendung sowie die gemeinsame Laufzeitumgebung. Gr
 
 Die meisten KI-Tools erfordern ein oder mehrere Funktionspakete, bevor sie ausgeführt werden können. Die Admin-Benutzeroberfläche installiert diese per Tool über `POST /api/v1/admin/tools/:toolId/features/install`, das die vollständige Bundle-Liste auflöst, bereits installierte Bundles überspringt und nur die fehlenden Downloads in die Warteschlange stellt. Wenn Sie beispielsweise Passport Photo auf einer neuen Instanz aktivieren, werden die Warteschlangen `background-removal` und `face-detection` angezeigt. Wenn Sie es aktivieren, nachdem die Hintergrundentfernung bereits installiert ist, werden nur Warteschlangen angezeigt `face-detection`. OCR ist die Ausnahme, da `fast` kein Paket benötigt; Installieren Sie die optionale genaue Laufzeit über die Benutzeroberfläche oder `POST /api/v1/admin/features/ocr/install`.
 
-| Bundle | Größe | Gemeinsame Abhängigkeitsgruppe | Werkzeuge, die es nutzen |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet Hintergrund-Matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | MediaPipe Gesichtserkennung und Landmarken | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa Inpainting/Outpainting und DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, Rauschunterdrückung | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | Kratzerreparatur und Restaurierungs-Pipeline | restore-photo |
-| `ocr` | ~208-234 MiB herunterladen / ~409-488 MiB installiert | Optionale Modelle RapidOCR 3.9.1, ONNX Runtime 1.20.1 und angeheftete PP-OCR-Modelle | ocr, ocr-pdf (nur `balanced` und `best`) |
-| `transcription` | ~600 MB | faster-whisper Sprache-zu-Text-Modelle | transcribe-audio, auto-subtitles |
+| Bundle | Größe | CPU-Speicher-Minimum | Gemeinsame Abhängigkeitsgruppe | Werkzeuge, die es nutzen |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (~2,5 GB frei) | rembg / BiRefNet Hintergrund-Matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (~0,5 GB frei) | MediaPipe Gesichtserkennung und Landmarken | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (~2 GB frei) | LaMa Inpainting/Outpainting und DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB frei) | Stable Diffusion 1.5 Inpainting in hoher Qualität | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (~2,5 GB frei) | RealESRGAN, GFPGAN / CodeFormer, Rauschunterdrückung | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB frei) | Kratzerreparatur und Restaurierungs-Pipeline | restore-photo |
+| `ocr` | ~208-234 MiB herunterladen / ~409-488 MiB installiert | 4 GiB effektiver Speicher (konfiguriert) (`fast` läuft mit 2 GB) | Optionale Modelle RapidOCR 3.9.1, ONNX Runtime 1.20.1 und angeheftete PP-OCR-Modelle | ocr, ocr-pdf (nur `balanced` und `best`) |
+| `transcription` | ~600 MB | 4 GB RAM (~2 GB frei) | faster-whisper Sprache-zu-Text-Modelle | transcribe-audio, auto-subtitles |
 
 Werkzeuge mit bundleübergreifenden Abhängigkeiten:
 
@@ -82,6 +83,27 @@ Werkzeuge mit bundleübergreifenden Abhängigkeiten:
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Erkennt Gesichter, bevor es GFPGAN oder CodeFormer zur Verbesserung der ausgewählten Gesichtsbereiche ausführt. |
 
 Ein Tool ist nur verfügbar, wenn alle erforderlichen Bundles installiert sind, mit Ausnahme von OCR: Die integrierte `fast`-Stufe bleibt auch ohne das optionale OCR-Paket verfügbar. Teilinstallationen sind gültig und werden inkrementell verarbeitet: Installierte Bundles werden wiederverwendet, fehlende Bundles werden als Downloads angezeigt und Installationen in der Warteschlange werden einzeln ausgeführt, sodass die freigegebene Python-Umgebung nicht gleichzeitig geändert wird.
+
+### Alle Bundles auf einmal installieren {#installing-every-bundle-at-once}
+
+Unter **Einstellungen → KI-Funktionen** gibt es eine Schaltfläche **Alle installieren**, die jedes Bundle in die Warteschlange stellt, das der Host ausführen kann. Sie überspringt alles, was bereits installiert ist, überspringt Bundles, die als mit dem Host inkompatibel gemeldet werden, und versucht ein fehlgeschlagenes Bundle einmal erneut, bevor sie weitermacht. Für eine normale Instanz ist diese Schaltfläche die ganze Antwort, und nichts von dem folgenden Verfahren ist nötig.
+
+Kalkulieren Sie zuerst den Speicherplatz ein. Zusammen belegen die Bundles installiert etwa 20-25 GB, und sie landen in `/data/ai` auf dem Daten-Volume statt im Image, sodass sie `docker compose down` und das Neuerstellen des Containers überstehen. Sie installieren sie einmal pro Host, nicht einmal pro Upgrade.
+
+Für die unbeaufsichtigte Bereitstellung, bei der niemand etwas anklicken wird, senden Sie jedes Bundle mit einem Admin-API-Schlüssel an den Installationsendpunkt. Der Server stellt sie in die Warteschlange, also senden Sie alle acht, ohne zu warten:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Jeder Aufruf gibt `202` mit einer `jobId` und einem `queued`-Flag zurück: `false` für das Bundle, das sofort startet, `true` für die übrigen. Ein bereits installiertes Bundle gibt `409` zurück und kann gefahrlos ignoriert werden, wodurch die Schleife erneut ausführbar ist. Fragen Sie `GET /api/v1/features` ab, um den Fortschritt zu verfolgen; jedes Bundle zeigt `installed`, sobald der Lauf abgeschlossen ist.
+
+Zwei Dinge sollten Sie erwarten. Das Bundle `ocr` führt eine Host-Kompatibilitätsprüfung durch und lehnt Hosts unterhalb seines signierten Minimums ab, sodass es fehlschlagen kann, während die anderen sieben erfolgreich sind (siehe [Genaue OCR-Laufzeitinstallation](#accurate-ocr-runtime-installation)). Und `POST /api/v1/admin/features/reset` gibt `409` zurück, solange eine Installation läuft, sodass ein teilweise abgeschlossener Lauf beendet werden muss oder der Container neu gestartet werden muss, bevor die Umgebung geleert werden kann.
 
 ### Genaue OCR-Laufzeitinstallation {#accurate-ocr-runtime-installation}
 
@@ -168,11 +190,11 @@ Zeichnet den Hintergrund weich und hält das Motiv scharf.
 | Parameter | Typ | Standard | Beschreibung |
 |-----------|------|---------|-------------|
 | `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Wenn `quality` und `engine` fehlen, wählt SnapOtter die höchste verfügbare Stufe in dieser Reihenfolge: `best`, `balanced`, `fast`. Für Koreanisch wird `fast` nie gewählt; es wird `best`, dann `balanced` verwendet oder ein Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben. |
-| `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast unterstützt `ko` nicht |
 | `enhance` | Boolescher Wert | Tierabhängig | Verbessern Sie den lokalen Kontrast. Fast wendet es direkt an; Genaue Stufen behalten die Variante nur bei, wenn die kalibrierte Bewertung OCR verbessert. Standardmäßig ist „Best“ aktiviert |
 | `engine` | Zeichenfolge | - | Veralteter Kompatibilitätsalias. Ordnet `tesseract` `fast` und den alten `paddleocr`-Wert `balanced` zu; PaddlePaddle wird nicht geladen |
 
-Gibt extrahierten Text plus Herkunftsmetadaten zurück: Engine, angeforderte und tatsächliche Qualität, Gerät, Anbieter, Verschlechterungsstatus, Warnungen und ggf. genaue Laufzeit-/Modellversionen. Explizite Qualitätsanforderungen fallen nie auf eine andere Ebene zurück. Wenn `balanced` oder `best` nicht verfügbar ist, gibt API `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück, anstatt `fast` stillschweigend auszuführen.
+Gibt extrahierten Text plus Herkunftsmetadaten zurück: Engine, angeforderte und tatsächliche Qualität, Gerät, Anbieter, Verschlechterungsstatus, Warnungen und ggf. genaue Laufzeit-/Modellversionen. Explizite Qualitätsanforderungen fallen nie auf eine andere Ebene zurück. Wenn `balanced` oder `best` nicht verfügbar ist, gibt API `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück, anstatt `fast` stillschweigend auszuführen. Explizites Fast oder das alte `tesseract` mit Koreanisch gibt vor dem Einreihen eines Jobs `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` und einen Hinweis auf das genaue Paket zurück.
 
 ## PDF-OCR {#pdf-ocr}
 
@@ -184,12 +206,12 @@ Extrahiert Text aus gescannten PDF-Dokumenten mittels KI-gestützter OCR, Seite 
 | Parameter | Typ | Standard | Beschreibung |
 |-----------|------|---------|-------------|
 | `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Wenn `quality` und `engine` fehlen, wählt SnapOtter die höchste verfügbare Stufe in dieser Reihenfolge: `best`, `balanced`, `fast`. Für Koreanisch wird `fast` nie gewählt; es wird `best`, dann `balanced` verwendet oder ein Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben. |
-| `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast unterstützt `ko` nicht |
 | `pages` | string | `"all"` | Seitenauswahl: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | Boolescher Wert | Tierabhängig | Verbessern Sie den lokalen Kontrast. Fast wendet es direkt an; Genaue Stufen behalten die Variante nur bei, wenn die kalibrierte Bewertung OCR verbessert. Standardmäßig ist „Best“ aktiviert |
 | `engine` | Zeichenfolge | - | Veralteter Kompatibilitätsalias. Ordnet `tesseract` `fast` und den alten `paddleocr`-Wert `balanced` zu; PaddlePaddle wird nicht geladen |
 
-Die gleiche No-Downgrade-Regel gilt für PDF OCR. PDF Seiten werden vor der Erkennung gerastert und eine Anfrage kann höchstens 50 Seiten auswählen.
+Die gleiche No-Downgrade-Regel und die gleichen Koreanisch-Kompatibilitätsregeln gelten für PDF OCR. PDF Seiten werden vor der Erkennung gerastert und eine Anfrage kann höchstens 50 Seiten auswählen.
 
 ## Gesichts- / PII-Weichzeichnung {#face-pii-blur}
 
@@ -357,7 +379,7 @@ Mindestens eine Erweiterungsrichtung muss größer als 0 sein.
 | `sensitivity` | number (0-1) | `0.5` | Schwellenwert der Gesichtserkennung |
 | `threshold` | integer (0-255) | `30` | Schwellenwert der Hintergrunderkennung (Trim-Modus) |
 | `padToSquare` | boolean | `false` | Getrimmtes Ergebnis auf ein Quadrat auffüllen |
-| `padColor` | string | `"#ffffff"` | Hintergrundfarbe für die quadratische Auffüllung |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Hintergrundfarbe für die quadratische Auffüllung |
 | `targetSize` | integer | - | Zielgröße für die aufgefüllte Ausgabe (Pixel) |
 | `quality` | integer (1-100) | - | Ausgabequalität |
 

@@ -1,7 +1,7 @@
 ---
 description: "組み込みの Tesseract またはオプションの高精度 RapidOCR ランタイムを使用して、画像からテキストをローカルに抽出します。"
 i18n_output_hash: 360daff93230
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

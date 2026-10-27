@@ -1,8 +1,8 @@
 ---
 description: "Distribuera SnapOtter till produktion med Docker. Hårdvarukrav, GPU-konfiguration och konfigurationer för omvänd proxy för Nginx, Traefik och Cloudflare."
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: 9438460845c1
+i18n_output_hash: 99bbbadef1f1
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,15 @@ Två saker är värda att veta innan du börjar mäta klient-IP:n. Docker Deskto
 
 Två saker spelar roll för varje proxy nedan: tillåt stora begäranden (uppladdningar) och buffra inte svar. En svarsbuffrande proxy bryter SSE-förloppet och, mer synligt, gör att en stor filnedladdning "startar men slutar aldrig", eftersom proxyn håller hela filen innan den skickas vidare. SnapOtter skickar `X-Accel-Buffering: no` vid nedladdningar så nginx streamar dem även om buffring lämnas på någon annanstans, men andra proxyservrar än nginx behöver explicit inaktivera svarsbuffring (visas i varje konfiguration nedan). Om en nedladdning stannar halvvägs är en buffrande proxy framför det första att kontrollera.
 
+En kommentar om HSTS: API:et skickar `Strict-Transport-Security` på varje svar självt, så en proxy som skickar vidare svarshuvuden (alla konfigurationer nedan gör det) behöver ingen egen HSTS-konfiguration. Endast om din proxy är konfigurerad att ta bort eller åsidosätta svarshuvuden från uppströmskällan behöver du bevara huvudet eller lägga till det igen vid kanten.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # Vanlig HTTP visas för korthetens skull. Avsluta TLS i ditt eget `listen 443 ssl`
+    # serverblock; huvudet Strict-Transport-Security som API:et skickar passerar
+    # igenom med varje proxat svar, så ingen add_header behövs där.
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +528,37 @@ server {
 }
 ```
 
+### Distribuera under en undersökväg {#subpath}
+
+För att servera `https://example.com/snapotter`, ange `BASE_PATH=/snapotter` i SnapOtter-containerns miljö och starta om den. De officiella Compose-filerna för CPU och GPU tar också emot `BASE_PATH` från ditt skal eller Compose-filen `.env`. Samma avbildning fungerar på vilken sökväg som helst; ingen ombyggnad av gränssnittet behövs.
+
+`BASE_PATH` accepterar snedstrecksseparerade segment som innehåller bokstäver, siffror, `_` eller `-`, inklusive kapslade sökvägar som `/apps/snapotter`. Ett avslutande snedstreck är valfritt. Lämna det tomt (standardvärdet), eller ange `/`, för en distribution i roten.
+
+I ditt befintliga Nginx HTTPS-serverblock, använd:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+Det här exemplet bevarar prefixet. Proxyservrar som tar bort `/snapotter` innan vidarebefordran stöds också. Interna hälsokontroller kan fortsätta använda `/api/v1/health`. För OIDC eller SAML, ange även `EXTERNAL_URL=https://example.com/snapotter` och uppdatera identitetsleverantörens callback-URL:er så att de inkluderar `/snapotter/api/auth/oidc/callback` respektive `/snapotter/api/auth/saml/callback`.
+
+API-skript fortsätter fungera oförändrat: URL:er i API-svar, som ett verktygs `downloadUrl`, börjar med `/api/` oavsett vad `BASE_PATH` är. Lägg dem till instansens bas-URL (`https://example.com/snapotter` + `/api/v1/download/...`) i stället för att lösa dem mot domänroten.
+
+Öppna gränssnittet via den prefixade URL:en (`https://example.com/snapotter`). En webbläsare som anländer utan prefixet skickas dit automatiskt; endast API-förfrågningar förväntas nå appen utan prefix. Om loggarna säger `Requests arrive under /snapotter/ but BASE_PATH is empty`, vidarebefordrar din proxy ett prefix som `BASE_PATH` inte deklarerar: ange `BASE_PATH` till det, eller ta bort prefixet i proxyn.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Lägg till en ny Proxy Host
@@ -530,6 +566,8 @@ server {
 3. Ange Scheme till `http`, Forward Hostname till `SnapOtter` (eller din container-IP), Forward Port till `1349`
 4. Aktivera WebSocket-stöd
 5. Under Advanced, lägg till: `client_max_body_size 500M;` och `proxy_buffering off;`
+
+API:ets `Strict-Transport-Security`-huvud passerar genom NPM oförändrat; HSTS-växeln på fliken SSL är valfri ovanpå det.
 
 ### Traefik {#traefik}
 
@@ -546,6 +584,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik vidarebefordrar svarshuvuden från uppströmskällan oförändrade, så API:ets `Strict-Transport-Security`-huvud når webbläsare utan någon `headers`-middleware. Om du redan kör en som skriver om svarshuvuden, se till att den lämnar det huvudet intakt.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +600,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` inaktiverar svarsbuffring, vilket krävs för SSE-förloppshändelser (batchbearbetning, AI-verktyg, funktionsinstallationer) och för att ladda ner stora filer att strömma igenom istället för att stanna. De utökade tidsgränserna gör att uppladdningar av stora filer kan slutföras utan att Caddy stänger anslutningen i förtid.
+`flush_interval -1` inaktiverar svarsbuffring, vilket krävs för SSE-förloppshändelser (batchbearbetning, AI-verktyg, funktionsinstallationer) och för att ladda ner stora filer att strömma igenom istället för att stanna. De utökade tidsgränserna gör att uppladdningar av stora filer kan slutföras utan att Caddy stänger anslutningen i förtid. Caddy skickar också API:ets `Strict-Transport-Security`-huvud vidare orört, så inget `header`-direktiv behövs för HSTS.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +609,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 Obs: Cloudflare har en uppladdningsgräns på 100 MB på gratisplaner. Ange `MAX_UPLOAD_SIZE_MB=100` så att den matchar.
+
+Tunneln vidarebefordrar API:ets svarshuvuden, inklusive `Strict-Transport-Security`, så ingen HSTS-konfiguration i instrumentpanelen krävs (Cloudflares egen HSTS-inställning vid kanten är valfri ovanpå).
+
+## Felsökning {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" direkt efter en misslyckad första start {#eai-again-after-failed-first-start}
+
+Om den allra första `docker compose up -d` misslyckas halvvägs (en port som redan används är den vanliga orsaken) kan ett nytt försök med bara `up -d` starta appcontainern utan att koppla den till compose-nätverket. Appen kraschloopar då med:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+medan `docker ps` visar att postgres är frisk. Felet är verkligt men pekar på fel container: utan nätverket kan DNS för värdnamnet `postgres` inte lösas alls, och omstartsprincipen spelar upp samma fel för alltid.
+
+Åtgärda det som bröt den första starten (vanligtvis: frigör porten), tvinga sedan appcontainern att skapas om så att den kopplas till nätverket igen:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: nåbar från andra enheter, inte från datorn själv {#windows-wsl2-loopback}
+
+Med Docker som körs i WSL2 (den vanliga Windows-konfigurationen) kan stacken vara nåbar från alla andra maskiner i nätverket medan `http://localhost:1349` tar slut på tid på Windows-värden själv, även med WSL:s speglade nätverksläge aktiverat. Porten dyker aldrig upp i Windows `netstat`, och det är inget fel på containrarna.
+
+Öppna appen från en annan enhet, eller inifrån distributionen med dess egen adress (`hostname -I` i WSL-skalet). Om localhost-vidarebefordran råkar fungera på din WSL-version, se det som en bonus snarare än något att förlita sig på.
 
 ## CI/CD {#ci-cd}
 

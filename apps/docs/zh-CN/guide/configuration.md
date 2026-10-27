@@ -1,8 +1,8 @@
 ---
 description: "所有 SnapOtter 环境变量及其默认值。配置认证、存储、AI 模型、分析等。"
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: a0f2d2b10467
+i18n_output_hash: d591de2e46ee
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ i18n_hash_version: 2
 | 变量 | 默认值 | 描述 |
 |---|---|---|
 | `PORT` | `1349` | 服务器监听的端口。 |
+| `BASE_PATH` | （空） | 公开部署路径，例如 `/snapotter`。为空或 `/` 时在域名根路径提供服务。运行时生效，无需重新构建镜像。 |
 | `RATE_LIMIT_PER_MIN` | `1000` | 每个 IP 每分钟的最大请求数。设为 0 可禁用限流。 |
 | `CORS_ORIGIN` | （空） | 用于 CORS 的逗号分隔的允许来源，留空则仅限同源。 |
 | `LOG_LEVEL` | `info` | 日志详细程度。取值之一：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
@@ -40,7 +41,8 @@ i18n_hash_version: 2
 | 变量 | 默认值 | 描述 |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` 或 `s3`。S3 和 MinIO 需要带有 s3_storage 功能的许可证，以及下面的 `S3_*` 变量。 |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 连接字符串。Compose 栈会把它指向自己的 `postgres` 服务；把它（连同 `REDIS_URL`）留作未设置即可进入内嵌模式。 |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 连接字符串，也是承载每个请求的连接。在 2.3.0 及更高版本中，同时设置 `DATABASE_MIGRATION_URL` 后，它会成为最小权限的运行时角色，仅对应用各表拥有 DML 权限，别无其他。Compose 栈会把它指向自己的 `postgres` 服务；把它（连同 `REDIS_URL`）留作未设置即可进入内嵌模式。 |
+| `DATABASE_MIGRATION_URL` | （空） | 自 2.3.0 起可用；2.2.0 镜像会忽略它，并要求 `DATABASE_URL` 指向数据库所有者。特权连接，仅在启动时用于运行迁移并授予运行时角色，然后在第一个请求之前关闭。留空时 SnapOtter 以单角色运行，由 `DATABASE_URL` 兼顾两项职责。参见[最小权限角色](/zh-CN/guide/database#least-privilege-roles)。 |
 | `REDIS_URL` | `redis://localhost:6379` | Redis 连接字符串（用于 BullMQ 作业队列）。Compose 会把它指向自己的 `redis` 服务。 |
 | `WORKSPACE_PATH` | `./tmp/workspace` | 处理期间临时文件的目录。会自动清理。镜像将其设为 `/tmp/workspace`。 |
 | `FILES_STORAGE_PATH` | `./data/files` | 持久化用户文件（上传的图像、已保存的结果）的目录。镜像将其设为 `/data/files`。 |
@@ -74,6 +76,8 @@ i18n_hash_version: 2
 |---|---|---|
 | `EMBEDDED` | `auto` | 当 `DATABASE_URL` 和 `REDIS_URL` 均未设置时自动启用。设为 `0` 可禁用（此时若未设置外部的 `DATABASE_URL`/`REDIS_URL`，应用会快速失败，而不是悄悄启动一个容器内数据库）。 |
 | `REDIS_MAXMEMORY` | `512mb` | 内嵌 Redis 的内存上限（仅限内嵌模式）。在树莓派等内存受限的主机上可将其调低。 |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | 启动时等待内嵌 Redis 响应 `PING` 的秒数，超时后放弃。超时后容器会停止并记录原因，而不是一直挂起。取值为 1 到 999999 的整数秒；没有“无限制”取值，因为无限等待正是这个上限要防止的故障。只有在慢速主机触发超时时才需要调高。 |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | 与上一项相同，但针对内嵌 PostgreSQL。计时从首次启动的 `initdb` 完成后开始，因此覆盖的是服务器启动和崩溃恢复，而不是最初的数据库创建。 |
 
 从 1.x 升级：将旧的 `snapotter.db` 放到卷中的 `/data/snapotter.db`，内嵌模式会在首次启动时将其导入内嵌的 PostgreSQL。导入只运行一次；之后的启动会跳过它。
 
@@ -93,6 +97,23 @@ i18n_hash_version: 2
 | `MAX_CANVAS_PIXELS` | `0`（无限制） | 输出图像的最大画布尺寸（像素）。设为 0 表示无限制。 |
 | `MAX_SVG_SIZE_MB` | `50` | 净化处理之前所接受的最大 SVG 大小（MB）。这里的 `0` 与相邻各行的含义不同：它不是把上限调高，而是彻底移除解析前的大小限制，所以这一项请保持设置。 |
 | `MAX_PDF_PAGES` | `0`（无限制） | PDF-to-image 转换的最大 PDF 页数。设为 0 表示无限制。 |
+
+### 引擎 {#engines}
+
+SnapOtter 会在容器内的 `$PATH` 中查找每个处理二进制文件，因此除非你挂载自己构建的版本，否则这些变量保持为空。
+
+| 变量 | 默认值 | 描述 |
+|---|---|---|
+| `FFMPEG_PATH` | （空） | 视频和音频工具所用 `ffmpeg` 二进制文件的路径。 |
+| `FFPROBE_PATH` | （空） | `ffprobe` 的路径，它在处理媒体文件之前读取这些文件。请将其指向与 `FFMPEG_PATH` 相同的构建。 |
+| `QPDF_PATH` | （空） | `qpdf` 的路径，PDF 工具会使用它，并用于检查上传的 PDF。 |
+| `SOFFICE_PATH` | （空） | LibreOffice 的 `soffice` 路径，用于办公文档转换。 |
+| `PDFCPU_PATH` | （空） | `pdfcpu` 的路径，部分 PDF 工具会使用。 |
+| `SNAPOTTER_HW_ACCEL` | （空） | 硬件视频编码器系列，可设为 `nvenc` 或 `vaapi`。为空时使用软件编码。 |
+
+`SNAPOTTER_HW_ACCEL` 需要使用构建时包含该编码器系列的 ffmpeg，而镜像自带的 ffmpeg 两者都不支持。使用镜像自带的二进制文件时，该设置会回退到软件编码，并在启动日志中说明这一点。要使用它，请挂载你自己构建的 ffmpeg，将 `FFMPEG_PATH` 和 `FFPROBE_PATH` 指向它，并为容器提供 GPU 设备。对于 `nvenc`，还要设置 `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`：镜像只请求 `compute,utility`，没有 `video` 时 NVIDIA 运行时不会挂载编码库，因此编码器会被列出，但每次编码都会失败。路径覆盖不存在或不可执行时也会在启动日志中列出名称，并且在该路径修复或取消设置之前，每个需要该二进制文件的作业都会失败。
+
+已发布的 Compose 文件会从 `.env` 透传这全部六个变量，因此在其中设置即可。
 
 ### 清理 {#cleanup}
 

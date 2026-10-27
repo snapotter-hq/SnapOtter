@@ -1,8 +1,8 @@
 ---
 description: "AI 驅動的護照與證件照產生器，具備臉部偵測、背景移除與列印排版拼貼功能。"
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 864ffda88a64
+i18n_output_hash: 4e000b76a5a6
 ---
 
 # 護照照片 {#passport-photo}
@@ -90,13 +90,13 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | filename | string | 是 | - | 來自階段 1 的原始檔名 |
 | countryCode | string | 是 | - | 護照規格的國家代碼（例如 `US`、`GB`、`IN`） |
 | documentType | string | 否 | `"passport"` | 文件類型（來自國家規格） |
-| bgColor | string | 否 | `"#FFFFFF"` | 背景色十六進位值 |
+| bgColor | string | 否 | `"#FFFFFF"` | 背景顏色十六進位色碼 |
 | printLayout | string | 否 | `"none"` | 列印紙張版面：`none`、`4x6`、`a4` |
-| maxFileSizeKb | number | 否 | `0` | 檔案大小上限限制（KB，0 = 無限制） |
+| maxFileSizeKb | number | 否 | `0` | 檔案大小上限（KB，其中 1 KB = 1000 位元組；0 = 無限制） |
 | dpi | number | 否 | `300` | 輸出 DPI（72-1200） |
 | customWidthMm | number | 否 | - | 自訂照片寬度（mm，覆寫國家規格） |
 | customHeightMm | number | 否 | - | 自訂照片高度（mm，覆寫國家規格） |
-| zoom | number | 否 | `1` | 縮放係數（0.5-3）。大於 1 的數值裁切得更緊 |
+| zoom | number | 否 | `1` | 縮放倍率（0.5-3）。大於 1 的數值裁切得更緊 |
 | adjustX | number | 否 | `0` | 水平位置調整 |
 | adjustY | number | 否 | `0` | 垂直位置調整 |
 | landmarks | object | 是 | - | 來自階段 1 回應的特徵點物件 |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### 錯誤：分析已過期（410） {#error-analysis-expired-410}
+
+產生階段會使用分析階段為 `jobId` 儲存的去背影像。已儲存的輸出會在經過一段時間後被清理，因此如果兩次呼叫之間相隔太久，該影像就不在了。請以同一張相片再次呼叫分析端點，並使用它傳回的 `jobId`。
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+無法指向已儲存檔案的 `jobId` 或 `filename`（含有路徑分隔符、`..` 或空字串）會回應 400。
+
 ---
 
 ### 基礎路由 {#base-route}
@@ -169,5 +182,5 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 - 特徵點以正規化座標傳回（0-1 範圍，相對於圖片尺寸）。
 - 分析回應中的 `preview` 欄位為 base64 編碼的 PNG（最大寬度 800px），供快速顯示。
 - 國家規格包含依據官方護照照片要求的文件尺寸、頭部高度比例與眼線定位。
-- `printLayout` 選項會在 4x6\" 或 A4 紙上產生拼貼版面，照片之間有 2mm 的間距。
-- 設定 `maxFileSizeKb` 時，輸出會反覆壓縮以符合大小限制。
+- `printLayout` 選項會在 4x6" 或 A4 紙上產生拼貼版面，照片之間有 2mm 的間距。
+- 設定 `maxFileSizeKb` 時，輸出的 JPEG 品質會逐步調降，直到符合大小限制。像素尺寸由國家規格固定，因此若照片在最低品質下仍無法符合限制，`/generate` 會傳回 422 並附上說明，而不是傳回超過限制的檔案。

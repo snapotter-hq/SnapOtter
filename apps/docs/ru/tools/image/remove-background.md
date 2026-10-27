@@ -1,8 +1,8 @@
 ---
 description: "Удаление фона на основе ИИ с опциональными эффектами (размытие, тень, градиент, пользовательский фон)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 1ce6edb18b47
+i18n_output_hash: 5c0b9077e60b
 ---
 
 # Удаление фона {#remove-background}
@@ -19,20 +19,12 @@ i18n_output_hash: 1ce6edb18b47
 
 ## Параметры {#parameters}
 
+Этап 1 удаляет фон и кеширует прозрачную PNG-маску и исходное изображение. Замена фона, размытие, падающая тень и преобразование формата вывода применяются на [этапе 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (или при запуске `remove-background` как шага конвейера или пакетного задания); передача этих полей на этап 1 возвращает 400.
+
 | Параметр | Тип | Обязательный | По умолчанию | Описание |
 |-----------|------|----------|---------|-------------|
 | file | file | Да | - | Файл изображения (multipart) |
 | model | string | Нет | - | Вариант ИИ-модели для использования |
-| backgroundType | string | Нет | `"transparent"` | Один из: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Нет | - | Hex-цвет для сплошного фона |
-| gradientColor1 | string | Нет | - | Первый цвет градиента |
-| gradientColor2 | string | Нет | - | Второй цвет градиента |
-| gradientAngle | number | Нет | - | Угол градиента в градусах |
-| blurEnabled | boolean | Нет | - | Включить эффект размытия фона |
-| blurIntensity | number | Нет | - | Интенсивность размытия (0-100) |
-| shadowEnabled | boolean | Нет | - | Включить падающую тень на объект |
-| shadowOpacity | number | Нет | - | Непрозрачность тени (0-100) |
-| outputFormat | string | Нет | - | Выходной формат: `png`, `webp` или `avif` |
 | edgeRefine | integer | Нет | - | Уровень уточнения краёв (0-3) |
 | decontaminate | boolean | Нет | - | Удалить цветовые затёки по краям |
 
@@ -41,7 +33,7 @@ i18n_output_hash: 1ce6edb18b47
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Ответ {#response}
@@ -91,24 +83,24 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 | Параметр | Тип | Обязательный | По умолчанию | Описание |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Да | - | JSON с настройками эффектов (см. ниже) |
-| backgroundImage | file | Нет | - | Пользовательское фоновое изображение (когда backgroundType равен `image`) |
+| backgroundImage | file | Требуется, когда `backgroundType` равен `image` | - | Пользовательское фоновое изображение |
 
 #### Поля JSON настроек {#settings-json-fields}
 
-| Поле | Тип | Обязательный | Описание |
-|-------|------|----------|-------------|
-| jobId | string | Да | ID задания из этапа 1 |
-| filename | string | Да | Исходное имя файла из этапа 1 |
-| backgroundType | string | Нет | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Нет | Hex-цвет для сплошного фона |
-| gradientColor1 | string | Нет | Первый цвет градиента |
-| gradientColor2 | string | Нет | Второй цвет градиента |
-| gradientAngle | number | Нет | Угол градиента в градусах |
-| blurEnabled | boolean | Нет | Включить размытие фона |
-| blurIntensity | number | Нет | Интенсивность размытия (0-100) |
-| shadowEnabled | boolean | Нет | Включить падающую тень |
-| shadowOpacity | number | Нет | Непрозрачность тени (0-100) |
-| outputFormat | string | Нет | `png`, `webp` или `avif` |
+| Поле | Тип | Обязательный | По умолчанию | Описание |
+|-------|------|----------|---------|-------------|
+| jobId | string | Да | - | ID задания из этапа 1 |
+| filename | string | Да | - | Исходное имя файла из этапа 1 |
+| backgroundType | string | Нет | `"transparent"` | Одно из: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Требуется, когда `backgroundType` равен `color` | - | Hex-цвет: `#RRGGBB` или `#RGB` (`#` необязателен) |
+| gradientColor1 | string | Требуется, когда `backgroundType` равен `gradient` | - | Первый цвет градиента, hex как в `backgroundColor` |
+| gradientColor2 | string | Требуется, когда `backgroundType` равен `gradient` | - | Второй цвет градиента, hex как в `backgroundColor` |
+| gradientAngle | number | Нет | - | Угол градиента в градусах |
+| blurEnabled | boolean | Нет | - | Размыть исходный фон за объектом (`backgroundType: "blur"` подразумевает это) |
+| blurIntensity | number | Нет | - | Интенсивность размытия (0-100) |
+| shadowEnabled | boolean | Нет | - | Включить падающую тень на объект |
+| shadowOpacity | number | Нет | `35` | Непрозрачность тени (0-100), используется, когда `shadowEnabled` равно true |
+| outputFormat | string | Нет | `"png"` | Формат вывода: `png`, `webp` или `avif` |
 
 ### Пример запроса {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Ошибка: удаление фона истекло (410) {#error-background-removal-expired-410}
+
+Эндпоинт effects работает с маской и оригиналом, которые этап 1 сохранил для `jobId`. Сохранённые результаты со временем очищаются, поэтому если между двумя вызовами пройдёт слишком много времени, они исчезнут. Снова запустите этап 1 с тем же изображением и используйте `jobId`, который он вернёт.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+`jobId` или `filename`, которые не могут обозначать сохранённый файл (разделитель пути, `..`, пустая строка), получают ответ 400.
 
 ## Примечания {#notes}
 

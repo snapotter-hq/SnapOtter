@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter की मोनोरेपो संरचना, ऐप और पैकेज आर्किटेक्चर, अनुरोध जीवनचक्र, और संसाधन फ़ुटप्रिंट।"
-i18n_source_hash: 50e076925c4b
+i18n_source_hash: 9a22dc09e976
 i18n_provenance: human
 i18n_output_hash: a96e8ad45f9d
 i18n_hash_version: 2

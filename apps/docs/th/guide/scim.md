@@ -1,8 +1,8 @@
 ---
 description: "ตั้งค่าการจัดสรร SCIM 2.0 เพื่อซิงก์ผู้ใช้และกลุ่มจากผู้ให้บริการข้อมูลประจำตัว (identity provider) ของคุณไปยัง SnapOtter ครอบคลุม Okta, Azure AD / Entra ID และการผสานรวมแบบกำหนดเอง"
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: e8ab3b07c519
+i18n_output_hash: 37eed53c701f
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP กำลังส่งคำขอมากกว่า 1000 คำขอ�
 ### ผู้ใช้ถูกยกเลิกการจัดสรรแต่ไม่ถูกลบออกจาก UI {#users-deprovisioned-but-not-removed-from-the-ui}
 
 DELETE ของ SCIM คือการปิดใช้งานแบบซอฟต์ ผู้ใช้ที่ถูกปิดใช้งานจะยังคงปรากฏในรายการผู้ใช้ของผู้ดูแลระบบพร้อมสถานะปิดใช้งาน นี่เป็นการออกแบบเพื่อให้ข้อมูลของพวกเขาถูกเก็บรักษาไว้ บทบาทของพวกเขาจะแสดงเป็น `disabled:<original-role>`
+
+### `externalId` filter misses a user who signs in with OIDC or SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+ก่อนที่ `externalId` ของ SCIM จะมีคอลัมน์ของตัวเอง (`users.scim_external_id`) การ `PUT` หรือ `PATCH` ผ่าน SCIM บนผู้ใช้ที่การเข้าสู่ระบบด้วย OIDC หรือ SAML เชื่อมโยงไว้แล้วจะเขียน id ของ SCIM ลงในตัวตนการเข้าสู่ระบบของผู้ใช้รายนั้น การย้ายข้อมูลตอนอัปเกรดแยกค่านั้นออกจาก OIDC subject หรือ SAML NameID ของจริงไม่ได้ จึงปล่อยผู้ใช้เหล่านั้นไว้ตามเดิม สำหรับพวกเขา `filter=externalId eq "..."` จะไม่คืนอะไรเลยจนกว่า IdP จะส่งการอัปเดตครั้งใหม่ที่พา `externalId` มาด้วย
+
+หากคุณไม่อยากรอ IdP บันทึกการตรวจสอบสามารถยืนยัน id ให้ได้ SCIM เขียนแถว `SCIM_USER_PROVISIONED` พร้อม `externalId` ที่ใช้สร้างผู้ใช้แต่ละราย เมื่อคุณอยู่บนรีลีสที่มีคอลัมน์ `scim_external_id` แล้ว ให้เปิด `psql` ต่อกับฐานข้อมูล SnapOtter (ดูวิธีสำหรับทั้งสองรูปแบบได้ใน [คู่มือการกู้คืนบัญชี](./account-recovery.md#older-images-and-fallbacks)) และดูตัวอย่างผู้ใช้ที่ตัวตนการเข้าสู่ระบบยังเท่ากับ id นั้น:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+หากรายการดูถูกต้อง ให้คัดลอก id ลงในคอลัมน์ SCIM รันภายใน `BEGIN;` และตรวจสอบแถวที่คืนมาก่อน `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+การรันครั้งที่สองจะไม่ตรงกับอะไรเลย การอัปเดตคง `external_id` ไว้ตามเดิม เพราะ IdP บางราย (รวมถึง Okta) ส่ง id เดียวกันทั้งเป็น `sub` ของ OIDC และ `externalId` ของ SCIM และสำหรับพวกเขา การล้างค่าจะทำให้การเข้าสู่ระบบด้วย OIDC เสีย ผู้ใช้ที่ `external_id` เป็น id ของ SCIM ที่หลงมาอยู่จริง ๆ จะไม่ผ่านการจับคู่ subject อยู่แล้ว เมื่อเปิด `OIDC_AUTO_LINK_USERS` (หรือ `SAML_AUTO_LINK_USERS`) การเข้าสู่ระบบครั้งถัดไปด้วยอีเมลที่ยืนยันแล้วจะเชื่อมโยงพวกเขาใหม่ไม่ทางใดก็ทางหนึ่ง
+
+ผู้ใช้บางรายยังคงเข้าไม่ถึงและจะได้ id กลับมาจากการอัปเดตครั้งถัดไปของ IdP:
+
+- ผู้ใช้ที่ลิงก์การเข้าสู่ระบบแทนที่ id ของ SCIM และไม่มีการเขียน SCIM ตามมาอีก เนื่องจาก `external_id` ของพวกเขาไม่ตรงกับแถวในบันทึกการตรวจสอบแล้ว
+- ผู้ใช้ที่แถวการจัดสรรถูกตัดออกจากบันทึกการตรวจสอบเพราะหมดระยะเก็บรักษาแล้ว
+- ผู้ใช้ที่ IdP เปลี่ยน `externalId` หลังสร้างพวกเขาขึ้นมา (แถวการอัปเดตบันทึกว่าฟิลด์ใดเปลี่ยน ไม่ได้บันทึกค่า)
+- ผู้ใช้สองรายที่ถือ id เดียวกัน ซึ่งคิวรีจะข้ามไปเพื่อไม่ให้ unique index ล้มเหลว ตัวอย่างก่อนเพิ่มอนุประโยคสุดท้ายจะแสดงรายการพวกเขา และคุณเป็นผู้ตัดสินว่าใครเป็นเจ้าของ id

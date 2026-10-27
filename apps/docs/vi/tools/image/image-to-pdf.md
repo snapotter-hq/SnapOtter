@@ -1,6 +1,6 @@
 ---
 description: "Kết hợp một hoặc nhiều ảnh thành tài liệu PDF với các tùy chọn kích thước trang, hướng và dung lượng tệp đích."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: c3fed2a16ab5
 ---

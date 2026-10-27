@@ -1,8 +1,8 @@
 ---
 description: "Wdroż SnapOtter na produkcję za pomocą Dockera. Wymagania sprzętowe, konfiguracja GPU i konfiguracje reverse proxy dla Nginx, Traefik i Cloudflare."
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: e3ddacd91df0
+i18n_output_hash: f59ca7183bfc
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,16 @@ Dwie rzeczy warto wiedzieć, zanim zaczniesz mierzyć adresy IP klientów. Docke
 
 Dla każdego serwera proxy poniżej ważne są dwie rzeczy: zezwalaj na duże treści żądań (przesyłanie) i nie buforuj odpowiedzi. Serwer proxy buforujący odpowiedzi przerywa postęp SSE i, co bardziej widoczne, powoduje, że pobieranie dużego pliku „rozpoczyna się, ale nigdy nie kończy”, ponieważ serwer proxy przechowuje cały plik przed przekazaniem go dalej. SnapOtter wysyła `X-Accel-Buffering: no` podczas pobierania, więc nginx przesyła je strumieniowo, nawet jeśli buforowanie jest włączone gdzie indziej, ale serwery proxy inne niż nginx wymagają jawnego wyłączenia buforowania odpowiedzi (pokazane w każdej konfiguracji poniżej). Jeśli pobieranie zostanie wstrzymane, pierwszą rzeczą do sprawdzenia jest buforujący serwer proxy z przodu.
 
+Uwaga o HSTS: API samo wysyła `Strict-Transport-Security` w każdej odpowiedzi, więc serwer proxy, który przekazuje nagłówki odpowiedzi dalej (wszystkie konfiguracje poniżej to robią), nie potrzebuje własnej konfiguracji HSTS. Dopiero gdy twój serwer proxy jest skonfigurowany tak, aby usuwać lub nadpisywać nagłówki odpowiedzi z serwera aplikacji, musisz zachować ten nagłówek albo dodać go ponownie na brzegu sieci.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # Dla zwięzłości pokazano zwykły HTTP. Zakończ TLS we własnym bloku
+    # serwera `listen 443 ssl`; nagłówek Strict-Transport-Security wysyłany
+    # przez API przechodzi z każdą odpowiedzią proxy, więc add_header nie jest
+    # tam potrzebny.
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +529,37 @@ server {
 }
 ```
 
+### Wdrażanie pod podścieżką {#subpath}
+
+Aby udostępnić aplikację pod adresem `https://example.com/snapotter`, ustaw `BASE_PATH=/snapotter` w środowisku kontenera SnapOtter i uruchom go ponownie. Oficjalne pliki Compose dla CPU i GPU również przyjmują `BASE_PATH` z twojej powłoki lub z pliku `.env` Compose. Ten sam obraz działa pod dowolną ścieżką; przebudowa frontendu nie jest potrzebna.
+
+`BASE_PATH` przyjmuje segmenty rozdzielone ukośnikami, zawierające litery, cyfry, `_` lub `-`, w tym zagnieżdżone ścieżki, takie jak `/apps/snapotter`. Ukośnik na końcu jest opcjonalny. Pozostaw tę zmienną pustą (wartość domyślna) lub ustaw `/` dla wdrożenia w katalogu głównym.
+
+W istniejącym bloku serwera HTTPS w Nginx użyj:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+Ten przykład zachowuje prefiks. Obsługiwane są też serwery proxy, które usuwają `/snapotter` przed przekazaniem żądania. Wewnętrzne kontrole stanu mogą nadal korzystać z `/api/v1/health`. W przypadku OIDC lub SAML ustaw także `EXTERNAL_URL=https://example.com/snapotter` i zaktualizuj adresy URL wywołań zwrotnych u dostawcy tożsamości, aby zawierały odpowiednio `/snapotter/api/auth/oidc/callback` lub `/snapotter/api/auth/saml/callback`.
+
+Skrypty API działają bez zmian: adresy URL w odpowiedziach API, takie jak `downloadUrl` narzędzia, zaczynają się od `/api/` niezależnie od `BASE_PATH`. Dołączaj je do podstawowego adresu URL swojej instancji (`https://example.com/snapotter` + `/api/v1/download/...`), zamiast rozwiązywać je względem katalogu głównego domeny.
+
+Otwieraj interfejs przez adres z prefiksem (`https://example.com/snapotter`). Przeglądarka, która trafi bez prefiksu, zostanie tam przekierowana automatycznie; tylko żądania API mają docierać do aplikacji bez prefiksu. Jeśli w dziennikach pojawi się `Requests arrive under /snapotter/ but BASE_PATH is empty`, oznacza to, że twój serwer proxy przekazuje prefiks, którego `BASE_PATH` nie deklaruje: ustaw `BASE_PATH` na ten prefiks albo usuń prefiks na poziomie serwera proxy.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Dodaj nowy Proxy Host
@@ -530,6 +567,8 @@ server {
 3. Ustaw Scheme na `http`, Forward Hostname na `SnapOtter` (lub IP twojego kontenera), Forward Port na `1349`
 4. Włącz obsługę WebSocket
 5. W sekcji Advanced dodaj: `client_max_body_size 500M;` oraz `proxy_buffering off;`
+
+Nagłówek `Strict-Transport-Security` z API przechodzi przez NPM bez zmian; przełącznik HSTS na karcie SSL jest opcjonalny i działa dodatkowo.
 
 ### Traefik {#traefik}
 
@@ -546,6 +585,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik przekazuje nagłówki odpowiedzi z serwera aplikacji bez zmian, więc nagłówek `Strict-Transport-Security` z API dociera do przeglądarek bez middleware `headers`. Jeśli masz już middleware, który przepisuje nagłówki odpowiedzi, upewnij się, że pozostawia ten nagłówek bez zmian.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +601,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` wyłącza buforowanie odpowiedzi, które jest wymagane w przypadku zdarzeń postępu SSE (przetwarzanie wsadowe, narzędzia AI, instalacje funkcji) oraz w przypadku pobierania dużych plików w celu przesyłania strumieniowego zamiast zatrzymywania. Wydłużone limity czasu pozwalają na zakończenie przesyłania dużych plików bez wcześniejszego zamykania połączenia przez Caddy.
+`flush_interval -1` wyłącza buforowanie odpowiedzi, które jest wymagane w przypadku zdarzeń postępu SSE (przetwarzanie wsadowe, narzędzia AI, instalacje funkcji) oraz w przypadku pobierania dużych plików w celu przesyłania strumieniowego zamiast zatrzymywania. Wydłużone limity czasu pozwalają na zakończenie przesyłania dużych plików bez wcześniejszego zamykania połączenia przez Caddy. Caddy również przekazuje nagłówek `Strict-Transport-Security` z API bez zmian, więc do HSTS nie jest potrzebna żadna dyrektywa `header`.
 
 ### Tunele Cloudflare {#cloudflare-tunnels}
 
@@ -569,6 +610,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 Uwaga: Cloudflare ma limit przesyłania 100 MB w planach darmowych. Ustaw `MAX_UPLOAD_SIZE_MB=100` tak, aby pasował.
+
+Tunel przekazuje nagłówki odpowiedzi API, w tym `Strict-Transport-Security`, więc konfiguracja HSTS w panelu nie jest wymagana (ustawienie HSTS na brzegu Cloudflare jest opcjonalne i działa dodatkowo).
+
+## Rozwiązywanie problemów {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" zaraz po nieudanym pierwszym starcie {#eai-again-after-failed-first-start}
+
+Jeśli pierwsze `docker compose up -d` zakończy się częściowo niepowodzeniem (zwykle z powodu zajętego portu), zwykłe ponowienie `up -d` może uruchomić kontener aplikacji bez podłączenia go do sieci Compose. Aplikacja wpada wtedy w pętlę awarii z komunikatem:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+podczas gdy `docker ps` pokazuje, że postgres działa poprawnie. Błąd jest prawdziwy, ale wskazuje niewłaściwy kontener: bez sieci nazwa hosta `postgres` w ogóle nie rozwiązuje się przez DNS, a polityka ponownego uruchamiania odtwarza tę samą awarię w nieskończoność.
+
+Napraw to, co zepsuło pierwszy start (zwykle: zwolnij port), a następnie wymuś odtworzenie kontenera aplikacji, aby ponownie podłączył się do sieci:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: osiągalny z innych urządzeń, ale nie z samego komputera {#windows-wsl2-loopback}
+
+Gdy Docker działa wewnątrz WSL2 (typowa konfiguracja w systemie Windows), stos może być osiągalny z każdego innego komputera w sieci, podczas gdy `http://localhost:1349` przekracza limit czasu na samym hoście Windows, nawet przy włączonym trybie sieci lustrzanej WSL. Port nigdy nie pojawia się w `netstat` w systemie Windows, a z kontenerami wszystko jest w porządku.
+
+Otwórz aplikację z innego urządzenia albo z wnętrza dystrybucji, używając jej własnego adresu (`hostname -I` w powłoce WSL). Jeśli przekazywanie localhost działa w twojej wersji WSL, traktuj to jako bonus, a nie coś, na czym można polegać.
 
 ## CI/CD {#ci-cd}
 

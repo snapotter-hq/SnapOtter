@@ -1,6 +1,6 @@
 ---
 description: "Guide de durcissement de la sécurité pour SnapOtter. Sécurité des conteneurs, isolation réseau, secrets Docker, déploiement Kubernetes et artefacts de conformité."
-i18n_source_hash: 9ff337fa0417
+i18n_source_hash: f37bcb6cc1c5
 i18n_provenance: machine
 i18n_output_hash: ff0e77083923
 i18n_hash_version: 2

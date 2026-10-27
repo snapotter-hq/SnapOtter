@@ -1,6 +1,6 @@
 ---
 description: "Підтримувані формати файлів у всіх модальностях - понад 55 форматів зображень для введення, а також відео, аудіо, PDF та файлові формати."
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: 3ae6fd2c03f0
 ---

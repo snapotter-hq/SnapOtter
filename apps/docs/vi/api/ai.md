@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo engine AI với tất cả công cụ ML chạy cục bộ. Xóa nền, upscale, OCR, phát hiện khuôn mặt, phục chế ảnh và nhiều tính năng khác."
-i18n_output_hash: 937f3b5907f4
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: 2e012549bd18
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -62,17 +62,18 @@ Các mô hình AI được đóng gói theo ngăn xếp phụ thuộc dùng chun
 
 Image Docker đi kèm ứng dụng cộng với runtime chung. Các kho lưu trữ mô hình lớn được tải theo yêu cầu vào volume `/data/ai` thường trực, rồi được tái sử dụng bởi mọi công cụ cần đến. Nếu một gói đã được cài vì công cụ khác cần, thì việc bật một công cụ phụ thuộc mới sẽ không tải lại gói đó.
 
-Hầu hết các công cụ AI đều yêu cầu một hoặc nhiều gói tính năng trước khi chúng có thể chạy. Giao diện người dùng quản trị viên cài đặt chúng theo công cụ thông qua `POST /api/v1/admin/tools/:toolId/features/install`, giải quyết danh sách gói đầy đủ, bỏ qua các gói đã được cài đặt và chỉ xếp hàng các bản tải xuống bị thiếu. Ví dụ: bật Ảnh hộ chiếu trên hàng đợi phiên bản mới `background-removal` và `face-detection`; kích hoạt nó sau khi loại bỏ nền đã được cài đặt chỉ xếp hàng `face-detection`. OCR là ngoại lệ vì `fast` không cần gói; cài đặt thời gian chạy chính xác tùy chọn thông qua UI hoặc `POST /api/v1/admin/features/ocr/install`.
+Hầu hết các công cụ AI đều yêu cầu một hoặc nhiều gói tính năng trước khi chúng có thể chạy. Giao diện người dùng quản trị viên cài đặt chúng theo công cụ thông qua `POST /api/v1/admin/tools/:toolId/features/install`, giải quyết danh sách gói đầy đủ, bỏ qua các gói đã được cài đặt và chỉ xếp hàng các bản tải xuống bị thiếu. Ví dụ: bật Ảnh hộ chiếu trên một instance mới sẽ xếp hàng `background-removal` và `face-detection`; bật nó sau khi Background Removal đã được cài đặt chỉ xếp hàng `face-detection`. OCR là ngoại lệ vì `fast` không cần gói; cài đặt thời gian chạy chính xác tùy chọn thông qua UI hoặc `POST /api/v1/admin/features/ocr/install`.
 
-| Gói | Kích thước | Nhóm phụ thuộc dùng chung | Công cụ sử dụng |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | matting nền rembg / BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | phát hiện khuôn mặt và mốc điểm MediaPipe | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | inpainting/outpainting LaMa và DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, khử nhiễu | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | quy trình sửa vết xước và phục chế | restore-photo |
-| `ocr` | ~208-234 Tải xuống MiB / ~409-488 MiB đã cài đặt | Tùy chọn RapidOCR 3.9.1, ONNX Runtime 1.20.1 và các mẫu PP-OCR được ghim | ocr, ocr-pdf (chỉ `balanced` và `best`) |
-| `transcription` | ~600 MB | mô hình chuyển giọng nói thành văn bản faster-whisper | transcribe-audio, auto-subtitles |
+| Gói | Kích thước | Bộ nhớ CPU tối thiểu | Nhóm phụ thuộc dùng chung | Công cụ sử dụng |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (~2.5 GB trống) | matting nền rembg / BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (~0.5 GB trống) | phát hiện khuôn mặt và mốc điểm MediaPipe | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (~2 GB trống) | inpainting/outpainting LaMa và DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB trống) | Inpainting chất lượng cao Stable Diffusion 1.5 | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (~2.5 GB trống) | RealESRGAN, GFPGAN / CodeFormer, khử nhiễu | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB trống) | quy trình sửa vết xước và phục chế | restore-photo |
+| `ocr` | ~208-234 MiB khi tải xuống / ~409-488 MiB khi cài đặt | 4 GiB bộ nhớ hiệu dụng theo cấu hình (`fast` chạy trên 2 GB) | Tùy chọn RapidOCR 3.9.1, ONNX Runtime 1.20.1 và các mẫu PP-OCR được ghim | ocr, ocr-pdf (chỉ `balanced` và `best`) |
+| `transcription` | ~600 MB | 4 GB RAM (~2 GB trống) | mô hình chuyển giọng nói thành văn bản faster-whisper | transcribe-audio, auto-subtitles |
 
 Các công cụ có phụ thuộc chéo giữa nhiều gói:
 
@@ -83,15 +84,36 @@ Các công cụ có phụ thuộc chéo giữa nhiều gói:
 
 Một công cụ chỉ khả dụng khi tất cả các gói yêu cầu của nó được cài đặt, ngoại trừ OCR: tầng `fast` tích hợp của nó vẫn khả dụng mà không cần gói OCR tùy chọn. Các lượt cài đặt một phần là hợp lệ và được xử lý tăng dần: các gói đã cài đặt được sử dụng lại, các gói bị thiếu được hiển thị dưới dạng tải xuống và các lượt cài đặt trong hàng đợi chạy lần lượt để môi trường Python dùng chung không bị sửa đổi đồng thời.
 
+### Cài đặt tất cả gói cùng lúc {#installing-every-bundle-at-once}
+
+Trong **Cài đặt → Tính năng AI** có nút **Cài đặt tất cả** để xếp hàng mọi gói mà máy chủ có thể chạy. Nó bỏ qua những gì đã được cài đặt, bỏ qua các gói được báo là không tương thích với máy chủ, và thử lại một gói bị lỗi một lần trước khi chuyển sang gói khác. Với một thực thể thông thường, nút đó là toàn bộ câu trả lời, và không cần bất cứ điều gì bên dưới.
+
+Hãy dự trù dung lượng đĩa trước. Tổng cộng các gói chiếm khoảng 20-25 GB khi cài đặt, và chúng nằm trong `/data/ai` trên volume dữ liệu chứ không phải trong image, nên chúng vẫn tồn tại sau `docker compose down` và việc tạo lại container. Bạn cài chúng một lần cho mỗi máy chủ, không phải một lần cho mỗi lần nâng cấp.
+
+Khi cung cấp tự động mà không ai sẽ nhấn vào bất cứ thứ gì, hãy POST từng gói đến endpoint cài đặt bằng khóa API quản trị. Máy chủ sẽ xếp hàng chúng, nên hãy gửi cả tám mà không cần chờ:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Mỗi lần gọi trả về `202` với một `jobId` và cờ `queued`: `false` cho lần bắt đầu ngay lập tức, `true` cho những lần còn lại. Một gói đã được cài đặt sẽ trả về `409` và có thể bỏ qua an toàn, điều này khiến vòng lặp có thể chạy lại. Thăm dò `GET /api/v1/features` để biết tiến trình; mọi gói sẽ hiển thị `installed` khi quá trình chạy xong.
+
+Có hai điều cần lưu ý. Gói `ocr` chạy kiểm tra trước về khả năng tương thích máy chủ và từ chối các máy chủ dưới mức tối thiểu đã ký của nó, vì vậy nó có thể thất bại trong khi bảy gói còn lại thành công (xem [Cài đặt thời gian chạy OCR chính xác](#accurate-ocr-runtime-installation)). Và `POST /api/v1/admin/features/reset` trả về `409` khi có bất kỳ quá trình cài đặt nào đang diễn ra, vì vậy một lần chạy đang dang dở phải hoàn tất hoặc container phải được khởi động lại trước khi môi trường có thể bị xóa.
+
 ### Cài đặt thời gian chạy OCR chính xác {#accurate-ocr-runtime-installation}
 
-Gói OCR chính xác là thời gian chạy dành riêng cho nền tảng cho vùng chứa Linux amd64 hoặc Linux arm64 chính thức. Bản dựng amd64 sử dụng Python 3.12; bản dựng arm64 sử dụng Python 3.11. Cả hai bản dựng đều chạy RapidOCR thông qua `CPUExecutionProvider` của ONNX Runtime, do đó, gói tương tự chỉ hoạt động trên các máy chủ chỉ dành cho CPU và NVIDIA Docker. Thời gian chạy chính xác yêu cầu ít nhất 4 GiB bộ nhớ hiệu dụng: giới hạn cgroup của vùng chứa được định cấu hình, nếu không thì bộ nhớ máy chủ. Hệ thống có mức độ tương thích tối thiểu đã được ký sẽ bị từ chối trước khi tải xuống. Yêu cầu này không áp dụng cho OCR nhanh được tích hợp sẵn. Các bản dựng Bare-metal bị từ chối vì libc và Python ABI của chúng không thể được suy ra một cách an toàn; OCR nhanh vẫn khả dụng khi máy chủ cung cấp Tesseract và Ghostscript.
+Gói OCR chính xác là thời gian chạy dành riêng cho nền tảng cho vùng chứa Linux amd64 hoặc Linux arm64 chính thức. Bản dựng amd64 sử dụng Python 3.12; bản dựng arm64 sử dụng Python 3.11. Cả hai bản dựng đều chạy RapidOCR thông qua `CPUExecutionProvider` của ONNX Runtime, do đó cùng một gói hoạt động trên cả máy chủ chỉ có CPU lẫn máy chủ NVIDIA Docker. Thời gian chạy chính xác yêu cầu ít nhất 4 GiB bộ nhớ hiệu dụng: giới hạn cgroup của vùng chứa được định cấu hình, nếu không thì bộ nhớ máy chủ. Hệ thống dưới mức tương thích tối thiểu đã được ký sẽ bị từ chối trước khi tải xuống. Yêu cầu này không áp dụng cho OCR nhanh được tích hợp sẵn. Các bản dựng Bare-metal bị từ chối vì libc và Python ABI của chúng không thể được suy ra một cách an toàn; OCR nhanh vẫn khả dụng khi máy chủ cung cấp Tesseract và Ghostscript. Fast hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`). Do đó tiếng Hàn cần một thời gian chạy chính xác được hỗ trợ cùng bậc `balanced` hoặc `best`; máy chủ không được hỗ trợ sẽ nhận phản hồi không tương thích rõ ràng thay vì âm thầm quay về Fast.
 
-Tạo phẩm tùy chọn có khoảng 208-234 MiB được nén và 409-488 MiB được trích xuất, tùy thuộc vào kiến ​​trúc. Chỉ mục đã ký liên kết số byte được nén và trích xuất chính xác được thực thi bởi trình cài đặt. Tesseract tích hợp thêm khoảng 25 MiB vào hình ảnh chính thức và không cần tệp trong `/data/ai`.
+Artifact tùy chọn có khoảng 208-234 MiB được nén và 409-488 MiB được trích xuất, tùy thuộc vào kiến trúc. Chỉ mục đã ký liên kết số byte được nén và trích xuất chính xác được thực thi bởi trình cài đặt. Tesseract tích hợp thêm khoảng 25 MiB vào image chính thức và không cần tệp trong `/data/ai`.
 
-Cài đặt trực tuyến tìm nạp chỉ mục phát hành đã ký và tạo phẩm có địa chỉ nội dung chính xác cho nền tảng hiện tại. SnapOtter xác minh chữ ký chỉ mục Ed25519, kích thước tạo phẩm, thông báo SHA-256, thông báo mô hình, đường dẫn, chế độ tệp và smoke test theo giai đoạn trước khi kích hoạt thế hệ mới một cách nguyên tử. Cài đặt không thành công sẽ khiến thế hệ khỏe mạnh trước đó hoạt động.
+Cài đặt trực tuyến tìm nạp chỉ mục phát hành đã ký và artifact có địa chỉ nội dung chính xác cho nền tảng hiện tại. SnapOtter xác minh chữ ký chỉ mục Ed25519, kích thước artifact, mã băm SHA-256, mã băm mô hình, đường dẫn, chế độ tệp và smoke test theo giai đoạn trước khi kích hoạt thế hệ mới một cách nguyên tử. Một lần cài đặt thất bại sẽ để thế hệ khỏe mạnh trước đó tiếp tục hoạt động.
 
-Để cài đặt air-gapped, hãy tải cả `ocr-runtime-index.json` của bản phát hành và kho lưu trữ thời gian chạy OCR phù hợp lên `POST /api/v1/admin/features/import` bằng cách sử dụng các trường nhiều phần có tên `index` và `archive`. Nhập ngoại tuyến áp dụng các kiểm tra chữ ký, hàm băm, trích xuất, tính tương thích và kiểm tra khói giống như cài đặt trực tuyến; một kho lưu trữ không có chỉ mục được ký đáng tin cậy sẽ bị từ chối.
+Để cài đặt air-gapped, hãy tải cả `ocr-runtime-index.json` của bản phát hành và kho lưu trữ thời gian chạy OCR phù hợp lên `POST /api/v1/admin/features/import` bằng cách sử dụng các trường multipart có tên `index` và `archive`. Nhập ngoại tuyến áp dụng các kiểm tra chữ ký, hàm băm, trích xuất, tính tương thích và smoke test giống như cài đặt trực tuyến; một kho lưu trữ không có chỉ mục được ký đáng tin cậy sẽ bị từ chối.
 
 ---
 
@@ -163,16 +185,16 @@ Làm mờ nền trong khi giữ chủ thể sắc nét.
 ## OCR / Trích xuất văn bản {#ocr-text-extraction}
 
 **Đường dẫn công cụ:** `ocr`  
-**Mẫu mã:** Tesseract (`fast`); RapidOCR với các mẫu nhỏ PP-OCRv6 (`balanced`); Các mô hình trung bình PP-OCRv6 có tính năng chấm điểm biến thể đã hiệu chỉnh (`best`)
+**Mô hình:** Tesseract (`fast`); RapidOCR với các mô hình nhỏ PP-OCRv6 (`balanced`); Các mô hình trung bình PP-OCRv6 có tính năng chấm điểm biến thể đã hiệu chỉnh (`best`)
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Năng động | Khi bỏ qua `quality` và `engine`, SnapOtter chọn cấp tốt nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Với tiếng Hàn, hệ thống không bao giờ chọn `fast`; hệ thống dùng `best`, sau đó `balanced`, hoặc trả về lỗi cài đặt hay tương thích của runtime chính xác. |
-| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | boolean | Phụ thuộc vào cấp bậc | Cải thiện độ tương phản cục bộ Nhanh chóng áp dụng nó trực tiếp; các cấp chính xác chỉ giữ lại biến thể khi tính điểm đã hiệu chỉnh cải thiện OCR. Bật mặc định cho Tốt nhất |
-| `engine` | sợi dây | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` tới `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
+| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast không hỗ trợ `ko` |
+| `enhance` | boolean | Phụ thuộc vào bậc | Cải thiện độ tương phản cục bộ. Fast áp dụng trực tiếp; các bậc chính xác chỉ giữ lại biến thể khi điểm số đã hiệu chỉnh cải thiện OCR. Mặc định bật cho Best |
+| `engine` | string | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` thành `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
 
-Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm.
+Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm. Yêu cầu rõ ràng dùng Fast hoặc bí danh cũ `tesseract` với tiếng Hàn sẽ trả về `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` và hướng dẫn cài gói chính xác trước khi công việc được xếp hàng.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -183,13 +205,13 @@ Trích xuất văn bản từ tài liệu PDF đã quét bằng OCR chạy trên
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Năng động | Khi bỏ qua `quality` và `engine`, SnapOtter chọn cấp tốt nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Với tiếng Hàn, hệ thống không bao giờ chọn `fast`; hệ thống dùng `best`, sau đó `balanced`, hoặc trả về lỗi cài đặt hay tương thích của runtime chính xác. |
-| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
+| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast không hỗ trợ `ko` |
 | `pages` | string | `"all"` | Chọn trang: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | boolean | Phụ thuộc vào cấp bậc | Cải thiện độ tương phản cục bộ Nhanh chóng áp dụng nó trực tiếp; các cấp chính xác chỉ giữ lại biến thể khi tính điểm đã hiệu chỉnh cải thiện OCR. Bật mặc định cho Tốt nhất |
-| `engine` | sợi dây | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` tới `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
+| `enhance` | boolean | Phụ thuộc vào bậc | Cải thiện độ tương phản cục bộ. Fast áp dụng trực tiếp; các bậc chính xác chỉ giữ lại biến thể khi điểm số đã hiệu chỉnh cải thiện OCR. Mặc định bật cho Best |
+| `engine` | string | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` thành `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
 
-Quy tắc không hạ cấp tương tự áp dụng cho PDF OCR. Các trang PDF được rasterized trước khi nhận dạng và một yêu cầu có thể chọn tối đa 50 trang.
+Quy tắc không hạ cấp và tương thích tiếng Hàn tương tự cũng áp dụng cho PDF OCR. Các trang PDF được rasterized trước khi nhận dạng và một yêu cầu có thể chọn tối đa 50 trang.
 
 ## Làm mờ khuôn mặt / PII {#face-pii-blur}
 
@@ -357,7 +379,7 @@ Mở rộng khung của một ảnh theo bất kỳ hướng nào và điền v�
 | `sensitivity` | number (0-1) | `0.5` | Ngưỡng phát hiện khuôn mặt |
 | `threshold` | integer (0-255) | `30` | Ngưỡng phát hiện nền (chế độ cắt viền) |
 | `padToSquare` | boolean | `false` | Đệm kết quả đã cắt viền thành hình vuông |
-| `padColor` | string | `"#ffffff"` | Màu nền cho phần đệm vuông |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Màu nền cho phần đệm vuông |
 | `targetSize` | integer | - | Kích thước đích cho đầu ra đã đệm (điểm ảnh) |
 | `quality` | integer (1-100) | - | Chất lượng đầu ra |
 

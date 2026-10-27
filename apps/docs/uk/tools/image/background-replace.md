@@ -1,6 +1,6 @@
 ---
 description: "Заміна фону зображення суцільним кольором або градієнтом за допомогою ШІ."
-i18n_source_hash: 930fe8890e55
+i18n_source_hash: 03d2298daaa3
 i18n_provenance: human
 i18n_output_hash: 6732f77d11df
 ---

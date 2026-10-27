@@ -1,6 +1,6 @@
 ---
 description: "Bir veya daha fazla görseli sayfa boyutu, yönlendirme ve hedef dosya boyutu seçenekleriyle bir PDF belgesinde birleştirin."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 449b1e21adb2
 ---

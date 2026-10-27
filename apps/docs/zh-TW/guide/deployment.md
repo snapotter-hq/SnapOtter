@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 將 SnapOtter 部署到正式環境。硬體需求、GPU 設定，以及 Nginx、Traefik 和 Cloudflare 的反向代理設定。"
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: 97aa47ef2602
+i18n_output_hash: 425d7896694a
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,15 @@ curl http://localhost:1349/api/v1/health
 
 對於下面的每個代理來說，有兩件事很重要：允許大型請求正文（上傳），並且不緩衝回應。響應緩衝代理會破壞 SSE 進度，更明顯的是，使大文件下載“開始但永遠不會完成”，因為代理在傳遞之前保存整個文件。 SnapOtter 在下載時發送 `X-Accel-Buffering: no`，因此即使在其他地方保留緩衝，nginx 也會對它們進行串流傳輸，但除 nginx 之外的代理需要明確停用回應緩衝（如下面的每個配置所示）。如果下載中途停止，首先要檢查前面的緩衝代理。
 
+關於 HSTS 的說明：API 本身會在每個回應送出 `Strict-Transport-Security`，因此只要代理會原樣傳遞回應標頭（下文所有設定都會這麼做），就不必自行設定 HSTS。唯有當你的代理設定為移除或覆寫上游的回應標頭時，才需要保留該標頭，或在邊緣重新加上它。
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # 為求簡潔，這裡只顯示純 HTTP。請在你自己的 `listen 443 ssl`
+    # 伺服器區塊中終止 TLS；API 送出的 Strict-Transport-Security 標頭
+    # 會隨著每個經代理的回應一併傳遞，因此該處不需要 add_header。
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +528,37 @@ server {
 }
 ```
 
+### 部署於子路徑 {#subpath}
+
+若要在 `https://example.com/snapotter` 提供服務，請在 SnapOtter 容器的環境變數中設定 `BASE_PATH=/snapotter`，然後重新啟動。官方的 CPU 與 GPU Compose 檔案也會從你的 shell 或 Compose `.env` 檔案接受 `BASE_PATH`。同一個映像檔可在任何路徑運作，不需要重新建置前端。
+
+`BASE_PATH` 接受以斜線分隔、包含字母、數字、`_` 或 `-` 的區段，也包含像 `/apps/snapotter` 這樣的巢狀路徑。結尾的斜線可加可不加。留空（預設值），或設為 `/`，即為根目錄部署。
+
+在你現有的 Nginx HTTPS 伺服器區塊中使用：
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+這個範例會保留前置路徑。在轉送前剝除 `/snapotter` 的代理也同樣支援。內部健康檢查可以繼續使用 `/api/v1/health`。若使用 OIDC 或 SAML，還需設定 `EXTERNAL_URL=https://example.com/snapotter`，並將身分提供者的回呼 URL 更新為包含 `/snapotter/api/auth/oidc/callback` 或 `/snapotter/api/auth/saml/callback`。
+
+API 指令碼維持不變即可運作：API 回應中的 URL（例如工具的 `downloadUrl`）無論 `BASE_PATH` 為何，都會以 `/api/` 開頭。請將它們附加到執行個體的基底 URL（`https://example.com/snapotter` + `/api/v1/download/...`），而不是對網域根目錄解析。
+
+請透過帶有前置路徑的 URL（`https://example.com/snapotter`）開啟 UI。未帶前置路徑抵達的瀏覽器會自動被導向該處；只有 API 請求預期會在不帶前置路徑的情況下到達應用程式。如果日誌顯示 `Requests arrive under /snapotter/ but BASE_PATH is empty`，表示你的代理正在轉送 `BASE_PATH` 未宣告的前置路徑：請將 `BASE_PATH` 設為該路徑，或在代理端剝除該前置路徑。
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. 新增一個 Proxy Host
@@ -530,6 +566,8 @@ server {
 3. 將 Scheme 設為 `http`，Forward Hostname 設為 `SnapOtter`（或你的容器 IP），Forward Port 設為 `1349`
 4. 啟用 WebSocket 支援
 5. 在 Advanced 底下，加入：`client_max_body_size 500M;` 和 `proxy_buffering off;`
+
+API 的 `Strict-Transport-Security` 標頭會原樣通過 NPM；SSL 分頁上的 HSTS 開關只是額外選項。
 
 ### Traefik {#traefik}
 
@@ -546,6 +584,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik 會原樣轉送上游的回應標頭，因此 API 的 `Strict-Transport-Security` 標頭無須 `headers` 中介軟體就會送達瀏覽器。如果你已經執行會改寫回應標頭的中介軟體，請確認它會讓該標頭保持原樣。
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +600,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` 停用回應緩衝，這是 SSE 進度事件（批次、AI 工具、功能安裝）以及大檔案下載串流（而不是停滯）所必需的。延長的逾時允許完成大檔案上傳，而無需 Caddy 提前關閉連線。
+`flush_interval -1` 停用回應緩衝，這是 SSE 進度事件（批次、AI 工具、功能安裝）以及大檔案下載串流（而不是停滯）所必需的。延長的逾時允許完成大檔案上傳，而無需 Caddy 提前關閉連線。Caddy 也會原樣傳遞 API 的 `Strict-Transport-Security` 標頭，因此 HSTS 不需要任何 `header` 指令。
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +609,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 注意：Cloudflare 在免費方案上有 100 MB 的上傳限制。請將 `MAX_UPLOAD_SIZE_MB=100` 設為相符。
+
+通道會轉送 API 的回應標頭，包括 `Strict-Transport-Security`，因此不需要在儀表板中設定 HSTS（Cloudflare 自家邊緣的 HSTS 設定只是額外選項）。
+
+## 疑難排解 {#troubleshooting}
+
+### 首次啟動失敗後立刻出現「Postgres not reachable: EAI_AGAIN」 {#eai-again-after-failed-first-start}
+
+如果第一次執行 `docker compose up -d` 時中途失敗（最常見的原因是連接埠已被占用），單純重試 `up -d` 可能會啟動應用程式容器，卻沒有將它連上 compose 網路。應用程式接著會陷入不斷重啟的迴圈，並顯示：
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+而 `docker ps` 卻顯示 postgres 健康。這個錯誤是真的，但指向了錯誤的容器：少了網路，`postgres` 主機名稱的 DNS 根本無法解析，而重新啟動原則會永遠重播同樣的失敗。
+
+先修復導致首次啟動失敗的原因（通常是：釋放連接埠），然後強制重新建立應用程式容器，讓它重新連上網路：
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows：其他裝置可連線，PC 本身卻不行 {#windows-wsl2-loopback}
+
+當 Docker 在 WSL2 內執行（Windows 上常見的設定）時，整個堆疊可能可以從網路上的其他每一台機器連線，但 Windows 主機本身的 `http://localhost:1349` 卻逾時，即使已啟用 WSL 的鏡像網路模式也一樣。該連接埠永遠不會出現在 Windows 的 `netstat` 中，而容器本身沒有任何問題。
+
+請從其他裝置開啟應用程式，或在發行版內使用它自己的位址（在 WSL shell 中執行 `hostname -I`）開啟。如果你的 WSL 版本剛好能讓 localhost 轉送運作，就把它當成額外的好處，而不是可以依賴的功能。
 
 ## CI/CD {#ci-cd}
 

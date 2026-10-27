@@ -1,6 +1,6 @@
 ---
 description: "Kadrowanie uwzględniające obiekt, twarze i entropię, które inteligentnie komponuje obrazy przy użyciu Sharp i wykrywania twarzy przez AI."
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: cad4c61cd50b
 ---

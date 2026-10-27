@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ve Cloudflare için ters proxy yapılandırmaları."
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: 7ba99eabac1c
+i18n_output_hash: 20a2ab7bde6d
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,16 @@ curl http://localhost:1349/api/v1/health
 
 Aşağıdaki her proxy için iki şey önemlidir: büyük istek gövdelerine (yüklemeler) izin verin ve yanıtları ara belleğe almayın. Yanıt arabelleğe alan bir proxy, SSE ilerlemesini keser ve daha görünür bir şekilde büyük bir dosya indirme işlemini "başlatır ancak hiçbir zaman bitirmez" çünkü proxy, aktarmadan önce tüm dosyayı tutar. SnapOtter, indirmelerde `X-Accel-Buffering: no`'yi gönderir, böylece ara belleğe alma başka bir yerde bırakılsa bile nginx bunları akışa alır, ancak nginx dışındaki proxy'lerin yanıt arabelleğe almanın açıkça devre dışı bırakılması gerekir (aşağıdaki her yapılandırmada gösterilmiştir). İndirme işlemi yarıda durursa, kontrol edilecek ilk şey öndeki ara belleğe alma proxy'sidir.
 
+HSTS hakkında bir not: API, `Strict-Transport-Security` başlığını her yanıtta kendisi gönderir, bu nedenle yanıt başlıklarını olduğu gibi ileten bir proxy'nin (aşağıdaki yapılandırmaların tümü bunu yapar) kendi başına HSTS kurulumuna ihtiyacı yoktur. Yalnızca proxy'niz üst sunucu yanıt başlıklarını kaldıracak veya geçersiz kılacak şekilde yapılandırılmışsa başlığı korumanız ya da uçta yeniden eklemeniz gerekir.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # Kısa tutmak için düz HTTP gösterilmiştir. TLS'i kendi `listen 443 ssl`
+    # sunucu bloğunuzda sonlandırın; API'nin gönderdiği Strict-Transport-Security
+    # başlığı proxy'den geçen her yanıtla birlikte iletilir, bu yüzden orada
+    # add_header gerekmez.
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +529,37 @@ server {
 }
 ```
 
+### Alt yol altında dağıtım {#subpath}
+
+`https://example.com/snapotter` adresinde yayın yapmak için SnapOtter konteyner ortamında `BASE_PATH=/snapotter` ayarlayın ve konteyneri yeniden başlatın. Resmi CPU ve GPU Compose dosyaları da `BASE_PATH` değişkenini kabuğunuzdan veya Compose `.env` dosyasından kabul eder. Aynı imge herhangi bir yolda çalışır; ön uç yeniden derlemesi gerekmez.
+
+`BASE_PATH`, harf, rakam, `_` veya `-` içeren eğik çizgiyle ayrılmış bölümleri kabul eder; `/apps/snapotter` gibi iç içe yollar dahil. Sondaki eğik çizgi isteğe bağlıdır. Kök dağıtım için boş bırakın (varsayılan) veya `/` ayarlayın.
+
+Mevcut Nginx HTTPS sunucu bloğunuzda şunu kullanın:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+Bu örnek ön eki korur. İletmeden önce `/snapotter` önekini kaldıran proxy'ler de desteklenir. Dahili sağlık kontrolleri `/api/v1/health` kullanmaya devam edebilir. OIDC veya SAML için ayrıca `EXTERNAL_URL=https://example.com/snapotter` ayarlayın ve kimlik sağlayıcının geri çağırma URL'lerini sırasıyla `/snapotter/api/auth/oidc/callback` veya `/snapotter/api/auth/saml/callback` içerecek şekilde güncelleyin.
+
+API betikleri değişmeden çalışmaya devam eder: bir aracın `downloadUrl` değeri gibi API yanıtlarındaki URL'ler, `BASE_PATH` ne olursa olsun `/api/` ile başlar. Bunları alan adı köküne göre çözümlemek yerine örneğinizin temel URL'sine ekleyin (`https://example.com/snapotter` + `/api/v1/download/...`).
+
+Kullanıcı arayüzünü ön ekli URL üzerinden açın (`https://example.com/snapotter`). Ön ek olmadan gelen tarayıcı otomatik olarak oraya yönlendirilir; uygulamaya ön eksiz ulaşması beklenen tek şey API istekleridir. Günlükler `Requests arrive under /snapotter/ but BASE_PATH is empty` diyorsa, proxy'niz `BASE_PATH`'in bildirmediği bir önek iletiyor demektir: `BASE_PATH` değişkenini bu ön eke ayarlayın veya öneki proxy'de kaldırın.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Yeni bir Proxy Host ekleyin
@@ -530,6 +567,8 @@ server {
 3. Scheme'i `http`, Forward Hostname'i `SnapOtter` (veya konteyner IP'niz), Forward Port'u `1349` olarak ayarlayın
 4. WebSocket desteğini etkinleştirin
 5. Advanced altında şunları ekleyin: `client_max_body_size 500M;` ve `proxy_buffering off;`
+
+API'nin `Strict-Transport-Security` başlığı NPM'den olduğu gibi geçer; SSL sekmesindeki HSTS anahtarı bunun üzerine isteğe bağlıdır.
 
 ### Traefik {#traefik}
 
@@ -546,6 +585,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik, üst sunucu yanıt başlıklarını değiştirmeden iletir, bu nedenle API'nin `Strict-Transport-Security` başlığı tarayıcılara bir `headers` ara katmanı olmadan ulaşır. Yanıt başlıklarını yeniden yazan bir ara katman zaten çalıştırıyorsanız, bu başlığı olduğu gibi bıraktığından emin olun.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +601,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1`, SSE ilerleme olayları (toplu işleme, yapay zeka araçları, özellik yüklemeleri) ve büyük dosya indirmelerinin durmak yerine akışa alınması için gerekli olan yanıt arabelleğe almayı devre dışı bırakır. Uzatılmış zaman aşımları, Caddy'nin bağlantıyı erken kapatmasına gerek kalmadan büyük dosya yüklemelerinin tamamlanmasına olanak tanır.
+`flush_interval -1`, SSE ilerleme olayları (toplu işleme, yapay zeka araçları, özellik yüklemeleri) ve büyük dosya indirmelerinin durmak yerine akışa alınması için gerekli olan yanıt arabelleğe almayı devre dışı bırakır. Uzatılmış zaman aşımları, Caddy'nin bağlantıyı erken kapatmasına gerek kalmadan büyük dosya yüklemelerinin tamamlanmasına olanak tanır. Caddy ayrıca API'nin `Strict-Transport-Security` başlığını da değiştirmeden iletir, bu yüzden HSTS için `header` yönergesine gerek yoktur.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +610,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 Not: Cloudflare'in ücretsiz planlarda 100 MB yükleme limiti vardır. Eşleştirmek için `MAX_UPLOAD_SIZE_MB=100` ayarlayın.
+
+Tünel, `Strict-Transport-Security` dahil olmak üzere API'nin yanıt başlıklarını iletir, bu yüzden panoda HSTS yapılandırması gerekmez (Cloudflare'in kendi uç HSTS ayarı bunun üzerine isteğe bağlıdır).
+
+## Sorun giderme {#troubleshooting}
+
+### Başarısız bir ilk başlatmanın hemen ardından "Postgres not reachable: EAI_AGAIN" {#eai-again-after-failed-first-start}
+
+İlk `docker compose up -d` yarıda başarısız olursa (olağan neden portun zaten kullanımda olmasıdır), düz bir `up -d` yeniden denemesi uygulama konteynerini compose ağına bağlamadan başlatabilir. Uygulama ardından şu hatayla çöküp yeniden başlar:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+`docker ps` ise postgres'i sağlıklı gösterir. Hata gerçektir ama yanlış konteyneri işaret eder: ağ olmadan `postgres` ana bilgisayar adının DNS'i hiç çözülemez ve yeniden başlatma ilkesi aynı hatayı sonsuza kadar tekrarlar.
+
+İlk başlatmayı bozan şeyi düzeltin (genellikle: portu serbest bırakın), ardından uygulama konteynerini ağa yeniden bağlanması için yeniden oluşturulmaya zorlayın:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: diğer cihazlardan erişilebilir, PC'nin kendisinden erişilemez {#windows-wsl2-loopback}
+
+Docker WSL2 içinde çalışırken (olağan Windows kurulumu), WSL'in yansıtmalı ağ modu etkin olsa bile yığın ağınızdaki diğer tüm makinelerden erişilebilir olabilirken Windows ana bilgisayarında `http://localhost:1349` zaman aşımına uğrayabilir. Port Windows `netstat` çıktısında hiç görünmez ve konteynerlerde sorun yoktur.
+
+Uygulamayı başka bir cihazdan veya dağıtımın içinden kendi adresini kullanarak açın (WSL kabuğunda `hostname -I`). Localhost yönlendirmesi WSL sürümünüzde çalışıyorsa bunu bağımlı olacağınız bir şey değil, bir bonus olarak görün.
 
 ## CI/CD {#ci-cd}
 

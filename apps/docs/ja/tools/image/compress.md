@@ -1,6 +1,6 @@
 ---
 description: "品質レベル、または目標ファイルサイズによって画像のファイルサイズを削減します。"
-i18n_source_hash: 342c5cf1f864
+i18n_source_hash: e1cc52597983
 i18n_provenance: human
 i18n_output_hash: 2aa6e052c339
 ---

@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter Docker imaj etiketleri, GPU karşılaştırmaları, sürüm sabitleme ve AMD64 ile ARM64 için çoklu platform desteği."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: fd5ce3bb0f0f
 i18n_hash_version: 2

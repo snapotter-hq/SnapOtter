@@ -1,8 +1,8 @@
 ---
 description: "Implementeer SnapOtter in productie met Docker. Hardwarevereisten, GPU-installatie en reverse-proxyconfiguraties voor Nginx, Traefik en Cloudflare."
-i18n_source_hash: 2a722f86da75
+i18n_source_hash: 4db97ead24e0
 i18n_provenance: human
-i18n_output_hash: 65686fc8753a
+i18n_output_hash: 27d74be52d4e
 i18n_hash_version: 2
 ---
 
@@ -496,10 +496,15 @@ Twee dingen om te weten voordat je client-IP's gaat meten. Docker Desktop op mac
 
 Voor elke onderstaande proxy zijn twee dingen van belang: sta grote verzoekinstanties (uploads) toe en buffer geen antwoorden. Een proxy die antwoorden buffert, onderbreekt de SSE-voortgang en, beter zichtbaar, zorgt ervoor dat het downloaden van grote bestanden "start maar nooit eindigt", omdat de proxy het hele bestand vasthoudt voordat het wordt doorgegeven. SnapOtter verzendt `X-Accel-Buffering: no` bij downloads, zodat nginx deze streamt, zelfs als de buffering elders is ingeschakeld, maar voor andere proxy's dan nginx moet de responsbuffering expliciet zijn uitgeschakeld (weergegeven in elke configuratie hieronder). Als een download halverwege vastloopt, is een bufferproxy ervoor het eerste wat u moet controleren.
 
+Een opmerking over HSTS: de API verzendt zelf `Strict-Transport-Security` bij elk antwoord, dus een proxy die responsheaders doorgeeft (alle onderstaande configuraties doen dat) heeft geen eigen HSTS-instelling nodig. Alleen als je proxy is geconfigureerd om de responsheaders van de upstream te strippen of te overschrijven, moet je de header behouden of opnieuw toevoegen op de edge.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # Voor de beknoptheid is gewone HTTP getoond. Beëindig TLS in je eigen
+    # `listen 443 ssl`-serverblok; de Strict-Transport-Security-header die de API
+    # verzendt, gaat mee met elk proxy-antwoord, dus daar is geen add_header nodig.
     listen 80;
     server_name images.example.com;
 
@@ -523,6 +528,37 @@ server {
 }
 ```
 
+### Implementeren onder een subpad {#subpath}
+
+Om `https://example.com/snapotter` te serveren, stel je `BASE_PATH=/snapotter` in de omgeving van de SnapOtter-container in en herstart je deze. De officiële CPU- en GPU-Compose-bestanden accepteren `BASE_PATH` ook uit je shell of het Compose-`.env`-bestand. Dezelfde image werkt op elk pad; er is geen rebuild van de frontend nodig.
+
+`BASE_PATH` accepteert door slashes gescheiden segmenten met letters, cijfers, `_` of `-`, inclusief geneste paden zoals `/apps/snapotter`. Een slash aan het eind is optioneel. Laat het leeg (de standaard), of stel `/` in, voor een implementatie op de root.
+
+Gebruik in je bestaande Nginx HTTPS-serverblok:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+Dit voorbeeld behoudt het voorvoegsel. Proxy's die `/snapotter` vóór het doorsturen strippen worden ook ondersteund. Interne health checks kunnen `/api/v1/health` blijven gebruiken. Stel voor OIDC of SAML ook `EXTERNAL_URL=https://example.com/snapotter` in en werk de callback-URL's van de identity provider bij naar `/snapotter/api/auth/oidc/callback` respectievelijk `/snapotter/api/auth/saml/callback`.
+
+API-scripts blijven ongewijzigd werken: URL's in API-antwoorden, zoals de `downloadUrl` van een tool, beginnen met `/api/` ongeacht `BASE_PATH`. Voeg ze toe aan de basis-URL van je instance (`https://example.com/snapotter` + `/api/v1/download/...`) in plaats van ze tegen de domeinroot te resolveren.
+
+Open de UI via de URL met het voorvoegsel (`https://example.com/snapotter`). Een browser die zonder het voorvoegsel binnenkomt, wordt daar automatisch naartoe gestuurd; alleen API-verzoeken worden geacht de app zonder voorvoegsel te bereiken. Als de logs `Requests arrive under /snapotter/ but BASE_PATH is empty` zeggen, dan stuurt je proxy een voorvoegsel door dat `BASE_PATH` niet declareert: stel `BASE_PATH` daarop in, of strip het voorvoegsel bij de proxy.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Voeg een nieuwe Proxy Host toe
@@ -530,6 +566,8 @@ server {
 3. Stel Scheme in op `http`, Forward Hostname op `SnapOtter` (of je container-IP), Forward Port op `1349`
 4. Schakel WebSocket-ondersteuning in
 5. Voeg onder Advanced toe: `client_max_body_size 500M;` en `proxy_buffering off;`
+
+De `Strict-Transport-Security`-header van de API gaat ongewijzigd door NPM heen; de HSTS-schakelaar op het SSL-tabblad is daarbovenop optioneel.
 
 ### Traefik {#traefik}
 
@@ -546,6 +584,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik geeft de responsheaders van de upstream ongewijzigd door, dus de `Strict-Transport-Security`-header van de API bereikt browsers zonder `headers`-middleware. Als je al een middleware draait die responsheaders herschrijft, zorg er dan voor dat die deze header intact laat.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -560,7 +600,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` schakelt responsbuffering uit, wat nodig is voor SSE-voortgangsgebeurtenissen (batchverwerking, AI-tools, functie-installaties) en voor het downloaden van grote bestanden om door te streamen in plaats van te vertragen. Dankzij de verlengde time-outs kunnen grote bestandsuploads worden voltooid zonder dat Caddy de verbinding vroegtijdig verbreekt.
+`flush_interval -1` schakelt responsbuffering uit, wat nodig is voor SSE-voortgangsgebeurtenissen (batchverwerking, AI-tools, functie-installaties) en voor het downloaden van grote bestanden om door te streamen in plaats van te vertragen. Dankzij de verlengde time-outs kunnen grote bestandsuploads worden voltooid zonder dat Caddy de verbinding vroegtijdig verbreekt. Caddy geeft de `Strict-Transport-Security`-header van de API ook onaangeroerd door, dus voor HSTS is geen `header`-richtlijn nodig.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -569,6 +609,32 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 Opmerking: Cloudflare heeft een uploadlimiet van 100 MB op gratis abonnementen. Stel `MAX_UPLOAD_SIZE_MB=100` hierop in.
+
+De tunnel geeft de responsheaders van de API door, inclusief `Strict-Transport-Security`, dus er is geen HSTS-configuratie in het dashboard nodig (Cloudflare's eigen HSTS-instelling op de edge is daarbovenop optioneel).
+
+## Probleemoplossing {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" direct na een mislukte eerste start {#eai-again-after-failed-first-start}
+
+Als de allereerste `docker compose up -d` halverwege mislukt (een poort die al in gebruik is, is de gebruikelijke reden), kan een gewone `up -d`-poging de app-container starten zonder hem aan het Compose-netwerk te koppelen. De app crasht dan in een lus met:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+terwijl `docker ps` postgres gezond toont. De fout is echt, maar wijst naar de verkeerde container: zonder het netwerk kan DNS voor de hostnaam `postgres` helemaal niet worden opgelost, en het restartbeleid herhaalt dezelfde fout voor altijd.
+
+Los op wat de eerste start heeft gebroken (meestal: maak de poort vrij) en forceer vervolgens dat de app-container opnieuw wordt aangemaakt, zodat hij weer aan het netwerk wordt gekoppeld:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
+### Windows: bereikbaar vanaf andere apparaten, niet vanaf de pc zelf {#windows-wsl2-loopback}
+
+Met Docker in WSL2 (de gebruikelijke Windows-opstelling) kan de stack bereikbaar zijn vanaf elke andere machine op je netwerk terwijl `http://localhost:1349` op de Windows-host zelf een timeout geeft, zelfs met de mirrored-netwerkmodus van WSL ingeschakeld. De poort verschijnt nooit in Windows-`netstat`, en er is niets mis met de containers.
+
+Open de app vanaf een ander apparaat, of van binnen de distributie via het eigen adres (`hostname -I` in de WSL-shell). Als localhost-forwarding toevallig wel werkt op jouw WSL-versie, beschouw dat dan als een bonus en niet als iets om op te vertrouwen.
 
 ## CI/CD {#ci-cd}
 

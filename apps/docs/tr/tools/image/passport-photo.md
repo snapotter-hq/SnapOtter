@@ -1,8 +1,8 @@
 ---
 description: "Yüz algılama, arka plan kaldırma ve baskı sayfası döşemesiyle yapay zeka destekli pasaport ve kimlik fotoğrafı oluşturucu."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 2979d2e1b061
+i18n_output_hash: 5067400f5ba0
 ---
 
 # Pasaport Fotoğrafı {#passport-photo}
@@ -92,7 +92,7 @@ Fotoğrafı kırpar, yeniden boyutlandırır ve isteğe bağlı olarak bir bask�
 | documentType | string | Hayır | `"passport"` | Belge türü (ülke belirtiminden) |
 | bgColor | string | Hayır | `"#FFFFFF"` | Arka plan rengi hex değeri |
 | printLayout | string | Hayır | `"none"` | Baskı kağıdı yerleşimi: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | Hayır | `0` | KB cinsinden maksimum dosya boyutu kısıtlaması (0 = sınır yok) |
+| maxFileSizeKb | number | Hayır | `0` | KB cinsinden maksimum dosya boyutu, burada 1 KB = 1000 bayt (0 = sınır yok) |
 | dpi | number | Hayır | `300` | Çıktı DPI'ı (72-1200) |
 | customWidthMm | number | Hayır | - | Mm cinsinden özel fotoğraf genişliği (ülke belirtimini geçersiz kılar) |
 | customHeightMm | number | Hayır | - | Mm cinsinden özel fotoğraf yüksekliği (ülke belirtimini geçersiz kılar) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Hata: Analiz Süresi Doldu (410) {#error-analysis-expired-410}
+
+Generate, analyze işleminin `jobId` için sakladığı arka planı kaldırılmış görselden çalışır. Saklanan çıktılar bir süre sonra temizlenir, bu yüzden iki çağrı arasında çok fazla zaman geçerse o görsel yok olur. Aynı fotoğrafla analyze işlemini yeniden çağırın ve döndürdüğü `jobId` değerini kullanın.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+Saklanan bir dosyayı adlandıramayan bir `jobId` veya `filename` (bir yol ayırıcı, `..`, boş bir dize) 400 yanıtı verir.
+
 ---
 
 ### Temel Rota {#base-route}
@@ -170,4 +183,4 @@ Doğru alt uç noktanın kullanılmasına yönelik yönlendirme döndürür.
 - Analiz yanıtındaki `preview` alanı, hızlı görüntüleme için base64 kodlamalı bir PNG'dir (en fazla 800px genişlik).
 - Ülke belirtimleri, resmi pasaport fotoğrafı gereksinimlerine dayalı belge boyutlarını, baş yüksekliği oranlarını ve göz çizgisi konumlandırmasını içerir.
 - `printLayout` seçeneği, fotoğraflar arasında 2mm boşlukla 4x6\" veya A4 kağıt üzerinde döşenmiş bir sayfa oluşturur.
-- `maxFileSizeKb` ayarlandığında, çıktı boyut sınırına sığacak şekilde yinelemeli olarak sıkıştırılır.
+- `maxFileSizeKb` ayarlandığında, çıktının JPEG kalitesi sığana kadar adım adım düşürülür. Piksel boyutu ülke belirtimiyle sabitlendiğinden, fotoğraf en düşük kalitede bile sığmıyorsa `/generate`, sınırı aşan bir dosya yerine bunu söyleyen bir mesajla 422 döndürür.

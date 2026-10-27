@@ -1,8 +1,8 @@
 ---
 description: "基于 AI 的背景去除，可选特效（模糊、阴影、渐变、自定义背景）。"
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: fdb2d2307e44
+i18n_output_hash: 432ac69cd77a
 ---
 
 # 背景去除 {#remove-background}
@@ -19,20 +19,12 @@ i18n_output_hash: fdb2d2307e44
 
 ## 参数 {#parameters}
 
+阶段 1 会移除背景，并缓存透明 PNG 蒙版和原图。背景替换、模糊、投影和输出格式转换会在[阶段 2（`/api/v1/tools/image/remove-background/effects`）](#effects-endpoint-phase-2)中应用（将 `remove-background` 作为流水线步骤或批处理作业运行时也是如此）；把这些字段传给阶段 1 会返回 400。
+
 | 参数 | 类型 | 是否必填 | 默认值 | 说明 |
 |-----------|------|----------|---------|-------------|
 | file | file | 是 | - | 图片文件（multipart） |
 | model | string | 否 | - | 要使用的 AI 模型变体 |
-| backgroundType | string | 否 | `"transparent"` | 以下之一：`transparent`、`color`、`gradient`、`blur`、`image` |
-| backgroundColor | string | 否 | - | 纯色背景的十六进制颜色 |
-| gradientColor1 | string | 否 | - | 第一个渐变颜色 |
-| gradientColor2 | string | 否 | - | 第二个渐变颜色 |
-| gradientAngle | number | 否 | - | 渐变角度（度） |
-| blurEnabled | boolean | 否 | - | 启用背景模糊效果 |
-| blurIntensity | number | 否 | - | 模糊强度（0-100） |
-| shadowEnabled | boolean | 否 | - | 在主体上启用投影 |
-| shadowOpacity | number | 否 | - | 阴影不透明度（0-100） |
-| outputFormat | string | 否 | - | 输出格式：`png`、`webp` 或 `avif` |
 | edgeRefine | integer | 否 | - | 边缘细化级别（0-3） |
 | decontaminate | boolean | 否 | - | 移除边缘的颜色溢出 |
 
@@ -41,7 +33,7 @@ i18n_output_hash: fdb2d2307e44
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## 响应 {#response}
@@ -91,24 +83,24 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 | 参数 | 类型 | 是否必填 | 默认值 | 说明 |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | 是 | - | 包含特效设置的 JSON（见下文） |
-| backgroundImage | file | 否 | - | 自定义背景图片（当 backgroundType 为 `image` 时） |
+| backgroundImage | file | 当 `backgroundType` 为 `image` 时必填 | - | 自定义背景图片 |
 
 #### 设置 JSON 字段 {#settings-json-fields}
 
-| 字段 | 类型 | 是否必填 | 说明 |
-|-------|------|----------|-------------|
-| jobId | string | 是 | 阶段 1 返回的任务 ID |
-| filename | string | 是 | 阶段 1 的原始文件名 |
-| backgroundType | string | 否 | `transparent`、`color`、`gradient`、`blur`、`image` |
-| backgroundColor | string | 否 | 纯色背景的十六进制颜色 |
-| gradientColor1 | string | 否 | 第一个渐变颜色 |
-| gradientColor2 | string | 否 | 第二个渐变颜色 |
-| gradientAngle | number | 否 | 渐变角度（度） |
-| blurEnabled | boolean | 否 | 启用背景模糊 |
-| blurIntensity | number | 否 | 模糊强度（0-100） |
-| shadowEnabled | boolean | 否 | 启用投影 |
-| shadowOpacity | number | 否 | 阴影不透明度（0-100） |
-| outputFormat | string | 否 | `png`、`webp` 或 `avif` |
+| 字段 | 类型 | 是否必填 | 默认值 | 说明 |
+|-------|------|----------|---------|-------------|
+| jobId | string | 是 | - | 阶段 1 返回的任务 ID |
+| filename | string | 是 | - | 阶段 1 的原始文件名 |
+| backgroundType | string | 否 | `"transparent"` | 以下之一：`transparent`、`color`、`gradient`、`blur`、`image` |
+| backgroundColor | string | 当 `backgroundType` 为 `color` 时必填 | - | 十六进制颜色：`#RRGGBB` 或 `#RGB`（`#` 可省略） |
+| gradientColor1 | string | 当 `backgroundType` 为 `gradient` 时必填 | - | 第一个渐变颜色，十六进制格式同 `backgroundColor` |
+| gradientColor2 | string | 当 `backgroundType` 为 `gradient` 时必填 | - | 第二个渐变颜色，十六进制格式同 `backgroundColor` |
+| gradientAngle | number | 否 | - | 渐变角度（度） |
+| blurEnabled | boolean | 否 | - | 模糊主体背后的原始背景（`backgroundType: "blur"` 会隐含启用） |
+| blurIntensity | number | 否 | - | 模糊强度（0-100） |
+| shadowEnabled | boolean | 否 | - | 在主体上启用投影 |
+| shadowOpacity | number | 否 | `35` | 阴影不透明度（0-100），在 `shadowEnabled` 为 true 时使用 |
+| outputFormat | string | 否 | `"png"` | 输出格式：`png`、`webp` 或 `avif` |
 
 ### 请求示例 {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### 错误：背景去除已过期（410） {#error-background-removal-expired-410}
+
+特效端点基于阶段 1 为 `jobId` 存储的蒙版和原图工作。存储的输出会在一段时间后被清理，因此如果两次调用之间间隔太久，它们就已不存在。请用同一张图片再次运行阶段 1，并使用它返回的 `jobId`。
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+无法指代已存储文件的 `jobId` 或 `filename`（包含路径分隔符、`..` 或空字符串）会返回 400。
 
 ## 说明 {#notes}
 

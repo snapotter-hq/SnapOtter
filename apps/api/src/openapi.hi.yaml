@@ -583,10 +583,10 @@ paths:
       operationId: compressImageTo20KbTool
       tags:
         - Tools
-      summary: Compress Image to 20 KB
+      summary: छवि को 20 KB तक संपीड़ित करें
       description: |
-        Compress an image to a 20 KB target size
-        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        एक छवि को 20 KB के लक्ष्य आकार तक संपीड़ित करें
+        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
       security:
         - bearerAuth: []
       requestBody:
@@ -608,7 +608,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 20.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -643,10 +643,10 @@ paths:
       operationId: compressImageTo50KbTool
       tags:
         - Tools
-      summary: Compress Image to 50 KB
+      summary: छवि को 50 KB तक संपीड़ित करें
       description: |
-        Compress an image to a 50 KB target size
-        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        एक छवि को 50 KB के लक्ष्य आकार तक संपीड़ित करें
+        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
       security:
         - bearerAuth: []
       requestBody:
@@ -668,7 +668,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 50.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -703,10 +703,10 @@ paths:
       operationId: compressImageTo100KbTool
       tags:
         - Tools
-      summary: Compress Image to 100 KB
+      summary: छवि को 100 KB तक संपीड़ित करें
       description: |
-        Compress an image to a 100 KB target size
-        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        एक छवि को 100 KB के लक्ष्य आकार तक संपीड़ित करें
+        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
       security:
         - bearerAuth: []
       requestBody:
@@ -728,7 +728,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 100.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -763,10 +763,10 @@ paths:
       operationId: compressImageTo200KbTool
       tags:
         - Tools
-      summary: Compress Image to 200 KB
+      summary: छवि को 200 KB तक संपीड़ित करें
       description: |
-        Compress an image to a 200 KB target size
-        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        एक छवि को 200 KB के लक्ष्य आकार तक संपीड़ित करें
+        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
       security:
         - bearerAuth: []
       requestBody:
@@ -788,7 +788,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 200.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -823,10 +823,10 @@ paths:
       operationId: compressImageTo500KbTool
       tags:
         - Tools
-      summary: Compress Image to 500 KB
+      summary: छवि को 500 KB तक संपीड़ित करें
       description: |
-        Compress an image to a 500 KB target size
-        This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        एक छवि को 500 KB के लक्ष्य आकार तक संपीड़ित करें
+        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
       security:
         - bearerAuth: []
       requestBody:
@@ -848,7 +848,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 500.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -1448,7 +1448,7 @@ paths:
                     - `quality` (number, default 90) - Output quality (1-100)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -1525,7 +1525,7 @@ paths:
                     - `quality` (number 1-100, default 90) - Output quality
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -1605,7 +1605,7 @@ paths:
                     - `colorizeStrength` (number 0-100, default 85) - Colorization strength
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -1675,7 +1675,7 @@ paths:
                   description: Photo with a clear, front-facing face
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -1958,7 +1958,7 @@ paths:
                     - `model` (string, default "auto") - One of: auto, ddcolor, opencv
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -2035,7 +2035,7 @@ paths:
                     - `sensitivity` (number 0-1, default 0.5) - Face detection sensitivity
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -2694,7 +2694,7 @@ paths:
                   description: Same settings as single-file endpoint
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Optional client-generated job ID for progress tracking
       responses:
@@ -3606,7 +3606,7 @@ paths:
                   description: Output quality
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -3689,7 +3689,7 @@ paths:
                     At least one extend direction must be greater than 0.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -3891,7 +3891,7 @@ paths:
                   description: Background image, required when backgroundType is "image"
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -3959,7 +3959,7 @@ paths:
                     Background and effect settings belong on `POST /api/v1/tools/image/remove-background/effects` (or `/batch` and pipelines).
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -4104,7 +4104,7 @@ paths:
                     - `removeWatermark` (boolean, default false) - Apply median filter to reduce watermark artifacts before matting
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -4180,7 +4180,7 @@ paths:
                     - `quality` (number, default 95) - Output quality (1-100)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -4252,7 +4252,7 @@ paths:
                     - `sensitivity` (number 0-1, default 0.5) - Face detection sensitivity
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -4330,7 +4330,7 @@ paths:
                     - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
       responses:
         '202':
@@ -5452,7 +5452,7 @@ paths:
                     - `steps[].settings` (object, optional) - Tool-specific settings
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Optional client-provided job ID for progress tracking via SSE
       responses:
@@ -7159,18 +7159,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
-        "401":
+        '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UnauthorizedError"
-        "404":
+                $ref: '#/components/schemas/UnauthorizedError'
+        '404':
           description: The job belongs to another user
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck
@@ -7949,7 +7949,7 @@ paths:
                     - `quality` (string, default "balanced") - One of: high, balanced, small
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -8015,7 +8015,7 @@ paths:
                     - `resolution` (string, default "original") - One of: original, 1080p, 720p, 480p
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -8176,7 +8176,7 @@ paths:
                     - `durationS` (number 0-60, default 5) - Duration in seconds
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -8774,7 +8774,7 @@ paths:
                     - `smoothing` (integer 5-60, default 15) - Smoothing window size in frames
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -8988,7 +8988,7 @@ paths:
                   description: Two or more video files to merge (up to 10)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -9100,7 +9100,7 @@ paths:
                     - `fontSize` (integer 8-72, default 24) - Subtitle font size in pixels
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -9357,7 +9357,7 @@ paths:
                     - `format` (string, default "srt") - One of: srt, vtt
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -10259,7 +10259,7 @@ paths:
                     - `outputFormat` (string, default "txt") - One of: txt, srt, vtt
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -10458,13 +10458,13 @@ paths:
       operationId: compressPdfTo100KbTool
       tags:
         - Tools
-      summary: Compress PDF to 100 KB
+      summary: PDF को 100 KB तक संपीड़ित करें
       description: |
-        Compress a PDF to a 100 KB target size (100 KB, where 1 KB = 1000 bytes).
-        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
-        Best effort: a mostly-text PDF may not reach the target. The job result then carries
-        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
-        The original bytes are returned if compression would enlarge the file.
+        एक PDF को 100 KB के लक्ष्य आकार तक संपीड़ित करें (100 KB, जहाँ 1 KB = 1000 बाइट्स)।
+        यह `compress-pdf` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        सर्वोत्तम प्रयास: एक अधिकांशतः टेक्स्ट वाला PDF लक्ष्य तक नहीं पहुँच सकता। तब जॉब परिणाम में
+        `targetMet: false` के साथ `targetKb` शामिल होता है, और फ़ाइल वह सबसे छोटी होती है जो बनाई जा सकती थी।
+        यदि संपीड़न से फ़ाइल बड़ी हो जाएगी, तो मूल बाइट्स लौटाए जाते हैं।
       security:
         - bearerAuth: []
       requestBody:
@@ -10486,7 +10486,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 100.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -10521,13 +10521,13 @@ paths:
       operationId: compressPdfTo200KbTool
       tags:
         - Tools
-      summary: Compress PDF to 200 KB
+      summary: PDF को 200 KB तक संपीड़ित करें
       description: |
-        Compress a PDF to a 200 KB target size (200 KB, where 1 KB = 1000 bytes).
-        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
-        Best effort: a mostly-text PDF may not reach the target. The job result then carries
-        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
-        The original bytes are returned if compression would enlarge the file.
+        एक PDF को 200 KB के लक्ष्य आकार तक संपीड़ित करें (200 KB, जहाँ 1 KB = 1000 बाइट्स)।
+        यह `compress-pdf` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        सर्वोत्तम प्रयास: एक अधिकांशतः टेक्स्ट वाला PDF लक्ष्य तक नहीं पहुँच सकता। तब जॉब परिणाम में
+        `targetMet: false` के साथ `targetKb` शामिल होता है, और फ़ाइल वह सबसे छोटी होती है जो बनाई जा सकती थी।
+        यदि संपीड़न से फ़ाइल बड़ी हो जाएगी, तो मूल बाइट्स लौटाए जाते हैं।
       security:
         - bearerAuth: []
       requestBody:
@@ -10549,7 +10549,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 200.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -10584,13 +10584,13 @@ paths:
       operationId: compressPdfTo500KbTool
       tags:
         - Tools
-      summary: Compress PDF to 500 KB
+      summary: PDF को 500 KB तक संपीड़ित करें
       description: |
-        Compress a PDF to a 500 KB target size (500 KB, where 1 KB = 1000 bytes).
-        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
-        Best effort: a mostly-text PDF may not reach the target. The job result then carries
-        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
-        The original bytes are returned if compression would enlarge the file.
+        एक PDF को 500 KB के लक्ष्य आकार तक संपीड़ित करें (500 KB, जहाँ 1 KB = 1000 बाइट्स)।
+        यह `compress-pdf` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        सर्वोत्तम प्रयास: एक अधिकांशतः टेक्स्ट वाला PDF लक्ष्य तक नहीं पहुँच सकता। तब जॉब परिणाम में
+        `targetMet: false` के साथ `targetKb` शामिल होता है, और फ़ाइल वह सबसे छोटी होती है जो बनाई जा सकती थी।
+        यदि संपीड़न से फ़ाइल बड़ी हो जाएगी, तो मूल बाइट्स लौटाए जाते हैं।
       security:
         - bearerAuth: []
       requestBody:
@@ -10612,7 +10612,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 500.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -10647,13 +10647,13 @@ paths:
       operationId: compressPdfTo1MbTool
       tags:
         - Tools
-      summary: Compress PDF to 1 MB
+      summary: PDF को 1 MB तक संपीड़ित करें
       description: |
-        Compress a PDF to a 1 MB target size (1000 KB, where 1 KB = 1000 bytes).
-        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
-        Best effort: a mostly-text PDF may not reach the target. The job result then carries
-        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
-        The original bytes are returned if compression would enlarge the file.
+        एक PDF को 1 MB के लक्ष्य आकार तक संपीड़ित करें (1000 KB, जहाँ 1 KB = 1000 बाइट्स)।
+        यह `compress-pdf` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        सर्वोत्तम प्रयास: एक अधिकांशतः टेक्स्ट वाला PDF लक्ष्य तक नहीं पहुँच सकता। तब जॉब परिणाम में
+        `targetMet: false` के साथ `targetKb` शामिल होता है, और फ़ाइल वह सबसे छोटी होती है जो बनाई जा सकती थी।
+        यदि संपीड़न से फ़ाइल बड़ी हो जाएगी, तो मूल बाइट्स लौटाए जाते हैं।
       security:
         - bearerAuth: []
       requestBody:
@@ -10675,7 +10675,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 1000.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -10710,13 +10710,13 @@ paths:
       operationId: compressPdfTo2MbTool
       tags:
         - Tools
-      summary: Compress PDF to 2 MB
+      summary: PDF को 2 MB तक संपीड़ित करें
       description: |
-        Compress a PDF to a 2 MB target size (2000 KB, where 1 KB = 1000 bytes).
-        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
-        Best effort: a mostly-text PDF may not reach the target. The job result then carries
-        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
-        The original bytes are returned if compression would enlarge the file.
+        एक PDF को 2 MB के लक्ष्य आकार तक संपीड़ित करें (2000 KB, जहाँ 1 KB = 1000 बाइट्स)।
+        यह `compress-pdf` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        सर्वोत्तम प्रयास: एक अधिकांशतः टेक्स्ट वाला PDF लक्ष्य तक नहीं पहुँच सकता। तब जॉब परिणाम में
+        `targetMet: false` के साथ `targetKb` शामिल होता है, और फ़ाइल वह सबसे छोटी होती है जो बनाई जा सकती थी।
+        यदि संपीड़न से फ़ाइल बड़ी हो जाएगी, तो मूल बाइट्स लौटाए जाते हैं।
       security:
         - bearerAuth: []
       requestBody:
@@ -10738,7 +10738,7 @@ paths:
                     Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 2000.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -10964,9 +10964,10 @@ paths:
   /api/v1/tools/pdf/multi-tool-pdf:
     post:
       operationId: multiToolPdf
-      tags: [Tools]
-      summary: PDF Multi-Tool
-      description: Assemble a PDF from an explicit page plan - reorder, duplicate, rotate, or delete pages and pull pages in from additional PDFs, in one submission.
+      tags:
+        - Tools
+      summary: PDF मल्टी-टूल
+      description: स्पष्ट पेज प्लान से एक PDF असेंबल करें - पेजों को पुनः क्रमबद्ध, डुप्लिकेट, घुमाएँ या हटाएँ और अतिरिक्त PDFs से पेज खींचें, एक ही सबमिशन में।
       security:
         - bearerAuth: []
       requestBody:
@@ -10975,7 +10976,8 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              required:
+                - file
               properties:
                 file:
                   type: array
@@ -10990,27 +10992,26 @@ paths:
                     - `items` (array, required) - Output page plan in output order (max 1200); each item is `{doc, page, rot?}` where `doc` is the 0-based upload index, `page` is a 1-based page number, and `rot` is an optional clockwise rotation (90, 180, or 270) recorded on that output position
                     - `pageCounts` (array, required) - Real page count of each uploaded document, in upload order; plans referencing a page beyond its document's count are rejected with 400
       responses:
-        "200":
+        '200':
           description: Assembled PDF
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ToolResponse"
-        "400":
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-        "401":
+                $ref: '#/components/schemas/Error'
+        '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UnauthorizedError"
-        "413":
-          $ref: "#/components/responses/PayloadTooLarge"
-
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/protect-pdf:
     post:
       operationId: protectPdf
@@ -11554,7 +11555,7 @@ paths:
                     - `format` (string, required) - One of: docx, odt, rtf, txt
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -11613,7 +11614,7 @@ paths:
                     - `format` (string, required) - One of: pptx, odp
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -11672,7 +11673,7 @@ paths:
                     - `format` (string, required) - One of: xlsx, ods, csv
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -11726,7 +11727,7 @@ paths:
                   description: Spreadsheet file to convert (.xlsx, .xls, .ods, .csv)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -11780,7 +11781,7 @@ paths:
                   description: Word document to convert (.docx, .doc, .odt, .rtf, .txt)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -11834,7 +11835,7 @@ paths:
                   description: Presentation file to convert (.pptx, .ppt, .odp)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -11888,7 +11889,7 @@ paths:
                   description: HTML file to convert (.html, .htm)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -12028,7 +12029,7 @@ paths:
                   description: Markdown file to convert (.md, .markdown)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -12087,7 +12088,7 @@ paths:
                     - `format` (string, required) - One of: pdf, docx, html, md
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -12141,7 +12142,7 @@ paths:
                   description: Document file to convert (.docx, .md, .html, .txt)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -12342,7 +12343,7 @@ paths:
                   description: PDF file to convert (.pdf)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -12467,7 +12468,7 @@ paths:
                     - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -12532,7 +12533,7 @@ paths:
       tags:
         - Tools
       summary: Chart Maker
-      description: CSV या JSON डेटा से बार, लाइन, या पाई चार्ट बनाएं। एक PNG image लौटाता है।
+      description: CSV या JSON डेटा से बार, लाइन या पाई चार्ट बनाएँ। एक PNG इमेज लौटाता है। जब किसी रो को छोड़ दिया गया क्योंकि उसकी वैल्यू सेल में एक संख्या न होने वाला टेक्स्ट था, तो रिस्पॉन्स में `chartRows` ({charted, skipped}) जुड़ता है; खाली रो नहीं गिने जाते।
       security:
         - bearerAuth: []
       requestBody:
@@ -13027,7 +13028,7 @@ paths:
                     - `format` (string, default "png") - One of: png, webp
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -13103,7 +13104,7 @@ paths:
                     - `format` (string, default "png") - One of: png, webp
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -13949,7 +13950,7 @@ paths:
                   description: JSON array of placement objects with sig, page, x, y, w, and h. Coordinates are page fractions with top-left origin.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
                 fileId:
@@ -14025,7 +14026,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14086,7 +14087,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14147,7 +14148,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14208,7 +14209,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14269,7 +14270,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14330,7 +14331,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14391,7 +14392,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14452,7 +14453,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14513,7 +14514,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14574,7 +14575,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14635,7 +14636,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14696,7 +14697,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14757,7 +14758,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14818,7 +14819,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14879,7 +14880,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -14940,7 +14941,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15001,7 +15002,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15062,7 +15063,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15123,7 +15124,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15184,7 +15185,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15245,7 +15246,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15306,7 +15307,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15367,7 +15368,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15428,7 +15429,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15489,7 +15490,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15550,7 +15551,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15611,7 +15612,7 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15672,7 +15673,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15733,7 +15734,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15794,7 +15795,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15855,7 +15856,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -15916,7 +15917,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -16663,7 +16664,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -16730,7 +16731,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -16797,7 +16798,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -16864,7 +16865,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -16931,7 +16932,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -16998,7 +16999,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17065,7 +17066,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17132,7 +17133,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17199,7 +17200,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17266,7 +17267,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17333,7 +17334,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17400,7 +17401,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17467,7 +17468,7 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17534,7 +17535,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17601,7 +17602,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17668,7 +17669,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17735,7 +17736,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17802,7 +17803,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17863,7 +17864,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17924,7 +17925,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -17985,7 +17986,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18046,7 +18047,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18107,7 +18108,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18168,7 +18169,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18229,7 +18230,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18290,7 +18291,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18351,7 +18352,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18412,7 +18413,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18473,7 +18474,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18534,7 +18535,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18595,7 +18596,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18656,7 +18657,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18717,7 +18718,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18778,7 +18779,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18839,7 +18840,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18900,7 +18901,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -18961,7 +18962,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -19022,7 +19023,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -19083,7 +19084,7 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
@@ -20369,6 +20370,46 @@ x-i18n:
       sourceHash: 01f63e9e928a
       provenance: machine
       outputHash: 01549bece8b8
+    paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
+      sourceHash: 7b2b9d14367f
+      provenance: machine
+      outputHash: 9581e2f42ace
+    paths./api/v1/tools/image/compress-image-to-20kb.post.description:
+      sourceHash: dbaf064a68d0
+      provenance: machine
+      outputHash: fc378b712ad0
+    paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
+      sourceHash: 404de90e70be
+      provenance: machine
+      outputHash: 30f641ba4cde
+    paths./api/v1/tools/image/compress-image-to-50kb.post.description:
+      sourceHash: 17ad89889448
+      provenance: machine
+      outputHash: 1ef1fc2143fa
+    paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
+      sourceHash: 871df45d5496
+      provenance: machine
+      outputHash: 83d791aefec6
+    paths./api/v1/tools/image/compress-image-to-100kb.post.description:
+      sourceHash: 485abfab7e89
+      provenance: machine
+      outputHash: 8144361973be
+    paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
+      sourceHash: 58077de56ada
+      provenance: machine
+      outputHash: c3433b1ea5c7
+    paths./api/v1/tools/image/compress-image-to-200kb.post.description:
+      sourceHash: 2326ab771a4e
+      provenance: machine
+      outputHash: 926c7ccdf929
+    paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
+      sourceHash: 8ddcd7ea07a9
+      provenance: machine
+      outputHash: 528bcab226ba
+    paths./api/v1/tools/image/compress-image-to-500kb.post.description:
+      sourceHash: 7026713d7c84
+      provenance: machine
+      outputHash: d31771f638b9
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine
@@ -21665,6 +21706,46 @@ x-i18n:
       sourceHash: 89f23fb6b3c8
       provenance: machine
       outputHash: 9dab1f5d541a
+    paths./api/v1/tools/pdf/compress-pdf-to-100kb.post.summary:
+      sourceHash: 5e4d2e88ec6b
+      provenance: machine
+      outputHash: d799d60ae82f
+    paths./api/v1/tools/pdf/compress-pdf-to-100kb.post.description:
+      sourceHash: 5a13ae7c6e69
+      provenance: machine
+      outputHash: eac68f130c48
+    paths./api/v1/tools/pdf/compress-pdf-to-200kb.post.summary:
+      sourceHash: 221c729e6ddd
+      provenance: machine
+      outputHash: d3be731bc3ee
+    paths./api/v1/tools/pdf/compress-pdf-to-200kb.post.description:
+      sourceHash: 48e46409e13a
+      provenance: machine
+      outputHash: 293db5be5bf2
+    paths./api/v1/tools/pdf/compress-pdf-to-500kb.post.summary:
+      sourceHash: 9196060d0d71
+      provenance: machine
+      outputHash: 581df82d2777
+    paths./api/v1/tools/pdf/compress-pdf-to-500kb.post.description:
+      sourceHash: 24c751490f0b
+      provenance: machine
+      outputHash: 92d055acbdfc
+    paths./api/v1/tools/pdf/compress-pdf-to-1mb.post.summary:
+      sourceHash: affd9a8d906f
+      provenance: machine
+      outputHash: 1881d05d88bf
+    paths./api/v1/tools/pdf/compress-pdf-to-1mb.post.description:
+      sourceHash: 16ef1ad29f01
+      provenance: machine
+      outputHash: 4df9e1f02e79
+    paths./api/v1/tools/pdf/compress-pdf-to-2mb.post.summary:
+      sourceHash: c78524582a37
+      provenance: machine
+      outputHash: 0066cc6e58a4
+    paths./api/v1/tools/pdf/compress-pdf-to-2mb.post.description:
+      sourceHash: 9408c6fdc894
+      provenance: machine
+      outputHash: 71f14ba58c9f
     paths./api/v1/tools/pdf/rotate-pdf.post.summary:
       sourceHash: 1eccabbce838
       provenance: machine
@@ -21697,6 +21778,14 @@ x-i18n:
       sourceHash: ac32f48665e7
       provenance: machine
       outputHash: 3d316fd1c7e6
+    paths./api/v1/tools/pdf/multi-tool-pdf.post.summary:
+      sourceHash: 0db53f175915
+      provenance: machine
+      outputHash: 4ede8c094838
+    paths./api/v1/tools/pdf/multi-tool-pdf.post.description:
+      sourceHash: b3cd42a4b0b1
+      provenance: machine
+      outputHash: 7d0e3143e714
     paths./api/v1/tools/pdf/protect-pdf.post.summary:
       sourceHash: dae6c607e963
       provenance: machine
@@ -21934,9 +22023,9 @@ x-i18n:
       provenance: machine
       outputHash: dbcca76ccbf5
     paths./api/v1/tools/files/chart-maker.post.description:
-      sourceHash: e4adb80dab58
+      sourceHash: afd06c39e795
       provenance: machine
-      outputHash: a9b33fbfc46b
+      outputHash: b8d3cf891423
     paths./api/v1/tools/files/csv-excel.post.summary:
       sourceHash: c53386a6d40d
       provenance: machine

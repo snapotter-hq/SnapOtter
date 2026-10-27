@@ -1,8 +1,8 @@
 ---
 description: "すべての SnapOtter 環境変数とデフォルト値。認証、ストレージ、AI モデル、分析などを設定します。"
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: 9823eeb45541
+i18n_output_hash: 6520246265e3
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ i18n_hash_version: 2
 | 変数 | デフォルト | 説明 |
 |---|---|---|
 | `PORT` | `1349` | サーバーがリッスンするポート。 |
+| `BASE_PATH` | (空) | 公開デプロイ用のパス（例: `/snapotter`）。空または `/` の場合、ドメインのルートで配信されます。実行時に適用されるため、イメージの再ビルドは不要です。 |
 | `RATE_LIMIT_PER_MIN` | `1000` | IP ごとの 1 分あたりの最大リクエスト数。レート制限を無効にするには 0 に設定します。 |
 | `CORS_ORIGIN` | (空) | CORS で許可するオリジンのカンマ区切りリスト。空の場合は同一オリジンのみ。 |
 | `LOG_LEVEL` | `info` | ログの詳細度。`fatal`、`error`、`warn`、`info`、`debug`、`trace` のいずれか。 |
@@ -40,7 +41,8 @@ i18n_hash_version: 2
 | 変数 | デフォルト | 説明 |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` または `s3`。S3 と MinIO には s3_storage 機能を含むライセンスに加えて、以下の `S3_*` 変数が必要です。 |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 接続文字列。Compose スタックではこれを自身の `postgres` サービスに向けます。組み込みモードにするには、（`REDIS_URL` と併せて）未設定のままにします。 |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 接続文字列であり、すべてのリクエストが処理される接続です。2.3.0 以降では `DATABASE_MIGRATION_URL` も設定すると、こちらはアプリのテーブルに対する DML のみを持つ最小権限のランタイムロールになります。Compose スタックではこれを自身の `postgres` サービスに向けます。組み込みモードにするには、（`REDIS_URL` と併せて）未設定のままにします。 |
+| `DATABASE_MIGRATION_URL` | (空) | 2.3.0 から利用可能です。2.2.0 イメージはこの変数を無視し、`DATABASE_URL` にデータベース所有者を指定する必要があります。特権接続で、起動時にのみマイグレーションの実行とランタイムロールへの権限付与に使用され、最初のリクエストの前に切断されます。空のままにすると SnapOtter は単一ロールで動作し、`DATABASE_URL` が両方の役割を担います。[最小権限ロール](/ja/guide/database#least-privilege-roles) を参照してください。 |
 | `REDIS_URL` | `redis://localhost:6379` | Redis 接続文字列（BullMQ ジョブキューに使用）。Compose ではこれを自身の `redis` サービスに向けます。 |
 | `WORKSPACE_PATH` | `./tmp/workspace` | 処理中の一時ファイル用ディレクトリ。自動的にクリーンアップされます。イメージでは `/tmp/workspace` が設定されます。 |
 | `FILES_STORAGE_PATH` | `./data/files` | 永続的なユーザーファイル（アップロードした画像、保存した結果）用ディレクトリ。イメージでは `/data/files` が設定されます。 |
@@ -74,6 +76,8 @@ i18n_hash_version: 2
 |---|---|---|
 | `EMBEDDED` | `auto` | `DATABASE_URL` と `REDIS_URL` の両方が未設定の場合に自動で有効になります。無効にするには `0` に設定します（その場合、外部の `DATABASE_URL`/`REDIS_URL` が設定されていなければ、アプリはコンテナ内データベースを黙って起動する代わりに即座に失敗します）。 |
 | `REDIS_MAXMEMORY` | `512mb` | 組み込み Redis のメモリ上限（組み込みモードのみ）。Raspberry Pi のようなメモリ制約のあるホストでは下げてください。 |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | 組み込み Redis が `PING` に応答するまで起動時に待機する秒数。タイムアウトすると、ハングする代わりにコンテナが停止し、理由をログに記録します。1 から 999999 までの整数で、無制限の値はありません。永久に待ち続けることが、この上限を設けている理由そのものだからです。遅いホストで引っかかる場合にのみ引き上げてください。 |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | 組み込み PostgreSQL についても同様です。計測は初回起動の `initdb` 完了後に始まるため、初回のデータベース作成ではなく、サーバー起動とクラッシュリカバリを対象とします。 |
 
 1.x からのアップグレード: 古い `snapotter.db` をボリューム内の `/data/snapotter.db` に配置すると、組み込みモードが初回起動時にそれを組み込み PostgreSQL へインポートします。インポートは一度だけ実行され、以降の起動ではスキップされます。
 
@@ -93,6 +97,23 @@ i18n_hash_version: 2
 | `MAX_CANVAS_PIXELS` | `0` (制限なし) | 出力画像の最大キャンバスサイズ（ピクセル単位）。制限なしにするには 0 に設定します。 |
 | `MAX_SVG_SIZE_MB` | `50` | サニタイズ前に受け付ける SVG の最大サイズ（メガバイト単位）。ここでの `0` は前後の行とは動作が異なります。上限を引き上げるのではなく、解析前のサイズ上限そのものを取り除くため、この項目は設定したままにしてください。 |
 | `MAX_PDF_PAGES` | `0` (無制限) | PDF-to-image 変換での PDF の最大ページ数。無制限にするには 0 に設定します。 |
+
+### エンジン {#engines}
+
+SnapOtter は各処理バイナリをコンテナ内の `$PATH` から探すため、独自にビルドしたものを持ち込まない限り、これらは空のままで問題ありません。
+
+| 変数 | デフォルト | 説明 |
+|---|---|---|
+| `FFMPEG_PATH` | （空） | ビデオおよびオーディオ ツールが使用する `ffmpeg` バイナリのパス。 |
+| `FFPROBE_PATH` | （空） | メディア ファイルを処理前に読み取る `ffprobe` のパス。`FFMPEG_PATH` と同じビルドを指定してください。 |
+| `QPDF_PATH` | （空） | `qpdf` のパス。PDF ツールと、アップロードされた PDF のチェックに使用されます。 |
+| `SOFFICE_PATH` | （空） | LibreOffice の `soffice` のパス。オフィス ドキュメントの変換に使用されます。 |
+| `PDFCPU_PATH` | （空） | `pdfcpu` のパス。一部の PDF ツールで使用されます。 |
+| `SNAPOTTER_HW_ACCEL` | （空） | ハードウェア ビデオ エンコーダーのファミリー。`nvenc` または `vaapi`。空の場合はソフトウェア エンコードになります。 |
+
+`SNAPOTTER_HW_ACCEL` には、そのエンコーダー ファミリーでビルドされた ffmpeg が必要ですが、イメージ内の ffmpeg はどちらも備えていません。イメージ同梱のバイナリを使う場合、この設定はソフトウェア エンコードにフォールバックし、起動ログでその旨が通知されます。使用するには、独自にビルドした ffmpeg をマウントし、`FFMPEG_PATH` と `FFPROBE_PATH` をそこに向け、コンテナに GPU デバイスを渡してください。`nvenc` の場合はさらに `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` を設定します。イメージは `compute,utility` のみを要求するため、`video` がないと NVIDIA ランタイムがエンコード ライブラリをマウントせず、エンコーダーは一覧に表示されるもののすべてのエンコードが失敗します。存在しない、または実行できないパスを上書きした場合も起動ログで通知され、パスを修正するか設定を解除するまで、そのバイナリを必要とするすべてのジョブが失敗します。
+
+公開されている Compose ファイルはこの 6 つすべてを `.env` から渡すため、そこで設定すれば十分です。
 
 ### クリーンアップ {#cleanup}
 

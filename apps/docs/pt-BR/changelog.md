@@ -1,11 +1,130 @@
 ---
 description: "Notas de versão e histórico de versões do SnapOtter. Veja o que há de novo, o que foi melhorado e o que foi corrigido em cada versão."
-i18n_source_hash: 9020073f127e
+i18n_source_hash: d3c5fc4c6b75
 i18n_provenance: human
-i18n_output_hash: 122334654881
+i18n_output_hash: b322400998ca
 ---
 
 # Changelog {#changelog}
+
+## v2.2.0 {#v2-2-0}
+
+A maior parte da 2.2 é reforço de segurança. Um usuário não administrador com um papel delegado `users:manage` podia assumir o controle de uma instância, e todos os endpoints de ferramentas estavam sem verificação de permissão. Atualize se você tiver mais de um usuário.
+
+O resto é a longa cauda da auto-hospedagem: downloads que começavam e nunca terminavam, predefinições que quebravam no momento em que você adicionava um segundo arquivo, contêineres em ciclo de falhas enquanto o Postgres ainda estava subindo. Duas novas ferramentas também chegaram. A documentação e o site agora estão traduzidos em 21 idiomas, e a interface finalmente atende ao contraste WCAG AA.
+
+> [!IMPORTANT]
+> Se você concedeu `users:manage` a um não administrador por meio de um papel personalizado, esse papel podia assumir contas de administrador nas versões 2.0.0 a 2.1.0. Detalhes em Segurança.
+
+### Segurança {#v2-2-0-security}
+
+- **Escalação de privilégios por um papel delegado `users:manage` (GHSA-9xgh-95qh-2x7h).** Um usuário não administrador com `users:manage` por um papel personalizado podia redefinir a senha ou excluir uma conta de privilégio superior, incluindo um administrador integrado, e assumir a instância. A redefinição de senha e a exclusão de conta agora verificam a autoridade de quem chama sobre o alvo, então um papel delegado não consegue alcançar acima do próprio nível. Afetadas: 2.0.0 a 2.1.0. Reportado por 李春来 (Chunlai Li). (#616)
+- **Todos os endpoints de ferramentas agora têm verificação.** O acesso às ferramentas era aplicado rota por rota, então as 45 rotas escritas à mão precisavam lembrar da mesma chamada e nenhuma delas lembrava. Um papel sem `tools:use` ainda conseguia executar image-to-pdf, erase-object, upscale, sign-pdf e o resto. A verificação agora fica em um único preHandler baseado na rota correspondente, então ela cobre subcaminhos e qualquer rota adicionada depois. (#646)
+- **A limitação de taxa podia ser contornada em instalações Docker.** A imagem trazia `TRUST_PROXY=true`, então o IP do cliente vinha de um cabeçalho da requisição e um `X-Forwarded-For` forjado passava pelo limitador de login. O padrão agora é uma lista de confiança de rede privada. (#649)
+- **Gravações de configurações são verificadas por configuração**, não uma vez na entrada, e a importação de configuração agora é transacional, para que uma chave rejeitada não deixe metade de uma configuração aplicada. (#618)
+- **Nomes de arquivos da biblioteca não podem escapar da raiz de armazenamento.** Um nome armazenado forjado, que uma importação maliciosa de SQLite da 1.x copia literalmente, podia ler ou excluir arquivos fora do diretório de arquivos. Só é alcançável depois que um operador importa um banco SQLite 1.x fornecido por um atacante, que é o único caminho que permite escolher um nome armazenado. Reportado por @Alpastx. (GHSA-55w2-8cqf-w969, #600)
+- **O cancelamento de jobs aplica a verificação de propriedade**, então um usuário autenticado não pode mais cancelar o job de outro usuário pelo id. Reportado por @Alpastx. (GHSA-wqxf-gj2p-689x, #599)
+- **Uma reauditoria de toda a árvore 2.0 encontrou o que ainda estava aberto**: uma asserção SAML capturada podia ser reproduzida, um desafio de MFA sobrevivia a qualquer número de códigos errados, a consulta de chave de API por requisição era uma varredura completa de tabela, `MAX_WORKSPACE_SIZE_GB` era configuração morta, e o sanitizador de SVG deixava passar hrefs `javascript:` sem aspas. (#620)
+- **Nove CVEs divulgadas corrigidas**: fast-uri, svgo, sharp e tar transitivamente (#619), além do Pillow 12.3.0 (#517). A decodificação RAW em arm64 agora compila o LibRaw 0.22.2 a partir do código-fonte em vez de vincular uma cópia do sistema sem patch. (#649)
+
+### Novos recursos {#v2-2-0-new-features}
+
+- **Recorte Arredondado**: máscaras de quadrado arredondado e squircle no estilo iOS, com um controle de raio de canto. Feito para favicons e ícones de aplicativos. (#602)
+- **Remover Fundo de GIF**: retire o fundo de um GIF animado, WebP ou APNG quadro a quadro e receba de volta uma animação transparente. (#502)
+- **Laço e modo de Alta Qualidade no Apagador de Objetos**: arraste um laço de forma livre em vez de pintar cada pixel, e opcionalmente instale um pacote de inpainting por difusão para preenchimentos mais limpos de áreas grandes. (#503, #566)
+- **Salvar como novo ou substituir.** Editar um arquivo da biblioteca costumava substituir o original silenciosamente. Agora você escolhe por edição, e o padrão mantém o original. (#564, #577)
+- **Predefinições de proporção em Redimensionar.** Escolha 1:1, 4:3 ou 16:9 e as duas dimensões permanecem travadas, sem ampliar. (#530)
+- **OCR em duas camadas**: uma camada rápida vem embutida na imagem e roda offline sem download, e um tempo de execução mais preciso é instalado sob demanda. (#519)
+- **Digite em qualquer lugar para pesquisar.** Comece a digitar no painel ou na página inicial e o texto vai para a caixa de pesquisa. (#644)
+- **Documentação e site em 21 idiomas**: o site de documentação, as páginas de destino e a referência da API estão todos traduzidos agora, juntando-se à interface do aplicativo. Um novo guia de implantação para recursos limitados cobre Raspberry Pi e máquinas de 2 GB. (#548)
+- **Nomes de ferramentas mais claros**: 18 nomes ambíguos agora se qualificam sozinhos, então "Compress" virou "Compress Image". IDs e rotas de ferramentas não mudaram, então nada favoritado quebra. (#520)
+
+### Melhorias {#v2-2-0-improvements}
+
+- **Contraste WCAG AA em toda a interface**: a paleta foi recalibrada para que o laranja vivo fique nos preenchimentos enquanto textos e rótulos usam tokens de cor acessíveis, e todos os 57 indicadores de foco agora superam o limite de 3:1 para elementos não textuais. (#567, #574)
+- **Ampliação e remoção de fundo deixam de parecer travadas**: a barra de progresso avança durante a inferência em vez de estacionar em 30%, e ambas as ferramentas agora avisam que um host somente CPU é muito mais lento. (#605, #608)
+- **Mensagens de tempo limite nomeiam a causa real** e consideram hosts somente CPU em vez de culpar o upload. (#596)
+- **O SnapOtter espera pelo Postgres e pelo Redis na inicialização** em vez de entrar em ciclo de falhas, tanto no Compose quanto na imagem tudo-em-um. Uma instalação em LXC no Proxmox reiniciava 76 vezes antes disso. (#537, #595)
+- **Downloads sobrevivem a um proxy reverso**: o SnapOtter pede ao nginx e a proxies compatíveis que não façam buffer das respostas de arquivo, que é o motivo usual para um download auto-hospedado começar e nunca terminar. (#604, #607)
+- **Comprimir PDF fica perto do tamanho alvo**, e diz isso honestamente quando um alvo é inalcançável. (#522)
+- **Controles de ferramentas no celular continuam acessíveis** agora que as estruturas do aplicativo se dimensionam pela viewport dinâmica. (#559)
+- **Converter Áudio expõe uma configuração de taxa de amostragem.** (#561)
+- **Administradores podem relaxar o comprimento mínimo de senha**, até 1 para uma instância em LAN confiável. (#543)
+- **A MFA agora é de autoatendimento**, o bloqueio causado pela política foi resolvido, e logins OIDC ou SAML recebem um desafio de MFA real em vez de um bloqueio rígido. (#531, #536)
+- **Um `Error: Error` simples agora nomeia sua causa.** Falhas de codificação do Sharp, saídas do sidecar de IA, saída não JSON do sidecar de documentos e falhas de remoção de fundo chegavam com o motivo apagado. (#532, #534, #535, #538, #612)
+- **O diálogo de ajuda está traduzido.** Seus rótulos de atalho e texto de introdução estavam fixos em inglês enquanto traduções prontas ficavam sem uso nos 21 arquivos de localidade. (#647)
+
+### Correções de bugs {#v2-2-0-bug-fixes}
+
+- **Arquivos HEIC de iPhone eram rejeitados** como ilegíveis antes de chegarem ao decodificador que os trata. (#631)
+- **Predefinições de conversão falhavam com um segundo arquivo**: jpg-to-pdf e seus irmãos image-to-pdf, além de pdf-to-png, pdf-to-jpg e pdf-to-tiff, retornavam `Tool not found` assim que você enviava dois arquivos. (#633, #643)
+- **Predefinições de conversão de PDF perdiam o botão de download.** (#629)
+- **Um tempo limite de processamento ilimitado não era respeitado**, e streams de progresso travados agora se recuperam em vez de deixar a interface esperando. (#638)
+- **Downloads travavam em vez de falhar** quando um arquivo armazenado era menor que o comprimento registrado. (#617)
+- **Ferramentas de páginas de PDF falhavam em arquivos curtos e criptografados**: Remover Páginas usava como padrão um intervalo de páginas que nenhum documento com menos de seis páginas tem, e PDFs protegidos por senha falhavam de forma críptica dentro do worker. (#594)
+- **PDF para Texto retornava silenciosamente um arquivo vazio** para PDFs digitalizados. Agora ele indica o OCR e entrega texto como UTF-8. (#603)
+- **PDF para Word descartava blocos de texto coloridos** e os dividia pela página. (#500)
+- **O Apagador de Objetos deixava resquícios fantasma** e desfocava objetos pequenos em imagens de alta resolução. (#501)
+- **Estabilizar Vídeo gerava saída não reproduzível** sem faststart. (#593)
+- **Reparos no editor de imagem**: girar, inverter, redimensionar, níveis, curvas, filtros e bloqueio de camada. (#597)
+- **Assinar PDF mostrava um canvas em branco** em vez de informar por que um PDF não carregou. (#545)
+- **A biblioteca de arquivos registrava dimensões 0x0** e pulava as pré-visualizações de uploads HEIC, RAW e PSD. (#636, #637)
+- **Instalar mais de um pacote de IA** deixava o virtualenv compartilhado com múltiplas versões e quebrava silenciosamente três ferramentas. (#649)
+- **Converter para JXL com qualidade 1 a 4 retornava um 500**, e um ffmpeg ausente era reportado a você como upload corrompido. (#649)
+- **Uma indisponibilidade transitória do Postgres deixava jobs concluídos presos**, deixando a saída no disco sem nenhuma linha apontando para ela. Um reconciliador agora adota esse trabalho em vez de descartá-lo. (#649)
+- **Um endpoint Redis que mudava de endereço travava todos os consumidores** enquanto as verificações de saúde ainda respondiam 200. (#649)
+- **Correções no site e na documentação**: links localizados não perdem mais fragmentos `#` nem colocam `zh-CN` em minúsculas, a navegação da documentação permanece dentro da viewport em tablets, e nenhum dos sites chama a API do GitHub pelo seu navegador. (#516, #562, #570, #560)
+
+### Notas de atualização {#v2-2-0-upgrade-notes}
+
+Nada para migrar, mas dois padrões enviados mudaram:
+
+- **`TRUST_PROXY` agora tem como padrão `loopback,linklocal,uniquelocal`** em vez de confiar em qualquer par. Redes bridge do Docker e do Compose ficam dentro desse intervalo, então a maioria das configurações não precisa de mudança. Se o seu proxy reverso alcança o SnapOtter a partir de um endereço público, defina `TRUST_PROXY` explicitamente, ou a limitação de taxa e os logs de auditoria atribuirão cada requisição ao proxy.
+- **`MAX_AI_JOBS_PER_USER` tem como padrão 5** jobs de IA de arquivo único em andamento por usuário. Execuções de IA em lote e em pipeline continuam sem limite.
+
+Novos ajustes opcionais: `DB_STARTUP_TIMEOUT_MS`, `SUBPROCESS_MEMORY_LIMIT_MB` (desligado por padrão) e `GIF_BG_MAX_FRAMES`.
+
+### Agradecimentos {#v2-2-0-acknowledgements}
+
+Boa parte desta versão começou como o relatório de bug de outra pessoa.
+
+Código e contribuições:
+
+- **@mvanhorn** ❤️: Reescreveu a falha de tempo limite da remoção de fundo em uma mensagem que diz o que fazer a respeito, em vez de um tempo limite seco. (#518, #494)
+- **@EuanTop** ❤️: Restaurou a ação de download nas páginas de predefinição de conversão de PDF fazendo a rota síncrona retornar o contrato padrão de resultado de ferramenta. (#629, #623)
+- **@harshjainnn** ❤️: Diagnosticou o download que começa e nunca termina, e propôs a direção de reset de socket sobre a qual a correção foi construída. (#617, #590)
+
+Divulgações de segurança:
+
+- **李春来 (Chunlai Li)** ❤️ ([@laijunyue](https://github.com/laijunyue)): Divulgou de forma privada a escalação de privilégios por um papel delegado `users:manage`, com uma análise completa da origem ao destino e uma cadeia de exploração funcional. (GHSA-9xgh-95qh-2x7h, #616)
+- **@Alpastx** ❤️ (Alpesh Bhagwatkar): Divulgou um IDOR autenticado no cancelamento de jobs, e um path traversal em nomes de arquivos armazenados na biblioteca alcançável após uma importação maliciosa de SQLite da 1.x, com uma prova de conceito funcional para cada um. (#599, #600)
+
+Relatos de bugs:
+
+- **@riz467** ❤️: Arquivos HEIC reais de iPhone rejeitados na validação, com a causa raiz esclarecida no relatório. (#622)
+- **@coupej** ❤️: Páginas de predefinição de PDF travando para sempre, e jpg-to-pdf falhando assim que um segundo arquivo era adicionado. Dois bugs distintos, corretamente separados. (#623, #627)
+- **@linuxuser1** ❤️: `PROCESSING_TIMEOUT_S=0` documentado como ilimitado mas limitado a cinco minutos. (#630)
+- **@bezibaerchen** ❤️: Converter Áudio escondia a configuração de taxa de amostragem que sua própria descrição prometia. (#558)
+- **@hell-toupee** ❤️: O pacote OCR preciso falhando na instalação com um erro `libpaddle`. (#505)
+- **@Michael1260** ❤️ e **@And-CSH** ❤️: Confirmaram essa falha de instalação do OCR de forma independente e estabeleceram que a extração manual funciona enquanto o instalador do aplicativo não, o que fixou o bug no instalador. (#505)
+- **@TomErnst1972** ❤️: Ativar a política de MFA obrigatória bloqueando um administrador da própria instância. (#515)
+- **@thokich** ❤️: O apagamento de objetos produzindo preenchimentos desfocados e inutilizáveis, o que impulsionou tanto a reescrita do inpainting HD quanto o pacote opcional de alta qualidade. (#141)
+- **@Hennie-git** ❤️: Uma instalação em LXC no Proxmox reiniciando 76 vezes contra um Postgres que ainda não aceitava conexões. (community-scripts/ProxmoxVE#15796)
+- **MickLesk** ❤️ (community-scripts do Proxmox VE): Triou esse relatório em tempo real e produziu o diagnóstico sobre o qual a correção de inicialização foi construída. (#537)
+
+Solicitações de recursos e feedback:
+
+- **@LECOQQ** ❤️: Pediu para relaxar a complexidade de senha em uma instalação de servidor doméstico. (#136)
+- **@killervette42** ❤️: Pediu um Unraid Community App, agora publicado na loja Unraid CA. (#96)
+- **@alienatedsec** ❤️: Apontou que a correção de fallback de GPU para CPU estava enterrada em uma issue fechada e era impossível de descobrir, e é por isso que ela está na documentação de implantação agora. (#490, #587)
+- **@neilp316** ❤️: Confirmou a falha da GPU Blackwell em uma RTX 5060 e mapeou um caminho de atualização funcional para CUDA 12.8. (#120)
+- **@Roiki11** ❤️: Defendeu armazenamento compartilhado com referências de caminho em vez de transferência de arquivos por HTTP para computação de IA fora da máquina. (#189)
+
+Agradecemos também aos membros da comunidade que relataram esses problemas no Discord e por e-mail, cujos nomes não registramos: o pedido de recorte squircle (#602), o download de imagem para PDF que começava e nunca terminava (#604, #607), a ferramenta Excluir Páginas travando (#594), texto em árabe ausente no pdf-to-text (#603), e o diagnóstico por trás do fallback de GPU do ONNX (#490).
+
+[Diff completo no GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.1.0...v2.2.0)
+
+---
 
 ## v2.0.0 {#v2-0-0}
 

@@ -1,8 +1,8 @@
 ---
 description: "Alle SnapOtter-omgevingsvariabelen met standaardwaarden. Configureer authenticatie, opslag, AI-modellen, analytics en meer."
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: 05e18ac893a3
+i18n_output_hash: b5bd3b2bd155
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ Alle configuratie gebeurt via omgevingsvariabelen. Elke variabele heeft een vers
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
 | `PORT` | `1349` | Poort waarop de server luistert. |
+| `BASE_PATH` | (leeg) | Openbaar implementatiepad, bijv. `/snapotter`. Leeg of `/` serveert op de domeinroot. Wordt tijdens runtime toegepast; geen herbouw van de image nodig. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximaal aantal verzoeken per minuut per IP. Stel in op 0 om rate limiting uit te schakelen. |
 | `CORS_ORIGIN` | (leeg) | Door komma's gescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
 | `LOG_LEVEL` | `info` | Uitgebreidheid van logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -40,7 +41,8 @@ De twee booleans hieronder accepteren alleen `true` en `false`. Al het andere, `
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` of `s3`. S3 en MinIO vereisen een licentie met de s3_storage-functie plus de `S3_*`-variabelen hieronder. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-connectiestring. De Compose-stack wijst deze naar zijn `postgres`-service; laat hem leeg (samen met `REDIS_URL`) om de ingebedde modus te krijgen. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-connectiestring, en de verbinding waarop elk verzoek wordt bediend. Stel vanaf 2.3.0 ook `DATABASE_MIGRATION_URL` in; dan wordt dit de runtime-rol met minimale rechten, met alleen DML op de tabellen van de app en niets anders. De Compose-stack wijst deze naar zijn `postgres`-service; laat hem leeg (samen met `REDIS_URL`) om de ingebedde modus te krijgen. |
+| `DATABASE_MIGRATION_URL` | (leeg) | Beschikbaar vanaf 2.3.0; de image van 2.2.0 negeert hem en vereist dat `DATABASE_URL` de database-eigenaar aanwijst. Bevoorrechte verbinding, alleen gebruikt tijdens het opstarten om migraties uit te voeren en de runtime-rol rechten te geven, en daarna gesloten voordat het eerste verzoek binnenkomt. Laat hem leeg en SnapOtter draait met één rol, waarbij `DATABASE_URL` beide taken doet. Zie [Rollen met minimale rechten](/nl/guide/database#least-privilege-roles). |
 | `REDIS_URL` | `redis://localhost:6379` | Redis-connectiestring (gebruikt voor BullMQ-taakwachtrijen). Compose wijst deze naar zijn `redis`-service. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Map voor tijdelijke bestanden tijdens de verwerking. Wordt automatisch opgeschoond. De image stelt `/tmp/workspace` in. |
 | `FILES_STORAGE_PATH` | `./data/files` | Map voor persistente gebruikersbestanden (geüploade afbeeldingen, opgeslagen resultaten). De image stelt `/data/files` in. |
@@ -74,6 +76,8 @@ Draai de image zonder `DATABASE_URL` en zonder `REDIS_URL` en hij start zijn eig
 |---|---|---|
 | `EMBEDDED` | `auto` | Automatisch ingeschakeld wanneer zowel `DATABASE_URL` als `REDIS_URL` niet zijn ingesteld. Stel in op `0` om het uit te schakelen (de app faalt dan direct als er geen externe `DATABASE_URL`/`REDIS_URL` is ingesteld, in plaats van stilletjes een database binnen de container te starten). |
 | `REDIS_MAXMEMORY` | `512mb` | Geheugenlimiet voor de ingebedde Redis (alleen in de ingebedde modus). Verlaag deze op hosts met beperkt geheugen, zoals een Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Aantal seconden dat het opstarten wacht tot de ingebedde Redis op `PING` antwoordt, voordat het opgeeft. Bij een time-out stopt de container en logt waarom, in plaats van te blijven hangen. Hele seconden van 1 tot 999999; er is geen onbeperkte waarde, omdat eeuwig wachten juist de fout is die deze grens moet voorkomen. Verhoog hem alleen als een trage host ertegenaan loopt. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Hetzelfde, voor de ingebedde PostgreSQL. De klok start nadat de eerste `initdb` is voltooid, dus de time-out dekt het starten van de server en crashherstel, niet het aanmaken van de initiële database. |
 
 Upgraden vanaf 1.x: plaats je oude `snapotter.db` op `/data/snapotter.db` in het volume en de ingebedde modus importeert het bij de eerste keer opstarten in de ingebedde PostgreSQL. De import draait één keer; latere opstarts slaan deze over.
 
@@ -93,6 +97,23 @@ Opmerking over telemetrie: de ingebedde modus erft de analytics-standaard van de
 | `MAX_CANVAS_PIXELS` | `0` (geen limiet) | Maximale canvasgrootte in pixels voor uitvoerafbeeldingen. Stel in op 0 voor geen limiet. |
 | `MAX_SVG_SIZE_MB` | `50` | Grootste SVG die vóór het opschonen wordt geaccepteerd, in megabytes. `0` gedraagt zich hier anders dan in de rijen eromheen. Het verwijdert de groottelimiet vóór het parsen volledig in plaats van hem te verhogen, dus laat deze ingesteld staan. |
 | `MAX_PDF_PAGES` | `0` (onbeperkt) | Maximaal aantal PDF-pagina's voor PDF-naar-image-conversie. Stel in op 0 voor onbeperkt. |
+
+### Engines {#engines}
+
+SnapOtter zoekt elk binair bestand voor verwerking op `$PATH` in de container, dus de variabelen blijven leeg tenzij je een eigen build mount.
+
+| Variabele | Standaard | Beschrijving |
+|---|---|---|
+| `FFMPEG_PATH` | (leeg) | Pad naar het binaire bestand `ffmpeg` achter de video- en audiotools. |
+| `FFPROBE_PATH` | (leeg) | Pad naar `ffprobe`, dat mediabestanden leest voordat ze worden verwerkt. Wijs het naar dezelfde build als `FFMPEG_PATH`. |
+| `QPDF_PATH` | (leeg) | Pad naar `qpdf`, gebruikt door de PDF-tools en om geüploade pdf's te controleren. |
+| `SOFFICE_PATH` | (leeg) | Pad naar `soffice` van LibreOffice, gebruikt voor conversies van kantoordocumenten. |
+| `PDFCPU_PATH` | (leeg) | Pad naar `pdfcpu`, gebruikt door sommige PDF-tools. |
+| `SNAPOTTER_HW_ACCEL` | (leeg) | Familie hardware-video-encoders, `nvenc` of `vaapi`. Leeg codeert in software. |
+
+`SNAPOTTER_HW_ACCEL` vereist een ffmpeg-build met die encoderfamilie, en de ffmpeg in de image heeft geen van beide. Met de ffmpeg uit de image zelf valt de instelling terug op software-encoding en meldt dat in het opstartlogboek. Om het te gebruiken, mount je je eigen ffmpeg-build, wijs je `FFMPEG_PATH` en `FFPROBE_PATH` ernaar en geef je de container het GPU-apparaat. Stel voor `nvenc` ook `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` in: de image vraagt alleen om `compute,utility`, en zonder `video` mount de NVIDIA-runtime de encodelibrary niet, zodat de encoder wel wordt vermeld maar elke encode mislukt. Een padoverride die niet bestaat of niet uitvoerbaar is, wordt ook in het opstartlogboek genoemd, en elke taak die dat binaire bestand nodig heeft, mislukt totdat je het pad repareert of de variabele leegmaakt.
+
+De gepubliceerde Compose-bestanden geven alle zes door vanuit `.env`, dus ze daar instellen is voldoende.
 
 ### Opschoning {#cleanup}
 

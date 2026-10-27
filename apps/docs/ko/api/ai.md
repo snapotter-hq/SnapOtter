@@ -1,13 +1,13 @@
 ---
 description: "모든 로컬 ML 도구를 다루는 AI 엔진 레퍼런스. 배경 제거, 업스케일링, OCR, 얼굴 감지, 사진 복원 등."
-i18n_output_hash: 534278b9910c
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: 1d29a0b1133c
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
 # AI 엔진 레퍼런스 {#ai-engine-reference}
 
-`@snapotter/ai` 패키지는 로컬 ML 작업을 위해 기본 도구와 Python 런타임을 조정합니다. 대부분의 ML 도구는 빠른 웜 스타트를 위해 영구 Python sidecar 를 사용합니다. OCR 는 의도적으로 분리되어 있습니다. `fast`는 기본 Tesseract 바이너리를 호출하는 반면, `balanced` 및 `best`는 `/data/ai/v3` 아래의 활성 불변 RapidOCR 세대에 고정된 전용 영구 JSONL dispatcher 를 사용합니다. 각 요청에는 generation lease 가 포함됩니다. 업그레이드 중에 SnapOtter 는 활성화하기 전에 후보에서 smoke test 를 실행하고 새로운 dispatcher 로 원자적으로 전환한 다음 garbage collection 이전의 이전 세대를 제거합니다.
+`@snapotter/ai` 패키지는 로컬 ML 작업을 위해 네이티브 도구와 Python 런타임을 조정합니다. 대부분의 ML 도구는 빠른 웜 스타트를 위해 영구 Python sidecar 를 사용합니다. OCR 는 의도적으로 분리되어 있습니다. `fast`는 기본 Tesseract 바이너리를 호출하는 반면, `balanced` 및 `best`는 `/data/ai/v3` 아래의 활성 불변 RapidOCR 세대에 고정된 전용 영구 JSONL dispatcher 를 사용합니다. 각 요청에는 generation lease 가 포함됩니다. 업그레이드 중에 SnapOtter 는 활성화하기 전에 후보에서 smoke test 를 실행하고 새로운 dispatcher 로 원자적으로 전환한 다음 garbage collection 이전의 이전 세대를 제거합니다.
 
 NVIDIA CUDA 는 이를 지원하는 런타임에서 자동 감지되고 사용됩니다. OCR 는 NVIDIA GPU가 있는 시스템을 포함하여 모든 호스트에서 CPU 를 사용하여 이 도구에 대한 CUDA 및 드라이버 결합을 방지합니다.
 
@@ -15,12 +15,12 @@ VA-API, Quick Sync, OpenCL을 통한 Intel/AMD iGPU 가속은 현재 AI 추론�
 
 네 가지 모달리티(이미지, 오디오, 비디오, 문서)에 걸쳐 19개의 Python 사이드카 AI 도구가 있으며, 여기에 선택적 AI 기능을 갖춘 2개의 도구가 추가된다. 모든 모델은 로컬에서 실행되며, 최초 모델 다운로드 이후에는 인터넷이 필요하지 않다.
 
-
 <!-- korean-ocr-contract:start -->
 ::: info 한국어 OCR 호환성
 빠른 OCR은 `auto`, `en`, `de`, `es`, `fr`, `zh`, `ja`를 지원하지만 한국어(`ko`)는 지원하지 않습니다. 한국어에는 정확한 OCR 팩과 `balanced` 또는 `best`가 필요합니다. 이 팩은 공식 Linux amd64 및 arm64 컨테이너에서 작동하며 NVIDIA 호스트에서도 OCR은 CPU에서 실행됩니다. 지원되지 않는 시스템은 명시적인 호환성 오류를 반환하며 조용히 `fast`로 대체하지 않습니다. 한국어에 `fast` 또는 이전 `tesseract` 별칭을 지정하면 큐에 넣기 전에 `FEATURE_INCOMPATIBLE` 및 `fast-korean-unsupported`로 거부됩니다.
 :::
 <!-- korean-ocr-contract:end -->
+
 ## 아키텍처 {#architecture}
 
 ```
@@ -62,17 +62,18 @@ AI 모델은 도구별로 아카이브 하나씩이 아니라 공유 의존성 �
 
 Docker 이미지는 애플리케이션과 공통 런타임을 함께 제공한다. 대용량 모델 아카이브는 필요할 때 상시 유지되는 `/data/ai` 볼륨으로 다운로드된 뒤, 이를 필요로 하는 모든 도구가 재사용한다. 다른 도구가 이미 필요로 해서 어떤 번들이 이미 설치되어 있다면, 새로 의존하는 도구를 활성화해도 그 번들을 다시 다운로드하지 않는다.
 
-대부분의 AI 도구를 실행하려면 하나 이상의 기능 번들이 필요합니다. 관리 UI는 전체 번들 목록을 확인하고 이미 설치된 번들을 건너뛰며 누락된 다운로드만 대기열에 추가하는 `POST /api/v1/admin/tools/:toolId/features/install`를 통해 도구로 해당 항목을 설치합니다. 예를 들어, 새로운 인스턴스 큐 `background-removal` 및 `face-detection`에서 여권 사진을 활성화합니다. 백그라운드 제거가 이미 설치된 후에 활성화하면 `face-detection`만 대기열에 추가됩니다. OCR 는 예외입니다. `fast`에는 팩이 필요하지 않기 때문입니다. UI 또는 `POST /api/v1/admin/features/ocr/install`를 통해 선택적 정확한 런타임을 설치합니다.
+대부분의 AI 도구를 실행하려면 하나 이상의 기능 번들이 필요합니다. 관리 UI는 전체 번들 목록을 확인하고 이미 설치된 번들을 건너뛰며 누락된 다운로드만 대기열에 추가하는 `POST /api/v1/admin/tools/:toolId/features/install`를 통해 도구로 해당 항목을 설치합니다. 예를 들어, 새 인스턴스에서 여권 사진을 활성화하면 `background-removal`과 `face-detection`이 대기열에 추가됩니다. 백그라운드 제거가 이미 설치된 뒤에 활성화하면 `face-detection`만 대기열에 추가됩니다. OCR 는 예외입니다. `fast`에는 팩이 필요하지 않기 때문입니다. UI 또는 `POST /api/v1/admin/features/ocr/install`를 통해 선택적 정확한 런타임을 설치합니다.
 
-| 번들 | 크기 | 공유 의존성 그룹 | 사용하는 도구 |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet 배경 매팅 | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | MediaPipe 얼굴 감지 및 랜드마크 | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa 인페인팅/아웃페인팅 및 DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, 노이즈 제거 | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | 스크래치 복구 및 복원 파이프라인 | restore-photo |
-| `ocr` | ~208-234 MiB 다운로드 / ~409-488 MiB 설치됨 | 옵션 RapidOCR 3.9.1, ONNX Runtime 1.20.1 및 고정형 PP-OCR 모델 | ocr, ocr-pdf(`balanced` 및 `best`에만 해당) |
-| `transcription` | ~600 MB | faster-whisper 음성-텍스트 변환 모델 | transcribe-audio, auto-subtitles |
+| 번들 | 크기 | CPU 메모리 하한 | 공유 의존성 그룹 | 사용하는 도구 |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (여유 메모리 ~2.5 GB) | rembg / BiRefNet 배경 매팅 | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (여유 메모리 ~0.5 GB) | MediaPipe 얼굴 감지 및 랜드마크 | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (여유 메모리 ~2 GB) | LaMa 인페인팅/아웃페인팅 및 DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (여유 메모리 ~6 GB) | Stable Diffusion 1.5 고품질 인페인팅 | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (여유 메모리 ~2.5 GB) | RealESRGAN, GFPGAN / CodeFormer, 노이즈 제거 | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (여유 메모리 ~3 GB) | 스크래치 복구 및 복원 파이프라인 | restore-photo |
+| `ocr` | ~208-234 MiB 다운로드 / ~409-488 MiB 설치됨 | 구성된 유효 메모리 4 GiB (`fast`는 2 GB에서 실행) | 옵션 RapidOCR 3.9.1, ONNX Runtime 1.20.1 및 고정형 PP-OCR 모델 | ocr, ocr-pdf(`balanced` 및 `best`에만 해당) |
+| `transcription` | ~600 MB | 4 GB RAM (여유 메모리 ~2 GB) | faster-whisper 음성-텍스트 변환 모델 | transcribe-audio, auto-subtitles |
 
 교차 번들 의존성을 갖는 도구:
 
@@ -82,6 +83,27 @@ Docker 이미지는 애플리케이션과 공통 런타임을 함께 제공한�
 | `enhance-faces` | `upscale-enhance`, `face-detection` | 선택된 얼굴 영역에 GFPGAN 또는 CodeFormer 보정을 적용하기 전에 얼굴을 감지한다. |
 
 도구는 OCR 를 제외하고 모든 필수 번들이 설치된 경우에만 사용할 수 있습니다. 내장된 `fast` 계층은 선택적 OCR 팩 없이도 계속 사용할 수 있습니다. 부분 설치는 유효하며 증분적으로 처리됩니다. 설치된 번들은 재사용되고, 누락된 번들은 다운로드로 표시되며, 대기 중인 설치는 한 번에 하나씩 실행되므로 공유 Python 환경이 동시에 수정되지 않습니다.
+
+### 한 번에 모든 번들 설치 {#installing-every-bundle-at-once}
+
+**설정 → AI 기능**에는 호스트가 실행할 수 있는 모든 번들을 대기열에 추가하는 **모두 설치** 버튼이 있습니다. 이미 설치된 번들은 건너뛰고, 호스트와 호환되지 않는다고 보고된 번들도 건너뛰며, 실패한 번들은 다음으로 넘어가기 전에 한 번 재시도합니다. 일반적인 인스턴스에서는 이 버튼 하나로 충분하며, 아래 내용은 필요하지 않습니다.
+
+디스크 공간을 먼저 확보하세요. 번들을 모두 합치면 설치 후 대략 20-25 GB이며, 이미지가 아닌 데이터 볼륨의 `/data/ai`에 저장되므로 `docker compose down`과 컨테이너 재생성 후에도 유지됩니다. 업그레이드할 때마다가 아니라 호스트당 한 번만 설치하면 됩니다.
+
+아무도 클릭하지 않는 무인 프로비저닝 환경이라면 관리자 API 키와 함께 각 번들을 설치 엔드포인트로 POST하세요. 서버가 대기열에 추가하므로 여덟 개를 기다리지 않고 모두 보내면 됩니다:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+각 호출은 `jobId`와 `queued` 플래그를 담아 `202`를 반환합니다. `queued`는 즉시 시작되는 번들의 경우 `false`, 나머지의 경우 `true`입니다. 이미 설치된 번들은 `409`를 반환하며 무시해도 안전하므로 이 루프는 다시 실행할 수 있습니다. 진행 상황은 `GET /api/v1/features`를 폴링해 확인하며, 실행이 끝나면 모든 번들이 `installed`로 표시됩니다.
+
+예상할 점이 두 가지 있습니다. `ocr` 번들은 호스트 호환성 사전 검사를 실행하고 서명된 최소 사양에 미달하는 호스트를 거부하므로, 나머지 일곱 개가 성공해도 실패할 수 있습니다([정확한 OCR 런타임 설치](#accurate-ocr-runtime-installation) 참고). 그리고 설치가 진행 중인 동안에는 `POST /api/v1/admin/features/reset`가 `409`를 반환하므로, 진행 중인 실행이 끝나거나 컨테이너를 재시작한 뒤에야 환경을 초기화할 수 있습니다.
 
 ### 정확한 OCR 런타임 설치 {#accurate-ocr-runtime-installation}
 
@@ -167,12 +189,12 @@ Docker 이미지는 애플리케이션과 공통 런타임을 함께 제공한�
 
 | 매개변수 | 타입 | 기본값 | 설명 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | `quality`와 `engine`을 생략하면 SnapOtter는 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어에서는 `fast`를 선택하지 않으며 `best`, 그다음 `balanced`를 사용하고, 둘 다 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
-| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | 부울 | 계층에 따라 다름 | 로컬 대비를 향상시킵니다. 빠르게 직접 적용합니다. 정확한 계층은 보정된 점수가 OCR 를 향상시키는 경우에만 변형을 유지합니다. 최고에 대한 기본값은 켜져 있습니다. |
-| `engine` | 끈 | - | 더 이상 사용되지 않는 호환성 별칭입니다. `tesseract`를 `fast`에 매핑하고 레거시 `paddleocr` 값을 `balanced`에 매핑합니다. PaddlePaddle 를 로드하지 않습니다. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | 처리 등급입니다. `quality`를 생략하면 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어에서는 `fast`를 선택하지 않으며, 정확한 등급이 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
+| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast는 `ko`를 지원하지 않습니다. |
+| `enhance` | boolean | 등급에 따라 다름 | 로컬 대비를 개선합니다. Fast는 이를 직접 적용하고, 정확한 등급은 보정된 점수가 OCR을 개선할 때만 변형을 유지합니다. Best에서는 기본으로 켜져 있습니다. |
+| `engine` | string | - | 더 이상 사용되지 않는 호환성 별칭입니다. `tesseract`를 `fast`에 매핑하고 레거시 `paddleocr` 값을 `balanced`에 매핑합니다. PaddlePaddle은 로드하지 않습니다. |
 
-추출된 텍스트와 출처 메타데이터(엔진, 요청 및 실제 품질, 장치, 공급자, 성능 저하 상태, 경고, 해당되는 경우 정확한 런타임/모델 버전)를 반환합니다. 명시적인 품질 요청은 다른 계층으로 돌아가지 않습니다. `balanced` 또는 `best`를 사용할 수 없는 경우 API 는 `fast`를 자동으로 실행하는 대신 `FEATURE_NOT_INSTALLED` 또는 `FEATURE_INCOMPATIBLE`를 반환합니다.
+추출된 텍스트와 출처 메타데이터(엔진, 요청 및 실제 품질, 장치, 공급자, 성능 저하 상태, 경고, 해당되는 경우 정확한 런타임/모델 버전)를 반환합니다. 명시적인 품질 요청은 다른 계층으로 돌아가지 않습니다. `balanced` 또는 `best`를 사용할 수 없는 경우 API 는 `fast`를 자동으로 실행하는 대신 `FEATURE_NOT_INSTALLED` 또는 `FEATURE_INCOMPATIBLE`를 반환합니다. 한국어에 Fast 또는 레거시 `tesseract`를 명시하면 작업이 대기열에 들어가기 전에 `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, 정확한 팩 안내를 반환합니다.
 
 ## PDF OCR {#pdf-ocr}
 
@@ -183,13 +205,13 @@ AI 기반 OCR을 사용해 스캔된 PDF 문서에서 페이지별로 텍스트�
 
 | 매개변수 | 타입 | 기본값 | 설명 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | `quality`와 `engine`을 생략하면 SnapOtter는 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어에서는 `fast`를 선택하지 않으며 `best`, 그다음 `balanced`를 사용하고, 둘 다 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
-| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | 처리 등급입니다. `quality`를 생략하면 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어에서는 `fast`를 선택하지 않으며, 정확한 등급이 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
+| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast는 `ko`를 지원하지 않습니다. |
 | `pages` | string | `"all"` | 페이지 선택: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | 부울 | 계층에 따라 다름 | 로컬 대비를 향상시킵니다. 빠르게 직접 적용합니다. 정확한 계층은 보정된 점수가 OCR 를 향상시키는 경우에만 변형을 유지합니다. 최고에 대한 기본값은 켜져 있습니다. |
-| `engine` | 끈 | - | 더 이상 사용되지 않는 호환성 별칭입니다. `tesseract`를 `fast`에 매핑하고 레거시 `paddleocr` 값을 `balanced`에 매핑합니다. PaddlePaddle 를 로드하지 않습니다. |
+| `enhance` | boolean | 등급에 따라 다름 | 로컬 대비를 개선합니다. Fast는 이를 직접 적용하고, 정확한 등급은 보정된 점수가 OCR을 개선할 때만 변형을 유지합니다. Best에서는 기본으로 켜져 있습니다. |
+| `engine` | string | - | 더 이상 사용되지 않는 호환성 별칭입니다. `tesseract`를 `fast`에 매핑하고 레거시 `paddleocr` 값을 `balanced`에 매핑합니다. PaddlePaddle은 로드하지 않습니다. |
 
-PDF OCR 에도 동일한 다운그레이드 금지 규칙이 적용됩니다. PDF 페이지는 인식되기 전에 래스터화되며, 한 요청으로 최대 50페이지를 선택할 수 있습니다.
+PDF OCR에도 동일한 다운그레이드 금지 규칙과 한국어 호환성 규칙이 적용됩니다. PDF 페이지는 인식되기 전에 래스터화되며, 한 요청으로 최대 50페이지를 선택할 수 있습니다.
 
 ## 얼굴 / PII 블러 {#face-pii-blur}
 
@@ -357,7 +379,7 @@ NVIDIA GPU가 있을 때 CUDA 가속된다.
 | `sensitivity` | number (0-1) | `0.5` | 얼굴 감지 임계값 |
 | `threshold` | integer (0-255) | `30` | 배경 감지 임계값 (트림 모드) |
 | `padToSquare` | boolean | `false` | 트림된 결과를 정사각형으로 패딩 |
-| `padColor` | string | `"#ffffff"` | 정사각형 패딩용 배경 색상 |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | 정사각형 패딩용 배경 색상 |
 | `targetSize` | integer | - | 패딩된 출력의 목표 크기(픽셀) |
 | `quality` | integer (1-100) | - | 출력 품질 |
 

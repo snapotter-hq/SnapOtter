@@ -1,8 +1,8 @@
 ---
 description: "设置 SCIM 2.0 预配以将用户和组从你的身份提供商同步到 SnapOtter。涵盖 Okta、Azure AD / Entra ID 以及自定义集成。"
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: d318d3799726
+i18n_output_hash: a637c53f2dff
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP 发送的请求超过每分钟 1000 个。这通常发生在大型初始同�
 ### 用户已取消预配但未从界面中移除 {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE 是软停用。已停用的用户仍会以禁用状态出现在管理员用户列表中。这是有意为之，以便保留他们的数据。他们的角色显示为 `disabled:<original-role>`。
+
+### `externalId` 筛选漏掉通过 OIDC 或 SAML 登录的用户 {#recover-scim-ids-in-oidc-or-saml-users}
+
+在 SCIM 的 `externalId` 拥有自己的列（`users.scim_external_id`）之前，对已由 OIDC 或 SAML 登录关联过的用户执行 SCIM `PUT` 或 `PATCH` 时，SCIM id 会被写入该用户的登录身份。升级迁移无法区分该值和真正的 OIDC subject 或 SAML NameID，因此会跳过这些用户。对他们来说，`filter=externalId eq "..."` 在 IdP 发送下一次携带 `externalId` 的更新之前不会返回任何结果。
+
+如果你不想等 IdP，审计日志可以为该 id 作证。SCIM 会为每个用户写入一行 `SCIM_USER_PROVISIONED`，其中包含创建该用户时使用的 `externalId`。升级到包含 `scim_external_id` 列的版本后，请针对 SnapOtter 数据库打开 `psql`（[账户恢复指南](./account-recovery.md#older-images-and-fallbacks)展示了两种部署方式下的做法），并预览登录身份仍然等于该 id 的用户：
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+如果列表看起来正确，就把该 id 复制到 SCIM 列中。请在 `BEGIN;` 内运行，并在 `COMMIT;` 之前检查返回的行：
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+再次运行不会匹配任何内容。该更新会保持 `external_id` 不变，因为某些 IdP（包括 Okta）会把同一个 id 同时作为 OIDC 的 `sub` 和 SCIM 的 `externalId` 发送，对它们来说清空该值会破坏 OIDC 登录。如果某个用户的 `external_id` 确实就是这个游离的 SCIM id，那么 subject 匹配本来就会失败。启用 `OIDC_AUTO_LINK_USERS`（或 `SAML_AUTO_LINK_USERS`）后，他们下次使用已验证邮箱登录时会以任一方式重新关联。
+
+有些用户仍然无法覆盖，并会在 IdP 的下一次更新中重新取回该 id：
+
+- 登录关联覆盖了 SCIM id、且之后没有收到 SCIM 写入的用户，因为他们的 `external_id` 不再与审计行匹配
+- 预配审计记录已被保留策略清理的用户
+- IdP 在创建用户后更改了其 `externalId` 的用户（更新行记录的是哪些字段发生变化，而不是它们的值）
+- 两个用户持有同一个 id，查询会跳过他们，以免唯一索引中止操作；去掉最后一个子句的预览会列出他们，至于该 id 最终归谁所有，由你决定

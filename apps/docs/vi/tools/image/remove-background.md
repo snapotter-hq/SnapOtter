@@ -1,8 +1,8 @@
 ---
 description: "Xóa nền do AI hỗ trợ với các hiệu ứng tùy chọn (làm mờ, đổ bóng, gradient, nền tùy chỉnh)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 52ddf417f567
+i18n_output_hash: 713fd3ded9b5
 ---
 
 # Remove Background {#remove-background}
@@ -19,20 +19,12 @@ Xóa nền do AI hỗ trợ với các hiệu ứng tùy chọn (làm mờ, đ�
 
 ## Parameters {#parameters}
 
+Phase 1 xóa nền và lưu vào bộ nhớ đệm mask PNG trong suốt cùng ảnh gốc. Việc thay nền, làm mờ, đổ bóng và chuyển đổi định dạng đầu ra được áp dụng ở [Phase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (hoặc khi chạy `remove-background` như một bước trong pipeline hay công việc hàng loạt); truyền các trường đó vào Phase 1 sẽ trả về 400.
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | Tệp ảnh (multipart) |
 | model | string | No | - | Biến thể mô hình AI cần dùng |
-| backgroundType | string | No | `"transparent"` | Một trong: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | - | Màu hex cho nền đặc |
-| gradientColor1 | string | No | - | Màu gradient thứ nhất |
-| gradientColor2 | string | No | - | Màu gradient thứ hai |
-| gradientAngle | number | No | - | Góc gradient tính bằng độ |
-| blurEnabled | boolean | No | - | Bật hiệu ứng làm mờ nền |
-| blurIntensity | number | No | - | Cường độ làm mờ (0-100) |
-| shadowEnabled | boolean | No | - | Bật đổ bóng lên đối tượng |
-| shadowOpacity | number | No | - | Độ mờ đục của bóng (0-100) |
-| outputFormat | string | No | - | Định dạng đầu ra: `png`, `webp`, hoặc `avif` |
 | edgeRefine | integer | No | - | Mức tinh chỉnh cạnh (0-3) |
 | decontaminate | boolean | No | - | Loại bỏ màu lem ở các cạnh |
 
@@ -41,7 +33,7 @@ Xóa nền do AI hỗ trợ với các hiệu ứng tùy chọn (làm mờ, đ�
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -91,24 +83,24 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | JSON với cài đặt hiệu ứng (xem bên dưới) |
-| backgroundImage | file | No | - | Ảnh nền tùy chỉnh (khi backgroundType là `image`) |
+| backgroundImage | file | Bắt buộc khi `backgroundType` là `image` | - | Ảnh nền tùy chỉnh |
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| jobId | string | Yes | ID job từ Phase 1 |
-| filename | string | Yes | Tên tệp gốc từ Phase 1 |
-| backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | Màu hex cho nền đặc |
-| gradientColor1 | string | No | Màu gradient thứ nhất |
-| gradientColor2 | string | No | Màu gradient thứ hai |
-| gradientAngle | number | No | Góc gradient tính bằng độ |
-| blurEnabled | boolean | No | Bật làm mờ nền |
-| blurIntensity | number | No | Cường độ làm mờ (0-100) |
-| shadowEnabled | boolean | No | Bật đổ bóng |
-| shadowOpacity | number | No | Độ mờ đục của bóng (0-100) |
-| outputFormat | string | No | `png`, `webp`, hoặc `avif` |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Yes | - | ID job từ Phase 1 |
+| filename | string | Yes | - | Tên tệp gốc từ Phase 1 |
+| backgroundType | string | No | `"transparent"` | Một trong: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Bắt buộc khi `backgroundType` là `color` | - | Màu hex: `#RRGGBB` hoặc `#RGB` (dấu `#` là tùy chọn) |
+| gradientColor1 | string | Bắt buộc khi `backgroundType` là `gradient` | - | Màu gradient thứ nhất, hex như `backgroundColor` |
+| gradientColor2 | string | Bắt buộc khi `backgroundType` là `gradient` | - | Màu gradient thứ hai, hex như `backgroundColor` |
+| gradientAngle | number | No | - | Góc gradient tính bằng độ |
+| blurEnabled | boolean | No | - | Làm mờ nền gốc phía sau chủ thể (`backgroundType: "blur"` ngụ ý bật tùy chọn này) |
+| blurIntensity | number | No | - | Cường độ làm mờ (0-100) |
+| shadowEnabled | boolean | No | - | Bật đổ bóng lên chủ thể |
+| shadowOpacity | number | No | `35` | Độ mờ đục của bóng (0-100), dùng khi `shadowEnabled` là true |
+| outputFormat | string | No | `"png"` | Định dạng đầu ra: `png`, `webp` hoặc `avif` |
 
 ### Example Request {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Error: Background Removal Expired (410) {#error-background-removal-expired-410}
+
+Endpoint effects hoạt động dựa trên mask và ảnh gốc mà Phase 1 đã lưu cho `jobId`. Các đầu ra đã lưu sẽ bị dọn dẹp sau một thời gian, vì vậy nếu quá nhiều thời gian trôi qua giữa hai lần gọi, chúng sẽ không còn. Hãy chạy lại Phase 1 với cùng ảnh và dùng `jobId` mà nó trả về.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Một `jobId` hoặc `filename` không thể chỉ định một tệp đã lưu (dấu phân cách đường dẫn, `..`, chuỗi rỗng) sẽ trả về 400.
 
 ## Notes {#notes}
 

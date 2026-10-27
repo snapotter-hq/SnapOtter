@@ -1,7 +1,7 @@
 ---
 description: "すべてのローカル ML ツールを網羅した AI エンジンリファレンス。背景除去、アップスケーリング、OCR、顔検出、写真復元など。"
-i18n_output_hash: aabfa7bf38f2
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: d94cd75e40f8
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -62,17 +62,18 @@ AI モデルは、ツールごとに 1 つのアーカイブとしてではな�
 
 Docker イメージには、アプリケーションと共通ランタイムが同梱されています。大きなモデルアーカイブはオンデマンドで永続的な `/data/ai` ボリュームにダウンロードされ、それを必要とするすべてのツールで再利用されます。別のツールがすでに必要としたためにバンドルがインストール済みの場合、新たに依存するツールを有効化してもそのバンドルは再ダウンロードされません。
 
-ほとんどの AI ツールは、実行する前に 1 つ以上の機能バンドルを必要とします。 管理 UI は、`POST /api/v1/admin/tools/:toolId/features/install` を介してツールによってこれらをインストールします。これにより、完全なバンドル リストが解決され、すでにインストールされているバンドルがスキップされ、不足しているダウンロードのみがキューに入れられます。 たとえば、新しいインスタンス キュー `background-removal` および `face-detection` でパスポート写真を有効にすると、 バックグラウンド削除がすでにインストールされている後に有効にすると、`face-detection` のみがキューに追加されます。 OCR は例外です。 `fast` パックは必要ありません。 UI または `POST /api/v1/admin/features/ocr/install` を通じて、オプションの正確なランタイムをインストールします。
+ほとんどの AI ツールは、実行する前に 1 つ以上の機能バンドルを必要とします。 管理 UI は、`POST /api/v1/admin/tools/:toolId/features/install` を介してツールによってこれらをインストールします。これにより、完全なバンドル リストが解決され、すでにインストールされているバンドルがスキップされ、不足しているダウンロードのみがキューに入れられます。 たとえば、新しいインスタンスでパスポート写真を有効にすると `background-removal` と `face-detection` がキューに追加され、背景除去がすでにインストールされている状態で有効にすると `face-detection` のみがキューに追加されます。 OCR は例外です。 `fast` パックは必要ありません。 UI または `POST /api/v1/admin/features/ocr/install` を通じて、オプションの正確なランタイムをインストールします。
 
-| バンドル | サイズ | 共有依存関係グループ | 使用するツール |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet 背景マッティング | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | MediaPipe 顔検出とランドマーク | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa インペインティング/アウトペインティングと DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN、GFPGAN / CodeFormer、ノイズ除去 | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | 傷の修復と復元パイプライン | restore-photo |
-| `ocr` | ~208-234 MiB ダウンロード / ~409-488 MiB インストール済み | オプションの RapidOCR 3.9.1、ONNX Runtime 1.20.1、および固定された PP-OCR モデル | ocr、ocr-pdf (`balanced` および `best` のみ) |
-| `transcription` | ~600 MB | faster-whisper 音声認識モデル | transcribe-audio, auto-subtitles |
+| バンドル | サイズ | CPU メモリの下限 | 共有依存関係グループ | 使用するツール |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM（空き約 2.5 GB） | rembg / BiRefNet 背景マッティング | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM（空き約 0.5 GB） | MediaPipe 顔検出とランドマーク | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM（空き約 2 GB） | LaMa インペインティング/アウトペインティングと DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM（空き約 6 GB） | Stable Diffusion 1.5 高品質インペインティング | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM（空き約 2.5 GB） | RealESRGAN、GFPGAN / CodeFormer、ノイズ除去 | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM（空き約 3 GB） | 傷の修復と復元パイプライン | restore-photo |
+| `ocr` | ~208-234 MiB ダウンロード / ~409-488 MiB インストール済み | 4 GiB の構成済み有効メモリ（`fast` は 2 GB で動作） | オプションの RapidOCR 3.9.1、ONNX Runtime 1.20.1、および固定された PP-OCR モデル | ocr、ocr-pdf (`balanced` および `best` のみ) |
+| `transcription` | ~600 MB | 4 GB RAM（空き約 2 GB） | faster-whisper 音声認識モデル | transcribe-audio, auto-subtitles |
 
 複数バンドルにまたがる依存関係を持つツール:
 
@@ -83,9 +84,30 @@ Docker イメージには、アプリケーションと共通ランタイムが�
 
 ツールは、OCR を除き、必要なバンドルがすべてインストールされている場合にのみ使用できます。その組み込みの `fast` 層は、オプションの OCR パックがなくても引き続き使用できます。 部分インストールは有効であり、段階的に処理されます。インストールされたバンドルは再利用され、不足しているバンドルはダウンロードとして表示され、キューに入れられたインストールは一度に 1 つずつ実行されるため、共有 Python 環境は同時に変更されません。
 
+### すべてのバンドルを一度にインストールする {#installing-every-bundle-at-once}
+
+設定 → AI 機能には **すべてインストール** ボタンがあり、そのホストで実行できるすべてのバンドルをキューに追加します。インストール済みのものはスキップし、ホストと互換性がないと報告されたバンドルもスキップし、失敗したバンドルは一度だけ再試行してから次へ進みます。通常のインスタンスではこのボタンだけで完了し、以下の手順は必要ありません。
+
+まずディスク容量を見積もってください。バンドルをすべて合わせるとインストール後はおよそ 20〜25 GB になり、イメージ内ではなくデータボリュームの `/data/ai` に配置されるため、`docker compose down` やコンテナの再作成後も残ります。インストールはホストごとに一度だけ行えばよく、アップグレードのたびにやり直す必要はありません。
+
+誰も操作しない無人プロビジョニングでは、管理者 API キーを使って各バンドルをインストール エンドポイントに POST します。サーバー側でキューに入るため、8 つすべてを待たずに送信できます:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+各呼び出しは `jobId` と `queued` フラグを伴う `202` を返します。`queued` は即座に開始される 1 つが `false`、残りが `true` です。インストール済みのバンドルは `409` を返しますが、無視して問題ありません。そのためこのループは何度でも再実行できます。進捗は `GET /api/v1/features` をポーリングしてください。実行が完了すると、すべてのバンドルが `installed` と表示されます。
+
+想定しておくべき点が 2 つあります。`ocr` バンドルはホスト互換性の事前チェックを実行し、署名された最小要件を下回るホストを拒否するため、他の 7 つが成功してもこれだけが失敗することがあります（[正確な OCR ランタイム インストール](#accurate-ocr-runtime-installation) を参照）。また、`POST /api/v1/admin/features/reset` はインストールの進行中は `409` を返すため、途中の実行を完了させるか、コンテナを再起動するまで環境を消去できません。
+
 ### 正確な OCR ランタイム インストール {#accurate-ocr-runtime-installation}
 
-正確な OCR パックは、公式 Linux amd64 または Linux arm64 コンテナー用のプラットフォーム固有のランタイムです。 amd64 ビルドは Python 3.12 を使用します。 arm64 ビルドは Python 3.11 を使用します。 どちらのビルドも ONNX Runtime の `CPUExecutionProvider` を介して RapidOCR を実行するため、同じパックが CPU のみおよび NVIDIA Docker ホストで動作します。 正確なランタイムには、少なくとも 4 GiB の有効メモリ (構成されたコンテナーの cgroup 制限、それ以外の場合はホスト メモリ) が必要です。 署名された互換性の最小値を下回るシステムは、ダウンロード前に拒否されます。 この要件は、組み込みの Fast OCR には適用されません。 Bare-metal ビルドは、libc および Python ABI を安全に推論できないため拒否されます。 ホストが Tesseract および Ghostscript を提供する場合、高速 OCR は引き続き利用可能です。
+正確な OCR パックは、公式 Linux amd64 または Linux arm64 コンテナー用のプラットフォーム固有のランタイムです。 amd64 ビルドは Python 3.12 を使用します。 arm64 ビルドは Python 3.11 を使用します。 どちらのビルドも ONNX Runtime の `CPUExecutionProvider` を介して RapidOCR を実行するため、同じパックが CPU のみおよび NVIDIA Docker ホストで動作します。 正確なランタイムには、少なくとも 4 GiB の有効メモリ (構成されたコンテナーの cgroup 制限、それ以外の場合はホスト メモリ) が必要です。 署名された互換性の最小値を下回るシステムは、ダウンロード前に拒否されます。 この要件は、組み込みの Fast OCR には適用されません。 Bare-metal ビルドは、libc および Python ABI を安全に推論できないため拒否されます。 ホストが Tesseract および Ghostscript を提供する場合、高速 OCR は引き続き利用可能です。Fast は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) には対応しません。そのため韓国語には、対応済みの高精度ランタイムと `balanced` または `best` ティアが必要です。非対応のホストでは、暗黙に Fast へフォールバックするのではなく、明示的な互換性エラーを返します。
 
 オプションのアーティファクトは、アーキテクチャに応じて、圧縮すると約 208 ～ 234 MiB、抽出すると約 409 ～ 488 MiB になります。 署名付きインデックスは、インストーラーによって強制された正確な圧縮バイト数と抽出バイト数をバインドします。 組み込みの Tesseract は、約 25 の MiB を公式イメージに追加し、`/data/ai` 内のファイルは必要ありません。
 
@@ -163,16 +185,16 @@ Docker イメージには、アプリケーションと共通ランタイムが�
 ## OCR / テキスト抽出 {#ocr-text-extraction}
 
 **ツールルート:** `ocr`  
-**モデル:** Tesseract (`fast`); RapidOCR と PP-OCRv6 小型モデル (`balanced`)。調整されたバリアント スコアリングを備えた PP-OCRv6 中モデル (`best`)
+**モデル:** Tesseract (`fast`)、RapidOCR と PP-OCRv6 小型モデル (`balanced`)、調整されたバリアント スコアリングを備えた PP-OCRv6 中モデル (`best`)
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | `quality` と `engine` を省略すると、SnapOtter は `best`、`balanced`、`fast` の順で利用可能な最上位の層を選びます。韓国語では `fast` を選択せず、`best`、次に `balanced` を使用し、どちらもなければ高精度ランタイムのインストールまたは互換性エラーを返します。 |
-| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | ブール値 | ティアに依存 | 局所的なコントラストを改善します。高速ではそれを直接適用します。正確な階層は、調整されたスコアによって OCR が向上した場合にのみバリアントを保持します。デフォルトで最良の状態 |
-| `engine` | 弦 | - | 非推奨の互換性エイリアス。 `tesseract` を `fast` にマップし、従来の `paddleocr` 値を `balanced` にマップします。 PaddlePaddle はロードされません |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | 処理ティア。`quality` を省略すると、`best`、`balanced`、`fast` の順で利用可能な最上位のティアを選択します。韓国語では `fast` を選択せず、高精度ティアがない場合は高精度ランタイムのインストールまたは互換性エラーを返します。 |
+| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`。Fast は `ko` に対応しません。 |
+| `enhance` | boolean | ティアに依存 | 局所的なコントラストを改善します。Fast では直接適用し、高精度ティアでは調整済みスコアリングによって OCR が改善する場合にのみバリアントを採用します。Best ではデフォルトで有効です。 |
+| `engine` | string | - | 非推奨の互換性エイリアス。`tesseract` を `fast` に、従来の `paddleocr` 値を `balanced` にマッピングします。PaddlePaddle は読み込みません。 |
 
-抽出されたテキストと来歴メタデータを返します: エンジン、要求された品質と実際の品質、デバイス、プロバイダー、劣化状態、警告、および該当する場合は正確なランタイム/モデルのバージョン。 明示的な品質要求が別の層にフォー​​ルバックすることはありません。 `balanced` または `best` が使用できない場合、API は、`fast` をサイレントに実行する代わりに、`FEATURE_NOT_INSTALLED` または `FEATURE_INCOMPATIBLE` を返します。
+抽出されたテキストと来歴メタデータを返します: エンジン、要求された品質と実際の品質、デバイス、プロバイダー、劣化状態、警告、および該当する場合は正確なランタイム/モデルのバージョン。 明示的な品質要求が別の層にフォー​​ルバックすることはありません。 `balanced` または `best` が使用できない場合、API は、`fast` をサイレントに実行する代わりに、`FEATURE_NOT_INSTALLED` または `FEATURE_INCOMPATIBLE` を返します。韓国語で明示的に Fast または旧 `tesseract` を指定した場合は、ジョブがキューに投入される前に `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`、高精度パックの案内を返します。
 
 ## PDF OCR {#pdf-ocr}
 
@@ -183,11 +205,11 @@ AI ベースの OCR を使用して、スキャンされた PDF ドキュメン�
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | `quality` と `engine` を省略すると、SnapOtter は `best`、`balanced`、`fast` の順で利用可能な最上位の層を選びます。韓国語では `fast` を選択せず、`best`、次に `balanced` を使用し、どちらもなければ高精度ランタイムのインストールまたは互換性エラーを返します。 |
-| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | 処理ティア。`quality` を省略すると、`best`、`balanced`、`fast` の順で利用可能な最上位のティアを選択します。韓国語では `fast` を選択せず、高精度ティアがない場合は高精度ランタイムのインストールまたは互換性エラーを返します。 |
+| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`。Fast は `ko` に対応しません。 |
 | `pages` | string | `"all"` | ページ選択: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | ブール値 | ティアに依存 | 局所的なコントラストを改善します。高速ではそれを直接適用します。正確な階層は、調整されたスコアによって OCR が向上した場合にのみバリアントを保持します。デフォルトで最良の状態 |
-| `engine` | 弦 | - | 非推奨の互換性エイリアス。 `tesseract` を `fast` にマップし、従来の `paddleocr` 値を `balanced` にマップします。 PaddlePaddle はロードされません |
+| `enhance` | boolean | ティアに依存 | 局所的なコントラストを改善します。Fast では直接適用し、高精度ティアでは調整済みスコアリングによって OCR が改善する場合にのみバリアントを採用します。Best ではデフォルトで有効です。 |
+| `engine` | string | - | 非推奨の互換性エイリアス。`tesseract` を `fast` に、従来の `paddleocr` 値を `balanced` にマッピングします。PaddlePaddle は読み込みません。 |
 
 同じダウングレードなしルールが PDF OCR にも適用されます。 PDF ページは認識前にラスタライズされ、1 つのリクエストで最大 50 ページを選択できます。
 
@@ -357,7 +379,7 @@ NVIDIA GPU が利用可能な場合は CUDA で高速化されます。
 | `sensitivity` | number (0-1) | `0.5` | 顔検出のしきい値 |
 | `threshold` | integer (0-255) | `30` | 背景検出のしきい値（trim モード） |
 | `padToSquare` | boolean | `false` | トリミング結果を正方形にパディング |
-| `padColor` | string | `"#ffffff"` | 正方形パディングの背景色 |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | 正方形パディングの背景色 |
 | `targetSize` | integer | - | パディング後の出力の目標サイズ（ピクセル） |
 | `quality` | integer (1-100) | - | 出力品質 |
 

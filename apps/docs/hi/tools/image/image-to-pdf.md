@@ -1,6 +1,6 @@
 ---
 description: "page size, orientation और लक्ष्य फ़ाइल आकार विकल्पों के साथ एक या अधिक छवियों को एक PDF दस्तावेज़ में संयोजित करें।"
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 4d0942ce13f6
 ---

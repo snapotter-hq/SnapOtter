@@ -1,7 +1,7 @@
 ---
 description: "Yerleşik Tesseract veya isteğe bağlı yüksek doğruluklu RapidOCR çalışma zamanı ile görüntülerden metni yerel olarak çıkarın."
 i18n_output_hash: 9c5e3cba8b34
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

@@ -1,8 +1,8 @@
 ---
 description: "顔検出、背景除去、印刷シートの並べ配置を備えた AI パスポート・証明写真ジェネレーター。"
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 2b0c1ea5ec9f
+i18n_output_hash: 0c88ff3fa637
 ---
 
 # パスポート写真 {#passport-photo}
@@ -92,7 +92,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | documentType | string | No | `"passport"` | 書類タイプ（国別仕様による） |
 | bgColor | string | No | `"#FFFFFF"` | 背景色（16 進） |
 | printLayout | string | No | `"none"` | 印刷用紙のレイアウト: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | 最大ファイルサイズ制約（KB、0 = 制限なし） |
+| maxFileSizeKb | number | No | `0` | 最大ファイルサイズ（KB、1 KB = 1000 バイト、0 = 制限なし） |
 | dpi | number | No | `300` | 出力 DPI（72～1200） |
 | customWidthMm | number | No | - | カスタム写真幅（mm、国別仕様を上書き） |
 | customHeightMm | number | No | - | カスタム写真高さ（mm、国別仕様を上書き） |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### エラー: 分析の有効期限切れ（410） {#error-analysis-expired-410}
+
+Generate は、analyze が `jobId` に対して保存した背景除去済みの画像から処理を行います。保存された出力は一定時間後に削除されるため、2 つの呼び出しの間に時間が空きすぎると画像は失われます。同じ写真で analyze を再度呼び出し、返された `jobId` を使用してください。
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+保存されたファイルを特定できない `jobId` または `filename`（パス区切り文字、`..`、空文字列）には 400 を返します。
+
 ---
 
 ### ベースルート {#base-route}
@@ -170,4 +183,4 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 - 解析レスポンスの `preview` フィールドは、高速表示のための base64 エンコードされた PNG（最大幅 800px）です。
 - 国別仕様には、公式のパスポート写真要件に基づく書類寸法、頭部の高さ比率、目線の位置が含まれます。
 - `printLayout` オプションは、4x6 インチまたは A4 用紙上に、写真間 2mm の余白を空けて並べたシートを生成します。
-- `maxFileSizeKb` が設定されている場合、サイズ制限に収まるよう出力が反復的に圧縮されます。
+- `maxFileSizeKb` が設定されている場合、出力が収まるまで JPEG 品質を段階的に下げます。ピクセルサイズは国別仕様で固定されているため、最低品質でも収まらない場合は、制限を超えたファイルを返すのではなく、その旨を伝える 422 を `/generate` が返します。

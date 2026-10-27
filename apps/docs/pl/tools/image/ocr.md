@@ -1,7 +1,7 @@
 ---
 description: "Wyodrębnij lokalnie tekst z obrazów za pomocą wbudowanego Tesseract lub opcjonalnego środowiska wykonawczego RapidOCR o wysokiej dokładności."
 i18n_output_hash: c79924df54eb
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

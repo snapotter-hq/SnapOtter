@@ -1,6 +1,6 @@
 ---
 description: "AI를 사용하여 이미지 배경을 단색 또는 그라디언트로 교체합니다."
-i18n_source_hash: 930fe8890e55
+i18n_source_hash: 03d2298daaa3
 i18n_provenance: human
 i18n_output_hash: cf63800fad7d
 ---

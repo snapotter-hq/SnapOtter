@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter의 모노레포 구조, 앱 및 패키지 아키텍처, 요청 라이프사이클, 리소스 사용량."
-i18n_source_hash: 50e076925c4b
+i18n_source_hash: 9a22dc09e976
 i18n_provenance: human
 i18n_output_hash: 45e8d01172a0
 i18n_hash_version: 2

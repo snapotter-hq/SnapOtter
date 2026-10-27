@@ -1,6 +1,6 @@
 ---
 description: "Як зробити внесок у SnapOtter. Звіти про помилки, запити на функції, pull request-и та вимоги CLA."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: 624e5a689563
 i18n_hash_version: 2

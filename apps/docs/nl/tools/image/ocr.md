@@ -1,7 +1,7 @@
 ---
 description: "Extraheer tekst lokaal uit afbeeldingen met de ingebouwde Tesseract of de optionele zeer nauwkeurige RapidOCR-runtime."
 i18n_output_hash: 3b0a511716a7
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

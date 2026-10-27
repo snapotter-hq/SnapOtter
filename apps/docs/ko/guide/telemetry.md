@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter가 수집하는 익명 사용 데이터, 전송 시점, 인스턴스 전체 제품 분석을 끄는 방법."
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 98f38443c2fd
 ---

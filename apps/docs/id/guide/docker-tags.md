@@ -1,6 +1,6 @@
 ---
 description: "Tag image Docker SnapOtter, benchmark GPU, penyematan versi, dan dukungan multi-platform untuk AMD64 dan ARM64."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: 30b4ac3f38a5
 i18n_hash_version: 2

@@ -1,8 +1,8 @@
 ---
 description: "Konfigurera SCIM 2.0-provisionering för att synkronisera användare och grupper från din identitetsleverantör till SnapOtter. Täcker Okta, Azure AD / Entra ID och anpassade integrationer."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: c9b3b79e1946
+i18n_output_hash: fe2f658db54e
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP:n skickar mer än 1000 förfrågningar per minut. Detta händer vanligtvis u
 ### Användare avprovisionerade men inte borttagna från gränssnittet {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE är en mjuk inaktivering. Inaktiverade användare visas fortfarande i administratörens användarlista med en inaktiverad status. Detta är avsiktligt så att deras data bevaras. Deras roll visas som `disabled:<original-role>`.
+
+### `externalId`-filtret missar en användare som loggar in med OIDC eller SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+Innan SCIM:s `externalId` fick en egen kolumn (`users.scim_external_id`) skrev en SCIM `PUT` eller `PATCH` på en användare som en OIDC- eller SAML-inloggning redan hade länkat SCIM-id:t till användarens inloggningsidentitet. Uppgraderingsmigreringen kan inte skilja det värdet från ett riktigt OIDC-subjekt eller SAML-NameID, så den lämnar dessa användare i fred. För dem returnerar `filter=externalId eq "..."` ingenting förrän IdP:n skickar en ny uppdatering som bär `externalId`.
+
+Om du hellre vill slippa vänta på IdP:n kan granskningsloggen intyga id:t. SCIM skriver en `SCIM_USER_PROVISIONED`-rad med det `externalId` som varje användare skapades med. När du kör en version som har kolumnen `scim_external_id`, öppna `psql` mot SnapOtter-databasen ([guiden för kontoåterställning](./account-recovery.md#older-images-and-fallbacks) visar hur för båda uppsättningarna) och förhandsgranska de användare vars inloggningsidentitet fortfarande är lika med det id:t:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Om listan ser rätt ut, kopiera id:t till SCIM-kolumnen. Kör det inom `BEGIN;` och kontrollera de returnerade raderna innan du gör `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+En andra körning matchar ingenting. Uppdateringen lämnar `external_id` som det är, eftersom vissa IdP:er (Okta bland dem) skickar samma id som både OIDC-`sub` och SCIM-`externalId`, och för dem skulle en rensning bryta OIDC-inloggningen. En användare vars `external_id` verkligen är det felaktiga SCIM-id:t misslyckas redan med subjektmatchningen. Med `OIDC_AUTO_LINK_USERS` (eller `SAML_AUTO_LINK_USERS`) påslaget länkas de om vid nästa inloggning med en verifierad e-postadress, oavsett vilket.
+
+Vissa användare förblir utom räckhåll och plockar upp id:t igen från IdP:ns nästa uppdatering:
+
+- användare vars inloggningslänk ersatte SCIM-id:t och som inte fick någon SCIM-skrivning efteråt, eftersom deras `external_id` inte längre matchar granskningsraden
+- användare vars provisioneringsrad redan har rensats av granskningsloggens lagringstid
+- användare vars `externalId` IdP:n ändrade efter att de skapades (uppdateringsrader registrerar vilka fält som ändrades, inte deras värden)
+- två användare som har samma id, vilket frågan hoppar över så att det unika indexet inte kan avbryta den; förhandsgranskningen utan sitt sista villkor listar dem, och vilken av dem som äger id:t är ditt beslut

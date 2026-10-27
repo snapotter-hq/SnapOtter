@@ -1,8 +1,8 @@
 ---
 description: "KI-gestützter Generator für Pass- und Ausweisfotos mit Gesichtserkennung, Hintergrundentfernung und Kachelung für Druckbögen."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 4dfcdaf3b7f5
+i18n_output_hash: 46a8e22d1c3b
 ---
 
 # Passfoto {#passport-photo}
@@ -92,7 +92,7 @@ Schneidet das Foto zu, ändert die Größe und kachelt es optional auf einen Dru
 | documentType | string | Nein | `"passport"` | Dokumenttyp (aus der Länderspezifikation) |
 | bgColor | string | Nein | `"#FFFFFF"` | Hintergrundfarbe als Hex |
 | printLayout | string | Nein | `"none"` | Druckpapier-Layout: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | Nein | `0` | Beschränkung der maximalen Dateigröße in KB (0 = keine Begrenzung) |
+| maxFileSizeKb | number | Nein | `0` | Beschränkung der maximalen Dateigröße in KB, wobei 1 KB = 1000 Byte gilt (0 = keine Begrenzung) |
 | dpi | number | Nein | `300` | Ausgabe-DPI (72-1200) |
 | customWidthMm | number | Nein | - | Eigene Fotobreite in mm (überschreibt die Länderspezifikation) |
 | customHeightMm | number | Nein | - | Eigene Fotohöhe in mm (überschreibt die Länderspezifikation) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Fehler: Analyse abgelaufen (410) {#error-analysis-expired-410}
+
+Generate arbeitet mit dem von der Hintergrundentfernung befreiten Bild, das analyze für `jobId` gespeichert hat. Gespeicherte Ausgaben werden nach einiger Zeit bereinigt; vergeht also zu viel Zeit zwischen den beiden Aufrufen, ist dieses Bild nicht mehr vorhanden. analyze erneut mit demselben Foto aufrufen und die zurückgegebene `jobId` verwenden.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+Eine `jobId` oder ein `filename`, die bzw. der keine gespeicherte Datei benennen kann (ein Pfadtrennzeichen, `..`, eine leere Zeichenkette), wird mit 400 beantwortet.
+
 ---
 
 ### Basis-Route {#base-route}
@@ -170,4 +183,4 @@ Gibt einen Hinweis zurück, den korrekten Unter-Endpunkt zu verwenden.
 - Das Feld `preview` in der Analyse-Antwort ist ein Base64-kodiertes PNG (maximal 800 px breit) für eine schnelle Anzeige.
 - Länderspezifikationen enthalten Dokumentabmessungen, Verhältnisse für die Kopfhöhe und die Positionierung der Augenlinie gemäß offiziellen Anforderungen an Passfotos.
 - Die Option `printLayout` erzeugt einen gekachelten Bogen auf 4x6\"- oder A4-Papier mit 2 mm Abstand zwischen den Fotos.
-- Wenn `maxFileSizeKb` gesetzt ist, wird die Ausgabe iterativ komprimiert, um innerhalb der Größenbeschränkung zu bleiben.
+- Wenn `maxFileSizeKb` gesetzt ist, wird die Ausgabe iterativ komprimiert, um innerhalb der Größenbeschränkung zu bleiben. Die JPEG-Qualität der Ausgabe wird dabei schrittweise gesenkt, bis sie passt. Die Pixelgröße ist durch die Länderspezifikation festgelegt, sodass `/generate` 422 mit einer entsprechenden Meldung zurückgibt, wenn das Foto auch bei der niedrigsten Qualität nicht passt, statt eine Datei über dem Limit.

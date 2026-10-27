@@ -1,11 +1,130 @@
 ---
 description: "Release notes en versiegeschiedenis voor SnapOtter. Bekijk wat er nieuw, verbeterd en opgelost is in elke release."
-i18n_source_hash: 9020073f127e
+i18n_source_hash: d3c5fc4c6b75
 i18n_provenance: human
-i18n_output_hash: d60a06326675
+i18n_output_hash: cce795711e73
 ---
 
 # Changelog {#changelog}
+
+## v2.2.0 {#v2-2-0}
+
+Het grootste deel van 2.2 draait om hardening. Een niet-beheerder met een gedelegeerde `users:manage`-rol kon een instance overnemen, en elk tool-endpoint bleek zijn permissiecontrole te missen. Upgrade als je meer dan één gebruiker hebt.
+
+De rest zit in de lange staart van self-hosting: downloads die startten en nooit afmaakten, presets die braken zodra je een tweede bestand toevoegde, containers die in een crash-lus zaten terwijl Postgres nog opstartte. Er zijn ook twee nieuwe tools bijgekomen. Documentatie en de website zijn nu vertaald in 21 talen, en de interface voldoet eindelijk aan de WCAG AA-contrastnorm.
+
+> [!IMPORTANT]
+> Als je `users:manage` via een aangepaste rol aan een niet-beheerder hebt gegeven, kon die rol beheerdersaccounts overnemen in 2.0.0 tot en met 2.1.0. Details staan onder Beveiliging.
+
+### Beveiliging {#v2-2-0-security}
+
+- **Privilege-escalatie via een gedelegeerde `users:manage`-rol (GHSA-9xgh-95qh-2x7h).** Een niet-beheerder met `users:manage` via een aangepaste rol kon het wachtwoord van een account met hogere rechten resetten of dat account verwijderen, een ingebouwde beheerder inbegrepen, en de instance overnemen. Wachtwoordreset en accountverwijdering controleren nu de autoriteit van de aanroeper over het doelwit, zodat een gedelegeerde rol niet boven zijn eigen niveau kan komen. Getroffen: 2.0.0 tot en met 2.1.0. Gemeld door 李春来 (Chunlai Li). (#616)
+- **Elk tool-endpoint is nu afgeschermd.** Tooltoegang werd per route afgedwongen, dus alle 45 handgeschreven routes moesten dezelfde aanroep onthouden en geen enkele deed dat. Een rol zonder `tools:use` kon nog steeds image-to-pdf, erase-object, upscale, sign-pdf en de rest draaien. De controle zit nu in één preHandler die is gekoppeld aan de gematchte route, zodat hij subpaden en elke later toegevoegde route dekt. (#646)
+- **Ratelimiting was te omzeilen op Docker-installaties.** De image leverde `TRUST_PROXY=true`, dus het client-IP kwam uit een requestheader en een vervalste `X-Forwarded-For` kwam voorbij de login-limiter. De standaard is nu een trustlijst voor privénetwerken. (#649)
+- **Schrijfacties naar instellingen worden per instelling gecontroleerd**, niet één keer bij de ingang, en configuratie-import is nu transactioneel, zodat een geweigerde sleutel niet een half toegepaste configuratie kan achterlaten. (#618)
+- **Bibliotheekbestandsnamen kunnen niet buiten hun opslagroot komen.** Een gemanipuleerde opgeslagen naam, die een kwaadaardige 1.x SQLite-import letterlijk kopieert, kon bestanden buiten de files-map lezen of verwijderen. Alleen bereikbaar nadat een beheerder een door een aanvaller aangeleverde 1.x SQLite-database importeert, het enige pad waarlangs een opgeslagen naam kan worden gekozen. Gemeld door @Alpastx. (GHSA-55w2-8cqf-w969, #600)
+- **Taakannulering dwingt eigenaarschap af**, zodat een geauthenticeerde gebruiker niet langer de taak van een andere gebruiker op id kan annuleren. Gemeld door @Alpastx. (GHSA-wqxf-gj2p-689x, #599)
+- **Een hercontrole van de hele 2.0-codebase vond wat nog open stond**: een onderschepte SAML-assertie kon opnieuw worden afgespeeld, een MFA-uitdaging overleefde elk aantal foute codes, de API-sleutelopzoeking per verzoek was een volledige tabelscan, `MAX_WORKSPACE_SIZE_GB` was dode configuratie, en de SVG-sanitizer liet ongequote `javascript:`-hrefs door. (#620)
+- **Negen bekendgemaakte CVE's gepatcht**: fast-uri, svgo, sharp en tar transitief (#619), plus Pillow 12.3.0 (#517). RAW-decodering op arm64 bouwt nu LibRaw 0.22.2 uit de broncode in plaats van een ongepatchte systeemkopie te linken. (#649)
+
+### Nieuwe functies {#v2-2-0-new-features}
+
+- **Rounded Crop**: afgeronde vierkante en iOS-achtige squircle-maskers, met een regelaar voor de hoekradius. Gebouwd voor favicons en app-iconen. (#602)
+- **Remove GIF Background**: verwijder de achtergrond uit een geanimeerde GIF, WebP of APNG frame voor frame en krijg een transparante animatie terug. (#502)
+- **Object Eraser met lasso en High Quality-modus**: sleep een vrije lus in plaats van elke pixel te schilderen, en installeer optioneel een diffusion-inpaintingbundel voor schonere vullingen van grote vlakken. (#503, #566)
+- **Opslaan als nieuw bestand, of overschrijven.** Het bewerken van een bibliotheekbestand verving vroeger stilzwijgend het origineel. Je kiest nu per bewerking, en de standaard behoudt het origineel. (#564, #577)
+- **Beeldverhoudingspresets in Resize.** Kies 1:1, 4:3 of 16:9 en de twee afmetingen blijven vergrendeld, zonder upscaling. (#530)
+- **OCR in twee lagen**: een snelle laag is in de image ingebakken en draait offline zonder download, en een nauwkeuriger runtime installeert op aanvraag. (#519)
+- **Typ ergens om te zoeken.** Begin te typen op het dashboard of de homepage en je belandt in het zoekvak. (#644)
+- **Documentatie en website in 21 talen**: de documentatiesite, de landingspagina's en de API-referentie zijn nu allemaal vertaald, naast de app-interface. Een nieuwe implementatiehandleiding voor low-resourceomgevingen behandelt Raspberry Pi en machines met 2 GB. (#548)
+- **Duidelijkere toolnamen**: 18 dubbelzinnige namen kwalificeren zich nu zelf, dus "Compress" werd "Compress Image". Tool-id's en routes zijn ongewijzigd, dus geen enkele bladwijzer raakt stuk. (#520)
+
+### Verbeteringen {#v2-2-0-improvements}
+
+- **WCAG AA-contrast door de hele interface**: het palet is opnieuw afgestemd zodat levendig oranje op vullingen blijft en tekst en labels toegankelijke inktkleuren gebruiken, en alle 57 focusindicatoren halen nu de 3:1-norm voor niet-tekst. (#567, #574)
+- **Upscale en achtergrondverwijdering lijken niet meer bevroren**: de voortgangsbalk loopt door tijdens inferentie in plaats van op 30% te blijven staan, en beide tools waarschuwen nu dat een host met alleen CPU veel langzamer is. (#605, #608)
+- **Time-outmeldingen noemen de echte oorzaak** en houden rekening met hosts met alleen CPU in plaats van de upload de schuld te geven. (#596)
+- **SnapOtter wacht bij het opstarten op Postgres en Redis** in plaats van in een crash-lus te belanden, zowel in Compose als in de all-in-one image. Een Proxmox LXC-installatie herstartte 76 keer voordat dit werd opgelost. (#537, #595)
+- **Downloads overleven een reverse proxy**: SnapOtter vraagt nginx en compatibele proxy's om bestandsantwoorden niet te bufferen, wat de gebruikelijke reden is dat een self-hosted download start en nooit eindigt. (#604, #607)
+- **Compress PDF komt dicht bij de doelgrootte**, en zegt het eerlijk wanneer een doel buiten bereik is. (#522)
+- **Bedieningselementen van mobiele tools blijven bereikbaar** nu de app-shells zich aan de dynamische viewport aanpassen. (#559)
+- **Convert Audio toont een instelling voor de samplerate.** (#561)
+- **Beheerders kunnen de minimale wachtwoordlengte versoepelen**, tot 1 voor een vertrouwde LAN-instance. (#543)
+- **MFA is selfservice**, de lockout van het beleid is gedicht, en OIDC- of SAML-aanmeldingen krijgen een echte MFA-uitdaging in plaats van een harde blokkade. (#531, #536)
+- **Een kale `Error: Error` noemt nu zijn oorzaak.** Sharp-encodefouten, afsluitingen van de AI-sidecar, niet-JSON-uitvoer van de document-sidecar en fouten bij achtergrondverwijdering kwamen vroeger allemaal aan met de reden weggepoetst. (#532, #534, #535, #538, #612)
+- **De helpdialoog is vertaald.** De labels van sneltoetsen en de getting-started-tekst waren hardgecodeerd Engels terwijl afgewerkte vertalingen ongebruikt in alle 21 localebestanden stonden. (#647)
+
+### Opgeloste fouten {#v2-2-0-bug-fixes}
+
+- **iPhone HEIC-bestanden werden afgewezen** als onleesbaar voordat ze de decoder bereikten die ze aankan. (#631)
+- **Conversiepresets faalden bij een tweede bestand**: jpg-to-pdf en zijn image-to-pdf-broers, plus pdf-to-png, pdf-to-jpg en pdf-to-tiff, gaven allemaal `Tool not found` zodra je twee bestanden uploadde. (#633, #643)
+- **PDF-conversiepresets verloren hun downloadknop.** (#629)
+- **Een onbeperkte verwerkingstime-out werd niet gerespecteerd**, en vastgelopen voortgangsstromen herstellen nu in plaats van de interface te laten wachten. (#638)
+- **Downloads bleven hangen in plaats van te falen** wanneer een opgeslagen bestand korter bleek dan zijn geregistreerde lengte. (#617)
+- **PDF-paginatools faalden op korte en versleutelde bestanden**: Remove Pages viel terug op een paginabereik dat geen enkel document onder zes pagina's heeft, en met een wachtwoord beveiligde pdf's faalden cryptisch in de worker. (#594)
+- **PDF naar tekst gaf stil een leeg bestand terug** voor gescande pdf's. Het wijst je nu op OCR en levert tekst als UTF-8. (#603)
+- **PDF naar Word liet gekleurde tekstblokken vallen** en splitste ze over de pagina. (#500)
+- **Object Eraser liet spookresten achter** en vervaagde kleine objecten in afbeeldingen met hoge resolutie. (#501)
+- **Stabilize Video schreef onafspeelbare uitvoer** zonder faststart. (#593)
+- **Reparaties in de beeldeditor**: roteren, spiegelen, formaat wijzigen, niveaus, curven, filters en laagvergrendeling. (#597)
+- **Sign PDF toonde een leeg canvas** in plaats van te melden waarom een pdf niet kon worden geladen. (#545)
+- **De bestandsbibliotheek registreerde afmetingen van 0x0** en sloeg previews over voor HEIC-, RAW- en PSD-uploads. (#636, #637)
+- **Meer dan één AI-bundel installeren** liet de gedeelde virtualenv met meerdere versies achter en brak stil drie tools. (#649)
+- **Converteren naar JXL op kwaliteit 1 tot en met 4 gaf een 500**, en een ontbrekende ffmpeg werd aan je gemeld als een beschadigde upload. (#649)
+- **Een tijdelijke Postgres-storing strandde afgeronde taken**, waardoor uitvoer op schijf achterbleef zonder rij die ernaar wees. Een reconciler neemt dat werk nu over in plaats van het te laten vallen. (#649)
+- **Een Redis-endpoint dat van adres veranderde, klemde elke consumer vast** terwijl health checks nog steeds 200 antwoordden. (#649)
+- **Oplossingen voor website en documentatie**: gelokaliseerde links laten geen `#`-fragmenten of kleine letters in `zh-CN` meer vallen, de documentatienavigatie blijft op tablets binnen de viewport, en geen van beide sites roept de GitHub-API meer aan vanuit je browser. (#516, #562, #570, #560)
+
+### Upgrade-opmerkingen {#v2-2-0-upgrade-notes}
+
+Niets om te migreren, maar twee meegeleverde standaardwaarden zijn gewijzigd:
+
+- **`TRUST_PROXY` staat nu standaard op `loopback,linklocal,uniquelocal`** in plaats van elke peer te vertrouwen. Docker bridge- en Compose-netwerken vallen binnen dat bereik, dus de meeste opstellingen hoeven niets te wijzigen. Als je reverse proxy SnapOtter vanaf een openbaar adres bereikt, stel `TRUST_PROXY` dan expliciet in, anders schrijven ratelimiting en auditlogs elk verzoek toe aan de proxy.
+- **`MAX_AI_JOBS_PER_USER` staat standaard op 5** gelijktijdige AI-taken met één bestand per gebruiker. Batch- en pijplijn-AI-runs blijven onbeperkt.
+
+Nieuwe optionele instellingen: `DB_STARTUP_TIMEOUT_MS`, `SUBPROCESS_MEMORY_LIMIT_MB` (standaard uit) en `GIF_BG_MAX_FRAMES`.
+
+### Dankbetuigingen {#v2-2-0-acknowledgements}
+
+Een groot deel van deze release begon als de bugmelding van iemand anders.
+
+Code en bijdragen:
+
+- **@mvanhorn** ❤️: Herschreef de time-outfout van remove-background naar een bericht dat zegt wat je eraan kunt doen, in plaats van een kale time-out. (#518, #494)
+- **@EuanTop** ❤️: Herstelde de downloadactie op de presetpagina's van PDF-conversies door de synchrone route het standaard tool-result-contract te laten teruggeven. (#629, #623)
+- **@harshjainnn** ❤️: Diagnosticeerde de download die start en nooit eindigt, en stelde de socket-reset-richting voor waarop de fix is gebouwd. (#617, #590)
+
+Beveiligingsmeldingen:
+
+- **李春来 (Chunlai Li)** ❤️ ([@laijunyue](https://github.com/laijunyue)): Meldde privé de privilege-escalatie via een gedelegeerde `users:manage`-rol, met een volledige source-to-sink-analyse en een werkende exploitketen. (GHSA-9xgh-95qh-2x7h, #616)
+- **@Alpastx** ❤️ (Alpesh Bhagwatkar): Meldde een geauthenticeerde IDOR bij taakannulering, en een path traversal in opgeslagen bibliotheekbestandsnamen die bereikbaar is na een kwaadaardige 1.x SQLite-import, met voor elk een werkend proof of concept. (#599, #600)
+
+Bugmeldingen:
+
+- **@riz467** ❤️: Echte iPhone HEIC-bestanden die bij validatie werden afgewezen, met de grondoorzaak uitgewerkt in het rapport. (#622)
+- **@coupej** ❤️: Presetpagina's van PDF die voor altijd hingen, en jpg-to-pdf dat faalde zodra een tweede bestand werd toegevoegd. Twee verschillende bugs, correct gescheiden. (#623, #627)
+- **@linuxuser1** ❤️: `PROCESSING_TIMEOUT_S=0` gedocumenteerd als onbeperkt maar afgekapt op vijf minuten. (#630)
+- **@bezibaerchen** ❤️: Convert Audio verborg de samplerate-instelling die de eigen beschrijving beloofde. (#558)
+- **@hell-toupee** ❤️: De nauwkeurige OCR-bundel die niet wilde installeren met een `libpaddle`-fout. (#505)
+- **@Michael1260** ❤️ en **@And-CSH** ❤️: Bevestigden die OCR-installatiefout onafhankelijk en stelden vast dat handmatig uitpakken werkt terwijl het installatieprogramma in de app dat niet doet, wat de bug op het installatieprogramma vastpinde. (#505)
+- **@TomErnst1972** ❤️: Het inschakelen van het MFA-verplicht-beleid dat een beheerder buitensloot van zijn eigen instance. (#515)
+- **@thokich** ❤️: Objectverwijdering die wazige, onbruikbare vullingen opleverde, wat zowel de HD-inpainting-herbouw als de optionele high-quality-bundel aandreef. (#141)
+- **@Hennie-git** ❤️: Een Proxmox LXC-installatie die 76 keer herstartte tegen een Postgres die nog geen verbindingen accepteerde. (community-scripts/ProxmoxVE#15796)
+- **MickLesk** ❤️ (Proxmox VE community-scripts): Triageerde dat rapport in realtime en leverde de diagnose waarop de opstartfix is gebouwd. (#537)
+
+Functieverzoeken en feedback:
+
+- **@LECOQQ** ❤️: Vroeg om versoepeling van de wachtwoordcomplexiteit op een thuisinstallatie. (#136)
+- **@killervette42** ❤️: Vroeg om een Unraid Community App, nu gepubliceerd in de Unraid CA-store. (#96)
+- **@alienatedsec** ❤️: Wees erop attent dat de fix voor GPU-terugval naar CPU begraven lag in een gesloten issue en onvindbaar was, wat de reden is dat die nu in de implementatiedocumentatie staat. (#490, #587)
+- **@neilp316** ❤️: Bevestigde de Blackwell-GPU-fout op een RTX 5060 en bracht een werkend upgradepad naar CUDA 12.8 in kaart. (#120)
+- **@Roiki11** ❤️: Pleitte voor gedeelde opslag met padverwijzingen in plaats van HTTP-bestandsoverdracht voor AI-compute buiten de machine. (#189)
+
+Dank ook aan de communityleden die deze meldingen via Discord en e-mail deden en wier namen we niet hebben vastgelegd: het squircle-cropverzoek (#602), de image-to-PDF-download die startte en nooit eindigde (#604, #607), de Delete Pages-tool die vastliep (#594), Arabische tekst die ontbrak bij pdf-to-text (#603), en de diagnose achter de ONNX GPU-terugval (#490).
+
+[Volledige diff op GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.1.0...v2.2.0)
+
+---
 
 ## v2.0.0 {#v2-0-0}
 

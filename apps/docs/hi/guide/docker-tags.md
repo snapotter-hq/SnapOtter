@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter Docker image टैग, GPU बेंचमार्क, वर्शन पिनिंग, और AMD64 तथा ARM64 के लिए मल्टी-प्लेटफ़ॉर्म समर्थन।"
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: 44c09e47365d
 i18n_hash_version: 2

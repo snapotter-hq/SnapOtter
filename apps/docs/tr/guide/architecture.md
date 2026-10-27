@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter'ın monorepo yapısı, uygulama ve paket mimarisi, istek yaşam döngüsü ve kaynak ayak izi."
-i18n_source_hash: 50e076925c4b
+i18n_source_hash: 9a22dc09e976
 i18n_provenance: human
 i18n_output_hash: 0d020a6fb0d5
 i18n_hash_version: 2

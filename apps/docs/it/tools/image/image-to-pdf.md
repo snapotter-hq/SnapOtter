@@ -1,6 +1,6 @@
 ---
 description: "Combina una o più immagini in un documento PDF con opzioni di formato pagina, orientamento e dimensione del file target."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 48b9e834e4cf
 ---

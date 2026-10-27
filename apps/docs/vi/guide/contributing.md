@@ -1,6 +1,6 @@
 ---
 description: "Cách đóng góp cho SnapOtter. Báo cáo lỗi, yêu cầu tính năng, pull request và các yêu cầu về CLA."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: 45552b575bff
 i18n_hash_version: 2

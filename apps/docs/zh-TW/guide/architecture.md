@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter 的 monorepo 結構、app 與套件架構、請求生命週期，以及資源占用。"
-i18n_source_hash: 50e076925c4b
+i18n_source_hash: 9a22dc09e976
 i18n_provenance: human
 i18n_output_hash: 712a7e7cf078
 i18n_hash_version: 2

@@ -1,8 +1,8 @@
 ---
 description: "Suppression de l'arrière-plan assistée par IA avec effets optionnels (flou, ombre, dégradé, arrière-plan personnalisé)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 58cb08d8414c
+i18n_output_hash: 421c7413ba36
 ---
 
 # Supprimer l'arrière-plan {#remove-background}
@@ -19,20 +19,12 @@ Suppression de l'arrière-plan assistée par IA avec effets optionnels (flou, om
 
 ## Paramètres {#parameters}
 
+La phase 1 supprime l'arrière-plan et met en cache le masque PNG transparent ainsi que l'image d'origine. Le remplacement d'arrière-plan, le flou, l'ombre portée et la conversion du format de sortie sont appliqués en [phase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (ou lorsque `remove-background` s'exécute comme étape de pipeline ou tâche par lots) ; transmettre ces champs à la phase 1 renvoie 400.
+
 | Paramètre | Type | Requis | Défaut | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Oui | - | Fichier image (multipart) |
 | model | string | Non | - | Variante de modèle IA à utiliser |
-| backgroundType | string | Non | `"transparent"` | L'un de : `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Non | - | Couleur hexadécimale pour un arrière-plan uni |
-| gradientColor1 | string | Non | - | Première couleur du dégradé |
-| gradientColor2 | string | Non | - | Deuxième couleur du dégradé |
-| gradientAngle | number | Non | - | Angle du dégradé en degrés |
-| blurEnabled | boolean | Non | - | Activer l'effet de flou d'arrière-plan |
-| blurIntensity | number | Non | - | Intensité du flou (0-100) |
-| shadowEnabled | boolean | Non | - | Activer l'ombre portée sur le sujet |
-| shadowOpacity | number | Non | - | Opacité de l'ombre (0-100) |
-| outputFormat | string | Non | - | Format de sortie : `png`, `webp` ou `avif` |
 | edgeRefine | integer | Non | - | Niveau d'affinage des contours (0-3) |
 | decontaminate | boolean | Non | - | Supprimer les débordements de couleur sur les bords |
 
@@ -91,24 +83,24 @@ Réapplique les effets d'arrière-plan sans réexécuter le modèle IA. Utilise 
 | Paramètre | Type | Requis | Défaut | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Oui | - | JSON contenant les réglages des effets (voir ci-dessous) |
-| backgroundImage | file | Non | - | Image d'arrière-plan personnalisée (lorsque backgroundType est `image`) |
+| backgroundImage | file | Requis lorsque `backgroundType` vaut `image` | - | Image d'arrière-plan personnalisée (lorsque backgroundType est `image`) |
 
 #### Champs du JSON settings {#settings-json-fields}
 
-| Champ | Type | Requis | Description |
-|-------|------|----------|-------------|
-| jobId | string | Oui | ID de tâche issu de la phase 1 |
-| filename | string | Oui | Nom de fichier d'origine issu de la phase 1 |
-| backgroundType | string | Non | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Non | Couleur hexadécimale pour un arrière-plan uni |
-| gradientColor1 | string | Non | Première couleur du dégradé |
-| gradientColor2 | string | Non | Deuxième couleur du dégradé |
-| gradientAngle | number | Non | Angle du dégradé en degrés |
-| blurEnabled | boolean | Non | Activer le flou d'arrière-plan |
-| blurIntensity | number | Non | Intensité du flou (0-100) |
-| shadowEnabled | boolean | Non | Activer l'ombre portée |
-| shadowOpacity | number | Non | Opacité de l'ombre (0-100) |
-| outputFormat | string | Non | `png`, `webp` ou `avif` |
+| Champ | Type | Requis | Défaut | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Oui | - | ID de tâche issu de la phase 1 |
+| filename | string | Oui | - | Nom de fichier d'origine issu de la phase 1 |
+| backgroundType | string | Non | `"transparent"` | L'un de : `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Requis lorsque `backgroundType` vaut `color` | - | Couleur hexadécimale : `#RRGGBB` ou `#RGB` (le `#` est facultatif) |
+| gradientColor1 | string | Requis lorsque `backgroundType` vaut `gradient` | - | Première couleur du dégradé, hexadécimale comme `backgroundColor` |
+| gradientColor2 | string | Requis lorsque `backgroundType` vaut `gradient` | - | Deuxième couleur du dégradé, hexadécimale comme `backgroundColor` |
+| gradientAngle | number | Non | - | Angle du dégradé en degrés |
+| blurEnabled | boolean | Non | - | Flouter l'arrière-plan d'origine derrière le sujet (`backgroundType: "blur"` l'implique) |
+| blurIntensity | number | Non | - | Intensité du flou (0-100) |
+| shadowEnabled | boolean | Non | - | Activer l'ombre portée sur le sujet |
+| shadowOpacity | number | Non | `35` | Opacité de l'ombre (0-100), utilisée lorsque `shadowEnabled` est vrai |
+| outputFormat | string | Non | `"png"` | Format de sortie : `png`, `webp` ou `avif` |
 
 ### Exemple de requête {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Erreur : suppression d'arrière-plan expirée (410) {#error-background-removal-expired-410}
+
+Le point de terminaison des effets s'appuie sur le masque et l'original que la phase 1 a stockés pour `jobId`. Les sorties stockées sont nettoyées au bout d'un moment ; si trop de temps s'écoule entre les deux appels, elles ont disparu. Relancez la phase 1 avec la même image et utilisez le `jobId` qu'elle renvoie.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Un `jobId` ou `filename` qui ne peut pas désigner un fichier stocké (un séparateur de chemin, `..`, une chaîne vide) renvoie 400.
 
 ## Remarques {#notes}
 

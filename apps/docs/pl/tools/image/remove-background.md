@@ -1,8 +1,8 @@
 ---
 description: "Usuwanie tła wspomagane AI z opcjonalnymi efektami (rozmycie, cień, gradient, niestandardowe tło)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: c66a3291299a
+i18n_output_hash: b609e1395985
 ---
 
 # Usuwanie tła {#remove-background}
@@ -19,20 +19,12 @@ Usuwanie tła wspomagane AI z opcjonalnymi efektami (rozmycie, cień, gradient, 
 
 ## Parametry {#parameters}
 
+Etap 1 usuwa tło i zapisuje w pamięci podręcznej przezroczystą maskę PNG oraz oryginalny obraz. Zamiana tła, rozmycie, cień i konwersja formatu wyjściowego są stosowane w [Etapie 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (albo gdy `remove-background` działa jako krok potoku lub zadanie wsadowe); przekazanie tych pól do Etapu 1 zwraca 400.
+
 | Parametr | Typ | Wymagany | Domyślnie | Opis |
 |-----------|------|----------|---------|-------------|
 | file | file | Tak | - | Plik obrazu (multipart) |
 | model | string | Nie | - | Wariant modelu AI do użycia |
-| backgroundType | string | Nie | `"transparent"` | Jedno z: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nie | - | Kolor hex dla jednolitego tła |
-| gradientColor1 | string | Nie | - | Pierwszy kolor gradientu |
-| gradientColor2 | string | Nie | - | Drugi kolor gradientu |
-| gradientAngle | number | Nie | - | Kąt gradientu w stopniach |
-| blurEnabled | boolean | Nie | - | Włącz efekt rozmycia tła |
-| blurIntensity | number | Nie | - | Intensywność rozmycia (0-100) |
-| shadowEnabled | boolean | Nie | - | Włącz cień pod obiektem |
-| shadowOpacity | number | Nie | - | Krycie cienia (0-100) |
-| outputFormat | string | Nie | - | Format wyjściowy: `png`, `webp` lub `avif` |
 | edgeRefine | integer | Nie | - | Poziom wygładzania krawędzi (0-3) |
 | decontaminate | boolean | Nie | - | Usuń przenikanie koloru z krawędzi |
 
@@ -41,7 +33,7 @@ Usuwanie tła wspomagane AI z opcjonalnymi efektami (rozmycie, cień, gradient, 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Odpowiedź {#response}
@@ -91,24 +83,24 @@ Ponownie stosuje efekty tła bez ponownego uruchamiania modelu AI. Korzysta z za
 | Parametr | Typ | Wymagany | Domyślnie | Opis |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Tak | - | JSON z ustawieniami efektów (patrz poniżej) |
-| backgroundImage | file | Nie | - | Niestandardowy obraz tła (gdy backgroundType to `image`) |
+| backgroundImage | file | Wymagany, gdy `backgroundType` to `image` | - | Niestandardowy obraz tła |
 
 #### Pola JSON ustawień {#settings-json-fields}
 
-| Pole | Typ | Wymagane | Opis |
-|-------|------|----------|-------------|
-| jobId | string | Tak | ID zadania z Etapu 1 |
-| filename | string | Tak | Oryginalna nazwa pliku z Etapu 1 |
-| backgroundType | string | Nie | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nie | Kolor hex dla jednolitego tła |
-| gradientColor1 | string | Nie | Pierwszy kolor gradientu |
-| gradientColor2 | string | Nie | Drugi kolor gradientu |
-| gradientAngle | number | Nie | Kąt gradientu w stopniach |
-| blurEnabled | boolean | Nie | Włącz rozmycie tła |
-| blurIntensity | number | Nie | Intensywność rozmycia (0-100) |
-| shadowEnabled | boolean | Nie | Włącz cień |
-| shadowOpacity | number | Nie | Krycie cienia (0-100) |
-| outputFormat | string | Nie | `png`, `webp` lub `avif` |
+| Pole | Typ | Wymagane | Domyślnie | Opis |
+|-------|------|----------|---------|-------------|
+| jobId | string | Tak | - | ID zadania z Etapu 1 |
+| filename | string | Tak | - | Oryginalna nazwa pliku z Etapu 1 |
+| backgroundType | string | Nie | `"transparent"` | Jedno z: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Wymagany, gdy `backgroundType` to `color` | - | Kolor hex: `#RRGGBB` lub `#RGB` (`#` jest opcjonalny) |
+| gradientColor1 | string | Wymagany, gdy `backgroundType` to `gradient` | - | Pierwszy kolor gradientu, hex jak w `backgroundColor` |
+| gradientColor2 | string | Wymagany, gdy `backgroundType` to `gradient` | - | Drugi kolor gradientu, hex jak w `backgroundColor` |
+| gradientAngle | number | Nie | - | Kąt gradientu w stopniach |
+| blurEnabled | boolean | Nie | - | Rozmyj oryginalne tło za obiektem (`backgroundType: "blur"` to implikuje) |
+| blurIntensity | number | Nie | - | Intensywność rozmycia (0-100) |
+| shadowEnabled | boolean | Nie | - | Włącz cień pod obiektem |
+| shadowOpacity | number | Nie | `35` | Krycie cienia (0-100), używane, gdy `shadowEnabled` ma wartość true |
+| outputFormat | string | Nie | `"png"` | Format wyjściowy: `png`, `webp` lub `avif` |
 
 ### Przykładowe żądanie {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Błąd: Usuwanie tła wygasło (410) {#error-background-removal-expired-410}
+
+Punkt końcowy efektów działa na masce i oryginale, które Etap 1 zapisał dla `jobId`. Zapisane wyniki są po pewnym czasie czyszczone, więc jeśli między oboma wywołaniami minie zbyt dużo czasu, ich nie ma. Uruchom Etap 1 ponownie na tym samym obrazie i użyj zwróconego `jobId`.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+`jobId` lub `filename`, które nie wskazują zapisanego pliku (separator ścieżki, `..`, pusty ciąg), zwraca 400.
 
 ## Uwagi {#notes}
 

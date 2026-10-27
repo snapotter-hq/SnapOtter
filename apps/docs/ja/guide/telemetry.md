@@ -1,6 +1,6 @@
 ---
 description: "SnapOtterが収集する匿名の使用データ、それが送信されるタイミング、インスタンス全体の製品アナリティクスをオフにする方法。"
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 98607316afbb
 ---

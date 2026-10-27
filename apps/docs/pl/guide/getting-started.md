@@ -1,6 +1,6 @@
 ---
 description: "Zainstaluj SnapOtter za pomocą Dockera jednym poleceniem. Zawiera konfigurację Docker Compose, budowanie ze źródeł i pełny przegląd funkcji."
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: b210f3fec848
 i18n_hash_version: 2

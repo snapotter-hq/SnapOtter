@@ -1,8 +1,8 @@
 ---
 description: "Stel SCIM 2.0-provisioning in om gebruikers en groepen vanuit je identity provider naar SnapOtter te synchroniseren. Behandelt Okta, Azure AD / Entra ID en aangepaste integraties."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: e058234e6981
+i18n_output_hash: 6a05ca4bef1a
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ De IdP verstuurt meer dan 1000 verzoeken per minuut. Dit gebeurt doorgaans tijde
 ### Gebruikers gedeprovisioneerd maar niet uit de UI verwijderd {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE is een zachte deactivatie. Gedeactiveerde gebruikers verschijnen nog steeds in de beheerdersgebruikerslijst met een uitgeschakelde status. Dit is opzettelijk zo, zodat hun gegevens behouden blijven. Hun rol wordt weergegeven als `disabled:<original-role>`.
+
+### `externalId`-filter mist een gebruiker die zich aanmeldt met OIDC of SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+Voordat het `externalId` van SCIM een eigen kolom kreeg (`users.scim_external_id`), schreef een SCIM `PUT` of `PATCH` op een gebruiker die al via een OIDC- of SAML-aanmelding was gekoppeld, het SCIM-id in de aanmeldidentiteit van die gebruiker. De upgrademigratie kan die waarde niet onderscheiden van een echte OIDC-subject of SAML-NameID, dus laat die gebruikers met rust. Voor hen levert `filter=externalId eq "..."` niets op totdat de IdP een bijwerking stuurt die `externalId` meedraagt.
+
+Als je liever niet op de IdP wacht, kan het auditlogboek het id bevestigen. SCIM schrijft een `SCIM_USER_PROVISIONED`-rij met het `externalId` waarmee elke gebruiker is aangemaakt. Zodra je op een release zit met de kolom `scim_external_id`, open je `psql` tegen de SnapOtter-database (de [handleiding voor accountherstel](./account-recovery.md#older-images-and-fallbacks) laat zien hoe dat voor beide opstellingen werkt) en bekijk je een voorbeeld van de gebruikers wier aanmeldidentiteit nog steeds gelijk is aan dat id:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Als de lijst er goed uitziet, kopieer je het id naar de SCIM-kolom. Voer dit uit binnen `BEGIN;` en controleer de geretourneerde rijen voordat je `COMMIT;` doet:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Een tweede run matcht niets. De update laat `external_id` zoals het is, omdat sommige IdP's (waaronder Okta) hetzelfde id zowel als OIDC-`sub` als als SCIM-`externalId` sturen, en voor hen zou het wissen daarvan OIDC-aanmelding breken. Een gebruiker wiens `external_id` echt het losse SCIM-id is, faalt al op de subject-match. Met `OIDC_AUTO_LINK_USERS` (of `SAML_AUTO_LINK_USERS`) aan, worden ze bij hun volgende aanmelding met een geverifieerd e-mailadres hoe dan ook opnieuw gekoppeld.
+
+Sommige gebruikers blijven buiten bereik en pikken het id weer op bij de volgende update van de IdP:
+
+- gebruikers wier aanmeldkoppeling het SCIM-id heeft vervangen en die daarna geen SCIM-write meer hebben gehad, omdat hun `external_id` niet langer overeenkomt met de auditrij
+- gebruikers wier provisioning-rij al door de auditbewaring is opgeruimd
+- gebruikers wier `externalId` de IdP heeft gewijzigd na het aanmaken (update-rijen leggen vast welke velden zijn gewijzigd, niet hun waarden)
+- twee gebruikers met hetzelfde id, die de query overslaat zodat de unieke index niet kan afbreken; de preview zonder de laatste clausule toont ze, en welke van de twee het id bezit is aan jou

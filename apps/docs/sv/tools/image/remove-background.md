@@ -1,8 +1,8 @@
 ---
 description: "AI-driven bakgrundsborttagning med valfria effekter (oskärpa, skugga, gradient, egen bakgrund)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: ce3b9e180575
+i18n_output_hash: a18a43d76e75
 ---
 
 # Ta bort bakgrund {#remove-background}
@@ -19,20 +19,12 @@ AI-driven bakgrundsborttagning med valfria effekter (oskärpa, skugga, gradient,
 
 ## Parametrar {#parameters}
 
+Fas 1 tar bort bakgrunden och cachar den transparenta PNG-masken och originalbilden. Bakgrundsutbyte, oskärpa, slagskugga och konvertering av utdataformat tillämpas i [fas 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (eller när `remove-background` körs som ett pipeline-steg eller batchjobb); skickar du dessa fält till fas 1 returneras 400.
+
 | Parameter | Typ | Obligatorisk | Standard | Beskrivning |
 |-----------|------|----------|---------|-------------|
 | file | file | Ja | - | Bildfil (multipart) |
 | model | string | Nej | - | AI-modellvariant att använda |
-| backgroundType | string | Nej | `"transparent"` | En av: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nej | - | Hex-färg för enfärgad bakgrund |
-| gradientColor1 | string | Nej | - | Första gradientfärgen |
-| gradientColor2 | string | Nej | - | Andra gradientfärgen |
-| gradientAngle | number | Nej | - | Gradientvinkel i grader |
-| blurEnabled | boolean | Nej | - | Aktivera bakgrundsoskärpa |
-| blurIntensity | number | Nej | - | Oskärpans intensitet (0-100) |
-| shadowEnabled | boolean | Nej | - | Aktivera slagskugga på motivet |
-| shadowOpacity | number | Nej | - | Skuggans opacitet (0-100) |
-| outputFormat | string | Nej | - | Utdataformat: `png`, `webp` eller `avif` |
 | edgeRefine | integer | Nej | - | Nivå för kantförfining (0-3) |
 | decontaminate | boolean | Nej | - | Ta bort färgblödning från kanter |
 
@@ -41,7 +33,7 @@ AI-driven bakgrundsborttagning med valfria effekter (oskärpa, skugga, gradient,
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Svar {#response}
@@ -91,24 +83,24 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 | Parameter | Typ | Obligatorisk | Standard | Beskrivning |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Ja | - | JSON med effektinställningar (se nedan) |
-| backgroundImage | file | Nej | - | Egen bakgrundsbild (när backgroundType är `image`) |
+| backgroundImage | file | Krävs när `backgroundType` är `image` | - | Egen bakgrundsbild |
 
 #### JSON-fält i settings {#settings-json-fields}
 
-| Fält | Typ | Obligatorisk | Beskrivning |
-|-------|------|----------|-------------|
-| jobId | string | Ja | Jobb-ID från fas 1 |
-| filename | string | Ja | Ursprungligt filnamn från fas 1 |
-| backgroundType | string | Nej | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nej | Hex-färg för enfärgad bakgrund |
-| gradientColor1 | string | Nej | Första gradientfärgen |
-| gradientColor2 | string | Nej | Andra gradientfärgen |
-| gradientAngle | number | Nej | Gradientvinkel i grader |
-| blurEnabled | boolean | Nej | Aktivera bakgrundsoskärpa |
-| blurIntensity | number | Nej | Oskärpans intensitet (0-100) |
-| shadowEnabled | boolean | Nej | Aktivera slagskugga |
-| shadowOpacity | number | Nej | Skuggans opacitet (0-100) |
-| outputFormat | string | Nej | `png`, `webp` eller `avif` |
+| Fält | Typ | Obligatorisk | Standard | Beskrivning |
+|-------|------|----------|---------|-------------|
+| jobId | string | Ja | - | Jobb-ID från fas 1 |
+| filename | string | Ja | - | Ursprungligt filnamn från fas 1 |
+| backgroundType | string | Nej | `"transparent"` | En av: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Krävs när `backgroundType` är `color` | - | Hexfärg: `#RRGGBB` eller `#RGB` (`#` är valfritt) |
+| gradientColor1 | string | Krävs när `backgroundType` är `gradient` | - | Första gradientfärgen, hex som `backgroundColor` |
+| gradientColor2 | string | Krävs när `backgroundType` är `gradient` | - | Andra gradientfärgen, hex som `backgroundColor` |
+| gradientAngle | number | Nej | - | Gradientvinkel i grader |
+| blurEnabled | boolean | Nej | - | Gör den ursprungliga bakgrunden oskarp bakom motivet (`backgroundType: "blur"` innebär det) |
+| blurIntensity | number | Nej | - | Oskärpans intensitet (0-100) |
+| shadowEnabled | boolean | Nej | - | Aktivera slagskugga på motivet |
+| shadowOpacity | number | Nej | `35` | Skuggans opacitet (0-100), används när `shadowEnabled` är true |
+| outputFormat | string | Nej | `"png"` | Utdataformat: `png`, `webp` eller `avif` |
 
 ### Exempelförfrågan {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Fel: Bakgrundsborttagningen har gått ut (410) {#error-background-removal-expired-410}
+
+Effektslutpunkten arbetar från masken och originalet som fas 1 sparade för `jobId`. Lagrade utdata rensas efter ett tag, så om det går för lång tid mellan de två anropen är de borta. Kör fas 1 igen med samma bild och använd det `jobId` som returneras.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Ett `jobId` eller `filename` som inte kan peka ut en lagrad fil (ett sökvägsseparator, `..`, en tom sträng) svarar 400.
 
 ## Anteckningar {#notes}
 

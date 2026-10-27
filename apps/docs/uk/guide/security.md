@@ -1,6 +1,6 @@
 ---
 description: "Посібник із посилення безпеки для SnapOtter. Безпека контейнерів, мережева ізоляція, секрети Docker, розгортання в Kubernetes та артефакти відповідності."
-i18n_source_hash: 9ff337fa0417
+i18n_source_hash: f37bcb6cc1c5
 i18n_provenance: machine
 i18n_output_hash: 09a77c679598
 i18n_hash_version: 2

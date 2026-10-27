@@ -1,8 +1,8 @@
 ---
 description: "KI-gestützte Hintergrundentfernung mit optionalen Effekten (Weichzeichnen, Schatten, Verlauf, eigener Hintergrund)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 4d349feb23a9
+i18n_output_hash: 2f566832b26c
 ---
 
 # Hintergrund entfernen {#remove-background}
@@ -19,20 +19,12 @@ KI-gestützte Hintergrundentfernung mit optionalen Effekten (Weichzeichnen, Scha
 
 ## Parameter {#parameters}
 
+Phase 1 entfernt den Hintergrund und speichert die transparente PNG-Maske sowie das Originalbild zwischen. Das Ersetzen des Hintergrunds, Weichzeichnen, der Schlagschatten und die Konvertierung des Ausgabeformats werden in [Phase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) angewendet (oder wenn `remove-background` als Pipeline-Schritt oder Stapeljob läuft); werden diese Felder an Phase 1 übergeben, gibt es 400 zurück.
+
 | Parameter | Typ | Erforderlich | Standard | Beschreibung |
 |-----------|------|----------|---------|-------------|
 | file | file | Ja | - | Bilddatei (multipart) |
 | model | string | Nein | - | Zu verwendende KI-Modellvariante |
-| backgroundType | string | Nein | `"transparent"` | Eines von: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nein | - | Hex-Farbe für einfarbigen Hintergrund |
-| gradientColor1 | string | Nein | - | Erste Verlaufsfarbe |
-| gradientColor2 | string | Nein | - | Zweite Verlaufsfarbe |
-| gradientAngle | number | Nein | - | Verlaufswinkel in Grad |
-| blurEnabled | boolean | Nein | - | Hintergrund-Weichzeichnungseffekt aktivieren |
-| blurIntensity | number | Nein | - | Weichzeichnungsintensität (0-100) |
-| shadowEnabled | boolean | Nein | - | Schlagschatten auf dem Motiv aktivieren |
-| shadowOpacity | number | Nein | - | Deckkraft des Schattens (0-100) |
-| outputFormat | string | Nein | - | Ausgabeformat: `png`, `webp` oder `avif` |
 | edgeRefine | integer | Nein | - | Stufe der Kantenverfeinerung (0-3) |
 | decontaminate | boolean | Nein | - | Farbüberläufe an den Kanten entfernen |
 
@@ -95,20 +87,20 @@ Wendet Hintergrundeffekte erneut an, ohne das KI-Modell neu auszuführen. Verwen
 
 #### JSON-Felder der Einstellungen {#settings-json-fields}
 
-| Feld | Typ | Erforderlich | Beschreibung |
-|-------|------|----------|-------------|
-| jobId | string | Ja | Job-ID aus Phase 1 |
-| filename | string | Ja | Ursprünglicher Dateiname aus Phase 1 |
-| backgroundType | string | Nein | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Nein | Hex-Farbe für einfarbigen Hintergrund |
-| gradientColor1 | string | Nein | Erste Verlaufsfarbe |
-| gradientColor2 | string | Nein | Zweite Verlaufsfarbe |
-| gradientAngle | number | Nein | Verlaufswinkel in Grad |
-| blurEnabled | boolean | Nein | Hintergrund-Weichzeichnung aktivieren |
-| blurIntensity | number | Nein | Weichzeichnungsintensität (0-100) |
-| shadowEnabled | boolean | Nein | Schlagschatten aktivieren |
-| shadowOpacity | number | Nein | Deckkraft des Schattens (0-100) |
-| outputFormat | string | Nein | `png`, `webp` oder `avif` |
+| Feld | Typ | Erforderlich | Standard | Beschreibung |
+|-------|------|----------|---------|-------------|
+| jobId | string | Ja | - | Job-ID aus Phase 1 |
+| filename | string | Ja | - | Ursprünglicher Dateiname aus Phase 1 |
+| backgroundType | string | Nein | `"transparent"` | Eines von: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Nein | - | Hex-Farbe für einfarbigen Hintergrund: `#RRGGBB` oder `#RGB` (das `#` ist optional) |
+| gradientColor1 | string | Nein | - | Erste Verlaufsfarbe, Hex wie `backgroundColor` |
+| gradientColor2 | string | Nein | - | Zweite Verlaufsfarbe, Hex wie `backgroundColor` |
+| gradientAngle | number | Nein | - | Verlaufswinkel in Grad |
+| blurEnabled | boolean | Nein | - | Hintergrund-Weichzeichnung aktivieren; zeichnet den ursprünglichen Hintergrund hinter dem Motiv weich (wird durch `backgroundType: "blur"` impliziert) |
+| blurIntensity | number | Nein | - | Weichzeichnungsintensität (0-100) |
+| shadowEnabled | boolean | Nein | - | Schlagschatten aktivieren |
+| shadowOpacity | number | Nein | `35` | Deckkraft des Schattens (0-100); wird verwendet, wenn `shadowEnabled` true ist |
+| outputFormat | string | Nein | `"png"` | `png`, `webp` oder `avif` |
 
 ### Beispielanfrage {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Fehler: Hintergrundentfernung abgelaufen (410) {#error-background-removal-expired-410}
+
+Der Effekt-Endpunkt arbeitet mit der Maske und dem Original, die Phase 1 für `jobId` gespeichert hat. Gespeicherte Ausgaben werden nach einiger Zeit bereinigt; vergeht also zu viel Zeit zwischen den beiden Aufrufen, sind sie nicht mehr vorhanden. Phase 1 erneut mit demselben Bild ausführen und die zurückgegebene `jobId` verwenden.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+Eine `jobId` oder ein `filename`, die bzw. der keine gespeicherte Datei benennen kann (ein Pfadtrennzeichen, `..`, eine leere Zeichenkette), wird mit 400 beantwortet.
 
 ## Hinweise {#notes}
 

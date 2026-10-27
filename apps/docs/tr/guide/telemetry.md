@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter'ın hangi anonim kullanım verilerini topladığı, ne zaman gönderildiği ve örnek genelindeki ürün analitiğinin nasıl kapatılacağı."
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 0111270b4a5d
 ---

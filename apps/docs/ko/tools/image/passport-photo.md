@@ -1,8 +1,8 @@
 ---
 description: "얼굴 감지, 배경 제거, 인쇄 시트 타일링을 갖춘 AI 기반 여권 및 신분증 사진 생성기."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: ed3fcec68489
+i18n_output_hash: 21bb1f9e0abf
 ---
 
 # Passport Photo {#passport-photo}
@@ -92,7 +92,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | documentType | string | No | `"passport"` | 문서 유형(국가 사양 기준) |
 | bgColor | string | No | `"#FFFFFF"` | 배경 색상 hex |
 | printLayout | string | No | `"none"` | 인쇄 용지 레이아웃: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | 최대 파일 크기 제약(KB, 0 = 제한 없음) |
+| maxFileSizeKb | number | No | `0` | 최대 파일 크기 제한(KB, 1 KB = 1000바이트, 0 = 제한 없음) |
 | dpi | number | No | `300` | 출력 DPI(72~1200) |
 | customWidthMm | number | No | - | 사용자 지정 사진 너비(mm, 국가 사양 재정의) |
 | customHeightMm | number | No | - | 사용자 지정 사진 높이(mm, 국가 사양 재정의) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Error: Analysis Expired (410) {#error-analysis-expired-410}
+
+Generate는 analyze가 `jobId`에 대해 저장해 둔 배경 제거 이미지로 동작합니다. 저장된 출력은 일정 시간이 지나면 정리되므로, 두 호출 사이에 시간이 너무 많이 흐르면 그 이미지는 사라집니다. 같은 사진으로 analyze를 다시 호출하고, 그때 반환된 `jobId`를 사용하세요.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+저장된 파일을 가리킬 수 없는 `jobId` 또는 `filename`(경로 구분자, `..`, 빈 문자열)은 400으로 응답합니다.
+
 ---
 
 ### Base Route {#base-route}
@@ -169,5 +182,5 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 - 랜드마크는 정규화된 좌표(이미지 치수 기준 0~1 범위)로 반환됩니다.
 - 분석 응답의 `preview` 필드는 빠른 표시를 위한 base64 인코딩 PNG(최대 너비 800px)입니다.
 - 국가 사양에는 공식 여권 사진 요구 사항에 기반한 문서 치수, 머리 높이 비율, 눈 라인 위치가 포함됩니다.
-- `printLayout` 옵션은 사진 사이에 2mm 여백을 두고 4x6\" 또는 A4 용지에 타일 시트를 생성합니다.
-- `maxFileSizeKb`이 설정되면 출력이 크기 제한에 맞도록 반복적으로 압축됩니다.
+- `printLayout` 옵션은 사진 사이에 2mm 여백을 두고 4x6" 또는 A4 용지에 타일 시트를 생성합니다.
+- `maxFileSizeKb`가 설정되면 출력이 크기 제한에 맞을 때까지 JPEG 품질을 단계적으로 낮춥니다. 픽셀 크기는 국가 사양에 고정되어 있으므로, 최저 품질에서도 사진이 제한에 맞지 않으면 `/generate`는 제한을 초과한 파일을 반환하는 대신 그 사실을 알리는 422를 반환합니다.

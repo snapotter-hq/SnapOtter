@@ -1,6 +1,6 @@
 ---
 description: "Структура монорепозитория, архитектура приложений и пакетов, жизненный цикл запроса и потребление ресурсов SnapOtter."
-i18n_source_hash: 50e076925c4b
+i18n_source_hash: 9a22dc09e976
 i18n_provenance: human
 i18n_output_hash: 14ec9075fa49
 i18n_hash_version: 2

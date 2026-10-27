@@ -1,6 +1,6 @@
 ---
 description: "SharpとAI顔検出を用いて、被写体・顔・エントロピーを認識しながら画像を賢くフレーミングして切り抜きます。"
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: 0effff4a667a
 ---

@@ -1,6 +1,6 @@
 ---
 description: "用一道 Docker 指令安裝 SnapOtter。包含 Docker Compose 設定、從原始碼建置，以及完整功能總覽。"
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: c2b2ed21e05f
 i18n_hash_version: 2

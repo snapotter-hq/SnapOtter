@@ -1,8 +1,8 @@
 ---
 description: "การลบพื้นหลังด้วย AI พร้อมเอฟเฟกต์เสริม (เบลอ เงา ไล่ระดับสี พื้นหลังกำหนดเอง)"
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 47e980b6f333
+i18n_output_hash: 8ab0c322536f
 ---
 
 # Remove Background {#remove-background}
@@ -19,20 +19,12 @@ i18n_output_hash: 47e980b6f333
 
 ## Parameters {#parameters}
 
+Phase 1 จะลบพื้นหลังและแคชมาสก์ PNG แบบโปร่งใสและรูปภาพต้นฉบับไว้ การแทนที่พื้นหลัง การเบลอ เงาตกกระทบ และการแปลงรูปแบบเอาต์พุตจะถูกนำไปใช้ใน [Phase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (หรือเมื่อรัน `remove-background` เป็นขั้นตอนในไปป์ไลน์หรืองานแบบชุด) การส่งฟิลด์เหล่านั้นไปยัง Phase 1 จะคืนค่า 400
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | ไฟล์รูปภาพ (multipart) |
 | model | string | No | - | รุ่นโมเดล AI ที่จะใช้ |
-| backgroundType | string | No | `"transparent"` | หนึ่งใน: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | - | สี hex สำหรับพื้นหลังสีทึบ |
-| gradientColor1 | string | No | - | สีไล่ระดับสีที่หนึ่ง |
-| gradientColor2 | string | No | - | สีไล่ระดับสีที่สอง |
-| gradientAngle | number | No | - | มุมไล่ระดับสีเป็นองศา |
-| blurEnabled | boolean | No | - | เปิดใช้เอฟเฟกต์เบลอพื้นหลัง |
-| blurIntensity | number | No | - | ความเข้มของเบลอ (0-100) |
-| shadowEnabled | boolean | No | - | เปิดใช้เงาตกกระทบบนวัตถุ |
-| shadowOpacity | number | No | - | ความทึบของเงา (0-100) |
-| outputFormat | string | No | - | รูปแบบเอาต์พุต: `png`, `webp` หรือ `avif` |
 | edgeRefine | integer | No | - | ระดับการปรับแต่งขอบ (0-3) |
 | decontaminate | boolean | No | - | ลบสีที่เลอะจากขอบ |
 
@@ -41,7 +33,7 @@ i18n_output_hash: 47e980b6f333
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -91,24 +83,24 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | JSON พร้อมการตั้งค่าเอฟเฟกต์ (ดูด้านล่าง) |
-| backgroundImage | file | No | - | รูปภาพพื้นหลังที่กำหนดเอง (เมื่อ backgroundType เป็น `image`) |
+| backgroundImage | file | Required when `backgroundType` is `image` | - | รูปภาพพื้นหลังที่กำหนดเอง |
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| jobId | string | Yes | ID งานจาก Phase 1 |
-| filename | string | Yes | ชื่อไฟล์ต้นฉบับจาก Phase 1 |
-| backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | สี hex สำหรับพื้นหลังสีทึบ |
-| gradientColor1 | string | No | สีไล่ระดับสีที่หนึ่ง |
-| gradientColor2 | string | No | สีไล่ระดับสีที่สอง |
-| gradientAngle | number | No | มุมไล่ระดับสีเป็นองศา |
-| blurEnabled | boolean | No | เปิดใช้เบลอพื้นหลัง |
-| blurIntensity | number | No | ความเข้มของเบลอ (0-100) |
-| shadowEnabled | boolean | No | เปิดใช้เงาตกกระทบ |
-| shadowOpacity | number | No | ความทึบของเงา (0-100) |
-| outputFormat | string | No | `png`, `webp` หรือ `avif` |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Yes | - | ID งานจาก Phase 1 |
+| filename | string | Yes | - | ชื่อไฟล์ต้นฉบับจาก Phase 1 |
+| backgroundType | string | No | `"transparent"` | หนึ่งใน: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Required when `backgroundType` is `color` | - | สี hex: `#RRGGBB` หรือ `#RGB` (เครื่องหมาย `#` ไม่บังคับ) |
+| gradientColor1 | string | Required when `backgroundType` is `gradient` | - | สีไล่ระดับสีแรก แบบ hex เหมือน `backgroundColor` |
+| gradientColor2 | string | Required when `backgroundType` is `gradient` | - | สีไล่ระดับสีที่สอง แบบ hex เหมือน `backgroundColor` |
+| gradientAngle | number | No | - | มุมไล่ระดับสีเป็นองศา |
+| blurEnabled | boolean | No | - | เบลอพื้นหลังต้นฉบับด้านหลังวัตถุ (`backgroundType: "blur"` หมายถึงเปิดใช้) |
+| blurIntensity | number | No | - | ความเข้มของเบลอ (0-100) |
+| shadowEnabled | boolean | No | - | เปิดใช้เงาตกกระทบบนวัตถุ |
+| shadowOpacity | number | No | `35` | ความทึบของเงา (0-100) ใช้เมื่อ `shadowEnabled` เป็น true |
+| outputFormat | string | No | `"png"` | รูปแบบเอาต์พุต: `png`, `webp` หรือ `avif` |
 
 ### Example Request {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Error: Background Removal Expired (410) {#error-background-removal-expired-410}
+
+ปลายทาง effects ทำงานจากมาสก์และต้นฉบับที่ Phase 1 จัดเก็บไว้สำหรับ `jobId` เอาต์พุตที่จัดเก็บไว้จะถูกล้างออกไปตามเวลา หากเวลาผ่านไปนานเกินไประหว่างการเรียกสองครั้ง พวกมันจะหายไป ให้รัน Phase 1 อีกครั้งด้วยภาพเดิมและใช้ `jobId` ที่ได้กลับมา
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+`jobId` หรือ `filename` ที่ระบุไฟล์ที่จัดเก็บไว้ไม่ได้ (มีเครื่องหมายคั่นพาธ, `..`, สตริงว่าง) จะตอบกลับ 400
 
 ## Notes {#notes}
 

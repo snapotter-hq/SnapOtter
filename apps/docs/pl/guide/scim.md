@@ -1,8 +1,8 @@
 ---
 description: "Skonfiguruj provisioning SCIM 2.0, aby synchronizować użytkowników i grupy z Twojego dostawcy tożsamości do SnapOtter. Obejmuje Okta, Azure AD / Entra ID oraz integracje niestandardowe."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 2c93409c4926
+i18n_output_hash: 3e85c8ef57fc
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP wysyła ponad 1000 żądań na minutę. Zwykle dzieje się tak podczas duże
 ### Użytkownicy zostali deprovisioned, ale nie usunięto ich z interfejsu {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE to miękka dezaktywacja. Dezaktywowani użytkownicy nadal pojawiają się na liście użytkowników administratora ze statusem wyłączony. Jest to działanie zamierzone, aby zachować ich dane. Ich rola jest wyświetlana jako `disabled:<original-role>`.
+
+### Filtr `externalId` nie znajduje użytkownika logującego się przez OIDC lub SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+Zanim `externalId` w SCIM dostał własną kolumnę (`users.scim_external_id`), operacja `PUT` lub `PATCH` w SCIM na użytkowniku, którego konto zostało już powiązane przez logowanie OIDC lub SAML, zapisywała identyfikator SCIM w tożsamości logowania tego użytkownika. Migracja przy aktualizacji nie potrafi odróżnić tej wartości od prawdziwego podmiotu OIDC ani NameID z SAML, więc pomija takich użytkowników. Dla nich `filter=externalId eq "..."` nic nie zwraca, dopóki IdP nie wyśle kolejnej aktualizacji zawierającej `externalId`.
+
+Jeśli wolisz nie czekać na IdP, dziennik audytu może poświadczyć ten identyfikator. SCIM zapisuje wiersz `SCIM_USER_PROVISIONED` z `externalId`, z którym utworzył każdego użytkownika. Gdy korzystasz już z wydania zawierającego kolumnę `scim_external_id`, otwórz `psql` na bazie danych SnapOtter (w [przewodniku odzyskiwania konta](./account-recovery.md#older-images-and-fallbacks) pokazano, jak to zrobić dla obu konfiguracji) i podejrzyj użytkowników, których tożsamość logowania nadal równa się temu identyfikatorowi:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Jeśli lista wygląda dobrze, skopiuj identyfikator do kolumny SCIM. Uruchom to w `BEGIN;` i sprawdź zwrócone wiersze, zanim wykonasz `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Drugie uruchomienie nie dopasuje niczego. Aktualizacja pozostawia `external_id` bez zmian, ponieważ niektóre IdP (między innymi Okta) wysyłają ten sam identyfikator zarówno jako `sub` w OIDC, jak i `externalId` w SCIM, a dla nich wyczyszczenie go zepsułoby logowanie OIDC. Użytkownik, którego `external_id` naprawdę jest zabłąkanym identyfikatorem SCIM, już nie przechodzi dopasowania podmiotu. Przy włączonym `OIDC_AUTO_LINK_USERS` (lub `SAML_AUTO_LINK_USERS`) jego następne logowanie ze zweryfikowanym adresem e-mail i tak go ponownie powiąże.
+
+Niektórzy użytkownicy pozostają poza zasięgiem i odzyskują identyfikator przy następnej aktualizacji z IdP:
+
+- użytkownicy, których powiązanie logowania zastąpiło identyfikator SCIM i którzy nie otrzymali potem żadnego zapisu SCIM, ponieważ ich `external_id` nie pasuje już do wiersza audytu
+- użytkownicy, których wiersz provisioningu został już usunięty przez retencję audytu
+- użytkownicy, których `externalId` IdP zmienił po ich utworzeniu (wiersze aktualizacji zapisują, które pola się zmieniły, a nie ich wartości)
+- dwóch użytkowników z tym samym identyfikatorem, których zapytanie pomija, aby unikalny indeks nie przerwał operacji; podgląd bez ostatniego warunku ich wylistuje, a to, do kogo należy identyfikator, jest twoją decyzją

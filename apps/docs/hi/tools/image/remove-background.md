@@ -1,8 +1,8 @@
 ---
 description: "वैकल्पिक प्रभावों (ब्लर, शैडो, ग्रेडिएंट, कस्टम बैकग्राउंड) के साथ AI-संचालित बैकग्राउंड हटाना।"
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 09821276c64d
+i18n_output_hash: 849b466fc2b3
 ---
 
 # Remove Background {#remove-background}
@@ -19,20 +19,12 @@ i18n_output_hash: 09821276c64d
 
 ## Parameters {#parameters}
 
+Phase 1 बैकग्राउंड हटाता है और पारदर्शी PNG मास्क तथा मूल इमेज को कैश करता है। बैकग्राउंड प्रतिस्थापन, ब्लर, ड्रॉप शैडो और आउटपुट प्रारूप रूपांतरण [Phase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) में लागू किए जाते हैं (या जब `remove-background` को पाइपलाइन चरण या बैच जॉब के रूप में चलाया जाता है); उन फ़ील्ड को Phase 1 को भेजने पर 400 लौटता है।
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | इमेज फ़ाइल (multipart) |
 | model | string | No | - | उपयोग करने के लिए AI मॉडल संस्करण |
-| backgroundType | string | No | `"transparent"` | इनमें से एक: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | - | ठोस बैकग्राउंड के लिए Hex रंग |
-| gradientColor1 | string | No | - | पहला ग्रेडिएंट रंग |
-| gradientColor2 | string | No | - | दूसरा ग्रेडिएंट रंग |
-| gradientAngle | number | No | - | डिग्री में ग्रेडिएंट कोण |
-| blurEnabled | boolean | No | - | बैकग्राउंड ब्लर प्रभाव सक्षम करें |
-| blurIntensity | number | No | - | ब्लर तीव्रता (0-100) |
-| shadowEnabled | boolean | No | - | विषय पर ड्रॉप शैडो सक्षम करें |
-| shadowOpacity | number | No | - | शैडो अपारदर्शिता (0-100) |
-| outputFormat | string | No | - | आउटपुट प्रारूप: `png`, `webp`, या `avif` |
 | edgeRefine | integer | No | - | एज परिशोधन स्तर (0-3) |
 | decontaminate | boolean | No | - | किनारों से रंग रिसाव हटाएँ |
 
@@ -41,7 +33,7 @@ i18n_output_hash: 09821276c64d
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -91,24 +83,24 @@ AI मॉडल को पुनः चलाए बिना बैकग्र
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | प्रभाव सेटिंग्स के साथ JSON (नीचे देखें) |
-| backgroundImage | file | No | - | कस्टम बैकग्राउंड इमेज (जब backgroundType `image` हो) |
+| backgroundImage | file | Required when `backgroundType` is `image` | - | कस्टम बैकग्राउंड इमेज |
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| jobId | string | Yes | Phase 1 से जॉब ID |
-| filename | string | Yes | Phase 1 से मूल फ़ाइल नाम |
-| backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | ठोस बैकग्राउंड के लिए Hex रंग |
-| gradientColor1 | string | No | पहला ग्रेडिएंट रंग |
-| gradientColor2 | string | No | दूसरा ग्रेडिएंट रंग |
-| gradientAngle | number | No | डिग्री में ग्रेडिएंट कोण |
-| blurEnabled | boolean | No | बैकग्राउंड ब्लर सक्षम करें |
-| blurIntensity | number | No | ब्लर तीव्रता (0-100) |
-| shadowEnabled | boolean | No | ड्रॉप शैडो सक्षम करें |
-| shadowOpacity | number | No | शैडो अपारदर्शिता (0-100) |
-| outputFormat | string | No | `png`, `webp`, या `avif` |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Yes | - | Phase 1 से जॉब ID |
+| filename | string | Yes | - | Phase 1 से मूल फ़ाइल नाम |
+| backgroundType | string | No | `"transparent"` | इनमें से एक: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Required when `backgroundType` is `color` | - | Hex रंग: `#RRGGBB` या `#RGB` (`#` वैकल्पिक है) |
+| gradientColor1 | string | Required when `backgroundType` is `gradient` | - | पहला ग्रेडिएंट रंग, `backgroundColor` जैसा hex |
+| gradientColor2 | string | Required when `backgroundType` is `gradient` | - | दूसरा ग्रेडिएंट रंग, `backgroundColor` जैसा hex |
+| gradientAngle | number | No | - | डिग्री में ग्रेडिएंट कोण |
+| blurEnabled | boolean | No | - | विषय के पीछे मूल बैकग्राउंड को ब्लर करें (`backgroundType: "blur"` इसे स्वतः लागू करता है) |
+| blurIntensity | number | No | - | ब्लर तीव्रता (0-100) |
+| shadowEnabled | boolean | No | - | विषय पर ड्रॉप शैडो सक्षम करें |
+| shadowOpacity | number | No | `35` | शैडो अपारदर्शिता (0-100), जब `shadowEnabled` true हो तब उपयोग होती है |
+| outputFormat | string | No | `"png"` | आउटपुट प्रारूप: `png`, `webp`, या `avif` |
 
 ### Example Request {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### त्रुटि: बैकग्राउंड हटाना समाप्त (410) {#error-background-removal-expired-410}
+
+effects endpoint उस मास्क और मूल से काम करता है जिसे Phase 1 ने `jobId` के लिए संग्रहीत किया था। संग्रहीत आउटपुट कुछ समय बाद साफ़ कर दिए जाते हैं, इसलिए यदि दोनों कॉलों के बीच बहुत अधिक समय बीत जाए, तो वे चले जाते हैं। उसी इमेज के साथ Phase 1 फिर से चलाएँ और उसके द्वारा लौटाए गए `jobId` का उपयोग करें।
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+ऐसा `jobId` या `filename` जो किसी संग्रहीत फ़ाइल को नाम नहीं दे सकता (पथ विभाजक, `..`, खाली स्ट्रिंग) 400 लौटाता है।
 
 ## Notes {#notes}
 

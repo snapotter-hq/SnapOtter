@@ -1,8 +1,8 @@
 ---
 description: "Penghapusan latar belakang bertenaga AI dengan efek opsional (blur, bayangan, gradien, latar belakang kustom)."
-i18n_source_hash: 326a91284529
+i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: f546e405fee9
+i18n_output_hash: 9787003af668
 ---
 
 # Remove Background {#remove-background}
@@ -19,20 +19,12 @@ Penghapusan latar belakang bertenaga AI dengan efek opsional (blur, bayangan, gr
 
 ## Parameters {#parameters}
 
+Fase 1 menghapus latar belakang dan meng-cache PNG transparan mask serta gambar asli. Penggantian latar belakang, blur, drop shadow, dan konversi format output diterapkan di [Fase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (atau saat menjalankan `remove-background` sebagai langkah pipeline atau job batch); meneruskan field tersebut ke Fase 1 mengembalikan 400.
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | Berkas gambar (multipart) |
 | model | string | No | - | Varian model AI yang digunakan |
-| backgroundType | string | No | `"transparent"` | Salah satu dari: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | - | Warna hex untuk latar belakang solid |
-| gradientColor1 | string | No | - | Warna gradien pertama |
-| gradientColor2 | string | No | - | Warna gradien kedua |
-| gradientAngle | number | No | - | Sudut gradien dalam derajat |
-| blurEnabled | boolean | No | - | Aktifkan efek blur latar belakang |
-| blurIntensity | number | No | - | Intensitas blur (0-100) |
-| shadowEnabled | boolean | No | - | Aktifkan drop shadow pada subjek |
-| shadowOpacity | number | No | - | Opasitas bayangan (0-100) |
-| outputFormat | string | No | - | Format output: `png`, `webp`, atau `avif` |
 | edgeRefine | integer | No | - | Tingkat penghalusan tepi (0-3) |
 | decontaminate | boolean | No | - | Hapus rembesan warna dari tepi |
 
@@ -41,7 +33,7 @@ Penghapusan latar belakang bertenaga AI dengan efek opsional (blur, bayangan, gr
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -91,24 +83,24 @@ Menerapkan ulang efek latar belakang tanpa menjalankan ulang model AI. Menggunak
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | JSON dengan pengaturan efek (lihat di bawah) |
-| backgroundImage | file | No | - | Gambar latar belakang kustom (saat backgroundType adalah `image`) |
+| backgroundImage | file | Wajib saat `backgroundType` adalah `image` | - | Gambar latar belakang kustom |
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| jobId | string | Yes | ID job dari Fase 1 |
-| filename | string | Yes | Nama berkas asli dari Fase 1 |
-| backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | Warna hex untuk latar belakang solid |
-| gradientColor1 | string | No | Warna gradien pertama |
-| gradientColor2 | string | No | Warna gradien kedua |
-| gradientAngle | number | No | Sudut gradien dalam derajat |
-| blurEnabled | boolean | No | Aktifkan blur latar belakang |
-| blurIntensity | number | No | Intensitas blur (0-100) |
-| shadowEnabled | boolean | No | Aktifkan drop shadow |
-| shadowOpacity | number | No | Opasitas bayangan (0-100) |
-| outputFormat | string | No | `png`, `webp`, atau `avif` |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Yes | - | ID job dari Fase 1 |
+| filename | string | Yes | - | Nama berkas asli dari Fase 1 |
+| backgroundType | string | No | `"transparent"` | Salah satu dari: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Wajib saat `backgroundType` adalah `color` | - | Warna hex: `#RRGGBB` atau `#RGB` (`#` opsional) |
+| gradientColor1 | string | Wajib saat `backgroundType` adalah `gradient` | - | Warna gradien pertama, hex seperti `backgroundColor` |
+| gradientColor2 | string | Wajib saat `backgroundType` adalah `gradient` | - | Warna gradien kedua, hex seperti `backgroundColor` |
+| gradientAngle | number | No | - | Sudut gradien dalam derajat |
+| blurEnabled | boolean | No | - | Memburamkan latar belakang asli di belakang subjek (`backgroundType: "blur"` menyiratkannya) |
+| blurIntensity | number | No | - | Intensitas blur (0-100) |
+| shadowEnabled | boolean | No | - | Aktifkan drop shadow pada subjek |
+| shadowOpacity | number | No | `35` | Opasitas bayangan (0-100), digunakan saat `shadowEnabled` bernilai true |
+| outputFormat | string | No | `"png"` | Format output: `png`, `webp`, atau `avif` |
 
 ### Example Request {#example-request-1}
 
@@ -126,6 +118,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Error: Background Removal Expired (410) {#error-background-removal-expired-410}
+
+Endpoint effects bekerja dari mask dan gambar asli yang disimpan oleh Fase 1 untuk `jobId`. Keluaran tersimpan dibersihkan setelah beberapa waktu, jadi jika terlalu lama berlalu antara kedua panggilan, semuanya sudah hilang. Jalankan Fase 1 lagi dengan gambar yang sama dan gunakan `jobId` yang dikembalikannya.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+`jobId` atau `filename` yang tidak dapat menunjuk file tersimpan (pemisah jalur, `..`, string kosong) akan mendapat jawaban 400.
 
 ## Notes {#notes}
 

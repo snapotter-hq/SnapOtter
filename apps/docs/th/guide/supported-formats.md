@@ -1,6 +1,6 @@
 ---
 description: "รูปแบบไฟล์ที่รองรับในทุกโมดัลลิตี - รูปแบบอินพุตรูปภาพ 55+ รูปแบบ, วิดีโอ, เสียง, PDF และรูปแบบไฟล์"
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: 22bb1a231aab
 ---

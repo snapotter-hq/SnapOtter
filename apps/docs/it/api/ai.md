@@ -1,7 +1,7 @@
 ---
 description: "Riferimento del motore AI con tutti gli strumenti ML locali. Rimozione dello sfondo, upscaling, OCR, rilevamento dei volti, restauro fotografico e altro ancora."
-i18n_output_hash: 7053b963a72f
-i18n_source_hash: aa9a56cdddc7
+i18n_output_hash: 1382a125cb2d
+i18n_source_hash: a12d261d0b8d
 i18n_provenance: human
 ---
 
@@ -64,15 +64,16 @@ L'immagine Docker include l'applicazione più il runtime comune. Gli archivi di 
 
 La maggior parte degli strumenti di intelligenza artificiale richiedono uno o più pacchetti di funzionalità prima di poter essere eseguiti. L'interfaccia utente di amministrazione li installa tramite lo strumento tramite `POST /api/v1/admin/tools/:toolId/features/install`, che risolve l'elenco completo dei bundle, salta i bundle già installati e mette in coda solo i download mancanti. Ad esempio, abilitando Passport Photo su una nuova istanza si accodano `background-removal` e `face-detection`; abilitandolo dopo la rimozione dello sfondo è già installata solo la coda `face-detection`. OCR è l'eccezione perché `fast` non necessita di alcun pacchetto; installa il suo runtime accurato opzionale tramite l'interfaccia utente o `POST /api/v1/admin/features/ocr/install`.
 
-| Bundle | Dimensione | Gruppo di dipendenze condivise | Strumenti che lo usano |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / matting dello sfondo BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | rilevamento dei volti e landmark MediaPipe | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | inpainting/outpainting LaMa e DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | pipeline di riparazione dei graffi e restauro | restore-photo |
-| `ocr` | ~208-234 MiB scaricato / ~409-488 MiB installato | Modelli RapidOCR 3.9.1, ONNX Runtime 1.20.1 e PP-OCR bloccati opzionali | ocr, ocr-pdf (solo `balanced` e `best`) |
-| `transcription` | ~600 MB | modelli speech-to-text faster-whisper | transcribe-audio, auto-subtitles |
+| Bundle | Dimensione | RAM minima su CPU | Gruppo di dipendenze condivise | Strumenti che lo usano |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB di RAM (~2,5 GB liberi) | rembg / matting dello sfondo BiRefNet | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB di RAM (~0,5 GB liberi) | rilevamento dei volti e landmark MediaPipe | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB di RAM (~2 GB liberi) | inpainting/outpainting LaMa e DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB di RAM (~6 GB liberi) | inpainting di alta qualità con Stable Diffusion 1.5 | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB di RAM (~2,5 GB liberi) | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB di RAM (~3 GB liberi) | pipeline di riparazione dei graffi e restauro | restore-photo |
+| `ocr` | ~208-234 MiB scaricato / ~409-488 MiB installato | 4 GiB di memoria effettiva configurata (`fast` funziona con 2 GB) | Modelli RapidOCR 3.9.1, ONNX Runtime 1.20.1 e PP-OCR bloccati opzionali | ocr, ocr-pdf (solo `balanced` e `best`) |
+| `transcription` | ~600 MB | 4 GB di RAM (~2 GB liberi) | modelli speech-to-text faster-whisper | transcribe-audio, auto-subtitles |
 
 Strumenti con dipendenze tra più bundle:
 
@@ -82,6 +83,27 @@ Strumenti con dipendenze tra più bundle:
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Rileva i volti prima di eseguire il miglioramento GFPGAN o CodeFormer sulle regioni facciali selezionate. |
 
 Uno strumento è disponibile solo quando sono installati tutti i bundle richiesti, ad eccezione di OCR: il livello `fast` integrato rimane disponibile senza il pacchetto OCR opzionale. Le installazioni parziali sono valide e vengono gestite in modo incrementale: i bundle installati vengono riutilizzati, i bundle mancanti vengono visualizzati come download e le installazioni in coda vengono eseguite una alla volta in modo che l'ambiente Python condiviso non venga modificato contemporaneamente.
+
+### Installare tutti i bundle in una sola volta {#installing-every-bundle-at-once}
+
+In Impostazioni → Funzionalità AI è presente un pulsante **Installa tutto** che mette in coda ogni bundle eseguibile sull'host. Salta ciò che è già installato, salta i bundle segnalati come incompatibili con l'host e ritenta una volta un bundle non riuscito prima di passare al successivo. Per un'istanza normale quel pulsante è la soluzione completa e non serve nulla di quanto segue.
+
+Fai prima i conti con il disco. Nell'insieme i bundle occupano circa 20-25 GB installati e finiscono in `/data/ai` sul volume dei dati anziché nell'immagine, quindi sopravvivono a `docker compose down` e alla ricreazione del container. Si installano una volta per host, non a ogni aggiornamento.
+
+Per un provisioning non presidiato, in cui nessuno cliccherà nulla, invia ogni bundle all'endpoint di installazione con una chiave API admin. Il server li mette in coda, quindi puoi inviare tutti e otto senza attendere:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Ogni chiamata restituisce `202` con un `jobId` e un flag `queued`: `false` per quello che parte subito, `true` per gli altri. Un bundle già installato restituisce `409` e può essere ignorato senza problemi, il che rende il ciclo rieseguibile. Monitora l'avanzamento con `GET /api/v1/features`; al termine dell'esecuzione ogni bundle risulta `installed`.
+
+Due cose da aspettarsi. Il bundle `ocr` esegue un preflight di compatibilità con l'host e rifiuta gli host al di sotto del minimo firmato, quindi può fallire mentre gli altri sette riescono (vedi [Installazione runtime OCR accurata](#accurate-ocr-runtime-installation)). Inoltre `POST /api/v1/admin/features/reset` restituisce `409` mentre è in corso un'installazione, quindi un'esecuzione a metà deve terminare oppure il container deve essere riavviato prima che l'ambiente possa essere azzerato.
 
 ### Installazione runtime OCR accurata {#accurate-ocr-runtime-installation}
 
@@ -167,8 +189,8 @@ Sfoca lo sfondo mantenendo nitido il soggetto.
 
 | Parametro | Tipo | Predefinito | Descrizione |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamico | Quando `quality` e `engine` sono omessi, SnapOtter sceglie il livello migliore disponibile nell’ordine `best`, `balanced`, `fast`. Per il coreano non sceglie mai `fast`: usa `best`, poi `balanced`, oppure restituisce l’errore di installazione o compatibilità del runtime accurato. |
-| `language` | string | `"auto"` | Lingua: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamico | Livello di elaborazione. Quando `quality` e `engine` sono omessi, SnapOtter sceglie il livello migliore disponibile nell’ordine `best`, `balanced`, `fast`. Per il coreano non sceglie mai `fast`: usa `best`, poi `balanced`, oppure restituisce l’errore di installazione o compatibilità del runtime accurato. |
+| `language` | string | `"auto"` | Lingua: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast non supporta `ko`. |
 | `enhance` | booleano | Dipendente dal livello | Migliora il contrasto locale. Fast lo applica direttamente; i livelli accurati mantengono la variante solo quando il punteggio calibrato migliora OCR. L'impostazione predefinita è Migliore |
 | `engine` | corda | - | Alias ​​di compatibilità deprecato. Mappa `tesseract` su `fast` e il valore `paddleocr` legacy su `balanced`; non carica PaddlePaddle |
 
@@ -183,13 +205,13 @@ Estrae il testo dai documenti PDF scansionati usando l'OCR basato su AI, pagina 
 
 | Parametro | Tipo | Predefinito | Descrizione |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamico | Quando `quality` e `engine` sono omessi, SnapOtter sceglie il livello migliore disponibile nell’ordine `best`, `balanced`, `fast`. Per il coreano non sceglie mai `fast`: usa `best`, poi `balanced`, oppure restituisce l’errore di installazione o compatibilità del runtime accurato. |
-| `language` | string | `"auto"` | Lingua: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamico | Livello di elaborazione. Quando `quality` e `engine` sono omessi, SnapOtter sceglie il livello migliore disponibile nell’ordine `best`, `balanced`, `fast`. Per il coreano non sceglie mai `fast`: usa `best`, poi `balanced`, oppure restituisce l’errore di installazione o compatibilità del runtime accurato. |
+| `language` | string | `"auto"` | Lingua: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast non supporta `ko`. |
 | `pages` | string | `"all"` | Selezione delle pagine: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | booleano | Dipendente dal livello | Migliora il contrasto locale. Fast lo applica direttamente; i livelli accurati mantengono la variante solo quando il punteggio calibrato migliora OCR. L'impostazione predefinita è Migliore |
 | `engine` | corda | - | Alias ​​di compatibilità deprecato. Mappa `tesseract` su `fast` e il valore `paddleocr` legacy su `balanced`; non carica PaddlePaddle |
 
-La stessa regola di non downgrade si applica a PDF OCR. Le pagine PDF vengono rasterizzate prima del riconoscimento e una richiesta può selezionare un massimo di 50 pagine.
+La stessa regola di non downgrade e le stesse regole di compatibilità per il coreano si applicano a PDF OCR. Le pagine PDF vengono rasterizzate prima del riconoscimento e una richiesta può selezionare un massimo di 50 pagine.
 
 ## Sfocatura di volti / PII {#face-pii-blur}
 
@@ -357,7 +379,7 @@ Almeno una direzione di estensione deve essere maggiore di 0.
 | `sensitivity` | number (0-1) | `0.5` | Soglia di rilevamento dei volti |
 | `threshold` | integer (0-255) | `30` | Soglia di rilevamento dello sfondo (modalità di rifilatura) |
 | `padToSquare` | boolean | `false` | Riempi il risultato rifilato fino a formare un quadrato |
-| `padColor` | string | `"#ffffff"` | Colore di sfondo per il riempimento quadrato |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Colore di sfondo per il riempimento quadrato |
 | `targetSize` | integer | - | Dimensione target per l'output con riempimento (pixel) |
 | `quality` | integer (1-100) | - | Qualità di output |
 

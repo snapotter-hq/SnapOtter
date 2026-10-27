@@ -1,8 +1,8 @@
 ---
 description: "Configurez le provisionnement SCIM 2.0 pour synchroniser les utilisateurs et les groupes depuis votre fournisseur d'identité vers SnapOtter. Couvre Okta, Azure AD / Entra ID et les intégrations personnalisées."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: c9b18c251435
+i18n_output_hash: a66ac8b76a89
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ Le fournisseur d'identité envoie plus de 1000 requêtes par minute. Cela se pro
 ### Utilisateurs déprovisionnés mais non retirés de l'interface {#users-deprovisioned-but-not-removed-from-the-ui}
 
 Le DELETE SCIM est une désactivation logique. Les utilisateurs désactivés apparaissent toujours dans la liste des utilisateurs de l'administration avec un statut désactivé. C'est intentionnel afin que leurs données soient préservées. Leur rôle s'affiche comme `disabled:<original-role>`.
+
+### Le filtre `externalId` ne trouve pas un utilisateur qui se connecte avec OIDC ou SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+Avant que `externalId` de SCIM ne dispose de sa propre colonne (`users.scim_external_id`), un `PUT` ou `PATCH` SCIM sur un utilisateur qu'une connexion OIDC ou SAML avait déjà associé écrivait l'identifiant SCIM dans l'identité de connexion de cet utilisateur. La migration de mise à niveau ne peut pas distinguer cette valeur d'un véritable sujet OIDC ou d'un NameID SAML ; elle laisse donc ces utilisateurs de côté. Pour eux, `filter=externalId eq "..."` ne renvoie rien tant que le fournisseur d'identité n'envoie pas une autre mise à jour contenant `externalId`.
+
+Si vous préférez ne pas attendre le fournisseur d'identité, le journal d'audit peut attester de l'identifiant. SCIM écrit une ligne `SCIM_USER_PROVISIONED` avec l'`externalId` utilisé pour créer chaque utilisateur. Une fois sur une version disposant de la colonne `scim_external_id`, ouvrez `psql` sur la base de données SnapOtter (le [guide de récupération de compte](./account-recovery.md#older-images-and-fallbacks) montre comment faire dans les deux configurations) et prévisualisez les utilisateurs dont l'identité de connexion est toujours égale à cet identifiant :
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Si la liste semble correcte, copiez l'identifiant dans la colonne SCIM. Exécutez la requête dans un bloc `BEGIN;` et vérifiez les lignes renvoyées avant de faire `COMMIT;` :
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Une seconde exécution ne correspond à rien. La mise à jour laisse `external_id` tel quel, car certains fournisseurs d'identité (dont Okta) envoient le même identifiant à la fois comme `sub` OIDC et comme `externalId` SCIM, et l'effacer casserait la connexion OIDC pour eux. Un utilisateur dont l'`external_id` est réellement l'identifiant SCIM égaré échoue déjà à la correspondance de sujet. Avec `OIDC_AUTO_LINK_USERS` (ou `SAML_AUTO_LINK_USERS`) activé, sa prochaine connexion avec un e-mail vérifié le rattache dans les deux cas.
+
+Certains utilisateurs restent hors de portée et récupèrent l'identifiant lors de la prochaine mise à jour du fournisseur d'identité :
+
+- les utilisateurs dont le lien de connexion a remplacé l'identifiant SCIM et qui n'ont reçu aucune écriture SCIM par la suite, leur `external_id` ne correspondant plus à la ligne d'audit
+- les utilisateurs dont la ligne de provisionnement a déjà été purgée par la rétention des audits
+- les utilisateurs dont le fournisseur d'identité a modifié l'`externalId` après leur création (les lignes de mise à jour enregistrent les champs modifiés, pas leurs valeurs)
+- deux utilisateurs partageant le même identifiant, que la requête ignore pour que l'index unique ne puisse pas l'interrompre ; l'aperçu sans sa dernière clause les liste, et c'est à vous de décider lequel possède l'identifiant

@@ -1,7 +1,7 @@
 ---
 description: "Ekstrak teks dari gambar secara lokal dengan Tesseract bawaan atau runtime RapidOCR opsional dengan akurasi tinggi."
 i18n_output_hash: 18a92d67d692
-i18n_source_hash: 0d453b49db02
+i18n_source_hash: 7b0c00be0510
 i18n_provenance: human
 ---
 

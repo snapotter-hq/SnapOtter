@@ -1,6 +1,6 @@
 ---
 description: "Monorepo-structuur, app- en package-architectuur, request-levenscyclus en resourcegebruik van SnapOtter."
-i18n_source_hash: 50e076925c4b
+i18n_source_hash: 9a22dc09e976
 i18n_provenance: human
 i18n_output_hash: 073fb843bda2
 i18n_hash_version: 2

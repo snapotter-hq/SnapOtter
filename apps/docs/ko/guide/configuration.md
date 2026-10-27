@@ -1,8 +1,8 @@
 ---
 description: "모든 SnapOtter 환경 변수와 기본값. 인증, 스토리지, AI 모델, 분석 등을 구성합니다."
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: 51e09a535cd4
+i18n_output_hash: c93ec183e7e0
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ i18n_hash_version: 2
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `PORT` | `1349` | 서버가 수신 대기하는 포트입니다. |
+| `BASE_PATH` | (비어 있음) | 공개 배포 경로입니다(예: `/snapotter`). 비워 두거나 `/`로 설정하면 도메인 루트에서 제공합니다. 런타임에 적용되며 이미지를 다시 빌드할 필요가 없습니다. |
 | `RATE_LIMIT_PER_MIN` | `1000` | IP당 분당 최대 요청 수입니다. 속도 제한을 비활성화하려면 0으로 설정합니다. |
 | `CORS_ORIGIN` | (비어 있음) | CORS에 대해 허용된 오리진의 쉼표 구분 목록이며, 동일 오리진만 허용하려면 비워 둡니다. |
 | `LOG_LEVEL` | `info` | 로그 상세 수준입니다. 다음 중 하나: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -40,7 +41,8 @@ i18n_hash_version: 2
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` 또는 `s3`. S3와 MinIO에는 s3_storage 기능이 포함된 라이선스와 아래의 `S3_*` 변수가 필요합니다. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 연결 문자열입니다. Compose 스택은 이 값을 자체 `postgres` 서비스로 지정합니다. (`REDIS_URL`과 함께) 설정하지 않은 채로 두면 임베디드 모드가 됩니다. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 연결 문자열이며 모든 요청이 사용하는 연결입니다. 2.3.0 이상에서는 `DATABASE_MIGRATION_URL`도 설정하면 이 값이 앱 테이블에 대한 DML만 보유하는 최소 권한 런타임 역할이 됩니다. Compose 스택은 이 값을 자체 `postgres` 서비스로 지정합니다. (`REDIS_URL`과 함께) 설정하지 않은 채로 두면 임베디드 모드가 됩니다. |
+| `DATABASE_MIGRATION_URL` | (비어 있음) | 2.3.0부터 사용할 수 있습니다. 2.2.0 이미지는 이 값을 무시하며 `DATABASE_URL`이 데이터베이스 소유자를 가리켜야 합니다. 부팅 중에만 마이그레이션을 실행하고 런타임 역할에 권한을 부여하는 데 사용되는 권한 있는 연결이며, 첫 요청 전에 닫힙니다. 비워 두면 SnapOtter는 단일 역할로 실행되고 `DATABASE_URL`이 두 작업을 모두 수행합니다. [최소 권한 역할](/ko/guide/database#least-privilege-roles)을 참고하세요. |
 | `REDIS_URL` | `redis://localhost:6379` | Redis 연결 문자열(BullMQ 작업 큐에 사용)입니다. Compose는 이 값을 자체 `redis` 서비스로 지정합니다. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | 처리 중 임시 파일을 위한 디렉터리입니다. 자동으로 정리됩니다. 이미지는 `/tmp/workspace`로 설정합니다. |
 | `FILES_STORAGE_PATH` | `./data/files` | 영구 사용자 파일(업로드된 이미지, 저장된 결과)을 위한 디렉터리입니다. 이미지는 `/data/files`로 설정합니다. |
@@ -74,6 +76,8 @@ i18n_hash_version: 2
 |---|---|---|
 | `EMBEDDED` | `auto` | `DATABASE_URL`과 `REDIS_URL`이 모두 설정되지 않으면 자동 활성화됩니다. 비활성화하려면 `0`로 설정합니다(그러면 외부 `DATABASE_URL`/`REDIS_URL`이 설정되지 않은 경우 앱이 조용히 컨테이너 내 데이터베이스를 시작하는 대신 즉시 실패합니다). |
 | `REDIS_MAXMEMORY` | `512mb` | 임베디드 Redis의 메모리 상한(임베디드 모드 전용)입니다. Raspberry Pi처럼 메모리가 제한된 호스트에서는 이 값을 낮추세요. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | 부팅 시 임베디드 Redis가 `PING`에 응답하기를 기다리는 시간(초)이며, 이 시간이 지나면 포기합니다. 시간 초과가 되면 컨테이너가 계속 멈춰 있는 대신 종료되고 그 이유를 로그에 남깁니다. 1에서 999999 사이의 정수 초이며 무제한 값은 없습니다. 영원히 기다리는 것이 바로 이 제한이 방지하려는 실패이기 때문입니다. 느린 호스트에서 이 값에 걸리는 경우에만 늘리세요. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | 임베디드 PostgreSQL에 대해 동일하게 적용됩니다. 타이머는 첫 부팅의 `initdb`가 끝난 뒤 시작되므로, 초기 데이터베이스 생성이 아니라 서버 시작과 크래시 복구 시간을 측정합니다. |
 
 1.x에서 업그레이드하기: 기존 `snapotter.db`을 볼륨의 `/data/snapotter.db`에 두면 임베디드 모드가 첫 부팅 시 이를 임베디드 PostgreSQL로 가져옵니다. 가져오기는 한 번만 실행되며 이후 부팅에서는 건너뜁니다.
 
@@ -93,6 +97,23 @@ i18n_hash_version: 2
 | `MAX_CANVAS_PIXELS` | `0` (제한 없음) | 출력 이미지의 최대 캔버스 크기(픽셀)입니다. 제한 없음으로 하려면 0으로 설정합니다. |
 | `MAX_SVG_SIZE_MB` | `50` | 새니타이즈하기 전에 허용하는 최대 SVG 크기(메가바이트)입니다. 여기서 `0`은 주변 행과 다르게 동작합니다. 상한을 높이는 것이 아니라 파싱 전 크기 제한을 아예 없애므로, 이 값은 설정된 상태로 두세요. |
 | `MAX_PDF_PAGES` | `0` (무제한) | PDF-to-image 변환의 최대 PDF 페이지 수입니다. 무제한으로 하려면 0으로 설정합니다. |
+
+### 엔진 {#engines}
+
+SnapOtter는 컨테이너 내부의 `$PATH`에서 각 처리 바이너리를 찾으므로, 직접 빌드한 바이너리를 마운트하지 않는 한 이 값들은 비어 있습니다.
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `FFMPEG_PATH` | (비어 있음) | 비디오 및 오디오 도구 뒤에 있는 `ffmpeg` 바이너리 경로입니다. |
+| `FFPROBE_PATH` | (비어 있음) | 미디어 파일을 처리 전에 읽는 `ffprobe` 경로입니다. `FFMPEG_PATH`와 동일한 빌드를 가리키도록 설정하세요. |
+| `QPDF_PATH` | (비어 있음) | PDF 도구와 업로드된 PDF 검사에 사용되는 `qpdf` 경로입니다. |
+| `SOFFICE_PATH` | (비어 있음) | 오피스 문서 변환에 사용되는 LibreOffice의 `soffice` 경로입니다. |
+| `PDFCPU_PATH` | (비어 있음) | 일부 PDF 도구에서 사용되는 `pdfcpu` 경로입니다. |
+| `SNAPOTTER_HW_ACCEL` | (비어 있음) | 하드웨어 비디오 인코더 계열로, `nvenc` 또는 `vaapi`입니다. 비워 두면 소프트웨어로 인코딩합니다. |
+
+`SNAPOTTER_HW_ACCEL`에는 해당 인코더 계열로 빌드된 ffmpeg가 필요하지만, 이미지에 포함된 ffmpeg에는 둘 다 없습니다. 이미지 자체의 바이너리를 사용하면 이 설정은 소프트웨어 인코딩으로 폴백하고 그 사실을 시작 로그에 남깁니다. 이 설정을 사용하려면 직접 빌드한 ffmpeg를 마운트하고 `FFMPEG_PATH`와 `FFPROBE_PATH`를 그쪽으로 지정한 뒤 컨테이너에 GPU 장치를 제공하세요. `nvenc`의 경우 `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`도 설정해야 합니다. 이미지는 `compute,utility`만 요청하는데, `video`가 없으면 NVIDIA 런타임이 인코드 라이브러리를 마운트하지 않으므로 인코더가 목록에는 표시되지만 모든 인코딩이 실패합니다. 존재하지 않거나 실행 권한이 없는 경로 재정의 역시 시작 로그에 표시되며, 해당 바이너리가 필요한 모든 작업은 경로를 수정하거나 설정을 해제할 때까지 실패합니다.
+
+게시된 Compose 파일은 이 여섯 개 값을 모두 `.env`에서 전달하므로, `.env`에 설정하는 것으로 충분합니다.
 
 ### 정리 {#cleanup}
 
