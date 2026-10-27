@@ -4,6 +4,7 @@ import type { FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
 import type { ToolJobData } from "../jobs/types.js";
 import { auditFromRequest, auditLog, isToolAuditEnabled } from "./audit.js";
+import { reportError } from "./error-report.js";
 import { logger } from "./logger.js";
 
 const TOOLS_PREFIX = "/api/v1/tools/";
@@ -227,10 +228,11 @@ export async function emitWorkerToolAudit(args: {
     );
     return true;
   } catch (err) {
-    logger.warn(
+    logger.error(
       { err, toolId: data.toolId, jobId: data.jobId },
       "Failed to emit TOOL_EXECUTED audit log",
     );
+    void reportError(err, { source: "worker", subsystem: "audit" });
     return false;
   }
 }
@@ -266,10 +268,11 @@ export async function emitWorkerPipelineAudit(args: {
       data.requestId ?? null,
     );
   } catch (err) {
-    logger.warn(
+    logger.error(
       { err, toolId: "pipeline", jobId: data.jobId },
       "Failed to emit PIPELINE_EXECUTED audit log",
     );
+    void reportError(err, { source: "worker", subsystem: "audit" });
   }
 }
 
@@ -304,10 +307,11 @@ export async function emitWorkerBatchAudit(args: {
       data.requestId ?? null,
     );
   } catch (err) {
-    logger.warn(
+    logger.error(
       { err, toolId: data.toolId, jobId: data.jobId },
       "Failed to emit BATCH_EXECUTED audit log",
     );
+    void reportError(err, { source: "worker", subsystem: "audit" });
   }
 }
 
@@ -391,7 +395,8 @@ export async function emitInlineRequestAuditIfNeeded(
       durationMs,
     });
   } catch (err) {
-    request.log.warn({ err, toolId: ctx.toolId }, "Failed to emit TOOL_EXECUTED audit log");
+    request.log.error({ err, toolId: ctx.toolId }, "Failed to emit TOOL_EXECUTED audit log");
+    void reportError(err, { source: "http", subsystem: "audit" });
   }
 }
 
@@ -421,6 +426,7 @@ export async function emitInlineBatchAudit(
       durationMs: Date.now() - ctx.startTime,
     });
   } catch (err) {
-    request.log.warn({ err, toolId: ctx.toolId }, "Failed to emit BATCH_EXECUTED audit log");
+    request.log.error({ err, toolId: ctx.toolId }, "Failed to emit BATCH_EXECUTED audit log");
+    void reportError(err, { source: "http", subsystem: "audit" });
   }
 }

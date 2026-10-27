@@ -60,6 +60,12 @@ vi.mock("../../../apps/api/src/lib/logger.js", () => ({
   logger: loggerMock,
 }));
 
+const reportErrorMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
+  reportError: reportErrorMock,
+}));
+
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     insert: () => ({
@@ -122,6 +128,7 @@ import {
   isToolAuditEnabled,
   sanitizeAuditInput,
 } from "../../../apps/api/src/lib/audit.js";
+import { reportError } from "../../../apps/api/src/lib/error-report.js";
 import { getSettingStrict } from "../../../apps/api/src/lib/settings-helpers.js";
 
 function makeLogger() {
@@ -545,18 +552,24 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
 // ── auditLog: DB failure resilience ──────────────────────────────────────
 
 describe("auditLog failure handling", () => {
-  it("logs a warning and returns without throwing when the insert fails", async () => {
+  it("logs an error and reports to Sentry without throwing when the insert fails", async () => {
     const logger = makeLogger();
     state.insertThrows = true;
     await expect(
       auditLog(logger as never, "SETTINGS_UPDATED", { userId: "u1" }),
     ).resolves.toBeUndefined();
-    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledTimes(1);
     // #1012: the caught error rides along under `err` (nothing else leaks in).
-    expect(logger.warn.mock.calls[0][0]).toEqual({
+    expect(logger.error.mock.calls[0][0]).toEqual({
       event: "SETTINGS_UPDATED",
       err: expect.any(Error),
     });
+
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    const [reportedErr, reportedCtx] = vi.mocked(reportError).mock.calls[0];
+    expect(reportedErr).toBeInstanceOf(Error);
+    expect((reportedErr as Error).message).toBe("DB write failed");
+    expect(reportedCtx).toEqual({ source: "http", subsystem: "audit" });
   });
 
   it("does not attempt the HMAC branch after an insert failure", async () => {

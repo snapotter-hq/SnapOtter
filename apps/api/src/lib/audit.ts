@@ -6,6 +6,7 @@ import { db, schema } from "../db/index.js";
 import { computeHmac } from "./audit-integrity.js";
 import { deriveAuditHmacKey } from "./encryption.js";
 import { isEnterpriseFeatureEnabled } from "./enterprise-feature.js";
+import { reportError } from "./error-report.js";
 import { logger } from "./logger.js";
 import { getSettingStrict } from "./settings-helpers.js";
 
@@ -92,7 +93,10 @@ export async function auditLog(
       requestId,
     });
   } catch (err) {
-    logger.warn({ err, event }, "Failed to write audit log to DB");
+    // Report-only: a failed audit insert must never fail the request, but it
+    // must not be silent either. reportError is fire-and-forget by contract.
+    logger.error({ err, event }, "Failed to write audit log to DB");
+    void reportError(err, { source: "http", subsystem: "audit" });
     return;
   }
 

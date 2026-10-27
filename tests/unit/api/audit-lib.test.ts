@@ -10,6 +10,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockInsertRun = vi.fn();
 
+const reportErrorMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
+  reportError: reportErrorMock,
+}));
+
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     insert: () => ({
@@ -27,6 +33,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 }));
 
 import { auditLog } from "../../../apps/api/src/lib/audit.js";
+import { reportError } from "../../../apps/api/src/lib/error-report.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
@@ -105,18 +112,25 @@ describe("auditLog", () => {
     expect(mockInsertRun).toHaveBeenCalledTimes(1);
   });
 
-  it("survives DB insert failure", async () => {
+  it("survives DB insert failure and reports it to Sentry without throwing", async () => {
     mockInsertRun.mockImplementationOnce(() => {
       throw new Error("DB write failed");
     });
 
-    // Should not throw
-    await auditLog(mockLogger as never, "SETTINGS_UPDATED", { userId: "u1" });
+    await expect(
+      auditLog(mockLogger as never, "SETTINGS_UPDATED", { userId: "u1" }),
+    ).resolves.toBeUndefined();
 
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
-    expect(mockLogger.warn).toHaveBeenCalledTimes(1);
-    const [warnData] = mockLogger.warn.mock.calls[0];
-    expect(warnData.event).toBe("SETTINGS_UPDATED");
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    const [errorData] = mockLogger.error.mock.calls[0];
+    expect(errorData.event).toBe("SETTINGS_UPDATED");
+
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    const [reportedErr, reportedCtx] = vi.mocked(reportError).mock.calls[0];
+    expect(reportedErr).toBeInstanceOf(Error);
+    expect((reportedErr as Error).message).toBe("DB write failed");
+    expect(reportedCtx).toEqual({ source: "http", subsystem: "audit" });
   });
 
   it("logs different event types correctly", async () => {

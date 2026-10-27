@@ -25,8 +25,14 @@ const loggerMock = vi.hoisted(() => ({
   debug: vi.fn(),
 }));
 
+const reportErrorMock = vi.hoisted(() => vi.fn());
+
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({
   logger: loggerMock,
+}));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
+  reportError: reportErrorMock,
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -76,6 +82,7 @@ vi.mock("../../../apps/api/src/lib/audit.js", () => ({
 }));
 
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import { reportError } from "../../../apps/api/src/lib/error-report.js";
 import {
   bindJobAuditMetadata,
   emitInlineBatchAudit,
@@ -98,6 +105,8 @@ describe("tool-audit helpers (#3973)", () => {
     state.selectThrows = false;
     state.auditThrows = false;
     loggerMock.warn.mockClear();
+    loggerMock.error.mockClear();
+    reportErrorMock.mockClear();
   });
 
   describe("subRouteFromRoute", () => {
@@ -274,7 +283,7 @@ describe("tool-audit helpers (#3973)", () => {
       ]);
     });
 
-    it("logs a warning and returns false without throwing when auditLog rejects", async () => {
+    it("logs an error and reports to Sentry without throwing when auditLog rejects (TOOL, PIPELINE, BATCH)", async () => {
       state.auditEnabled = true;
       state.auditThrows = true;
 
@@ -287,10 +296,47 @@ describe("tool-audit helpers (#3973)", () => {
           durationMs: 250,
         }),
       ).resolves.toBe(false);
-      expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect(loggerMock.error).toHaveBeenCalledWith(
         expect.objectContaining({ toolId: "compress-video", jobId: "job-1" }),
         "Failed to emit TOOL_EXECUTED audit log",
       );
+
+      await expect(
+        emitWorkerPipelineAudit({
+          data: { ...baseJobData, kind: "pipeline-finalize", toolId: "pipeline" },
+          totalSteps: 2,
+          steps: ["resize", "compress"],
+          totalInputSize: 1024,
+          processedSize: 512,
+          durationMs: 300,
+        }),
+      ).resolves.toBeUndefined();
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ toolId: "pipeline", jobId: "job-1" }),
+        "Failed to emit PIPELINE_EXECUTED audit log",
+      );
+
+      await expect(
+        emitWorkerBatchAudit({
+          data: { ...baseJobData, kind: "batch-finalize", toolId: "compress" },
+          totalFiles: 3,
+          completedFiles: 2,
+          failedFiles: 1,
+          processedSize: 2048,
+          durationMs: 400,
+        }),
+      ).resolves.toBeUndefined();
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ toolId: "compress", jobId: "job-1" }),
+        "Failed to emit BATCH_EXECUTED audit log",
+      );
+
+      expect(reportErrorMock).toHaveBeenCalledTimes(3);
+      for (const [reportedErr, reportedCtx] of vi.mocked(reportError).mock.calls) {
+        expect(reportedErr).toBeInstanceOf(Error);
+        expect((reportedErr as Error).message).toBe("audit write failed");
+        expect(reportedCtx).toEqual({ source: "worker", subsystem: "audit" });
+      }
     });
   });
 
@@ -440,6 +486,66 @@ describe("tool-audit helpers (#3973)", () => {
       await emitInlineRequestAuditIfNeeded(errReq as never, 400, '{"error":"bad"}');
 
       expect(state.auditCalls).toHaveLength(0);
+    });
+
+    it("logs an error and reports to Sentry without throwing on inline custom tool routes when auditLog rejects", async () => {
+      state.auditEnabled = true;
+      state.auditThrows = true;
+
+      const req1 = makeRequest();
+      enterToolRequestAuditContext(req1 as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: req1.ip,
+        requestId: req1.id,
+        toolId: "qr-generate",
+        subRoute: null,
+        startTime: Date.now() - 15,
+      });
+
+      await expect(
+        emitInlineRequestAuditIfNeeded(
+          req1 as never,
+          200,
+          JSON.stringify({ jobId: "j1", originalSize: 0, processedSize: 120 }),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ toolId: "qr-generate" }),
+        "Failed to emit TOOL_EXECUTED audit log",
+      );
+
+      const req2 = makeRequest();
+      enterToolRequestAuditContext(req2 as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: req2.ip,
+        requestId: req2.id,
+        toolId: "pdf-to-image",
+        subRoute: "batch",
+        startTime: Date.now() - 15,
+      });
+
+      await expect(
+        emitInlineBatchAudit(req2 as never, {
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ toolId: "pdf-to-image" }),
+        "Failed to emit BATCH_EXECUTED audit log",
+      );
+
+      expect(reportErrorMock).toHaveBeenCalledTimes(2);
+      for (const [reportedErr, reportedCtx] of vi.mocked(reportError).mock.calls) {
+        expect(reportedErr).toBeInstanceOf(Error);
+        expect((reportedErr as Error).message).toBe("audit write failed");
+        expect(reportedCtx).toEqual({ source: "http", subsystem: "audit" });
+      }
     });
 
     it("extracts inputFileCount from multi-file inline payloads and emits BATCH_EXECUTED for inline custom batch routes", async () => {
