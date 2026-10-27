@@ -6,6 +6,7 @@ import { db, schema } from "../../db/index.js";
 import { requestCancel } from "../../jobs/cancel.js";
 import { getQueue } from "../../jobs/queues.js";
 import { SYSTEM_JOBS } from "../../jobs/system-jobs.js";
+import { ANONYMOUS_USER_ID, isAnonymousUserId } from "../../lib/anonymous-user.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { assertNotLastAdmin, LastAdminError } from "../../lib/last-admin.js";
@@ -137,6 +138,9 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const targetUserId = request.params.id;
+      if (isAnonymousUserId(targetUserId)) {
+        return reply.status(404).send({ error: "User not found" });
+      }
 
       // Validate the target user exists
       const [targetUser] = await db
@@ -276,6 +280,9 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const targetUserId = request.params.id;
+      if (isAnonymousUserId(targetUserId)) {
+        return reply.status(404).send({ error: "User not found" });
+      }
 
       // Guard: admin cannot purge themselves
       if (targetUserId === user.id) {
@@ -391,7 +398,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
           legalHold: schema.users.legalHold,
         })
         .from(schema.users)
-        .where(eq(schema.users.team, targetTeamId));
+        .where(and(eq(schema.users.team, targetTeamId), ne(schema.users.id, ANONYMOUS_USER_ID)));
 
       if (teamUsers.some((member) => member.id === user.id)) {
         return reply.status(400).send({ error: "Cannot purge a team containing your own account" });

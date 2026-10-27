@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { deletePrefix, objectExists, putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { ensureAnonymousUser } from "../../../apps/api/src/plugins/auth.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 describe("GDPR lifecycle without enterprise license", () => {
@@ -460,6 +461,76 @@ describe("GDPR purge role hierarchy", () => {
       expect(remainingTarget).toBeUndefined();
       expect(remainingTeam).toBeUndefined();
     } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+      await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
+    }
+  });
+
+  it("refuses to export the synthetic anonymous row (#4047)", async () => {
+    await ensureAnonymousUser();
+
+    const res = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/enterprise/users/anonymous/export",
+      headers: { authorization: `Bearer ${licensedAdminToken}` },
+    });
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("refuses to purge the synthetic anonymous row (#4047)", async () => {
+    await ensureAnonymousUser();
+
+    const res = await licensedApp.app.inject({
+      method: "DELETE",
+      url: "/api/v1/enterprise/users/anonymous/purge",
+      headers: { authorization: `Bearer ${licensedAdminToken}` },
+      payload: { confirm: true },
+    });
+
+    expect(res.statusCode).toBe(404);
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
+    expect(row).toBeDefined();
+  });
+
+  it("purges a team without touching the synthetic anonymous row (#4047)", async () => {
+    await ensureAnonymousUser();
+    const [anonymousBefore] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, "anonymous"));
+    const teamId = randomUUID();
+    await db
+      .insert(schema.teams)
+      .values({ id: teamId, name: `GDPR anonymous ${Date.now().toString(36)}` });
+    const targetId = await createTarget("user", teamId);
+    await db.update(schema.users).set({ team: teamId }).where(eq(schema.users.id, "anonymous"));
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/enterprise/teams/${teamId}/purge`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+        payload: { confirm: true },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).purgedUsers).toBe(1);
+      const [anonymousAfter] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, "anonymous"));
+      expect(anonymousAfter).toBeDefined();
+      const [remainingTarget] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, targetId));
+      expect(remainingTarget).toBeUndefined();
+    } finally {
+      await db
+        .update(schema.users)
+        .set({ team: anonymousBefore?.team ?? schema.DEFAULT_TEAM_ID })
+        .where(eq(schema.users.id, "anonymous"));
       await db.delete(schema.users).where(eq(schema.users.id, targetId));
       await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
     }

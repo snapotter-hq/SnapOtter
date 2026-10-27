@@ -18,6 +18,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
+import { isAnonymousUserId } from "../lib/anonymous-user.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { isHttpsUrl } from "../lib/env.js";
@@ -1532,6 +1533,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
       const parsed = updateUserSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({
@@ -1763,6 +1767,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
       const parsed = resetPasswordSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({
@@ -1883,6 +1890,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
 
       if (id === admin.id) {
         return reply.status(400).send({

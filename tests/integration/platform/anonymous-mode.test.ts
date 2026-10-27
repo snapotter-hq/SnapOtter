@@ -311,6 +311,86 @@ describe("leftover anonymous row when AUTH_ENABLED=true (#2461)", () => {
   });
 });
 
+describe("admin mutations of the synthetic anonymous row (#4047)", () => {
+  async function anonymousRow() {
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
+    return row;
+  }
+
+  it("refuses PUT /api/auth/users/anonymous and leaves the row alone", async () => {
+    await ensureAnonymousUser();
+
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/auth/users/anonymous",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { role: "user" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+    expect((await anonymousRow())?.role).toBe("admin");
+  });
+
+  it("refuses a password reset for the synthetic anonymous row", async () => {
+    await ensureAnonymousUser();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/users/anonymous/reset-password",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { newPassword: "ResetPass1!" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+    expect((await anonymousRow())?.passwordHash).toBeNull();
+  });
+
+  it("refuses an admin MFA reset for the synthetic anonymous row", async () => {
+    await ensureAnonymousUser();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/users/anonymous/mfa/reset",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+  });
+
+  it("refuses DELETE /api/auth/users/anonymous and keeps its pipelines", async () => {
+    await ensureAnonymousUser();
+    const pipelineId = randomUUID();
+    await db.insert(schema.pipelines).values({
+      id: pipelineId,
+      userId: "anonymous",
+      name: "anonymous delete guard",
+      steps: JSON.stringify([{ toolId: "resize", settings: { width: 100 } }]),
+    });
+
+    try {
+      const res = await app.inject({
+        method: "DELETE",
+        url: "/api/auth/users/anonymous",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+      expect(await anonymousRow()).toBeDefined();
+      const [pipeline] = await db
+        .select({ id: schema.pipelines.id })
+        .from(schema.pipelines)
+        .where(eq(schema.pipelines.id, pipelineId));
+      expect(pipeline?.id).toBe(pipelineId);
+    } finally {
+      await db.delete(schema.pipelines).where(eq(schema.pipelines.id, pipelineId));
+    }
+  });
+});
+
 describe("leftover anonymous row in teams, roles, usage, and SCIM user routes (#2473)", () => {
   const scimToken = `so_scim_v2_${"b".repeat(64)}`;
 

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
+import { isAnonymousUserId } from "../lib/anonymous-user.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
@@ -1459,6 +1460,10 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
 
       const [targetUser] = await db.select().from(schema.users).where(eq(schema.users.id, id));
       if (!targetUser) {

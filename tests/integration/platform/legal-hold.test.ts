@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { ensureAnonymousUser } from "../../../apps/api/src/plugins/auth.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -203,5 +204,63 @@ describe("legal hold permission enforcement", () => {
       headers: { authorization: `Bearer ${editorToken}` },
     });
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe("legal hold on the synthetic anonymous row (#4047)", () => {
+  let licensedApp: TestApp;
+  let licensedAdminToken: string;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
+    mockEnterpriseFeatures(["legal_hold"]);
+    const { buildTestApp: buildLicensedApp, loginAsAdmin: loginLicensedAdmin } = await import(
+      "../test-server.js"
+    );
+    licensedApp = await buildLicensedApp();
+    licensedAdminToken = await loginLicensedAdmin(licensedApp.app);
+    await ensureAnonymousUser();
+  });
+
+  afterAll(async () => {
+    await db.update(schema.users).set({ legalHold: false }).where(eq(schema.users.id, "anonymous"));
+    await licensedApp.cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("refuses to place the synthetic anonymous row on legal hold", async () => {
+    const res = await licensedApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/legal-hold",
+      headers: { authorization: `Bearer ${licensedAdminToken}` },
+      payload: { targetType: "user", targetId: "anonymous", hold: true },
+    });
+
+    expect(res.statusCode).toBe(404);
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
+    expect(row?.legalHold).toBe(false);
+  });
+
+  it("omits the synthetic anonymous row from the held users list", async () => {
+    // A hold written before this guard existed must not leak into the list.
+    await db.update(schema.users).set({ legalHold: true }).where(eq(schema.users.id, "anonymous"));
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/legal-hold",
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body) as { users: Array<{ id: string }> };
+      expect(body.users.some((u) => u.id === "anonymous")).toBe(false);
+    } finally {
+      await db
+        .update(schema.users)
+        .set({ legalHold: false })
+        .where(eq(schema.users.id, "anonymous"));
+    }
   });
 });
