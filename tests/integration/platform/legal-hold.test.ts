@@ -242,6 +242,30 @@ describe("legal hold on the synthetic anonymous row (#4047)", () => {
     expect(row?.legalHold).toBe(false);
   });
 
+  it("releases a legacy hold on the synthetic anonymous row", async () => {
+    // A hold written before the guard existed must still be releasable, or the
+    // row's leftover storage is exempt from retention forever.
+    await db.update(schema.users).set({ legalHold: true }).where(eq(schema.users.id, "anonymous"));
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/legal-hold",
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+        payload: { targetType: "user", targetId: "anonymous", hold: false },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      const [row] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
+      expect(row?.legalHold).toBe(false);
+    } finally {
+      await db
+        .update(schema.users)
+        .set({ legalHold: false })
+        .where(eq(schema.users.id, "anonymous"));
+    }
+  });
+
   it("lists real held users and omits the synthetic anonymous row", async () => {
     // A hold written before this guard existed must not leak into the list.
     await db.update(schema.users).set({ legalHold: true }).where(eq(schema.users.id, "anonymous"));

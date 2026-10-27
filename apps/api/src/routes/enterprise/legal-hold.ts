@@ -39,7 +39,10 @@ export async function registerLegalHoldRoutes(app: FastifyInstance): Promise<voi
       const { targetType, targetId, hold } = parsed.data;
 
       if (targetType === "user") {
-        if (isAnonymousUserId(targetId)) {
+        // Refuse a new hold on the synthetic row, but let a hold written before
+        // this guard existed be released: it otherwise exempts the row's
+        // leftover storage from retention forever (#4047).
+        if (isAnonymousUserId(targetId) && hold) {
           return reply.status(404).send({ error: "User not found" });
         }
         const [existing] = await db
