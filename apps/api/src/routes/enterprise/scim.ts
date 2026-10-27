@@ -5,6 +5,7 @@ import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest }
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
+import { ANONYMOUS_USER_ID, isAnonymousUserId } from "../../lib/anonymous-user.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { stripInternalPaths } from "../../lib/errors.js";
@@ -167,7 +168,7 @@ class DefaultTeamMemberRemovalError extends Error {}
 
 /** What a group sync did to its members beyond the plain adds. */
 interface MemberSync {
-  /** Member ids that matched no user, skipped (#1683). */
+  /** Member ids that matched no user or name the synthetic anonymous row (#1683, #4046), skipped. */
   unknown: string[];
   /** Users taken out of another (non-Default) team to join this one (#1747). */
   moved: { userId: string; fromTeam: string }[];
@@ -180,7 +181,9 @@ function emptyMemberSync(): MemberSync {
 /**
  * Move each listed user into the team. Ids that match no user are skipped
  * rather than refused: a member deleted here but still in the IdP's group
- * would otherwise fail every sync of that group for good (#1683).
+ * would otherwise fail every sync of that group for good (#1683). The
+ * synthetic anonymous row is skipped the same way: it has no real owner, so a
+ * group must not claim it (#4046).
  *
  * A user has one team, but an IdP puts users in several groups, so the last
  * group to sync wins and the user leaves the team they were in. That stays the
@@ -202,6 +205,10 @@ async function addMembers(
     .where(eq(schema.teams.name, "Default"));
   const defaultId = defaultTeam?.id ?? schema.DEFAULT_TEAM_ID;
   for (const member of members) {
+    if (isAnonymousUserId(member.value)) {
+      into.unknown.push(member.value);
+      continue;
+    }
     // Locked so a concurrent sync can't move the user between this read and
     // the update, which would name the wrong team in the record.
     const [current] = await executor
@@ -272,7 +279,7 @@ function warnMemberSync(
         skippedCount: sync.unknown.length,
         skippedMembers: sync.unknown.slice(0, AUDIT_MEMBER_CAP),
       },
-      "SCIM group named members that match no user; skipped",
+      "SCIM group named members that cannot be synced; skipped",
     );
   }
   if (sync.moved.length > 0) {
@@ -1273,7 +1280,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       const teamMembers = await db
         .select({ id: schema.users.id, username: schema.users.username })
         .from(schema.users)
-        .where(eq(schema.users.team, id));
+        .where(and(eq(schema.users.team, id), ne(schema.users.id, ANONYMOUS_USER_ID)));
       const settled = settleMemberSync(sync, teamMembers);
       warnMemberSync(request.log, id, "created", settled);
 
@@ -1315,7 +1322,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       const members = await db
         .select({ id: schema.users.id, username: schema.users.username })
         .from(schema.users)
-        .where(eq(schema.users.team, id));
+        .where(and(eq(schema.users.team, id), ne(schema.users.id, ANONYMOUS_USER_ID)));
 
       return reply.send(toScimGroup(team, members));
     },
@@ -1372,7 +1379,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         const members = await db
           .select({ id: schema.users.id, username: schema.users.username })
           .from(schema.users)
-          .where(eq(schema.users.team, team.id));
+          .where(and(eq(schema.users.team, team.id), ne(schema.users.id, ANONYMOUS_USER_ID)));
         resources.push(toScimGroup(team, members));
       }
 
@@ -1498,7 +1505,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
           const teamMembers = await tx
             .select({ id: schema.users.id, username: schema.users.username })
             .from(schema.users)
-            .where(eq(schema.users.team, id));
+            .where(and(eq(schema.users.team, id), ne(schema.users.id, ANONYMOUS_USER_ID)));
           return { updatedTeam, teamMembers };
         });
       } catch (err) {
@@ -1673,7 +1680,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
           const teamMembers = await tx
             .select({ id: schema.users.id, username: schema.users.username })
             .from(schema.users)
-            .where(eq(schema.users.team, id));
+            .where(and(eq(schema.users.team, id), ne(schema.users.id, ANONYMOUS_USER_ID)));
           return { updatedTeam, teamMembers };
         });
       } catch (err) {

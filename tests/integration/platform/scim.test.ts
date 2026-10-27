@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { ANONYMOUS_USER_ID } from "../../../apps/api/src/lib/anonymous-user.js";
 import {
   computeKeyPrefix,
+  ensureAnonymousUser,
   hashPassword,
   verifyPassword,
 } from "../../../apps/api/src/plugins/auth.js";
@@ -5070,6 +5072,175 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           .update(schema.teams)
           .set({ name: "Default" })
           .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      }
+    });
+  });
+
+  describe("Groups leave the synthetic anonymous row alone (#4046)", () => {
+    let defaultTeamId: string;
+
+    async function anonymousTeam(): Promise<string | undefined> {
+      const [row] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+      return row?.team;
+    }
+
+    async function groupMembers(groupId: string): Promise<string[]> {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: `/api/v1/scim/v2/Groups/${groupId}`,
+        headers: authHeaders(),
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const body = JSON.parse(res.body) as { members: Array<{ value: string }> };
+      return body.members.map((member) => member.value);
+    }
+
+    async function lastSync(teamId: string, action: string): Promise<Record<string, unknown>> {
+      const [row] = await db
+        .select({ details: schema.auditLog.details })
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${teamId}`,
+            sql`${schema.auditLog.details}->>'action' = ${action}`,
+          ),
+        )
+        .orderBy(desc(schema.auditLog.createdAt))
+        .limit(1);
+      return (row?.details ?? {}) as Record<string, unknown>;
+    }
+
+    beforeAll(async () => {
+      await ensureAnonymousUser();
+      const [defaultTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.name, "Default"));
+      defaultTeamId = defaultTeam?.id ?? DEFAULT_TEAM_ID;
+      await db
+        .update(schema.users)
+        .set({ team: defaultTeamId })
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+    });
+
+    afterAll(async () => {
+      await db
+        .update(schema.users)
+        .set({ team: defaultTeamId })
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+    });
+
+    it("omits the synthetic anonymous row from GET /Groups/:id", async () => {
+      expect(await groupMembers(defaultTeamId)).not.toContain(ANONYMOUS_USER_ID);
+    });
+
+    it("omits the synthetic anonymous row from GET /Groups", async () => {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Groups?count=200",
+        headers: authHeaders(),
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      const resources = JSON.parse(res.body).Resources as Array<{
+        id: string;
+        members: Array<{ value: string }>;
+      }>;
+      const defaultGroup = resources.find((group) => group.id === defaultTeamId);
+      expect(defaultGroup).toBeDefined();
+      expect(defaultGroup?.members.map((member) => member.value)).not.toContain(ANONYMOUS_USER_ID);
+    });
+
+    it("skips the synthetic anonymous row when a group is created with it as a member", async () => {
+      const displayName = uniqueName("scim-4046-post");
+      const res = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Groups",
+        headers: authHeaders(),
+        payload: { displayName, members: [{ value: ANONYMOUS_USER_ID }] },
+      });
+
+      expect(res.statusCode, res.body).toBe(201);
+      const body = JSON.parse(res.body) as { id: string; members: unknown[] };
+      expect(body.members).toEqual([]);
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+      expect((await lastSync(body.id, "created")).skippedMembers).toEqual([ANONYMOUS_USER_ID]);
+    });
+
+    it("skips the synthetic anonymous row on a PATCH add", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-4046-patch") });
+      const real = await createScimUser({ userName: uniqueName("scim-4046-patch-real") });
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Groups/${group.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [
+            {
+              op: "add",
+              path: "members",
+              value: [{ value: ANONYMOUS_USER_ID }, { value: real.id }],
+            },
+          ],
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await groupMembers(group.id)).toEqual([real.id]);
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+      expect((await lastSync(group.id, "patched")).skippedMembers).toEqual([ANONYMOUS_USER_ID]);
+    });
+
+    it("skips the synthetic anonymous row on a PUT replace", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-4046-put") });
+      const real = await createScimUser({ userName: uniqueName("scim-4046-put-real") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Groups/${group.id}`,
+        headers: authHeaders(),
+        payload: {
+          displayName: group.displayName,
+          members: [{ value: ANONYMOUS_USER_ID }, { value: real.id }],
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await groupMembers(group.id)).toEqual([real.id]);
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+    });
+
+    it("normalizes a legacy anonymous membership when a group is replaced", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-4046-legacy") });
+      await db
+        .update(schema.users)
+        .set({ team: group.id })
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+
+      try {
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Groups/${group.id}`,
+          headers: authHeaders(),
+          payload: { displayName: group.displayName, members: [] },
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        // The bulk move-out still sends every row to Default, so a membership
+        // written before the addMembers guard existed does not linger unseen.
+        expect(await anonymousTeam()).toBe(defaultTeamId);
+      } finally {
+        await db
+          .update(schema.users)
+          .set({ team: defaultTeamId })
+          .where(eq(schema.users.id, ANONYMOUS_USER_ID));
       }
     });
   });
