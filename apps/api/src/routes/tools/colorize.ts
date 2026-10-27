@@ -71,7 +71,7 @@ registerAiJobHandler(
         result = await colorize(
           input,
           ctx.scratchDir,
-          { intensity: settings.intensity, model: settings.model },
+          { intensity: settings.intensity, model: settings.model, signal: ctx.signal },
           (percent, stage) => ctx.report(percent, stage),
         );
       } catch (err) {
@@ -296,6 +296,7 @@ export function registerColorize(app: FastifyInstance) {
               {
                 intensity: (settings as { intensity?: number }).intensity ?? 1.0,
                 model: (settings as { model?: string }).model ?? "auto",
+                signal: ctx?.signal,
               },
               ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
             );

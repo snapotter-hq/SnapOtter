@@ -733,6 +733,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
         try {
           landmarksResult = await detectFaceLandmarks(orientedBuffer, undefined, {
             toolId: "passport-photo",
+            signal: ctx?.signal,
           });
         } catch (err) {
           throw await asInputErrorIfUndecodable(orientedBuffer, err);
@@ -758,6 +759,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
             bgRemovedBuffer = await removeBackground(orientedBuffer, scratchDir, {
               model: "birefnet-portrait",
               toolId: "passport-photo",
+              signal: ctx?.signal,
             });
           } catch (err) {
             throw await asInputErrorIfUndecodable(orientedBuffer, err);

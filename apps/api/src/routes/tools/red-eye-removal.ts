@@ -75,6 +75,7 @@ registerAiJobHandler(
             strength: settings.strength,
             format: settings.format,
             quality: settings.quality,
+            signal: ctx.signal,
           },
           (percent, stage) => ctx.report(percent, stage),
         );
@@ -311,6 +312,7 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
                 strength: s.strength ?? 70,
                 format: s.format,
                 quality: s.quality ?? 90,
+                signal: ctx?.signal,
               },
               ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
             );

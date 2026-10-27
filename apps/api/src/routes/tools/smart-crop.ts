@@ -153,10 +153,12 @@ async function processSubject(
 async function processFace(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
+  signal?: AbortSignal,
 ): Promise<Buffer> {
   const result = await detectFaces(inputBuffer, {
     sensitivity: settings.sensitivity,
     toolId: "smart-crop",
+    signal,
   });
 
   if (result.facesDetected === 0) {
@@ -264,13 +266,13 @@ export function registerSmartCrop(app: FastifyInstance) {
     process: withImageEncodeContext<z.output<typeof settingsSchema>>(
       "Smart crop failed",
       (s) => s?.mode ?? "subject",
-      async (inputBuffer, settings, filename) => {
+      async (inputBuffer, settings, filename, ctx) => {
         const outputFormat = await resolveOutputFormat(inputBuffer, filename, settings.quality);
         let result: Buffer;
 
         try {
           if (settings.mode === "face") {
-            result = await processFace(inputBuffer, settings);
+            result = await processFace(inputBuffer, settings, ctx?.signal);
           } else if (settings.mode === "trim") {
             result = await processTrim(inputBuffer, settings);
           } else {

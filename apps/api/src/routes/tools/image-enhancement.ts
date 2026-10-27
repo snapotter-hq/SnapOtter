@@ -49,6 +49,7 @@ export async function processImageEnhancement(
   rawBuffer: Buffer,
   settings: EnhancementSettings,
   filename: string,
+  options: { signal?: AbortSignal } = {},
 ) {
   const outputFormat = await resolveOutputFormat(rawBuffer, filename);
 
@@ -154,9 +155,17 @@ export async function processImageEnhancement(
         detailPreservation: 70,
         colorNoise: 20,
         toolId: "image-enhancement",
+        signal: options.signal,
       });
       denoised = result.buffer;
     } catch (err) {
+      // A cancel is not a failed deep pass: rethrow it so the worker settles the
+      // job as canceled instead of logging and reporting a Sharp-only success.
+      // Gate on the error itself, not just signal.aborted, so a real failure
+      // that races a cancel still gets logged and reported (#1224).
+      if (options.signal?.aborted && err instanceof Error && err.name === "AbortError") {
+        throw err;
+      }
       // isToolInstalled() only filters out bundles the install record says
       // are absent, so what lands here is a pass that was meant to run and
       // broke: a sidecar crash, an OOM, a bad scratch dir, missing or corrupt

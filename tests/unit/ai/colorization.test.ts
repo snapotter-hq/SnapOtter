@@ -236,6 +236,19 @@ describe("colorize", () => {
       const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
       expect(options.onProgress).toBeUndefined();
     });
+
+    it("hands the abort signal to the sidecar call", async () => {
+      const { signal } = new AbortController();
+      await colorize(FAKE_INPUT, FAKE_OUTPUT_DIR, { signal });
+
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "colorize.py",
+        expect.any(Array),
+        expect.objectContaining({ signal }),
+      );
+      // The signal is not a sidecar option and must not reach the script JSON.
+      expect(vi.mocked(runPythonWithProgress).mock.calls[0][1][2]).toBe("{}");
+    });
   });
 
   describe("sharp conversion errors", () => {

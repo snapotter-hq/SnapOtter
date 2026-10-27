@@ -169,6 +169,7 @@ async function processTransparencyFix(
   settings: z.infer<typeof settingsSchema>,
   outputDir: string,
   onProgress?: (percent: number, stage: string) => void,
+  signal?: AbortSignal,
 ): Promise<Buffer> {
   let workingBuffer = inputBuffer;
 
@@ -184,7 +185,7 @@ async function processTransparencyFix(
       resultBuffer = await removeBackground(
         workingBuffer,
         outputDir,
-        { model: DEFAULT_MODEL, oomFallbackModel: false, toolId: TOOL_ID },
+        { model: DEFAULT_MODEL, oomFallbackModel: false, toolId: TOOL_ID, signal },
         onProgress,
       );
     } catch (err) {
@@ -195,7 +196,7 @@ async function processTransparencyFix(
       resultBuffer = await removeBackground(
         workingBuffer,
         outputDir,
-        { model: FALLBACK_MODEL, toolId: TOOL_ID },
+        { model: FALLBACK_MODEL, toolId: TOOL_ID, signal },
         onProgress,
       );
     }
@@ -226,6 +227,7 @@ registerAiJobHandler(
         settings,
         ctx.scratchDir,
         (percent, stage) => ctx.report(Math.min(percent, 95), stage),
+        ctx.signal,
       );
 
       const outputExt = settings.outputFormat === "webp" ? "webp" : "png";
@@ -429,6 +431,7 @@ export function registerTransparencyFixer(app: FastifyInstance) {
             s,
             scratchDir,
             ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            ctx?.signal,
           );
 
           const outputExt = s.outputFormat === "webp" ? "webp" : "png";

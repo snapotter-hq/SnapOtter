@@ -71,7 +71,7 @@ registerAiJobHandler(
         result = await blurFaces(
           input,
           ctx.scratchDir,
-          { blurRadius, sensitivity },
+          { blurRadius, sensitivity, signal: ctx.signal },
           (percent, stage) => ctx.report(percent, stage),
         );
       } catch (err) {
@@ -310,6 +310,7 @@ export function registerBlurFaces(app: FastifyInstance) {
               {
                 blurRadius: s.blurRadius ?? 30,
                 sensitivity: s.sensitivity ?? 0.5,
+                signal: ctx?.signal,
               },
               ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
             );

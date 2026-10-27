@@ -139,7 +139,7 @@ describe("AI image job handlers", () => {
     expect(colorize).toHaveBeenCalledWith(
       PNG,
       SCRATCH_DIR,
-      { intensity: 0.5, model: "opencv" },
+      { intensity: 0.5, model: "opencv", signal: ctx.signal },
       expect.any(Function),
     );
     expect(ctx.report).toHaveBeenCalledWith(40, "colorizing");
@@ -174,6 +174,7 @@ describe("AI image job handlers", () => {
         colorNoise: 10,
         format: "jpeg",
         quality: 82,
+        signal: ctx.signal,
       },
       expect.any(Function),
     );
@@ -209,6 +210,7 @@ describe("AI image job handlers", () => {
         denoiseStrength: 35,
         colorize: true,
         colorizeStrength: 80,
+        signal: ctx.signal,
       },
       expect.any(Function),
     );
@@ -250,7 +252,13 @@ describe("AI image job handlers", () => {
     expect(enhanceFaces).toHaveBeenCalledWith(
       PNG,
       SCRATCH_DIR,
-      { model: "codeformer", strength: 0.65, onlyCenterFace: true, sensitivity: 0.7 },
+      {
+        model: "codeformer",
+        strength: 0.65,
+        onlyCenterFace: true,
+        sensitivity: 0.7,
+        signal: ctx.signal,
+      },
       expect.any(Function),
     );
     expect(enhanced).toMatchObject({
@@ -261,7 +269,7 @@ describe("AI image job handlers", () => {
     expect(removeRedEye).toHaveBeenCalledWith(
       PNG,
       SCRATCH_DIR,
-      { sensitivity: 45, strength: 80, format: "png", quality: 90 },
+      { sensitivity: 45, strength: 80, format: "png", quality: 90, signal: ctx.signal },
       expect.any(Function),
     );
     expect(redEye).toMatchObject({
@@ -291,14 +299,19 @@ describe("AI image job handlers", () => {
       1,
       PNG,
       SCRATCH_DIR,
-      { model: "birefnet-hr-matting", oomFallbackModel: false, toolId: "transparency-fixer" },
+      {
+        model: "birefnet-hr-matting",
+        oomFallbackModel: false,
+        toolId: "transparency-fixer",
+        signal: ctx.signal,
+      },
       expect.any(Function),
     );
     expect(removeBackground).toHaveBeenNthCalledWith(
       2,
       PNG,
       SCRATCH_DIR,
-      { model: "birefnet-general", toolId: "transparency-fixer" },
+      { model: "birefnet-general", toolId: "transparency-fixer", signal: ctx.signal },
       expect.any(Function),
     );
     expect(ctx.report).toHaveBeenCalledWith(5, "Retrying with fallback model (birefnet-general)");

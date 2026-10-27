@@ -268,6 +268,17 @@ describe("detectFaceLandmarks", () => {
       const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
       expect(options.onProgress).toBeUndefined();
     });
+
+    it("hands the abort signal to the sidecar call", async () => {
+      const { signal } = new AbortController();
+      await detectFaceLandmarks(FAKE_INPUT, undefined, { signal });
+
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "face_landmarks.py",
+        expect.any(Array),
+        expect.objectContaining({ signal }),
+      );
+    });
   });
 
   describe("edge cases", () => {

@@ -80,6 +80,7 @@ registerAiJobHandler(
             colorNoise: settings.colorNoise,
             format: settings.format,
             quality: settings.quality,
+            signal: ctx.signal,
           },
           (percent, stage) => ctx.report(percent, stage),
         );
@@ -311,6 +312,7 @@ export function registerNoiseRemoval(app: FastifyInstance) {
                 colorNoise: s.colorNoise,
                 format: s.format,
                 quality: s.quality,
+                signal: ctx?.signal,
               },
               ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
             );

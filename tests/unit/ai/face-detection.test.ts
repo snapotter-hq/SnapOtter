@@ -193,6 +193,19 @@ describe("blurFaces", () => {
         expect.objectContaining({ onProgress }),
       );
     });
+
+    it("hands the abort signal to the sidecar call", async () => {
+      const { signal } = new AbortController();
+      await blurFaces(FAKE_INPUT, FAKE_OUTPUT_DIR, { signal });
+
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "detect_faces.py",
+        expect.any(Array),
+        expect.objectContaining({ signal }),
+      );
+      // The signal is not a sidecar option and must not reach the script JSON.
+      expect(JSON.parse(vi.mocked(runPythonWithProgress).mock.calls[0][1][2])).toEqual({});
+    });
   });
 });
 
@@ -322,6 +335,19 @@ describe("detectFaces", () => {
 
       const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
       expect(options.onProgress).toBeUndefined();
+    });
+
+    it("hands the abort signal to the sidecar call", async () => {
+      const { signal } = new AbortController();
+      await detectFaces(FAKE_INPUT, { signal });
+
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "detect_faces.py",
+        expect.any(Array),
+        expect.objectContaining({ signal }),
+      );
+      const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
+      expect(JSON.parse(args[2])).toEqual({ detectOnly: true });
     });
   });
 

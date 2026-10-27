@@ -76,6 +76,7 @@ registerAiJobHandler(
             strength: settings.strength,
             onlyCenterFace: settings.onlyCenterFace,
             sensitivity: settings.sensitivity,
+            signal: ctx.signal,
           },
           (percent, stage) => ctx.report(percent, stage),
         );
@@ -302,6 +303,7 @@ export function registerEnhanceFaces(app: FastifyInstance) {
                 strength: s.strength ?? 0.8,
                 onlyCenterFace: s.onlyCenterFace ?? false,
                 sensitivity: s.sensitivity ?? 0.5,
+                signal: ctx?.signal,
               },
               ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
             );

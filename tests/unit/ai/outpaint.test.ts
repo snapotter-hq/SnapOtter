@@ -359,5 +359,26 @@ describe("outpaint", () => {
         "output missing",
       );
     });
+
+    it("hands the abort signal to the sidecar call", async () => {
+      const { signal } = new AbortController();
+      await outpaint(
+        FAKE_INPUT,
+        {
+          extendTop: 10,
+          extendRight: 10,
+          extendBottom: 10,
+          extendLeft: 10,
+          signal,
+        },
+        FAKE_OUTPUT_DIR,
+      );
+
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "outpaint.py",
+        expect.any(Array),
+        expect.objectContaining({ signal }),
+      );
+    });
   });
 });

@@ -13,11 +13,13 @@ export interface BlurFacesOptions {
   blurRadius?: number;
   sensitivity?: number;
   toolId?: string;
+  signal?: AbortSignal;
 }
 
 export interface DetectFacesOptions {
   sensitivity?: number;
   toolId?: string;
+  signal?: AbortSignal;
 }
 
 export interface FaceRegion {
@@ -44,7 +46,7 @@ export async function blurFaces(
   options: BlurFacesOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<BlurFacesResult> {
-  const { toolId, ...sidecarOptions } = options;
+  const { signal, toolId, ...sidecarOptions } = options;
   const inputPath = join(outputDir, "input_faces.png");
   const outputPath = join(outputDir, "output_faces.png");
 
@@ -53,7 +55,7 @@ export async function blurFaces(
   const { stdout } = await runPythonWithProgress(
     "detect_faces.py",
     [inputPath, outputPath, JSON.stringify(sidecarOptions)],
-    { onProgress, ...(toolId ? { toolId } : {}) },
+    { onProgress, signal, ...(toolId ? { toolId } : {}) },
   );
 
   const result = parseStdoutJson(stdout);
@@ -74,7 +76,7 @@ export async function detectFaces(
   options: DetectFacesOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<DetectFacesResult> {
-  const { toolId = "smart-crop", ...sidecarOptions } = options;
+  const { signal, toolId = "smart-crop", ...sidecarOptions } = options;
   const inputPath = join(tmpdir(), `detect_faces_${Date.now()}.png`);
 
   try {
@@ -83,7 +85,7 @@ export async function detectFaces(
     const { stdout } = await runPythonWithProgress(
       "detect_faces.py",
       [inputPath, "unused", JSON.stringify({ ...sidecarOptions, detectOnly: true })],
-      { onProgress, toolId },
+      { onProgress, signal, toolId },
     );
 
     const result = parseStdoutJson(stdout);

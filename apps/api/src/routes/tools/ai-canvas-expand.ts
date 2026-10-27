@@ -175,6 +175,7 @@ registerAiJobHandler(
             extendBottom: settings.extendBottom,
             extendLeft: settings.extendLeft,
             tier: settings.tier,
+            signal: ctx.signal,
           },
           ctx.scratchDir,
           (percent, stage) => ctx.report(percent, stage),
@@ -405,6 +406,7 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
                 extendBottom: s.extendBottom,
                 extendLeft: s.extendLeft,
                 tier: s.tier,
+                signal: ctx?.signal,
               },
               scratchDir,
             );

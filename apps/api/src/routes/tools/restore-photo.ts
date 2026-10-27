@@ -85,6 +85,7 @@ registerAiJobHandler(
             denoiseStrength: settings.denoiseStrength,
             colorize: settings.colorize,
             colorizeStrength: settings.colorizeStrength,
+            signal: ctx.signal,
           },
           (percent, stage) => ctx.report(percent, stage),
         );
@@ -348,6 +349,7 @@ export function registerRestorePhoto(app: FastifyInstance) {
                 denoiseStrength: s.denoiseStrength,
                 colorize: s.colorize,
                 colorizeStrength: s.colorizeStrength,
+                signal: ctx?.signal,
               },
               ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
             );
