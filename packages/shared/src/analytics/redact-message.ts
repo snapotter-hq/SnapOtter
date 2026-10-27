@@ -10,7 +10,8 @@ const CTRL_RE = /[\x00-\x1f\x7f]/g;
 const BLOB_RE = /blob:[^\s"')]+/g;
 const DATA_RE = /data:[^\s"')]+/g;
 const URL_RE = /https?:\/\/[^\s"')]+/g;
-const PATH_RE = /(?:\/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-z]:\\)[^\s"')]*/g;
+const PATH_RE =
+  /(?:\/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv|Volumes|private|media|run|storage|scratch|workspace|volume\d+)|[A-Za-z]:\\)[^\s"')]*/g;
 // Relative object-storage keys (uploads/<jobId>/…, outputs/…, previews/…) carry a
 // user-supplied filename tail, so mask them like absolute paths. Runs after
 // PATH_RE, which already swallows the absolute /data/uploads/… form.
@@ -30,7 +31,7 @@ const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 // (\p{L} + the u flag) so a non-ASCII user filename (CJK, Arabic) is masked too.
 // Matches up to 5 preceding words to redact unquoted filenames with spaces.
 const USER_FILE_EXT =
-  "jpe?g|png|gif|webp|avif|heif?|tiff?|bmp|svg|raw|psd|mp4|mov|avi|mkv|webm|flv|wmv|m4v|mp3|wav|flac|aac|ogg|m4a|opus|pdf|docx?|xlsx?|pptx?|odt|ods|odp|txt|csv|epub|zip";
+  "jpe?g|png|gif|webp|avif|hei[cf]|tiff?|bmp|svg|raw|psd|jxl|mp4|mov|avi|mkv|webm|flv|wmv|m4v|3gp|3g2|vob|m2ts|ogv|rmvb|asf|f4v|mxf|wtv|mp3|wav|flac|aac|ogg|m4a|opus|wma|amr|ape|ac3|aiff|aif|wv|tta|dsf|dff|mka|caf|pdf|docx?|xlsx?|pptx?|odt|ods|odp|txt|csv|epub|zip";
 const FILE_RE = new RegExp(
   `((?:[\\p{L}\\p{N}_-]+\\s+){0,5})([\\p{L}\\p{N}_-]+\\.(?:${USER_FILE_EXT}))\\b`,
   "giu",

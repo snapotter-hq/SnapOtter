@@ -97,3 +97,57 @@ describe("redactMessage IPv6 and relative keys", () => {
     expect(redactMessage("panic in core::result::unwrap")).toBe("panic in core::result::unwrap");
   });
 });
+
+describe("redactMessage custom roots and media extensions (#4086)", () => {
+  it("masks a self-hoster's custom storage root", () => {
+    expect(
+      redactMessage(
+        "Error opening input file /volume1/snapotter-scratch/9f/media/in-0-Q3_Layoffs_v2.wma",
+      ),
+    ).toBe("Error opening input file <path>");
+  });
+
+  it("masks a macOS external volume path", () => {
+    expect(redactMessage("open /Volumes/External/photo.png failed")).toBe("open <path> failed");
+  });
+
+  it("masks extensionless paths under the self-host roots", () => {
+    for (const path of [
+      "/volume2/scratch/in-0",
+      "/Volumes/External",
+      "/private/staging/in-0",
+      "/media/9f/in-0",
+      "/run/9f/in-0",
+      "/storage/9f/in-0",
+      "/scratch/9f/in-0",
+      "/workspace/9f/in-0",
+    ]) {
+      expect(redactMessage(`open ${path} failed`)).toBe("open <path> failed");
+    }
+  });
+
+  it("masks a bare media filename the extension list used to miss", () => {
+    expect(redactMessage("cannot read in-0-Q3_Layoffs_v2.wma")).toBe("cannot read <file>");
+  });
+
+  it("masks the image formats the old extension list typo missed", () => {
+    expect(redactMessage("cannot read scan.heic")).toBe("cannot read <file>");
+    expect(redactMessage("cannot read scan.jxl")).toBe("cannot read <file>");
+  });
+
+  it("masks a privacy-sensitive private root", () => {
+    expect(redactMessage("open /private/tmp/secret.bin failed")).toBe("open <path> failed");
+  });
+
+  it("keeps code extensions that collide with media containers", () => {
+    expect(redactMessage("failed in vite.config.mts")).toBe("failed in vite.config.mts");
+    expect(redactMessage("TypeError: fs.rm is not a function")).toBe(
+      "TypeError: fs.rm is not a function",
+    );
+  });
+
+  it("leaves app routes and source filenames alone", () => {
+    expect(redactMessage("GET /api/v1/jobs/123 failed")).toBe("GET /api/v1/jobs/123 failed");
+    expect(redactMessage("failed in rounded-crop.ts")).toBe("failed in rounded-crop.ts");
+  });
+});
