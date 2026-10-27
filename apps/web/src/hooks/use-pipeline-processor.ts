@@ -1596,7 +1596,14 @@ export function usePipelineProcessor() {
             const fileResults = parseFileResultsHeader(xhr.getResponseHeader("X-File-Results"), {
               status: xhr.status,
             });
-            void settleOrFail(xhr.response as Blob, fileResults ?? {}, xhr.status);
+            // A header that was present but unreadable is not "no results":
+            // settling from an empty map would mark every file "not found in
+            // batch results" and hide the real failure (#4045).
+            if (fileResults === null) {
+              failRun(t.errors.batchFailed);
+              return;
+            }
+            void settleOrFail(xhr.response as Blob, fileResults, xhr.status);
             return;
           }
 

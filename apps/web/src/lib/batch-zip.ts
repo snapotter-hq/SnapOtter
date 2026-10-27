@@ -29,9 +29,10 @@ export async function unpackBatchZip(zipBlob: Blob, tags: ReportTags): Promise<U
 /**
  * Decodes a batch answer's X-File-Results header: input index to the result's
  * name inside the ZIP. A missing header is no results. One that doesn't decode
- * to an object is logged and reported (#1805), then answered with null so
- * every file settles as "File not found in batch results" and the caller can
- * record that the header was unreadable (#1929).
+ * to an object is logged and reported (#1805), then answered with null so a
+ * caller can tell an unreadable header from an absent one: the pipeline fails
+ * the run (#4045), while a single-tool batch keeps per-file results and tracks
+ * `bad-file-results` (#1929).
  */
 export function parseFileResultsHeader(
   header: string | null,

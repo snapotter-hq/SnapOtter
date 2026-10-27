@@ -2830,31 +2830,34 @@ describe("usePipelineProcessor batch ZIP that won't unpack (#1805)", () => {
     ["does not decode", "%ZZ"],
     ["is not JSON", encodeURIComponent("{oops")],
     ["is not an object", encodeURIComponent("[1]")],
-  ])("logs and reports a file-results header that %s", async (_label, header) => {
-    const { unmount } = startBatchRun();
-    act(() => respond(zipBlob(), header));
+  ])(
+    "logs, reports and fails the batch on a file-results header that %s (#4045)",
+    async (_label, header) => {
+      const { unmount } = startBatchRun();
+      act(() => respond(zipBlob(), header));
 
-    await settled(() => expect(useFileStore.getState().processing).toBe(false));
-    // Only the length: the header holds file names.
-    expect(consoleError).toHaveBeenCalledWith("Ignoring unreadable X-File-Results", {
-      length: header.length,
-    });
-    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
-    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
-    expect(error).toMatchObject({
-      name: "FileResultsUnreadableError",
-      message: "Batch result file map could not be read",
-      statusCode: 200,
-    });
-    expect(error.cause).toBeUndefined();
-    expect(tags).toEqual({ error_class: "operational" });
-    // No file can be matched to its result, as before.
-    expect(useFileStore.getState().entries.map((e) => e.error)).toEqual([
-      "File not found in batch results",
-      "File not found in batch results",
-    ]);
-    unmount();
-  });
+      await settled(() => expect(useFileStore.getState().processing).toBe(false));
+      // Only the length: the header holds file names.
+      expect(consoleError).toHaveBeenCalledWith("Ignoring unreadable X-File-Results", {
+        length: header.length,
+      });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error).toMatchObject({
+        name: "FileResultsUnreadableError",
+        message: "Batch result file map could not be read",
+        statusCode: 200,
+      });
+      expect(error.cause).toBeUndefined();
+      expect(tags).toEqual({ error_class: "operational" });
+      // An unreadable header is not "no results": settling from an empty map
+      // blamed every file for being missing from the ZIP instead (#4045).
+      expectBatchFailed(en.errors.batchFailed);
+      // Nothing can be matched to a result, so the ZIP is not offered either.
+      expect(useFileStore.getState().batchZipBlob).toBeNull();
+      unmount();
+    },
+  );
 
   it("reads a missing file-results header as no results, without a report", async () => {
     const { unmount } = startBatchRun();
@@ -2862,6 +2865,14 @@ describe("usePipelineProcessor batch ZIP that won't unpack (#1805)", () => {
 
     await settled(() => expect(useFileStore.getState().processing).toBe(false));
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    // The absent-header half of the distinction #4045 relies on: no results,
+    // not a failed batch, and the ZIP stays available.
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries.map((e) => e.error)).toEqual([
+      "File not found in batch results",
+      "File not found in batch results",
+    ]);
+    expect(useFileStore.getState().batchZipBlob).not.toBeNull();
     unmount();
   });
 
