@@ -229,6 +229,67 @@ describe("ImageInputHandler request logger (#1417)", () => {
   });
 });
 
+describe("ImageInputHandler validation failure logging (#1598)", () => {
+  it("logs the validator's cause with the filename and keeps the input error", async () => {
+    const cause = new Error("Input buffer has corrupt header");
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: false,
+      reason: "Failed to read image metadata",
+      cause,
+    });
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "corrupt.png", {
+        scratchDir: "/tmp/in",
+        log: log as never,
+      }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      message: "Invalid image: Failed to read image metadata",
+    });
+
+    expect(log.info).toHaveBeenCalledOnce();
+    expect(log.info).toHaveBeenCalledWith(
+      { err: cause, filename: "corrupt.png" },
+      "Image validation failed",
+    );
+  });
+
+  it("falls back to the process logger when no request logger is given", async () => {
+    const cause = new Error("Input buffer has corrupt header");
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: false,
+      reason: "Failed to read image metadata",
+      cause,
+    });
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "corrupt.png", { scratchDir: "/tmp/in" }),
+    ).rejects.toBeInstanceOf(InputValidationError);
+
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      { err: cause, filename: "corrupt.png" },
+      "Image validation failed",
+    );
+  });
+
+  it("stays quiet when the rejection carries no cause", async () => {
+    mocks.validateImageBuffer.mockResolvedValue({ valid: false, reason: "File is empty" });
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "empty.png", {
+        scratchDir: "/tmp/in",
+        log: log as never,
+      }),
+    ).rejects.toBeInstanceOf(InputValidationError);
+
+    expect(log.info).not.toHaveBeenCalled();
+    expect(mocks.logger.info).not.toHaveBeenCalled();
+  });
+});
+
 describe("ImageInputHandler decoder availability (#1428)", () => {
   const missingHeif = () => new DecoderUnavailableError("No HEIF decoder found.");
   const missingMagick = () => new DecoderUnavailableError("No ImageMagick found.");

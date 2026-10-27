@@ -241,6 +241,7 @@ describe("file-validation metadata OOM propagation (#3717)", () => {
       await expect(validateImageBuffer(buf, "sample.png")).resolves.toEqual({
         valid: false,
         reason: "Failed to read image metadata",
+        cause: expect.any(Error),
       });
     } finally {
       metaSpy.mockRestore();
@@ -251,6 +252,7 @@ describe("file-validation metadata OOM propagation (#3717)", () => {
     ).resolves.toEqual({
       valid: false,
       reason: "Failed to read image metadata",
+      cause: expect.any(Error),
     });
   });
 });

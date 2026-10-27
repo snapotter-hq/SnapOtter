@@ -57,7 +57,11 @@ function expectRejected(
   result: Awaited<ReturnType<typeof validateImageBuffer>>,
   reason: string,
 ): void {
-  expect(result).toEqual({ valid: false, reason });
+  if (reason === "Failed to read image metadata") {
+    expect(result).toEqual({ valid: false, reason, cause: expect.any(Error) });
+  } else {
+    expect(result).toEqual({ valid: false, reason });
+  }
 }
 
 // --------------------------------------------------------------------------

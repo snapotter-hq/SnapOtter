@@ -53,6 +53,12 @@ export class ImageInputHandler implements InputHandler {
       throw rawErr;
     }
     if (!validation.valid) {
+      if (validation.cause) {
+        (opts.log || logger).info(
+          { err: validation.cause, filename: originalFilename },
+          "Image validation failed",
+        );
+      }
       throw new InputValidationError(`Invalid image: ${validation.reason}`);
     }
     assertWithinImageLimits(validation.width, validation.height, opts.maxPixels, opts.maxDimension);

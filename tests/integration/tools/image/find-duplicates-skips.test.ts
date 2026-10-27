@@ -95,6 +95,10 @@ const FAKE_PSD = Buffer.concat([
 ]);
 // gzip magic plus garbage: validation passes .svgz by extension, decompress throws.
 const FAKE_SVGZ = Buffer.concat([Buffer.from([0x1f, 0x8b]), Buffer.alloc(32, 9)]);
+// The real PNG cut off at 33 bytes: signature and IHDR chunk, no IDAT or IEND.
+// The signature proves it is a PNG, so validation reaches Sharp, which rejects
+// the missing image data. Drives the metadata-failure branch without stubbing.
+const CORRUPT_PNG = PNG.subarray(0, 33);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -162,6 +166,35 @@ function findDuplicatesWarns(spy: ReturnType<typeof vi.spyOn>) {
 }
 
 describe("find-duplicates skip paths (#1493)", () => {
+  it("skips a corrupt PNG when sharp rejects metadata(), and logs the sharp error via info", async () => {
+    // Sharp must reject these bytes before the test proves anything.
+    await expect(sharp(CORRUPT_PNG).metadata()).rejects.toThrow();
+    const infoSpy = vi.spyOn(logger, "info");
+    try {
+      const res = await post(
+        withGoodPair({ filename: "corrupt.png", contentType: "image/png", content: CORRUPT_PNG }),
+      );
+
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+      expect(result.skippedFiles).toEqual([
+        { filename: "corrupt.png", reason: "Failed to read image metadata" },
+      ]);
+      expect(result.duplicateGroups).toHaveLength(1);
+
+      const lines = infoSpy.mock.calls.filter(
+        (call) => typeof call[1] === "string" && String(call[1]) === "Image validation failed",
+      );
+      expect(lines).toHaveLength(1);
+      expect(lines[0][0]).toMatchObject({
+        filename: "corrupt.png",
+        err: expect.any(Error),
+      });
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
   it("skips a HEIC the decoder rejects, and logs the decoder's error", async () => {
     decoderMocks.heic = new Error("injected heif-dec failure");
     const warnSpy = vi.spyOn(logger, "warn");

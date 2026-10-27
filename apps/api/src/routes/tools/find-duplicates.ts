@@ -178,6 +178,12 @@ export function registerFindDuplicates(app: FastifyInstance) {
     for (const file of files) {
       const validation = await validateImageBuffer(file.buffer, file.filename);
       if (!validation.valid) {
+        if (validation.cause) {
+          logger.info(
+            { err: validation.cause, filename: file.filename },
+            "Image validation failed",
+          );
+        }
         skippedFiles.push({ filename: file.filename, reason: validation.reason });
         continue;
       }

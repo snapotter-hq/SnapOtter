@@ -160,6 +160,11 @@ export interface ValidationResult {
 export interface ValidationError {
   valid: false;
   reason: string;
+  /**
+   * The decoder error behind a failed metadata read, for server-side logs
+   * only. It can carry internal paths, so it must never reach a client.
+   */
+  cause?: unknown;
 }
 
 /** Camera RAW extensions that share TIFF magic bytes. */
@@ -345,7 +350,7 @@ export async function validateImageBuffer(
   } catch (err) {
     const outOfMemory = asDecoderOutOfMemory(err);
     if (outOfMemory instanceof DecoderOutOfMemoryError) throw outOfMemory;
-    return { valid: false, reason: "Failed to read image metadata" };
+    return { valid: false, reason: "Failed to read image metadata", cause: err };
   }
 }
 
