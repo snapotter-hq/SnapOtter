@@ -1598,12 +1598,14 @@ export function usePipelineProcessor() {
             });
             // A header that was present but unreadable is not "no results":
             // settling from an empty map would mark every file "not found in
-            // batch results" and hide the real failure (#4045).
-            if (fileResults === null) {
+            // batch results" and hide the real failure (#4045). A canceled run
+            // keeps its cancel outcome, so it falls through and settles every
+            // entry as "Canceled" (#4096).
+            if (fileResults === null && !canceledByUserRef.current) {
               failRun(t.errors.batchFailed);
               return;
             }
-            void settleOrFail(xhr.response as Blob, fileResults, xhr.status);
+            void settleOrFail(xhr.response as Blob, fileResults ?? {}, xhr.status);
             return;
           }
 

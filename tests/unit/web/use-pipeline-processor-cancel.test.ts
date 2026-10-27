@@ -484,6 +484,49 @@ describe("usePipelineProcessor cancel (#771)", () => {
     hook.unmount();
   });
 
+  it("keeps a canceled batch's Canceled outcome when the file-results header is unreadable (#4096)", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ canceled: true }),
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const hook = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    await act(async () => {
+      await useFileStore.getState().cancelCurrentJob?.();
+    });
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].response = partialZipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? "%ZZ" : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().processing).toBe(false);
+    });
+    // The cancel wins over the unreadable header: a batch failure would blame
+    // the server for a run the user stopped.
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().entries.map((e) => [e.status, e.error])).toEqual([
+      ["failed", "Canceled"],
+      ["failed", "Canceled"],
+    ]);
+
+    hook.unmount();
+  });
+
   it("keeps the lookup-failure label when nothing was canceled by the user", async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
