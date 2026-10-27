@@ -1961,11 +1961,12 @@ export function useToolProcessor(toolId: string) {
           if (teardownError) throw teardownError.cause;
         };
 
-        // How a ZIP answer settles. A null fileResults means X-File-Results
-        // was present on the response and could not be read (#1805, #1929);
-        // `status` is the HTTP status of a sync answer.
+        // How a ZIP answer settles. A null fileResults never reaches here: the
+        // sync handler fails the batch first, and the cached-download and
+        // canceled paths coalesce it to an empty map (#4081, #4045). `status`
+        // is the HTTP status of a sync answer.
         interface ZipSettle {
-          fileResults: Record<string, string> | null;
+          fileResults: Record<string, string>;
           fileNotes: Record<string, unknown>;
           status?: number;
         }
@@ -2026,7 +2027,7 @@ export function useToolProcessor(toolId: string) {
               continue;
             }
             const entryId = captured.id;
-            const processedName = fileResults?.[String(i)];
+            const processedName = fileResults[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
               let processedSize = null;
@@ -2076,8 +2077,8 @@ export function useToolProcessor(toolId: string) {
 
           const teardownError = finishRun();
           trackBatch(
-            canceledByUser ? "canceled" : fileResults === null ? "failed" : "completed",
-            canceledByUser ? "canceled" : fileResults === null ? "bad-file-results" : undefined,
+            canceledByUser ? "canceled" : "completed",
+            canceledByUser ? "canceled" : undefined,
           );
           // Every entry has settled, so settleOrFail passes this on to the
           // global handler instead of failing the run.
@@ -2360,13 +2361,24 @@ export function useToolProcessor(toolId: string) {
               status: xhr.status,
               toolId,
             });
+            // A header that was present but unreadable is not "no results":
+            // settling from an empty map would mark every file "not found in
+            // batch results" and hide the real failure (#4081, the twin of the
+            // pipeline's #4045). A canceled run keeps its cancel outcome, so it
+            // falls through and settles every entry as "Canceled" (#1929).
+            if (fileResults === null && !canceledByUser) {
+              failRun(t.errors.batchFailed, "bad-file-results");
+              return;
+            }
             // Absent on servers from before #1292, which is no notes. A header
             // that doesn't parse to an object only costs the notes, never the
             // results, but it's logged: silently dropping it would settle every
             // file as fine, the exact thing the notes exist to prevent.
             const fileNotes = parseFileNotesHeader(xhr.getResponseHeader("X-File-Notes"));
             void settleOrFail(xhr.response as Blob, {
-              fileResults,
+              // Only a canceled run reaches this with null, where an empty map
+              // settles the entries as "Canceled" (see above).
+              fileResults: fileResults ?? {},
               fileNotes,
               status: xhr.status,
             });
