@@ -58,6 +58,9 @@ const WEB_PARSE_ALLOWLIST = new Set([
   // parses JSON only on a failed answer's error body (#2516).
   "apps/web/src/components/tools/favicon-settings.tsx",
   "apps/web/src/components/tools/image-enhancement-settings.tsx",
+  // Builds previewUrl from URL.createObjectURL(blob) on 2xx; parses JSON only
+  // on a failed answer's error body (#2185).
+  "apps/web/src/components/tools/optimize-for-web-settings.tsx",
   "apps/web/src/components/tools/strip-metadata-settings.tsx",
 ]);
 
