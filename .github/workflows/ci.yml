@@ -478,17 +478,22 @@ jobs:
         # (all last_affected at or below 2.10.0, resolves to 2.13.0), joblib
         # (not in the closure), markdown (last_affected 3.8, resolves 3.10.2).
         # PYSEC-2025-194 was a duplicate of CVE-2025-3000, which is itself now
-        # dead. Re-check the three below whenever requirements.txt moves.
+        # dead. Re-check the four below whenever requirements.txt moves.
         #
         # CVE-2024-27763: basicsr, no fixed release exists in any channel.
         # CVE-2026-40086 + GHSA-55v6-g8pm-pw4c: rembg 2.0.69. The fix is
         #   rembg 2.0.75, held back by the numpy 1.26.4 pin (see the rationale
         #   in packages/ai/python/requirements.txt).
+        # CVE-2026-115924: rembg 2.0.69, fixed only in 2.0.82, which requires
+        #   numpy 2.x and holds back the same pin. The vulnerable surface is the
+        #   `rembg s` HTTP command, which this repo never runs (the sidecar
+        #   imports rembg as a library).
         run: >-
           pip-audit -r packages/ai/python/requirements.txt
           --ignore-vuln CVE-2024-27763
           --ignore-vuln CVE-2026-40086
           --ignore-vuln GHSA-55v6-g8pm-pw4c
+          --ignore-vuln CVE-2026-115924
           --strict
 
       # hf-release-requirements.txt is the tooling the ai-bundles publish job
