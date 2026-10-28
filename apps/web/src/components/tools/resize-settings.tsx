@@ -177,8 +177,12 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
     ...RESIZE_RATIO_PRESETS.map((p) => ({ id: p.id, label: p.id })),
   ];
 
-  const widthOverLimit = width !== "" && !isDimensionWithinLimit(Number(width));
-  const heightOverLimit = height !== "" && !isDimensionWithinLimit(Number(height));
+  // In square mode the two inputs are disabled and omitted from the payload, so a
+  // leftover over-limit value must not keep flagging the form.
+  const dimensionsActive = !(squareMode && contentAware);
+  const widthOverLimit = dimensionsActive && width !== "" && !isDimensionWithinLimit(Number(width));
+  const heightOverLimit =
+    dimensionsActive && height !== "" && !isDimensionWithinLimit(Number(height));
   const dimensionsOverLimit = widthOverLimit || heightOverLimit;
 
   const dimensionInputs = (

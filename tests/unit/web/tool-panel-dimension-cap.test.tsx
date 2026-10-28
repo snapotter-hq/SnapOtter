@@ -160,6 +160,21 @@ describe("Resize panel dimension cap (#2186)", () => {
     expect(screen.getByText(resizeMessage)).toBeInTheDocument();
     expect(screen.getByTestId("resize-submit")).toBeDisabled();
   });
+
+  it("stops flagging a leftover size when Content-Aware square mode takes over", () => {
+    open(<ResizeSettings />);
+    fireEvent.click(screen.getByRole("button", { name: resizeCopy.contentAware }));
+    const width = screen.getByLabelText(resizeCopy.widthPx) as HTMLInputElement;
+
+    fireEvent.change(width, { target: { value: "20000" } });
+    expect(screen.getByText(resizeMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeDisabled();
+
+    // Square mode drops both dimensions from the payload, so the old value is moot.
+    fireEvent.click(screen.getByLabelText(resizeCopy.resizeToSquare));
+    expect(screen.queryByText(resizeMessage)).not.toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeEnabled();
+  });
 });
 
 describe("GIF Tools panel dimension cap (#2186)", () => {
@@ -259,5 +274,17 @@ describe("Content-Aware Resize panel dimension cap (#2186)", () => {
     expect(screen.getByTestId("content-aware-resize-submit")).toBeDisabled();
     fireEvent.click(screen.getByTestId("content-aware-resize-submit"));
     expect(processFiles).not.toHaveBeenCalled();
+  });
+
+  it("stops flagging a leftover size when square mode is on", () => {
+    open(<ContentAwareResizeSettings />);
+    const width = screen.getByLabelText(contentAwareCopy.widthPx) as HTMLInputElement;
+
+    fireEvent.change(width, { target: { value: "20000" } });
+    expect(screen.getByText(contentAwareMessage)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(contentAwareCopy.resizeToSquare));
+    expect(screen.queryByText(contentAwareMessage)).not.toBeInTheDocument();
+    expect(screen.getByTestId("content-aware-resize-submit")).toBeEnabled();
   });
 });

@@ -45,8 +45,10 @@ export function ContentAwareResizeControls({
     onChangeRef.current = onChange;
   });
 
-  const widthOverLimit = width !== "" && !isDimensionWithinLimit(Number(width));
-  const heightOverLimit = height !== "" && !isDimensionWithinLimit(Number(height));
+  const dimensionsActive = !squareMode;
+  const widthOverLimit = dimensionsActive && width !== "" && !isDimensionWithinLimit(Number(width));
+  const heightOverLimit =
+    dimensionsActive && height !== "" && !isDimensionWithinLimit(Number(height));
   const dimensionsOverLimit = widthOverLimit || heightOverLimit;
 
   useEffect(() => {
