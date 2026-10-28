@@ -1434,6 +1434,7 @@ export const ar: TranslationKeys = {
       submitBatch: "تغيير الحجم ({count} ملف)",
       progressLabel: "جاري تغيير الحجم",
       maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
+      maxPercentageExceeded: "استخدم نسبة تكبير من 1 إلى {max}%.",
     },
     crop: {
       width: "العرض",
@@ -2197,6 +2198,8 @@ export const ar: TranslationKeys = {
       submitBatch: "تغيير الحجم ({count} ملف)",
       progressLabel: "تغيير حجم ذكي",
       maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
+      areaExceeded:
+        "يقتصر تغيير الحجم المدرك للمحتوى على {max} بكسل إجمالًا. قلّل العرض أو الارتفاع.",
     },
     "ai-canvas-expand": {
       quality: "الجودة",

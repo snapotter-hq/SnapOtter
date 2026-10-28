@@ -1437,6 +1437,7 @@ export const es: TranslationKeys = {
       submitBatch: "Redimensionar ({count} archivos)",
       progressLabel: "Redimensionando",
       maxDimensionExceeded: "Usa un tamaño de 1 a {max} px.",
+      maxPercentageExceeded: "Usa una escala de 1 a {max} %.",
     },
     crop: {
       width: "Ancho",
@@ -2211,6 +2212,8 @@ export const es: TranslationKeys = {
       submitBatch: "Redimensionar ({count} archivos)",
       progressLabel: "Redimensionando con reconocimiento de contenido",
       maxDimensionExceeded: "Usa un tamaño de 1 a {max} px.",
+      areaExceeded:
+        "El cambio de tamaño según el contenido está limitado a {max} píxeles en total. Reduce la anchura o la altura.",
     },
     "ai-canvas-expand": {
       quality: "Calidad",

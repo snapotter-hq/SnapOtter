@@ -1455,6 +1455,7 @@ export const nl: TranslationKeys = {
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Formaat wijzigen",
       maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      maxPercentageExceeded: "Gebruik een schaal van 1 tot {max}%.",
     },
     crop: {
       width: "Breedte",
@@ -2227,6 +2228,8 @@ export const nl: TranslationKeys = {
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Inhoudsbewust schalen",
       maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      areaExceeded:
+        "Inhoudsbewust formaat wijzigen is beperkt tot {max} pixels in totaal. Verlaag de breedte of hoogte.",
     },
     "ai-canvas-expand": {
       quality: "Kwaliteit",

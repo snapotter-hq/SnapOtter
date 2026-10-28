@@ -1447,6 +1447,7 @@ export const sv: TranslationKeys = {
       submitBatch: "Ändra storlek ({count} filer)",
       progressLabel: "Ändrar storlek",
       maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      maxPercentageExceeded: "Använd en skala från 1 till {max} %.",
     },
     crop: {
       width: "Bredd",
@@ -2216,6 +2217,8 @@ export const sv: TranslationKeys = {
       submitBatch: "Ändra storlek ({count} filer)",
       progressLabel: "Innehållsmedveten storleksändring",
       maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      areaExceeded:
+        "Innehållsmedveten storleksändring är begränsad till {max} pixlar totalt. Minska bredden eller höjden.",
     },
     "ai-canvas-expand": {
       quality: "Kvalitet",

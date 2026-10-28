@@ -1450,6 +1450,7 @@ export const tr: TranslationKeys = {
       submitBatch: "Boyutlandır ({count} dosya)",
       progressLabel: "Boyutlandırılıyor",
       maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      maxPercentageExceeded: "%1 ile %{max} arasında bir ölçek kullanın.",
     },
     crop: {
       width: "Genişlik",
@@ -2221,6 +2222,8 @@ export const tr: TranslationKeys = {
       submitBatch: "Boyutlandır ({count} dosya)",
       progressLabel: "İçerik duyarlı boyutlandırma",
       maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      areaExceeded:
+        "İçerik algılayan yeniden boyutlandırma toplam {max} piksel ile sınırlıdır. Genişliği veya yüksekliği azaltın.",
     },
     "ai-canvas-expand": {
       quality: "Kalite",

@@ -2,15 +2,21 @@
 // value before it reaches the server and comes back a generic "Invalid settings".
 // Kept free of React/DOM so the checks are unit-testable in isolation.
 
-import { MAX_RESIZE_OUTPUT_DIMENSION, MAX_RESIZE_OUTPUT_PIXELS } from "@snapotter/shared";
+import {
+  MAX_CONTENT_AWARE_RESIZE_PIXELS,
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_OUTPUT_PIXELS,
+  MAX_RESIZE_PERCENTAGE,
+} from "@snapotter/shared";
 
 // The trim square path is one side of a square output, so its ceiling is the
 // square root of the pixel budget the smart-crop route enforces (#2203).
 export const MAX_SMART_CROP_TARGET_SIZE = Math.floor(Math.sqrt(MAX_RESIZE_OUTPUT_PIXELS));
 
-// The routes require a positive size up to MAX_RESIZE_OUTPUT_DIMENSION.
+// The routes require a positive integer up to MAX_RESIZE_OUTPUT_DIMENSION.
+// A fractional value is rejected by every route's z.number().int().
 export function isDimensionWithinLimit(value: number): boolean {
-  return Number.isFinite(value) && value >= 1 && value <= MAX_RESIZE_OUTPUT_DIMENSION;
+  return Number.isInteger(value) && value >= 1 && value <= MAX_RESIZE_OUTPUT_DIMENSION;
 }
 
 // The requested box and the padded intermediate must both stay inside the
@@ -28,5 +34,14 @@ export function isSmartCropAreaWithinLimit(
 }
 
 export function isSmartCropTargetSizeWithinLimit(value: number): boolean {
-  return Number.isFinite(value) && value >= 1 && value <= MAX_SMART_CROP_TARGET_SIZE;
+  return Number.isInteger(value) && value >= 1 && value <= MAX_SMART_CROP_TARGET_SIZE;
+}
+
+// Seam carving is capped well below the plain resize budget.
+export function isContentAwareAreaWithinLimit(width: number, height: number): boolean {
+  return width * height <= MAX_CONTENT_AWARE_RESIZE_PIXELS;
+}
+
+export function isResizePercentageWithinLimit(value: number): boolean {
+  return Number.isFinite(value) && value >= 1 && value <= MAX_RESIZE_PERCENTAGE;
 }

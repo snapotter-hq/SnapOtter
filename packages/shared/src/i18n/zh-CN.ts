@@ -1212,6 +1212,7 @@ export const zhCN: TranslationKeys = {
       submitBatch: "调整大小（{count} 个文件）",
       progressLabel: "调整中",
       maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
+      maxPercentageExceeded: "请使用 1% 到 {max}% 之间的缩放比例。",
     },
     crop: {
       width: "宽度",
@@ -1958,6 +1959,7 @@ export const zhCN: TranslationKeys = {
       submitBatch: "调整大小（{count} 个文件）",
       progressLabel: "内容感知缩放中",
       maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
+      areaExceeded: "内容感知缩放总计上限为 {max} 像素。请减小宽度或高度。",
     },
     "ai-canvas-expand": {
       quality: "质量",

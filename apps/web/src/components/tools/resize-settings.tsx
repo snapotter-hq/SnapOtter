@@ -1,4 +1,9 @@
-import { MAX_RESIZE_OUTPUT_DIMENSION, SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
+import {
+  MAX_CONTENT_AWARE_RESIZE_PIXELS,
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_PERCENTAGE,
+  SOCIAL_MEDIA_PRESETS,
+} from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -6,7 +11,11 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { largestRatioBox, pairedDimension, RESIZE_RATIO_PRESETS } from "@/lib/aspect-ratio";
-import { isDimensionWithinLimit } from "@/lib/dimension-limits";
+import {
+  isContentAwareAreaWithinLimit,
+  isDimensionWithinLimit,
+  isResizePercentageWithinLimit,
+} from "@/lib/dimension-limits";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -177,13 +186,38 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
     ...RESIZE_RATIO_PRESETS.map((p) => ({ id: p.id, label: p.id })),
   ];
 
-  // In square mode the two inputs are disabled and omitted from the payload, so a
-  // leftover over-limit value must not keep flagging the form.
-  const dimensionsActive = !(squareMode && contentAware);
-  const widthOverLimit = dimensionsActive && width !== "" && !isDimensionWithinLimit(Number(width));
+  // Dimensions are only in the payload on the custom, presets, and non-square
+  // content-aware tabs. A leftover over-limit value on another tab must not keep
+  // flagging the form.
+  const dimensionsInPayload = contentAware ? !squareMode : tab !== "scale";
+  const widthValue = width === "" ? undefined : Number(width);
+  const heightValue = height === "" ? undefined : Number(height);
+  const widthOverLimit =
+    dimensionsInPayload && widthValue !== undefined && !isDimensionWithinLimit(widthValue);
   const heightOverLimit =
-    dimensionsActive && height !== "" && !isDimensionWithinLimit(Number(height));
-  const dimensionsOverLimit = widthOverLimit || heightOverLimit;
+    dimensionsInPayload && heightValue !== undefined && !isDimensionWithinLimit(heightValue);
+  // Seam carving caps the product at 25 MP, far below the plain resize budget.
+  const contentAwareAreaOverLimit =
+    contentAware &&
+    !squareMode &&
+    widthValue !== undefined &&
+    heightValue !== undefined &&
+    isDimensionWithinLimit(widthValue) &&
+    isDimensionWithinLimit(heightValue) &&
+    !isContentAwareAreaWithinLimit(widthValue, heightValue);
+  const dimensionsOverLimit = widthOverLimit || heightOverLimit || contentAwareAreaOverLimit;
+  const dimensionError = dimensionsOverLimit ? (
+    <p id="resize-dimension-error" className="mt-1 text-xs text-destructive-ink">
+      {widthOverLimit || heightOverLimit
+        ? format(t.toolSettings.resize.maxDimensionExceeded, { max: MAX_RESIZE_OUTPUT_DIMENSION })
+        : format(t.toolSettings["content-aware-resize"].areaExceeded, {
+            max: MAX_CONTENT_AWARE_RESIZE_PIXELS,
+          })}
+    </p>
+  ) : null;
+  const percentageValue = percentage === "" ? undefined : Number(percentage);
+  const percentageOverLimit =
+    percentageValue !== undefined && !isResizePercentageWithinLimit(percentageValue);
 
   const dimensionInputs = (
     <div>
@@ -225,13 +259,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
           />
         </div>
       </div>
-      {dimensionsOverLimit && (
-        <p id="resize-dimension-error" className="mt-1 text-xs text-destructive-ink">
-          {format(t.toolSettings.resize.maxDimensionExceeded, {
-            max: MAX_RESIZE_OUTPUT_DIMENSION,
-          })}
-        </p>
-      )}
+      {dimensionError}
     </div>
   );
 
@@ -279,6 +307,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
       {/* Presets tab */}
       {tab === "presets" && (
         <div className="space-y-3 max-h-[50dvh] overflow-y-auto pe-1">
+          {dimensionError}
           {platforms.map((platform) => (
             <div key={platform}>
               <p className="text-xs font-medium text-muted-foreground mb-1.5">{platform}</p>
@@ -377,8 +406,18 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
               value={percentage}
               onChange={(e) => setPercentage(e.target.value)}
               min={1}
+              max={MAX_RESIZE_PERCENTAGE}
+              aria-invalid={percentageOverLimit || undefined}
+              aria-describedby={percentageOverLimit ? "resize-percentage-error" : undefined}
               className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
             />
+            {percentageOverLimit && (
+              <p id="resize-percentage-error" className="mt-1 text-xs text-destructive-ink">
+                {format(t.toolSettings.resize.maxPercentageExceeded, {
+                  max: MAX_RESIZE_PERCENTAGE,
+                })}
+              </p>
+            )}
           </div>
           <div className="flex gap-1">
             {[25, 50, 75].map((pct) => (
@@ -499,10 +538,24 @@ export function ResizeSettings() {
   const dimensionInvalid = [settings.width, settings.height].some(
     (value) => typeof value === "number" && !isDimensionWithinLimit(value),
   );
+  const areaInvalid =
+    isContentAware &&
+    typeof settings.width === "number" &&
+    typeof settings.height === "number" &&
+    isDimensionWithinLimit(settings.width) &&
+    isDimensionWithinLimit(settings.height) &&
+    !isContentAwareAreaWithinLimit(settings.width, settings.height);
+  const percentageInvalid =
+    !isContentAware &&
+    tab === "scale" &&
+    typeof settings.percentage === "number" &&
+    !isResizePercentageWithinLimit(settings.percentage);
   const canProcess =
     hasFile &&
     !processing &&
     !dimensionInvalid &&
+    !areaInvalid &&
+    !percentageInvalid &&
     (isContentAware
       ? Boolean(settings.width) || Boolean(settings.height) || Boolean(settings.square)
       : tab === "scale"

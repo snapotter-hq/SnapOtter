@@ -1451,6 +1451,7 @@ export const ru: TranslationKeys = {
       submitBatch: "Изменить размер ({count} файлов)",
       progressLabel: "Изменение размера",
       maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      maxPercentageExceeded: "Используйте масштаб от 1 до {max}%.",
     },
     crop: {
       width: "Ширина",
@@ -2223,6 +2224,8 @@ export const ru: TranslationKeys = {
       submitBatch: "Изменить размер ({count} файлов)",
       progressLabel: "Контентно-зависимое масштабирование",
       maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      areaExceeded:
+        "Изменение размера с учётом содержимого ограничено {max} пикселями в сумме. Уменьшите ширину или высоту.",
     },
     "ai-canvas-expand": {
       quality: "Качество",

@@ -1425,6 +1425,7 @@ export const th: TranslationKeys = {
       submitBatch: "ปรับขนาด ({count} ไฟล์)",
       progressLabel: "กำลังปรับขนาด",
       maxDimensionExceeded: "ใช้ขนาดตั้งแต่ 1 ถึง {max} px",
+      maxPercentageExceeded: "ใช้มาตราส่วนตั้งแต่ 1 ถึง {max}%",
     },
     crop: {
       width: "ความกว้าง",
@@ -2177,6 +2178,7 @@ export const th: TranslationKeys = {
       submitBatch: "ปรับขนาด ({count} ไฟล์)",
       progressLabel: "กำลังปรับขนาดแบบรับรู้เนื้อหา",
       maxDimensionExceeded: "ใช้ขนาดตั้งแต่ 1 ถึง {max} px",
+      areaExceeded: "การปรับขนาดแบบรับรู้เนื้อหาจำกัดที่ {max} พิกเซลรวม ลดความกว้างหรือความสูง",
     },
     "ai-canvas-expand": {
       quality: "คุณภาพ",

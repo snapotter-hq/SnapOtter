@@ -6,6 +6,7 @@ import { seamCarve } from "@snapotter/ai";
 import {
   hasServerErrorStatus,
   isToolInputError,
+  MAX_CONTENT_AWARE_RESIZE_PIXELS,
   MAX_RESIZE_OUTPUT_DIMENSION,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -23,11 +24,10 @@ import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
-// caire's -width/-height/-blur/-sobel flags are integer-only; a fractional
-// value makes the binary exit with a flag parse error.
-const MAX_SEAM_CARVE_PIXELS = 25_000_000;
 const MISSING_DIMENSIONS_MESSAGE = "Either width, height, or square mode must be specified";
 
+// caire's -width/-height/-blur/-sobel flags are integer-only; a fractional
+// value makes the binary exit with a flag parse error.
 const settingsSchema = z
   .object({
     width: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
@@ -47,11 +47,11 @@ const settingsSchema = z
     }
     if (s.square || s.width === undefined || s.height === undefined) return;
     if (s.width > MAX_RESIZE_OUTPUT_DIMENSION || s.height > MAX_RESIZE_OUTPUT_DIMENSION) return;
-    if (s.width * s.height > MAX_SEAM_CARVE_PIXELS) {
+    if (s.width * s.height > MAX_CONTENT_AWARE_RESIZE_PIXELS) {
       ctx.addIssue({
         code: "custom",
         path: ["width"],
-        message: `Target size ${s.width} x ${s.height} is over the ${MAX_SEAM_CARVE_PIXELS} pixel limit`,
+        message: `Target size ${s.width} x ${s.height} is over the ${MAX_CONTENT_AWARE_RESIZE_PIXELS} pixel limit`,
       });
     }
   });

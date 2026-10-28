@@ -1450,6 +1450,7 @@ export const uk: TranslationKeys = {
       submitBatch: "Змінити розмір ({count} файлів)",
       progressLabel: "Зміна розміру",
       maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      maxPercentageExceeded: "Використовуйте масштаб від 1 до {max}%.",
     },
     crop: {
       width: "Ширина",
@@ -2226,6 +2227,8 @@ export const uk: TranslationKeys = {
       submitBatch: "Змінити розмір ({count} файлів)",
       progressLabel: "Контентно-залежне масштабування",
       maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      areaExceeded:
+        "Зміна розміру з урахуванням вмісту обмежена {max} пікселями загалом. Зменште ширину або висоту.",
     },
     "ai-canvas-expand": {
       quality: "Якість",

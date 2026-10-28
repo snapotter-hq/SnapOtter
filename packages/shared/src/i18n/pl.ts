@@ -1449,6 +1449,7 @@ export const pl: TranslationKeys = {
       submitBatch: "Zmień rozmiar ({count} plików)",
       progressLabel: "Zmiana rozmiaru",
       maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
+      maxPercentageExceeded: "Użyj skali od 1 do {max}%.",
     },
     crop: {
       width: "Szerokość",
@@ -2224,6 +2225,8 @@ export const pl: TranslationKeys = {
       submitBatch: "Zmień rozmiar ({count} plików)",
       progressLabel: "Zmiana rozmiaru z uwzględnieniem treści",
       maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
+      areaExceeded:
+        "Zmiana rozmiaru z uwzględnieniem treści jest ograniczona do łącznie {max} pikseli. Zmniejsz szerokość lub wysokość.",
     },
     "ai-canvas-expand": {
       quality: "Jakość",

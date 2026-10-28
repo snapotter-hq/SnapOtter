@@ -169,9 +169,9 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
 
   const widthValue = width === "" ? undefined : Number(width);
   const heightValue = height === "" ? undefined : Number(height);
-  const dimensionOverLimit =
-    (widthValue !== undefined && !isDimensionWithinLimit(widthValue)) ||
-    (heightValue !== undefined && !isDimensionWithinLimit(heightValue));
+  const widthOverLimit = widthValue !== undefined && !isDimensionWithinLimit(widthValue);
+  const heightOverLimit = heightValue !== undefined && !isDimensionWithinLimit(heightValue);
+  const dimensionOverLimit = widthOverLimit || heightOverLimit;
   const areaOverLimit =
     !dimensionOverLimit &&
     (mode === "subject" || mode === "face") &&
@@ -204,7 +204,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
             }}
             min={1}
             max={MAX_RESIZE_OUTPUT_DIMENSION}
-            aria-invalid={dimensionOverLimit || undefined}
+            aria-invalid={widthOverLimit || undefined}
             aria-describedby={
               dimensionOverLimit || areaOverLimit ? "sc-dimension-error" : undefined
             }
@@ -233,7 +233,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
             }}
             min={1}
             max={MAX_RESIZE_OUTPUT_DIMENSION}
-            aria-invalid={dimensionOverLimit || undefined}
+            aria-invalid={heightOverLimit || undefined}
             aria-describedby={
               dimensionOverLimit || areaOverLimit ? "sc-dimension-error" : undefined
             }

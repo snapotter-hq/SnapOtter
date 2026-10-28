@@ -1,7 +1,13 @@
-import { MAX_RESIZE_OUTPUT_DIMENSION, MAX_RESIZE_OUTPUT_PIXELS } from "@snapotter/shared";
+import {
+  MAX_CONTENT_AWARE_RESIZE_PIXELS,
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_PERCENTAGE,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
+  isContentAwareAreaWithinLimit,
   isDimensionWithinLimit,
+  isResizePercentageWithinLimit,
   isSmartCropAreaWithinLimit,
   isSmartCropTargetSizeWithinLimit,
   MAX_SMART_CROP_TARGET_SIZE,
@@ -16,6 +22,12 @@ describe("isDimensionWithinLimit", () => {
     expect(isDimensionWithinLimit(-4)).toBe(false);
     expect(isDimensionWithinLimit(Number.NaN)).toBe(false);
     expect(isDimensionWithinLimit(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+
+  it("rejects fractional sizes the routes' z.number().int() would reject", () => {
+    expect(isDimensionWithinLimit(800.5)).toBe(false);
+    expect(isDimensionWithinLimit(0.5)).toBe(false);
+    expect(isDimensionWithinLimit(2.5)).toBe(false);
   });
 });
 
@@ -43,5 +55,26 @@ describe("isSmartCropTargetSizeWithinLimit", () => {
     expect(isSmartCropTargetSizeWithinLimit(8192)).toBe(true);
     expect(isSmartCropTargetSizeWithinLimit(8193)).toBe(false);
     expect(isSmartCropTargetSizeWithinLimit(0)).toBe(false);
+    expect(isSmartCropTargetSizeWithinLimit(800.5)).toBe(false);
+  });
+});
+
+describe("isContentAwareAreaWithinLimit", () => {
+  it("caps seam-carved output at the 25 MP route budget", () => {
+    expect(isContentAwareAreaWithinLimit(5000, 5000)).toBe(true);
+    expect(isContentAwareAreaWithinLimit(5000, 5001)).toBe(false);
+    expect(isContentAwareAreaWithinLimit(MAX_RESIZE_OUTPUT_DIMENSION, 1)).toBe(true);
+    expect(isContentAwareAreaWithinLimit(MAX_RESIZE_OUTPUT_DIMENSION, 2000)).toBe(false);
+  });
+});
+
+describe("isResizePercentageWithinLimit", () => {
+  it("caps scale at the route's percentage ceiling", () => {
+    expect(isResizePercentageWithinLimit(1)).toBe(true);
+    expect(isResizePercentageWithinLimit(MAX_RESIZE_PERCENTAGE)).toBe(true);
+    expect(isResizePercentageWithinLimit(MAX_RESIZE_PERCENTAGE + 1)).toBe(false);
+    expect(isResizePercentageWithinLimit(0)).toBe(false);
+    expect(isResizePercentageWithinLimit(-10)).toBe(false);
+    expect(isResizePercentageWithinLimit(Number.NaN)).toBe(false);
   });
 });

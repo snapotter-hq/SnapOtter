@@ -1458,6 +1458,7 @@ export const fr: TranslationKeys = {
       submitBatch: "Redimensionner ({count} fichiers)",
       progressLabel: "Redimensionnement en cours",
       maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      maxPercentageExceeded: "Utilisez une échelle de 1 à {max} %.",
     },
     crop: {
       width: "Largeur",
@@ -2232,6 +2233,8 @@ export const fr: TranslationKeys = {
       submitBatch: "Redimensionner ({count} fichiers)",
       progressLabel: "Redimensionnement intelligent",
       maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      areaExceeded:
+        "Le redimensionnement sensible au contenu est limité à {max} pixels au total. Réduisez la largeur ou la hauteur.",
     },
     "ai-canvas-expand": {
       quality: "Qualité",

@@ -1212,6 +1212,7 @@ export const zhTW: TranslationKeys = {
       submitBatch: "調整大小（{count}個檔案）",
       progressLabel: "調整大小中",
       maxDimensionExceeded: "請使用 1 到 {max} px 之間的尺寸。",
+      maxPercentageExceeded: "請使用 1% 到 {max}% 之間的縮放比例。",
     },
     crop: {
       width: "寬度",
@@ -1957,6 +1958,7 @@ export const zhTW: TranslationKeys = {
       submitBatch: "調整大小（{count}個檔案）",
       progressLabel: "內容感知縮放中",
       maxDimensionExceeded: "請使用 1 到 {max} px 之間的尺寸。",
+      areaExceeded: "內容感知縮放總計上限為 {max} 像素。請減小寬度或高度。",
     },
     "ai-canvas-expand": {
       quality: "品質",

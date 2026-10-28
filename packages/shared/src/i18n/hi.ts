@@ -1264,6 +1264,7 @@ export const hi: TranslationKeys = {
       submitBatch: "रीसाइज़ करें ({count} फाइलें)",
       progressLabel: "रीसाइज़ हो रहा है",
       maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
+      maxPercentageExceeded: "1 से {max}% तक का स्केल इस्तेमाल करें।",
     },
     crop: {
       width: "चौड़ाई",
@@ -2025,6 +2026,7 @@ export const hi: TranslationKeys = {
       submitBatch: "रीसाइज़ करें ({count} फाइलें)",
       progressLabel: "कंटेंट-अवेयर रीसाइज़िंग",
       maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
+      areaExceeded: "कंटेंट-अवेयर रीसाइज़ कुल {max} पिक्सेल तक सीमित है। चौड़ाई या ऊंचाई कम करें।",
     },
     "ai-canvas-expand": {
       quality: "क्वालिटी",

@@ -11,7 +11,12 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { MAX_RESIZE_OUTPUT_DIMENSION, MAX_RESIZE_OUTPUT_PIXELS } from "@snapotter/shared";
+import {
+  MAX_CONTENT_AWARE_RESIZE_PIXELS,
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_OUTPUT_PIXELS,
+  MAX_RESIZE_PERCENTAGE,
+} from "@snapotter/shared";
 import { en } from "@snapotter/shared/i18n/en.js";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -76,6 +81,12 @@ const smartCropAreaMessage = format(smartCropCopy.cropAreaExceeded, {
 });
 const contentAwareMessage = format(contentAwareCopy.maxDimensionExceeded, {
   max: MAX_RESIZE_OUTPUT_DIMENSION,
+});
+const contentAwareAreaMessage = format(contentAwareCopy.areaExceeded, {
+  max: MAX_CONTENT_AWARE_RESIZE_PIXELS,
+});
+const resizePercentageMessage = format(resizeCopy.maxPercentageExceeded, {
+  max: MAX_RESIZE_PERCENTAGE,
 });
 
 function open(ui: ReactNode) {
@@ -161,6 +172,64 @@ describe("Resize panel dimension cap (#2186)", () => {
     expect(screen.getByTestId("resize-submit")).toBeDisabled();
   });
 
+  it("flags a fractional size the API schema rejects", () => {
+    open(<ResizeSettings />);
+    const width = screen.getByLabelText(resizeCopy.widthPx) as HTMLInputElement;
+
+    fireEvent.change(width, { target: { value: "800.5" } });
+    expect(screen.getByText(resizeMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeDisabled();
+  });
+
+  it("flags a scale over the percentage ceiling and lets the ceiling through", () => {
+    open(<ResizeSettings />);
+    fireEvent.click(screen.getByRole("button", { name: resizeCopy.scale }));
+    const scale = screen.getByLabelText(resizeCopy.scalePercent) as HTMLInputElement;
+
+    expect(scale).toHaveAttribute("max", String(MAX_RESIZE_PERCENTAGE));
+    fireEvent.change(scale, { target: { value: String(MAX_RESIZE_PERCENTAGE + 1) } });
+    expect(screen.getByText(resizePercentageMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeDisabled();
+
+    fireEvent.change(scale, { target: { value: String(MAX_RESIZE_PERCENTAGE) } });
+    expect(screen.queryByText(resizePercentageMessage)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("resize-submit"));
+    expect(processFiles).toHaveBeenCalledTimes(1);
+    expect(processFiles.mock.calls[0][1]).toMatchObject({ percentage: MAX_RESIZE_PERCENTAGE });
+  });
+
+  it("keeps the message visible on the Presets tab but not on Scale", () => {
+    open(<ResizeSettings />);
+    const width = screen.getByLabelText(resizeCopy.widthPx) as HTMLInputElement;
+    fireEvent.change(width, { target: { value: "20000" } });
+
+    // Presets send the leftover width/height, so the block has to stay explained.
+    fireEvent.click(screen.getByRole("button", { name: resizeCopy.presets }));
+    expect(screen.getByText(resizeMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeDisabled();
+
+    // Scale drops the dimensions from the payload, so the old value is moot.
+    fireEvent.click(screen.getByRole("button", { name: resizeCopy.scale }));
+    expect(screen.queryByText(resizeMessage)).not.toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeEnabled();
+  });
+
+  it("flags a Content-Aware box over the 25 MP seam-carve budget", () => {
+    open(<ResizeSettings />);
+    fireEvent.click(screen.getByRole("button", { name: resizeCopy.contentAware }));
+    const width = screen.getByLabelText(resizeCopy.widthPx) as HTMLInputElement;
+    const height = screen.getByLabelText(resizeCopy.heightPx) as HTMLInputElement;
+
+    fireEvent.change(width, { target: { value: "5000" } });
+    fireEvent.change(height, { target: { value: "5001" } });
+    expect(screen.getByText(contentAwareAreaMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeDisabled();
+
+    fireEvent.change(height, { target: { value: "5000" } });
+    expect(screen.queryByText(contentAwareAreaMessage)).not.toBeInTheDocument();
+    expect(screen.getByTestId("resize-submit")).toBeEnabled();
+  });
+
   it("stops flagging a leftover size when Content-Aware square mode takes over", () => {
     open(<ResizeSettings />);
     fireEvent.click(screen.getByRole("button", { name: resizeCopy.contentAware }));
@@ -200,6 +269,15 @@ describe("GIF Tools panel dimension cap (#2186)", () => {
     expect(processFiles).toHaveBeenCalledTimes(1);
     expect(processFiles.mock.calls[0][1]).toMatchObject({ width: 1200 });
   });
+
+  it("flags a fractional size even though submit is a plain button", () => {
+    open(<GifToolsSettings />);
+    const width = screen.getByLabelText(gifCopy.widthPx) as HTMLInputElement;
+
+    fireEvent.change(width, { target: { value: "100.5" } });
+    expect(screen.getByText(gifMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("gif-tools-submit")).toBeDisabled();
+  });
 });
 
 describe("Smart Crop panel dimension cap (#2186)", () => {
@@ -230,6 +308,24 @@ describe("Smart Crop panel dimension cap (#2186)", () => {
     expect(height.value).toBe(String(MAX_RESIZE_OUTPUT_DIMENSION));
     expect(screen.getByText(smartCropAreaMessage)).toBeInTheDocument();
     expect(screen.getByTestId("smart-crop-submit")).toBeDisabled();
+  });
+
+  it("counts padding in the budget and marks only the field that is over the ceiling", () => {
+    open(<SmartCropSettings />);
+    const width = screen.getByLabelText(smartCropCopy.widthPx) as HTMLInputElement;
+    const height = screen.getByLabelText(smartCropCopy.heightPx) as HTMLInputElement;
+
+    fireEvent.change(width, { target: { value: "8000" } });
+    fireEvent.change(height, { target: { value: "8000" } });
+    expect(screen.queryByText(smartCropAreaMessage)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(smartCropCopy.padding), { target: { value: "30" } });
+    expect(screen.getByText(smartCropAreaMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("smart-crop-submit")).toBeDisabled();
+
+    fireEvent.change(width, { target: { value: "20000" } });
+    expect(width).toHaveAttribute("aria-invalid", "true");
+    expect(height).not.toHaveAttribute("aria-invalid");
   });
 
   it("flags an over-ceiling trim target size and omits a cleared one", () => {
@@ -274,6 +370,21 @@ describe("Content-Aware Resize panel dimension cap (#2186)", () => {
     expect(screen.getByTestId("content-aware-resize-submit")).toBeDisabled();
     fireEvent.click(screen.getByTestId("content-aware-resize-submit"));
     expect(processFiles).not.toHaveBeenCalled();
+  });
+
+  it("flags a box over the 25 MP seam-carve budget", () => {
+    open(<ContentAwareResizeSettings />);
+    const width = screen.getByLabelText(contentAwareCopy.widthPx) as HTMLInputElement;
+    const height = screen.getByLabelText(contentAwareCopy.heightPx) as HTMLInputElement;
+
+    fireEvent.change(width, { target: { value: "5000" } });
+    fireEvent.change(height, { target: { value: "5001" } });
+    expect(screen.getByText(contentAwareAreaMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("content-aware-resize-submit")).toBeDisabled();
+
+    fireEvent.change(height, { target: { value: "5000" } });
+    expect(screen.queryByText(contentAwareAreaMessage)).not.toBeInTheDocument();
+    expect(screen.getByTestId("content-aware-resize-submit")).toBeEnabled();
   });
 
   it("stops flagging a leftover size when square mode is on", () => {

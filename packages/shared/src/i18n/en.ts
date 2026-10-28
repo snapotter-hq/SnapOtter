@@ -1396,6 +1396,7 @@ export const en = {
       submitBatch: "Resize ({count} files)",
       progressLabel: "Resizing",
       maxDimensionExceeded: "Use a size from 1 to {max} px.",
+      maxPercentageExceeded: "Use a scale from 1 to {max}%.",
     },
     crop: {
       yOfMax: "Y (of {max})",
@@ -2161,6 +2162,8 @@ export const en = {
       submitBatch: "Resize ({count} files)",
       progressLabel: "Content-aware resizing",
       maxDimensionExceeded: "Use a size from 1 to {max} px.",
+      areaExceeded:
+        "Content-aware resize is capped at {max} total pixels. Lower the width or height.",
     },
     "ai-canvas-expand": {
       quality: "Quality",

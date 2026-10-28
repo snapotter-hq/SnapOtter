@@ -1407,6 +1407,7 @@ export const ja: TranslationKeys = {
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "リサイズ中",
       maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      maxPercentageExceeded: "1〜{max}% の倍率を指定してください。",
     },
     crop: {
       width: "幅",
@@ -2174,6 +2175,8 @@ export const ja: TranslationKeys = {
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "コンテンツ認識リサイズ中",
       maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      areaExceeded:
+        "コンテンツ認識リサイズは合計 {max} ピクセルまでです。幅または高さを小さくしてください。",
     },
     "ai-canvas-expand": {
       quality: "品質",
