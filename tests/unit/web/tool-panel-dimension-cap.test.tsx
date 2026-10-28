@@ -328,6 +328,20 @@ describe("Smart Crop panel dimension cap (#2186)", () => {
     expect(height).not.toHaveAttribute("aria-invalid");
   });
 
+  it("keeps the message visible on the Social Presets sub-tab", () => {
+    open(<SmartCropSettings />);
+    const width = screen.getByLabelText(smartCropCopy.widthPx) as HTMLInputElement;
+    fireEvent.change(width, { target: { value: "20000" } });
+
+    // Presets still send the current width and height with the request.
+    fireEvent.click(screen.getByRole("button", { name: smartCropCopy.socialPresets }));
+    expect(screen.getByText(smartCropMessage)).toBeInTheDocument();
+    expect(screen.getByTestId("smart-crop-submit")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: smartCropCopy.customSize }));
+    expect(screen.getByText(smartCropMessage)).toBeInTheDocument();
+  });
+
   it("flags an over-ceiling trim target size and omits a cleared one", () => {
     open(<SmartCropSettings />);
     fireEvent.click(screen.getByRole("button", { name: smartCropCopy.autoTrim }));

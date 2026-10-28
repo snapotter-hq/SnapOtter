@@ -186,6 +186,18 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
     targetSize.trim() !== "" &&
     !isSmartCropTargetSizeWithinLimit(Number(targetSize));
 
+  const dimensionError =
+    dimensionOverLimit || areaOverLimit ? (
+      <p id="sc-dimension-error" className="mt-1 text-xs text-destructive-ink">
+        {format(
+          dimensionOverLimit
+            ? t.toolSettings["smart-crop"].maxDimensionExceeded
+            : t.toolSettings["smart-crop"].cropAreaExceeded,
+          { max: dimensionOverLimit ? MAX_RESIZE_OUTPUT_DIMENSION : MAX_RESIZE_OUTPUT_PIXELS },
+        )}
+      </p>
+    ) : null;
+
   // Shared dimension inputs with swap button
   const dimensionInputs = (
     <div>
@@ -241,16 +253,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
           />
         </div>
       </div>
-      {(dimensionOverLimit || areaOverLimit) && (
-        <p id="sc-dimension-error" className="mt-1 text-xs text-destructive-ink">
-          {format(
-            dimensionOverLimit
-              ? t.toolSettings["smart-crop"].maxDimensionExceeded
-              : t.toolSettings["smart-crop"].cropAreaExceeded,
-            { max: dimensionOverLimit ? MAX_RESIZE_OUTPUT_DIMENSION : MAX_RESIZE_OUTPUT_PIXELS },
-          )}
-        </p>
-      )}
+      {dimensionError}
     </div>
   );
 
@@ -339,6 +342,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
 
           {subjectTab === "presets" ? (
             <div className="space-y-3 max-h-[50dvh] overflow-y-auto pe-1">
+              {dimensionError}
               {platforms.map((platform) => (
                 <div key={platform}>
                   <p className="text-xs font-medium text-muted-foreground mb-1.5">{platform}</p>
