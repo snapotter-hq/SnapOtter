@@ -201,6 +201,7 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
   }
 
   if (posthog) {
+    gateRequestsOnOptOut(posthog);
     // Clear any persisted opt-out from a previous disabled period. opt_out_capturing()
     // writes a localStorage flag that survives reloads, so without this a browser that
     // once opted out would stay silent even after the instance re-enables analytics.
@@ -488,6 +489,18 @@ export function getRenderErrorDestination(): "buffer" | "send" | "drop" {
   if (!enabled) return "drop";
   if (!sentryConfig) return sentryPossible ? "buffer" : "drop";
   return sentryRunning ? "send" : "buffer";
+}
+
+// posthog-js queues a failed send in its retry queue and re-sends it on a timer
+// and on `online`, skipping consent and before_send (#2284). Every send, retries
+// included, goes through _send_request, so the gate sits there.
+function gateRequestsOnOptOut(instance: PostHogInstance): void {
+  // Test doubles of the SDK may not carry the method; the egress test catches a real miss.
+  if (typeof instance._send_request !== "function") return;
+  const send = instance._send_request.bind(instance);
+  instance._send_request = (options) => {
+    if (enabled) send(options);
+  };
 }
 
 /** Hard runtime opt-out: stop PostHog and Sentry in this tab without a reload. */
