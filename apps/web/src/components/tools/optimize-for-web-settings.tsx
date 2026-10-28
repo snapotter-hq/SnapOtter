@@ -189,6 +189,14 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
         const blob = await response.blob();
         if (abortRef.current === controller) abortRef.current = null;
         if (controller.signal.aborted || entryIdRef.current !== entryId) return;
+        // A 200 is not proof of an image: a proxy or captive portal can answer
+        // with HTML. The route always sets an image Content-Type, so a missing
+        // or foreign one is a failed preview, not a broken <img> (#4107).
+        if (blob.size === 0 || !blob.type.startsWith("image/")) {
+          throw new SafeError("Optimize for Web preview returned a non-image body", {
+            code: "preview-not-image",
+          });
+        }
         const previewUrl = URL.createObjectURL(blob);
 
         // Revoke previous preview URL

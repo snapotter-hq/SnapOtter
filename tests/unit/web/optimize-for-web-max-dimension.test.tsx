@@ -218,7 +218,7 @@ describe("Optimize for Web max dimensions stay within what the API accepts (#205
           ok: true,
           status: 200,
           headers: new Headers({ "X-Original-Size": "100", "X-Processed-Size": "50" }),
-          blob: () => Promise.resolve(new Blob(["preview"])),
+          blob: () => Promise.resolve(new Blob(["preview"], { type: "image/webp" })),
         } as Response);
       });
       await vi.waitFor(() => {
@@ -264,6 +264,7 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
             return new Response("webp-preview", {
               status: 200,
               headers: {
+                "Content-Type": "image/webp",
                 "X-Original-Size": "1000",
                 "X-Processed-Size": previewCount === 1 ? "600" : "420",
               },
@@ -340,7 +341,11 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
             previewCount++;
             return new Response("webp-preview", {
               status: 200,
-              headers: { "X-Original-Size": "1000", "X-Processed-Size": "350" },
+              headers: {
+                "Content-Type": "image/webp",
+                "X-Original-Size": "1000",
+                "X-Processed-Size": "350",
+              },
             });
           }
           return new Response(JSON.stringify({ authEnabled: false }), { status: 200 });
@@ -493,7 +498,11 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
         resolvers[0](
           new Response("stale-first", {
             status: 200,
-            headers: { "X-Original-Size": "100", "X-Processed-Size": "50" },
+            headers: {
+              "Content-Type": "image/webp",
+              "X-Original-Size": "100",
+              "X-Processed-Size": "50",
+            },
           }),
         );
       });
@@ -504,7 +513,11 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
         resolvers[1](
           new Response("fresh-second", {
             status: 200,
-            headers: { "X-Original-Size": "200", "X-Processed-Size": "80" },
+            headers: {
+              "Content-Type": "image/webp",
+              "X-Original-Size": "200",
+              "X-Processed-Size": "80",
+            },
           }),
         );
       });
@@ -557,7 +570,11 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
             }
             return new Response("preview-bytes", {
               status: 200,
-              headers: { "X-Original-Size": "1000", "X-Processed-Size": "300" },
+              headers: {
+                "Content-Type": "image/webp",
+                "X-Original-Size": "1000",
+                "X-Processed-Size": "300",
+              },
             });
           }
           return new Response(JSON.stringify({ authEnabled: false }), { status: 200 });
@@ -717,7 +734,11 @@ describe("Optimize for Web live preview failures are visible (#2185)", () => {
         if (failing) return fail();
         return new Response("preview-bytes", {
           status: 200,
-          headers: { "X-Original-Size": "1000", "X-Processed-Size": "400" },
+          headers: {
+            "Content-Type": "image/webp",
+            "X-Original-Size": "1000",
+            "X-Processed-Size": "400",
+          },
         });
       }),
     );
@@ -796,7 +817,11 @@ describe("Optimize for Web live preview failures are visible (#2185)", () => {
           if (previewCount === 2) throw new TypeError("Failed to fetch");
           return new Response("preview-bytes", {
             status: 200,
-            headers: { "X-Original-Size": "1000", "X-Processed-Size": "400" },
+            headers: {
+              "Content-Type": "image/webp",
+              "X-Original-Size": "1000",
+              "X-Processed-Size": "400",
+            },
           });
         }),
       );
@@ -809,6 +834,83 @@ describe("Optimize for Web live preview failures are visible (#2185)", () => {
       // Sentry drops a bare "Failed to fetch" through IGNORE_ERRORS; wrapping
       // it in a SafeError would push it past that filter.
       expect(captureHandledError).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says the preview failed when a 200 body is not an image (#4107)", async () => {
+    vi.useFakeTimers();
+    try {
+      const previewFetch = stubPreviewFetch(
+        () =>
+          new Response("<html>Sign in</html>", {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          }),
+      );
+
+      await showFirstPreview();
+      previewFetch.failNext();
+      await changeQuality();
+
+      expect(screen.getByRole("alert")).toHaveTextContent(en.toolPage.previewFailed);
+      expect(screen.queryByText("60.0% smaller")).not.toBeInTheDocument();
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+      expect(captureHandledError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Optimize for Web preview returned a non-image body",
+        }),
+        expect.objectContaining({ error_class: "operational", tool_id: "optimize-for-web" }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats a 200 with no content type as a failed preview (#4107)", async () => {
+    vi.useFakeTimers();
+    try {
+      const previewFetch = stubPreviewFetch(
+        () =>
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { "X-Original-Size": "1000", "X-Processed-Size": "400" },
+          }),
+      );
+
+      await showFirstPreview();
+      previewFetch.failNext();
+      await changeQuality();
+
+      expect(screen.getByRole("alert")).toHaveTextContent(en.toolPage.previewFailed);
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats an empty image body as a failed preview (#4107)", async () => {
+    vi.useFakeTimers();
+    try {
+      const previewFetch = stubPreviewFetch(
+        () =>
+          new Response("", {
+            status: 200,
+            headers: {
+              "Content-Type": "image/webp",
+              "X-Original-Size": "1000",
+              "X-Processed-Size": "0",
+            },
+          }),
+      );
+
+      await showFirstPreview();
+      previewFetch.failNext();
+      await changeQuality();
+
+      expect(screen.getByRole("alert")).toHaveTextContent(en.toolPage.previewFailed);
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

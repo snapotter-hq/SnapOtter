@@ -30,6 +30,12 @@ function reported(): { message: string; statusCode: unknown; tags: unknown }[] {
 describe("NonNativePreview failure states", () => {
   beforeEach(() => {
     vi.mocked(captureHandledError).mockClear();
+    // jsdom has no object URLs; a valid preview must not fail on that alone.
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: () => "blob:preview",
+      revokeObjectURL: () => {},
+    });
   });
 
   afterEach(() => {
@@ -118,6 +124,49 @@ describe("NonNativePreview failure states", () => {
 
     expect(await screen.findByText(en.toolPage.previewFailed)).toBeTruthy();
     expect(captureHandledError).not.toHaveBeenCalled();
+  });
+
+  it("says the preview failed when a 200 body is not media (#4107)", async () => {
+    generateWith(
+      async () =>
+        new Response("<html>Sign in</html>", {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        }),
+    );
+
+    expect(await screen.findByText(en.toolPage.previewFailed)).toBeTruthy();
+    expect(reported()).toEqual([
+      {
+        message: "Media preview returned a non-media body",
+        statusCode: undefined,
+        tags: { error_class: "operational" },
+      },
+    ]);
+  });
+
+  it("treats a 200 with no content type as a failed preview (#4107)", async () => {
+    generateWith(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
+
+    expect(await screen.findByText(en.toolPage.previewFailed)).toBeTruthy();
+    expect(reported().map(({ message }) => message)).toEqual([
+      "Media preview returned a non-media body",
+    ]);
+  });
+
+  it("treats an empty media body as a failed preview (#4107)", async () => {
+    generateWith(
+      async () =>
+        new Response("", {
+          status: 200,
+          headers: { "Content-Type": "video/mp4" },
+        }),
+    );
+
+    expect(await screen.findByText(en.toolPage.previewFailed)).toBeTruthy();
+    expect(reported().map(({ message }) => message)).toEqual([
+      "Media preview returned a non-media body",
+    ]);
   });
 
   it("doesn't report an undecodable file (422)", async () => {

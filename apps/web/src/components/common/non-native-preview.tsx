@@ -137,6 +137,16 @@ export function NonNativePreview({
       }
 
       const blob = await response.blob();
+      // A 200 is not proof of media: a proxy or captive portal can answer with
+      // HTML. The route answers with video/mp4 or audio/mpeg depending on the
+      // source, so anything else (or nothing) is a failed preview, not a
+      // broken player (#4107).
+      const isMedia = blob.type.startsWith("video/") || blob.type.startsWith("audio/");
+      if (blob.size === 0 || !isMedia) {
+        throw new SafeError("Media preview returned a non-media body", {
+          code: "preview-not-media",
+        });
+      }
       const url = URL.createObjectURL(blob);
 
       // Revoke previous URL if any
