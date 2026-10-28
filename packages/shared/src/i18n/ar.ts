@@ -1433,6 +1433,7 @@ export const ar: TranslationKeys = {
       submit: "تغيير الحجم",
       submitBatch: "تغيير الحجم ({count} ملف)",
       progressLabel: "جاري تغيير الحجم",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
     },
     crop: {
       width: "العرض",
@@ -2068,6 +2069,9 @@ export const ar: TranslationKeys = {
       submitSubject: "قص ذكي",
       submitFace: "قص الوجه",
       submitTrim: "تقليم الحدود",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
+      cropAreaExceeded:
+        "هذا الاقتصاص يتجاوز حد {max} بكسل. قلّل العرض أو الارتفاع أو المساحة الإضافية.",
     },
     imageEnhancement: {
       enhancementMode: "وضع التحسين",
@@ -2192,6 +2196,7 @@ export const ar: TranslationKeys = {
       submit: "تغيير الحجم",
       submitBatch: "تغيير الحجم ({count} ملف)",
       progressLabel: "تغيير حجم ذكي",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
     },
     "ai-canvas-expand": {
       quality: "الجودة",
@@ -3234,6 +3239,7 @@ export const ar: TranslationKeys = {
       submit: "معالجة GIF",
       submitBatch: "معالجة ({count} ملف)",
       progressLabel: "جاري معالجة GIF",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
     },
     "image-to-base64": {
       converting: "جاري التحويل...",

@@ -1446,6 +1446,7 @@ export const id: TranslationKeys = {
       submit: "Ubah Ukuran",
       submitBatch: "Ubah Ukuran ({count} file)",
       progressLabel: "Mengubah ukuran",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
     },
     crop: {
       width: "Lebar",
@@ -2085,6 +2086,9 @@ export const id: TranslationKeys = {
       submitSubject: "Potong Cerdas",
       submitFace: "Potong Wajah",
       submitTrim: "Trim Border",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
+      cropAreaExceeded:
+        "Potongan ini melebihi batas {max} piksel. Kurangi lebar, tinggi, atau padding.",
     },
     imageEnhancement: {
       enhancementMode: "Mode Peningkatan",
@@ -2211,6 +2215,7 @@ export const id: TranslationKeys = {
       submit: "Ubah Ukuran",
       submitBatch: "Ubah Ukuran ({count} file)",
       progressLabel: "Mengubah ukuran content-aware",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
     },
     "ai-canvas-expand": {
       quality: "Kualitas",
@@ -3259,6 +3264,7 @@ export const id: TranslationKeys = {
       submit: "Proses GIF",
       submitBatch: "Proses ({count} file)",
       progressLabel: "Memproses GIF",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
     },
     "image-to-base64": {
       converting: "Mengonversi...",

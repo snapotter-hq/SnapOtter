@@ -1211,6 +1211,7 @@ export const zhCN: TranslationKeys = {
       submit: "调整大小",
       submitBatch: "调整大小（{count} 个文件）",
       progressLabel: "调整中",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
     },
     crop: {
       width: "宽度",
@@ -1835,6 +1836,8 @@ export const zhCN: TranslationKeys = {
       submitSubject: "智能裁剪",
       submitFace: "人脸裁剪",
       submitTrim: "裁切边框",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
+      cropAreaExceeded: "此裁剪区域超出 {max} 像素的上限。请减小宽度、高度或内边距。",
     },
     imageEnhancement: {
       enhancementMode: "增强模式",
@@ -1954,6 +1957,7 @@ export const zhCN: TranslationKeys = {
       submit: "调整大小",
       submitBatch: "调整大小（{count} 个文件）",
       progressLabel: "内容感知缩放中",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
     },
     "ai-canvas-expand": {
       quality: "质量",
@@ -2995,6 +2999,7 @@ export const zhCN: TranslationKeys = {
       submit: "处理 GIF",
       submitBatch: "处理（{count} 个文件）",
       progressLabel: "正在处理 GIF",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
     },
     "image-to-base64": {
       converting: "正在转换...",

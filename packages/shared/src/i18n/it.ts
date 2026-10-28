@@ -1451,6 +1451,7 @@ export const it: TranslationKeys = {
       submit: "Ridimensiona",
       submitBatch: "Ridimensiona ({count} file)",
       progressLabel: "Ridimensionamento in corso",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
     },
     crop: {
       width: "Larghezza",
@@ -2092,6 +2093,9 @@ export const it: TranslationKeys = {
       submitSubject: "Ritaglio intelligente",
       submitFace: "Ritaglio per volto",
       submitTrim: "Ritaglia bordi",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
+      cropAreaExceeded:
+        "Questo ritaglio supera il limite di {max} pixel. Riduci larghezza, altezza o spaziatura.",
     },
     imageEnhancement: {
       enhancementMode: "Modalità di miglioramento",
@@ -2218,6 +2222,7 @@ export const it: TranslationKeys = {
       submit: "Ridimensiona",
       submitBatch: "Ridimensiona ({count} file)",
       progressLabel: "Ridimensionamento intelligente",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
     },
     "ai-canvas-expand": {
       quality: "Qualità",
@@ -3268,6 +3273,7 @@ export const it: TranslationKeys = {
       submit: "Elabora GIF",
       submitBatch: "Elabora ({count} file)",
       progressLabel: "Elaborazione GIF",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
     },
     "image-to-base64": {
       converting: "Conversione in corso...",

@@ -1,9 +1,11 @@
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { isDimensionWithinLimit } from "@/lib/dimension-limits";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -43,6 +45,10 @@ export function ContentAwareResizeControls({
     onChangeRef.current = onChange;
   });
 
+  const widthOverLimit = width !== "" && !isDimensionWithinLimit(Number(width));
+  const heightOverLimit = height !== "" && !isDimensionWithinLimit(Number(height));
+  const dimensionsOverLimit = widthOverLimit || heightOverLimit;
+
   useEffect(() => {
     const settings: Record<string, unknown> = {};
     if (!squareMode) {
@@ -59,35 +65,52 @@ export function ContentAwareResizeControls({
   return (
     <div className="space-y-4">
       {/* Dimensions */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <label htmlFor="car-width" className="text-xs text-muted-foreground">
-            {t.toolSettings["content-aware-resize"].widthPx}
-          </label>
-          <input
-            id="car-width"
-            type="number"
-            value={width}
-            onChange={(e) => setWidth(e.target.value)}
-            placeholder={t.toolSettings["content-aware-resize"].auto}
-            disabled={squareMode}
-            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
-          />
+      <div>
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <label htmlFor="car-width" className="text-xs text-muted-foreground">
+              {t.toolSettings["content-aware-resize"].widthPx}
+            </label>
+            <input
+              id="car-width"
+              type="number"
+              value={width}
+              onChange={(e) => setWidth(e.target.value)}
+              placeholder={t.toolSettings["content-aware-resize"].auto}
+              disabled={squareMode}
+              min={1}
+              max={MAX_RESIZE_OUTPUT_DIMENSION}
+              aria-invalid={widthOverLimit || undefined}
+              aria-describedby={dimensionsOverLimit ? "car-dimension-error" : undefined}
+              className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
+            />
+          </div>
+          <div className="flex-1">
+            <label htmlFor="car-height" className="text-xs text-muted-foreground">
+              {t.toolSettings["content-aware-resize"].heightPx}
+            </label>
+            <input
+              id="car-height"
+              type="number"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              placeholder={t.toolSettings["content-aware-resize"].auto}
+              disabled={squareMode}
+              min={1}
+              max={MAX_RESIZE_OUTPUT_DIMENSION}
+              aria-invalid={heightOverLimit || undefined}
+              aria-describedby={dimensionsOverLimit ? "car-dimension-error" : undefined}
+              className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
+            />
+          </div>
         </div>
-        <div className="flex-1">
-          <label htmlFor="car-height" className="text-xs text-muted-foreground">
-            {t.toolSettings["content-aware-resize"].heightPx}
-          </label>
-          <input
-            id="car-height"
-            type="number"
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-            placeholder={t.toolSettings["content-aware-resize"].auto}
-            disabled={squareMode}
-            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
-          />
-        </div>
+        {dimensionsOverLimit && (
+          <p id="car-dimension-error" className="mt-1 text-xs text-destructive-ink">
+            {format(t.toolSettings["content-aware-resize"].maxDimensionExceeded, {
+              max: MAX_RESIZE_OUTPUT_DIMENSION,
+            })}
+          </p>
+        )}
       </div>
 
       {/* Square mode */}
@@ -177,9 +200,13 @@ export function ContentAwareResizeSettings() {
   };
 
   const hasFile = files.length > 0;
+  const dimensionInvalid = [settings.width, settings.height].some(
+    (value) => typeof value === "number" && !isDimensionWithinLimit(value),
+  );
   const canProcess =
     hasFile &&
     !processing &&
+    !dimensionInvalid &&
     (Boolean(settings.width) || Boolean(settings.height) || Boolean(settings.square));
 
   const handleSubmit = (e: React.FormEvent) => {

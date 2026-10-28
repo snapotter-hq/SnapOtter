@@ -1395,6 +1395,7 @@ export const en = {
       submit: "Resize",
       submitBatch: "Resize ({count} files)",
       progressLabel: "Resizing",
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
     },
     crop: {
       yOfMax: "Y (of {max})",
@@ -2028,6 +2029,9 @@ export const en = {
       padColor: "Pad color",
       trimHint:
         'Removes uniform-color borders around your subject. Enable "Pad to square" for e-commerce ready images.',
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
+      cropAreaExceeded:
+        "This crop is over the {max} pixel limit. Lower the width, height, or padding.",
       submitSubject: "Smart Crop",
       submitFace: "Face Crop",
       submitTrim: "Trim Borders",
@@ -2156,6 +2160,7 @@ export const en = {
       submit: "Resize",
       submitBatch: "Resize ({count} files)",
       progressLabel: "Content-aware resizing",
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
     },
     "ai-canvas-expand": {
       quality: "Quality",
@@ -3200,6 +3205,7 @@ export const en = {
       submit: "Process GIF",
       submitBatch: "Process ({count} files)",
       progressLabel: "Processing GIF",
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
     },
     "image-to-base64": {
       converting: "Converting...",

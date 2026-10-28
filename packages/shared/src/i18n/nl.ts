@@ -1454,6 +1454,7 @@ export const nl: TranslationKeys = {
       submit: "Formaat wijzigen",
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Formaat wijzigen",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
     },
     crop: {
       width: "Breedte",
@@ -2096,6 +2097,9 @@ export const nl: TranslationKeys = {
       submitSubject: "Slim bijsnijden",
       submitFace: "Gezicht bijsnijden",
       submitTrim: "Randen bijsnijden",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      cropAreaExceeded:
+        "Deze uitsnede overschrijdt de limiet van {max} pixels. Verklein de breedte, hoogte of opvulling.",
     },
     imageEnhancement: {
       enhancementMode: "Verbeteringsmodus",
@@ -2222,6 +2226,7 @@ export const nl: TranslationKeys = {
       submit: "Formaat wijzigen",
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Inhoudsbewust schalen",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
     },
     "ai-canvas-expand": {
       quality: "Kwaliteit",
@@ -3276,6 +3281,7 @@ export const nl: TranslationKeys = {
       submit: "GIF verwerken",
       submitBatch: "Verwerken ({count} bestanden)",
       progressLabel: "GIF verwerken",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
     },
     "image-to-base64": {
       converting: "Converteren...",

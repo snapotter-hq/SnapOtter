@@ -1455,6 +1455,7 @@ export const de: TranslationKeys = {
       submit: "Größe ändern",
       submitBatch: "Größe ändern ({count} Dateien)",
       progressLabel: "Größe wird geändert",
+      maxDimensionExceeded: "Verwende eine Größe von 1 bis {max} px.",
     },
     crop: {
       width: "Breite",
@@ -2101,6 +2102,9 @@ export const de: TranslationKeys = {
       submitSubject: "Intelligenter Zuschnitt",
       submitFace: "Gesichtszuschnitt",
       submitTrim: "Ränder beschneiden",
+      maxDimensionExceeded: "Verwende eine Größe von 1 bis {max} px.",
+      cropAreaExceeded:
+        "Dieser Zuschnitt überschreitet das Limit von {max} Pixeln. Verringere Breite, Höhe oder Abstand.",
     },
     imageEnhancement: {
       enhancementMode: "Verbesserungsmodus",
@@ -2227,6 +2231,7 @@ export const de: TranslationKeys = {
       submit: "Größe ändern",
       submitBatch: "Größe ändern ({count} Dateien)",
       progressLabel: "Inhaltsabhängige Größenänderung",
+      maxDimensionExceeded: "Verwende eine Größe von 1 bis {max} px.",
     },
     "ai-canvas-expand": {
       quality: "Qualität",
@@ -3284,6 +3289,7 @@ export const de: TranslationKeys = {
       submit: "GIF verarbeiten",
       submitBatch: "Verarbeiten ({count} Dateien)",
       progressLabel: "GIF wird verarbeitet",
+      maxDimensionExceeded: "Verwende eine Größe von 1 bis {max} px.",
     },
     "image-to-base64": {
       converting: "Wird konvertiert...",

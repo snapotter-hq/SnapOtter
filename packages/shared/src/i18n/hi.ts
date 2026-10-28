@@ -1263,6 +1263,7 @@ export const hi: TranslationKeys = {
       submit: "रीसाइज़ करें",
       submitBatch: "रीसाइज़ करें ({count} फाइलें)",
       progressLabel: "रीसाइज़ हो रहा है",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
     },
     crop: {
       width: "चौड़ाई",
@@ -1896,6 +1897,8 @@ export const hi: TranslationKeys = {
       submitSubject: "स्मार्ट क्रॉप",
       submitFace: "फेस क्रॉप",
       submitTrim: "बॉर्डर ट्रिम",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
+      cropAreaExceeded: "यह क्रॉप {max} पिक्सेल की सीमा से बड़ा है। चौड़ाई, ऊंचाई या पैडिंग कम करें।",
     },
     imageEnhancement: {
       enhancementMode: "एन्हांसमेंट मोड",
@@ -2021,6 +2024,7 @@ export const hi: TranslationKeys = {
       submit: "रीसाइज़ करें",
       submitBatch: "रीसाइज़ करें ({count} फाइलें)",
       progressLabel: "कंटेंट-अवेयर रीसाइज़िंग",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
     },
     "ai-canvas-expand": {
       quality: "क्वालिटी",
@@ -3064,6 +3068,7 @@ export const hi: TranslationKeys = {
       submit: "GIF प्रोसेस करें",
       submitBatch: "प्रोसेस करें ({count} फाइलें)",
       progressLabel: "GIF प्रोसेस हो रहा है",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
     },
     "image-to-base64": {
       converting: "कन्वर्ट हो रहा है...",

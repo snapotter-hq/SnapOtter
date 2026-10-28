@@ -1406,6 +1406,7 @@ export const ja: TranslationKeys = {
       submit: "リサイズ",
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "リサイズ中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
     },
     crop: {
       width: "幅",
@@ -2044,6 +2045,9 @@ export const ja: TranslationKeys = {
       submitSubject: "スマートクロップ",
       submitFace: "顔クロップ",
       submitTrim: "ボーダートリム",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      cropAreaExceeded:
+        "この切り抜きは {max} ピクセルの上限を超えています。幅、高さ、パディングを小さくしてください。",
     },
     imageEnhancement: {
       enhancementMode: "エンハンスモード",
@@ -2169,6 +2173,7 @@ export const ja: TranslationKeys = {
       submit: "リサイズ",
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "コンテンツ認識リサイズ中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
     },
     "ai-canvas-expand": {
       quality: "品質",
@@ -3214,6 +3219,7 @@ export const ja: TranslationKeys = {
       submit: "GIF処理",
       submitBatch: "処理（{count}ファイル）",
       progressLabel: "GIFを処理中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
     },
     "image-to-base64": {
       converting: "変換中...",

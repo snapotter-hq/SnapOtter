@@ -1448,6 +1448,7 @@ export const pl: TranslationKeys = {
       submit: "Zmień rozmiar",
       submitBatch: "Zmień rozmiar ({count} plików)",
       progressLabel: "Zmiana rozmiaru",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
     },
     crop: {
       width: "Szerokość",
@@ -2093,6 +2094,9 @@ export const pl: TranslationKeys = {
       submitSubject: "Inteligentne kadrowanie",
       submitFace: "Kadrowanie twarzy",
       submitTrim: "Przytnij krawędzie",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
+      cropAreaExceeded:
+        "Ten kadr przekracza limit {max} pikseli. Zmniejsz szerokość, wysokość lub margines wewnętrzny.",
     },
     imageEnhancement: {
       enhancementMode: "Tryb ulepszenia",
@@ -2219,6 +2223,7 @@ export const pl: TranslationKeys = {
       submit: "Zmień rozmiar",
       submitBatch: "Zmień rozmiar ({count} plików)",
       progressLabel: "Zmiana rozmiaru z uwzględnieniem treści",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
     },
     "ai-canvas-expand": {
       quality: "Jakość",
@@ -3267,6 +3272,7 @@ export const pl: TranslationKeys = {
       submit: "Przetwórz GIF",
       submitBatch: "Przetwórz ({count} plików)",
       progressLabel: "Przetwarzanie GIF",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
     },
     "image-to-base64": {
       converting: "Konwersja...",

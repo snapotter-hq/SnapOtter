@@ -1,4 +1,4 @@
-import { SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
+import { MAX_RESIZE_OUTPUT_DIMENSION, SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -6,6 +6,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { largestRatioBox, pairedDimension, RESIZE_RATIO_PRESETS } from "@/lib/aspect-ratio";
+import { isDimensionWithinLimit } from "@/lib/dimension-limits";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -176,36 +177,57 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
     ...RESIZE_RATIO_PRESETS.map((p) => ({ id: p.id, label: p.id })),
   ];
 
+  const widthOverLimit = width !== "" && !isDimensionWithinLimit(Number(width));
+  const heightOverLimit = height !== "" && !isDimensionWithinLimit(Number(height));
+  const dimensionsOverLimit = widthOverLimit || heightOverLimit;
+
   const dimensionInputs = (
-    <div className="flex items-end gap-2">
-      <div className="flex-1">
-        <label htmlFor="resize-width" className="text-xs text-muted-foreground">
-          {t.toolSettings.resize.widthPx}
-        </label>
-        <input
-          id="resize-width"
-          type="number"
-          value={width}
-          onChange={(e) => handleWidthChange(e.target.value)}
-          placeholder={t.toolSettings.resize.auto}
-          disabled={squareMode && contentAware}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
-        />
+    <div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <label htmlFor="resize-width" className="text-xs text-muted-foreground">
+            {t.toolSettings.resize.widthPx}
+          </label>
+          <input
+            id="resize-width"
+            type="number"
+            value={width}
+            onChange={(e) => handleWidthChange(e.target.value)}
+            placeholder={t.toolSettings.resize.auto}
+            disabled={squareMode && contentAware}
+            min={1}
+            max={MAX_RESIZE_OUTPUT_DIMENSION}
+            aria-invalid={widthOverLimit || undefined}
+            aria-describedby={dimensionsOverLimit ? "resize-dimension-error" : undefined}
+            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
+          />
+        </div>
+        <div className="flex-1">
+          <label htmlFor="resize-height" className="text-xs text-muted-foreground">
+            {t.toolSettings.resize.heightPx}
+          </label>
+          <input
+            id="resize-height"
+            type="number"
+            value={height}
+            onChange={(e) => handleHeightChange(e.target.value)}
+            placeholder={t.toolSettings.resize.auto}
+            disabled={squareMode && contentAware}
+            min={1}
+            max={MAX_RESIZE_OUTPUT_DIMENSION}
+            aria-invalid={heightOverLimit || undefined}
+            aria-describedby={dimensionsOverLimit ? "resize-dimension-error" : undefined}
+            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
+          />
+        </div>
       </div>
-      <div className="flex-1">
-        <label htmlFor="resize-height" className="text-xs text-muted-foreground">
-          {t.toolSettings.resize.heightPx}
-        </label>
-        <input
-          id="resize-height"
-          type="number"
-          value={height}
-          onChange={(e) => handleHeightChange(e.target.value)}
-          placeholder={t.toolSettings.resize.auto}
-          disabled={squareMode && contentAware}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
-        />
-      </div>
+      {dimensionsOverLimit && (
+        <p id="resize-dimension-error" className="mt-1 text-xs text-destructive-ink">
+          {format(t.toolSettings.resize.maxDimensionExceeded, {
+            max: MAX_RESIZE_OUTPUT_DIMENSION,
+          })}
+        </p>
+      )}
     </div>
   );
 
@@ -470,9 +492,13 @@ export function ResizeSettings() {
 
   const hasFile = files.length > 0;
   const tab = settings.percentage !== undefined ? "scale" : "other";
+  const dimensionInvalid = [settings.width, settings.height].some(
+    (value) => typeof value === "number" && !isDimensionWithinLimit(value),
+  );
   const canProcess =
     hasFile &&
     !processing &&
+    !dimensionInvalid &&
     (isContentAware
       ? Boolean(settings.width) || Boolean(settings.height) || Boolean(settings.square)
       : tab === "scale"
