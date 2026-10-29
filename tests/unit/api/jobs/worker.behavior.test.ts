@@ -3779,6 +3779,139 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       }),
     ).rejects.toBe(normalizedOutage);
   });
+
+  describe("child storage reclaim (#1241)", () => {
+    const finalizeJob = (jobId: string, extra: Record<string, unknown> = {}) => ({
+      id: jobId,
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId,
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+        ...extra,
+      },
+    });
+    const rows = (jobId: string) => ({
+      [`${jobId}-f0`]: {
+        id: `${jobId}-f0`,
+        status: "completed",
+        inputRefs: [`uploads/${jobId}-f0/a.png`],
+        outputRefs: [`outputs/${jobId}-f0/a.png`],
+      },
+      [`${jobId}-f1`]: {
+        id: `${jobId}-f1`,
+        status: "completed",
+        inputRefs: [`uploads/${jobId}-f1/b.png`],
+        outputRefs: [`outputs/${jobId}-f1/b.png`],
+      },
+    });
+    const prefixes = () => objectStorageMocks.deletePrefix.mock.calls.map(([prefix]) => prefix);
+
+    async function primeZip() {
+      const { Readable } = await import("node:stream");
+      objectStorageMocks.deletePrefix.mockReset().mockResolvedValue(undefined);
+      objectStorageMocks.getObjectSize.mockResolvedValue(3);
+      objectStorageMocks.getObjectStream.mockImplementation(async () =>
+        Readable.from(Buffer.from("png")),
+      );
+      objectStorageMocks.putObject.mockResolvedValue(undefined);
+      objectStorageMocks.putObjectStream.mockResolvedValue(123);
+    }
+
+    it("frees every child's input and output once the ZIP is written", async () => {
+      await primeZip();
+      const { processor, completeBatchJobMock } = await setupSystemProcessor({
+        rowsById: rows("rc-ok"),
+      });
+
+      await processor(finalizeJob("rc-ok"));
+
+      expect(completeBatchJobMock).toHaveBeenCalledTimes(1);
+      expect(prefixes().sort()).toEqual(
+        ["uploads/rc-ok-f0", "outputs/rc-ok-f0", "uploads/rc-ok-f1", "outputs/rc-ok-f1"].sort(),
+      );
+      expect(prefixes()).not.toContain("outputs/rc-ok");
+    });
+
+    it("frees the children when packaging fails, so the next request is not refused", async () => {
+      await primeZip();
+      objectStorageMocks.putObjectStream.mockRejectedValue(new Error("disk full"));
+      const { processor, failBatchJobMock } = await setupSystemProcessor({
+        rowsById: rows("rc-fail"),
+      });
+
+      await expect(processor(finalizeJob("rc-fail"))).rejects.toThrow("disk full");
+
+      expect(failBatchJobMock).toHaveBeenCalledTimes(1);
+      expect(prefixes()).toEqual(
+        expect.arrayContaining([
+          "uploads/rc-fail-f0",
+          "outputs/rc-fail-f0",
+          "uploads/rc-fail-f1",
+          "outputs/rc-fail-f1",
+        ]),
+      );
+    });
+
+    it("still finishes the batch when a child delete fails", async () => {
+      await primeZip();
+      objectStorageMocks.deletePrefix.mockRejectedValue(new Error("EBUSY"));
+      const { processor, completeBatchJobMock } = await setupSystemProcessor({
+        rowsById: rows("rc-busy"),
+      });
+
+      await expect(processor(finalizeJob("rc-busy"))).resolves.toBeDefined();
+
+      expect(completeBatchJobMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("frees every pipeline step directory using the parent's stepCount", async () => {
+      await primeZip();
+      const { processor } = await setupSystemProcessor({
+        rowsById: {
+          "rc-pipe": {
+            id: "rc-pipe",
+            type: "batch",
+            toolId: "pipeline-batch",
+            status: "queued",
+            settings: { flowChildCount: 1, fileIndexMap: [0], stepCount: 2 },
+          },
+          "rc-pipe-f0": {
+            id: "rc-pipe-f0",
+            type: "pipeline-finalize",
+            status: "completed",
+            inputRefs: ["uploads/rc-pipe-f0-s0/a.png"],
+            outputRefs: ["outputs/rc-pipe-f0/a.png"],
+          },
+        },
+      });
+
+      await processor(
+        finalizeJob("rc-pipe", {
+          toolId: "pipeline-batch",
+          totalFiles: 1,
+          settings: { flowChildCount: 1, fileIndexMap: [0] },
+        }),
+      );
+
+      expect(prefixes()).toEqual(
+        expect.arrayContaining([
+          "uploads/rc-pipe-f0",
+          "outputs/rc-pipe-f0",
+          "uploads/rc-pipe-f0-s0",
+          "outputs/rc-pipe-f0-s0",
+          "uploads/rc-pipe-f0-s1",
+          "outputs/rc-pipe-f0-s1",
+        ]),
+      );
+    });
+  });
 });
 
 describe("processPipelineFinalize (#3167, #2703)", () => {
