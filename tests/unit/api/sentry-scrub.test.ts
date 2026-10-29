@@ -572,6 +572,47 @@ describe("outgoing request urls (#1899)", () => {
     expect(crumbs.breadcrumbs).toEqual([{ category: "http", data: { status_code: 0 } }]);
   });
 
+  // #1926: some webhook services put the secret in the hostname.
+  it("masks a secret subdomain in every url and hostname key (#1926)", () => {
+    const url = "https://abc123secret.m.pipedream.net/hook";
+    const span = clientSpan(url);
+    span.data = {
+      ...span.data,
+      "url.domain": "abc123secret.m.pipedream.net",
+      "net.peer.name": "abc123secret.m.pipedream.net",
+      "http.host": "abc123secret.m.pipedream.net:8443",
+    };
+    const out = buildBeforeSendTransaction(() => true)({ spans: [span] });
+    expect(JSON.stringify(out)).not.toContain("abc123secret");
+    expect(out.spans[0].description).toBe("POST https://*.pipedream.net");
+    expect(out.spans[0].data["server.address"]).toBe("*.pipedream.net");
+    expect(out.spans[0].data["http.host"]).toBe("*.pipedream.net:8443");
+    const crumbs = buildBeforeSend(() => true, true)(
+      { breadcrumbs: [crumb(url)] } as never,
+      {},
+    ) as AnyEvent;
+    expect(JSON.stringify(crumbs)).not.toContain("abc123secret");
+    expect(crumbs.breadcrumbs[0].data.url).toBe("https://*.pipedream.net");
+  });
+
+  it("drops a hostname key that is not a string rather than pass it through (#1926)", () => {
+    const out = buildBeforeSendTransaction(() => true)({
+      spans: [{ op: "http.client", description: "POST", data: { "server.address": ["a.b.c"] } }],
+    });
+    expect(out.spans[0].data).toEqual({});
+  });
+
+  it("keeps the registrable domain under a country-code suffix, and bare hosts as they are", () => {
+    const desc = (url: string) =>
+      buildBeforeSendTransaction(() => true)({ spans: [clientSpan(url)] }).spans[0].description;
+    expect(desc("https://tok.hooks.example.co.uk/x")).toBe("POST https://*.example.co.uk");
+    expect(desc("https://tok.example.com:9000/x")).toBe("POST https://*.example.com:9000");
+    expect(desc("https://example.com/x")).toBe("POST https://example.com");
+    expect(desc("http://10.0.0.5:8080/x")).toBe("POST http://10.0.0.5:8080");
+    expect(desc("http://[::1]:8080/x")).toBe("POST http://[::1]:8080");
+    expect(desc("https://idp/x")).toBe("POST https://idp");
+  });
+
   it("leaves non-http breadcrumbs' urls with their path", () => {
     const out = buildBeforeSend(() => true, true)(
       { breadcrumbs: [{ category: "navigation", data: { url: "https://h/a/b?t=1" } }] } as never,
