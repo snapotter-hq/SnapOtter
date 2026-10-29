@@ -9,6 +9,7 @@ import { SafeError } from "@snapotter/shared";
 import type { ConnectionOptions } from "bullmq";
 import Redis from "ioredis";
 import { env } from "../config.js";
+import { logger } from "../lib/logger.js";
 
 const RECONNECTING_PATCHED = Symbol.for("snapotter.ioredis.reconnectingDisconnectPatched");
 
@@ -124,7 +125,7 @@ const SUBSCRIBER_PING_INTERVAL_MS = 10_000;
  */
 function swallowConnectionErrors(connection: Redis): Redis {
   connection.on("error", (err: Error) => {
-    console.error("[redis] connection error:", err.message);
+    logger.error({ err }, "[redis] connection error");
   });
   return connection;
 }
@@ -237,7 +238,7 @@ export async function assertRedisCompatible(): Promise<void> {
   try {
     info = await sharedRedis().info("server");
   } catch {
-    console.warn("[redis] INFO not permitted; skipping version preflight");
+    logger.warn("[redis] INFO not permitted; skipping version preflight");
     return;
   }
   const err = checkRedisInfoCompatible(info);

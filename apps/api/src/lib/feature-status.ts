@@ -95,7 +95,7 @@ function warnImportSweepFailure(key: string, message: string, error: unknown): v
   const code = (error as NodeJS.ErrnoException).code ?? "unknown";
   if (importSweepWarnings.get(key) === code) return;
   importSweepWarnings.set(key, code);
-  console.warn(`${message} (${code}):`, error);
+  logger.warn({ err: error }, `${message} (${code})`);
 }
 
 /**
@@ -137,7 +137,7 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
       }
       if (info.isSymbolicLink()) unlinkSync(path);
       else rmSync(path, { recursive: true, force: true });
-      console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
+      logger.info(`[feature-status] Deleted orphaned ${entry.name}/`);
       importSweepWarnings.delete(path);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -165,7 +165,7 @@ export function ensureAiDirs(): void {
     // Never refuse to boot over the AI data dir. AI tools simply report as not
     // installed until DATA_DIR points somewhere writable.
     const code = (err as NodeJS.ErrnoException).code;
-    console.error(
+    logger.error(
       `WARNING: Cannot create AI directories under "${AI_DIR}" (${code}). AI features will be unavailable. Set DATA_DIR to a writable path (or check volume permissions / PUID / PGID in Docker).`,
     );
   }
@@ -254,7 +254,7 @@ function readInstalled(): InstalledData {
     const raw = readFileSync(INSTALLED_PATH, "utf-8");
     installedCache = normalizeInstalled(JSON.parse(raw));
   } catch {
-    console.warn("[feature-status] installed.json is corrupt or unreadable, treating as empty");
+    logger.warn("[feature-status] installed.json is corrupt or unreadable, treating as empty");
     installedCache = { bundles: {} };
   }
 
@@ -616,7 +616,7 @@ function claimInstallMarker(lock: LockData): InstallMarkerSnapshot | null {
       if (belongsToNewReplica || ageMs > LEGACY_LOCK_STALE_MS) {
         if (removeInstallMarker(existing)) {
           if (!belongsToNewReplica) {
-            console.warn(
+            logger.warn(
               `[feature-status] Removed stale legacy install lock (age: ${Math.round(ageMs / 1000)}s)`,
             );
           }
@@ -738,7 +738,7 @@ export function releaseInstallLock(): void {
     // The permanent kernel lease is authoritative. A leftover token-bearing
     // marker is safe and will be removed by the next new acquirer once it
     // proves the flock is free; teardown must never strand in-memory state.
-    console.warn("[feature-status] Unable to remove install marker during release:", error);
+    logger.warn({ err: error }, "[feature-status] Unable to remove install marker during release");
   } finally {
     if (markerFd !== null) {
       try {
@@ -950,7 +950,7 @@ export function resetAiEnvironment(
       // stays. Deleting one we cannot rebuild is strictly worse than keeping a
       // stale one, because the next install spawns <venv>/bin/python3 and dies
       // with ENOENT (#796). Clear what we can and let the operator decide.
-      console.warn(
+      logger.warn(
         `[feature-status] No base venv at ${BAKED_BASE_VENV} to reseed from; left the shared AI venv at ${sharedVenvPath()} untouched. Models, the pip cache and the install ledger were cleared. Recreate that venv yourself if a stale package in it is the problem.`,
       );
     }
@@ -1078,7 +1078,7 @@ function deleteDownloadingFiles(dir: string): void {
       const fullPath = join(entry.parentPath ?? entry.path, entry.name);
       try {
         unlinkSync(fullPath);
-        console.info(`[feature-status] Deleted partial download: ${fullPath}`);
+        logger.info(`[feature-status] Deleted partial download: ${fullPath}`);
       } catch {
         // best-effort
       }
@@ -1097,7 +1097,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
   // A second API replica can start while the first is actively mutating this
   // shared volume. Never erase its lock, downloads, staging, or venv marker.
   if (!acquireInstallLock("__recovery__")) {
-    console.info("[feature-status] Another replica owns the install lease; recovery deferred");
+    logger.info("[feature-status] Another replica owns the install lease; recovery deferred");
     return "deferred";
   }
 
@@ -1110,7 +1110,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
     if (existsSync(INSTALLED_TMP_PATH)) {
       try {
         unlinkSync(INSTALLED_TMP_PATH);
-        console.info("[feature-status] Deleted stale installed.json.tmp");
+        logger.info("[feature-status] Deleted stale installed.json.tmp");
       } catch {
         // best-effort
       }
@@ -1121,7 +1121,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
     if (existsSync(bootstrappingDir)) {
       try {
         rmSync(bootstrappingDir, { recursive: true, force: true });
-        console.info("[feature-status] Deleted stale venv.bootstrapping/");
+        logger.info("[feature-status] Deleted stale venv.bootstrapping/");
       } catch {
         // best-effort
       }
@@ -1138,7 +1138,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
     if (existsSync(VENV_WRITING_MARKER)) {
       let consumeMarker = false;
       if (canReseedFromBakedBase()) {
-        console.warn(
+        logger.warn(
           "[feature-status] An install was interrupted mid venv-write; reseeding the AI venv to a clean state and clearing installed bundles (reinstall to restore).",
         );
         try {
@@ -1150,9 +1150,9 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           consumeMarker = true;
         } catch (err) {
           recoveryIncomplete = true;
-          console.error(
-            "[feature-status] Failed to reseed AI venv after interrupted install; retaining venv.writing for retry:",
-            err,
+          logger.error(
+            { err },
+            "[feature-status] Failed to reseed AI venv after interrupted install; retaining venv.writing for retry",
           );
         }
       } else {
@@ -1161,7 +1161,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
         // every few seconds forever while holding back the rest of startup
         // recovery, so surface the risk once and let the operator repair or
         // reinstall the affected environment themselves.
-        console.warn(
+        logger.warn(
           `[feature-status] An install was interrupted mid venv-write and there is no base venv at ${BAKED_BASE_VENV} to restore from; the AI venv at ${sharedVenvPath()} may be inconsistent. Reinstall the affected bundle.`,
         );
         consumeMarker = true;
@@ -1171,9 +1171,9 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           unlinkSync(VENV_WRITING_MARKER);
         } catch (error) {
           recoveryIncomplete = true;
-          console.error(
-            "[feature-status] AI venv recovery completed but venv.writing could not be cleared; retaining recovery retry:",
-            error,
+          logger.error(
+            { err: error },
+            "[feature-status] AI venv recovery completed but venv.writing could not be cleared; retaining recovery retry",
           );
         }
       }
@@ -1191,7 +1191,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           if (model.path) {
             const modelPath = join(MODELS_DIR, model.path);
             if (!existsSync(modelPath)) {
-              console.warn(
+              logger.warn(
                 `[feature-status] Bundle "${bundleId}" missing model file: ${model.path}`,
               );
               break;
@@ -1200,13 +1200,13 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
               try {
                 const st = statSync(modelPath);
                 if (st.size < model.minSize) {
-                  console.warn(
+                  logger.warn(
                     `[feature-status] Bundle "${bundleId}" model "${model.path}" is undersized (${st.size} < ${model.minSize})`,
                   );
                   break;
                 }
               } catch {
-                console.warn(
+                logger.warn(
                   `[feature-status] Bundle "${bundleId}" cannot stat model: ${model.path}`,
                 );
                 break;
@@ -1215,7 +1215,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           } else if (model.downloadFn === "rembg_session" && model.args?.[0]) {
             const filePath = join(MODELS_DIR, "rembg", `${model.args[0]}.onnx`);
             if (!existsSync(filePath)) {
-              console.warn(
+              logger.warn(
                 `[feature-status] Bundle "${bundleId}" missing rembg model: ${model.args[0]}`,
               );
               break;
@@ -1223,7 +1223,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           } else if (model.downloadFn === "hf_snapshot" && model.args?.[1]) {
             const dirPath = join(MODELS_DIR, model.args[1]);
             if (!existsSync(dirPath)) {
-              console.warn(
+              logger.warn(
                 `[feature-status] Bundle "${bundleId}" missing model directory: ${model.args[1]}`,
               );
               break;
@@ -1244,7 +1244,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
         if (entry.isDirectory() && entry.name.startsWith("staging-")) {
           const stagingPath = join(AI_DIR, entry.name);
           rmSync(stagingPath, { recursive: true, force: true });
-          console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
+          logger.info(`[feature-status] Deleted orphaned ${entry.name}/`);
         }
       }
     } catch {
@@ -1260,10 +1260,10 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           const filePath = join(downloadStaging, file);
           if (file.endsWith(".partial") || file.endsWith(".meta")) {
             unlinkSync(filePath);
-            console.info(`[feature-status] Deleted stale download file: ${file}`);
+            logger.info(`[feature-status] Deleted stale download file: ${file}`);
           } else if (file.endsWith(".tar.gz")) {
             unlinkSync(filePath);
-            console.info(`[feature-status] Deleted orphaned archive: ${file}`);
+            logger.info(`[feature-status] Deleted orphaned archive: ${file}`);
           }
         }
       } catch {
@@ -1329,7 +1329,7 @@ export function startInterruptedInstallRecovery(
     try {
       recoveryResult = recoverInterruptedInstallsWithResult();
     } catch (error) {
-      console.warn(
+      logger.warn(
         `[feature-status] Interrupted-install recovery failed; retrying: ${(error as Error).message}`,
       );
     }
@@ -1347,7 +1347,7 @@ export function startInterruptedInstallRecovery(
       try {
         postRecovery = options.onRecovered();
       } catch (error) {
-        console.warn(
+        logger.warn(
           `[feature-status] Post-recovery startup cleanup failed: ${(error as Error).message}`,
         );
         scheduleRetry();
@@ -1358,7 +1358,7 @@ export function startInterruptedInstallRecovery(
           if (completed === false) scheduleRetry();
         })
         .catch((error) => {
-          console.warn(
+          logger.warn(
             `[feature-status] Post-recovery startup cleanup failed: ${(error as Error).message}`,
           );
           scheduleRetry();

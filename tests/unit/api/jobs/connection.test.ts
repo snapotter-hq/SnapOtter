@@ -113,8 +113,13 @@ vi.mock("ioredis", () => ({
 
 // Fresh module graph per test so the module-level `_shared` singleton
 // never leaks state across cases.
+const loggerMock = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }));
+
 async function freshModule() {
   vi.resetModules();
+  loggerMock.error.mockClear();
+  loggerMock.warn.mockClear();
+  vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
   return import("../../../../apps/api/src/jobs/connection.js");
 }
 
@@ -338,7 +343,6 @@ describe("Redis connection factory", () => {
   });
 
   it("logs and swallows connection errors, leaving reconnection to ioredis", async () => {
-    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     const { createRedisConnection } = await freshModule();
 
     const conn = createRedisConnection() as unknown as RedisStub;
@@ -346,9 +350,9 @@ describe("Redis connection factory", () => {
     expect(() =>
       conn.emitOn("error", new Error("connect ECONNREFUSED 127.0.0.1:6379")),
     ).not.toThrow();
-    expect(errorLog).toHaveBeenCalledWith(
-      expect.stringContaining("[redis]"),
-      expect.stringContaining("ECONNREFUSED"),
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err: expect.objectContaining({ message: expect.stringContaining("ECONNREFUSED") }) },
+      "[redis] connection error",
     );
   });
 
@@ -603,7 +607,6 @@ describe("assertRedisCompatible", () => {
   });
 
   it("does not block boot when INFO is not permitted (warns and returns)", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const mod = await freshModule();
     const stub = mod.sharedRedis();
     stub.info = vi
@@ -613,7 +616,9 @@ describe("assertRedisCompatible", () => {
       ) as unknown as RedisStub["info"];
 
     await expect(mod.assertRedisCompatible()).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalledWith("[redis] INFO not permitted; skipping version preflight");
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      "[redis] INFO not permitted; skipping version preflight",
+    );
   });
 
   it("does not throw when INFO is unparseable (managed Redis hides details)", async () => {
