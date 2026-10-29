@@ -9,6 +9,7 @@
  * spawned, so this runs on CI shards that have no ffmpeg.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { resolveFfmpeg } from "../../../packages/media-engine/src/binaries.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -61,8 +62,8 @@ describe("POST /api/v1/preview/generate upload limit", () => {
 
   it("still reads a file under the limit (the 413 is not a blanket rejection)", async () => {
     // Garbage bytes under the limit get past the read and fail later: 422
-    // where ffmpeg ran and couldn't decode them, or a spawn error mapped to the
-    // same 422 where ffmpeg is missing. Either way, not 413.
+    // where ffmpeg ran and couldn't decode them, or 503 ENGINE_UNAVAILABLE where
+    // no ffmpeg binary exists (#1576). Either way, not 413.
     const { body, contentType } = mkvUpload(64 * 1024);
     const res = await testApp.app.inject({
       method: "POST",
@@ -72,6 +73,11 @@ describe("POST /api/v1/preview/generate upload limit", () => {
     });
 
     expect(res.statusCode).not.toBe(413);
-    expect(res.statusCode).toBe(422);
+    if (resolveFfmpeg()) {
+      expect(res.statusCode).toBe(422);
+    } else {
+      expect(res.statusCode).toBe(503);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    }
   });
 });
