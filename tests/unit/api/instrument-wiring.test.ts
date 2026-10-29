@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   nodeFlush: vi.fn(async () => true),
   makeNodeTransport: vi.fn(),
   spotlightIntegration: vi.fn(),
+  fastifyIntegration: vi.fn((options: unknown) => ({ name: "Fastify", options })),
 }));
 
 vi.mock("@sentry/node", () => ({
@@ -22,6 +23,7 @@ vi.mock("@sentry/node", () => ({
   requestDataIntegration: h.requestDataIntegration,
   makeNodeTransport: h.makeNodeTransport,
   spotlightIntegration: h.spotlightIntegration,
+  fastifyIntegration: h.fastifyIntegration,
 }));
 
 type InitOptions = {
@@ -76,15 +78,16 @@ describe("instrument.ts Sentry wiring (#1880)", () => {
     expect(options.tracesSampler).toBeUndefined();
   });
 
-  it("keeps them, minus Redis, with tracing on", async () => {
+  it("keeps them, minus Redis, with tracing on and Fastify error capture off (#1645)", async () => {
     const options = await loadInstrument({ SENTRY_TRACES_SAMPLE_RATE: "0.5" });
     expect(options.integrations).toBeTypeOf("function");
     const resolve = options.integrations as (d: Array<{ name: string }>) => unknown;
-    expect(resolve([{ name: "Redis" }, { name: "Postgres" }])).toEqual([
+    expect(resolve([{ name: "Redis" }, { name: "Fastify" }, { name: "Postgres" }])).toEqual([
       { name: "Postgres" },
       { name: "Http", options: OUR_HTTP },
       { name: "RequestData", options: OUR_REQUEST_DATA },
       GATED_SPOTLIGHT,
+      { name: "Fastify", options: { shouldHandleError: expect.any(Function) } },
     ]);
     expect(options.beforeSendTransaction).toBeTypeOf("function");
     expect(options.tracesSampler).toBeTypeOf("function");
