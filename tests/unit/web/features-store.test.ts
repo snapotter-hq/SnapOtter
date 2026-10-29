@@ -72,7 +72,11 @@ describe("useFeaturesStore", () => {
     FakeEventSource.reset();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // The store is a singleton, so pollers and streams started by one test
+    // would keep ticking into the next. resetEnvironment stops all of them.
+    apiPostMock.mockResolvedValueOnce({ ok: true });
+    await useFeaturesStore.getState().resetEnvironment();
     vi.restoreAllMocks();
   });
 
@@ -1200,6 +1204,37 @@ describe("useFeaturesStore", () => {
 
       expect(useFeaturesStore.getState().bundlesStale).toBe(false);
     });
+
+    // #4174: a poll tick that finds the bundle missing or not_installed means
+    // the install did not finish. Settling it as success clears the pill with
+    // no error, so the user sees neither installed nor failed.
+    it.each([
+      ["missing from the list", []],
+      ["reported not_installed", [makeBundleState({ id: "test-bundle", status: "not_installed" })]],
+    ])(
+      "records an error when the install's bundle is %s on a poll tick",
+      async (_label, bundles) => {
+        apiPostMock.mockResolvedValueOnce({ jobId: "job-vanished" });
+        const promise = useFeaturesStore.getState().installBundle("test-bundle");
+        await vi.waitFor(() => {
+          expect(FakeEventSource.instances).toHaveLength(1);
+        });
+        await promise;
+        const es = FakeEventSource.instances[0];
+
+        vi.useFakeTimers();
+        try {
+          apiGetMock.mockResolvedValue({ bundles });
+          es.onerror?.();
+          await vi.advanceTimersByTimeAsync(3_000);
+
+          expect(useFeaturesStore.getState().errors["test-bundle"]).toBeTruthy();
+          expect(useFeaturesStore.getState().installing["test-bundle"]).toBeUndefined();
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
 
     it("keeps the status poller running after a failed refresh tick", async () => {
       apiPostMock.mockResolvedValueOnce({ jobId: "job-poll-refresh-fail" });

@@ -183,13 +183,12 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         return;
       }
 
-      // Terminal: installed / error / not_installed.
+      // Terminal: installed, or a failure. A bundle that is missing or back to
+      // not_installed means the job vanished before it finished.
       stopPolling(bundleId);
       stopTracking(bundleId);
-      onInstallSettled(
-        bundleId,
-        updated?.status === "error" ? (updated.error ?? "Installation failed") : null,
-      );
+      const failed = !updated || updated.status === "not_installed" || updated.status === "error";
+      onInstallSettled(bundleId, failed ? (updated?.error ?? "Installation failed") : null);
     }, 3000);
     pollRefs[bundleId] = timer;
   };
