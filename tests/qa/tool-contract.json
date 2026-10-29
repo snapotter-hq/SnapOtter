@@ -2506,7 +2506,7 @@
       },
       {
         "key": "language",
-        "values": ["auto", "en", "de", "fr", "es", "zh", "ja", "ko", null]
+        "values": ["auto", "en", "de", "fr", "es", "zh", "ja", "ko", "ar", null]
       },
       {
         "key": "enhance",
@@ -2572,7 +2572,7 @@
       },
       {
         "key": "language",
-        "values": ["auto", "en", "de", "fr", "es", "zh", "ja", "ko", null]
+        "values": ["auto", "en", "de", "fr", "es", "zh", "ja", "ko", "ar", null]
       },
       {
         "key": "enhance",
