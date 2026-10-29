@@ -401,9 +401,9 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     && rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
     && test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
     && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
        else \
          echo "No supported ImageMagick EXR coder package found" >&2; exit 1; \
        fi \
