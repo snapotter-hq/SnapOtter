@@ -54,7 +54,15 @@ function ffmpegSpawnFailure(
  */
 export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Promise<string> {
   const bin = resolveFfmpeg();
-  if (!bin) throw new Error("ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)");
+  // Shaped like a failed spawn, so callers can tell a missing install from a
+  // bad input (#1576).
+  if (!bin) {
+    throw Object.assign(new Error("ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)"), {
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "ffmpeg",
+    });
+  }
   return new Promise<string>((resolvePromise, reject) => {
     const [limBin, limArgs] = wrapWithMemoryLimit(bin, [
       "-hide_banner",

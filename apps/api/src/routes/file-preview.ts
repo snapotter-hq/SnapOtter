@@ -28,6 +28,8 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
+import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
@@ -38,6 +40,7 @@ import {
   normalizeOperationalWriteError,
   STORAGE_UNAVAILABLE_MESSAGE,
 } from "../lib/object-storage.js";
+import { InputValidationError } from "../modality/contract.js";
 import { hasEffectivePermission, requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 
@@ -152,6 +155,32 @@ function previewErrorBody(err: unknown): { error: string; code?: string; encoder
     return { error: friendlyError(err.message), code: err.code, encoder };
   }
   return { error: "Could not generate preview" };
+}
+
+/**
+ * ffmpeg's binary isn't on the box at all: no PATH entry, or FFMPEG_PATH names
+ * a file that isn't there. runFfmpeg reports both as a spawn ENOENT (#1576).
+ * Other spawn failures (EACCES, ENOEXEC) stay a 500 under #1439.
+ */
+function isMissingFfmpeg(err: unknown): boolean {
+  return isBinarySpawnFailure(err) && (err as NodeJS.ErrnoException).code === "ENOENT";
+}
+
+/**
+ * ffmpeg can't be started: none on PATH, FFMPEG_PATH names nothing, or the
+ * binary isn't executable. That is the operator's install, not the upload, so it
+ * gets the 503 ENGINE_UNAVAILABLE the tool routes answer with, and is reported.
+ * A 422 here read as a bad file, and nothing on the server ever heard about it
+ * (#1576).
+ */
+function ffmpegUnavailable(request: FastifyRequest, reply: FastifyReply) {
+  const err = new InputValidationError(
+    "Media processing is unavailable on this server because ffmpeg is not installed.",
+    503,
+    "Install ffmpeg in the container or set FFMPEG_PATH.",
+    "ENGINE_UNAVAILABLE",
+  );
+  return sendInputValidationError(reply, err, "preview", request.log);
 }
 
 /**
@@ -548,6 +577,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         }
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
+        if (isMissingFfmpeg(err)) return ffmpegUnavailable(request, reply);
         if (isServerFault(err)) {
           reportPreviewFault(err, request, { fileId: id }, "Preview encode could not run");
           return reply.status(500).send({ error: "Could not generate preview" });
@@ -718,6 +748,8 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         if (disconnect.clientGone()) {
           request.log.info({ filename }, "On-demand preview stopped: client disconnected");
+        } else if (isMissingFfmpeg(err)) {
+          return ffmpegUnavailable(request, reply);
         } else if (isServerFault(err)) {
           // A temp write that failed, a spawn that couldn't start: the server's
           // fault, not the uploaded file's (#1439).

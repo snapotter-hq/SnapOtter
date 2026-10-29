@@ -762,3 +762,134 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
     await expect(generateHandler?.(tooLargeReq, streamReply)).rejects.toBe(tooLarge);
   });
 });
+
+describe("media previews when ffmpeg is missing (#1576)", () => {
+  const ENGINE_MSG =
+    "Media processing is unavailable on this server because ffmpeg is not installed.";
+  const ENGINE_HINT = "Install ffmpeg in the container or set FFMPEG_PATH.";
+  const missingBinary = () =>
+    Object.assign(new Error("ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)"), {
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "ffmpeg",
+    });
+
+  beforeEach(async () => {
+    await writeFile(join(testDir, "stored-audio.mp3"), "mp3-bytes");
+    fileRows.set("aud-1", {
+      id: "aud-1",
+      userId: "user-1",
+      originalName: "song.mp3",
+      storedName: "stored-audio.mp3",
+      mimeType: "audio/mpeg",
+    });
+  });
+
+  it("answers GET preview with 503 ENGINE_UNAVAILABLE when no ffmpeg is found, and reports it", async () => {
+    previewMocks.runFfmpeg.mockRejectedValue(missingBinary());
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    const app = Fastify();
+    await filePreviewRoutes(app);
+    await app.ready();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/aud-1/preview" });
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toEqual({
+        error: ENGINE_MSG,
+        details: ENGINE_HINT,
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+      expect(previewMocks.reportError.mock.calls[0][1]).toMatchObject({
+        source: "http",
+        statusCode: 503,
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("answers GET preview with 503 ENGINE_UNAVAILABLE when FFMPEG_PATH points at nothing (spawn ENOENT)", async () => {
+    previewMocks.runFfmpeg.mockRejectedValue(
+      Object.assign(new Error("spawn /nope/ffmpeg ENOENT"), {
+        code: "ENOENT",
+        syscall: "spawn",
+        path: "/nope/ffmpeg",
+      }),
+    );
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    const app = Fastify();
+    await filePreviewRoutes(app);
+    await app.ready();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/aud-1/preview" });
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE", details: ENGINE_HINT });
+      expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("answers POST preview/generate with 503 ENGINE_UNAVAILABLE when no ffmpeg is found", async () => {
+    const { Readable } = await import("node:stream");
+    previewMocks.runFfmpeg.mockRejectedValue(missingBinary());
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let generateHandler: RouteHandler | undefined;
+    const fakeApp = {
+      log: loggerMock,
+      get: vi.fn(),
+      post: vi.fn((path: string, _opts: unknown, handler?: RouteHandler) => {
+        if (path === "/api/v1/preview/generate") {
+          generateHandler = (typeof _opts === "function" ? _opts : handler) as RouteHandler;
+        }
+      }),
+    };
+    await filePreviewRoutes(fakeApp as never);
+
+    const reply = {
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      status: vi.fn().mockReturnThis(),
+      header: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+    };
+    const req = {
+      raw: {
+        destroyed: false,
+        socket: { destroyed: false },
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      log: loggerMock,
+      async *parts() {
+        yield {
+          type: "file" as const,
+          fieldname: "file",
+          filename: "song.mp3",
+          file: Readable.from([Buffer.from("mp3-bytes")]),
+        };
+      },
+    };
+
+    await generateHandler?.(req, reply);
+    expect(reply.status).toHaveBeenCalledWith(503);
+    expect(reply.send).toHaveBeenCalledWith({
+      error: ENGINE_MSG,
+      details: ENGINE_HINT,
+      code: "ENGINE_UNAVAILABLE",
+    });
+  });
+});

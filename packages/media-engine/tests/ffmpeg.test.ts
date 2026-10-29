@@ -512,4 +512,18 @@ describe("runFfmpeg: missing binary", () => {
     expect(vi.mocked(spawn)).not.toHaveBeenCalled();
     vi.doUnmock("../src/binaries.js");
   });
+
+  // A failed spawn is how the route tells a broken install from a bad file (#1576).
+  it("rejects with a spawn-shaped ENOENT so callers read it as an engine fault", async () => {
+    vi.doMock("../src/binaries.js", () => ({
+      resolveFfmpeg: () => null,
+      resolveFfprobe: () => null,
+    }));
+    const { runFfmpeg } = await import("../src/ffmpeg.js");
+    await expect(runFfmpeg(["out.mp4"])).rejects.toMatchObject({
+      code: "ENOENT",
+      syscall: "spawn",
+    });
+    vi.doUnmock("../src/binaries.js");
+  });
 });
