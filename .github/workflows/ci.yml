@@ -131,10 +131,13 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
-    # Headroom for a degraded-apt-mirror day: the full bounded recovery
-    # ladder (~27m worst case) plus the tests still fit (#876). A 15m cap
-    # killed this job mid-recovery on a real degraded day.
-    timeout-minutes: 35
+    # Headroom for a degraded-apt-mirror day (#876, #2007). The apt-install
+    # ladder's worst case is ~34m since #1971 (120s update, two 360s
+    # post-swap updates, three 300s installs, a shared 300s dpkg wait), plus
+    # up to 3m of KILL grace if apt ignores TERM, plus the rest of the job,
+    # which took up to ~11m on main. A 15m cap killed this job mid-recovery
+    # on a real degraded day. Re-derive this if the ladder's budgets change.
+    timeout-minutes: 50
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
@@ -174,9 +177,11 @@ jobs:
   test-integration:
     name: Integration (${{ matrix.shard }}/8)
     runs-on: ubuntu-latest
-    # Headroom for a degraded-apt-mirror day: both bounded install attempts
-    # plus the tests still fit (#876).
-    timeout-minutes: 40
+    # Headroom for a degraded-apt-mirror day (#876, #2007). Same apt-install
+    # ladder as test-unit (~34m worst case since #1971, plus up to 3m of KILL
+    # grace), plus the rest of a shard, which took up to ~8m on main. Re-derive
+    # this if the ladder's budgets change.
+    timeout-minutes: 45
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
