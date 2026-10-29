@@ -50,6 +50,8 @@ interface BatchProgressFrame {
   currentFile?: string;
   /** Terminal frames carry the durable batch result (#750). */
   result?: Record<string, unknown>;
+  /** A failed frame's shared reason, such as NO_TEXT_LAYER (#4143). */
+  code?: string;
 }
 
 export interface ToolProgress {
