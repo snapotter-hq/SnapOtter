@@ -29,7 +29,9 @@ export function buildTracesSampler(httpRate: number): (ctx: SamplingContext) => 
     // polls). The exact incident source: zero them outright.
     const op = String(attrs["sentry.op"] ?? "");
     if (op.startsWith("db")) return 0;
-    if (attrs["db.system"] === "redis") return 0;
+    // @sentry/node 10.66 sends the current semantic-convention key,
+    // db.system.name; db.system is the legacy spelling (#4154).
+    if (attrs["db.system.name"] === "redis" || attrs["db.system"] === "redis") return 0;
 
     // Any queue root span: only sample a real job execution we explicitly named
     // "job <name>" (see worker.ts); drop the continuous poll transactions.

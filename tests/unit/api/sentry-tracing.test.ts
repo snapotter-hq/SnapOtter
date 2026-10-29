@@ -8,6 +8,39 @@ describe("buildTracesSampler (the July-incident guard)", () => {
     expect(sampler({ name: "BRPOPLPUSH", attributes: { "db.system": "redis" } })).toBe(0);
   });
 
+  it("zeroes the Redis root spans @sentry/node 10.66 actually sends (#4154)", () => {
+    // Captured from the real SDK with its default Redis integration, see
+    // tests/integration/sentry-sampler-default-integrations.test.ts. They carry
+    // db.system.name, not db.system, and no messaging.system.
+    const origin = "auto.db.redis.diagnostic_channel";
+    const spans = [
+      { name: "redis-connect", op: "db.redis.connect" },
+      { name: "redis-bzpopmin", op: "db.redis" },
+      { name: "redis-eval", op: "db.redis" },
+    ];
+    for (const { name, op } of spans) {
+      const attributes = {
+        "sentry.origin": origin,
+        "sentry.op": op,
+        "db.system.name": "redis",
+        "server.address": "localhost",
+        "server.port": 6379,
+      };
+      expect(sampler({ name, attributes })).toBe(0);
+    }
+  });
+
+  it("zeroes a Redis span on db.system.name alone, even under a sampled parent", () => {
+    // Without the branch the span would follow its parent's decision (1).
+    expect(
+      sampler({
+        name: "redis-bzpopmin",
+        attributes: { "db.system.name": "redis" },
+        inheritOrSampleWith: () => 1,
+      }),
+    ).toBe(0);
+  });
+
   it("zeroes standalone db root transactions (pg idle pings) by op prefix", () => {
     expect(sampler({ name: "SELECT 1", attributes: { "sentry.op": "db.query" } })).toBe(0);
     expect(sampler({ name: "pg", attributes: { "sentry.op": "db.redis" } })).toBe(0);
