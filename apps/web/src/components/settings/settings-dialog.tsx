@@ -59,6 +59,7 @@ import {
   throwWithMessage,
 } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { quietImport } from "@/lib/chunk-reload";
 import { canRecordFeedback, shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, formatDate, plural } from "@/lib/format";
 import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
@@ -751,7 +752,7 @@ export function SystemSection() {
       await apiPut("/v1/settings", writableSettings(changed));
       originalSettingsRef.current = { ...settings };
       if ("analyticsEnabled" in changed) {
-        const { optIn, optOut } = await import("@/lib/analytics");
+        const { optIn, optOut } = await quietImport(() => import("@/lib/analytics"));
         if (settings.analyticsEnabled === "false") optOut();
         else optIn();
         // Refresh the cached config so this tab converges immediately: optOut()

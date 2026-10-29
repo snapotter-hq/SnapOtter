@@ -9,6 +9,7 @@ import { appUrl } from "@/lib/app-url";
 import { formatFileSize, triggerDownload } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { isIgnoredError } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -107,7 +108,7 @@ export function ReviewPanel({
   }, [originalSize, fileSize]);
 
   const handleDownload = () => {
-    import("@/lib/analytics").then(({ track }) => {
+    withAnalytics(({ track }) => {
       track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: currentToolId });
     });
     if (downloadUrl) triggerDownload(downloadUrl, filename);
@@ -173,7 +174,7 @@ export function ReviewPanel({
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
       // fired, so save-rate was unmeasurable.
-      import("@/lib/analytics").then(({ track }) => {
+      withAnalytics(({ track }) => {
         track(ANALYTICS_EVENTS.RESULT_SAVED, { tool_id: currentToolId });
       });
     } catch (err) {

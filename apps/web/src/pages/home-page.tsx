@@ -17,6 +17,7 @@ import type { FeedbackPromptVariant } from "@/lib/feedback.js";
 import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback.js";
 import { format } from "@/lib/format.js";
 import { ICON_MAP } from "@/lib/icon-map.js";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { parseStringArray } from "@/lib/settings-payload.js";
 import { getCategoryName, getToolName } from "@/lib/tool-i18n.js";
 import { buildToolRequestDiscussionUrl } from "@/lib/tool-request.js";
@@ -126,7 +127,7 @@ export function HomePage() {
   useEffect(() => {
     if (!search || search.length < 2) return;
     const timer = setTimeout(() => {
-      import("@/lib/analytics").then(({ track }) => {
+      withAnalytics(({ track }) => {
         track(ANALYTICS_EVENTS.SEARCH, { results_count: searchResults.length });
       });
     }, 1000);
@@ -438,7 +439,7 @@ function SearchResults({
             showPin
             onNavigate={() => {
               // search -> click attribution: which result the user opened.
-              import("@/lib/analytics").then(({ track }) =>
+              withAnalytics(({ track }) =>
                 track(ANALYTICS_EVENTS.SEARCH, {
                   results_count: results.length,
                   clicked_tool_id: tool.id,

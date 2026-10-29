@@ -47,6 +47,7 @@ import { failedAnswerMessage, formatHeaders, getFileDownloadUrl } from "@/lib/ap
 import { appUrl } from "@/lib/app-url";
 import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import { cn } from "@/lib/utils";
@@ -136,7 +137,7 @@ function AutomatePageContent({
   usePageTitle(t.sidebar.automate);
 
   useEffect(() => {
-    import("@/lib/analytics").then(({ track }) => track(ANALYTICS_EVENTS.PIPELINE_OPENED, {}));
+    withAnalytics(({ track }) => track(ANALYTICS_EVENTS.PIPELINE_OPENED, {}));
   }, []);
   const {
     files,
@@ -446,7 +447,7 @@ function AutomatePageContent({
         return;
       }
 
-      import("@/lib/analytics").then(({ track }) =>
+      withAnalytics(({ track }) =>
         track(ANALYTICS_EVENTS.PIPELINE_SAVED, { step_count: steps.length }),
       );
       setSaveName("");
@@ -571,7 +572,7 @@ function AutomatePageContent({
   const handleUseTemplate = useCallback(
     (template: PipelineTemplate) => {
       loadSteps(template.steps);
-      import("@/lib/analytics").then(({ track }) =>
+      withAnalytics(({ track }) =>
         track(ANALYTICS_EVENTS.PIPELINE_TEMPLATE_SELECTED, { template_id: template.id }),
       );
     },
@@ -750,7 +751,7 @@ function AutomatePageContent({
   const handleAddStep = useCallback(
     (toolId: string) => {
       addStep(toolId);
-      import("@/lib/analytics").then(({ track }) =>
+      withAnalytics(({ track }) =>
         track(ANALYTICS_EVENTS.PIPELINE_STEP_ADDED, { tool_id: toolId }),
       );
       if (isMobile) setMobileToolPaletteOpen(false);

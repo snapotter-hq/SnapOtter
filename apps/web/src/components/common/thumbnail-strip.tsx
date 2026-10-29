@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { quietImport } from "@/lib/chunk-reload";
 import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { hasResultWarning } from "@/lib/result-notes";
 import type { FileEntry, PreviewKind } from "@/stores/file-store";
@@ -128,7 +129,7 @@ function renderPdfThumb(file: File, onDone: (url: string | null) => void): () =>
   };
   const run = async () => {
     try {
-      const pdfjs = await import("pdfjs-dist");
+      const pdfjs = await quietImport(() => import("pdfjs-dist"));
       if (cancelled) return;
       pdfjs.GlobalWorkerOptions.workerSrc = new URL(
         "pdfjs-dist/build/pdf.worker.min.mjs",

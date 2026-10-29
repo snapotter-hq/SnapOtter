@@ -13,6 +13,7 @@ import {
   type LevelsValues,
   type ToneChannel,
 } from "@/components/editor/adjustment-lut";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { generateId } from "@/lib/utils";
 import type {
   AdjustmentValues,
@@ -660,7 +661,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         if (tool !== activeTool) {
           // Which editor tools users actually engage (brush/shape/adjust/...);
           // the single chokepoint, so UI clicks and keyboard shortcuts both count.
-          import("@/lib/analytics").then(({ track }) =>
+          withAnalytics(({ track }) =>
             track(ANALYTICS_EVENTS.EDITOR_TOOL_USED, { editor_tool: tool }),
           );
         }

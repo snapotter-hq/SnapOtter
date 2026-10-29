@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { useFeaturesStore } from "@/stores/features-store";
 
 export function formatTimeRemaining(ms: number, t: TranslationKeys, locale: string): string {
@@ -123,7 +124,7 @@ export function FeatureInstallPrompt({
     // Install-prompt impression: the top of the AI-adoption funnel
     // (prompted -> ai_bundle_action install -> tool_used is_ai_tool). Non-admins
     // see a different "not enabled" message, not this prompt.
-    import("@/lib/analytics").then(({ track }) => {
+    withAnalytics(({ track }) => {
       track(ANALYTICS_EVENTS.AI_BUNDLE_PROMPTED, { bundle_id: bundle.id });
     });
   }, [bundle.id, bundle.status, isAdmin]);

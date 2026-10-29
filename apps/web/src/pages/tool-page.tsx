@@ -54,6 +54,7 @@ import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { showUnsupportedFileType } from "@/lib/intake-notice";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
@@ -430,7 +431,7 @@ function ToolPageContent({
   useEffect(() => {
     if (tool) {
       recordRecentTool(tool.id);
-      import("@/lib/analytics").then(({ track, setSentryTag }) => {
+      withAnalytics(({ track, setSentryTag }) => {
         // Tag Sentry so a frontend crash is filterable by which tool/section the
         // user was on (the web TAG_ALLOWLIST reserves these but nothing set them).
         setSentryTag("tool_id", tool.id);

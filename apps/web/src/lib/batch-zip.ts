@@ -1,4 +1,5 @@
 import type { Unzipped } from "fflate";
+import { quietImport } from "@/lib/chunk-reload";
 import { MalformedResultError, reportMalformedResult } from "@/lib/progress-frames";
 
 interface ReportTags {
@@ -16,7 +17,7 @@ interface ReportTags {
  * to load is ours, not the answer's, so that throw goes to the caller.
  */
 export async function unpackBatchZip(zipBlob: Blob, tags: ReportTags): Promise<Unzipped | null> {
-  const { unzipSync } = await import("fflate");
+  const { unzipSync } = await quietImport(() => import("fflate"));
   try {
     return unzipSync(new Uint8Array(await zipBlob.arrayBuffer()));
   } catch (err) {
