@@ -158,6 +158,8 @@ async function loadEnqueueModule(
     }));
   }
 
+  loggerMock.error.mockClear();
+  loggerMock.warn.mockClear();
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
   vi.doMock("../../../../apps/api/src/lib/ai-quota.js", () => ({
     assertAiJobQuota: assertAiJobQuotaMock,
