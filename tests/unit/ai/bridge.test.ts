@@ -1329,6 +1329,60 @@ describe("bridge - dispatcher lifecycle via runPythonWithProgress", () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
+  it("logs the signal and the last stderr lines when an idle dispatcher dies (#1656)", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    // A request sent before readiness takes the per-request path, which
+    // spawns the fallback process. Finish it, then mark the dispatcher ready.
+    const first = runPythonWithProgress("test.py", []);
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await first;
+
+    mockDispatcher.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await new Promise((r) => setTimeout(r, 10));
+
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+    const id = JSON.parse(mockDispatcher.stdinWrites.join("").split("\n").filter(Boolean)[0]).id;
+    mockDispatcher.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id, exitCode: 0, stdout: "ok" })}\n`),
+    );
+    await promise;
+
+    // Nothing is pending now, so this traceback reaches no request's error.
+    // The flood before it checks that only the last 20 stderr lines are kept.
+    const frames = Array.from({ length: 25 }, (_, i) => `frame-${String(i + 1).padStart(2, "0")}`);
+    mockDispatcher.stderr.emit("data", Buffer.from(`${frames.join("\n")}\n`));
+    mockDispatcher.stderr.emit(
+      "data",
+      Buffer.from("Traceback (most recent call last):\nRuntimeError: model blew up\n"),
+    );
+    mockDispatcher.emitEvent("close", null, "SIGKILL");
+
+    const logged = [...sink.warn.mock.calls, ...sink.error.mock.calls]
+      .map((call) => String(call[0]))
+      .join("\n");
+    expect(logged).toContain("exit code null, signal SIGKILL");
+    expect(logged).toContain("RuntimeError: model blew up");
+    expect(logged).toContain("frame-08");
+    expect(logged).not.toContain("frame-07");
+  });
+
   it("spawns the dispatcher outside the requesting job's trace context (#1500)", async () => {
     // The child outlives the job that happened to start it. Its pipe events
     // run in the context spawn() was called in, so spawning inside a job
@@ -2325,13 +2379,13 @@ describe("bridge - max consecutive crash threshold", () => {
     expect(status.consecutiveCrashes).toBeGreaterThanOrEqual(5);
     // Each crash, and giving up, reaches the log sink (#1500).
     expect(sink.warn.mock.calls.map((call) => call[0])).toEqual([
-      "[bridge] Dispatcher crash #1, backing off 1000ms before restart",
-      "[bridge] Dispatcher crash #2, backing off 2000ms before restart",
-      "[bridge] Dispatcher crash #3, backing off 4000ms before restart",
-      "[bridge] Dispatcher crash #4, backing off 8000ms before restart",
+      "[bridge] Dispatcher crash #1, backing off 1000ms before restart (exit code 1, signal none)",
+      "[bridge] Dispatcher crash #2, backing off 2000ms before restart (exit code 1, signal none)",
+      "[bridge] Dispatcher crash #3, backing off 4000ms before restart (exit code 1, signal none)",
+      "[bridge] Dispatcher crash #4, backing off 8000ms before restart (exit code 1, signal none)",
     ]);
     expect(sink.error.mock.calls.map((call) => call[0])).toEqual([
-      "[bridge] Dispatcher crashed 5 times in 60s, disabling permanently",
+      "[bridge] Dispatcher crashed 5 times in 60s, disabling permanently (exit code 1, signal none)",
     ]);
 
     vi.useRealTimers();

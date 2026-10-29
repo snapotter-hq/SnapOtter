@@ -31,3 +31,25 @@ export const aiLog: AiLogger = {
   warn: (message, error) => sink.warn(message, error),
   error: (message, error) => sink.error(message, error),
 };
+
+const MAX_EXIT_DETAIL_CHARS = 500;
+
+/**
+ * One-line summary of a Python child that exited unexpectedly: its exit code,
+ * its signal (an OOM kill shows as `code null, signal SIGKILL`), and the end of
+ * its stderr. The stderr can quote upload paths and model names, so control
+ * characters are flattened and only the tail is kept: one crash can't forge
+ * or flood the rolling log files.
+ */
+export function describeUnexpectedExit(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+  stderrLines: readonly string[],
+): string {
+  const stderr = stderrLines
+    .map((line) => line.replace(/[\p{Cc}\p{Cf}\s]+/gu, " ").trim())
+    .filter(Boolean)
+    .join(" | ")
+    .slice(-MAX_EXIT_DETAIL_CHARS);
+  return `exit code ${String(code)}, signal ${signal ?? "none"}${stderr ? `; last stderr: ${stderr}` : ""}`;
+}

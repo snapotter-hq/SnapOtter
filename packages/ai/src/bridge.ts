@@ -12,7 +12,7 @@ import {
   type SidecarMemoryOptions,
   sidecarMemoryRefusal,
 } from "./feature-gate.js";
-import { aiLog } from "./log.js";
+import { aiLog, describeUnexpectedExit } from "./log.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -391,6 +391,8 @@ interface PendingRequest {
 const CRASH_WINDOW_MS = 60_000;
 const MAX_CONSECUTIVE_CRASHES = 5;
 const BASE_BACKOFF_MS = 1_000;
+// Enough to hold a Python traceback's tail without keeping a whole log per child.
+const EXIT_STDERR_TAIL_LINES = 20;
 const DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES = 3;
 
 const CUDA_POISON_RE =
@@ -500,7 +502,11 @@ export class PythonDispatcher {
     return env;
   }
 
-  private recordCrash(): void {
+  /**
+   * @param exit what the dead child reported (see describeUnexpectedExit), so
+   * the log says why it died, not only how many times.
+   */
+  private recordCrash(exit?: string): void {
     const now = Date.now();
     if (now - this.lastCrashTs > CRASH_WINDOW_MS) {
       this.crashes = 1;
@@ -508,10 +514,11 @@ export class PythonDispatcher {
       this.crashes++;
     }
     this.lastCrashTs = now;
+    const detail = exit ? ` (${exit})` : "";
 
     if (this.crashes >= MAX_CONSECUTIVE_CRASHES) {
       aiLog.error(
-        `[bridge] Dispatcher crashed ${this.crashes} times in ${CRASH_WINDOW_MS / 1000}s, disabling permanently`,
+        `[bridge] Dispatcher crashed ${this.crashes} times in ${CRASH_WINDOW_MS / 1000}s, disabling permanently${detail}`,
       );
       this.childFailed = true;
       return;
@@ -519,7 +526,9 @@ export class PythonDispatcher {
 
     const delay = BASE_BACKOFF_MS * 2 ** (this.crashes - 1);
     this.backoffEnd = now + delay;
-    aiLog.warn(`[bridge] Dispatcher crash #${this.crashes}, backing off ${delay}ms before restart`);
+    aiLog.warn(
+      `[bridge] Dispatcher crash #${this.crashes}, backing off ${delay}ms before restart${detail}`,
+    );
   }
 
   /**
@@ -643,6 +652,9 @@ export class PythonDispatcher {
 
       let stderrBuf = "";
       let stdoutBuf = "";
+      // Kept per child, not per request: a crash with nothing pending still
+      // needs the traceback that explains it.
+      const stderrTail: string[] = [];
 
       const handleStderrLine = (line: string) => {
         const trimmed = line.trim();
@@ -700,6 +712,8 @@ export class PythonDispatcher {
           // Forward diagnostic messages to Node.js logger and collect as regular stderr.
           aiLog.info(`[python] ${trimmed}`);
         }
+        stderrTail.push(trimmed);
+        if (stderrTail.length > EXIT_STDERR_TAIL_LINES) stderrTail.shift();
         for (const req of this.pending.values()) {
           if (req.generation === gen) req.stderrLines.push(trimmed);
         }
@@ -782,7 +796,7 @@ export class PythonDispatcher {
         }
       });
 
-      proc.on("close", (code) => {
+      proc.on("close", (code, signal) => {
         if (this.child === proc) {
           this.child = null;
           this.childReady = false;
@@ -799,7 +813,7 @@ export class PythonDispatcher {
           stderrBuf = "";
         }
         if (code !== 0 && !this.stoppedChildren.has(proc)) {
-          this.recordCrash();
+          this.recordCrash(describeUnexpectedExit(code, signal, stderrTail));
         }
       });
 
