@@ -372,7 +372,12 @@ describe("privacy invariants (#1022)", () => {
       } as never);
       await mod.initAnalytics(enabledConfig);
       const instance = mockInit.mock.results[0]?.value as {
-        _send_request: (o: { batchKey?: string; url: string }) => void;
+        _send_request: (o: {
+          batchKey?: string;
+          url: string;
+          fireCallbackOnDrop?: boolean;
+          callback?: (r: { statusCode: number }) => void;
+        }) => void;
       };
       return { rawSend, send: instance._send_request };
     }
@@ -381,6 +386,28 @@ describe("privacy invariants (#1022)", () => {
       const { rawSend, send } = await initWithSendSpy();
       send({ url: "https://ph.test/i/v1/logs?token=phc_test", batchKey: "logs" });
       expect(rawSend).not.toHaveBeenCalled();
+    });
+
+    it("answers a dropped logs batch with a 4xx so the SDK discards it instead of retrying", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      const callback = vi.fn();
+      send({
+        url: "https://ph.test/i/v1/logs?token=phc_test",
+        batchKey: "logs",
+        fireCallbackOnDrop: true,
+        callback,
+      });
+      expect(rawSend).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith({ statusCode: 400 });
+    });
+
+    it("answers a request dropped after an opt-out too, when the SDK asked for an answer", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      mod.optOut();
+      const callback = vi.fn();
+      send({ url: "https://ph.test/e/", fireCallbackOnDrop: true, callback });
+      expect(rawSend).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith({ statusCode: 400 });
     });
 
     it("still sends ordinary events while analytics is on", async () => {

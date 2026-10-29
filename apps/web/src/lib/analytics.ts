@@ -512,8 +512,13 @@ function gateRequestsOnOptOut(instance: PostHogInstance): void {
   if (typeof instance._send_request !== "function") return;
   const send = instance._send_request.bind(instance);
   instance._send_request = (options) => {
-    if (!enabled) return;
-    if ((options as { batchKey?: string }).batchKey === "logs") return;
+    if (!enabled || (options as { batchKey?: string }).batchKey === "logs") {
+      // The logs sender waits on its callback (90 s timeout, then retry-later)
+      // and keeps the records queued while it does. A 4xx is the SDK's fatal
+      // answer: the batch leaves the queue and is not retried (#4185).
+      if (options.fireCallbackOnDrop) options.callback?.({ statusCode: 400 });
+      return;
+    }
     send(options);
   };
 }
