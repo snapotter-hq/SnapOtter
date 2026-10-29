@@ -5670,6 +5670,7 @@ export const ru: TranslationKeys = {
     invalidSetting: "Недопустимое значение параметра «{setting}».",
     network: "Сетевая ошибка",
     invalidResponse: "Некорректный ответ",
+    staleVersionReload: "Приложение обновлено. Перезагрузите страницу и повторите попытку.",
     failedWithStatus: "Не удалось выполнить запрос. Пожалуйста, попробуйте снова.",
     processingFailedWithStatus:
       "Не удалось обработать этот файл. Убедитесь, что файл не повреждён, и попробуйте снова.",

@@ -5675,6 +5675,7 @@ export const ptBR: TranslationKeys = {
     invalidSetting: "Valor inválido para {setting}.",
     network: "Erro de rede",
     invalidResponse: "Resposta inválida",
+    staleVersionReload: "O app foi atualizado. Recarregue a página e tente novamente.",
     failedWithStatus: "Não foi possível concluir essa solicitação. Tente novamente.",
     processingFailedWithStatus:
       "Não foi possível processar este arquivo. Verifique se ele não está corrompido e tente novamente.",

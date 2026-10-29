@@ -5567,6 +5567,7 @@ export const ko: TranslationKeys = {
     invalidSetting: "{setting} 값이 올바르지 않습니다.",
     network: "네트워크 오류",
     invalidResponse: "잘못된 응답",
+    staleVersionReload: "앱이 업데이트되었습니다. 페이지를 새로고침한 후 다시 시도하세요.",
     failedWithStatus: "요청을 완료할 수 없습니다. 다시 시도해 주세요.",
     processingFailedWithStatus:
       "이 파일을 처리할 수 없습니다. 파일이 손상되지 않았는지 확인한 후 다시 시도해 주세요.",

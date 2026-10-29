@@ -5678,6 +5678,7 @@ export const it: TranslationKeys = {
     invalidSetting: "Valore non valido per {setting}.",
     network: "Errore di rete",
     invalidResponse: "Risposta non valida",
+    staleVersionReload: "L'app è stata aggiornata. Ricarica la pagina e riprova.",
     failedWithStatus: "Non è stato possibile completare la richiesta. Riprova.",
     processingFailedWithStatus:
       "Non è stato possibile elaborare questo file. Verifica che il file non sia danneggiato e riprova.",

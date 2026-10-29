@@ -5582,6 +5582,7 @@ export const en = {
     invalidSetting: "Invalid value for {setting}.",
     network: "Network error",
     invalidResponse: "Invalid response",
+    staleVersionReload: "The app was updated. Reload the page and try again.",
     failedWithStatus: "We couldn't complete that request. Please try again.",
     processingFailedWithStatus:
       "We couldn't process this file. Check that the file isn't damaged and try again.",

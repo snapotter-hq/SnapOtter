@@ -5710,6 +5710,7 @@ export const de: TranslationKeys = {
     invalidSetting: "Ungültiger Wert für {setting}.",
     network: "Netzwerkfehler",
     invalidResponse: "Ungültige Antwort",
+    staleVersionReload: "Die App wurde aktualisiert. Lade die Seite neu und versuche es erneut.",
     failedWithStatus:
       "Die Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
     processingFailedWithStatus:

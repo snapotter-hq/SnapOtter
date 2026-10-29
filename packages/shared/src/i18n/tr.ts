@@ -5666,6 +5666,7 @@ export const tr: TranslationKeys = {
     invalidSetting: "{setting} için geçersiz değer.",
     network: "Ağ hatası",
     invalidResponse: "Geçersiz yanıt",
+    staleVersionReload: "Uygulama güncellendi. Sayfayı yenileyip tekrar deneyin.",
     failedWithStatus: "Bu isteği tamamlayamadık. Lütfen tekrar deneyin.",
     processingFailedWithStatus:
       "Bu dosyayı işleyemedik. Dosyanın bozuk olmadığından emin olup tekrar deneyin.",

@@ -1,10 +1,12 @@
 import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, FolderArchive, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { quietImport } from "@/lib/chunk-reload";
 import { formatFileSize } from "@/lib/download";
 import { format, plural } from "@/lib/format";
 import { createXhrWatchdog } from "@/lib/xhr-watchdog";
@@ -288,7 +290,12 @@ export function FindDuplicatesSettings() {
   const handleDownloadUnique = useCallback(async () => {
     if (!results) return;
 
-    const { zipSync } = await import("fflate");
+    const fflate = await quietImport(() => import("fflate")).catch(() => null);
+    if (!fflate) {
+      toast.error(t.errors.staleVersionReload);
+      return;
+    }
+    const { zipSync } = fflate;
 
     const duplicateFilenames = new Set<string>();
     const bestFilenames = new Set<string>();
@@ -326,7 +333,12 @@ export function FindDuplicatesSettings() {
   const handleDownloadGrouped = useCallback(async () => {
     if (!results || results.duplicateGroups.length === 0) return;
 
-    const { zipSync } = await import("fflate");
+    const fflate = await quietImport(() => import("fflate")).catch(() => null);
+    if (!fflate) {
+      toast.error(t.errors.staleVersionReload);
+      return;
+    }
+    const { zipSync } = fflate;
 
     const duplicateFilenames = new Set<string>();
     const zipData: Record<string, Uint8Array> = {};

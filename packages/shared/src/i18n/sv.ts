@@ -5654,6 +5654,7 @@ export const sv: TranslationKeys = {
     invalidSetting: "Ogiltigt värde för {setting}.",
     network: "Nätverksfel",
     invalidResponse: "Ogiltigt svar",
+    staleVersionReload: "Appen har uppdaterats. Ladda om sidan och försök igen.",
     failedWithStatus: "Det gick inte att slutföra begäran. Försök igen.",
     processingFailedWithStatus:
       "Det gick inte att bearbeta den här filen. Kontrollera att filen inte är skadad och försök igen.",

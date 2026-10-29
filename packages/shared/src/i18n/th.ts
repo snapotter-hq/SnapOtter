@@ -5562,6 +5562,7 @@ export const th: TranslationKeys = {
     invalidSetting: "ค่าของ {setting} ไม่ถูกต้อง",
     network: "ข้อผิดพลาดเครือข่าย",
     invalidResponse: "การตอบกลับไม่ถูกต้อง",
+    staleVersionReload: "แอปได้รับการอัปเดตแล้ว โหลดหน้านี้ใหม่แล้วลองอีกครั้ง",
     failedWithStatus: "ไม่สามารถดำเนินการตามคำขอได้ โปรดลองอีกครั้ง",
     processingFailedWithStatus: "ไม่สามารถประมวลผลไฟล์นี้ได้ โปรดตรวจสอบว่าไฟล์ไม่เสียหายแล้วลองอีกครั้ง",
     processingFailedNoDetail: "ประมวลผลล้มเหลว",

@@ -5682,6 +5682,7 @@ export const nl: TranslationKeys = {
     invalidSetting: "Ongeldige waarde voor {setting}.",
     network: "Netwerkfout",
     invalidResponse: "Ongeldig antwoord",
+    staleVersionReload: "De app is bijgewerkt. Laad de pagina opnieuw en probeer het nog eens.",
     failedWithStatus: "Het verzoek kon niet worden voltooid. Probeer het opnieuw.",
     processingFailedWithStatus:
       "Dit bestand kon niet worden verwerkt. Controleer of het bestand niet beschadigd is en probeer het opnieuw.",

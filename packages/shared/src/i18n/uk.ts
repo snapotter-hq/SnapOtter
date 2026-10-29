@@ -5669,6 +5669,7 @@ export const uk: TranslationKeys = {
     invalidSetting: "Неприпустиме значення параметра «{setting}».",
     network: "Помилка мережі",
     invalidResponse: "Некоректна відповідь",
+    staleVersionReload: "Застосунок оновлено. Перезавантажте сторінку й спробуйте ще раз.",
     failedWithStatus: "Не вдалося виконати цей запит. Спробуйте ще раз.",
     processingFailedWithStatus:
       "Не вдалося обробити цей файл. Перевірте, чи файл не пошкоджений, і спробуйте ще раз.",

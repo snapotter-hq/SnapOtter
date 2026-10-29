@@ -5339,6 +5339,7 @@ export const zhTW: TranslationKeys = {
     invalidSetting: "{setting} 的值無效。",
     network: "網路錯誤",
     invalidResponse: "無效的回應",
+    staleVersionReload: "應用程式已更新。請重新整理頁面後再試一次。",
     failedWithStatus: "無法完成該要求，請再試一次。",
     processingFailedWithStatus: "無法處理此檔案，請確認檔案未損毀後再試一次。",
     processingFailedNoDetail: "處理失敗",

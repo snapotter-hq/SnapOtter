@@ -5433,6 +5433,7 @@ export const hi: TranslationKeys = {
     invalidSetting: "{setting} के लिए अमान्य मान।",
     network: "नेटवर्क त्रुटि",
     invalidResponse: "अमान्य प्रतिक्रिया",
+    staleVersionReload: "ऐप अपडेट हो गया है। पेज को फिर से लोड करें और दोबारा कोशिश करें।",
     failedWithStatus: "हम वह अनुरोध पूरा नहीं कर सके। कृपया फिर से प्रयास करें।",
     processingFailedWithStatus:
       "हम इस फ़ाइल को प्रोसेस नहीं कर सके। जाँचें कि फ़ाइल खराब नहीं है और फिर से प्रयास करें।",

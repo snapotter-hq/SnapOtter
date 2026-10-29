@@ -5608,6 +5608,7 @@ export const ja: TranslationKeys = {
     invalidSetting: "{setting} の値が無効です。",
     network: "ネットワークエラー",
     invalidResponse: "無効な応答",
+    staleVersionReload: "アプリが更新されました。ページを再読み込みして、もう一度お試しください。",
     failedWithStatus: "リクエストを完了できませんでした。もう一度お試しください。",
     processingFailedWithStatus:
       "このファイルを処理できませんでした。ファイルが破損していないか確認して、もう一度お試しください。",

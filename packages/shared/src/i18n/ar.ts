@@ -5606,6 +5606,7 @@ export const ar: TranslationKeys = {
     invalidSetting: "قيمة غير صالحة لـ {setting}.",
     network: "خطأ في الشبكة",
     invalidResponse: "استجابة غير صالحة",
+    staleVersionReload: "تم تحديث التطبيق. أعد تحميل الصفحة وحاول مرة أخرى.",
     failedWithStatus: "تعذّر إكمال هذا الطلب. يرجى المحاولة مرة أخرى.",
     processingFailedWithStatus: "تعذّرت معالجة هذا الملف. تأكد من أن الملف غير تالف وحاول مرة أخرى.",
     processingFailedNoDetail: "فشلت المعالجة",

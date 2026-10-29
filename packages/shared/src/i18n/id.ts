@@ -5659,6 +5659,7 @@ export const id: TranslationKeys = {
     invalidSetting: "Nilai tidak valid untuk {setting}.",
     network: "Kesalahan jaringan",
     invalidResponse: "Respons tidak valid",
+    staleVersionReload: "Aplikasi telah diperbarui. Muat ulang halaman dan coba lagi.",
     failedWithStatus: "Kami tidak dapat menyelesaikan permintaan tersebut. Silakan coba lagi.",
     processingFailedWithStatus:
       "Kami tidak dapat memproses file ini. Pastikan file tidak rusak dan coba lagi.",

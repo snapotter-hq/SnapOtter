@@ -5641,6 +5641,7 @@ export const vi: TranslationKeys = {
     invalidSetting: "Giá trị không hợp lệ cho {setting}.",
     network: "Lỗi mạng",
     invalidResponse: "Phản hồi không hợp lệ",
+    staleVersionReload: "Ứng dụng đã được cập nhật. Hãy tải lại trang và thử lại.",
     failedWithStatus: "Không thể hoàn tất yêu cầu đó. Vui lòng thử lại.",
     processingFailedWithStatus:
       "Không thể xử lý tệp này. Hãy kiểm tra xem tệp có bị hỏng không rồi thử lại.",

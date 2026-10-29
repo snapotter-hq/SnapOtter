@@ -5679,6 +5679,7 @@ export const pl: TranslationKeys = {
     invalidSetting: "Nieprawidłowa wartość: {setting}.",
     network: "Błąd sieci",
     invalidResponse: "Nieprawidłowa odpowiedź",
+    staleVersionReload: "Aplikacja została zaktualizowana. Odśwież stronę i spróbuj ponownie.",
     failedWithStatus: "Nie udało się zrealizować tego żądania. Spróbuj ponownie.",
     processingFailedWithStatus:
       "Nie udało się przetworzyć tego pliku. Sprawdź, czy plik nie jest uszkodzony, i spróbuj ponownie.",

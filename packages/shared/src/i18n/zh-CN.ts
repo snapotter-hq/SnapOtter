@@ -5337,6 +5337,7 @@ export const zhCN: TranslationKeys = {
     invalidSetting: "{setting} 的值无效。",
     network: "网络错误",
     invalidResponse: "无效响应",
+    staleVersionReload: "应用已更新。请刷新页面后重试。",
     failedWithStatus: "无法完成该请求，请重试。",
     processingFailedWithStatus: "无法处理此文件，请检查文件是否损坏后重试。",
     processingFailedNoDetail: "处理失败",
