@@ -95,7 +95,9 @@ import { registerFavicon } from "../../../apps/api/src/routes/tools/favicon.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
 import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
+import { registerImageToBase64 } from "../../../apps/api/src/routes/tools/image-to-base64.js";
 import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
+import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
 import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
 import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
@@ -960,6 +962,68 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       expect(logLines.some((l) => l.includes("Favicon input decode failed"))).toBe(true);
     } finally {
       statsSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("info, image-to-base64, and favicon report the CLI decoder's error when the Sharp probe also fails, and log it (#4066)", async () => {
+    const cliSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValue(
+        new Error(`magick: improper image header \`${sampleTempPath}' @ error/icon.c`),
+      );
+    const corruptIco = Buffer.concat([ICO.subarray(0, 22), Buffer.alloc(2048, 0x5a)]);
+
+    const { app, logLines } = await buildLoggedApp((instance) => {
+      registerInfo(instance);
+      registerImageToBase64(instance);
+      registerFavicon(instance);
+    });
+    try {
+      for (const url of [
+        "/api/v1/tools/image/info",
+        "/api/v1/tools/image/image-to-base64",
+        "/api/v1/tools/image/favicon",
+      ]) {
+        const res = await app.inject({
+          method: "POST",
+          url,
+          ...multipartBody([{ name: "broken.ico", type: "image/x-icon", data: corruptIco }]),
+        });
+        expect(res.body, url).not.toContain(tmpdir());
+        expect(res.body, url).not.toContain("unsupported image format");
+        expect(res.body, url).toContain("improper image header");
+      }
+      expect(
+        logLines.some((l) => l.includes(sampleTempPath) && l.includes("improper image header")),
+        "the unstripped decoder error should be logged",
+      ).toBe(true);
+    } finally {
+      cliSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("file preview answers a HEIC decoder failure with stripped details and logs the raw error (#4066)", async () => {
+    const heicSpy = vi
+      .spyOn(heicConverter, "decodeHeic")
+      .mockRejectedValueOnce(new Error(`Command failed: heif-convert ${sampleTempPath}`));
+
+    const { app, logLines } = await buildLoggedApp(fileRoutes);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/preview",
+        ...multipartBody([{ name: "photo.heic", type: "image/heic", data: HEIC }]),
+      });
+      expect(res.statusCode, res.body).toBe(422);
+      expect(res.json()).toEqual({
+        error: "Failed to decode HEIC/HEIF file",
+        details: "Command failed: heif-convert [internal]",
+      });
+      expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
+    } finally {
+      heicSpy.mockRestore();
       await app.close();
     }
   });

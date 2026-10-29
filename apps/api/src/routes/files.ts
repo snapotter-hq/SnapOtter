@@ -451,7 +451,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
             request.log,
           );
         }
-        return reply.status(422).send({ error: "Failed to decode HEIC/HEIF file" });
+        request.log.warn({ err, toolId: "file-preview" }, "Decode failed");
+        return reply.status(422).send({
+          error: "Failed to decode HEIC/HEIF file",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
       }
     }
 

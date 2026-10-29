@@ -168,10 +168,7 @@ export function registerFavicon(app: FastifyInstance) {
               if (probeErr instanceof DecoderOutOfMemoryError) {
                 throw probeErr;
               }
-              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                throw decodeErr;
-              }
-              throw rawProbeErr;
+              throw decodeErr;
             }
           }
         }

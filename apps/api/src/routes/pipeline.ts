@@ -533,6 +533,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                       throw decodeErr;
                     }
+                    request.log.warn({ err: decodeErr, toolId: "pipeline" }, "Decode failed");
                     return reply.status(422).send({
                       error: `Failed to decode ${validation.format} file`,
                       details: stripInternalPaths(
