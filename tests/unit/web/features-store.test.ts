@@ -348,6 +348,26 @@ describe("useFeaturesStore", () => {
       expect(useFeaturesStore.getState().installing["test-bundle"]).toBeUndefined();
     });
 
+    it("logs a malformed progress frame with its raw payload", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-log-malformed" });
+
+      const promise = useFeaturesStore.getState().installBundle("test-bundle");
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances).toHaveLength(1);
+      });
+
+      const es = FakeEventSource.instances[0];
+      es.onmessage?.({ data: "not json" });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("progress frame"),
+        expect.objectContaining({ bundleId: "test-bundle", raw: "not json" }),
+      );
+
+      es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      await promise;
+    });
+
     // #1287: the onmessage catch used to wrap the whole handler, so a throw
     // while handling a frame was swallowed. A terminal frame closes the stream
     // before it settles, so a throw there left nothing to settle the pill.

@@ -194,7 +194,12 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       };
       try {
         data = JSON.parse(event.data);
-      } catch {
+      } catch (err) {
+        console.warn("Ignoring an unparseable install progress frame.", {
+          bundleId,
+          raw: event.data,
+          error: err,
+        });
         return;
       }
       try {
