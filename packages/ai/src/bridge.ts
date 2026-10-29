@@ -492,6 +492,14 @@ export class PythonDispatcher {
    */
   private stoppedChildren = new WeakSet<ChildProcess>();
 
+  /**
+   * Children whose death is already in the crash counter. A dead child can
+   * report itself twice (a broken stdin pipe, then a non-zero "close"); both
+   * handlers record the crash, and only the first may count so
+   * MAX_CONSECUTIVE_CRASHES means five dead children (#4162).
+   */
+  private countedCrashes = new WeakSet<ChildProcess>();
+
   constructor(opts: { profile: "ai" | "docs" }) {
     this.profile = opts.profile;
   }
@@ -529,6 +537,12 @@ export class PythonDispatcher {
     aiLog.warn(
       `[bridge] Dispatcher crash #${this.crashes}, backing off ${delay}ms before restart${detail}`,
     );
+  }
+
+  private recordChildCrash(proc: ChildProcess, exit?: string): void {
+    if (this.countedCrashes.has(proc)) return;
+    this.countedCrashes.add(proc);
+    this.recordCrash(exit);
   }
 
   /**
@@ -641,7 +655,7 @@ export class PythonDispatcher {
               `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
               err,
             );
-            this.recordCrash();
+            this.recordChildCrash(proc);
           }
           if (this.child === proc) {
             this.child = null;
@@ -813,7 +827,7 @@ export class PythonDispatcher {
           stderrBuf = "";
         }
         if (code !== 0 && !this.stoppedChildren.has(proc)) {
-          this.recordCrash(describeUnexpectedExit(code, signal, stderrTail));
+          this.recordChildCrash(proc, describeUnexpectedExit(code, signal, stderrTail));
         }
       });
 

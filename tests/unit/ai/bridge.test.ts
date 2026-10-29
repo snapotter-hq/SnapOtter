@@ -1736,7 +1736,8 @@ describe("bridge - initDispatcher", () => {
     destroyed.code = "ERR_STREAM_DESTROYED";
     mock.stdin.emit("error", destroyed);
 
-    expect(getDispatcherStatus().consecutiveCrashes).toBe(2);
+    // Same child: the second pipe error is the same death, not a new crash (#4162).
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
     expect(sink.error).toHaveBeenCalledWith(
       "[bridge] Dispatcher stdin pipe broken (ERR_STREAM_DESTROYED), rejecting pending requests",
       destroyed,
@@ -1746,12 +1747,60 @@ describe("bridge - initDispatcher", () => {
     procErr.code = "EPERM";
     mock.emitEvent("error", procErr);
 
-    expect(getDispatcherStatus().consecutiveCrashes).toBe(3);
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(2);
     expect(sink.error).toHaveBeenCalledWith(
       "[bridge] Dispatcher error: unexpected EPERM (code: EPERM)",
       procErr,
     );
     expect(sink.error).toHaveBeenCalledTimes(3);
+  });
+
+  it("counts a broken stdin pipe followed by a non-zero exit as one crash (#4162)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await promise;
+
+    const epipe = new Error("write EPIPE") as NodeJS.ErrnoException;
+    epipe.code = "EPIPE";
+    mock.stdin.emit("error", epipe);
+    mock.emitEvent("close", 1, null);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
+  });
+
+  it("counts a non-zero exit followed by a broken stdin pipe as one crash (#4162)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await promise;
+
+    mock.emitEvent("close", 1, null);
+    const epipe = new Error("write EPIPE") as NodeJS.ErrnoException;
+    epipe.code = "EPIPE";
+    mock.stdin.emit("error", epipe);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
+  });
+
+  it("still counts a broken stdin pipe with a clean exit once (#4162)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await promise;
+
+    const epipe = new Error("write EPIPE") as NodeJS.ErrnoException;
+    epipe.code = "EPIPE";
+    mock.stdin.emit("error", epipe);
+    mock.emitEvent("close", 0, null);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
   });
 });
 
