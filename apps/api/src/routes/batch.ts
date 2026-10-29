@@ -385,6 +385,29 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             });
           } catch (err) {
             if (isUniqueViolation(err)) {
+              // The owner resending the same batch (a browser retrying a POST
+              // whose response it gave up on) attaches to the batch already
+              // running. The XHR reports whichever answer arrives, so a 409
+              // here would fail a batch that finishes fine; 202 sends the
+              // client to the SSE, whose terminal frame carries the durable
+              // result (#2015). Another user's id stays a conflict.
+              const [existing] = await db
+                .select({
+                  userId: schema.jobs.userId,
+                  toolId: schema.jobs.toolId,
+                  type: schema.jobs.type,
+                })
+                .from(schema.jobs)
+                .where(eq(schema.jobs.id, parentId))
+                .limit(1);
+              if (
+                existing &&
+                existing.type === "batch" &&
+                existing.toolId === toolId &&
+                existing.userId === userId
+              ) {
+                return reply.status(202).send({ jobId: parentId, async: true });
+              }
               return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
             }
             throw err;
