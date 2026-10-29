@@ -1916,11 +1916,16 @@ export function useToolProcessor(toolId: string) {
         // the run stays live, as before. The SSE handler's own failure path
         // (#1287) then ends it with a message, and on the other paths the
         // cancel button stays armed, so a second click can still end it.
-        const failRun = (message: string, reason: string, category?: FeedbackErrorCategory) => {
+        const failRun = (
+          message: string,
+          reason: string,
+          category?: FeedbackErrorCategory,
+          code?: string,
+        ) => {
           let teardownError: { cause: unknown } | null = null;
           try {
             try {
-              setError(message);
+              setError(message, code);
             } catch (cause) {
               if (useFileStore.getState().error !== message) throw cause;
               console.error("Ending the run failed", cause);
@@ -2248,6 +2253,8 @@ export function useToolProcessor(toolId: string) {
             failRun(
               syntheticError ?? (allFilesFailed ? t.errors.allFilesFailed : t.errors.batchFailed),
               !syntheticError && allFilesFailed ? "all-files-failed" : "server-failed",
+              undefined,
+              frame.code,
             );
           },
         };
@@ -2421,6 +2428,7 @@ export function useToolProcessor(toolId: string) {
             // the bare status as the failure reason: the cap and the disk floor
             // are both 503s, and telling them apart is what the reason is for.
             let reason = `http-${xhr.status}`;
+            let serverCode: string | undefined;
             let body: unknown;
             let parsedJson = true;
             try {
@@ -2448,7 +2456,10 @@ export function useToolProcessor(toolId: string) {
               // instead of being repainted as "Canceled".
               serverCanceled = record.canceled === true;
               const code = record.code;
-              if (typeof code === "string" && code.length > 0) reason = code;
+              if (typeof code === "string" && code.length > 0) {
+                reason = code;
+                serverCode = code;
+              }
               const parsed = parseApiError(
                 record,
                 xhr.status,
@@ -2470,6 +2481,7 @@ export function useToolProcessor(toolId: string) {
               serverCanceled ? "Canceled" : errorMsg,
               reason,
               !serverCanceled && xhr.status === 413 ? "upload_error" : undefined,
+              serverCanceled ? undefined : serverCode,
             );
           })();
         };

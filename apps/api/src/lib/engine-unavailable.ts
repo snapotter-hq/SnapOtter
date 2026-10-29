@@ -93,9 +93,41 @@ export function allFailedFault(
   childFaults: BatchFault[],
   flowChildCount: number,
 ): ReturnType<typeof sharedServerFault> {
+  const faults = accountedFaults(preFailureFaults, preFailedCount, childFaults, flowChildCount);
+  return faults ? sharedServerFault(faults) : null;
+}
+
+/**
+ * The batch finalize's code for an all-failed batch whose files each failed on
+ * the same input problem (a 4xx with one code, such as NO_TEXT_LAYER). The
+ * message and status stay the batch's generic ones; the code only lets a
+ * client offer the next step for every file (#4143).
+ */
+export function allFailedInputCode(
+  preFailureFaults: unknown,
+  preFailedCount: number,
+  childFaults: BatchFault[],
+  flowChildCount: number,
+): string | null {
+  const faults = accountedFaults(preFailureFaults, preFailedCount, childFaults, flowChildCount);
+  const first = faults?.[0];
+  if (!faults || !first?.code || first.statusCode === undefined || first.statusCode >= 500) {
+    return null;
+  }
+  return faults.every((f) => f.code === first.code && f.statusCode === first.statusCode)
+    ? first.code
+    : null;
+}
+
+function accountedFaults(
+  preFailureFaults: unknown,
+  preFailedCount: number,
+  childFaults: BatchFault[],
+  flowChildCount: number,
+): BatchFault[] | null {
   const pre = Array.isArray(preFailureFaults) ? (preFailureFaults as BatchFault[]) : [];
   if (pre.length !== preFailedCount || childFaults.length !== flowChildCount) return null;
-  return sharedServerFault([...pre, ...childFaults]);
+  return [...pre, ...childFaults];
 }
 
 /** What a batch keeps about a file that failed input preparation, besides its message. */

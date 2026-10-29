@@ -912,6 +912,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 }>;
                 canceled?: boolean;
                 fault?: { statusCode: number; code: string; error: string; details?: string };
+                /** Every file failed on this one 4xx input code (#4143). */
+                sharedCode?: string;
                 zip?: {
                   key: string;
                   filename: string;
@@ -962,6 +964,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               error: payload?.canceled
                 ? "Batch canceled"
                 : (shared ?? "All files failed processing"),
+              ...(payload?.sharedCode && { code: payload.sharedCode }),
               // Structured so clients key on the outcome instead of matching
               // the message string.
               ...(payload?.canceled ? { canceled: true } : {}),

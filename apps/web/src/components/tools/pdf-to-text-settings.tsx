@@ -28,10 +28,10 @@ export function PdfToTextSettings() {
     }
   };
 
-  // One file only: a batch reports its failures per file, and the handoff
-  // carries the whole selection into a tool that would OCR the readable ones too.
-  const offerOcr =
-    OCR_TOOL !== undefined && !hasMultiple && !!error && errorCode === NO_TEXT_LAYER_CODE;
+  // A batch only carries the code when every file failed on it (the server
+  // withholds it from a mixed batch), so the handoff never drags readable PDFs
+  // into OCR (#4143).
+  const offerOcr = OCR_TOOL !== undefined && !!error && errorCode === NO_TEXT_LAYER_CODE;
 
   // The files stay in the store across the navigation (`fromLibrary`), so OCR
   // starts with the PDF already loaded and nothing is uploaded until it runs.

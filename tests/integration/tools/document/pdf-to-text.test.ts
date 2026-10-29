@@ -242,6 +242,43 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     expect(body.code).toBe("NO_TEXT_LAYER");
   }, 60_000);
 
+  async function runBatch(files: Array<{ filename: string; content: Buffer }>) {
+    const { body, contentType } = createMultipartPayload([
+      ...files.map((f) => ({
+        name: "file",
+        filename: f.filename,
+        contentType: "application/pdf",
+        content: f.content,
+      })),
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    return testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf/pdf-to-text/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+  }
+
+  it("flags a batch where every file is scanned so the UI can offer OCR (#4143)", async () => {
+    const scan = makeImageOnlyPdf();
+    const res = await runBatch([
+      { filename: "a.pdf", content: scan },
+      { filename: "b.pdf", content: scan },
+    ]);
+    expect(res.statusCode).toBe(422);
+    expect(JSON.parse(res.body).code).toBe("NO_TEXT_LAYER");
+  }, 90_000);
+
+  it("keeps the code off a batch with a readable PDF, so only failed files are never sent to OCR (#4143)", async () => {
+    const res = await runBatch([
+      { filename: "scan.pdf", content: makeImageOnlyPdf() },
+      { filename: "text.pdf", content: PDF },
+    ]);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("zip");
+  }, 90_000);
+
   it("tells the user to run OCR when a composite font has no ToUnicode map (#955)", async () => {
     const res = await runTool(makeFontPdf("type0-no-tounicode"), "glyph-ids.pdf");
     expect(res.statusCode).toBe(422);

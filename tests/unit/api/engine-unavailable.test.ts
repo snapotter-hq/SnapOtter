@@ -227,3 +227,31 @@ describe("allFailedFault (#1627)", () => {
     });
   });
 });
+
+describe("allFailedInputCode (#4143)", () => {
+  async function helpers() {
+    return await import("../../../apps/api/src/lib/engine-unavailable.js");
+  }
+  const scanned = { error: "no text layer", statusCode: 422, code: "NO_TEXT_LAYER" };
+
+  it("names the code every failed file shares", async () => {
+    const { allFailedInputCode } = await helpers();
+    expect(allFailedInputCode([], 0, [scanned, scanned], 2)).toBe("NO_TEXT_LAYER");
+    expect(allFailedInputCode([scanned], 1, [scanned], 1)).toBe("NO_TEXT_LAYER");
+  });
+
+  it("gives nothing for a mixed batch, so readable files stay out of the handoff", async () => {
+    const { allFailedInputCode } = await helpers();
+    const corrupt = { error: "corrupt", statusCode: 422, code: "CORRUPT" };
+    expect(allFailedInputCode([], 0, [scanned, corrupt], 2)).toBeNull();
+    expect(allFailedInputCode([], 0, [scanned, { error: "boom", statusCode: 422 }], 2)).toBeNull();
+  });
+
+  it("leaves 5xx faults to sharedServerFault and unaccounted files to nobody", async () => {
+    const { allFailedInputCode } = await helpers();
+    const down = { error: "down", statusCode: 503, code: "ENGINE_UNAVAILABLE" };
+    expect(allFailedInputCode([], 0, [down, down], 2)).toBeNull();
+    expect(allFailedInputCode(undefined, 1, [scanned], 1)).toBeNull();
+    expect(allFailedInputCode([], 0, [scanned], 2)).toBeNull();
+  });
+});

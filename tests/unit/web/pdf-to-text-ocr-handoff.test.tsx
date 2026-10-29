@@ -68,11 +68,11 @@ describe("pdf-to-text OCR handoff (#1164)", () => {
     expect(screen.queryByTestId("pdf-to-text-run-ocr")).not.toBeInTheDocument();
   });
 
-  it("offers nothing for a batch, which reports failures per file", () => {
+  it("offers OCR for a batch the server flagged as all scanned (#4143)", () => {
     useFileStore.getState().setFiles([pdf("a.pdf"), pdf("b.pdf")]);
     useFileStore.getState().setError(SCANNED_MESSAGE, NO_TEXT_LAYER_CODE);
     renderPanel();
-    expect(screen.queryByTestId("pdf-to-text-run-ocr")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pdf-to-text-run-ocr")).toBeInTheDocument();
   });
 
   it("carries the loaded file into the OCR tool and clears the failure", () => {

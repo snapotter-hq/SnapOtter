@@ -951,6 +951,27 @@ describe("useToolProcessor batch recovery (#750)", () => {
     unmount();
   });
 
+  it("keeps the server's code on the store error so a panel can offer the next step (#4143)", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].response = new Blob(
+        [JSON.stringify({ error: "All files failed processing", code: "NO_TEXT_LAYER" })],
+        { type: "application/json" },
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().processing).toBe(false);
+    });
+    expect(useFileStore.getState().errorCode).toBe("NO_TEXT_LAYER");
+
+    unmount();
+  });
+
   it("reports the server's error code as the reason when the body carries one (#1161)", async () => {
     const { unmount } = startBatchRun();
 
@@ -1643,6 +1664,25 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
     expectRunEnded("Canceled", "canceled", "canceled");
     // The cancel still stops the upload.
     expect(xhrs[0].abort).toHaveBeenCalled();
+    unmount();
+  });
+
+  it("keeps the failed frame's code on the store error (#4143)", () => {
+    const { unmount } = startBatchRun();
+    degrade();
+
+    act(() => {
+      sendBatchFrame({
+        status: "failed",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [],
+        code: "NO_TEXT_LAYER",
+      });
+    });
+
+    expect(useFileStore.getState().errorCode).toBe("NO_TEXT_LAYER");
     unmount();
   });
 

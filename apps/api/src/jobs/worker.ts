@@ -63,7 +63,7 @@ import {
   isBinarySpawnFailure,
   probeFailureLevel,
 } from "../lib/binary-overrides.js";
-import { allFailedFault, type BatchFault } from "../lib/engine-unavailable.js";
+import { allFailedFault, allFailedInputCode, type BatchFault } from "../lib/engine-unavailable.js";
 import { resolveConcurrency, resolveWorkerThreads } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
@@ -2513,6 +2513,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       childFaults,
       flowChildCount,
     );
+    const inputCode = fault
+      ? undefined
+      : allFailedInputCode(
+          settings.preFailureFaults,
+          totalFiles - flowChildCount,
+          childFaults,
+          flowChildCount,
+        );
+    const batchCode = fault?.code ?? inputCode ?? undefined;
     // Otherwise one shared reason (the workspace cap on every output write)
     // becomes the batch's own message and a blank-name entry the client reads
     // as the run's error, appended after the per-file entries like the
@@ -2531,7 +2540,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       failedFiles,
       errors: shared ? [...batchErrors, { filename: "", error: shared }] : batchErrors,
       message: fault?.error ?? shared ?? "All files failed processing",
-      ...(fault && { code: fault.code }),
+      ...(batchCode && { code: batchCode }),
       ...(fault?.details && { details: fault.details }),
     });
     if (!applied) {
@@ -2547,7 +2556,12 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       contentType: "application/json",
       originalSize: 0,
       processedSize: 0,
-      resultPayload: { manifest, allFailed: true, ...(fault && { fault }) },
+      resultPayload: {
+        manifest,
+        allFailed: true,
+        ...(fault && { fault }),
+        ...(inputCode && { sharedCode: inputCode }),
+      },
     };
   }
 
