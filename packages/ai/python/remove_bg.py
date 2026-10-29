@@ -372,7 +372,7 @@ def main():
 
     except ImportError as e:
         detail = str(e).strip() or type(e).__name__
-        print(f"[remove-bg] Import failed: {detail}", file=sys.stderr, flush=True)
+        print(json.dumps({"warning": f"[remove-bg] Import failed: {detail}"}), file=sys.stderr, flush=True)
         result = json.dumps(
             {
                 "success": False,

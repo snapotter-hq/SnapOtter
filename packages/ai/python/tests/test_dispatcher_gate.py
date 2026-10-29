@@ -179,13 +179,15 @@ def test_main_falls_back_to_all_false_gpu_frameworks_when_probe_raises(monkeypat
     dispatcher.main()
 
     stderr_lines = [line.strip() for line in capsys.readouterr().err.splitlines() if line.strip()]
-    # First line is the diagnostic, second is the readiness JSON.
-    readiness = next(json.loads(line) for line in stderr_lines if line.startswith("{"))
+    # The diagnostic is a {"warning": ...} line (#1657), so pick readiness by its key.
+    json_lines = [json.loads(line) for line in stderr_lines if line.startswith("{")]
+    readiness = next(obj for obj in json_lines if "ready" in obj)
     assert readiness == {
         "ready": True,
         "gpu": False,
         "gpuFrameworks": {"torch": False, "onnx": False, "ctranslate2": False},
     }
+    assert {"warning": "[dispatcher] GPU detection failed: CUDA driver initialization failed"} in json_lines
 
 
 def test_main_recycles_immediately_on_cuda_or_ort_failure(monkeypatch, capsys):

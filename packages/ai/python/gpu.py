@@ -217,7 +217,7 @@ def _try_torch_cuda():
     try:
         cuda_available = torch.cuda.is_available()
     except Exception as e:
-        print(f"[gpu] torch CUDA probe failed: {e}", file=sys.stderr, flush=True)
+        print(json.dumps({"warning": f"[gpu] torch CUDA probe failed: {e}"}), file=sys.stderr, flush=True)
         return False
 
     if cuda_available:
