@@ -409,9 +409,9 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
        fi \
     && convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)' \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-199; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-209; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-209; \
        fi \
     && if apt-cache show libcublas-12-6 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libcublas-12-6; \

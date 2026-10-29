@@ -42,7 +42,7 @@ describe("cross-platform image decoder dependencies", () => {
     expectImageMagickExtraCoders(read("docker/Dockerfile.test"));
   });
 
-  it("bounds the EXR coder installs in both images so a stalled mirror cannot hang the build (#4132)", () => {
+  it("bounds the EXR coder and libx265 installs in both images so a stalled mirror cannot hang the build (#4132, #4134)", () => {
     for (const path of ["docker/Dockerfile", "docker/Dockerfile.test"]) {
       const source = read(path);
       expect(source, path).toContain(
@@ -50,6 +50,12 @@ describe("cross-platform image decoder dependencies", () => {
       );
       expect(source, path).toContain(
         "timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra",
+      );
+      expect(source, path).toContain(
+        "timeout -k 30 300 apt-get install -y --no-install-recommends libx265-199",
+      );
+      expect(source, path).toContain(
+        "timeout -k 30 300 apt-get install -y --no-install-recommends libx265-209",
       );
     }
   });

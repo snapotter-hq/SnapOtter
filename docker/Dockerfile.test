@@ -83,9 +83,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        fi \
     && convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)' \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-199; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-209; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-209; \
        fi \
     && rm -rf /var/lib/apt/lists/*
 
