@@ -3833,10 +3833,24 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       await processor(finalizeJob("rc-ok"));
 
       expect(completeBatchJobMock).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(prefixes()).toHaveLength(4));
       expect(prefixes().sort()).toEqual(
         ["uploads/rc-ok-f0", "outputs/rc-ok-f0", "uploads/rc-ok-f1", "outputs/rc-ok-f1"].sort(),
       );
       expect(prefixes()).not.toContain("outputs/rc-ok");
+    });
+
+    it("returns without waiting for the cleanup to finish (#4184)", async () => {
+      await primeZip();
+      objectStorageMocks.deletePrefix.mockReturnValue(new Promise(() => {}));
+      const { processor, completeBatchJobMock } = await setupSystemProcessor({
+        rowsById: rows("rc-slow"),
+      });
+
+      await expect(processor(finalizeJob("rc-slow"))).resolves.toBeDefined();
+
+      expect(completeBatchJobMock).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(prefixes().length).toBeGreaterThan(0));
     });
 
     it("frees the children when packaging fails, so the next request is not refused", async () => {
@@ -3849,6 +3863,7 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       await expect(processor(finalizeJob("rc-fail"))).rejects.toThrow("disk full");
 
       expect(failBatchJobMock).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(prefixes()).toHaveLength(4));
       expect(prefixes()).toEqual(
         expect.arrayContaining([
           "uploads/rc-fail-f0",
@@ -3900,6 +3915,7 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
         }),
       );
 
+      await vi.waitFor(() => expect(prefixes().length).toBeGreaterThanOrEqual(6));
       expect(prefixes()).toEqual(
         expect.arrayContaining([
           "uploads/rc-pipe-f0",

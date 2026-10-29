@@ -3,6 +3,8 @@ import { db, schema } from "../db/index.js";
 import { logger } from "../lib/logger.js";
 import { deletePrefix } from "../lib/object-storage.js";
 
+const DELETE_CONCURRENCY = 8;
+
 /**
  * True when the user, or the team they belong to, is under legal hold. Any
  * lookup failure answers true: a deletion that cannot prove the hold is clear
@@ -66,8 +68,13 @@ export async function reclaimBatchChildStorage(args: {
 }): Promise<void> {
   if (args.dirs.length === 0) return;
   if (args.userId && (await isUnderLegalHold(args.userId))) return;
-  for (const dir of args.dirs) {
-    for (const prefix of [`uploads/${dir}`, `outputs/${dir}`]) {
+  const prefixes = args.dirs.flatMap((dir) => [`uploads/${dir}`, `outputs/${dir}`]);
+  let next = 0;
+  // A bounded pool: on S3 every delete is a list plus a delete request, so a
+  // large pipeline batch is thousands of round trips (#4184).
+  const lane = async () => {
+    while (next < prefixes.length) {
+      const prefix = prefixes[next++] as string;
       try {
         await deletePrefix(prefix);
       } catch (err) {
@@ -77,5 +84,6 @@ export async function reclaimBatchChildStorage(args: {
         );
       }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(DELETE_CONCURRENCY, prefixes.length) }, lane));
 }

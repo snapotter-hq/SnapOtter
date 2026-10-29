@@ -74,6 +74,22 @@ describe("reclaimBatchChildStorage (#1241)", () => {
     expect(mocks.deletePrefix).not.toHaveBeenCalled();
   });
 
+  it("runs deletes in parallel, capped, so a large batch isn't a long serial walk (#4184)", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    mocks.deletePrefix.mockImplementation(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 1));
+      inFlight--;
+    });
+    const many = Array.from({ length: 40 }, (_, i) => `b-f${i}`);
+    await reclaimBatchChildStorage({ parentId: "b", userId: null, dirs: many });
+    expect(mocks.deletePrefix).toHaveBeenCalledTimes(80);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(8);
+  });
+
   it("keeps going past a failed delete", async () => {
     mocks.deletePrefix.mockRejectedValueOnce(new Error("EBUSY"));
     await reclaimBatchChildStorage({ parentId: "b", userId: null, dirs });
