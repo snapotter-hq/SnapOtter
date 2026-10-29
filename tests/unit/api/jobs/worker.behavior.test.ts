@@ -2915,6 +2915,7 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       }));
       vi.doMock("../../../../apps/api/src/lib/engine-unavailable.js", () => ({
         allFailedFault: vi.fn(actualEngineUnavailable.allFailedFault),
+        allFailedInputCode: vi.fn(actualEngineUnavailable.allFailedInputCode),
       }));
       vi.doMock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
         isBatchCanceled: vi.fn(async () => false),
