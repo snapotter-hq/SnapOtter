@@ -36,6 +36,37 @@ interface OidcStateCookie {
   codeVerifier: string;
 }
 
+// ── Consumed Login States ─────────────────────────────────────────
+
+/**
+ * How long a state stays "consumed" after a successful login. iOS Safari
+ * sometimes requests the callback a second time with the same code and state
+ * (#4021), and the IdP rejects the reused code. Remembering the state lets that
+ * repeat go to the app, where the first response already set the session,
+ * instead of ending on a login error. Per process: the repeat arrives within a
+ * few hundred ms, so a restart in that gap is the only miss.
+ */
+const CONSUMED_STATE_TTL_MS = 60 * 1000;
+const consumedStates = new Map<string, number>();
+
+function markStateConsumed(state: string): void {
+  const now = Date.now();
+  for (const [key, expiresAt] of consumedStates) {
+    if (expiresAt <= now) consumedStates.delete(key);
+  }
+  consumedStates.set(state, now + CONSUMED_STATE_TTL_MS);
+}
+
+function isStateConsumed(state: string): boolean {
+  const expiresAt = consumedStates.get(state);
+  if (expiresAt === undefined) return false;
+  if (expiresAt <= Date.now()) {
+    consumedStates.delete(state);
+    return false;
+  }
+  return true;
+}
+
 // ── Lazy Discovery Cache ──────────────────────────────────────────
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -312,6 +343,12 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         return redirectToLogin(reply, "oidc_session_expired");
       }
 
+      // A repeat of a callback that already signed this browser in.
+      if (isStateConsumed(storedState.state)) {
+        request.log.info("OIDC callback: state already used by a successful login");
+        return reply.redirect(`${env.BASE_PATH}/`);
+      }
+
       const audit = auditFromRequest(request);
 
       // Check for error response from the IdP
@@ -358,6 +395,12 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
           expectedState: storedState.state,
         });
       } catch (err) {
+        // The twin of this request may have finished its login while this
+        // one was waiting on the IdP (#4021).
+        if (isStateConsumed(storedState.state)) {
+          request.log.info("OIDC callback: duplicate request lost the code race to a login");
+          return reply.redirect(`${env.BASE_PATH}/`);
+        }
         request.log.error({ err }, "OIDC token exchange failed");
         // An expired or replayed code (invalid_grant) or access_denied is the
         // user's doing and stays out of Sentry. Anything else, an IdP that is
@@ -583,6 +626,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         await evictExcessUserSessions(tx, resolvedUser.id, maxSessions, token);
       });
 
+      markStateConsumed(storedState.state);
       authAttempts.inc({ method: "oidc", result: "success" });
       void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN, { method: "oidc" });
       await audit("OIDC_LOGIN_SUCCESS", {
