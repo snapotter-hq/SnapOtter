@@ -341,6 +341,17 @@ describe("privacy invariants (#1022)", () => {
     );
   });
 
+  it("sets exception and console-log capture locally so project remote config cannot enable them (#2285)", async () => {
+    await mod.initAnalytics(enabledConfig);
+    expect(mockInit).toHaveBeenCalledWith(
+      "phc_test",
+      expect.objectContaining({
+        capture_exceptions: false,
+        logs: { captureConsoleLogs: false },
+      }),
+    );
+  });
+
   it("strips query and fragment from the nested $web_vitals_*_event $current_url", async () => {
     await mod.initAnalytics(enabledConfig);
     const [, options] = mockInit.mock.calls[0] as unknown as [

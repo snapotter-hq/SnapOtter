@@ -152,6 +152,12 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           capture_heatmaps: false,
           capture_dead_clicks: false,
           capture_performance: { web_vitals: true, network_timing: false },
+          // Unset, the project's remote config can turn on exception capture,
+          // which would send crashes to PostHog as well as Sentry (#2285).
+          capture_exceptions: false,
+          // Local default for console-log capture. Remote config can still
+          // switch it on, which #4145 tracks.
+          logs: { captureConsoleLogs: false },
           // Fire $pageview on SPA history changes, not just the initial hard
           // load, so react-router route changes (tool pages, editor, automate,
           // files) are captured. capture_pageleave gives accurate time-on-page.
