@@ -921,13 +921,13 @@ class OcrRuntimeManager {
       );
     }
     // With no request to carry the failure, the log is the only place an idle
-    // crash can surface. A shutdown we asked for (stdin ended, possibly
-    // followed by a SIGTERM) must stay silent, so `ending` gates it.
+    // crash can surface. A shutdown we asked for ends stdin, and then the child
+    // either exits 0 or gets a SIGTERM. Any other exit during a drain is a crash.
     if (
       !error &&
       !this.current &&
       this.queue.length === 0 &&
-      !this.ending &&
+      !(this.ending && signal === "SIGTERM") &&
       (code !== 0 || signal !== null)
     ) {
       aiLog.warn(
