@@ -352,6 +352,53 @@ describe("privacy invariants (#1022)", () => {
     );
   });
 
+  describe("log egress gate (#4145)", () => {
+    // Remote config can switch the SDK's logs extension on, and its queued
+    // records can flush after an opt-out. Both leave through _send_request,
+    // so that is where console-log egress is closed.
+    async function initWithSendSpy() {
+      const rawSend = vi.fn();
+      mockInit.mockReturnValueOnce({
+        capture: mockCapture,
+        startSessionRecording: vi.fn(),
+        opt_in_capturing: mockOptInCapturing,
+        opt_out_capturing: vi.fn(),
+        has_opted_out_capturing: vi.fn(() => false),
+        reset: vi.fn(),
+        register: vi.fn(),
+        get_distinct_id: vi.fn(() => "test-distinct-id"),
+        persistence: { disabled: false },
+        _send_request: rawSend,
+      } as never);
+      await mod.initAnalytics(enabledConfig);
+      const instance = mockInit.mock.results[0]?.value as {
+        _send_request: (o: { batchKey?: string; url: string }) => void;
+      };
+      return { rawSend, send: instance._send_request };
+    }
+
+    it("never sends a logs batch, even while analytics is on", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      send({ url: "https://ph.test/i/v1/logs?token=phc_test", batchKey: "logs" });
+      expect(rawSend).not.toHaveBeenCalled();
+    });
+
+    it("still sends ordinary events while analytics is on", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      send({ url: "https://ph.test/e/", batchKey: "events" });
+      send({ url: "https://ph.test/e/" });
+      expect(rawSend).toHaveBeenCalledTimes(2);
+    });
+
+    it("sends nothing after an opt-out", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      mod.optOut();
+      send({ url: "https://ph.test/e/", batchKey: "events" });
+      send({ url: "https://ph.test/i/v1/logs?token=phc_test", batchKey: "logs" });
+      expect(rawSend).not.toHaveBeenCalled();
+    });
+  });
+
   it("strips query and fragment from the nested $web_vitals_*_event $current_url", async () => {
     await mod.initAnalytics(enabledConfig);
     const [, options] = mockInit.mock.calls[0] as unknown as [

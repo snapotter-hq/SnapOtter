@@ -156,7 +156,8 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           // which would send crashes to PostHog as well as Sentry (#2285).
           capture_exceptions: false,
           // Local default for console-log capture. Remote config can still
-          // switch it on, which #4145 tracks.
+          // switch the logs extension on, so gateRequestsOnOptOut drops every
+          // logs batch (#4145).
           logs: { captureConsoleLogs: false },
           // Fire $pageview on SPA history changes, not just the initial hard
           // load, so react-router route changes (tool pages, editor, automate,
@@ -500,12 +501,20 @@ export function getRenderErrorDestination(): "buffer" | "send" | "drop" {
 // posthog-js queues a failed send in its retry queue and re-sends it on a timer
 // and on `online`, skipping consent and before_send (#2284). Every send, retries
 // included, goes through _send_request, so the gate sits there.
+//
+// It also closes console-log egress. posthog-js has no init option that stops
+// the project's remote config from turning the logs extension on, and its
+// flush checks only isDisabled, so records queued before an opt-out can still
+// go out. SnapOtter sends no console output to PostHog, so every batch keyed
+// "logs" is dropped whatever the remote config says (#4145).
 function gateRequestsOnOptOut(instance: PostHogInstance): void {
   // Test doubles of the SDK may not carry the method; the egress test catches a real miss.
   if (typeof instance._send_request !== "function") return;
   const send = instance._send_request.bind(instance);
   instance._send_request = (options) => {
-    if (enabled) send(options);
+    if (!enabled) return;
+    if ((options as { batchKey?: string }).batchKey === "logs") return;
+    send(options);
   };
 }
 
