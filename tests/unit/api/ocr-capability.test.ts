@@ -19,12 +19,16 @@ const incompatibleCapability: OcrRuntimeCapability = {
   providers: [],
 };
 
-function readyCapability(qualities: readonly ("balanced" | "best")[]): OcrRuntimeCapability {
+function readyCapability(
+  qualities: readonly ("balanced" | "best")[],
+  installedLanguages: readonly string[] = ["ar"],
+): OcrRuntimeCapability {
   return {
     available: true,
     status: "ready",
     qualities,
     providers: ["CPUExecutionProvider"],
+    installedLanguages,
     descriptor: {} as never,
   };
 }
@@ -246,6 +250,48 @@ describe("resolveOcrIngressSettings", () => {
       expect(result).not.toMatchObject({ reason: "fast-language-unsupported" });
     },
   );
+
+  it.each(["ocr", "ocr-pdf"])(
+    "rejects Arabic %s when the installed pack predates the Arabic recognizer",
+    (toolId) => {
+      const getCapability = vi.fn(() => readyCapability(["balanced", "best"], []));
+
+      expect(
+        resolveOcrIngressSettings(
+          toolId,
+          { quality: "balanced", language: "ar" },
+          { readCapability: getCapability },
+        ),
+      ).toEqual({
+        ok: false,
+        code: "FEATURE_NOT_INSTALLED",
+        reason: "language-not-installed",
+        requestedQuality: "balanced",
+        guidance:
+          "This language is not in the installed OCR pack. Update the Accurate OCR pack in Settings > AI Features, then run it again.",
+      });
+    },
+  );
+
+  it("keeps other languages working on a pack that predates the Arabic recognizer", () => {
+    expect(
+      resolveOcrIngressSettings(
+        "ocr",
+        { quality: "balanced", language: "en" },
+        { readCapability: () => readyCapability(["balanced", "best"], []) },
+      ),
+    ).toEqual({ ok: true, settings: { language: "en", quality: "balanced" } });
+  });
+
+  it("accepts Arabic on the Accurate tiers when the pack includes the recognizer", () => {
+    expect(
+      resolveOcrIngressSettings(
+        "ocr",
+        { quality: "best", language: "ar" },
+        { readCapability: () => readyCapability(["balanced", "best"], ["ar"]) },
+      ),
+    ).toEqual({ ok: true, settings: { language: "ar", quality: "best" } });
+  });
 
   it("rejects legacy Tesseract for Korean like explicit Fast", () => {
     expect(

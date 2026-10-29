@@ -109,12 +109,29 @@ export type OcrRuntimeUnavailableReason =
   | "memory-capacity-unknown"
   | "unsupported-host";
 
+/**
+ * Languages that need a recognizer beyond the unified one, keyed by language
+ * and listing the manifest model IDs that must all be in the installed pack.
+ * Packs built before a recognizer existed omit its IDs, so the language stays
+ * unavailable on them instead of failing inside the sidecar.
+ */
+export const OCR_OPTIONAL_LANGUAGE_MODELS: Readonly<Record<string, readonly string[]>> = {
+  ar: ["arabic-pp-ocrv5-mobile-rec", "arabic-pp-ocrv5-dictionary"],
+};
+
+export function installedOptionalLanguages(models: Readonly<Record<string, string>>): string[] {
+  return Object.entries(OCR_OPTIONAL_LANGUAGE_MODELS)
+    .filter(([, modelIds]) => modelIds.every((modelId) => Object.hasOwn(models, modelId)))
+    .map(([language]) => language);
+}
+
 export type OcrRuntimeCapability =
   | {
       available: true;
       status: "ready";
       qualities: readonly OcrRuntimeQuality[];
       providers: readonly string[];
+      installedLanguages: readonly string[];
       descriptor: ActiveRuntimeDescriptor;
     }
   | {
@@ -1264,6 +1281,7 @@ export function getOcrRuntimeCapability(options: RuntimeStateOptions = {}): OcrR
     status: "ready",
     qualities: [...result.descriptor.capabilities.qualities],
     providers: [...result.descriptor.capabilities.providers],
+    installedLanguages: installedOptionalLanguages(result.descriptor.artifact.models),
     descriptor: result.descriptor,
   };
 }

@@ -112,6 +112,7 @@ export type {
 } from "./runtime-state.js";
 export {
   getOcrRuntimeCapability,
+  OCR_OPTIONAL_LANGUAGE_MODELS,
   OCR_RUNTIME_PROTOCOL_VERSION,
   readActiveRuntime,
   readCommittedOcrRuntimeActivationIdentity,

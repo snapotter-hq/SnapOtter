@@ -1,12 +1,16 @@
 import {
   fastLanguageUnsupportedReason,
   getOcrRuntimeCapability,
+  OCR_OPTIONAL_LANGUAGE_MODELS,
   type OcrRuntimeCapability,
   type OcrRuntimeQuality,
 } from "@snapotter/ai";
 import { InputValidationError } from "../modality/contract.js";
 
 export type OcrIngressQuality = "fast" | OcrRuntimeQuality;
+
+const OCR_LANGUAGE_NOT_INSTALLED_GUIDANCE =
+  "This language is not in the installed OCR pack. Update the Accurate OCR pack in Settings > AI Features, then run it again.";
 
 const FAST_LANGUAGE_REASON_CODES = new Map<string, string>([
   ["ko", "fast-korean-unsupported"],
@@ -119,6 +123,19 @@ export function resolveOcrIngressSettings(
   capability ??= readCapability();
   if (capability.available) {
     if (capability.qualities.includes(quality)) {
+      if (
+        language !== undefined &&
+        Object.hasOwn(OCR_OPTIONAL_LANGUAGE_MODELS, language) &&
+        !capability.installedLanguages.includes(language)
+      ) {
+        return {
+          ok: false,
+          code: "FEATURE_NOT_INSTALLED",
+          reason: "language-not-installed",
+          requestedQuality: quality,
+          guidance: OCR_LANGUAGE_NOT_INSTALLED_GUIDANCE,
+        };
+      }
       return { ok: true, settings: settingsWithQuality };
     }
 
