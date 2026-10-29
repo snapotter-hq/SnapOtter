@@ -38,6 +38,33 @@ describe("buildTracesSampler (the July-incident guard)", () => {
     ).toBe(0.05);
   });
 
+  it("samples an inbound request carrying the http.method key the SDK sends", () => {
+    // Attributes an incoming Fastify request carries at sampling time on
+    // @sentry/node 10.66 (captured from the real SDK, #1897). The sampler used to
+    // look only for http.request.method, so these fell through to a 0 rate.
+    const realServerSpan = {
+      "sentry.op": "http.server",
+      "sentry.origin": "auto.http.otel.http",
+      "http.url": "http://127.0.0.1:51714/api/auth/login?token=qtok-5d1e8b",
+      "http.method": "POST",
+      "http.target": "/api/auth/login?token=qtok-5d1e8b",
+      "http.host": "127.0.0.1:51714",
+      "http.client_ip": "203.0.113.7",
+      "http.scheme": "http",
+      "http.flavor": "1.1",
+    };
+    expect(sampler({ name: "POST /api/auth/login", attributes: realServerSpan })).toBe(0.05);
+  });
+
+  it("does not sample an outgoing client call that also carries http.method", () => {
+    expect(
+      sampler({
+        name: "POST hooks.slack.com",
+        attributes: { "sentry.op": "http.client", "http.method": "POST" },
+      }),
+    ).toBe(0);
+  });
+
   it("respects an explicit parent sampling decision via inheritOrSampleWith", () => {
     expect(
       sampler({

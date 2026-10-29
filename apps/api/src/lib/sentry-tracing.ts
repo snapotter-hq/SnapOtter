@@ -44,7 +44,11 @@ export function buildTracesSampler(httpRate: number): (ctx: SamplingContext) => 
     if (/\/(healthz|readyz|metrics)\b/.test(name)) return 0;
 
     // Real inbound HTTP: sample at the configured rate, honoring parent traces.
-    if (attrs["http.request.method"] !== undefined) return inherit(httpRate);
+    // @sentry/node 10.66 marks the server span with sentry.op and the old
+    // http.method key, not http.request.method. Key on the op: outgoing client
+    // spans carry http.method too, and they must not count as inbound.
+    const isInboundHttp = op === "http.server" || attrs["http.request.method"] !== undefined;
+    if (isInboundHttp) return inherit(httpRate);
 
     // Anything else: follow the parent decision, else drop.
     return inherit(0);
