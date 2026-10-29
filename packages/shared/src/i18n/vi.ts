@@ -1991,6 +1991,8 @@ export const vi: TranslationKeys = {
         "Cải thiện độ tương phản cục bộ trước khi nhận dạng. Nhanh áp dụng trực tiếp; Cân bằng và Tốt nhất chỉ giữ biến thể khi điểm đã hiệu chỉnh cải thiện kết quả.",
       fastKoreanUnsupported:
         "OCR Nhanh không hỗ trợ tiếng Hàn. Hãy cài đặt gói OCR Chính xác rồi chọn Cân bằng hoặc Tốt nhất.",
+      fastArabicUnsupported:
+        "OCR Nhanh không hỗ trợ tiếng Ả Rập. Hãy cài đặt gói OCR Chính xác rồi chọn Cân bằng hoặc Tốt nhất.",
       language: "Ngôn ngữ",
       autoDetect: "Tự động nhận diện",
       extractedText: "Văn bản trích xuất",
@@ -5865,6 +5867,7 @@ export const vi: TranslationKeys = {
       zh: "Tiếng Trung",
       ja: "Tiếng Nhật",
       ko: "Tiếng Hàn",
+      ar: "Tiếng Ả Rập",
       id: "Tiếng Indonesia",
       th: "Tiếng Thái",
       vi: "Tiếng Việt",

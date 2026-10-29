@@ -2002,6 +2002,8 @@ export const nl: TranslationKeys = {
         "Verbetert lokaal contrast vóór herkenning. Snel past dit direct toe; Gebalanceerd en Beste behouden de variant alleen als de gekalibreerde score het resultaat verbetert.",
       fastKoreanUnsupported:
         "Snelle OCR ondersteunt geen Koreaans. Installeer het pakket voor nauwkeurige OCR en kies Gebalanceerd of Beste.",
+      fastArabicUnsupported:
+        "Snelle OCR ondersteunt geen Arabisch. Installeer het pakket voor nauwkeurige OCR en kies Gebalanceerd of Beste.",
       language: "Taal",
       autoDetect: "Automatisch detecteren",
       extractedText: "Geextraheerde tekst",
@@ -5912,6 +5914,7 @@ export const nl: TranslationKeys = {
       zh: "Chinees",
       ja: "Japans",
       ko: "Koreaans",
+      ar: "Arabisch",
       id: "Indonesisch",
       th: "Thais",
       vi: "Vietnamees",

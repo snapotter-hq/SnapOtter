@@ -112,6 +112,49 @@ describe("extractText error and progress behavior", () => {
     expect(runOcrRuntime).not.toHaveBeenCalled();
   });
 
+  it("rejects explicit Arabic Fast OCR before image processing or Tesseract dispatch", async () => {
+    await expect(
+      extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "ar" }),
+    ).rejects.toThrow(
+      "Fast OCR does not support Arabic. Install the Accurate OCR bundle and choose Balanced or Best.",
+    );
+
+    expect(sharp).not.toHaveBeenCalled();
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+    expect(runOcrRuntime).not.toHaveBeenCalled();
+  });
+
+  it.each(["balanced", "best"] as const)(
+    "keeps explicit Arabic on the %s accurate tier without silent rerouting",
+    async (quality) => {
+      vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+        runtimeResponse({
+          success: true,
+          text: "مرحبا بالعالم",
+          engine: "rapidocr-onnx",
+          requestedQuality: quality,
+          actualQuality: quality,
+          device: "cpu",
+          provider: "CPUExecutionProvider",
+          degraded: false,
+          warnings: [],
+        }),
+      );
+
+      const result = await extractText(INPUT, "/tmp/ocr", { quality, language: "ar" });
+
+      expect(result.text).toBe("مرحبا بالعالم");
+      expect(result.requestedQuality).toBe(quality);
+      expect(result.actualQuality).toBe(quality);
+      expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+      expect(runOcrRuntime).toHaveBeenCalledTimes(1);
+      const runtimeOptions = JSON.parse(
+        vi.mocked(runOcrRuntime).mock.calls[0]?.[1][1] ?? "null",
+      ) as Record<string, unknown>;
+      expect(runtimeOptions).toMatchObject({ language: "ar", quality });
+    },
+  );
+
   it.each(["balanced", "best"] as const)(
     "keeps explicit Korean on the %s accurate tier without silent rerouting",
     async (quality) => {

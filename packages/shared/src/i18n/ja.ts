@@ -1950,6 +1950,8 @@ export const ja: TranslationKeys = {
         "認識前に局所コントラストを改善します。高速では直接適用し、バランスと最高では調整済みスコアで結果が改善する場合のみ採用します。",
       fastKoreanUnsupported:
         "高速 OCR は韓国語に対応していません。高精度 OCR パックをインストールし、バランスまたは最高を選択してください。",
+      fastArabicUnsupported:
+        "高速 OCR はアラビア語に対応していません。高精度 OCR パックをインストールし、バランスまたは最高を選択してください。",
       language: "言語",
       autoDetect: "自動検出",
       extractedText: "抽出テキスト",
@@ -5833,6 +5835,7 @@ export const ja: TranslationKeys = {
       zh: "中国語",
       ja: "日本語",
       ko: "韓国語",
+      ar: "アラビア語",
       id: "インドネシア語",
       th: "タイ語",
       vi: "ベトナム語",

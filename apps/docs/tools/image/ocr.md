@@ -20,11 +20,11 @@ Extract text from images without sending the image to an external service. The b
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | Image file (multipart), up to 512 MiB encoded and 40 megapixels decoded; a lower operator upload limit still applies |
 | quality | string | No | Dynamic | Quality tier: `fast` (Tesseract), `balanced` (RapidOCR with the small PP-OCRv6 models), or `best` (the higher-accuracy medium PP-OCRv6 models with calibrated variant scoring) |
-| language | string | No | `"auto"` | Language hint: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
+| language | string | No | `"auto"` | Language hint: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast does not support `ko` or `ar` |
 | enhance | boolean | No | Tier-dependent | Improve local contrast before recognition. Fast applies it directly; Balanced and Best retain the variant only when calibrated scoring improves the result. Defaults to `true` for `best` and `false` for `fast`/`balanced` |
 | engine | string | No | - | Deprecated compatibility alias. Use `quality` instead. `tesseract` maps to `fast`; the legacy `paddleocr` value maps to `balanced` but does not load PaddlePaddle |
 
-If `quality` and the deprecated `engine` field are both omitted, SnapOtter selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; it uses `best`, then `balanced`, or returns the accurate-runtime install or compatibility error.
+If `quality` and the deprecated `engine` field are both omitted, SnapOtter selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean and Arabic never select `fast`; they use `best`, then `balanced`, or return the accurate-runtime install or compatibility error.
 
 ## Example Request {#example-request}
 
@@ -77,7 +77,7 @@ Processing failures arrive in the terminal `failed` event's `error` field; they 
 
 ## Notes {#notes}
 
-- `fast` is available in supported SnapOtter images for `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`. It does not support Korean (`ko`); Korean requires the optional accurate OCR pack and `balanced` or `best`.
+- `fast` is available in supported SnapOtter images for `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`. It does not support Korean (`ko`) or Arabic (`ar`); both require the optional accurate OCR pack and `balanced` or `best`.
 - Built-in Tesseract adds about 25 MiB to the official image. The accurate pack is stored in `/data/ai`, not baked into the image.
 - The accurate pack is published for the official Linux amd64 and arm64 containers. It deliberately uses ONNX Runtime's CPU provider, including on NVIDIA hosts, so it does not depend on CUDA libraries or GPU compatibility. Unsupported hosts receive an explicit incompatibility error for Korean instead of silently falling back to Fast.
 - The successful terminal `result` includes both the extracted text in `text` and a downloadable `.txt` artifact in `downloadUrl`.

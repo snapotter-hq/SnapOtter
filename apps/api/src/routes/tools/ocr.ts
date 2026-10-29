@@ -38,7 +38,7 @@ import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   quality: z.enum(["fast", "balanced", "best"]).optional(),
-  language: z.enum(["auto", "en", "de", "fr", "es", "zh", "ja", "ko"]).default("auto"),
+  language: z.enum(["auto", "en", "de", "fr", "es", "zh", "ja", "ko", "ar"]).default("auto"),
   enhance: z.boolean().optional(),
   // Backward compat: old "engine" param still accepted
   engine: z.enum(["tesseract", "paddleocr"]).optional(),

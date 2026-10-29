@@ -1986,6 +1986,8 @@ export const es: TranslationKeys = {
         "Mejora el contraste local antes del reconocimiento. Rápido lo aplica directamente; Equilibrado y Óptimo solo conservan la variante si la puntuación calibrada mejora el resultado.",
       fastKoreanUnsupported:
         "El OCR rápido no admite coreano. Instala el paquete de OCR preciso y elige Equilibrado u Óptimo.",
+      fastArabicUnsupported:
+        "El OCR rápido no admite árabe. Instala el paquete de OCR preciso y elige Equilibrado u Óptimo.",
       language: "Idioma",
       autoDetect: "Detección automática",
       extractedText: "Texto extraído",
@@ -5902,6 +5904,7 @@ export const es: TranslationKeys = {
       zh: "Chino",
       ja: "Japonés",
       ko: "Coreano",
+      ar: "Árabe",
       id: "Indonesio",
       th: "Tailandés",
       vi: "Vietnamita",

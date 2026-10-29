@@ -1991,6 +1991,8 @@ export const id: TranslationKeys = {
         "Memperbaiki kontras lokal sebelum pengenalan. Cepat menerapkannya langsung; Seimbang dan Terbaik hanya mempertahankannya jika skor terkalibrasi memperbaiki hasil.",
       fastKoreanUnsupported:
         "OCR Cepat tidak mendukung bahasa Korea. Instal paket OCR Akurat lalu pilih Seimbang atau Terbaik.",
+      fastArabicUnsupported:
+        "OCR Cepat tidak mendukung bahasa Arab. Instal paket OCR Akurat lalu pilih Seimbang atau Terbaik.",
       language: "Bahasa",
       autoDetect: "Deteksi otomatis",
       extractedText: "Teks yang Diekstrak",
@@ -5885,6 +5887,7 @@ export const id: TranslationKeys = {
       zh: "Tionghoa",
       ja: "Jepang",
       ko: "Korea",
+      ar: "Arab",
       id: "Indonesia",
       th: "Thai",
       vi: "Vietnam",

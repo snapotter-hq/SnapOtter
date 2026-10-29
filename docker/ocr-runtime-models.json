@@ -139,6 +139,28 @@
       "sha256": "a88071c68c01707489baa79ebe0405b7beb5cca229f4fc94cc3ef992328802d7",
       "size": 47451,
       "license": "Apache-2.0"
+    },
+    {
+      "id": "arabic-pp-ocrv5-mobile-rec",
+      "repository": "PaddlePaddle/arabic_PP-OCRv5_mobile_rec_onnx",
+      "revision": "14aaedcd75825982689ecf5cd64ab33ee083215a",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/arabic_PP-OCRv5_mobile_rec_onnx/resolve/14aaedcd75825982689ecf5cd64ab33ee083215a/inference.onnx",
+      "path": "models/arabic_PP-OCRv5_mobile_rec.onnx",
+      "sha256": "799113ebf267fbe742deb99eb36e8d42c9ddc5291ceacf92add41b4d52a59110",
+      "size": 7998947,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "arabic-pp-ocrv5-dictionary",
+      "repository": "RapidAI/RapidOCR",
+      "revision": "49043b4cb8eaf8388a6399394ebdc014851c217c",
+      "file": "paddle/PP-OCRv5/rec/arabic_PP-OCRv5_rec_mobile/ppocrv5_arabic_dict.txt",
+      "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/49043b4cb8eaf8388a6399394ebdc014851c217c/paddle/PP-OCRv5/rec/arabic_PP-OCRv5_rec_mobile/ppocrv5_arabic_dict.txt",
+      "path": "models/arabic_dict.txt",
+      "sha256": "7f92f7dbb9b75a4787a83bfb4f6d14a8ab515525130c9d40a9036f61cf6999e9",
+      "size": 2369,
+      "license": "Apache-2.0"
     }
   ]
 }

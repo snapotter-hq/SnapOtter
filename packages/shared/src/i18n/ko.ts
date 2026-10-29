@@ -1929,6 +1929,8 @@ export const ko: TranslationKeys = {
         "인식 전에 국소 대비를 개선합니다. 빠름은 직접 적용하고, 균형 및 최고는 보정된 점수가 결과를 개선할 때만 해당 버전을 사용합니다.",
       fastKoreanUnsupported:
         "빠른 OCR은 한국어를 지원하지 않습니다. 정확한 OCR 팩을 설치하고 균형 또는 최고를 선택하세요.",
+      fastArabicUnsupported:
+        "빠른 OCR은 아랍어를 지원하지 않습니다. 정확한 OCR 팩을 설치하고 균형 또는 최고를 선택하세요.",
       language: "언어",
       autoDetect: "자동 감지",
       extractedText: "추출된 텍스트",
@@ -5791,6 +5793,7 @@ export const ko: TranslationKeys = {
       zh: "중국어",
       ja: "일본어",
       ko: "한국어",
+      ar: "아랍어",
       id: "인도네시아어",
       th: "태국어",
       vi: "베트남어",

@@ -2007,6 +2007,8 @@ export const fr: TranslationKeys = {
         "Améliore le contraste local avant la reconnaissance. Rapide l’applique directement ; Équilibré et Optimal ne conservent la variante que si le score étalonné améliore le résultat.",
       fastKoreanUnsupported:
         "L’OCR rapide ne prend pas en charge le coréen. Installez le pack d’OCR précis et choisissez Équilibré ou Optimal.",
+      fastArabicUnsupported:
+        "L’OCR rapide ne prend pas en charge l’arabe. Installez le pack d’OCR précis et choisissez Équilibré ou Optimal.",
       language: "Langue",
       autoDetect: "Détection automatique",
       extractedText: "Texte extrait",
@@ -5925,6 +5927,7 @@ export const fr: TranslationKeys = {
       zh: "Chinois",
       ja: "Japonais",
       ko: "Coréen",
+      ar: "Arabe",
       id: "Indonésien",
       th: "Thaï",
       vi: "Vietnamien",

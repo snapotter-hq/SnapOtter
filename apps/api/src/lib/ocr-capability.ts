@@ -1,5 +1,5 @@
 import {
-  FAST_KOREAN_UNSUPPORTED_REASON,
+  fastLanguageUnsupportedReason,
   getOcrRuntimeCapability,
   type OcrRuntimeCapability,
   type OcrRuntimeQuality,
@@ -8,7 +8,10 @@ import { InputValidationError } from "../modality/contract.js";
 
 export type OcrIngressQuality = "fast" | OcrRuntimeQuality;
 
-export const OCR_FAST_KOREAN_GUIDANCE = FAST_KOREAN_UNSUPPORTED_REASON;
+const FAST_LANGUAGE_REASON_CODES = new Map<string, string>([
+  ["ko", "fast-korean-unsupported"],
+  ["ar", "fast-arabic-unsupported"],
+]);
 
 export type OcrIngressResolution =
   | {
@@ -72,11 +75,15 @@ export function resolveOcrIngressSettings(
           : undefined
       : undefined;
 
+  const language =
+    typeof parsedSettings.language === "string" ? parsedSettings.language : undefined;
+  const fastUnsupportedReason = fastLanguageUnsupportedReason(language);
+
   let capability: OcrRuntimeCapability | undefined;
   let quality = explicitQuality ?? legacyQuality;
   if (!quality) {
     capability = readCapability();
-    if (parsedSettings.language === "ko") {
+    if (fastUnsupportedReason) {
       quality =
         capability.available && capability.qualities.includes("best")
           ? "best"
@@ -97,13 +104,13 @@ export function resolveOcrIngressSettings(
   const settingsWithQuality = { ...normalizedSettings, quality };
 
   if (quality === "fast") {
-    if (parsedSettings.language === "ko") {
+    if (fastUnsupportedReason && language) {
       return {
         ok: false,
         code: "FEATURE_INCOMPATIBLE",
-        reason: "fast-korean-unsupported",
+        reason: FAST_LANGUAGE_REASON_CODES.get(language) ?? "fast-language-unsupported",
         requestedQuality: "fast",
-        guidance: OCR_FAST_KOREAN_GUIDANCE,
+        guidance: fastUnsupportedReason,
       };
     }
     return { ok: true, settings: settingsWithQuality };

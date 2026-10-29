@@ -2007,6 +2007,8 @@ export const de: TranslationKeys = {
         "Verbessert den lokalen Kontrast vor der Erkennung. Schnell wendet dies direkt an; Ausgewogen und Beste Qualität übernehmen die Variante nur, wenn die kalibrierte Bewertung das Ergebnis verbessert.",
       fastKoreanUnsupported:
         "Schnelles OCR unterstützt Koreanisch nicht. Installiere das Paket für präzises OCR und wähle Ausgewogen oder Beste Qualität.",
+      fastArabicUnsupported:
+        "Schnelles OCR unterstützt Arabisch nicht. Installiere das Paket für präzises OCR und wähle Ausgewogen oder Beste Qualität.",
       language: "Sprache",
       autoDetect: "Automatisch erkennen",
       extractedText: "Extrahierter Text",
@@ -5944,6 +5946,7 @@ export const de: TranslationKeys = {
       zh: "Chinesisch",
       ja: "Japanisch",
       ko: "Koreanisch",
+      ar: "Arabisch",
       id: "Indonesisch",
       th: "Thailändisch",
       vi: "Vietnamesisch",

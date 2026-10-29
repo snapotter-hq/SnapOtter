@@ -1746,6 +1746,8 @@ export const zhTW: TranslationKeys = {
         "辨識前改善局部對比度。快速模式會直接套用；均衡和最佳模式僅在校準評分改善結果時保留該版本。",
       fastKoreanUnsupported:
         "快速 OCR 不支援韓語。請安裝精確 OCR 套件，然後選擇「均衡」或「最佳」。",
+      fastArabicUnsupported:
+        "快速 OCR 不支援阿拉伯語。請安裝精確 OCR 套件，然後選擇「均衡」或「最佳」。",
       language: "語言",
       autoDetect: "自動偵測",
       extractedText: "擷取的文字",
@@ -5559,6 +5561,7 @@ export const zhTW: TranslationKeys = {
       zh: "中文",
       ja: "日文",
       ko: "韓文",
+      ar: "阿拉伯文",
       id: "印尼文",
       th: "泰文",
       vi: "越南文",

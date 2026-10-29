@@ -194,6 +194,10 @@ class OcrRuntimeTest(unittest.TestCase):
             **kwargs,
         )
 
+    def write_arabic_model(self):
+        (self.models / "arabic_PP-OCRv5_mobile_rec.onnx").write_bytes(b"model")
+        (self.models / "arabic_dict.txt").write_text("ا\nب\n", encoding="utf-8")
+
     def write_variant_calibration(
         self,
         *,
@@ -1158,6 +1162,89 @@ class OcrRuntimeTest(unittest.TestCase):
         self.assertEqual(result["text"], "안녕하세요")
         self.assertEqual([call[:2] for call in factory.calls], [("small", "korean")])
         self.assertEqual(result["modelVersion"], "PP-OCRv6-small+korean-PP-OCRv5")
+
+    def test_explicit_arabic_uses_the_dedicated_recognizer(self):
+        self.write_arabic_model()
+        arabic = FakeBackend(candidate([("مرحبا بالعالم", 0.91, box(0, 0))]))
+        factory = RecordingFactory({("small", "arabic"): arabic})
+
+        result = self.runtime(factory).recognize_image(
+            self.image, {"quality": "balanced", "language": "ar"}
+        )
+
+        self.assertEqual(result["text"], "مرحبا بالعالم")
+        self.assertEqual([call[:2] for call in factory.calls], [("small", "arabic")])
+        self.assertEqual(result["modelVersion"], "PP-OCRv6-small+arabic-PP-OCRv5")
+
+    def test_arabic_is_not_run_by_auto_detection(self):
+        self.write_arabic_model()
+        unified = FakeBackend(candidate([("hello", 0.95, box(0, 0))]))
+        arabic = FakeBackend(candidate([("مرحبا", 0.95, box(0, 0))]))
+        factory = RecordingFactory(
+            {
+                ("small", "unified"): unified,
+                ("small", "korean"): FakeBackend(
+                    candidate([]),
+                    crop_result=(ocr_runtime.RawRecognition(text="", confidence=0.0),),
+                ),
+                ("small", "arabic"): arabic,
+            }
+        )
+
+        self.runtime(factory).recognize_image(
+            self.image, {"quality": "balanced", "language": "auto"}
+        )
+
+        self.assertNotIn(("small", "arabic"), [call[:2] for call in factory.calls])
+
+    def test_arabic_without_installed_model_fails_before_loading_the_engine(self):
+        paths = {"model_root": self.models}
+
+        with self.assertRaisesRegex(FileNotFoundError, "Arabic OCR is not installed"):
+            ocr_runtime.RapidOcrBackendFactory({}).create(
+                tier="small", recognizer="arabic", paths=paths
+            )
+
+    def test_arabic_lines_read_right_to_left_while_latin_stays_left_to_right(self):
+        lines = [("الفاتورة", 0.9, box(0, 0, width=200)), ("مرحبا", 0.9, box(220, 0, width=200))]
+
+        arabic = ocr_runtime.OcrRuntime._text(candidate(lines), "ar")
+        latin = ocr_runtime.OcrRuntime._text(candidate(lines), "en")
+
+        self.assertEqual(arabic, "مرحبا الفاتورة")
+        self.assertEqual(latin, "الفاتورة مرحبا")
+
+    def test_arabic_rows_stack_top_to_bottom_before_reading_right_to_left(self):
+        lines = [
+            ("ثانيا", 0.9, box(0, 40, width=200)),
+            ("أولا", 0.9, box(220, 0, width=200)),
+            ("ابدأ", 0.9, box(0, 0, width=200)),
+        ]
+
+        self.assertEqual(
+            ocr_runtime.OcrRuntime._text(candidate(lines), "ar"), "أولا ابدأ\nثانيا"
+        )
+
+    def test_smoke_includes_arabic_when_its_model_is_installed(self):
+        self.write_variant_calibration()
+        self.write_arabic_model()
+        smoke_candidate = candidate([("SNAPOTTER 505", 0.99, box(10, 10))])
+        orientation = FakeOrientationClassifier(ocr_runtime.OrientationPrediction(0, 1.0))
+        factory = RecordingFactory(
+            {
+                ("small", "unified"): FakeBackend(smoke_candidate),
+                ("medium", "unified"): FakeBackend(smoke_candidate),
+                ("small", "korean"): FakeBackend(smoke_candidate),
+                ("medium", "korean"): FakeBackend(smoke_candidate),
+                ("small", "arabic"): FakeBackend(smoke_candidate),
+                ("medium", "arabic"): FakeBackend(smoke_candidate),
+            }
+        )
+
+        result = self.runtime(factory, orientation_classifier=orientation).smoke()
+
+        self.assertIn(("small", "arabic"), [call[:2] for call in factory.calls])
+        self.assertIn("arabic", result["representativeModel"])
 
     def test_auto_reuses_unified_crops_and_rejects_single_false_hangul(self):
         shared_crops = (object(), object())

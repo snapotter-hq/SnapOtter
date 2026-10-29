@@ -58,7 +58,9 @@ export type {
 export {
   extractPdfText,
   extractText,
+  FAST_ARABIC_UNSUPPORTED_REASON,
   FAST_KOREAN_UNSUPPORTED_REASON,
+  fastLanguageUnsupportedReason,
   MAX_OCR_INPUT_DIMENSION,
   MAX_OCR_INPUT_PIXELS,
 } from "./ocr.js";

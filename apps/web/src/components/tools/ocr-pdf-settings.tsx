@@ -7,7 +7,7 @@ import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
 
-const LANGUAGE_CODES = ["en", "de", "fr", "es", "zh", "ja", "ko"] as const;
+const LANGUAGE_CODES = ["en", "de", "fr", "es", "zh", "ja", "ko", "ar"] as const;
 
 export function OcrPdfSettings() {
   const { t } = useTranslation();

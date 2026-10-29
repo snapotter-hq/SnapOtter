@@ -1997,6 +1997,8 @@ export const tr: TranslationKeys = {
         "Tanımadan önce yerel kontrastı iyileştirir. Hızlı doğrudan uygular; Dengeli ve En İyi yalnızca kalibre edilmiş puan sonucu iyileştirirse bu varyantı kullanır.",
       fastKoreanUnsupported:
         "Hızlı OCR Koreceyi desteklemez. Doğru OCR paketini yükleyip Dengeli veya En İyi seçeneğini seçin.",
+      fastArabicUnsupported:
+        "Hızlı OCR Arapçayı desteklemez. Doğru OCR paketini yükleyip Dengeli veya En İyi seçeneğini seçin.",
       language: "Dil",
       autoDetect: "Otomatik algıla",
       extractedText: "Çıkarılan Metin",
@@ -5892,6 +5894,7 @@ export const tr: TranslationKeys = {
       zh: "Çince",
       ja: "Japonca",
       ko: "Korece",
+      ar: "Arapça",
       id: "Endonezce",
       th: "Tayca",
       vi: "Vietnamca",

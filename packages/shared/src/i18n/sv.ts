@@ -1991,6 +1991,8 @@ export const sv: TranslationKeys = {
         "Förbättrar lokal kontrast före igenkänning. Snabb använder den direkt; Balanserad och Bäst behåller varianten bara när den kalibrerade poängen förbättrar resultatet.",
       fastKoreanUnsupported:
         "Snabb OCR stöder inte koreanska. Installera paketet för exakt OCR och välj Balanserad eller Bäst.",
+      fastArabicUnsupported:
+        "Snabb OCR stöder inte arabiska. Installera paketet för exakt OCR och välj Balanserad eller Bäst.",
       language: "Språk",
       autoDetect: "Automatisk detektion",
       extractedText: "Extraherad text",
@@ -5880,6 +5882,7 @@ export const sv: TranslationKeys = {
       zh: "Kinesiska",
       ja: "Japanska",
       ko: "Koreanska",
+      ar: "Arabiska",
       id: "Indonesiska",
       th: "Thailändska",
       vi: "Vietnamesiska",

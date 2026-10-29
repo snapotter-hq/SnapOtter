@@ -1937,6 +1937,8 @@ export const en = {
         "Improves local contrast before recognition. Fast applies it directly; Balanced and Best keep it only when calibrated scoring improves the result.",
       fastKoreanUnsupported:
         "Fast OCR does not support Korean. Install the Accurate OCR pack and choose Balanced or Best.",
+      fastArabicUnsupported:
+        "Fast OCR does not support Arabic. Install the Accurate OCR pack and choose Balanced or Best.",
       language: "Language",
       autoDetect: "Auto-detect",
       extractedText: "Extracted Text",
@@ -5806,6 +5808,7 @@ export const en = {
       zh: "Chinese",
       ja: "Japanese",
       ko: "Korean",
+      ar: "Arabic",
       id: "Indonesian",
       th: "Thai",
       vi: "Vietnamese",

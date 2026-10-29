@@ -44,8 +44,11 @@ EXPECTED_RAPIDOCR_VERSION = "3.9.1"
 EXPECTED_ONNXRUNTIME_VERSION = "1.20.1"
 
 SUPPORTED_QUALITIES = frozenset(("balanced", "best"))
-SUPPORTED_LANGUAGES = frozenset(("auto", "en", "de", "fr", "es", "zh", "ja", "ko"))
+SUPPORTED_LANGUAGES = frozenset(("auto", "en", "de", "fr", "es", "zh", "ja", "ko", "ar"))
 RASTER_SUFFIXES = frozenset((".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"))
+
+# Languages that need their own recognizer model instead of the unified one.
+LANGUAGE_RECOGNIZERS: Mapping[str, str] = {"ko": "korean", "ar": "arabic"}
 
 MODEL_FILENAMES: Mapping[str, str] = {
     "small_det": "PP-OCRv6_det_small.onnx",
@@ -57,6 +60,13 @@ MODEL_FILENAMES: Mapping[str, str] = {
     "document_orientation": "PP-LCNet_x1_0_doc_ori.onnx",
     "unified_dict": "ppocrv6_dict.txt",
     "korean_dict": "korean_dict.txt",
+}
+
+# Packs published before Arabic existed lack these files. They load only when
+# present, so an older pack keeps serving every other language.
+OPTIONAL_MODEL_FILENAMES: Mapping[str, str] = {
+    "arabic_rec": "arabic_PP-OCRv5_mobile_rec.onnx",
+    "arabic_dict": "arabic_dict.txt",
 }
 
 _SMOKE_GLYPHS: Mapping[str, tuple[str, ...]] = {
@@ -679,11 +689,15 @@ class RapidOcrBackendFactory:
         recognizer: str,
         paths: Mapping[str, Path],
     ) -> OcrBackend:
-        if tier not in ("small", "medium") or recognizer not in ("unified", "korean"):
+        if tier not in ("small", "medium") or recognizer not in ("unified", "korean", "arabic"):
             raise ValueError("Unsupported RapidOCR backend profile")
+        if recognizer == "arabic" and "arabic_rec" not in paths:
+            raise FileNotFoundError("Arabic OCR is not installed in this OCR pack")
         RapidOCR, recognition_input_type, cropper, ocr_version = self._load_libraries()
-        rec_path = paths["korean_rec"] if recognizer == "korean" else paths[f"{tier}_rec"]
-        rec_dict = paths["korean_dict"] if recognizer == "korean" else paths["unified_dict"]
+        if recognizer == "unified":
+            rec_path, rec_dict = paths[f"{tier}_rec"], paths["unified_dict"]
+        else:
+            rec_path, rec_dict = paths[f"{recognizer}_rec"], paths[f"{recognizer}_dict"]
         intra_op_threads, inter_op_threads = _onnx_thread_counts()
 
         params = {
@@ -907,8 +921,8 @@ def _bounds(line: RawLine) -> tuple[float, float, float, float]:
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def _rows(lines: Sequence[RawLine]) -> list[list[RawLine]]:
-    """Group overlapping polygons into rows, then order each row left-to-right."""
+def _rows(lines: Sequence[RawLine], *, right_to_left: bool = False) -> list[list[RawLine]]:
+    """Group overlapping polygons into rows, then order each row in reading direction."""
     groups: list[dict[str, Any]] = []
     for line in sorted(lines, key=lambda value: (_bounds(value)[1], _bounds(value)[0])):
         left, top, right, bottom = _bounds(line)
@@ -943,6 +957,9 @@ def _rows(lines: Sequence[RawLine]) -> list[list[RawLine]]:
         best_group["left"] = min(best_group["left"], left)
         best_group["right"] = max(best_group["right"], right)
 
+    if right_to_left:
+        groups.sort(key=lambda group: (group["top"], -group["right"]))
+        return [sorted(group["lines"], key=lambda line: -_bounds(line)[2]) for group in groups]
     groups.sort(key=lambda group: (group["top"], group["left"]))
     return [sorted(group["lines"], key=lambda line: _bounds(line)[0]) for group in groups]
 
@@ -1063,7 +1080,7 @@ def _is_cjk_boundary(character: str) -> bool:
     )
 
 
-def _join_row(lines: Sequence[RawLine]) -> str:
+def _join_row(lines: Sequence[RawLine], *, right_to_left: bool = False) -> str:
     output = ""
     previous: RawLine | None = None
     for line in lines:
@@ -1077,7 +1094,10 @@ def _join_row(lines: Sequence[RawLine]) -> str:
         previous_bounds = _bounds(previous)
         current_bounds = _bounds(line)
         height = max(previous_bounds[3] - previous_bounds[1], current_bounds[3] - current_bounds[1], 1)
-        gap = current_bounds[0] - previous_bounds[2]
+        if right_to_left:
+            gap = previous_bounds[0] - current_bounds[2]
+        else:
+            gap = current_bounds[0] - previous_bounds[2]
         if gap < 0:
             for duplicate_count in range(min(8, len(output), len(text)), 0, -1):
                 if output.endswith(text[:duplicate_count]):
@@ -1284,6 +1304,10 @@ class OcrRuntime:
             if not path.is_file():
                 raise FileNotFoundError(f"Required OCR model {model_id} is missing: {path}")
             self.paths[model_id] = path
+        for model_id, filename in OPTIONAL_MODEL_FILENAMES.items():
+            path = self.model_root / filename
+            if path.is_file():
+                self.paths[model_id] = path
 
         self.provider = self._read_provider()
         self.device = "cpu"
@@ -1334,7 +1358,10 @@ class OcrRuntime:
                 os.fsync(fixture.fileno())
                 fixture_path = Path(fixture.name)
 
-            for recognizer in ("unified", "korean"):
+            recognizers = ["unified", "korean"]
+            if "arabic_rec" in self.paths:
+                recognizers.append("arabic")
+            for recognizer in recognizers:
                 for tier in ("small", "medium"):
                     candidate = self._backend(tier, recognizer).recognize(fixture_path)
                     self._validate_candidate(candidate)
@@ -1361,6 +1388,7 @@ class OcrRuntime:
             "target": self.target,
             "representativeModel": (
                 "PP-OCRv6-small+medium+both-korean-pipelines+document-orientation"
+                + ("+arabic-pipeline" if "arabic_rec" in self.paths else "")
             ),
         }
 
@@ -1394,7 +1422,7 @@ class OcrRuntime:
         return path
 
     def _run_tier(self, image_input: Any, tier: str, language: str) -> RawCandidate:
-        recognizer = "korean" if language == "ko" else "unified"
+        recognizer = LANGUAGE_RECOGNIZERS.get(language, "unified")
         candidate = self._backend(tier, recognizer).recognize(
             image_input,
             retain_crops=language == "auto",
@@ -1569,11 +1597,17 @@ class OcrRuntime:
                 )
                 parts.extend(text for row in _rows(after) if (text := _join_row(row)))
                 return "\n".join(parts)
+        # Arabic reads right-to-left, so the columns and the rows inside each
+        # column both run in the opposite direction from Latin and CJK.
+        right_to_left = language == "ar"
+        columns = _horizontal_columns(lines, candidate.width)
+        if right_to_left:
+            columns = list(reversed(columns))
         return "\n".join(
             text
-            for column in _horizontal_columns(lines, candidate.width)
-            for row in _rows(column)
-            if (text := _join_row(row))
+            for column in columns
+            for row in _rows(column, right_to_left=right_to_left)
+            if (text := _join_row(row, right_to_left=right_to_left))
         )
 
     def recognize_image(
@@ -1635,6 +1669,8 @@ class OcrRuntime:
         warnings.extend(choice.warnings)
         if language == "ko" or (language == "auto" and selected.lines):
             model_version += "+korean-PP-OCRv5"
+        if language == "ar":
+            model_version += "+arabic-PP-OCRv5"
         text = self._text(selected, language)
         self._validate_text_output(selected, text)
         return {

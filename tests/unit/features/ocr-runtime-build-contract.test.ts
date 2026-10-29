@@ -39,6 +39,8 @@ const MODEL_IDS = [
   "pp-lcnet-x1-0-doc-ori",
   "pp-ocrv6-dictionary",
   "korean-pp-ocrv5-dictionary",
+  "arabic-pp-ocrv5-mobile-rec",
+  "arabic-pp-ocrv5-dictionary",
   "best-v1-calibration",
 ];
 const LEGAL_ASSET_IDS = ["snapotter-agpl", "apache-2.0", "antlr-4.9.3-license"];

@@ -24,7 +24,7 @@ import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
 import { type OcrQuality, OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
 
-const LANGUAGE_CODES = ["auto", "en", "de", "fr", "es", "zh", "ja", "ko"] as const;
+const LANGUAGE_CODES = ["auto", "en", "de", "fr", "es", "zh", "ja", "ko", "ar"] as const;
 
 const ENHANCE_DEFAULTS: Record<OcrQuality, boolean> = {
   fast: false,
