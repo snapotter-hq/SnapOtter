@@ -1030,6 +1030,7 @@ interface ManifestBundle {
 }
 
 interface Manifest {
+  bundleRepo?: string;
   bundles: Record<string, ManifestBundle>;
 }
 
@@ -1043,11 +1044,26 @@ function bundleArchKey(): string {
   return process.arch === "arm64" ? "arm64-cpu" : "amd64-gpu";
 }
 
-function readManifest(): Manifest | null {
-  if (!existsSync(MANIFEST_PATH)) return null;
+// A manifest that exists but can't be read or parsed is a broken image or a bad
+// FEATURE_MANIFEST_PATH, so it's logged. Feature states are polled, so the same
+// failure is logged once, and again only after a read has worked in between.
+let lastLoggedManifestFailure: string | null = null;
+
+export function readManifest(manifestPath = getManifestPath()): Manifest | null {
+  if (!existsSync(manifestPath)) return null;
   try {
-    return JSON.parse(readFileSync(MANIFEST_PATH, "utf-8")) as Manifest;
-  } catch {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
+    lastLoggedManifestFailure = null;
+    return manifest;
+  } catch (error) {
+    const failure = `${manifestPath}: ${causeChain(error)}`;
+    if (failure !== lastLoggedManifestFailure) {
+      lastLoggedManifestFailure = failure;
+      logger.warn(
+        { err: error, path: manifestPath },
+        "Feature manifest couldn't be read or parsed; treating it as absent",
+      );
+    }
     return null;
   }
 }
