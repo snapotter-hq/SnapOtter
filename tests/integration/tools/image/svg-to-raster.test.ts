@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../../apps/api/src/db/index.js";
+import { encodeHeic } from "../../../../apps/api/src/lib/heic-converter.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -21,6 +22,13 @@ import {
 
 const SVG = readFixture(fixtures.image.base.svg100);
 const PNG = readFixture(fixtures.image.base.png200);
+
+// heif-enc can decode without an HEVC encoder, so a decode-side check cannot
+// tell whether HEIF output works. Encode once and gate on the real result.
+const hasHeifEncoder = await encodeHeic(PNG).then(
+  () => true,
+  () => false,
+);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -799,37 +807,41 @@ describe("svg-to-raster", () => {
 
   // ── Branch coverage: HEIF output with preview (line 363, 404) ───────
 
-  it("converts to heif format and generates a preview", { timeout: 120_000 }, async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
-    ]);
+  it.skipIf(!hasHeifEncoder)(
+    "converts to heif format and generates a preview",
+    { timeout: 120_000 },
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/svg-to-raster",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toBeDefined();
-    // HEIF is non-previewable, so previewUrl should be generated
-    expect(json.previewUrl).toBeDefined();
-
-    // Download the preview and verify it is a webp image
-    if (json.previewUrl) {
-      const previewRes = await app.inject({
-        method: "GET",
-        url: json.previewUrl,
-        headers: { authorization: `Bearer ${adminToken}` },
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
       });
-      expect(previewRes.statusCode).toBe(200);
-      const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
-      expect(meta.format).toBe("webp");
-    }
-  });
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toBeDefined();
+      // HEIF is non-previewable, so previewUrl should be generated
+      expect(json.previewUrl).toBeDefined();
+
+      // Download the preview and verify it is a webp image
+      if (json.previewUrl) {
+        const previewRes = await app.inject({
+          method: "GET",
+          url: json.previewUrl,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(previewRes.statusCode).toBe(200);
+        const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
+        expect(meta.format).toBe("webp");
+      }
+    },
+  );
 
   // ── Branch coverage: TIFF preview generation (non-previewable) ──────
 
@@ -1079,23 +1091,27 @@ describe("svg-to-raster", () => {
 
   // ── Branch coverage: batch with heif output ────────────────────────
 
-  it("batch converts SVGs to heif format", { timeout: 120_000 }, async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
-    ]);
+  it.skipIf(!hasHeifEncoder)(
+    "batch converts SVGs to heif format",
+    { timeout: 120_000 },
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/svg-to-raster/batch",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster/batch",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    expect(res.statusCode).toBe(200);
-    expect(res.headers["content-type"]).toBe("application/zip");
-  });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["content-type"]).toBe("application/zip");
+    },
+  );
 
   // ── Branch coverage: batch with 5+ SVG files ──────────────────────
 
@@ -1203,27 +1219,31 @@ describe("svg-to-raster", () => {
 
   // ── Branch coverage: heif + background color combination ───────────
 
-  it("converts to heif format with background color applied", { timeout: 120_000 }, async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
-      {
-        name: "settings",
-        content: JSON.stringify({ outputFormat: "heif", backgroundColor: "#FF0000" }),
-      },
-    ]);
+  it.skipIf(!hasHeifEncoder)(
+    "converts to heif format with background color applied",
+    { timeout: 120_000 },
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+        {
+          name: "settings",
+          content: JSON.stringify({ outputFormat: "heif", backgroundColor: "#FF0000" }),
+        },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/svg-to-raster",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toBeDefined();
-    expect(json.previewUrl).toBeDefined();
-  });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toBeDefined();
+      expect(json.previewUrl).toBeDefined();
+    },
+  );
 
   // ── SVGZ (compressed SVG) input ──────────────────────────────────
 
