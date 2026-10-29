@@ -167,7 +167,15 @@ async function removePartialWrite(
     await unlink(path);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
-    logger.error({ err, writeErr, storedName }, "Could not remove a partly written library file");
+    // Same as image-error: pino serializes only `err`, so the write error goes in as its message.
+    logger.error(
+      {
+        err,
+        writeErr: writeErr instanceof Error ? writeErr.message : String(writeErr),
+        storedName,
+      },
+      "Could not remove a partly written library file",
+    );
   }
 }
 
