@@ -73,6 +73,53 @@ function sanitize(event: string, properties?: Record<string, unknown>): Record<s
   return out;
 }
 
+// posthog-js reads these from the page URL and attaches them to every event as
+// top-level properties, and as $session_entry_* / $initial_* copies. The list
+// mirrors its CAMPAIGN_PARAMS. They are deleted, not masked, because an
+// instance has no attribution worth keeping (#1124).
+const CAMPAIGN_KEYS = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_content",
+  "utm_term",
+  "gad_source",
+  "mc_cid",
+  "gclid",
+  "gclsrc",
+  "dclid",
+  "gbraid",
+  "wbraid",
+  "fbclid",
+  "msclkid",
+  "twclid",
+  "li_fat_id",
+  "igshid",
+  "ttclid",
+  "rdt_cid",
+  "epik",
+  "qclid",
+  "sccid",
+  "irclid",
+  "_kx",
+]);
+const SDK_COPY_PREFIX = /^\$(session_entry|initial)_/;
+// Properties built from a full stored URL, which keep their query string.
+const URL_PROPERTIES = [
+  "$current_url",
+  "$referrer",
+  "$session_entry_url",
+  "$session_entry_referrer",
+  "$initial_current_url",
+  "$initial_referrer",
+];
+
+function removeCampaignProperties(props: Record<string, unknown>): void {
+  for (const key of Object.keys(props)) {
+    if (CAMPAIGN_KEYS.has(key.replace(SDK_COPY_PREFIX, ""))) delete props[key];
+  }
+}
+
 export function initAnalytics(config: AnalyticsConfig): Promise<void> {
   decided = true;
   if (!config.enabled) {
@@ -182,8 +229,10 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
             const props = event?.properties;
             if (props) {
               const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
-              props.$current_url = strip(props.$current_url);
-              props.$referrer = strip(props.$referrer);
+              for (const key of URL_PROPERTIES) {
+                if (key in props) props[key] = strip(props[key]);
+              }
+              removeCampaignProperties(props);
               // $web_vitals_*_event objects nest their own $current_url, which
               // skips the top-level strip above, so walk them too (#1022).
               for (const key of Object.keys(props)) {

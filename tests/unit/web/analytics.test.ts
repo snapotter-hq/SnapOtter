@@ -468,4 +468,56 @@ describe("privacy invariants (#1022)", () => {
       "https://x.test/b",
     );
   });
+
+  it("removes campaign parameters that posthog-js lifts into top-level and session/initial props (#1124)", async () => {
+    await mod.initAnalytics(enabledConfig);
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({
+      properties: {
+        tool_id: "pdf-to-word",
+        utm_source: "chatgpt.com",
+        utm_medium: null,
+        gclid: "abc",
+        $session_entry_utm_source: "chatgpt.com",
+        $session_entry_gclid: "abc",
+        $initial_utm_campaign: "spring",
+        $initial_fbclid: "xyz",
+      },
+    });
+    expect(result.properties.tool_id).toBe("pdf-to-word");
+    for (const key of [
+      "utm_source",
+      "utm_medium",
+      "gclid",
+      "$session_entry_utm_source",
+      "$session_entry_gclid",
+      "$initial_utm_campaign",
+      "$initial_fbclid",
+    ]) {
+      expect(result.properties).not.toHaveProperty(key);
+    }
+  });
+
+  it("strips query and fragment from the session-entry and initial URL/referrer properties (#1124)", async () => {
+    await mod.initAnalytics(enabledConfig);
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({
+      properties: {
+        $session_entry_url: "https://x.test/pdf?token=abc#frag",
+        $session_entry_referrer: "https://ref.test/page?q=secret",
+        $initial_current_url: "https://x.test/a?b=1",
+        $initial_referrer: "https://ref.test/c?d=2",
+      },
+    });
+    expect(result.properties.$session_entry_url).toBe("https://x.test/pdf");
+    expect(result.properties.$session_entry_referrer).toBe("https://ref.test/page");
+    expect(result.properties.$initial_current_url).toBe("https://x.test/a");
+    expect(result.properties.$initial_referrer).toBe("https://ref.test/c");
+  });
 });
