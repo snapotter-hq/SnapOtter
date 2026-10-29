@@ -1,7 +1,7 @@
 ---
 description: "すべてのローカル ML ツールを網羅した AI エンジンリファレンス。背景除去、アップスケーリング、OCR、顔検出、写真復元など。"
 i18n_output_hash: d94cd75e40f8
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -18,7 +18,7 @@ VA-API、Quick Sync、OpenCL を介した Intel/AMD の iGPU アクセラレー�
 
 <!-- korean-ocr-contract:start -->
 ::: info 韓国語 OCR の互換性
-高速 OCR は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) には対応しません。韓国語には高精度 OCR パックと `balanced` または `best` が必要です。パックは公式 Linux amd64/arm64 コンテナで動作し、NVIDIA ホストでも OCR は CPU 上で実行されます。非対応システムでは明示的な互換性エラーを返し、暗黙に `fast` へ切り替えません。韓国語で `fast` または旧 `tesseract` エイリアスを指定すると、キュー投入前に `FEATURE_INCOMPATIBLE` と `fast-korean-unsupported` で拒否されます。
+高速 OCR は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) とアラビア語 (`ar`) には対応しません。韓国語とアラビア語には高精度 OCR パックと `balanced` または `best` が必要です。パックは公式 Linux amd64/arm64 コンテナで動作し、NVIDIA ホストでも OCR は CPU 上で実行されます。非対応システムでは明示的な互換性エラーを返し、暗黙に `fast` へ切り替えません。韓国語またはアラビア語で `fast` または旧 `tesseract` エイリアスを指定すると、キュー投入前に `FEATURE_INCOMPATIBLE` と `fast-korean-unsupported` で拒否されます。
 :::
 <!-- korean-ocr-contract:end -->
 ## アーキテクチャ {#architecture}
@@ -107,7 +107,7 @@ done
 
 ### 正確な OCR ランタイム インストール {#accurate-ocr-runtime-installation}
 
-正確な OCR パックは、公式 Linux amd64 または Linux arm64 コンテナー用のプラットフォーム固有のランタイムです。 amd64 ビルドは Python 3.12 を使用します。 arm64 ビルドは Python 3.11 を使用します。 どちらのビルドも ONNX Runtime の `CPUExecutionProvider` を介して RapidOCR を実行するため、同じパックが CPU のみおよび NVIDIA Docker ホストで動作します。 正確なランタイムには、少なくとも 4 GiB の有効メモリ (構成されたコンテナーの cgroup 制限、それ以外の場合はホスト メモリ) が必要です。 署名された互換性の最小値を下回るシステムは、ダウンロード前に拒否されます。 この要件は、組み込みの Fast OCR には適用されません。 Bare-metal ビルドは、libc および Python ABI を安全に推論できないため拒否されます。 ホストが Tesseract および Ghostscript を提供する場合、高速 OCR は引き続き利用可能です。Fast は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) には対応しません。そのため韓国語には、対応済みの高精度ランタイムと `balanced` または `best` ティアが必要です。非対応のホストでは、暗黙に Fast へフォールバックするのではなく、明示的な互換性エラーを返します。
+正確な OCR パックは、公式 Linux amd64 または Linux arm64 コンテナー用のプラットフォーム固有のランタイムです。 amd64 ビルドは Python 3.12 を使用します。 arm64 ビルドは Python 3.11 を使用します。 どちらのビルドも ONNX Runtime の `CPUExecutionProvider` を介して RapidOCR を実行するため、同じパックが CPU のみおよび NVIDIA Docker ホストで動作します。 正確なランタイムには、少なくとも 4 GiB の有効メモリ (構成されたコンテナーの cgroup 制限、それ以外の場合はホスト メモリ) が必要です。 署名された互換性の最小値を下回るシステムは、ダウンロード前に拒否されます。 この要件は、組み込みの Fast OCR には適用されません。 Bare-metal ビルドは、libc および Python ABI を安全に推論できないため拒否されます。 ホストが Tesseract および Ghostscript を提供する場合、高速 OCR は引き続き利用可能です。Fast は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) とアラビア語 (`ar`) には対応しません。そのため韓国語には、対応済みの高精度ランタイムと `balanced` または `best` ティアが必要です。非対応のホストでは、暗黙に Fast へフォールバックするのではなく、明示的な互換性エラーを返します。
 
 オプションのアーティファクトは、アーキテクチャに応じて、圧縮すると約 208 ～ 234 MiB、抽出すると約 409 ～ 488 MiB になります。 署名付きインデックスは、インストーラーによって強制された正確な圧縮バイト数と抽出バイト数をバインドします。 組み込みの Tesseract は、約 25 の MiB を公式イメージに追加し、`/data/ai` 内のファイルは必要ありません。
 
@@ -189,12 +189,12 @@ done
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | 処理ティア。`quality` を省略すると、`best`、`balanced`、`fast` の順で利用可能な最上位のティアを選択します。韓国語では `fast` を選択せず、高精度ティアがない場合は高精度ランタイムのインストールまたは互換性エラーを返します。 |
-| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`。Fast は `ko` に対応しません。 |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | 処理ティア。`quality` を省略すると、`best`、`balanced`、`fast` の順で利用可能な最上位のティアを選択します。韓国語とアラビア語では `fast` を選択せず、高精度ティアがない場合は高精度ランタイムのインストールまたは互換性エラーを返します。 |
+| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`。Fast は `ko` と `ar` に対応しません。 |
 | `enhance` | boolean | ティアに依存 | 局所的なコントラストを改善します。Fast では直接適用し、高精度ティアでは調整済みスコアリングによって OCR が改善する場合にのみバリアントを採用します。Best ではデフォルトで有効です。 |
 | `engine` | string | - | 非推奨の互換性エイリアス。`tesseract` を `fast` に、従来の `paddleocr` 値を `balanced` にマッピングします。PaddlePaddle は読み込みません。 |
 
-抽出されたテキストと来歴メタデータを返します: エンジン、要求された品質と実際の品質、デバイス、プロバイダー、劣化状態、警告、および該当する場合は正確なランタイム/モデルのバージョン。 明示的な品質要求が別の層にフォー​​ルバックすることはありません。 `balanced` または `best` が使用できない場合、API は、`fast` をサイレントに実行する代わりに、`FEATURE_NOT_INSTALLED` または `FEATURE_INCOMPATIBLE` を返します。韓国語で明示的に Fast または旧 `tesseract` を指定した場合は、ジョブがキューに投入される前に `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`、高精度パックの案内を返します。
+抽出されたテキストと来歴メタデータを返します: エンジン、要求された品質と実際の品質、デバイス、プロバイダー、劣化状態、警告、および該当する場合は正確なランタイム/モデルのバージョン。 明示的な品質要求が別の層にフォー​​ルバックすることはありません。 `balanced` または `best` が使用できない場合、API は、`fast` をサイレントに実行する代わりに、`FEATURE_NOT_INSTALLED` または `FEATURE_INCOMPATIBLE` を返します。韓国語またはアラビア語で明示的に Fast または旧 `tesseract` を指定した場合は、ジョブがキューに投入される前に `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`、高精度パックの案内を返します。
 
 ## PDF OCR {#pdf-ocr}
 
@@ -205,8 +205,8 @@ AI ベースの OCR を使用して、スキャンされた PDF ドキュメン�
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | 処理ティア。`quality` を省略すると、`best`、`balanced`、`fast` の順で利用可能な最上位のティアを選択します。韓国語では `fast` を選択せず、高精度ティアがない場合は高精度ランタイムのインストールまたは互換性エラーを返します。 |
-| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`。Fast は `ko` に対応しません。 |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動的 | 処理ティア。`quality` を省略すると、`best`、`balanced`、`fast` の順で利用可能な最上位のティアを選択します。韓国語とアラビア語では `fast` を選択せず、高精度ティアがない場合は高精度ランタイムのインストールまたは互換性エラーを返します。 |
+| `language` | string | `"auto"` | 言語: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`。Fast は `ko` と `ar` に対応しません。 |
 | `pages` | string | `"all"` | ページ選択: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | ティアに依存 | 局所的なコントラストを改善します。Fast では直接適用し、高精度ティアでは調整済みスコアリングによって OCR が改善する場合にのみバリアントを採用します。Best ではデフォルトで有効です。 |
 | `engine` | string | - | 非推奨の互換性エイリアス。`tesseract` を `fast` に、従来の `paddleocr` 値を `balanced` にマッピングします。PaddlePaddle は読み込みません。 |

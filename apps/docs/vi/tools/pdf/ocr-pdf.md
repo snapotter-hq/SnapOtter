@@ -1,7 +1,7 @@
 ---
 description: "Trích xuất văn bản từ các tệp PDF được quét cục bộ bằng Tesseract tích hợp sẵn hoặc thời gian chạy RapidOCR có độ chính xác cao tùy chọn."
 i18n_output_hash: 74e1bebfa9b1
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ Trích xuất văn bản từ từng trang tài liệu PDF được quét mà kh
 
 <!-- korean-ocr-contract:start -->
 ::: info Khả năng tương thích OCR tiếng Hàn
-OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`). Tiếng Hàn cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
+OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`) và tiếng Ả Rập (`ar`). Cả hai cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Với tiếng Hàn và tiếng Ả Rập, hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn hoặc tiếng Ả Rập với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -27,12 +27,12 @@ Chấp nhận dữ liệu biểu mẫu multipart với một tệp PDF và một
 |-----------|------|----------|---------|-------------|
 | file | file | Đúng | - | Tệp PDF (nhiều phần), được mã hóa tối đa 512 MiB; giới hạn tải lên của nhà điều hành thấp hơn vẫn được áp dụng |
 | quality | string | KHÔNG | Năng động | Cấp chất lượng OCR: `fast`, `balanced` hoặc `best` |
-| language | string | Không | `"auto"` | Ngôn ngữ tài liệu: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | Không | `"auto"` | Ngôn ngữ tài liệu: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast không hỗ trợ `ko` và `ar` |
 | pages | string | Không | `"all"` | Chọn trang, ví dụ `"all"`, `"1-3"`, `"1,3,5"` |
 | enhance | boolean | KHÔNG | Phụ thuộc vào cấp bậc | Cải thiện độ tương phản cục bộ trước khi nhận dạng. Nhanh chóng áp dụng nó trực tiếp; Cân bằng và Tốt nhất chỉ giữ lại biến thể khi việc tính điểm đã hiệu chỉnh cải thiện kết quả. Mặc định là `true` cho `best` và `false` cho `fast`/`balanced` |
 | engine | string | KHÔNG | - | Bí danh tương thích không được dùng nữa. Thay vào đó hãy sử dụng `quality`. `tesseract` ánh xạ tới `fast`; giá trị `paddleocr` kế thừa ánh xạ tới `balanced` nhưng không tải PaddlePaddle |
 
-Khi bỏ qua `quality` và `engine`, SnapOtter chọn cấp tốt nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Với tiếng Hàn, hệ thống không bao giờ chọn `fast`; hệ thống dùng `best`, sau đó `balanced`, hoặc trả về lỗi cài đặt hay tương thích của runtime chính xác.
+Khi bỏ qua `quality` và `engine`, SnapOtter chọn cấp tốt nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Với tiếng Hàn và tiếng Ả Rập, hệ thống không bao giờ chọn `fast`; hệ thống dùng `best`, sau đó `balanced`, hoặc trả về lỗi cài đặt hay tương thích của runtime chính xác.
 
 ## Example Request {#example-request}
 

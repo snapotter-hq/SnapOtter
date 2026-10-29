@@ -1,7 +1,7 @@
 ---
 description: "AI 引擎參考，涵蓋所有本機 ML 工具。去背、放大、OCR、人臉偵測、相片修復等。"
 i18n_output_hash: 7a0476b48ec2
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -18,7 +18,7 @@ NVIDIA CUDA 會自動偵測，並由支援它的執行環境使用。OCR 在所�
 
 <!-- korean-ocr-contract:start -->
 ::: info 韓語 OCR 相容性
-快速 OCR 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支援韓語 (`ko`)。韓語需要精確 OCR 套件以及 `balanced` 或 `best`。此套件可在官方 Linux amd64 和 arm64 容器上執行；即使是 NVIDIA 主機，OCR 仍使用 CPU。不受支援的系統會傳回明確的相容性錯誤，絕不會靜默回退至 `fast`。韓語搭配 `fast` 或舊版 `tesseract` 別名時，會在排入佇列前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒絕。
+快速 OCR 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支援韓語 (`ko`) 和阿拉伯語 (`ar`)。韓語和阿拉伯語需要精確 OCR 套件以及 `balanced` 或 `best`。此套件可在官方 Linux amd64 和 arm64 容器上執行；即使是 NVIDIA 主機，OCR 仍使用 CPU。不受支援的系統會傳回明確的相容性錯誤，絕不會靜默回退至 `fast`。韓語或阿拉伯語搭配 `fast` 或舊版 `tesseract` 別名時，會在排入佇列前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒絕。
 :::
 <!-- korean-ocr-contract:end -->
 ## 架構 {#architecture}
@@ -107,7 +107,7 @@ done
 
 ### 精確 OCR 執行環境安裝 {#accurate-ocr-runtime-installation}
 
-精確 OCR 套件是專供官方 Linux amd64 或 Linux arm64 容器使用的平台專屬執行環境。amd64 建置使用 Python 3.12，arm64 建置則使用 Python 3.11。兩者都透過 ONNX Runtime 的 `CPUExecutionProvider` 執行 RapidOCR，因此同一套件也可在僅有 CPU 的主機與 NVIDIA Docker 主機上運作。精確執行環境至少需要 4 GiB 的有效記憶體：也就是容器已設定的 cgroup 上限，若未設定則以主機記憶體為準。低於此簽署相容性下限的系統會在下載前遭到拒絕。這項需求不適用於內建 Fast OCR。裸機建置會遭到拒絕，因為其 libc 與 Python ABI 無法安全推斷；若主機提供 Tesseract 與 Ghostscript，Fast OCR 仍可使用。Fast 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 與 `ja`，但不支援韓語（`ko`）。因此韓語需要受支援的精確執行環境，以及 `balanced` 或 `best` 層級；不受支援的主機會收到明確的相容性錯誤回應，而不是默默退回 Fast。
+精確 OCR 套件是專供官方 Linux amd64 或 Linux arm64 容器使用的平台專屬執行環境。amd64 建置使用 Python 3.12，arm64 建置則使用 Python 3.11。兩者都透過 ONNX Runtime 的 `CPUExecutionProvider` 執行 RapidOCR，因此同一套件也可在僅有 CPU 的主機與 NVIDIA Docker 主機上運作。精確執行環境至少需要 4 GiB 的有效記憶體：也就是容器已設定的 cgroup 上限，若未設定則以主機記憶體為準。低於此簽署相容性下限的系統會在下載前遭到拒絕。這項需求不適用於內建 Fast OCR。裸機建置會遭到拒絕，因為其 libc 與 Python ABI 無法安全推斷；若主機提供 Tesseract 與 Ghostscript，Fast OCR 仍可使用。Fast 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 與 `ja`，但不支援韓語（`ko`）和阿拉伯語（`ar`）。因此韓語和阿拉伯語需要受支援的精確執行環境，以及 `balanced` 或 `best` 層級；不受支援的主機會收到明確的相容性錯誤回應，而不是默默退回 Fast。
 
 選用產物的壓縮大小約為 208-234 MiB，解壓後約為 409-488 MiB，視架構而定。簽署索引會綁定安裝程式強制執行的確切壓縮與解壓位元組數。內建 Tesseract 會為官方映像檔增加約 25 MiB，且不需要在 `/data/ai` 中放置任何檔案。
 
@@ -189,12 +189,12 @@ done
 
 | 參數 | 型別 | 預設值 | 說明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
-| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。Fast 不支援 `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語和阿拉伯語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
+| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。Fast 不支援 `ko` 和 `ar` |
 | `enhance` | boolean | 取決於層級 | 提升局部對比。Fast 會直接套用；精確層級只有在校準評分能改善 OCR 時才會保留該變體。Best 預設為開啟 |
 | `engine` | string | - | 已棄用的相容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不會載入 PaddlePaddle |
 
-傳回擷取的文字，以及來源中繼資料：引擎、要求的品質與實際品質、裝置、提供者、降級狀態、警告，以及適用時的精確執行環境/模型版本。明確指定品質時，絕不會退回其他層級。若 `balanced` 或 `best` 無法使用，API 會傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是默默執行 `fast`。明確指定 Fast，或使用舊版 `tesseract` 別名搭配韓語時，會在作業排入佇列前傳回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`，以及精確套件的指引。
+傳回擷取的文字，以及來源中繼資料：引擎、要求的品質與實際品質、裝置、提供者、降級狀態、警告，以及適用時的精確執行環境/模型版本。明確指定品質時，絕不會退回其他層級。若 `balanced` 或 `best` 無法使用，API 會傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是默默執行 `fast`。明確指定 Fast，或使用舊版 `tesseract` 別名搭配韓語或阿拉伯語時，會在作業排入佇列前傳回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`，以及精確套件的指引。
 
 ## PDF OCR {#pdf-ocr}
 
@@ -205,13 +205,13 @@ done
 
 | 參數 | 型別 | 預設值 | 說明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
-| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。Fast 不支援 `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語和阿拉伯語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
+| `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。Fast 不支援 `ko` 和 `ar` |
 | `pages` | string | `"all"` | 頁面選取：`"all"`、`"1-3"`、`"1,3,5"` |
 | `enhance` | boolean | 取決於層級 | 提升局部對比。Fast 會直接套用；精確層級只有在校準評分能改善 OCR 時才會保留該變體。Best 預設為開啟 |
 | `engine` | string | - | 已棄用的相容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不會載入 PaddlePaddle |
 
-PDF OCR 也適用相同的不降級與韓語相容性規則。PDF 頁面會在辨識前先點陣化，且一次請求最多可選取 50 頁。
+PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF 頁面會在辨識前先點陣化，且一次請求最多可選取 50 頁。
 
 ## 人臉 / PII 模糊 {#face-pii-blur}
 

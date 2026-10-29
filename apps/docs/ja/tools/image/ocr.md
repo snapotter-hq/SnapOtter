@@ -1,7 +1,7 @@
 ---
 description: "組み込みの Tesseract またはオプションの高精度 RapidOCR ランタイムを使用して、画像からテキストをローカルに抽出します。"
 i18n_output_hash: 360daff93230
-i18n_source_hash: 7b0c00be0510
+i18n_source_hash: 1e098dbb5a20
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ i18n_provenance: human
 
 <!-- korean-ocr-contract:start -->
 ::: info 韓国語 OCR の互換性
-高速 OCR は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) には対応しません。韓国語には高精度 OCR パックと `balanced` または `best` が必要です。パックは公式 Linux amd64/arm64 コンテナで動作し、NVIDIA ホストでも OCR は CPU 上で実行されます。非対応システムでは明示的な互換性エラーを返し、暗黙に `fast` へ切り替えません。韓国語で `fast` または旧 `tesseract` エイリアスを指定すると、キュー投入前に `FEATURE_INCOMPATIBLE` と `fast-korean-unsupported` で拒否されます。
+高速 OCR は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) とアラビア語 (`ar`) には対応しません。韓国語とアラビア語には高精度 OCR パックと `balanced` または `best` が必要です。パックは公式 Linux amd64/arm64 コンテナで動作し、NVIDIA ホストでも OCR は CPU 上で実行されます。非対応システムでは明示的な互換性エラーを返し、暗黙に `fast` へ切り替えません。韓国語またはアラビア語で `fast` または旧 `tesseract` エイリアスを指定すると、キュー投入前に `FEATURE_INCOMPATIBLE` と `fast-korean-unsupported` で拒否されます。
 :::
 <!-- korean-ocr-contract:end -->
 ## API エンドポイント {#api-endpoint}
@@ -29,11 +29,11 @@ i18n_provenance: human
 |-----------|------|----------|---------|-------------|
 | file | file | はい | - | 画像ファイル (マルチパート)、最大 512 MiB エンコードおよび 40 メガピクセルのデコード。オペレータのアップロード制限の下限は引き続き適用されます |
 | quality | string | いいえ | 動的 | 品質レベル: `fast` (Tesseract)、`balanced` (小型 PP-OCRv6 モデルを備えた RapidOCR)、または `best` (校正されたバリアント スコアリングを備えた高精度の中型 PP-OCRv6 モデル) |
-| language | string | No | `"auto"` | 言語ヒント: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | No | `"auto"` | 言語ヒント: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | enhance | boolean | いいえ | ティアに依存 | 認識前に局所的なコントラストを改善します。高速ではそれを直接適用します。 Balanced および Best は、調整されたスコアによって結果が改善された場合にのみバリアントを保持します。デフォルトは、`best` の場合は `true`、`fast`/`balanced` の場合は `false` です。 |
 | engine | string | いいえ | - | 非推奨の互換性エイリアス。代わりに `quality` を使用してください。 `tesseract` は `fast` にマップされます。従来の `paddleocr` 値は `balanced` にマップされますが、PaddlePaddle はロードされません |
 
-`quality` と `engine` を省略すると、SnapOtter は `best`、`balanced`、`fast` の順で利用可能な最上位の層を選びます。韓国語では `fast` を選択せず、`best`、次に `balanced` を使用し、どちらもなければ高精度ランタイムのインストールまたは互換性エラーを返します。
+`quality` と `engine` を省略すると、SnapOtter は `best`、`balanced`、`fast` の順で利用可能な最上位の層を選びます。韓国語とアラビア語では `fast` を選択せず、`best`、次に `balanced` を使用し、どちらもなければ高精度ランタイムのインストールまたは互換性エラーを返します。
 
 ## リクエスト例 {#example-request}
 

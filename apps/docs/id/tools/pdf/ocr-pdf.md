@@ -1,7 +1,7 @@
 ---
 description: "Ekstrak teks dari PDF yang dipindai secara lokal dengan Tesseract bawaan atau runtime RapidOCR opsional dengan akurasi tinggi."
 i18n_output_hash: 773cab1835b3
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ Ekstrak teks dari dokumen PDF yang dipindai halaman demi halaman tanpa mengirim 
 
 <!-- korean-ocr-contract:start -->
 ::: info Kompatibilitas OCR bahasa Korea
-OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`). Bahasa Korea memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
+OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`) maupun bahasa Arab (`ar`). Keduanya memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea atau Arab dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -27,7 +27,7 @@ Menerima data form multipart berisi file PDF dan sebuah field JSON `settings` op
 |-----------|------|----------|---------|-------------|
 | file | file | Ya | - | File PDF (multibagian), hingga 512 MiB dikodekan; batas unggah operator yang lebih rendah masih berlaku |
 | quality | string | TIDAK | Dinamis | Tingkat kualitas OCR: `fast`, `balanced`, atau `best` |
-| language | string | No | `"auto"` | Bahasa dokumen: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | No | `"auto"` | Bahasa dokumen: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | pages | string | No | `"all"` | Pemilihan halaman, mis. `"all"`, `"1-3"`, `"1,3,5"` |
 | enhance | boolean | TIDAK | Bergantung pada tingkatan | Tingkatkan kontras lokal sebelum pengenalan. Fast menerapkannya secara langsung; Seimbang dan Terbaik mempertahankan varian hanya jika penilaian yang dikalibrasi meningkatkan hasilnya. Defaultnya adalah `true` untuk `best` dan `false` untuk `fast`/`balanced` |
 | engine | string | TIDAK | - | Alias ​​​​kompatibilitas yang tidak digunakan lagi. Gunakan `quality` sebagai gantinya. `tesseract` dipetakan ke `fast`; nilai `paddleocr` lama dipetakan ke `balanced` tetapi tidak memuat PaddlePaddle |

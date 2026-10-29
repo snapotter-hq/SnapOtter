@@ -1,7 +1,7 @@
 ---
 description: "Referência do motor de IA com todas as ferramentas de ML locais. Remoção de fundo, ampliação, OCR, detecção de rostos, restauração de fotos e muito mais."
 i18n_output_hash: 296df51c81a2
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -17,8 +17,8 @@ A aceleração por iGPU Intel/AMD via VA-API, Quick Sync ou OpenCL não é supor
 
 
 <!-- korean-ocr-contract:start -->
-::: info Compatibilidade do OCR em coreano
-O OCR rápido oferece suporte a `auto`, `en`, `de`, `es`, `fr`, `zh` e `ja`, mas não a coreano (`ko`). Coreano exige o pacote de OCR preciso e `balanced` ou `best`. O pacote funciona nos contêineres oficiais Linux amd64 e arm64, inclusive em hosts NVIDIA, onde o OCR continua na CPU. Sistemas não compatíveis recebem um erro explícito e nunca retornam silenciosamente para `fast`. Coreano com `fast` ou com o alias legado `tesseract` é rejeitado antes da fila com `FEATURE_INCOMPATIBLE` e `fast-korean-unsupported`.
+::: info Compatibilidade do OCR em coreano e árabe
+O OCR rápido oferece suporte a `auto`, `en`, `de`, `es`, `fr`, `zh` e `ja`, mas não a coreano (`ko`) nem a árabe (`ar`). Coreano e árabe exigem o pacote de OCR preciso e `balanced` ou `best`. O pacote funciona nos contêineres oficiais Linux amd64 e arm64, inclusive em hosts NVIDIA, onde o OCR continua na CPU. Sistemas não compatíveis recebem um erro explícito e nunca retornam silenciosamente para `fast`. Coreano ou árabe com `fast` ou com o alias legado `tesseract` é rejeitado antes da fila com `FEATURE_INCOMPATIBLE` e `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## Arquitetura {#architecture}
@@ -107,7 +107,7 @@ Duas coisas para esperar. O pacote `ocr` executa uma pré-verificação de compa
 
 ### Instalação precisa do tempo de execução do OCR {#accurate-ocr-runtime-installation}
 
-O pacote OCR preciso é um tempo de execução específico da plataforma para o contêiner oficial Linux amd64 ou Linux arm64. A construção amd64 usa Python 3.12; a compilação arm64 usa Python 3.11. Ambas as compilações executam RapidOCR por meio do `CPUExecutionProvider` do ONNX Runtime, portanto, o mesmo pacote funciona apenas em hosts CPU e NVIDIA Docker. O tempo de execução preciso requer pelo menos 4 GiB de memória efetiva: o limite cgroup do contêiner configurado, caso contrário, memória do host. Um sistema abaixo do mínimo de compatibilidade assinado é rejeitado antes do download. Este requisito não se aplica ao Fast OCR integrado. As compilações Bare-metal são rejeitadas porque seus libc e Python ABI não podem ser inferidos com segurança; O OCR rápido permanece disponível quando o host fornece Tesseract e Ghostscript. O Fast OCR oferece suporte a `auto`, `en`, `de`, `es`, `fr`, `zh` e `ja`, mas não a coreano (`ko`). O coreano, portanto, exige um tempo de execução preciso compatível e um nível `balanced` ou `best`; hosts não compatíveis recebem uma resposta explícita de incompatibilidade, em vez de um fallback silencioso para o Fast.
+O pacote OCR preciso é um tempo de execução específico da plataforma para o contêiner oficial Linux amd64 ou Linux arm64. A construção amd64 usa Python 3.12; a compilação arm64 usa Python 3.11. Ambas as compilações executam RapidOCR por meio do `CPUExecutionProvider` do ONNX Runtime, portanto, o mesmo pacote funciona apenas em hosts CPU e NVIDIA Docker. O tempo de execução preciso requer pelo menos 4 GiB de memória efetiva: o limite cgroup do contêiner configurado, caso contrário, memória do host. Um sistema abaixo do mínimo de compatibilidade assinado é rejeitado antes do download. Este requisito não se aplica ao Fast OCR integrado. As compilações Bare-metal são rejeitadas porque seus libc e Python ABI não podem ser inferidos com segurança; O OCR rápido permanece disponível quando o host fornece Tesseract e Ghostscript. O Fast OCR oferece suporte a `auto`, `en`, `de`, `es`, `fr`, `zh` e `ja`, mas não a coreano (`ko`) nem a árabe (`ar`). Coreano e árabe, portanto, exigem um tempo de execução preciso compatível e um nível `balanced` ou `best`; hosts não compatíveis recebem uma resposta explícita de incompatibilidade, em vez de um fallback silencioso para o Fast.
 
 O artefato opcional tem cerca de 208-234 MiB compactado e 409-488 MiB extraído, dependendo da arquitetura. O índice assinado vincula as contagens exatas de bytes compactados e extraídos impostas pelo instalador. Tesseract integrado adiciona cerca de 25 MiB à imagem oficial e não precisa de arquivos em `/data/ai`.
 
@@ -189,12 +189,12 @@ Desfoca o fundo mantendo o sujeito nítido.
 
 | Parâmetro | Tipo | Padrão | Descrição |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinâmico | Quando `quality` e `engine` são omitidos, o SnapOtter escolhe o melhor nível disponível nesta ordem: `best`, `balanced`, `fast`. Para coreano, `fast` nunca é escolhido; usa-se `best`, depois `balanced`, ou é retornado o erro de instalação ou compatibilidade do runtime preciso. |
-| `language` | string | `"auto"` | Idioma: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinâmico | Quando `quality` e `engine` são omitidos, o SnapOtter escolhe o melhor nível disponível nesta ordem: `best`, `balanced`, `fast`. Para coreano e árabe, `fast` nunca é escolhido; usa-se `best`, depois `balanced`, ou é retornado o erro de instalação ou compatibilidade do runtime preciso. |
+| `language` | string | `"auto"` | Idioma: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | `enhance` | booleano | Dependente do nível | Melhore o contraste local. Fast aplica-o diretamente; níveis precisos mantêm a variante somente quando a pontuação calibrada melhora OCR. O padrão é Melhor |
 | `engine` | corda | - | Alias ​​de compatibilidade obsoleta. Mapeia `tesseract` para `fast` e o valor herdado de `paddleocr` para `balanced`; não carrega PaddlePaddle |
 
-Retorna o texto extraído mais os metadados de origem: mecanismo, qualidade solicitada e real, dispositivo, provedor, estado de degradação, avisos e versões de tempo de execução/modelo precisos, quando aplicável. Solicitações de qualidade explícitas nunca voltam para outro nível. Se `balanced` ou `best` não estiver disponível, API retornará `FEATURE_NOT_INSTALLED` ou `FEATURE_INCOMPATIBLE` em vez de executar `fast` silenciosamente. Fast explícito ou o legado `tesseract` com coreano retorna `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` e orientação sobre o pacote preciso antes que um job seja enfileirado.
+Retorna o texto extraído mais os metadados de origem: mecanismo, qualidade solicitada e real, dispositivo, provedor, estado de degradação, avisos e versões de tempo de execução/modelo precisos, quando aplicável. Solicitações de qualidade explícitas nunca voltam para outro nível. Se `balanced` ou `best` não estiver disponível, API retornará `FEATURE_NOT_INSTALLED` ou `FEATURE_INCOMPATIBLE` em vez de executar `fast` silenciosamente. Fast explícito ou o legado `tesseract` com coreano ou árabe retorna `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` e orientação sobre o pacote preciso antes que um job seja enfileirado.
 
 ## OCR de PDF {#pdf-ocr}
 
@@ -205,13 +205,13 @@ Extrai texto de documentos PDF digitalizados usando OCR com IA, página por pág
 
 | Parâmetro | Tipo | Padrão | Descrição |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinâmico | Quando `quality` e `engine` são omitidos, o SnapOtter escolhe o melhor nível disponível nesta ordem: `best`, `balanced`, `fast`. Para coreano, `fast` nunca é escolhido; usa-se `best`, depois `balanced`, ou é retornado o erro de instalação ou compatibilidade do runtime preciso. |
-| `language` | string | `"auto"` | Idioma: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinâmico | Quando `quality` e `engine` são omitidos, o SnapOtter escolhe o melhor nível disponível nesta ordem: `best`, `balanced`, `fast`. Para coreano e árabe, `fast` nunca é escolhido; usa-se `best`, depois `balanced`, ou é retornado o erro de instalação ou compatibilidade do runtime preciso. |
+| `language` | string | `"auto"` | Idioma: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | `pages` | string | `"all"` | Seleção de páginas: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | booleano | Dependente do nível | Melhore o contraste local. Fast aplica-o diretamente; níveis precisos mantêm a variante somente quando a pontuação calibrada melhora OCR. O padrão é Melhor |
 | `engine` | corda | - | Alias ​​de compatibilidade obsoleta. Mapeia `tesseract` para `fast` e o valor herdado de `paddleocr` para `balanced`; não carrega PaddlePaddle |
 
-A mesma regra de não downgrade se aplica a PDF OCR. As páginas PDF são rasterizadas antes do reconhecimento e uma solicitação pode selecionar no máximo 50 páginas.
+As mesmas regras de não downgrade e de compatibilidade com coreano e árabe se aplicam ao OCR de PDF. As páginas PDF são rasterizadas antes do reconhecimento e uma solicitação pode selecionar no máximo 50 páginas.
 
 ## Desfoque de Rosto / PII {#face-pii-blur}
 

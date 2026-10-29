@@ -1,6 +1,6 @@
 ---
 description: "使用 Docker 将 SnapOtter 部署到生产环境。涵盖硬件要求、GPU 配置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
-i18n_source_hash: 4db97ead24e0
+i18n_source_hash: 4cae787c775e
 i18n_provenance: human
 i18n_output_hash: 960e0a8c2b9a
 i18n_hash_version: 2
@@ -15,7 +15,7 @@ SnapOtter 以 3 容器 Docker Compose 栈的形式部署：SnapOtter 应用镜�
 
 <!-- korean-ocr-contract:start -->
 ::: info 韩语 OCR 兼容性
-快速 OCR 支持 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支持韩语 (`ko`)。韩语需要精确 OCR 包以及 `balanced` 或 `best`。该包可在官方 Linux amd64 和 arm64 容器上运行；即使是 NVIDIA 主机，OCR 仍使用 CPU。不受支持的系统会返回明确的兼容性错误，绝不会静默回退到 `fast`。韩语与 `fast` 或旧版 `tesseract` 别名的组合会在入队前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒绝。
+快速 OCR 支持 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支持韩语 (`ko`) 和阿拉伯语 (`ar`)。韩语和阿拉伯语需要精确 OCR 包以及 `balanced` 或 `best`。该包可在官方 Linux amd64 和 arm64 容器上运行；即使是 NVIDIA 主机，OCR 仍使用 CPU。不受支持的系统会返回明确的兼容性错误，绝不会静默回退到 `fast`。韩语或阿拉伯语与 `fast` 或旧版 `tesseract` 别名的组合会在入队前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒绝。
 :::
 <!-- korean-ocr-contract:end -->
 ## 快速开始（CPU） {#quick-start-cpu}

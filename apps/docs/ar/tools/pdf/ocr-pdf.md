@@ -1,7 +1,7 @@
 ---
 description: "استخرج النص من ملفات PDF الممسوحة ضوئيًا محليًا باستخدام ميزة مدمجة Tesseract أو الدقة العالية الاختيارية RapidOCR وقت التشغيل."
 i18n_output_hash: 8a637d247049
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ i18n_provenance: human
 
 <!-- korean-ocr-contract:start -->
 ::: info توافق OCR الكوري
-يدعم Fast OCR اللغات `auto` و`en` و`de` و`es` و`fr` و`zh` و`ja`، لكنه لا يدعم الكورية (`ko`). تتطلب الكورية حزمة OCR الدقيقة ومستوى `balanced` أو `best`. تعمل الحزمة على حاويات Linux amd64 وarm64 الرسمية، بما في ذلك مضيفات NVIDIA حيث يبقى OCR على CPU. تُرجع الأنظمة غير المدعومة خطأ توافق صريحاً ولا تعود بصمت إلى `fast`. كما يُرفض طلب Korean مع `fast` أو الاسم القديم `tesseract` قبل وضعه في قائمة الانتظار، مع `FEATURE_INCOMPATIBLE` والسبب `fast-korean-unsupported`.
+يدعم Fast OCR اللغات `auto` و`en` و`de` و`es` و`fr` و`zh` و`ja`، لكنه لا يدعم الكورية (`ko`) ولا العربية (`ar`). تتطلب كلتاهما حزمة OCR الدقيقة ومستوى `balanced` أو `best`. تعمل الحزمة على حاويات Linux amd64 وarm64 الرسمية، بما في ذلك مضيفات NVIDIA حيث يبقى OCR على CPU. تُرجع الأنظمة غير المدعومة خطأ توافق صريحاً ولا تعود بصمت إلى `fast`. كما يُرفض طلب الكورية أو العربية مع `fast` أو الاسم القديم `tesseract` قبل وضعه في قائمة الانتظار، مع `FEATURE_INCOMPATIBLE` والسبب `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -27,7 +27,7 @@ i18n_provenance: human
 |-----------|------|----------|---------|-------------|
 | file | file | نعم | - | ملف PDF (متعدد الأجزاء)، مشفر حتى 512 MiB؛ ولا يزال الحد الأدنى للتحميل الخاص بالمشغل مطبقًا |
 | quality | string | لا | متحرك | طبقة الجودة OCR: `fast` أو `balanced` أو `best` |
-| language | string | No | `"auto"` | لغة المستند: `auto` أو `en` أو `de` أو `fr` أو `es` أو `zh` أو `ja` أو `ko` |
+| language | string | No | `"auto"` | لغة المستند: `auto` أو `en` أو `de` أو `fr` أو `es` أو `zh` أو `ja` أو `ko` أو `ar` |
 | pages | string | No | `"all"` | تحديد الصفحات، مثل `"all"` أو `"1-3"` أو `"1,3,5"` |
 | enhance | boolean | لا | تعتمد على الطبقة | تحسين التباين المحلي قبل التعرف عليه. سريع يطبقه مباشرة؛ يحتفظ الخيار Balanced وBest بالمتغير فقط عندما يؤدي تسجيل المعايرة إلى تحسين النتيجة. الإعدادات الافتراضية هي `true` لـ `best` و`false` لـ `fast`/`balanced` |
 | engine | string | لا | - | الاسم المستعار للتوافق مهمل. استخدم `quality` بدلاً من ذلك. يقوم `tesseract` بتعيين `fast`؛ يتم تعيين قيمة `paddleocr` القديمة إلى `balanced` ولكنها لا تقوم بتحميل PaddlePaddle |

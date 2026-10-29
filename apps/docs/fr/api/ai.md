@@ -1,7 +1,7 @@
 ---
 description: "Référence du moteur d'IA avec tous les outils de ML locaux. Suppression d'arrière-plan, agrandissement, OCR, détection de visages, restauration de photos, et plus encore."
 i18n_output_hash: ac4d060d6181
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -18,7 +18,7 @@ L'accélération par iGPU Intel/AMD via VA-API, Quick Sync ou OpenCL n'est pas p
 
 <!-- korean-ocr-contract:start -->
 ::: info Compatibilité de l’OCR coréen
-L’OCR rapide prend en charge `auto`, `en`, `de`, `es`, `fr`, `zh` et `ja`, mais pas le coréen (`ko`). Le coréen nécessite le pack OCR précis et `balanced` ou `best`. Le pack fonctionne dans les conteneurs Linux amd64 et arm64 officiels, y compris sur les hôtes NVIDIA où l’OCR reste exécuté sur le CPU. Un système non pris en charge reçoit une erreur de compatibilité explicite, sans repli silencieux vers `fast`. Le coréen avec `fast` ou l’alias historique `tesseract` est refusé avant la mise en file avec `FEATURE_INCOMPATIBLE` et `fast-korean-unsupported`.
+L’OCR rapide prend en charge `auto`, `en`, `de`, `es`, `fr`, `zh` et `ja`, mais ni le coréen (`ko`) ni l’arabe (`ar`). Ils nécessitent le pack OCR précis et `balanced` ou `best`. Le pack fonctionne dans les conteneurs Linux amd64 et arm64 officiels, y compris sur les hôtes NVIDIA où l’OCR reste exécuté sur le CPU. Un système non pris en charge reçoit une erreur de compatibilité explicite, sans repli silencieux vers `fast`. Le coréen ou l’arabe avec `fast` ou l’alias historique `tesseract` est refusé avant la mise en file avec `FEATURE_INCOMPATIBLE` et `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## Architecture {#architecture}
@@ -189,8 +189,8 @@ Applique un flou à l'arrière-plan tout en gardant le sujet net.
 
 | Paramètre | Type | Par défaut | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamique | Lorsque `quality` et `engine` sont omis, SnapOtter choisit le meilleur niveau disponible dans cet ordre : `best`, `balanced`, `fast`. Pour le coréen, `fast` n’est jamais choisi : `best`, puis `balanced` sont utilisés, sinon une erreur d’installation ou de compatibilité du moteur précis est renvoyée. |
-| `language` | string | `"auto"` | Langue : `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamique | Lorsque `quality` et `engine` sont omis, SnapOtter choisit le meilleur niveau disponible dans cet ordre : `best`, `balanced`, `fast`. Pour le coréen et l’arabe, `fast` n’est jamais choisi : `best`, puis `balanced` sont utilisés, sinon une erreur d’installation ou de compatibilité du moteur précis est renvoyée. |
+| `language` | string | `"auto"` | Langue : `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | `enhance` | booléen | Dépend du niveau | Améliorer le contraste local. Fast l'applique directement ; les niveaux précis conservent la variante uniquement lorsque la notation calibrée améliore OCR. Activé par défaut pour le meilleur |
 | `engine` | chaîne | - | Alias ​​de compatibilité obsolète. Mappe `tesseract` à `fast` et la valeur `paddleocr` héritée à `balanced` ; il ne charge pas PaddlePaddle |
 
@@ -205,8 +205,8 @@ Extrait le texte de documents PDF numérisés à l'aide d'un OCR alimenté par I
 
 | Paramètre | Type | Par défaut | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamique | Lorsque `quality` et `engine` sont omis, SnapOtter choisit le meilleur niveau disponible dans cet ordre : `best`, `balanced`, `fast`. Pour le coréen, `fast` n’est jamais choisi : `best`, puis `balanced` sont utilisés, sinon une erreur d’installation ou de compatibilité du moteur précis est renvoyée. |
-| `language` | string | `"auto"` | Langue : `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamique | Lorsque `quality` et `engine` sont omis, SnapOtter choisit le meilleur niveau disponible dans cet ordre : `best`, `balanced`, `fast`. Pour le coréen et l’arabe, `fast` n’est jamais choisi : `best`, puis `balanced` sont utilisés, sinon une erreur d’installation ou de compatibilité du moteur précis est renvoyée. |
+| `language` | string | `"auto"` | Langue : `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | `pages` | string | `"all"` | Sélection de pages : `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | booléen | Dépend du niveau | Améliorer le contraste local. Fast l'applique directement ; les niveaux précis conservent la variante uniquement lorsque la notation calibrée améliore OCR. Activé par défaut pour le meilleur |
 | `engine` | chaîne | - | Alias ​​de compatibilité obsolète. Mappe `tesseract` à `fast` et la valeur `paddleocr` héritée à `balanced` ; il ne charge pas PaddlePaddle |

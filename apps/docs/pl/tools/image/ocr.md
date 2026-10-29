@@ -1,7 +1,7 @@
 ---
 description: "Wyodrębnij lokalnie tekst z obrazów za pomocą wbudowanego Tesseract lub opcjonalnego środowiska wykonawczego RapidOCR o wysokiej dokładności."
 i18n_output_hash: c79924df54eb
-i18n_source_hash: 7b0c00be0510
+i18n_source_hash: 1e098dbb5a20
 i18n_provenance: human
 ---
 
@@ -11,8 +11,8 @@ Wyodrębnij tekst z obrazów bez wysyłania obrazu do usługi zewnętrznej. Wbud
 
 
 <!-- korean-ocr-contract:start -->
-::: info Zgodność OCR dla języka koreańskiego
-Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie język koreański (`ko`). Koreański wymaga dokładnego pakietu OCR i `balanced` lub `best`. Pakiet działa w oficjalnych kontenerach Linux amd64 i arm64, także na hostach NVIDIA, gdzie OCR nadal używa CPU. Nieobsługiwany system otrzymuje jawny błąd zgodności i nigdy po cichu nie przechodzi na `fast`. Koreański z `fast` lub starszym aliasem `tesseract` jest odrzucany przed zakolejkowaniem z `FEATURE_INCOMPATIBLE` i `fast-korean-unsupported`.
+::: info Zgodność OCR dla języka koreańskiego i arabskiego
+Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie język koreański (`ko`) ani arabski (`ar`). Koreański i arabski wymagają dokładnego pakietu OCR i `balanced` lub `best`. Pakiet działa w oficjalnych kontenerach Linux amd64 i arm64, także na hostach NVIDIA, gdzie OCR nadal używa CPU. Nieobsługiwany system otrzymuje jawny błąd zgodności i nigdy po cichu nie przechodzi na `fast`. Koreański lub arabski z `fast` lub starszym aliasem `tesseract` jest odrzucany przed zakolejkowaniem z `FEATURE_INCOMPATIBLE` i `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## Punkt końcowy API {#api-endpoint}
@@ -29,11 +29,11 @@ Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie języ
 |-----------|------|----------|---------|-------------|
 | file | file | Tak | - | Plik obrazu (wieloczęściowy), do 512 zakodowanych w MiB i dekodowanych w rozdzielczości 40 megapikseli; nadal obowiązuje niższy limit przesyłania przez operatora |
 | quality | string | NIE | Dynamiczny | Poziom jakości: `fast` (Tesseract), `balanced` (RapidOCR z małymi modelami PP-OCRv6) lub `best` (średnie modele PP-OCRv6 o wyższej dokładności z kalibrowaną punktacją wariantów) |
-| language | string | Nie | `"auto"` | Podpowiedź językowa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | Nie | `"auto"` | Podpowiedź językowa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | enhance | boolean | NIE | Zależne od poziomu | Popraw lokalny kontrast przed rozpoznaniem. Fast stosuje go bezpośrednio; Zrównoważony i Najlepszy zachowują wariant tylko wtedy, gdy skalibrowana punktacja poprawia wynik. Domyślnie `true` dla `best` i `false` dla `fast`/`balanced` |
 | engine | string | NIE | - | Przestarzały alias zgodności. Zamiast tego użyj `quality`. `tesseract` mapuje do `fast`; starsza wartość `paddleocr` jest odwzorowywana na `balanced`, ale nie ładuje PaddlePaddle |
 
-Gdy pominięto `quality` i `engine`, SnapOtter wybiera najlepszy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego nigdy nie wybiera `fast`; używa `best`, następnie `balanced`, albo zwraca błąd instalacji lub zgodności dokładnego środowiska.
+Gdy pominięto `quality` i `engine`, SnapOtter wybiera najlepszy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego i arabskiego nigdy nie wybiera `fast`; używa `best`, następnie `balanced`, albo zwraca błąd instalacji lub zgodności dokładnego środowiska.
 
 ## Przykładowe żądanie {#example-request}
 
