@@ -151,9 +151,9 @@ jobs:
       - name: Install the ImageMagick EXR coder and verify
         run: |
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
           else
             echo "No supported ImageMagick EXR coder package found" >&2
             exit 1
@@ -206,9 +206,9 @@ jobs:
       - name: Install the ImageMagick EXR coder and verify the format toolchain
         run: |
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
           else
             echo "No supported ImageMagick EXR coder package found" >&2
             exit 1

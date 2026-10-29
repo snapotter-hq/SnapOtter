@@ -28,6 +28,13 @@ describe("cross-platform image decoder dependencies", () => {
     const workflow = read(".github/workflows/ci.yml");
     expectImageMagickExtraCoders(workflowJob(workflow, "test-unit", "test-integration"));
     expectImageMagickExtraCoders(workflowJob(workflow, "test-integration", "test-e2e-smoke"));
+    // Bounded so a degraded mirror cannot hang the job until its ceiling (#4124).
+    for (const job of [
+      workflowJob(workflow, "test-unit", "test-integration"),
+      workflowJob(workflow, "test-integration", "test-e2e-smoke"),
+    ]) {
+      expect(job).toContain("timeout -k 30 300 apt-get install");
+    }
   });
 
   it("installs the same coders in production and test containers", () => {
