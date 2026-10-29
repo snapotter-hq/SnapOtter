@@ -12,9 +12,12 @@ on:
   pull_request:
     branches: [main]
 
+# PR branches cancel superseded runs. Main never does: a later merge would
+# otherwise cancel the run on the commit before it, and no commit on main
+# would get a completed post-merge signal (#4190, #2457). Main runs queue.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
