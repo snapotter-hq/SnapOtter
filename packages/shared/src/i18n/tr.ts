@@ -3948,6 +3948,9 @@ export const tr: TranslationKeys = {
       submit: "Metni Çıkar",
       submitBatch: "Metni Çıkar ({count} dosya)",
       progressLabel: "Çıkarılıyor",
+      scannedHint:
+        "Bu PDF taranmış, bu yüzden çıkarılacak metin yok. OCR okuyabilir, ancak daha uzun sürer ve OCR yapay zeka paketinin kurulu olmasını gerektirir.",
+      runOcr: "Bu PDF'de OCR çalıştır",
     },
     "pdf-to-word": {
       hint: "Metin tabanlı PDF'ler için en iyisidir; taranan sayfalar OCR gerektirir",

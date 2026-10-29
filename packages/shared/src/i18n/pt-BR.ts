@@ -3953,6 +3953,9 @@ export const ptBR: TranslationKeys = {
       submit: "Extrair Texto",
       submitBatch: "Extrair Texto ({count} arquivos)",
       progressLabel: "Extraindo",
+      scannedHint:
+        "Este PDF é digitalizado, então não há texto para extrair. O OCR consegue lê-lo, mas leva mais tempo e exige o pacote de IA de OCR instalado.",
+      runOcr: "Executar OCR neste PDF",
     },
     "pdf-to-word": {
       hint: "Ideal para PDFs com texto; páginas digitalizadas precisam de OCR",

@@ -3671,6 +3671,9 @@ export const zhCN: TranslationKeys = {
       submit: "提取文本",
       submitBatch: "提取文本（{count} 个文件）",
       progressLabel: "正在提取",
+      scannedHint:
+        "此 PDF 是扫描件，没有可提取的文本。OCR 可以识别它，但耗时更长，并且需要已安装 OCR AI 功能包。",
+      runOcr: "对此 PDF 运行 OCR",
     },
     "pdf-to-word": {
       hint: "适用于文字型 PDF；扫描页面需要 OCR",

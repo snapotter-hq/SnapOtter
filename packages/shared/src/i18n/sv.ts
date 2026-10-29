@@ -3942,6 +3942,9 @@ export const sv: TranslationKeys = {
       submit: "Extrahera text",
       submitBatch: "Extrahera text ({count} filer)",
       progressLabel: "Extraherar",
+      scannedHint:
+        "Den här PDF:en är skannad, så det finns ingen text att extrahera. OCR kan läsa den, men det tar längre tid och kräver att OCR-AI-paketet är installerat.",
+      runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-to-word": {
       hint: "Bäst för textbaserade PDF-filer; skannade sidor kräver OCR",

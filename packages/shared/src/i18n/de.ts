@@ -3972,6 +3972,9 @@ export const de: TranslationKeys = {
       submit: "Text extrahieren",
       submitBatch: "Text extrahieren ({count} Dateien)",
       progressLabel: "Wird extrahiert",
+      scannedHint:
+        "Dieses PDF ist gescannt, es gibt also keinen Text zu extrahieren. OCR kann es lesen, braucht aber länger und setzt das installierte OCR-KI-Paket voraus.",
+      runOcr: "OCR auf dieses PDF anwenden",
     },
     "pdf-to-word": {
       hint: "Optimal für textbasierte PDFs; gescannte Seiten benötigen OCR",

@@ -3890,6 +3890,9 @@ export const th: TranslationKeys = {
       submit: "แยกข้อความ",
       submitBatch: "แยกข้อความ ({count} ไฟล์)",
       progressLabel: "กำลังแยกข้อความ",
+      scannedHint:
+        "PDF นี้เป็นไฟล์สแกน จึงไม่มีข้อความให้แยก OCR อ่านได้ แต่ใช้เวลานานกว่าและต้องติดตั้งชุด AI สำหรับ OCR ก่อน",
+      runOcr: "เรียกใช้ OCR กับ PDF นี้",
     },
     "pdf-to-word": {
       hint: "เหมาะสำหรับ PDF ที่เป็นข้อความ หน้าที่สแกนต้องใช้ OCR",

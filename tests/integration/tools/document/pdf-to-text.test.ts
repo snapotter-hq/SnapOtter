@@ -238,6 +238,8 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
     expect(body.error).toMatch(/text layer/i);
     expect(body.error).toMatch(/OCR/);
+    // The web app offers the OCR handoff off this code, not the prose (#1164).
+    expect(body.code).toBe("NO_TEXT_LAYER");
   }, 60_000);
 
   it("tells the user to run OCR when a composite font has no ToUnicode map (#955)", async () => {

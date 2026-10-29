@@ -3939,6 +3939,9 @@ export const vi: TranslationKeys = {
       submit: "Trích xuất văn bản",
       submitBatch: "Trích xuất văn bản ({count} tệp)",
       progressLabel: "Đang trích xuất",
+      scannedHint:
+        "PDF này là bản quét nên không có văn bản để trích xuất. OCR có thể đọc được, nhưng mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+      runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-to-word": {
       hint: "Phù hợp nhất cho PDF dạng văn bản; trang quét cần OCR",

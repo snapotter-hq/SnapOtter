@@ -3882,6 +3882,9 @@ export const en = {
       submit: "Extract Text",
       submitBatch: "Extract Text ({count} files)",
       progressLabel: "Extracting",
+      scannedHint:
+        "This PDF is scanned, so there's no text to extract. OCR can read it, but it takes longer and needs the OCR AI bundle installed.",
+      runOcr: "Run OCR on this PDF",
     },
     "pdf-to-word": {
       hint: "Best for text-based PDFs; scanned pages need OCR",

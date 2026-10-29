@@ -71,3 +71,10 @@ export function hasServerErrorStatus(err: unknown): err is Error & { statusCode:
   const code = (err as { statusCode?: unknown } | null)?.statusCode;
   return err instanceof Error && typeof code === "number" && code >= 500 && code <= 599;
 }
+
+/**
+ * The `code` a text-extraction tool answers with when the PDF has no text layer
+ * (a scan). The web app keys its "run OCR instead" offer on it, since the
+ * message is prose and gets reworded or translated.
+ */
+export const NO_TEXT_LAYER_CODE = "NO_TEXT_LAYER";

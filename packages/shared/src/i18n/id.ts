@@ -3946,6 +3946,9 @@ export const id: TranslationKeys = {
       submit: "Ekstrak Teks",
       submitBatch: "Ekstrak Teks ({count} file)",
       progressLabel: "Mengekstrak",
+      scannedHint:
+        "PDF ini hasil pindaian, jadi tidak ada teks yang bisa diekstrak. OCR bisa membacanya, tetapi butuh waktu lebih lama dan paket AI OCR harus terpasang.",
+      runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-to-word": {
       hint: "Terbaik untuk PDF berbasis teks; halaman pindaian memerlukan OCR",

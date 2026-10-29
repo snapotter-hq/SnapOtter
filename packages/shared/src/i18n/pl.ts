@@ -3954,6 +3954,9 @@ export const pl: TranslationKeys = {
       submit: "Wyodrębnij tekst",
       submitBatch: "Wyodrębnij tekst ({count} plików)",
       progressLabel: "Wyodrębnianie",
+      scannedHint:
+        "Ten PDF jest skanem, więc nie ma tekstu do wyodrębnienia. OCR może go odczytać, ale trwa to dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
+      runOcr: "Uruchom OCR dla tego PDF-a",
     },
     "pdf-to-word": {
       hint: "Najlepiej dla PDF tekstowych; zeskanowane strony wymagają OCR",

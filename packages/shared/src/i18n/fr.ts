@@ -3965,6 +3965,9 @@ export const fr: TranslationKeys = {
       submit: "Extraire le texte",
       submitBatch: "Extraire le texte ({count} fichiers)",
       progressLabel: "Extraction",
+      scannedHint:
+        "Ce PDF est numérisé, il n'y a donc pas de texte à extraire. L'OCR peut le lire, mais c'est plus long et cela demande que le pack d'IA OCR soit installé.",
+      runOcr: "Lancer l'OCR sur ce PDF",
     },
     "pdf-to-word": {
       hint: "Idéal pour les PDF textuels ; les pages numérisées nécessitent l'OCR",

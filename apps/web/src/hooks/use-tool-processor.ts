@@ -870,7 +870,11 @@ export function useToolProcessor(toolId: string) {
 
             // Ends the run on the server's word: a failed frame, or a
             // completed one with nothing to download.
-            const endFailedRun = (message: string, category?: FeedbackErrorCategory) => {
+            const endFailedRun = (
+              message: string,
+              category?: FeedbackErrorCategory,
+              code?: string,
+            ) => {
               clearRequestTimer();
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -890,7 +894,7 @@ export function useToolProcessor(toolId: string) {
               // passes it on (#1890).
               const teardownError = runEndWrites([
                 clearActiveJob,
-                () => setError(message),
+                () => setError(message, code),
                 () => setProcessing(false),
               ]);
               settleProcessingEntries(message, category);
@@ -976,7 +980,11 @@ export function useToolProcessor(toolId: string) {
             }
 
             if (data.phase === "failed") {
-              endFailedRun(failedFrameMessage(data, tRef.current.errors.processingFailedNoDetail));
+              endFailedRun(
+                failedFrameMessage(data, tRef.current.errors.processingFailedNoDetail),
+                undefined,
+                typeof data.code === "string" && data.code.length > 0 ? data.code : undefined,
+              );
               return;
             }
 
@@ -1467,13 +1475,13 @@ export function useToolProcessor(toolId: string) {
         // (#1698). Returns the first teardown error, for the caller to rethrow
         // so it still reaches Sentry.
         const endSyncRun = (
-          failure: { message: string; category?: FeedbackErrorCategory } | null,
+          failure: { message: string; category?: FeedbackErrorCategory; code?: string } | null,
         ): { cause: unknown } | null => {
           clearRequestTimer();
           setProgress(IDLE_PROGRESS);
           const firstError = runEndWrites([
             clearActiveJob,
-            ...(failure ? [() => setError(failure.message)] : []),
+            ...(failure ? [() => setError(failure.message, failure.code)] : []),
             () => setProcessing(false),
           ]);
           if (failure) failEntry(failure.message, failure.category);
@@ -1577,7 +1585,11 @@ export function useToolProcessor(toolId: string) {
           // must not read as "Invalid response" and must still surface (#1354,
           // the sync twin of #1287).
           let handlingError: { cause: unknown } | null = null;
-          let failure: { message: string; category?: FeedbackErrorCategory } | null = null;
+          let failure: {
+            message: string;
+            category?: FeedbackErrorCategory;
+            code?: string;
+          } | null = null;
           if (xhr.status >= 200 && xhr.status < 300) {
             let result: ProcessResult | null = null;
             try {
@@ -1595,8 +1607,11 @@ export function useToolProcessor(toolId: string) {
             }
           } else {
             let message: string;
+            let code: string | undefined;
             try {
               const body = JSON.parse(xhr.responseText);
+              const bodyCode = (body as { code?: unknown } | null)?.code;
+              if (typeof bodyCode === "string" && bodyCode.length > 0) code = bodyCode;
               // Store the canonical "Canceled" sentinel so displayStoredError
               // translates it in the active locale, matching the batch and
               // pipeline paths (#1436, #4009).
@@ -1622,7 +1637,11 @@ export function useToolProcessor(toolId: string) {
             // Our API's 413 and a reverse proxy's (an HTML body-size page) mean
             // the same thing to the user, in their language (#1341).
             if (xhr.status === 413) message = t.errors.fileTooLarge;
-            failure = { message, category: xhr.status === 413 ? "upload_error" : undefined };
+            failure = {
+              message,
+              category: xhr.status === 413 ? "upload_error" : undefined,
+              ...(code ? { code } : {}),
+            };
           }
 
           if (handlingError) {

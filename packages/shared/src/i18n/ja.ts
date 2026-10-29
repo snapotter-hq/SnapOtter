@@ -3897,6 +3897,9 @@ export const ja: TranslationKeys = {
       submit: "テキストを抽出",
       submitBatch: "テキストを抽出 ({count}ファイル)",
       progressLabel: "抽出中",
+      scannedHint:
+        "このPDFはスキャンされた画像のため、抽出できるテキストがありません。OCRなら読み取れますが、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+      runOcr: "このPDFでOCRを実行",
     },
     "pdf-to-word": {
       hint: "テキストベースのPDFに最適です。スキャンページにはOCRが必要です",

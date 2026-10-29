@@ -3671,6 +3671,9 @@ export const zhTW: TranslationKeys = {
       submit: "擷取文字",
       submitBatch: "擷取文字（{count} 個檔案）",
       progressLabel: "正在擷取",
+      scannedHint:
+        "此 PDF 是掃描檔，沒有可擷取的文字。OCR 可以辨識它，但耗時較長，且需要已安裝 OCR AI 功能包。",
+      runOcr: "對此 PDF 執行 OCR",
     },
     "pdf-to-word": {
       hint: "最適合文字型 PDF；掃描頁面需使用 OCR",

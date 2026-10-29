@@ -3941,6 +3941,9 @@ export const es: TranslationKeys = {
       submit: "Extraer texto",
       submitBatch: "Extraer texto ({count} archivos)",
       progressLabel: "Extrayendo",
+      scannedHint:
+        "Este PDF está escaneado, así que no hay texto que extraer. El OCR puede leerlo, pero tarda más y requiere tener instalado el paquete de IA de OCR.",
+      runOcr: "Ejecutar OCR en este PDF",
     },
     "pdf-to-word": {
       hint: "Ideal para PDF con texto; las páginas escaneadas requieren OCR",

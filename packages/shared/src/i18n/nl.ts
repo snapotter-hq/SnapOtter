@@ -3962,6 +3962,9 @@ export const nl: TranslationKeys = {
       submit: "Tekst extraheren",
       submitBatch: "Tekst extraheren ({count} bestanden)",
       progressLabel: "Extraheren",
+      scannedHint:
+        "Deze pdf is gescand, dus er is geen tekst om te extraheren. OCR kan hem lezen, maar dat duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+      runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-to-word": {
       hint: "Geschikt voor tekst-PDF's; gescande pagina's vereisen OCR",

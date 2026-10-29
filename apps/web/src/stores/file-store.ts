@@ -194,6 +194,13 @@ interface FileState {
   batchZipClaimed: boolean;
   processing: boolean;
   error: string | null;
+  /**
+   * The server's machine-readable code for `error` (NO_TEXT_LAYER), when the
+   * failure carried one. `error` is prose and may be translated, so a panel
+   * deciding what to offer next can't read it from the text. Only meaningful
+   * while `error` is set.
+   */
+  errorCode: string | null;
   activeJobId: string | null;
   /**
    * Rejects with a CancelRefusedError when the server won't cancel or never
@@ -246,7 +253,7 @@ interface FileState {
    *  entry's id first and use markClaimedById instead. */
   claimSelected: () => void;
   setProcessing: (v: boolean) => void;
-  setError: (e: string | null) => void;
+  setError: (e: string | null, code?: string) => void;
   setActiveJob: (id: string | null, cancelFn: (() => Promise<void>) | null) => void;
   setLibrarySaveMode: (mode: LibrarySaveMode) => void;
   setLastSavedLibraryFileId: (id: string | null) => void;
@@ -266,6 +273,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   batchZipClaimed: false,
   processing: false,
   error: null,
+  errorCode: null,
   activeJobId: null,
   cancelCurrentJob: null,
   librarySaveMode: "new",
@@ -541,7 +549,12 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   setProcessing: (v) => set({ processing: v }),
 
-  setError: (e) => set(e ? { error: e, processing: false } : { error: null }),
+  setError: (e, code) =>
+    set(
+      e
+        ? { error: e, errorCode: code ?? null, processing: false }
+        : { error: null, errorCode: null },
+    ),
 
   setActiveJob: (id, cancelFn) => set({ activeJobId: id, cancelCurrentJob: cancelFn }),
 
