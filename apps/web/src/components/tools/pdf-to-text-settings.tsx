@@ -1,4 +1,4 @@
-import { NO_TEXT_LAYER_CODE, TOOLS, toolSection } from "@snapotter/shared";
+import { NO_TEXT_LAYER_CODE, TOOLS } from "@snapotter/shared";
 import { useNavigate } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -42,7 +42,7 @@ export function PdfToTextSettings() {
     store.entries.forEach((entry) => {
       store.updateEntryById(entry.id, { status: "pending", error: null });
     });
-    navigate(`/${toolSection(OCR_TOOL)}/${OCR_TOOL.id}`, { state: { fromLibrary: true } });
+    navigate(OCR_TOOL.route, { state: { fromLibrary: true } });
   };
 
   return (
