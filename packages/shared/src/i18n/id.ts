@@ -5224,6 +5224,7 @@ export const id: TranslationKeys = {
       description: "Kelola bundel model AI untuk pemrosesan file tingkat lanjut.",
       installAll: "Instal Semua",
       diskUsage: "Penggunaan disk: {size}",
+      statusStale: "Gagal memperbarui status paket. Daftar di bawah mungkin sudah tidak terbaru.",
       sizeOnDisk: "{size} di disk",
       installed: "Terinstal",
       notInstalled: "Belum terinstal",

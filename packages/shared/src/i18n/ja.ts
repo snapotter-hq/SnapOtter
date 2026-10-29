@@ -5170,6 +5170,7 @@ export const ja: TranslationKeys = {
       description: "高度なファイル処理のためのAIモデルバンドルを管理します。",
       installAll: "すべてインストール",
       diskUsage: "ディスク使用量: {size}",
+      statusStale: "バンドルの状態を更新できませんでした。下の一覧は最新でない可能性があります。",
       sizeOnDisk: "ディスク上 {size}",
       installed: "インストール済み",
       notInstalled: "未インストール",

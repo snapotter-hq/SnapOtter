@@ -5135,6 +5135,7 @@ export const en = {
       description: "Manage AI model bundles for advanced file processing.",
       installAll: "Install All",
       diskUsage: "Disk usage: {size}",
+      statusStale: "Couldn't refresh the bundle status. The list below may be out of date.",
       sizeOnDisk: "{size} on disk",
       installed: "Installed",
       notInstalled: "Not installed",

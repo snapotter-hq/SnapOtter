@@ -5238,6 +5238,8 @@ export const ptBR: TranslationKeys = {
       description: "Gerencie pacotes de modelos de IA para processamento avançado de arquivos.",
       installAll: "Instalar tudo",
       diskUsage: "Uso do disco: {size}",
+      statusStale:
+        "Não foi possível atualizar o status dos pacotes. A lista abaixo pode estar desatualizada.",
       sizeOnDisk: "{size} em disco",
       installed: "Instalado",
       notInstalled: "Não instalado",

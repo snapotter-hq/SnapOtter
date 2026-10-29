@@ -5222,6 +5222,7 @@ export const sv: TranslationKeys = {
       description: "Hantera AI-modellpaket för avancerad filbehandling.",
       installAll: "Installera alla",
       diskUsage: "Diskanvändning: {size}",
+      statusStale: "Det gick inte att uppdatera paketstatusen. Listan nedan kan vara inaktuell.",
       sizeOnDisk: "{size} på disk",
       installed: "Installerad",
       notInstalled: "Inte installerad",

@@ -5144,6 +5144,7 @@ export const th: TranslationKeys = {
       description: "จัดการชุดโมเดล AI สำหรับการประมวลผลไฟล์ขั้นสูง",
       installAll: "ติดตั้งทั้งหมด",
       diskUsage: "การใช้พื้นที่ดิสก์: {size}",
+      statusStale: "ไม่สามารถรีเฟรชสถานะแพ็กเกจได้ รายการด้านล่างอาจไม่เป็นปัจจุบัน",
       sizeOnDisk: "{size} บนดิสก์",
       installed: "ติดตั้งแล้ว",
       notInstalled: "ยังไม่ได้ติดตั้ง",

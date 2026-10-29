@@ -5243,6 +5243,8 @@ export const it: TranslationKeys = {
       description: "Gestisci pacchetti di modelli di IA per l'elaborazione avanzata dei file.",
       installAll: "Installa tutto",
       diskUsage: "Utilizzo del disco: {size}",
+      statusStale:
+        "Impossibile aggiornare lo stato dei bundle. L’elenco qui sotto potrebbe non essere aggiornato.",
       sizeOnDisk: "{size} su disco",
       installed: "Installato",
       notInstalled: "Non installato",

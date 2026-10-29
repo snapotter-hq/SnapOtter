@@ -5254,6 +5254,8 @@ export const fr: TranslationKeys = {
       description: "Gérez les paquets de modèles AI pour le traitement avancé de fichiers.",
       installAll: "Tout installer",
       diskUsage: "Utilisation du disque : {size}",
+      statusStale:
+        "Impossible d’actualiser l’état des bundles. La liste ci-dessous est peut-être obsolète.",
       sizeOnDisk: "{size} sur le disque",
       installed: "Installé",
       notInstalled: "Non installé",

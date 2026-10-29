@@ -5231,6 +5231,7 @@ export const tr: TranslationKeys = {
       description: "Gelişmiş dosya işleme için AI model paketlerini yönetin.",
       installAll: "Tümünü Kur",
       diskUsage: "Disk kullanımı: {size}",
+      statusStale: "Paket durumu yenilenemedi. Aşağıdaki liste güncel olmayabilir.",
       sizeOnDisk: "diskte {size}",
       installed: "Kurulu",
       notInstalled: "Kurulu değil",

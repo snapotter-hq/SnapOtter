@@ -5233,6 +5233,7 @@ export const uk: TranslationKeys = {
       description: "Керування пакетами AI-моделей для розширеної обробки файлів.",
       installAll: "Встановити все",
       diskUsage: "Використання диска: {size}",
+      statusStale: "Не вдалося оновити стан пакетів. Список нижче може бути застарілим.",
       sizeOnDisk: "{size} на диску",
       installed: "Встановлено",
       notInstalled: "Не встановлено",

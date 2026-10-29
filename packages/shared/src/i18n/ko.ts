@@ -5140,6 +5140,7 @@ export const ko: TranslationKeys = {
       description: "고급 파일 처리를 위한 AI 모델 번들을 관리합니다.",
       installAll: "모두 설치",
       diskUsage: "디스크 사용량: {size}",
+      statusStale: "번들 상태를 새로 고치지 못했습니다. 아래 목록이 최신이 아닐 수 있습니다.",
       sizeOnDisk: "디스크에 {size}",
       installed: "설치됨",
       notInstalled: "설치되지 않음",

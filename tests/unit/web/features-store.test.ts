@@ -1138,6 +1138,13 @@ describe("useFeaturesStore", () => {
   });
 
   describe("refresh()", () => {
+    // The failure streak lives in the store closure, which setState does not
+    // reset. A successful refresh clears it, so each test starts from zero.
+    const resetFailureStreak = async (bundles: FeatureBundleState[]) => {
+      apiGetMock.mockResolvedValueOnce({ bundles });
+      await useFeaturesStore.getState().refresh();
+    };
+
     it("refreshes bundles from API", async () => {
       const bundles = [makeBundleState({ id: "refreshed" })];
       apiGetMock.mockResolvedValueOnce({ bundles });
@@ -1156,6 +1163,66 @@ describe("useFeaturesStore", () => {
       await useFeaturesStore.getState().refresh();
 
       expect(useFeaturesStore.getState().bundles).toEqual([makeBundleState({ id: "existing" })]);
+    });
+
+    // #1138: one failed refresh is often a blip, so the notice waits for a
+    // second consecutive failure. The poller ticks every 3s, so a single
+    // failure flapping the notice on and off would read as noise.
+    it("marks the list stale after two consecutive failed refreshes and clears it on success", async () => {
+      const known = [makeBundleState({ id: "known", status: "installed" })];
+      await resetFailureStreak(known);
+      useFeaturesStore.setState({ bundles: known, loaded: true });
+      apiGetMock.mockRejectedValue(new Error("down"));
+
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().bundlesStale).toBe(false);
+
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().bundlesStale).toBe(true);
+      expect(useFeaturesStore.getState().bundles).toEqual(known);
+
+      apiGetMock.mockResolvedValue({ bundles: known });
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().bundlesStale).toBe(false);
+    });
+
+    it("counts only consecutive failures toward the stale notice", async () => {
+      await resetFailureStreak([]);
+      useFeaturesStore.setState({ loaded: true });
+      apiGetMock
+        .mockRejectedValueOnce(new Error("blip"))
+        .mockResolvedValueOnce({ bundles: [] })
+        .mockRejectedValueOnce(new Error("blip again"));
+
+      await useFeaturesStore.getState().refresh();
+      await useFeaturesStore.getState().refresh();
+      await useFeaturesStore.getState().refresh();
+
+      expect(useFeaturesStore.getState().bundlesStale).toBe(false);
+    });
+
+    it("keeps the status poller running after a failed refresh tick", async () => {
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-poll-refresh-fail" });
+      const promise = useFeaturesStore.getState().installBundle("test-bundle");
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances).toHaveLength(1);
+      });
+      await promise;
+      const es = FakeEventSource.instances[0];
+
+      vi.useFakeTimers();
+      try {
+        apiGetMock.mockRejectedValue(new Error("down"));
+        es.onerror?.();
+        await vi.advanceTimersByTimeAsync(3_000);
+        await vi.advanceTimersByTimeAsync(3_000);
+
+        const featureCalls = apiGetMock.mock.calls.filter((call) => call[0] === "/v1/features");
+        expect(featureCalls.length).toBeGreaterThanOrEqual(2);
+        expect(useFeaturesStore.getState().installing["test-bundle"]).toBeDefined();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

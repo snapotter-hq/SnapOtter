@@ -5007,6 +5007,7 @@ export const hi: TranslationKeys = {
       description: "उन्नत फ़ाइल प्रोसेसिंग के लिए AI मॉडल बंडल प्रबंधित करें।",
       installAll: "सभी इंस्टॉल करें",
       diskUsage: "डिस्क उपयोग: {size}",
+      statusStale: "बंडल की स्थिति ताज़ा नहीं हो सकी। नीचे की सूची पुरानी हो सकती है।",
       sizeOnDisk: "डिस्क पर {size}",
       installed: "इंस्टॉल किया गया",
       notInstalled: "इंस्टॉल नहीं है",

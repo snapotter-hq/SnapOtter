@@ -5231,6 +5231,8 @@ export const es: TranslationKeys = {
       description: "Gestiona paquetes de modelos AI para procesamiento avanzado de archivos.",
       installAll: "Instalar todo",
       diskUsage: "Uso del disco: {size}",
+      statusStale:
+        "No se pudo actualizar el estado de los paquetes. La lista puede estar desactualizada.",
       sizeOnDisk: "{size} en disco",
       installed: "Instalado",
       notInstalled: "No instalado",

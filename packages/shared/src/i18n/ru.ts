@@ -5235,6 +5235,7 @@ export const ru: TranslationKeys = {
       description: "Управление пакетами AI-моделей для расширенной обработки файлов.",
       installAll: "Установить все",
       diskUsage: "Использование диска: {size}",
+      statusStale: "Не удалось обновить состояние пакетов. Список ниже может быть устаревшим.",
       sizeOnDisk: "{size} на диске",
       installed: "Установлено",
       notInstalled: "Не установлено",
