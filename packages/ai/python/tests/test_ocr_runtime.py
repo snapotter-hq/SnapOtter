@@ -1246,6 +1246,56 @@ class OcrRuntimeTest(unittest.TestCase):
         self.assertIn(("small", "arabic"), [call[:2] for call in factory.calls])
         self.assertIn("arabic", result["representativeModel"])
 
+    def test_auto_recovers_arabic_when_every_unified_line_is_low_confidence(self):
+        self.write_arabic_model()
+        unified = FakeBackend(candidate([("ﻢﻟﺎ", 0.20, box(0, 0))]))
+        korean = FakeBackend(
+            candidate([]), crop_result=(ocr_runtime.RawRecognition(text="", confidence=0.0),)
+        )
+        arabic = FakeBackend(
+            candidate([]),
+            crop_result=(ocr_runtime.RawRecognition(text="مرحبا بالعالم", confidence=0.91),),
+        )
+        factory = RecordingFactory(
+            {
+                ("small", "unified"): unified,
+                ("small", "korean"): korean,
+                ("small", "arabic"): arabic,
+            }
+        )
+
+        result = self.runtime(factory).recognize_image(
+            self.image, {"quality": "balanced", "language": "auto"}
+        )
+
+        self.assertEqual(result["text"], "مرحبا بالعالم")
+        self.assertEqual(arabic.shared_crop_calls[0], unified.result.crops)
+        self.assertIn("+arabic-PP-OCRv5", result["modelVersion"])
+
+    def test_auto_skips_the_arabic_pass_when_the_pack_has_no_arabic_model(self):
+        unified = FakeBackend(candidate([("ﻢﻟﺎ", 0.20, box(0, 0))]))
+        korean = FakeBackend(
+            candidate([]), crop_result=(ocr_runtime.RawRecognition(text="", confidence=0.0),)
+        )
+        factory = RecordingFactory({("small", "unified"): unified, ("small", "korean"): korean})
+
+        result = self.runtime(factory).recognize_image(
+            self.image, {"quality": "balanced", "language": "auto"}
+        )
+
+        self.assertEqual(result["text"], "ﻢﻟﺎ")
+        self.assertNotIn("arabic", result["modelVersion"])
+
+    def test_prefer_arabic_needs_mostly_arabic_letters_and_a_better_score(self):
+        weak = ocr_runtime.RawLine("ﻢﻟﺎ", 0.20, box(0, 0))
+        latin = ocr_runtime.RawRecognition(text="hello world", confidence=0.95)
+        arabic = ocr_runtime.RawRecognition(text="مرحبا بالعالم", confidence=0.91)
+        noisy = ocr_runtime.RawRecognition(text="مرحبا 123 456 789 000", confidence=0.91)
+
+        self.assertFalse(ocr_runtime._prefer_arabic(weak, latin))
+        self.assertTrue(ocr_runtime._prefer_arabic(weak, arabic))
+        self.assertFalse(ocr_runtime._prefer_arabic(weak, noisy))
+
     def test_auto_reuses_unified_crops_and_rejects_single_false_hangul(self):
         shared_crops = (object(), object())
         unified = FakeBackend(

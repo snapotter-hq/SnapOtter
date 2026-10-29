@@ -128,6 +128,8 @@ class RawCandidate:
     width: int
     height: int
     crops: tuple[Any, ...] = ()
+    # True when the auto-language Arabic pass replaced at least one line.
+    arabic_merged: bool = False
 
 
 @dataclass(frozen=True)
@@ -1281,6 +1283,54 @@ def _merge_auto_korean(
     return replace(candidate, lines=tuple(merged), crops=())
 
 
+def _arabic_count(text: str) -> int:
+    return sum(
+        1 for character in text if "\u0600" <= character <= "\u06ff" or "\ufb50" <= character <= "\ufefc"
+    )
+
+
+def _auto_needs_arabic(candidate: RawCandidate) -> bool:
+    """Run the Arabic pass only when no unified line is confident.
+
+    A page the unified model reads confidently is not Arabic, so the extra
+    recognizer is skipped there. The threshold keeps the cost off normal jobs.
+    """
+    return all(line.confidence < 0.60 for line in candidate.lines)
+
+
+def _prefer_arabic(unified: RawLine, arabic: RawRecognition) -> bool:
+    visible = [character for character in arabic.text if not character.isspace()]
+    arabic_letters = _arabic_count(arabic.text)
+    if arabic_letters < 2 or not visible:
+        return False
+    ratio = arabic_letters / len(visible)
+    score = min(max(arabic.confidence, 0.0), 1.0)
+    unified_score = min(max(unified.confidence, 0.0), 1.0)
+    return ratio >= 0.60 and score >= 0.50 and score >= unified_score + 0.03
+
+
+def _merge_auto_arabic(
+    candidate: RawCandidate, recognitions: tuple[RawRecognition, ...]
+) -> RawCandidate:
+    if len(recognitions) != len(candidate.lines):
+        raise RuntimeError("Arabic recognizer did not return one result per shared crop")
+    merged = []
+    replaced = False
+    for unified, arabic in zip(candidate.lines, recognitions):
+        if not isinstance(arabic.text, str) or not _is_number(arabic.confidence):
+            raise RuntimeError("Arabic recognizer returned malformed output")
+        if _prefer_arabic(unified, arabic):
+            merged.append(RawLine(arabic.text.strip(), arabic.confidence, unified.polygon))
+            replaced = True
+        else:
+            merged.append(unified)
+    return replace(
+        candidate,
+        lines=tuple(merged),
+        arabic_merged=candidate.arabic_merged or replaced,
+    )
+
+
 class OcrRuntime:
     def __init__(
         self,
@@ -1429,9 +1479,18 @@ class OcrRuntime:
         )
         self._validate_candidate(candidate)
         if language == "auto" and candidate.lines:
-            korean_backend = self._backend(tier, "korean")
-            recognitions = korean_backend.recognize_crops(candidate.crops)
-            candidate = _merge_auto_korean(candidate, recognitions)
+            crops = candidate.crops
+            # Both passes read the crops from the unified detection, so they run
+            # before the Korean merge releases them.
+            korean_recognitions = self._backend(tier, "korean").recognize_crops(crops)
+            arabic_recognitions = (
+                self._backend(tier, "arabic").recognize_crops(crops)
+                if "arabic_rec" in self.paths and _auto_needs_arabic(candidate)
+                else None
+            )
+            candidate = _merge_auto_korean(candidate, korean_recognitions)
+            if arabic_recognitions is not None:
+                candidate = _merge_auto_arabic(candidate, arabic_recognitions)
             self._validate_candidate(candidate)
         return candidate
 
@@ -1669,7 +1728,7 @@ class OcrRuntime:
         warnings.extend(choice.warnings)
         if language == "ko" or (language == "auto" and selected.lines):
             model_version += "+korean-PP-OCRv5"
-        if language == "ar":
+        if language == "ar" or (language == "auto" and selected.arabic_merged):
             model_version += "+arabic-PP-OCRv5"
         text = self._text(selected, language)
         self._validate_text_output(selected, text)
