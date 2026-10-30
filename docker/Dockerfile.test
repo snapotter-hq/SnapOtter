@@ -6,7 +6,7 @@
 # ============================================
 # Stage 1: Build libheif from source
 # ============================================
-FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS libheif-builder
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS libheif-builder
 
 ARG LIBHEIF_VERSION=1.23.4
 ARG LIBDE265_VERSION=1.1.3
@@ -58,7 +58,7 @@ RUN curl --fail --location --silent --show-error --retry 3 \
 # ============================================
 # Stage 2: Test runner
 # ============================================
-FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
