@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
 import { BaseSequencer } from "vitest/node";
-import { partitionByCost } from "./tests/helpers/shard-partition.js";
+import { compareHeaviestFirst, partitionByCost } from "./tests/helpers/shard-partition.js";
 
 // Resolve api-workspace packages that pnpm only exposes under apps/api/node_modules.
 const apiNodeModules = path.resolve(__dirname, "apps/api/node_modules");
@@ -35,10 +35,16 @@ function findPnpmPackage(scope: string, name: string): string {
  * no account of the fact that four generated matrix specs carry most of the
  * suite's runtime. See tests/helpers/shard-partition.ts for the measurements.
  *
- * `sort` is inherited untouched, and vitest only calls `shard` when --shard is
- * passed, so unsharded runs (local, nightly full matrix) behave exactly as before.
+ * Sharded runs also sort each shard heaviest first, so the costliest spec starts
+ * at once instead of queueing behind small ones. Unsharded runs (local, nightly
+ * full matrix) keep the inherited sort and behave exactly as before.
  */
 class CostAwareSequencer extends BaseSequencer {
+  async sort(specs: Parameters<BaseSequencer["sort"]>[0]) {
+    if (!this.ctx.config.shard) return super.sort(specs);
+    return [...specs].sort((a, b) => compareHeaviestFirst(a.moduleId, b.moduleId));
+  }
+
   async shard(specs: Parameters<BaseSequencer["shard"]>[0]) {
     const shardConfig = this.ctx.config.shard;
     if (!shardConfig) return specs;

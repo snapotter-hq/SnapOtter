@@ -134,7 +134,7 @@ jobs:
       - run: pnpm typecheck
 
   test-unit:
-    name: Unit Tests
+    name: Unit (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     # Headroom for a degraded-apt-mirror day (#876, #2007). The apt-install
     # ladder's worst case is ~34m since #1971 (120s update, two 360s
@@ -145,6 +145,10 @@ jobs:
     timeout-minutes: 50
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -177,10 +181,29 @@ jobs:
             done
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
-      - run: pnpm vitest run tests/unit/ --reporter=verbose
+      - run: pnpm vitest run tests/unit/ --reporter=verbose --shard=${{ matrix.shard }}/2
+
+  test-unit-result:
+    # Keeps the required "Unit Tests" context stable across shard counts, the
+    # same way test-integration-result does for Integration.
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test-unit
+    if: always()
+    steps:
+      - name: Check all unit shards
+        env:
+          RESULT: ${{ needs.test-unit.result }}
+        run: |
+          echo "test-unit: $RESULT"
+          case "$RESULT" in
+            success | skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
 
   test-integration:
-    name: Integration (${{ matrix.shard }}/8)
+    name: Integration (${{ matrix.shard }}/6)
     runs-on: ubuntu-latest
     # Headroom for a degraded-apt-mirror day (#876, #2007). Same apt-install
     # ladder as test-unit (~34m worst case since #1971, plus up to 3m of KILL
@@ -192,7 +215,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -252,12 +275,12 @@ jobs:
             done
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
-      - run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/8
+      - run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/6
 
   test-integration-result:
     # Single gate job for branch protection so changing the shard count (or
     # skipping the matrix on a docs/landing-only PR, where GitHub reports the
-    # unexpanded name "Integration (${{ matrix.shard }}/8)") never leaves
+    # unexpanded name "Integration (${{ matrix.shard }}/6)") never leaves
     # required shard contexts stuck as expected.
     name: Integration
     runs-on: ubuntu-latest

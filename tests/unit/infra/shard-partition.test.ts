@@ -1,23 +1,30 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { costOf, FILE_COST_SECONDS, partitionByCost } from "../../helpers/shard-partition.js";
+import {
+  compareHeaviestFirst,
+  costOf,
+  FILE_COST_SECONDS,
+  partitionByCost,
+} from "../../helpers/shard-partition.js";
 
 const repoRoot = path.resolve(__dirname, "../../..");
 
-/** Every integration spec on disk, repo-relative, sorted. Mirrors the CI glob. */
-function integrationSpecs(): string[] {
+/** Every spec under a tests/ subdirectory, repo-relative, sorted. Mirrors the CI glob. */
+function specsUnder(suite: string): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".test.ts")) out.push(path.relative(repoRoot, full));
+      else if (/\.test\.tsx?$/.test(entry.name)) out.push(path.relative(repoRoot, full));
     }
   };
-  walk(path.join(repoRoot, "tests/integration"));
+  walk(path.join(repoRoot, "tests", suite));
   return out.sort();
 }
+
+const integrationSpecs = () => specsUnder("integration");
 
 /**
  * The four costliest specs, read from the table rather than hardcoded so this
@@ -114,9 +121,36 @@ describe("partitionByCost", () => {
     });
   });
 
+  describe("compareHeaviestFirst", () => {
+    it("puts the costliest spec first and orders ties by path", () => {
+      const sorted = [
+        "tests/unit/b.test.ts",
+        HEAVYWEIGHTS[1],
+        "tests/unit/a.test.ts",
+        HEAVYWEIGHTS[0],
+      ]
+        .slice()
+        .sort(compareHeaviestFirst);
+      expect(sorted).toEqual([
+        HEAVYWEIGHTS[0],
+        HEAVYWEIGHTS[1],
+        "tests/unit/a.test.ts",
+        "tests/unit/b.test.ts",
+      ]);
+    });
+
+    it("orders absolute moduleIds the same as repo-relative paths", () => {
+      const files = HEAVYWEIGHTS.slice().reverse();
+      const absolute = files.map((f) => path.join(repoRoot, f)).sort(compareHeaviestFirst);
+      expect(absolute.map((f) => path.relative(repoRoot, f))).toEqual(
+        files.slice().sort(compareHeaviestFirst),
+      );
+    });
+  });
+
   describe("cost table hygiene", () => {
     it("only lists specs that still exist", () => {
-      const onDisk = new Set(integrationSpecs());
+      const onDisk = new Set([...integrationSpecs(), ...specsUnder("unit")]);
       const stale = Object.keys(FILE_COST_SECONDS).filter((f) => !onDisk.has(f));
       expect(stale, `cost table references deleted specs: ${stale.join(", ")}`).toEqual([]);
     });
