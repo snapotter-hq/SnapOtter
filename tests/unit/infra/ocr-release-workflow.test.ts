@@ -695,10 +695,10 @@ describe("OCR v3 bundle release workflow", () => {
     const publishJob = job(workflow, "publish");
     const requirements = readRequired(hfReleaseRequirementsPath);
 
-    expect(publishJob).toContain("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
+    expect(publishJob).toContain("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
     expect(publishJob).toContain("ref: ${{ inputs.release_commit }}");
     expect(publishJob).toContain("persist-credentials: false");
-    expect(publishJob).toContain("actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1");
+    expect(publishJob).toContain("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0");
     expect(publishJob).toContain('python-version: "3.11.14"');
     expect(publishJob).toContain("/tmp/hf-release-venv/bin/python -m pip install");
     expect(publishJob).toContain("--disable-pip-version-check --require-hashes --no-deps");
@@ -767,12 +767,12 @@ describe("OCR v3 bundle release workflow", () => {
     expect(rest).toEqual([]);
     expect(Object.keys(checkout).sort()).toEqual(["name", "uses", "with"]);
     expect(Object.keys(python).sort()).toEqual(["name", "uses", "with"]);
-    expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
+    expect(checkout.uses).toBe("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
     expect(checkout.with).toEqual({
       ref: "${{ inputs.release_commit }}",
       "persist-credentials": false,
     });
-    expect(python.uses).toBe("actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1");
+    expect(python.uses).toBe("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0");
     expect(python.with).toEqual({ "python-version": "3.11.14" });
     expect(Object.keys(audit).sort()).toEqual(["name", "run"]);
     expect(audit.run).toBe(
@@ -850,12 +850,12 @@ describe("OCR v3 bundle release workflow", () => {
     expect(rest).toEqual([]);
     expect(Object.keys(checkout).sort()).toEqual(["name", "uses", "with"]);
     expect(Object.keys(python).sort()).toEqual(["name", "uses", "with"]);
-    expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
+    expect(checkout.uses).toBe("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
     expect(checkout.with).toEqual({
       ref: "${{ inputs.release_commit }}",
       "persist-credentials": false,
     });
-    expect(python.uses).toBe("actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1");
+    expect(python.uses).toBe("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0");
     expect(python.with).toEqual({ "python-version": "3.11.14" });
     expect(Object.keys(audit).sort()).toEqual(["name", "run"]);
     expect(audit.run).toBe(
