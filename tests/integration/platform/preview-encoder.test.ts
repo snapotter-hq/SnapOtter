@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { resolveFfmpeg } from "../../../packages/media-engine/src/binaries.js";
 import { setEncoderInventoryForTests } from "../../../packages/media-engine/src/encoders.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -124,15 +125,21 @@ describe("on-demand preview encoders (#1270)", () => {
   });
 
   it("keeps any other failure behind the generic message", async () => {
-    // Not audio at all, so ffmpeg fails on it (or, on a shard without ffmpeg,
-    // runFfmpeg fails to start). Neither message may reach the client.
+    // Not audio at all, so ffmpeg fails on it. Its stderr may not reach the
+    // client. On a shard without ffmpeg there is no binary to fail, so the
+    // answer is the missing-engine 503 instead (#1576), which names no stderr.
     setEncoderInventoryForTests(new Set(SHIPPED));
     const res = await generatePreview(
       "clip.wav",
       "audio/wav",
       Buffer.from("not really a wav file"),
     );
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body)).toEqual({ error: "Could not generate preview" });
+    if (resolveFfmpeg()) {
+      expect(res.statusCode).toBe(422);
+      expect(JSON.parse(res.body)).toEqual({ error: "Could not generate preview" });
+    } else {
+      expect(res.statusCode).toBe(503);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    }
   });
 });

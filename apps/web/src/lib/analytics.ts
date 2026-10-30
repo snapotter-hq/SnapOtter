@@ -73,6 +73,53 @@ function sanitize(event: string, properties?: Record<string, unknown>): Record<s
   return out;
 }
 
+// posthog-js reads these from the page URL and attaches them to every event as
+// top-level properties, and as $session_entry_* / $initial_* copies. The list
+// mirrors its CAMPAIGN_PARAMS. They are deleted, not masked, because an
+// instance has no attribution worth keeping (#1124).
+const CAMPAIGN_KEYS = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_content",
+  "utm_term",
+  "gad_source",
+  "mc_cid",
+  "gclid",
+  "gclsrc",
+  "dclid",
+  "gbraid",
+  "wbraid",
+  "fbclid",
+  "msclkid",
+  "twclid",
+  "li_fat_id",
+  "igshid",
+  "ttclid",
+  "rdt_cid",
+  "epik",
+  "qclid",
+  "sccid",
+  "irclid",
+  "_kx",
+]);
+const SDK_COPY_PREFIX = /^\$(session_entry|initial)_/;
+// Properties built from a full stored URL, which keep their query string.
+const URL_PROPERTIES = [
+  "$current_url",
+  "$referrer",
+  "$session_entry_url",
+  "$session_entry_referrer",
+  "$initial_current_url",
+  "$initial_referrer",
+];
+
+function removeCampaignProperties(props: Record<string, unknown>): void {
+  for (const key of Object.keys(props)) {
+    if (CAMPAIGN_KEYS.has(key.replace(SDK_COPY_PREFIX, ""))) delete props[key];
+  }
+}
+
 export function initAnalytics(config: AnalyticsConfig): Promise<void> {
   decided = true;
   if (!config.enabled) {
@@ -152,6 +199,13 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           capture_heatmaps: false,
           capture_dead_clicks: false,
           capture_performance: { web_vitals: true, network_timing: false },
+          // Unset, the project's remote config can turn on exception capture,
+          // which would send crashes to PostHog as well as Sentry (#2285).
+          capture_exceptions: false,
+          // Local default for console-log capture. Remote config can still
+          // switch the logs extension on, so gateRequestsOnOptOut drops every
+          // logs batch (#4145).
+          logs: { captureConsoleLogs: false },
           // Fire $pageview on SPA history changes, not just the initial hard
           // load, so react-router route changes (tool pages, editor, automate,
           // files) are captured. capture_pageleave gives accurate time-on-page.
@@ -175,8 +229,10 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
             const props = event?.properties;
             if (props) {
               const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
-              props.$current_url = strip(props.$current_url);
-              props.$referrer = strip(props.$referrer);
+              for (const key of URL_PROPERTIES) {
+                if (key in props) props[key] = strip(props[key]);
+              }
+              removeCampaignProperties(props);
               // $web_vitals_*_event objects nest their own $current_url, which
               // skips the top-level strip above, so walk them too (#1022).
               for (const key of Object.keys(props)) {
@@ -201,6 +257,7 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
   }
 
   if (posthog) {
+    gateRequestsOnOptOut(posthog);
     // Clear any persisted opt-out from a previous disabled period. opt_out_capturing()
     // writes a localStorage flag that survives reloads, so without this a browser that
     // once opted out would stay silent even after the instance re-enables analytics.
@@ -488,6 +545,31 @@ export function getRenderErrorDestination(): "buffer" | "send" | "drop" {
   if (!enabled) return "drop";
   if (!sentryConfig) return sentryPossible ? "buffer" : "drop";
   return sentryRunning ? "send" : "buffer";
+}
+
+// posthog-js queues a failed send in its retry queue and re-sends it on a timer
+// and on `online`, skipping consent and before_send (#2284). Every send, retries
+// included, goes through _send_request, so the gate sits there.
+//
+// It also closes console-log egress. posthog-js has no init option that stops
+// the project's remote config from turning the logs extension on, and its
+// flush checks only isDisabled, so records queued before an opt-out can still
+// go out. SnapOtter sends no console output to PostHog, so every batch keyed
+// "logs" is dropped whatever the remote config says (#4145).
+function gateRequestsOnOptOut(instance: PostHogInstance): void {
+  // Test doubles of the SDK may not carry the method; the egress test catches a real miss.
+  if (typeof instance._send_request !== "function") return;
+  const send = instance._send_request.bind(instance);
+  instance._send_request = (options) => {
+    if (!enabled || (options as { batchKey?: string }).batchKey === "logs") {
+      // The logs sender waits on its callback (90 s timeout, then retry-later)
+      // and keeps the records queued while it does. A 4xx is the SDK's fatal
+      // answer: the batch leaves the queue and is not retried (#4185).
+      if (options.fireCallbackOnDrop) options.callback?.({ statusCode: 400 });
+      return;
+    }
+    send(options);
+  };
 }
 
 /** Hard runtime opt-out: stop PostHog and Sentry in this tab without a reload. */

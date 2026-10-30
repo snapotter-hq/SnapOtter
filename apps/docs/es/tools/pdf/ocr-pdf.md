@@ -1,7 +1,7 @@
 ---
 description: "Extraiga texto de archivos PDF escaneados localmente con Tesseract integrado o el tiempo de ejecución opcional de alta precisión RapidOCR."
 i18n_output_hash: f3e92ae150d4
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ Extraiga texto de documentos PDF escaneados página por página sin enviar el PD
 
 <!-- korean-ocr-contract:start -->
 ::: info Compatibilidad del OCR coreano
-OCR rápido admite `auto`, `en`, `de`, `es`, `fr`, `zh` y `ja`, pero no coreano (`ko`). El coreano requiere el paquete OCR preciso y `balanced` o `best`. El paquete funciona en los contenedores oficiales Linux amd64 y arm64, incluidos hosts NVIDIA, donde el OCR sigue usando la CPU. Los sistemas no compatibles reciben un error explícito y nunca vuelven silenciosamente a `fast`. Coreano con `fast` o el alias heredado `tesseract` se rechaza antes de encolarse con `FEATURE_INCOMPATIBLE` y `fast-korean-unsupported`.
+OCR rápido admite `auto`, `en`, `de`, `es`, `fr`, `zh` y `ja`, pero no coreano (`ko`) ni árabe (`ar`). Ambos requieren el paquete OCR preciso y `balanced` o `best`. El paquete funciona en los contenedores oficiales Linux amd64 y arm64, incluidos hosts NVIDIA, donde el OCR sigue usando la CPU. Los sistemas no compatibles reciben un error explícito y nunca vuelven silenciosamente a `fast`. Coreano o árabe con `fast` o el alias heredado `tesseract` se rechaza antes de encolarse con `FEATURE_INCOMPATIBLE` y `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -27,12 +27,12 @@ Acepta datos de formulario multipart con un archivo PDF y un campo JSON `setting
 |-----------|------|----------|---------|-------------|
 | file | file | Sí | - | Archivo PDF (multiparte), hasta 512 MiB codificados; todavía se aplica un límite de carga de operador más bajo |
 | quality | string | No | Dinámica | Nivel de calidad OCR: `fast`, `balanced` o `best` |
-| language | string | No | `"auto"` | Idioma del documento: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | No | `"auto"` | Idioma del documento: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | pages | string | No | `"all"` | Selección de páginas, p. ej. `"all"`, `"1-3"`, `"1,3,5"` |
 | enhance | boolean | No | Dependiente del nivel | Mejorar el contraste local antes del reconocimiento. Fast lo aplica directamente; Equilibrado y Mejor conservan la variante solo cuando la puntuación calibrada mejora el resultado. El valor predeterminado es `true` para `best` y `false` para `fast`/`balanced`. |
 | engine | string | No | - | Alias ​​de compatibilidad obsoleto. Utilice `quality` en su lugar. `tesseract` se asigna a `fast`; el valor `paddleocr` heredado se asigna a `balanced` pero no carga PaddlePaddle |
 
-Si se omiten `quality` y `engine`, SnapOtter elige el mejor nivel disponible en este orden: `best`, `balanced`, `fast`. Para coreano nunca elige `fast`: usa `best`, luego `balanced`, o devuelve el error de instalación o compatibilidad del entorno preciso.
+Si se omiten `quality` y `engine`, SnapOtter elige el mejor nivel disponible en este orden: `best`, `balanced`, `fast`. Para coreano y árabe nunca elige `fast`: usa `best`, luego `balanced`, o devuelve el error de instalación o compatibilidad del entorno preciso.
 
 ## Example Request {#example-request}
 

@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo engine AI với tất cả công cụ ML chạy cục bộ. Xóa nền, upscale, OCR, phát hiện khuôn mặt, phục chế ảnh và nhiều tính năng khác."
 i18n_output_hash: 2e012549bd18
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -18,7 +18,7 @@ Hiện chưa hỗ trợ tăng tốc iGPU Intel/AMD qua VA-API, Quick Sync hay Op
 
 <!-- korean-ocr-contract:start -->
 ::: info Khả năng tương thích OCR tiếng Hàn
-OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`). Tiếng Hàn cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
+OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`) và tiếng Ả Rập (`ar`). Cả hai cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Với tiếng Hàn và tiếng Ả Rập, hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn hoặc tiếng Ả Rập với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## Kiến trúc {#architecture}
@@ -189,12 +189,12 @@ Làm mờ nền trong khi giữ chủ thể sắc nét.
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
-| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast không hỗ trợ `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn và tiếng Ả Rập không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
+| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast không hỗ trợ `ko` và `ar` |
 | `enhance` | boolean | Phụ thuộc vào bậc | Cải thiện độ tương phản cục bộ. Fast áp dụng trực tiếp; các bậc chính xác chỉ giữ lại biến thể khi điểm số đã hiệu chỉnh cải thiện OCR. Mặc định bật cho Best |
 | `engine` | string | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` thành `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
 
-Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm. Yêu cầu rõ ràng dùng Fast hoặc bí danh cũ `tesseract` với tiếng Hàn sẽ trả về `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` và hướng dẫn cài gói chính xác trước khi công việc được xếp hàng.
+Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm. Yêu cầu rõ ràng dùng Fast hoặc bí danh cũ `tesseract` với tiếng Hàn hoặc tiếng Ả Rập sẽ trả về `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` và hướng dẫn cài gói chính xác trước khi công việc được xếp hàng.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -205,13 +205,13 @@ Trích xuất văn bản từ tài liệu PDF đã quét bằng OCR chạy trên
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
-| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast không hỗ trợ `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn và tiếng Ả Rập không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
+| `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast không hỗ trợ `ko` và `ar` |
 | `pages` | string | `"all"` | Chọn trang: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Phụ thuộc vào bậc | Cải thiện độ tương phản cục bộ. Fast áp dụng trực tiếp; các bậc chính xác chỉ giữ lại biến thể khi điểm số đã hiệu chỉnh cải thiện OCR. Mặc định bật cho Best |
 | `engine` | string | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` thành `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
 
-Quy tắc không hạ cấp và tương thích tiếng Hàn tương tự cũng áp dụng cho PDF OCR. Các trang PDF được rasterized trước khi nhận dạng và một yêu cầu có thể chọn tối đa 50 trang.
+Quy tắc không hạ cấp và tương thích tiếng Hàn và tiếng Ả Rập tương tự cũng áp dụng cho PDF OCR. Các trang PDF được rasterized trước khi nhận dạng và một yêu cầu có thể chọn tối đa 50 trang.
 
 ## Làm mờ khuôn mặt / PII {#face-pii-blur}
 

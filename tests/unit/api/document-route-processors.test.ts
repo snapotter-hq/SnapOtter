@@ -222,7 +222,11 @@ describe("document route processors", () => {
 
     await withScratch(async (scratchDir) => {
       const ctx = createCtx(scratchDir, "scanned.pdf");
-      await expect(config?.processV2?.(ctx)).rejects.toThrow(/text layer/i);
+      await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
+        message: expect.stringMatching(/text layer/i),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
     });
   });
 

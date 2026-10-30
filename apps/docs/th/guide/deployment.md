@@ -1,6 +1,6 @@
 ---
 description: "ปรับใช้ SnapOtter สู่โปรดักชันด้วย Docker ความต้องการฮาร์ดแวร์ การตั้งค่า GPU และคอนฟิก reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
-i18n_source_hash: 4db97ead24e0
+i18n_source_hash: 4cae787c775e
 i18n_provenance: human
 i18n_output_hash: 841ed25bbdce
 i18n_hash_version: 2
@@ -15,7 +15,7 @@ SnapOtter ปรับใช้เป็นสแตก Docker Compose แบบ
 
 <!-- korean-ocr-contract:start -->
 ::: info ความเข้ากันได้ของ OCR ภาษาเกาหลี
-OCR แบบเร็วรองรับ `auto`, `en`, `de`, `es`, `fr`, `zh` และ `ja` แต่ไม่รองรับภาษาเกาหลี (`ko`) ภาษาเกาหลีต้องใช้แพ็ก OCR แบบแม่นยำและ `balanced` หรือ `best` แพ็กทำงานบนคอนเทนเนอร์ Linux amd64 และ arm64 อย่างเป็นทางการ รวมถึงโฮสต์ NVIDIA ซึ่ง OCR ยังคงทำงานบน CPU ระบบที่ไม่รองรับจะส่งคืนข้อผิดพลาดความเข้ากันได้อย่างชัดเจนและไม่ย้อนกลับไปใช้ `fast` โดยเงียบ ๆ ภาษาเกาหลีร่วมกับ `fast` หรือนามแฝงเดิม `tesseract` จะถูกปฏิเสธก่อนเข้าคิวด้วย `FEATURE_INCOMPATIBLE` และ `fast-korean-unsupported`
+OCR แบบเร็วรองรับ `auto`, `en`, `de`, `es`, `fr`, `zh` และ `ja` แต่ไม่รองรับภาษาเกาหลี (`ko`) และภาษาอาหรับ (`ar`) ทั้งสองภาษาต้องใช้แพ็ก OCR แบบแม่นยำและ `balanced` หรือ `best` แพ็กทำงานบนคอนเทนเนอร์ Linux amd64 และ arm64 อย่างเป็นทางการ รวมถึงโฮสต์ NVIDIA ซึ่ง OCR ยังคงทำงานบน CPU ระบบที่ไม่รองรับจะส่งคืนข้อผิดพลาดความเข้ากันได้อย่างชัดเจนและไม่ย้อนกลับไปใช้ `fast` โดยเงียบ ๆ ภาษาเกาหลีหรือภาษาอาหรับร่วมกับ `fast` หรือนามแฝงเดิม `tesseract` จะถูกปฏิเสธก่อนเข้าคิวด้วย `FEATURE_INCOMPATIBLE` และ `fast-korean-unsupported`
 :::
 <!-- korean-ocr-contract:end -->
 ## Quick Start (CPU) {#quick-start-cpu}

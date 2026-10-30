@@ -1386,6 +1386,8 @@ export const ko: TranslationKeys = {
       submit: "리사이즈",
       submitBatch: "리사이즈 ({count}개 파일)",
       progressLabel: "리사이즈 중",
+      maxDimensionExceeded: "1~{max} px 사이의 크기를 사용하세요.",
+      maxPercentageExceeded: "1~{max}% 사이의 배율을 사용하세요.",
     },
     crop: {
       width: "너비",
@@ -1927,6 +1929,8 @@ export const ko: TranslationKeys = {
         "인식 전에 국소 대비를 개선합니다. 빠름은 직접 적용하고, 균형 및 최고는 보정된 점수가 결과를 개선할 때만 해당 버전을 사용합니다.",
       fastKoreanUnsupported:
         "빠른 OCR은 한국어를 지원하지 않습니다. 정확한 OCR 팩을 설치하고 균형 또는 최고를 선택하세요.",
+      fastArabicUnsupported:
+        "빠른 OCR은 아랍어를 지원하지 않습니다. 정확한 OCR 팩을 설치하고 균형 또는 최고를 선택하세요.",
       language: "언어",
       autoDetect: "자동 감지",
       extractedText: "추출된 텍스트",
@@ -2022,6 +2026,9 @@ export const ko: TranslationKeys = {
       submitSubject: "스마트 크롭",
       submitFace: "얼굴 크롭",
       submitTrim: "테두리 트림",
+      maxDimensionExceeded: "1~{max} px 사이의 크기를 사용하세요.",
+      cropAreaExceeded:
+        "이 자르기는 {max} 픽셀 한도를 초과합니다. 너비, 높이 또는 패딩을 줄이세요.",
     },
     imageEnhancement: {
       enhancementMode: "향상 모드",
@@ -2147,6 +2154,8 @@ export const ko: TranslationKeys = {
       submit: "리사이즈",
       submitBatch: "리사이즈 ({count}개 파일)",
       progressLabel: "콘텐츠 인식 리사이즈 중",
+      maxDimensionExceeded: "1~{max} px 사이의 크기를 사용하세요.",
+      areaExceeded: "콘텐츠 인식 크기 조정은 총 {max}픽셀로 제한됩니다. 너비나 높이를 줄이세요.",
     },
     "ai-canvas-expand": {
       quality: "품질",
@@ -3191,6 +3200,7 @@ export const ko: TranslationKeys = {
       submit: "GIF 처리",
       submitBatch: "처리 ({count}개 파일)",
       progressLabel: "GIF 처리 중",
+      maxDimensionExceeded: "1~{max} px 사이의 크기를 사용하세요.",
     },
     "image-to-base64": {
       converting: "변환 중...",
@@ -3634,8 +3644,7 @@ export const ko: TranslationKeys = {
       bestEffortHint:
         "최대한 노력한 최대치입니다. 이미지 기반 PDF는 이 크기에 가깝게 도달하지만, 텍스트 전용 PDF는 이 크기까지 줄어들지 않을 수 있습니다.",
       targetReached: "목표 {target}에 도달했습니다(결과: {size}).",
-      targetMissed:
-        "{target}에 도달할 수 없습니다. 이 PDF는 대부분 텍스트나 벡터로 이루어져 있어 이미지 압축으로 줄일 수 없으므로, 달성 가능한 최소 크기는 {size}였습니다.",
+      targetMissed: "{target}에 도달할 수 없습니다. 달성 가능한 최소 크기는 {size}였습니다.",
     },
     "rotate-pdf": {
       angle: "회전 각도",
@@ -3864,6 +3873,9 @@ export const ko: TranslationKeys = {
       submit: "텍스트 추출",
       submitBatch: "텍스트 추출 ({count}개 파일)",
       progressLabel: "추출 중",
+      scannedHint:
+        "이 PDF는 스캔본이라 추출할 텍스트가 없습니다. OCR로 읽을 수 있지만 시간이 더 걸리고 OCR AI 번들이 설치되어 있어야 합니다.",
+      runOcr: "이 PDF에 OCR 실행",
     },
     "pdf-to-word": {
       hint: "텍스트 기반 PDF에 적합합니다. 스캔된 페이지는 OCR이 필요합니다",
@@ -4614,6 +4626,7 @@ export const ko: TranslationKeys = {
         anchorLabel: "기준점:",
         anchorAriaLabel: "기준점 {position}",
         backgroundLabel: "배경:",
+        transparent: "투명",
         anchors: {
           topLeft: "왼쪽 상단",
           topCenter: "상단 중앙",
@@ -5127,6 +5140,7 @@ export const ko: TranslationKeys = {
       description: "고급 파일 처리를 위한 AI 모델 번들을 관리합니다.",
       installAll: "모두 설치",
       diskUsage: "디스크 사용량: {size}",
+      statusStale: "번들 상태를 새로 고치지 못했습니다. 아래 목록이 최신이 아닐 수 있습니다.",
       sizeOnDisk: "디스크에 {size}",
       installed: "설치됨",
       notInstalled: "설치되지 않음",
@@ -5557,6 +5571,7 @@ export const ko: TranslationKeys = {
     invalidSetting: "{setting} 값이 올바르지 않습니다.",
     network: "네트워크 오류",
     invalidResponse: "잘못된 응답",
+    staleVersionReload: "앱이 업데이트되었습니다. 페이지를 새로고침한 후 다시 시도하세요.",
     failedWithStatus: "요청을 완료할 수 없습니다. 다시 시도해 주세요.",
     processingFailedWithStatus:
       "이 파일을 처리할 수 없습니다. 파일이 손상되지 않았는지 확인한 후 다시 시도해 주세요.",
@@ -5783,6 +5798,7 @@ export const ko: TranslationKeys = {
       zh: "중국어",
       ja: "일본어",
       ko: "한국어",
+      ar: "아랍어",
       id: "인도네시아어",
       th: "태국어",
       vi: "베트남어",

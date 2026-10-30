@@ -21,6 +21,7 @@ import {
   installChunkReloadHandler,
   isAbortedByLeaving,
   LEAVING_WINDOW_MS,
+  quietImport,
 } from "@/lib/chunk-reload";
 
 function fireChunkErrorWith(payload: unknown): Event {
@@ -284,6 +285,43 @@ describe("installChunkReloadHandler", () => {
       expect(remove).toHaveBeenCalledWith("navigate", expect.any(Function));
       remove.mockRestore();
       uninstall = installChunkReloadHandler(reload);
+    });
+  });
+  describe("quietImport", () => {
+    // Vite fires vite:preloadError before the importer's catch runs, so the
+    // event is dispatched from inside the loader, like the real thing.
+    const failingImport = (payload: Error) => () =>
+      new Promise<never>((_, reject) => {
+        fireChunkErrorWith(payload);
+        reject(payload);
+      });
+
+    it("does not reload or swallow a failure raised while the import is in flight (#1680)", async () => {
+      const error = new Error("Failed to fetch dynamically imported module");
+      let event: Event | undefined;
+      const load = () =>
+        new Promise<never>((_, reject) => {
+          event = fireChunkErrorWith(error);
+          reject(error);
+        });
+
+      await expect(quietImport(load)).rejects.toBe(error);
+
+      expect(reload).not.toHaveBeenCalled();
+      expect(event?.defaultPrevented).toBe(false);
+      expect(sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY)).toBeNull();
+    });
+
+    it("resolves with the module when the import succeeds", async () => {
+      await expect(quietImport(async () => 42)).resolves.toBe(42);
+    });
+
+    it("reloads again for a route chunk once the quiet import has settled", async () => {
+      await expect(quietImport(failingImport(new Error("gone")))).rejects.toThrow("gone");
+
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
     });
   });
 });

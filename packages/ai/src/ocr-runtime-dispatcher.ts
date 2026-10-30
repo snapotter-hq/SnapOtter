@@ -17,6 +17,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { aiLog, describeUnexpectedExit } from "./log.js";
 import {
   type ActiveRuntimeDescriptor,
   OCR_RUNTIME_PROTOCOL_VERSION,
@@ -908,15 +909,29 @@ class OcrRuntimeManager {
     this.forceKillTimer = null;
 
     let error = this.fatalError;
+    const stderr = Buffer.concat(this.processStderrChunks).toString("utf8").trim();
     if (!error && this.stdoutBuffer.length > 0) {
       error = new Error("Accurate OCR runtime returned a malformed JSON response");
     }
     if (!error && (this.current || this.queue.length > 0)) {
-      const stderr = Buffer.concat(this.processStderrChunks).toString("utf8").trim();
       error = new Error(
         `Accurate OCR runtime exited with code ${String(code)}${
           signal ? ` (${signal})` : ""
         }${stderr ? `: ${stderr}` : ""}`,
+      );
+    }
+    // With no request to carry the failure, the log is the only place an idle
+    // crash can surface. A shutdown we asked for ends stdin, and then the child
+    // either exits 0 or gets a SIGTERM. Any other exit during a drain is a crash.
+    if (
+      !error &&
+      !this.current &&
+      this.queue.length === 0 &&
+      !(this.ending && signal === "SIGTERM") &&
+      (code !== 0 || signal !== null)
+    ) {
+      aiLog.warn(
+        `[ocr-runtime] Accurate OCR runtime exited while idle: ${describeUnexpectedExit(code, signal, stderr.split("\n"))}`,
       );
     }
 

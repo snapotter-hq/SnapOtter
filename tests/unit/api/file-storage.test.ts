@@ -1131,7 +1131,7 @@ describe("saveFile after a failed write", () => {
       expect.objectContaining({
         storedName: leftover,
         err: expect.objectContaining({ code: "EBUSY" }),
-        writeErr: expect.objectContaining({ code: "ENOSPC" }),
+        writeErr: "ENOSPC: simulated",
       }),
       expect.any(String),
     );
@@ -1365,7 +1365,7 @@ describe("saveThumbnail after a failed write (#1633)", () => {
       expect.objectContaining({
         storedName: join(".thumbs", leftover),
         err: expect.objectContaining({ code: "EBUSY" }),
-        writeErr: expect.objectContaining({ code: "ENOSPC" }),
+        writeErr: "ENOSPC: simulated",
       }),
       expect.any(String),
     );

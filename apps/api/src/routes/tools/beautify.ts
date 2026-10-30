@@ -140,6 +140,7 @@ async function prepareBeautifyImage(
         const probeErr = asDecoderOutOfMemory(rawProbeErr);
         if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+        log?.warn({ err: decodeErr, toolId: "beautify" }, "Decode failed");
         throw await asInputErrorIfUndecodable(buf, rawProbeErr);
       }
     }

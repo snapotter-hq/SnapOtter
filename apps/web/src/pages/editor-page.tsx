@@ -30,6 +30,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { captureHandledError } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import {
   checkToolResult,
   jobFailureMessage,
@@ -128,7 +129,7 @@ export function EditorPage() {
   });
 
   useEffect(() => {
-    import("@/lib/analytics").then(({ track }) => track(ANALYTICS_EVENTS.EDITOR_OPENED, {}));
+    withAnalytics(({ track }) => track(ANALYTICS_EVENTS.EDITOR_OPENED, {}));
   }, []);
 
   // Listen for fill-dialog custom event (dispatched from Shift+Backspace shortcut)

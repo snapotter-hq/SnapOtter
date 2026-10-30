@@ -1,7 +1,7 @@
 ---
 description: "모든 로컬 ML 도구를 다루는 AI 엔진 레퍼런스. 배경 제거, 업스케일링, OCR, 얼굴 감지, 사진 복원 등."
 i18n_output_hash: 1d29a0b1133c
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -17,7 +17,7 @@ VA-API, Quick Sync, OpenCL을 통한 Intel/AMD iGPU 가속은 현재 AI 추론�
 
 <!-- korean-ocr-contract:start -->
 ::: info 한국어 OCR 호환성
-빠른 OCR은 `auto`, `en`, `de`, `es`, `fr`, `zh`, `ja`를 지원하지만 한국어(`ko`)는 지원하지 않습니다. 한국어에는 정확한 OCR 팩과 `balanced` 또는 `best`가 필요합니다. 이 팩은 공식 Linux amd64 및 arm64 컨테이너에서 작동하며 NVIDIA 호스트에서도 OCR은 CPU에서 실행됩니다. 지원되지 않는 시스템은 명시적인 호환성 오류를 반환하며 조용히 `fast`로 대체하지 않습니다. 한국어에 `fast` 또는 이전 `tesseract` 별칭을 지정하면 큐에 넣기 전에 `FEATURE_INCOMPATIBLE` 및 `fast-korean-unsupported`로 거부됩니다.
+빠른 OCR은 `auto`, `en`, `de`, `es`, `fr`, `zh`, `ja`를 지원하지만 한국어(`ko`)와 아랍어(`ar`)는 지원하지 않습니다. 한국어와 아랍어에는 정확한 OCR 팩과 `balanced` 또는 `best`가 필요합니다. 이 팩은 공식 Linux amd64 및 arm64 컨테이너에서 작동하며 NVIDIA 호스트에서도 OCR은 CPU에서 실행됩니다. 지원되지 않는 시스템은 명시적인 호환성 오류를 반환하며 조용히 `fast`로 대체하지 않습니다. 한국어 또는 아랍어에 `fast` 또는 이전 `tesseract` 별칭을 지정하면 큐에 넣기 전에 `FEATURE_INCOMPATIBLE` 및 `fast-korean-unsupported`로 거부됩니다.
 :::
 <!-- korean-ocr-contract:end -->
 
@@ -189,12 +189,12 @@ done
 
 | 매개변수 | 타입 | 기본값 | 설명 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | 처리 등급입니다. `quality`를 생략하면 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어에서는 `fast`를 선택하지 않으며, 정확한 등급이 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
-| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast는 `ko`를 지원하지 않습니다. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | 처리 등급입니다. `quality`를 생략하면 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어와 아랍어에서는 `fast`를 선택하지 않으며, 정확한 등급이 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
+| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast는 `ko`와 `ar`을 지원하지 않습니다. |
 | `enhance` | boolean | 등급에 따라 다름 | 로컬 대비를 개선합니다. Fast는 이를 직접 적용하고, 정확한 등급은 보정된 점수가 OCR을 개선할 때만 변형을 유지합니다. Best에서는 기본으로 켜져 있습니다. |
 | `engine` | string | - | 더 이상 사용되지 않는 호환성 별칭입니다. `tesseract`를 `fast`에 매핑하고 레거시 `paddleocr` 값을 `balanced`에 매핑합니다. PaddlePaddle은 로드하지 않습니다. |
 
-추출된 텍스트와 출처 메타데이터(엔진, 요청 및 실제 품질, 장치, 공급자, 성능 저하 상태, 경고, 해당되는 경우 정확한 런타임/모델 버전)를 반환합니다. 명시적인 품질 요청은 다른 계층으로 돌아가지 않습니다. `balanced` 또는 `best`를 사용할 수 없는 경우 API 는 `fast`를 자동으로 실행하는 대신 `FEATURE_NOT_INSTALLED` 또는 `FEATURE_INCOMPATIBLE`를 반환합니다. 한국어에 Fast 또는 레거시 `tesseract`를 명시하면 작업이 대기열에 들어가기 전에 `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, 정확한 팩 안내를 반환합니다.
+추출된 텍스트와 출처 메타데이터(엔진, 요청 및 실제 품질, 장치, 공급자, 성능 저하 상태, 경고, 해당되는 경우 정확한 런타임/모델 버전)를 반환합니다. 명시적인 품질 요청은 다른 계층으로 돌아가지 않습니다. `balanced` 또는 `best`를 사용할 수 없는 경우 API 는 `fast`를 자동으로 실행하는 대신 `FEATURE_NOT_INSTALLED` 또는 `FEATURE_INCOMPATIBLE`를 반환합니다. 한국어 또는 아랍어에 Fast 또는 레거시 `tesseract`를 명시하면 작업이 대기열에 들어가기 전에 `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, 정확한 팩 안내를 반환합니다.
 
 ## PDF OCR {#pdf-ocr}
 
@@ -205,13 +205,13 @@ AI 기반 OCR을 사용해 스캔된 PDF 문서에서 페이지별로 텍스트�
 
 | 매개변수 | 타입 | 기본값 | 설명 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | 처리 등급입니다. `quality`를 생략하면 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어에서는 `fast`를 선택하지 않으며, 정확한 등급이 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
-| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast는 `ko`를 지원하지 않습니다. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 동적 | 처리 등급입니다. `quality`를 생략하면 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어와 아랍어에서는 `fast`를 선택하지 않으며, 정확한 등급이 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다. |
+| `language` | string | `"auto"` | 언어: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast는 `ko`와 `ar`을 지원하지 않습니다. |
 | `pages` | string | `"all"` | 페이지 선택: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | 등급에 따라 다름 | 로컬 대비를 개선합니다. Fast는 이를 직접 적용하고, 정확한 등급은 보정된 점수가 OCR을 개선할 때만 변형을 유지합니다. Best에서는 기본으로 켜져 있습니다. |
 | `engine` | string | - | 더 이상 사용되지 않는 호환성 별칭입니다. `tesseract`를 `fast`에 매핑하고 레거시 `paddleocr` 값을 `balanced`에 매핑합니다. PaddlePaddle은 로드하지 않습니다. |
 
-PDF OCR에도 동일한 다운그레이드 금지 규칙과 한국어 호환성 규칙이 적용됩니다. PDF 페이지는 인식되기 전에 래스터화되며, 한 요청으로 최대 50페이지를 선택할 수 있습니다.
+PDF OCR에도 동일한 다운그레이드 금지 규칙과 한국어 및 아랍어 호환성 규칙이 적용됩니다. PDF 페이지는 인식되기 전에 래스터화되며, 한 요청으로 최대 50페이지를 선택할 수 있습니다.
 
 ## 얼굴 / PII 블러 {#face-pii-blur}
 

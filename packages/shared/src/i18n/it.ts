@@ -1451,6 +1451,8 @@ export const it: TranslationKeys = {
       submit: "Ridimensiona",
       submitBatch: "Ridimensiona ({count} file)",
       progressLabel: "Ridimensionamento in corso",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
+      maxPercentageExceeded: "Usa una scala da 1 a {max}%.",
     },
     crop: {
       width: "Larghezza",
@@ -1996,6 +1998,8 @@ export const it: TranslationKeys = {
         "Migliora il contrasto locale prima del riconoscimento. Veloce lo applica direttamente; Bilanciata e Migliore conservano la variante solo se il punteggio calibrato migliora il risultato.",
       fastKoreanUnsupported:
         "L’OCR veloce non supporta il coreano. Installa il pacchetto OCR accurato e scegli Bilanciata o Migliore.",
+      fastArabicUnsupported:
+        "L’OCR veloce non supporta l’arabo. Installa il pacchetto OCR accurato e scegli Bilanciata o Migliore.",
       language: "Lingua",
       autoDetect: "Rilevamento automatico",
       extractedText: "Testo estratto",
@@ -2092,6 +2096,9 @@ export const it: TranslationKeys = {
       submitSubject: "Ritaglio intelligente",
       submitFace: "Ritaglio per volto",
       submitTrim: "Ritaglia bordi",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
+      cropAreaExceeded:
+        "Questo ritaglio supera il limite di {max} pixel. Riduci larghezza, altezza o spaziatura.",
     },
     imageEnhancement: {
       enhancementMode: "Modalità di miglioramento",
@@ -2218,6 +2225,9 @@ export const it: TranslationKeys = {
       submit: "Ridimensiona",
       submitBatch: "Ridimensiona ({count} file)",
       progressLabel: "Ridimensionamento intelligente",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
+      areaExceeded:
+        "Il ridimensionamento consapevole del contenuto è limitato a {max} pixel in totale. Riduci la larghezza o l'altezza.",
     },
     "ai-canvas-expand": {
       quality: "Qualità",
@@ -3268,6 +3278,7 @@ export const it: TranslationKeys = {
       submit: "Elabora GIF",
       submitBatch: "Elabora ({count} file)",
       progressLabel: "Elaborazione GIF",
+      maxDimensionExceeded: "Usa una dimensione da 1 a {max} px.",
     },
     "image-to-base64": {
       converting: "Conversione in corso...",
@@ -3713,8 +3724,7 @@ export const it: TranslationKeys = {
       bestEffortHint:
         "Massimo possibile. I PDF basati su immagini si avvicinano; i PDF di solo testo potrebbero non ridursi a questa dimensione.",
       targetReached: "Obiettivo di {target} raggiunto (risultato: {size}).",
-      targetMissed:
-        "Impossibile raggiungere {target}. La dimensione minima ottenibile era {size} perché questo PDF è composto principalmente da testo o vettori, che la compressione delle immagini non può ridurre.",
+      targetMissed: "Impossibile raggiungere {target}. La dimensione minima ottenibile era {size}.",
     },
     "rotate-pdf": {
       angle: "Angolo di rotazione",
@@ -3944,6 +3954,9 @@ export const it: TranslationKeys = {
       submit: "Estrai testo",
       submitBatch: "Estrai testo ({count} file)",
       progressLabel: "Estrazione",
+      scannedHint:
+        "Questo PDF è una scansione, quindi non c'è testo da estrarre. L'OCR può leggerlo, ma richiede più tempo e il pacchetto IA per l'OCR installato.",
+      runOcr: "Esegui l'OCR su questo PDF",
     },
     "pdf-to-word": {
       hint: "Ideale per PDF basati su testo; le pagine scansionate richiedono OCR",
@@ -4698,6 +4711,7 @@ export const it: TranslationKeys = {
         anchorLabel: "Ancoraggio:",
         anchorAriaLabel: "Ancoraggio {position}",
         backgroundLabel: "Sfondo:",
+        transparent: "Trasparente",
         anchors: {
           topLeft: "in alto a sinistra",
           topCenter: "in alto al centro",
@@ -5229,6 +5243,8 @@ export const it: TranslationKeys = {
       description: "Gestisci pacchetti di modelli di IA per l'elaborazione avanzata dei file.",
       installAll: "Installa tutto",
       diskUsage: "Utilizzo del disco: {size}",
+      statusStale:
+        "Impossibile aggiornare lo stato dei bundle. L’elenco qui sotto potrebbe non essere aggiornato.",
       sizeOnDisk: "{size} su disco",
       installed: "Installato",
       notInstalled: "Non installato",
@@ -5667,6 +5683,7 @@ export const it: TranslationKeys = {
     invalidSetting: "Valore non valido per {setting}.",
     network: "Errore di rete",
     invalidResponse: "Risposta non valida",
+    staleVersionReload: "L'app è stata aggiornata. Ricarica la pagina e riprova.",
     failedWithStatus: "Non è stato possibile completare la richiesta. Riprova.",
     processingFailedWithStatus:
       "Non è stato possibile elaborare questo file. Verifica che il file non sia danneggiato e riprova.",
@@ -5898,6 +5915,7 @@ export const it: TranslationKeys = {
       zh: "Cinese",
       ja: "Giapponese",
       ko: "Coreano",
+      ar: "Arabo",
       id: "Indonesiano",
       th: "Thailandese",
       vi: "Vietnamita",

@@ -1,7 +1,7 @@
 ---
 description: "Yerleşik Tesseract veya isteğe bağlı yüksek doğruluklu RapidOCR çalışma zamanı ile taranan PDF'lerden metni yerel olarak çıkarın."
 i18n_output_hash: 9d1adaa5e2b7
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ PDF'yi harici bir hizmete göndermeden, taranan PDF belgelerinden metni sayfa sa
 
 <!-- korean-ocr-contract:start -->
 ::: info Korece OCR uyumluluğu
-Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler, ancak Koreceyi (`ko`) desteklemez. Korece için doğru OCR paketi ve `balanced` ya da `best` gerekir. Paket resmi Linux amd64 ve arm64 kapsayıcılarında, OCR’nin CPU’da kaldığı NVIDIA ana bilgisayarları dahil çalışır. Desteklenmeyen sistemler açık bir uyumluluk hatası alır ve sessizce `fast` seçeneğine dönülmez. Korece ile `fast` veya eski `tesseract` diğer adı kuyruk öncesinde `FEATURE_INCOMPATIBLE` ve `fast-korean-unsupported` ile reddedilir.
+Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler, ancak Koreceyi (`ko`) ve Arapçayı (`ar`) desteklemez. Korece ve Arapça için doğru OCR paketi ve `balanced` ya da `best` gerekir. Paket resmi Linux amd64 ve arm64 kapsayıcılarında, OCR’nin CPU’da kaldığı NVIDIA ana bilgisayarları dahil çalışır. Desteklenmeyen sistemler Korece ve Arapça için açık bir uyumluluk hatası alır ve sessizce `fast` seçeneğine dönülmez. Korece veya Arapça ile `fast` veya eski `tesseract` diğer adı kuyruk öncesinde `FEATURE_INCOMPATIBLE` ve `fast-korean-unsupported` ile reddedilir.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Uç Noktası {#api-endpoint}
@@ -27,12 +27,12 @@ Bir PDF dosyası ve isteğe bağlı bir JSON `settings` alanı içeren multipart
 |-----------|------|----------|---------|-------------|
 | file | file | Evet | - | PDF dosyası (çok parçalı), 512'ye kadar MiB kodlanmış; daha düşük bir operatör yükleme sınırı hâlâ geçerlidir |
 | quality | string | HAYIR | Dinamik | OCR kalite katmanı: `fast`, `balanced` veya `best` |
-| language | string | Hayır | `"auto"` | Belge dili: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | Hayır | `"auto"` | Belge dili: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. `fast` katmanı `ko` ve `ar` desteklemez. |
 | pages | string | Hayır | `"all"` | Sayfa seçimi, örn. `"all"`, `"1-3"`, `"1,3,5"` |
 | enhance | boolean | HAYIR | Seviyeye bağlı | Tanınmadan önce yerel kontrastı iyileştirin. Hızlı doğrudan uygular; Dengeli ve En İyi, yalnızca kalibre edilmiş puanlama sonucu iyileştirdiğinde varyantı korur. `best` için `true` ve `fast`/`balanced` için `false` varsayılanları |
 | engine | string | HAYIR | - | Kullanımdan kaldırılan uyumluluk takma adı. Bunun yerine `quality` kullanın. `tesseract`, `fast` ile eşleşir; eski `paddleocr` değeri `balanced` ile eşleşir ancak PaddlePaddle'yi yüklemez |
 
-`quality` ve `engine` belirtilmezse SnapOtter kullanılabilir en iyi katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece için `fast` hiçbir zaman seçilmez; `best`, ardından `balanced` kullanılır veya doğru çalışma zamanının kurulum ya da uyumluluk hatası döndürülür.
+`quality` ve `engine` belirtilmezse SnapOtter kullanılabilir en iyi katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece ve Arapça için `fast` hiçbir zaman seçilmez; `best`, ardından `balanced` kullanılır veya doğru çalışma zamanının kurulum ya da uyumluluk hatası döndürülür.
 
 ## Örnek İstek {#example-request}
 

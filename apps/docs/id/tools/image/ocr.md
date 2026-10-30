@@ -1,7 +1,7 @@
 ---
 description: "Ekstrak teks dari gambar secara lokal dengan Tesseract bawaan atau runtime RapidOCR opsional dengan akurasi tinggi."
 i18n_output_hash: 18a92d67d692
-i18n_source_hash: 7b0c00be0510
+i18n_source_hash: 1e098dbb5a20
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ Ekstrak teks dari gambar tanpa mengirim gambar ke layanan eksternal. Tingkat `fa
 
 <!-- korean-ocr-contract:start -->
 ::: info Kompatibilitas OCR bahasa Korea
-OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`). Bahasa Korea memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
+OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`) maupun bahasa Arab (`ar`). Keduanya memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea atau Arab dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -29,7 +29,7 @@ OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak
 |-----------|------|----------|---------|-------------|
 | file | file | Ya | - | File gambar (multibagian), hingga 512 MiB dikodekan dan 40 megapiksel dikodekan; batas unggah operator yang lebih rendah masih berlaku |
 | quality | string | TIDAK | Dinamis | Tingkat kualitas: `fast` (Tesseract), `balanced` (RapidOCR dengan model PP-OCRv6 kecil), atau `best` (model PP-OCRv6 medium dengan akurasi lebih tinggi dengan penilaian varian yang dikalibrasi) |
-| language | string | No | `"auto"` | Petunjuk bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | No | `"auto"` | Petunjuk bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | enhance | boolean | TIDAK | Bergantung pada tingkatan | Tingkatkan kontras lokal sebelum pengenalan. Fast menerapkannya secara langsung; Seimbang dan Terbaik mempertahankan varian hanya jika penilaian yang dikalibrasi meningkatkan hasilnya. Defaultnya adalah `true` untuk `best` dan `false` untuk `fast`/`balanced` |
 | engine | string | TIDAK | - | Alias ​​​​kompatibilitas yang tidak digunakan lagi. Gunakan `quality` sebagai gantinya. `tesseract` dipetakan ke `fast`; nilai `paddleocr` lama dipetakan ke `balanced` tetapi tidak memuat PaddlePaddle |
 

@@ -1,6 +1,6 @@
 ---
 description: "انشر SnapOtter في بيئة الإنتاج باستخدام Docker. متطلبات العتاد وإعداد GPU وإعدادات الوكيل العكسي لـ Nginx و Traefik و Cloudflare."
-i18n_source_hash: 4db97ead24e0
+i18n_source_hash: 4cae787c775e
 i18n_provenance: human
 i18n_output_hash: c66572adae90
 i18n_hash_version: 2
@@ -15,7 +15,7 @@ i18n_hash_version: 2
 
 <!-- korean-ocr-contract:start -->
 ::: info توافق OCR الكوري
-يدعم Fast OCR اللغات `auto` و`en` و`de` و`es` و`fr` و`zh` و`ja`، لكنه لا يدعم الكورية (`ko`). تتطلب الكورية حزمة OCR الدقيقة ومستوى `balanced` أو `best`. تعمل الحزمة على حاويات Linux amd64 وarm64 الرسمية، بما في ذلك مضيفات NVIDIA حيث يبقى OCR على CPU. تُرجع الأنظمة غير المدعومة خطأ توافق صريحاً ولا تعود بصمت إلى `fast`. كما يُرفض طلب Korean مع `fast` أو الاسم القديم `tesseract` قبل وضعه في قائمة الانتظار، مع `FEATURE_INCOMPATIBLE` والسبب `fast-korean-unsupported`.
+يدعم Fast OCR اللغات `auto` و`en` و`de` و`es` و`fr` و`zh` و`ja`، لكنه لا يدعم الكورية (`ko`) ولا العربية (`ar`). تتطلب كلتاهما حزمة OCR الدقيقة ومستوى `balanced` أو `best`. تعمل الحزمة على حاويات Linux amd64 وarm64 الرسمية، بما في ذلك مضيفات NVIDIA حيث يبقى OCR على CPU. تُرجع الأنظمة غير المدعومة خطأ توافق صريحاً ولا تعود بصمت إلى `fast`. كما يُرفض طلب الكورية أو العربية مع `fast` أو الاسم القديم `tesseract` قبل وضعه في قائمة الانتظار، مع `FEATURE_INCOMPATIBLE` والسبب `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## بداية سريعة (المعالج المركزي) {#quick-start-cpu}

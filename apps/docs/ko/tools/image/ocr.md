@@ -1,7 +1,7 @@
 ---
 description: "내장된 Tesseract 또는 선택적인 고정밀 RapidOCR 런타임을 사용하여 이미지에서 로컬로 텍스트를 추출합니다."
 i18n_output_hash: 8320ed5125e7
-i18n_source_hash: 7b0c00be0510
+i18n_source_hash: 1e098dbb5a20
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ i18n_provenance: human
 
 <!-- korean-ocr-contract:start -->
 ::: info 한국어 OCR 호환성
-빠른 OCR은 `auto`, `en`, `de`, `es`, `fr`, `zh`, `ja`를 지원하지만 한국어(`ko`)는 지원하지 않습니다. 한국어에는 정확한 OCR 팩과 `balanced` 또는 `best`가 필요합니다. 이 팩은 공식 Linux amd64 및 arm64 컨테이너에서 작동하며 NVIDIA 호스트에서도 OCR은 CPU에서 실행됩니다. 지원되지 않는 시스템은 명시적인 호환성 오류를 반환하며 조용히 `fast`로 대체하지 않습니다. 한국어에 `fast` 또는 이전 `tesseract` 별칭을 지정하면 큐에 넣기 전에 `FEATURE_INCOMPATIBLE` 및 `fast-korean-unsupported`로 거부됩니다.
+빠른 OCR은 `auto`, `en`, `de`, `es`, `fr`, `zh`, `ja`를 지원하지만 한국어(`ko`)와 아랍어(`ar`)는 지원하지 않습니다. 한국어와 아랍어에는 정확한 OCR 팩과 `balanced` 또는 `best`가 필요합니다. 이 팩은 공식 Linux amd64 및 arm64 컨테이너에서 작동하며 NVIDIA 호스트에서도 OCR은 CPU에서 실행됩니다. 지원되지 않는 시스템은 명시적인 호환성 오류를 반환하며 조용히 `fast`로 대체하지 않습니다. 한국어 또는 아랍어에 `fast` 또는 이전 `tesseract` 별칭을 지정하면 큐에 넣기 전에 `FEATURE_INCOMPATIBLE` 및 `fast-korean-unsupported`로 거부됩니다.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -29,11 +29,11 @@ i18n_provenance: human
 |-----------|------|----------|---------|-------------|
 | file | file | 예 | - | 이미지 파일(멀티파트), 최대 512 MiB 인코딩 및 40 메가픽셀 디코딩; 더 낮은 운영자 업로드 제한이 여전히 적용됩니다. |
 | quality | string | 아니요 | 동적 | 품질 등급: `fast`(Tesseract), `balanced`(소형 PP-OCRv6 모델이 포함된 RapidOCR) 또는 `best`(보정된 변형 스코어링이 포함된 정확도가 높은 중간 PP-OCRv6 모델) |
-| language | string | No | `"auto"` | 언어 힌트: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | No | `"auto"` | 언어 힌트: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | enhance | boolean | 아니요 | 계층에 따라 다름 | 인식 전 로컬 대비를 향상시킵니다. 빠르게 직접 적용합니다. 균형 및 최상은 보정된 점수로 결과가 향상되는 경우에만 변형을 유지합니다. `best`의 경우 기본값은 `true`이고 `fast`/`balanced`의 경우 `false`입니다. |
 | engine | string | 아니요 | - | 더 이상 사용되지 않는 호환성 별칭입니다. 대신 `quality`를 사용하세요. `tesseract`는 `fast`에 매핑됩니다. 레거시 `paddleocr` 값은 `balanced`에 매핑되지만 PaddlePaddle 를 로드하지 않습니다. |
 
-`quality`와 `engine`을 생략하면 SnapOtter는 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어에서는 `fast`를 선택하지 않으며 `best`, 그다음 `balanced`를 사용하고, 둘 다 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다.
+`quality`와 `engine`을 생략하면 SnapOtter는 `best`, `balanced`, `fast` 순으로 사용 가능한 최상위 등급을 선택합니다. 한국어와 아랍어에서는 `fast`를 선택하지 않으며 `best`, 그다음 `balanced`를 사용하고, 둘 다 없으면 정확한 런타임의 설치 또는 호환성 오류를 반환합니다.
 
 ## Example Request {#example-request}
 

@@ -115,3 +115,46 @@ describe("Korean OCR settings", () => {
     expect(submit).toBeEnabled();
   });
 });
+
+function expectArabicAccuratePackContract(submit: HTMLElement) {
+  expect(screen.getByRole("button", { name: "Fast" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Fast" })).toHaveAccessibleDescription(
+    /does not support Arabic.*Accurate OCR pack.*Balanced or Best/i,
+  );
+  expect(screen.getByRole("button", { name: "Best" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: /Enable OCR/ })).toBeInTheDocument();
+  expect(submit).toBeDisabled();
+}
+
+describe("Arabic OCR settings", () => {
+  it("enforces the accurate-pack contract in the image OCR form and restores Fast", () => {
+    render(<OcrSettings />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Language/i }));
+    const language = screen.getByRole("combobox");
+    const submit = screen.getByTestId("ocr-submit");
+
+    fireEvent.change(language, { target: { value: "ar" } });
+    expectArabicAccuratePackContract(submit);
+
+    fireEvent.change(language, { target: { value: "en" } });
+    expect(screen.getByRole("button", { name: "Fast" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fast" })).toHaveAttribute("aria-pressed", "true");
+    expect(submit).toBeEnabled();
+  });
+
+  it("enforces the accurate-pack contract in the PDF OCR form and restores Fast", () => {
+    render(<OcrPdfSettings />);
+
+    const language = screen.getByLabelText("Language");
+    const submit = screen.getByRole("button", { name: "Extract Text" });
+
+    fireEvent.change(language, { target: { value: "ar" } });
+    expectArabicAccuratePackContract(submit);
+
+    fireEvent.change(language, { target: { value: "en" } });
+    expect(screen.getByRole("button", { name: "Fast" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fast" })).toHaveAttribute("aria-pressed", "true");
+    expect(submit).toBeEnabled();
+  });
+});

@@ -186,7 +186,11 @@ export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknow
     ) {
       return err instanceof Error ? err : new Error(String(err));
     }
-    logger.info({ err, probeErr }, "undecodable image input rejected");
+    // pino serializes only the `err` key as an Error, so the probe's reason goes in as its message or it lands as `{}`.
+    logger.info(
+      { err, probeErr: probeErr instanceof Error ? probeErr.message : String(probeErr) },
+      "undecodable image input rejected",
+    );
     if (isPixelSafetyError(probeErr)) {
       return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: err });
     }

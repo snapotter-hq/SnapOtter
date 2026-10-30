@@ -89,6 +89,9 @@ function runBootstrap(): string {
       TEST_INSTALLED_JSON: installedJson,
       TEST_ENTRYPOINT_LIB: ENTRYPOINT_LIB,
       PATH: process.env.PATH,
+      // A python3 wrapper on PATH may resolve its venv under $HOME (the fleet
+      // hosts do), so the shell needs HOME like any login shell has (#4118).
+      HOME: process.env.HOME,
     },
     encoding: "utf-8",
   }).trim();

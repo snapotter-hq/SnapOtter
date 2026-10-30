@@ -1,7 +1,7 @@
 ---
 description: "Extraheer tekst lokaal uit afbeeldingen met de ingebouwde Tesseract of de optionele zeer nauwkeurige RapidOCR-runtime."
 i18n_output_hash: 3b0a511716a7
-i18n_source_hash: 7b0c00be0510
+i18n_source_hash: 1e098dbb5a20
 i18n_provenance: human
 ---
 
@@ -11,8 +11,8 @@ Extraheer tekst uit afbeeldingen zonder de afbeelding naar een externe service t
 
 
 <!-- korean-ocr-contract:start -->
-::: info Compatibiliteit voor Koreaanse OCR
-Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`). Koreaans vereist het nauwkeurige OCR-pakket en `balanced` of `best`. Het pakket werkt in officiële Linux amd64- en arm64-containers, ook op NVIDIA-hosts waar OCR op de CPU blijft draaien. Niet-ondersteunde systemen krijgen een expliciete compatibiliteitsfout en vallen nooit stil terug op `fast`. Koreaans met `fast` of de oude alias `tesseract` wordt vóór het in de wachtrij plaatsen geweigerd met `FEATURE_INCOMPATIBLE` en `fast-korean-unsupported`.
+::: info Compatibiliteit voor Koreaanse en Arabische OCR
+Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`) of Arabisch (`ar`). Koreaans en Arabisch vereisen het nauwkeurige OCR-pakket en `balanced` of `best`. Het pakket werkt in officiële Linux amd64- en arm64-containers, ook op NVIDIA-hosts waar OCR op de CPU blijft draaien. Niet-ondersteunde systemen krijgen een expliciete compatibiliteitsfout en vallen nooit stil terug op `fast`. Koreaans of Arabisch met `fast` of de oude alias `tesseract` wordt vóór het in de wachtrij plaatsen geweigerd met `FEATURE_INCOMPATIBLE` en `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -29,11 +29,11 @@ Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen K
 |-----------|------|----------|---------|-------------|
 | file | file | Ja | - | Beeldbestand (meerdere delen), tot 512 MiB gecodeerd en 40 megapixels gedecodeerd; er geldt nog steeds een lagere uploadlimiet voor operators |
 | quality | string | Nee | Dynamisch | Kwaliteitsniveau: `fast` (Tesseract), `balanced` (RapidOCR met de kleine PP-OCRv6-modellen) of `best` (de medium PP-OCRv6-modellen met hogere nauwkeurigheid met gekalibreerde variantscores) |
-| language | string | Nee | `"auto"` | Taalhint: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | Nee | `"auto"` | Taalhint: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | enhance | boolean | Nee | Niveau-afhankelijk | Verbeter het lokale contrast vóór herkenning. Snel past het direct toe; Gebalanceerd en Best behouden de variant alleen als gekalibreerde scores het resultaat verbeteren. Standaard ingesteld op `true` voor `best` en `false` voor `fast`/`balanced` |
 | engine | string | Nee | - | Verouderde compatibiliteitsalias. Gebruik in plaats daarvan `quality`. `tesseract` wordt toegewezen aan `fast`; de oude `paddleocr`-waarde wordt toegewezen aan `balanced` maar laadt PaddlePaddle niet |
 
-Als `quality` en `engine` zijn weggelaten, kiest SnapOtter de beste beschikbare laag in deze volgorde: `best`, `balanced`, `fast`. Voor Koreaans wordt `fast` nooit gekozen; het gebruikt `best`, daarna `balanced`, of geeft een installatie- of compatibiliteitsfout voor de nauwkeurige runtime terug.
+Als `quality` en `engine` zijn weggelaten, kiest SnapOtter de beste beschikbare laag in deze volgorde: `best`, `balanced`, `fast`. Voor Koreaans en Arabisch wordt `fast` nooit gekozen; het gebruikt `best`, daarna `balanced`, of geeft een installatie- of compatibiliteitsfout voor de nauwkeurige runtime terug.
 
 ## Example Request {#example-request}
 

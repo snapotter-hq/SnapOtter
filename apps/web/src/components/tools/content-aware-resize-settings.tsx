@@ -1,9 +1,11 @@
+import { MAX_CONTENT_AWARE_RESIZE_PIXELS, MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { isContentAwareAreaWithinLimit, isDimensionWithinLimit } from "@/lib/dimension-limits";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -43,6 +45,34 @@ export function ContentAwareResizeControls({
     onChangeRef.current = onChange;
   });
 
+  const dimensionsActive = !squareMode;
+  const widthValue = width === "" ? undefined : Number(width);
+  const heightValue = height === "" ? undefined : Number(height);
+  const widthOverLimit =
+    dimensionsActive && widthValue !== undefined && !isDimensionWithinLimit(widthValue);
+  const heightOverLimit =
+    dimensionsActive && heightValue !== undefined && !isDimensionWithinLimit(heightValue);
+  // Seam carving caps the product at 25 MP, far below the plain resize budget.
+  const areaOverLimit =
+    dimensionsActive &&
+    widthValue !== undefined &&
+    heightValue !== undefined &&
+    isDimensionWithinLimit(widthValue) &&
+    isDimensionWithinLimit(heightValue) &&
+    !isContentAwareAreaWithinLimit(widthValue, heightValue);
+  const dimensionsOverLimit = widthOverLimit || heightOverLimit || areaOverLimit;
+  const dimensionError = dimensionsOverLimit ? (
+    <p id="car-dimension-error" className="mt-1 text-xs text-destructive-ink">
+      {widthOverLimit || heightOverLimit
+        ? format(t.toolSettings["content-aware-resize"].maxDimensionExceeded, {
+            max: MAX_RESIZE_OUTPUT_DIMENSION,
+          })
+        : format(t.toolSettings["content-aware-resize"].areaExceeded, {
+            max: MAX_CONTENT_AWARE_RESIZE_PIXELS,
+          })}
+    </p>
+  ) : null;
+
   useEffect(() => {
     const settings: Record<string, unknown> = {};
     if (!squareMode) {
@@ -59,35 +89,46 @@ export function ContentAwareResizeControls({
   return (
     <div className="space-y-4">
       {/* Dimensions */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <label htmlFor="car-width" className="text-xs text-muted-foreground">
-            {t.toolSettings["content-aware-resize"].widthPx}
-          </label>
-          <input
-            id="car-width"
-            type="number"
-            value={width}
-            onChange={(e) => setWidth(e.target.value)}
-            placeholder={t.toolSettings["content-aware-resize"].auto}
-            disabled={squareMode}
-            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
-          />
+      <div>
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <label htmlFor="car-width" className="text-xs text-muted-foreground">
+              {t.toolSettings["content-aware-resize"].widthPx}
+            </label>
+            <input
+              id="car-width"
+              type="number"
+              value={width}
+              onChange={(e) => setWidth(e.target.value)}
+              placeholder={t.toolSettings["content-aware-resize"].auto}
+              disabled={squareMode}
+              min={1}
+              max={MAX_RESIZE_OUTPUT_DIMENSION}
+              aria-invalid={widthOverLimit || undefined}
+              aria-describedby={dimensionsOverLimit ? "car-dimension-error" : undefined}
+              className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
+            />
+          </div>
+          <div className="flex-1">
+            <label htmlFor="car-height" className="text-xs text-muted-foreground">
+              {t.toolSettings["content-aware-resize"].heightPx}
+            </label>
+            <input
+              id="car-height"
+              type="number"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              placeholder={t.toolSettings["content-aware-resize"].auto}
+              disabled={squareMode}
+              min={1}
+              max={MAX_RESIZE_OUTPUT_DIMENSION}
+              aria-invalid={heightOverLimit || undefined}
+              aria-describedby={dimensionsOverLimit ? "car-dimension-error" : undefined}
+              className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
+            />
+          </div>
         </div>
-        <div className="flex-1">
-          <label htmlFor="car-height" className="text-xs text-muted-foreground">
-            {t.toolSettings["content-aware-resize"].heightPx}
-          </label>
-          <input
-            id="car-height"
-            type="number"
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-            placeholder={t.toolSettings["content-aware-resize"].auto}
-            disabled={squareMode}
-            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
-          />
-        </div>
+        {dimensionError}
       </div>
 
       {/* Square mode */}
@@ -177,9 +218,20 @@ export function ContentAwareResizeSettings() {
   };
 
   const hasFile = files.length > 0;
+  const dimensionInvalid = [settings.width, settings.height].some(
+    (value) => typeof value === "number" && !isDimensionWithinLimit(value),
+  );
+  const areaInvalid =
+    typeof settings.width === "number" &&
+    typeof settings.height === "number" &&
+    isDimensionWithinLimit(settings.width) &&
+    isDimensionWithinLimit(settings.height) &&
+    !isContentAwareAreaWithinLimit(settings.width, settings.height);
   const canProcess =
     hasFile &&
     !processing &&
+    !dimensionInvalid &&
+    !areaInvalid &&
     (Boolean(settings.width) || Boolean(settings.height) || Boolean(settings.square));
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -13,6 +13,10 @@ vi.mock("@/lib/analytics", () => ({
   captureHandledError,
 }));
 
+// Locale chunks load asynchronously, and a loaded CI runner can take longer than
+// waitFor's 1 s default to resolve one (#4117).
+const CHUNK_TIMEOUT = { timeout: 5_000 };
+
 const storageMap = new Map<string, string>();
 const localStorageMock = {
   getItem: vi.fn((key: string) => storageMap.get(key) ?? null),
@@ -85,7 +89,7 @@ describe("I18nProvider locale validation (#3952)", () => {
     expect(screen.getByTestId("locale").textContent).toBe("de");
     // Document attributes follow the loaded catalog, so the German chunk has to
     // land before lang flips away from the English fallback (#4031).
-    await waitFor(() => expect(document.documentElement.lang).toBe("de"));
+    await waitFor(() => expect(document.documentElement.lang).toBe("de"), CHUNK_TIMEOUT);
   });
 
   it("normalizes regional, underscore, and case-variant codes in localStorage to supported codes", async () => {
@@ -163,7 +167,7 @@ describe("I18nProvider locale validation (#3952)", () => {
     expect(screen.getByTestId("locale").textContent).toBe("ar");
     // Direction follows the loaded catalog (#4031), so rtl arrives with the
     // Arabic chunk rather than with the requested locale.
-    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"));
+    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"), CHUNK_TIMEOUT);
   });
 
   it("fetches instance default when localStorage holds an unsupported code and validates defaultLocale", async () => {
@@ -282,7 +286,7 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
         </I18nProvider>,
       );
 
-      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"));
+      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"), CHUNK_TIMEOUT);
 
       expect(screen.getByTestId("dir").textContent).toBe("ltr");
       expect(document.documentElement.dir).toBe("ltr");
@@ -309,7 +313,7 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
         </I18nProvider>,
       );
 
-      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"));
+      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"), CHUNK_TIMEOUT);
 
       expect(screen.getByTestId("dir").textContent).toBe("ltr");
       expect(document.documentElement.dir).toBe("ltr");
@@ -330,14 +334,14 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
           <LocaleProbe />
         </I18nProvider>,
       );
-      await waitFor(() => expect(document.documentElement.lang).toBe("de"));
+      await waitFor(() => expect(document.documentElement.lang).toBe("de"), CHUNK_TIMEOUT);
 
       localeLoaders.ar = () => Promise.reject(new Error("Chunk load failed: ar.js 404"));
       await act(async () => {
         screen.getByTestId("set-ar").click();
       });
 
-      await waitFor(() => expect(document.documentElement.lang).toBe("en"));
+      await waitFor(() => expect(document.documentElement.lang).toBe("en"), CHUNK_TIMEOUT);
       expect(screen.getByTestId("dir").textContent).toBe("ltr");
       expect(document.documentElement.dir).toBe("ltr");
       expect(screen.getByTestId("locale").textContent).toBe("ar");
@@ -360,7 +364,7 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
         </I18nProvider>,
       );
 
-      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"));
+      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"), CHUNK_TIMEOUT);
 
       expect(screen.getByTestId("locale").textContent).toBe("de");
       expect(document.documentElement.lang).toBe("en");
@@ -372,6 +376,9 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
   });
 
   it("keeps rtl and lang=ar when the Arabic chunk loads", async () => {
+    const originalLoader = localeLoaders.ar;
+    localeLoaders.ar = () =>
+      new Promise((resolve) => setTimeout(() => resolve(originalLoader()), 1500));
     storageMap.set("snapotter-locale", "ar");
 
     render(
@@ -380,9 +387,10 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
       </I18nProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"));
+    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"), CHUNK_TIMEOUT);
     expect(document.documentElement.dir).toBe("rtl");
     expect(document.documentElement.lang).toBe("ar");
+    localeLoaders.ar = originalLoader;
   });
 });
 

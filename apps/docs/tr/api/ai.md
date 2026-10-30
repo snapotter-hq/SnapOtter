@@ -1,7 +1,7 @@
 ---
 description: "Tüm yerel ML araçlarını içeren AI motoru referansı. Arka plan kaldırma, büyütme, OCR, yüz algılama, fotoğraf onarımı ve daha fazlası."
 i18n_output_hash: 36dcadbcc0c0
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -18,7 +18,7 @@ Dört modalite (image, audio, video, document) genelinde 19 Python sidecar AI ar
 
 <!-- korean-ocr-contract:start -->
 ::: info Korece OCR uyumluluğu
-Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler, ancak Koreceyi (`ko`) desteklemez. Korece için doğru OCR paketi ve `balanced` ya da `best` gerekir. Paket resmi Linux amd64 ve arm64 kapsayıcılarında, OCR’nin CPU’da kaldığı NVIDIA ana bilgisayarları dahil çalışır. Desteklenmeyen sistemler açık bir uyumluluk hatası alır ve sessizce `fast` seçeneğine dönülmez. Korece ile `fast` veya eski `tesseract` diğer adı kuyruk öncesinde `FEATURE_INCOMPATIBLE` ve `fast-korean-unsupported` ile reddedilir.
+Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler, ancak Koreceyi (`ko`) ve Arapçayı (`ar`) desteklemez. Korece ve Arapça için doğru OCR paketi ve `balanced` ya da `best` gerekir. Paket resmi Linux amd64 ve arm64 kapsayıcılarında, OCR’nin CPU’da kaldığı NVIDIA ana bilgisayarları dahil çalışır. Desteklenmeyen sistemler Korece ve Arapça için açık bir uyumluluk hatası alır ve sessizce `fast` seçeneğine dönülmez. Korece veya Arapça ile `fast` veya eski `tesseract` diğer adı kuyruk öncesinde `FEATURE_INCOMPATIBLE` ve `fast-korean-unsupported` ile reddedilir.
 :::
 <!-- korean-ocr-contract:end -->
 ## Mimari {#architecture}
@@ -189,12 +189,12 @@ Arka planı kaldırır ve düz bir renk veya gradyanla değiştirir.
 
 | Parametre | Tür | Varsayılan | Açıklama |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen `quality`, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür. |
-| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. `fast` katmanı `ko` desteklemez. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen `quality`, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece ve Arapça için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür. |
+| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. `fast` katmanı `ko` ve `ar` desteklemez. |
 | `enhance` | boolean | Seviyeye bağlı | Yerel kontrastı iyileştirin. Hızlı doğrudan uygular; doğru katmanlar, yalnızca kalibre edilmiş puanlama OCR'yi iyileştirdiğinde varyantı korur. En İyi için Varsayılanlar Açıktır |
 | `engine` | string | - | Kullanımdan kaldırılan uyumluluk takma adı. `tesseract`'yi `fast`'ye ve eski `paddleocr` değerini `balanced`'ye eşler; PaddlePaddle yüklenmiyor |
 
-Çıkarılan metni artı kaynak meta verilerini döndürür: motor, istenen ve gerçek kalite, cihaz, sağlayıcı, bozulma durumu, uyarılar ve uygun olduğunda doğru çalışma zamanı/model sürümleri. Açık kalite istekleri hiçbir zaman başka bir katmana geri dönmez. `balanced` veya `best` kullanılamıyorsa API, `fast`'yi sessizce çalıştırmak yerine `FEATURE_NOT_INSTALLED` veya `FEATURE_INCOMPATIBLE`'yi döndürür. Korece ile açıkça `fast` veya eski `tesseract` istendiğinde, iş kuyruğa alınmadan önce `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` ve doğru pakete yönlendirme döndürülür.
+Çıkarılan metni artı kaynak meta verilerini döndürür: motor, istenen ve gerçek kalite, cihaz, sağlayıcı, bozulma durumu, uyarılar ve uygun olduğunda doğru çalışma zamanı/model sürümleri. Açık kalite istekleri hiçbir zaman başka bir katmana geri dönmez. `balanced` veya `best` kullanılamıyorsa API, `fast`'yi sessizce çalıştırmak yerine `FEATURE_NOT_INSTALLED` veya `FEATURE_INCOMPATIBLE`'yi döndürür. Korece veya Arapça ile açıkça `fast` veya eski `tesseract` istendiğinde, iş kuyruğa alınmadan önce `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` ve doğru pakete yönlendirme döndürülür.
 
 ## PDF OCR {#pdf-ocr}
 
@@ -205,13 +205,13 @@ Yapay zeka destekli OCR kullanarak taranmış PDF belgelerinden sayfa sayfa meti
 
 | Parametre | Tür | Varsayılan | Açıklama |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen `quality`, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür. |
-| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. `fast` katmanı `ko` desteklemez. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen `quality`, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece ve Arapça için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür. |
+| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. `fast` katmanı `ko` ve `ar` desteklemez. |
 | `pages` | string | `"all"` | Sayfa seçimi: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Seviyeye bağlı | Yerel kontrastı iyileştirin. Hızlı doğrudan uygular; doğru katmanlar, yalnızca kalibre edilmiş puanlama OCR'yi iyileştirdiğinde varyantı korur. En İyi için Varsayılanlar Açıktır |
 | `engine` | string | - | Kullanımdan kaldırılan uyumluluk takma adı. `tesseract`'yi `fast`'ye ve eski `paddleocr` değerini `balanced`'ye eşler; PaddlePaddle yüklenmiyor |
 
-Aynı sürüm düşürmeme ve Korece uyumluluk kuralları PDF OCR için de geçerlidir. PDF sayfaları tanınmadan önce rasterleştirilir ve bir istek en fazla 50 sayfa seçebilir.
+Aynı sürüm düşürmeme ve Korece ve Arapça uyumluluk kuralları PDF OCR için de geçerlidir. PDF sayfaları tanınmadan önce rasterleştirilir ve bir istek en fazla 50 sayfa seçebilir.
 
 ## Yüz / PII Bulanıklaştırma {#face-pii-blur}
 

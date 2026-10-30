@@ -1449,6 +1449,8 @@ export const tr: TranslationKeys = {
       submit: "Boyutlandır",
       submitBatch: "Boyutlandır ({count} dosya)",
       progressLabel: "Boyutlandırılıyor",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      maxPercentageExceeded: "%1 ile %{max} arasında bir ölçek kullanın.",
     },
     crop: {
       width: "Genişlik",
@@ -1995,6 +1997,8 @@ export const tr: TranslationKeys = {
         "Tanımadan önce yerel kontrastı iyileştirir. Hızlı doğrudan uygular; Dengeli ve En İyi yalnızca kalibre edilmiş puan sonucu iyileştirirse bu varyantı kullanır.",
       fastKoreanUnsupported:
         "Hızlı OCR Koreceyi desteklemez. Doğru OCR paketini yükleyip Dengeli veya En İyi seçeneğini seçin.",
+      fastArabicUnsupported:
+        "Hızlı OCR Arapçayı desteklemez. Doğru OCR paketini yükleyip Dengeli veya En İyi seçeneğini seçin.",
       language: "Dil",
       autoDetect: "Otomatik algıla",
       extractedText: "Çıkarılan Metin",
@@ -2091,6 +2095,9 @@ export const tr: TranslationKeys = {
       submitSubject: "Akıllı Kırp",
       submitFace: "Yüz Kırpma",
       submitTrim: "Kenarlıkları Kırp",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      cropAreaExceeded:
+        "Bu kırpma {max} piksel sınırını aşıyor. Genişliği, yüksekliği veya dolguyu azaltın.",
     },
     imageEnhancement: {
       enhancementMode: "İyileştirme Modu",
@@ -2216,6 +2223,9 @@ export const tr: TranslationKeys = {
       submit: "Boyutlandır",
       submitBatch: "Boyutlandır ({count} dosya)",
       progressLabel: "İçerik duyarlı boyutlandırma",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      areaExceeded:
+        "İçerik algılayan yeniden boyutlandırma toplam {max} piksel ile sınırlıdır. Genişliği veya yüksekliği azaltın.",
     },
     "ai-canvas-expand": {
       quality: "Kalite",
@@ -3263,6 +3273,7 @@ export const tr: TranslationKeys = {
       submit: "GIF İşle",
       submitBatch: "İşle ({count} dosya)",
       progressLabel: "GIF işleniyor",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
     },
     "image-to-base64": {
       converting: "Dönüştürülüyor...",
@@ -3708,8 +3719,7 @@ export const tr: TranslationKeys = {
       bestEffortHint:
         "Elden gelenin en fazlası. Görüntü tabanlı PDF'ler bu boyuta yaklaşır; yalnızca metin içeren PDF'ler bu boyuta küçülmeyebilir.",
       targetReached: "{target} hedefinize ulaşıldı (sonuç: {size}).",
-      targetMissed:
-        "{target} boyutuna ulaşılamadı. Ulaşılabilen en küçük boyut {size} oldu; çünkü bu PDF çoğunlukla metin veya vektörlerden oluşuyor ve görüntü sıkıştırma bunları küçültemez.",
+      targetMissed: "{target} boyutuna ulaşılamadı. Ulaşılabilen en küçük boyut {size} oldu.",
     },
     "rotate-pdf": {
       angle: "Döndürme açısı",
@@ -3938,6 +3948,9 @@ export const tr: TranslationKeys = {
       submit: "Metni Çıkar",
       submitBatch: "Metni Çıkar ({count} dosya)",
       progressLabel: "Çıkarılıyor",
+      scannedHint:
+        "Bu PDF taranmış, bu yüzden çıkarılacak metin yok. OCR okuyabilir, ancak daha uzun sürer ve OCR yapay zeka paketinin kurulu olmasını gerektirir.",
+      runOcr: "Bu PDF'de OCR çalıştır",
     },
     "pdf-to-word": {
       hint: "Metin tabanlı PDF'ler için en iyisidir; taranan sayfalar OCR gerektirir",
@@ -4690,6 +4703,7 @@ export const tr: TranslationKeys = {
         anchorLabel: "Sabitleme:",
         anchorAriaLabel: "Sabitleme: {position}",
         backgroundLabel: "Arka plan:",
+        transparent: "Saydam",
         anchors: {
           topLeft: "üst sol",
           topCenter: "üst orta",
@@ -5217,6 +5231,7 @@ export const tr: TranslationKeys = {
       description: "Gelişmiş dosya işleme için AI model paketlerini yönetin.",
       installAll: "Tümünü Kur",
       diskUsage: "Disk kullanımı: {size}",
+      statusStale: "Paket durumu yenilenemedi. Aşağıdaki liste güncel olmayabilir.",
       sizeOnDisk: "diskte {size}",
       installed: "Kurulu",
       notInstalled: "Kurulu değil",
@@ -5655,6 +5670,7 @@ export const tr: TranslationKeys = {
     invalidSetting: "{setting} için geçersiz değer.",
     network: "Ağ hatası",
     invalidResponse: "Geçersiz yanıt",
+    staleVersionReload: "Uygulama güncellendi. Sayfayı yenileyip tekrar deneyin.",
     failedWithStatus: "Bu isteği tamamlayamadık. Lütfen tekrar deneyin.",
     processingFailedWithStatus:
       "Bu dosyayı işleyemedik. Dosyanın bozuk olmadığından emin olup tekrar deneyin.",
@@ -5883,6 +5899,7 @@ export const tr: TranslationKeys = {
       zh: "Çince",
       ja: "Japonca",
       ko: "Korece",
+      ar: "Arapça",
       id: "Endonezce",
       th: "Tayca",
       vi: "Vietnamca",

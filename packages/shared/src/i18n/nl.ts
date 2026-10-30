@@ -1454,6 +1454,8 @@ export const nl: TranslationKeys = {
       submit: "Formaat wijzigen",
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Formaat wijzigen",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      maxPercentageExceeded: "Gebruik een schaal van 1 tot {max}%.",
     },
     crop: {
       width: "Breedte",
@@ -2000,6 +2002,8 @@ export const nl: TranslationKeys = {
         "Verbetert lokaal contrast vóór herkenning. Snel past dit direct toe; Gebalanceerd en Beste behouden de variant alleen als de gekalibreerde score het resultaat verbetert.",
       fastKoreanUnsupported:
         "Snelle OCR ondersteunt geen Koreaans. Installeer het pakket voor nauwkeurige OCR en kies Gebalanceerd of Beste.",
+      fastArabicUnsupported:
+        "Snelle OCR ondersteunt geen Arabisch. Installeer het pakket voor nauwkeurige OCR en kies Gebalanceerd of Beste.",
       language: "Taal",
       autoDetect: "Automatisch detecteren",
       extractedText: "Geextraheerde tekst",
@@ -2096,6 +2100,9 @@ export const nl: TranslationKeys = {
       submitSubject: "Slim bijsnijden",
       submitFace: "Gezicht bijsnijden",
       submitTrim: "Randen bijsnijden",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      cropAreaExceeded:
+        "Deze uitsnede overschrijdt de limiet van {max} pixels. Verklein de breedte, hoogte of opvulling.",
     },
     imageEnhancement: {
       enhancementMode: "Verbeteringsmodus",
@@ -2222,6 +2229,9 @@ export const nl: TranslationKeys = {
       submit: "Formaat wijzigen",
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Inhoudsbewust schalen",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      areaExceeded:
+        "Inhoudsbewust formaat wijzigen is beperkt tot {max} pixels in totaal. Verlaag de breedte of hoogte.",
     },
     "ai-canvas-expand": {
       quality: "Kwaliteit",
@@ -3276,6 +3286,7 @@ export const nl: TranslationKeys = {
       submit: "GIF verwerken",
       submitBatch: "Verwerken ({count} bestanden)",
       progressLabel: "GIF verwerken",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
     },
     "image-to-base64": {
       converting: "Converteren...",
@@ -3721,8 +3732,7 @@ export const nl: TranslationKeys = {
       bestEffortHint:
         "Maximaal haalbaar. Op afbeeldingen gebaseerde PDF's komen dichtbij; PDF's met alleen tekst worden mogelijk niet tot deze grootte verkleind.",
       targetReached: "Doel van {target} bereikt (resultaat: {size}).",
-      targetMissed:
-        "Kon {target} niet bereiken. De kleinst haalbare grootte was {size}, omdat deze PDF voornamelijk uit tekst of vectoren bestaat, die beeldcompressie niet kan verkleinen.",
+      targetMissed: "Kon {target} niet bereiken. De kleinst haalbare grootte was {size}.",
     },
     "rotate-pdf": {
       angle: "Rotatiehoek",
@@ -3952,6 +3962,9 @@ export const nl: TranslationKeys = {
       submit: "Tekst extraheren",
       submitBatch: "Tekst extraheren ({count} bestanden)",
       progressLabel: "Extraheren",
+      scannedHint:
+        "Deze pdf is gescand, dus er is geen tekst om te extraheren. OCR kan hem lezen, maar dat duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+      runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-to-word": {
       hint: "Geschikt voor tekst-PDF's; gescande pagina's vereisen OCR",
@@ -4705,6 +4718,7 @@ export const nl: TranslationKeys = {
         anchorLabel: "Ankerpunt:",
         anchorAriaLabel: "Ankerpunt {position}",
         backgroundLabel: "Achtergrond:",
+        transparent: "Transparant",
         anchors: {
           topLeft: "linksboven",
           topCenter: "midden boven",
@@ -5230,6 +5244,8 @@ export const nl: TranslationKeys = {
       description: "Beheer AI-modelbundels voor geavanceerde bestandsverwerking.",
       installAll: "Alles installeren",
       diskUsage: "Schijfgebruik: {size}",
+      statusStale:
+        "De bundelstatus kon niet worden bijgewerkt. De lijst hieronder is mogelijk verouderd.",
       sizeOnDisk: "{size} op schijf",
       installed: "Geïnstalleerd",
       notInstalled: "Niet geïnstalleerd",
@@ -5671,6 +5687,7 @@ export const nl: TranslationKeys = {
     invalidSetting: "Ongeldige waarde voor {setting}.",
     network: "Netwerkfout",
     invalidResponse: "Ongeldig antwoord",
+    staleVersionReload: "De app is bijgewerkt. Laad de pagina opnieuw en probeer het nog eens.",
     failedWithStatus: "Het verzoek kon niet worden voltooid. Probeer het opnieuw.",
     processingFailedWithStatus:
       "Dit bestand kon niet worden verwerkt. Controleer of het bestand niet beschadigd is en probeer het opnieuw.",
@@ -5903,6 +5920,7 @@ export const nl: TranslationKeys = {
       zh: "Chinees",
       ja: "Japans",
       ko: "Koreaans",
+      ar: "Arabisch",
       id: "Indonesisch",
       th: "Thais",
       vi: "Vietnamees",

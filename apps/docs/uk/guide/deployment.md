@@ -1,6 +1,6 @@
 ---
 description: "Розгорніть SnapOtter у продакшені за допомогою Docker. Вимоги до апаратного забезпечення, налаштування GPU та конфігурації зворотного проксі для Nginx, Traefik і Cloudflare."
-i18n_source_hash: 4db97ead24e0
+i18n_source_hash: 4cae787c775e
 i18n_provenance: human
 i18n_output_hash: 0ce24a2f37cb
 i18n_hash_version: 2
@@ -15,7 +15,7 @@ SnapOtter розгортається як стек Docker Compose із 3 кон�
 
 <!-- korean-ocr-contract:start -->
 ::: info Сумісність OCR для корейської мови
-Швидкий OCR підтримує `auto`, `en`, `de`, `es`, `fr`, `zh` і `ja`, але не корейську мову (`ko`). Для корейської потрібен пакет точного OCR і рівень `balanced` або `best`. Пакет працює в офіційних контейнерах Linux amd64 і arm64, зокрема на вузлах NVIDIA, де OCR і далі виконується на CPU. Непідтримувані системи отримують явну помилку сумісності без прихованого переходу на `fast`. Корейська з `fast` або застарілим псевдонімом `tesseract` відхиляється до постановки в чергу з `FEATURE_INCOMPATIBLE` і `fast-korean-unsupported`.
+Швидкий OCR підтримує `auto`, `en`, `de`, `es`, `fr`, `zh` і `ja`, але не корейську (`ko`) та арабську (`ar`). Для корейської й арабської потрібен пакет точного OCR і рівень `balanced` або `best`. Пакет працює в офіційних контейнерах Linux amd64 і arm64, зокрема на вузлах NVIDIA, де OCR і далі виконується на CPU. Непідтримувані системи отримують для корейської й арабської явну помилку сумісності без прихованого переходу на `fast`. Корейська чи арабська з `fast` або застарілим псевдонімом `tesseract` відхиляється до постановки в чергу з `FEATURE_INCOMPATIBLE` і `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## Швидкий старт (CPU) {#quick-start-cpu}

@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter を Docker で本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare 向けのリバースプロキシ設定を扱います。"
-i18n_source_hash: 4db97ead24e0
+i18n_source_hash: 4cae787c775e
 i18n_provenance: human
 i18n_output_hash: 1dd30ed66f5c
 i18n_hash_version: 2
@@ -15,7 +15,7 @@ GPU のセットアップ、Docker Compose の例、バージョン固定につ�
 
 <!-- korean-ocr-contract:start -->
 ::: info 韓国語 OCR の互換性
-高速 OCR は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) には対応しません。韓国語には高精度 OCR パックと `balanced` または `best` が必要です。パックは公式 Linux amd64/arm64 コンテナで動作し、NVIDIA ホストでも OCR は CPU 上で実行されます。非対応システムでは明示的な互換性エラーを返し、暗黙に `fast` へ切り替えません。韓国語で `fast` または旧 `tesseract` エイリアスを指定すると、キュー投入前に `FEATURE_INCOMPATIBLE` と `fast-korean-unsupported` で拒否されます。
+高速 OCR は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応しますが、韓国語 (`ko`) とアラビア語 (`ar`) には対応しません。韓国語とアラビア語には高精度 OCR パックと `balanced` または `best` が必要です。パックは公式 Linux amd64/arm64 コンテナで動作し、NVIDIA ホストでも OCR は CPU 上で実行されます。非対応システムでは明示的な互換性エラーを返し、暗黙に `fast` へ切り替えません。韓国語またはアラビア語で `fast` または旧 `tesseract` エイリアスを指定すると、キュー投入前に `FEATURE_INCOMPATIBLE` と `fast-korean-unsupported` で拒否されます。
 :::
 <!-- korean-ocr-contract:end -->
 ## クイックスタート（CPU） {#quick-start-cpu}

@@ -1211,6 +1211,8 @@ export const zhCN: TranslationKeys = {
       submit: "调整大小",
       submitBatch: "调整大小（{count} 个文件）",
       progressLabel: "调整中",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
+      maxPercentageExceeded: "请使用 1% 到 {max}% 之间的缩放比例。",
     },
     crop: {
       width: "宽度",
@@ -1743,6 +1745,7 @@ export const zhCN: TranslationKeys = {
       enhanceHint:
         "识别前改善局部对比度。快速模式会直接应用；均衡和最佳模式仅在校准评分改善结果时保留该版本。",
       fastKoreanUnsupported: "快速 OCR 不支持韩语。请安装精确 OCR 包，然后选择“均衡”或“最佳”。",
+      fastArabicUnsupported: "快速 OCR 不支持阿拉伯语。请安装精确 OCR 包，然后选择“均衡”或“最佳”。",
       language: "语言",
       autoDetect: "自动检测",
       extractedText: "提取的文字",
@@ -1835,6 +1838,8 @@ export const zhCN: TranslationKeys = {
       submitSubject: "智能裁剪",
       submitFace: "人脸裁剪",
       submitTrim: "裁切边框",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
+      cropAreaExceeded: "此裁剪区域超出 {max} 像素的上限。请减小宽度、高度或内边距。",
     },
     imageEnhancement: {
       enhancementMode: "增强模式",
@@ -1954,6 +1959,8 @@ export const zhCN: TranslationKeys = {
       submit: "调整大小",
       submitBatch: "调整大小（{count} 个文件）",
       progressLabel: "内容感知缩放中",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
+      areaExceeded: "内容感知缩放总计上限为 {max} 像素。请减小宽度或高度。",
     },
     "ai-canvas-expand": {
       quality: "质量",
@@ -2995,6 +3002,7 @@ export const zhCN: TranslationKeys = {
       submit: "处理 GIF",
       submitBatch: "处理（{count} 个文件）",
       progressLabel: "正在处理 GIF",
+      maxDimensionExceeded: "请使用 1 到 {max} px 之间的尺寸。",
     },
     "image-to-base64": {
       converting: "正在转换...",
@@ -3437,8 +3445,7 @@ export const zhCN: TranslationKeys = {
       bestEffortHint:
         "尽力压缩的上限。基于图像的 PDF 会接近该大小；纯文本 PDF 可能无法缩小到此大小。",
       targetReached: "已达到你设定的 {target} 目标（结果：{size}）。",
-      targetMissed:
-        "无法达到 {target}。可实现的最小体积为 {size}，因为此 PDF 主要由文本或矢量图形组成，图像压缩无法将其缩小。",
+      targetMissed: "无法达到 {target}。可实现的最小体积为 {size}。",
     },
     "rotate-pdf": {
       angle: "旋转角度",
@@ -3664,6 +3671,9 @@ export const zhCN: TranslationKeys = {
       submit: "提取文本",
       submitBatch: "提取文本（{count} 个文件）",
       progressLabel: "正在提取",
+      scannedHint:
+        "此 PDF 是扫描件，没有可提取的文本。OCR 可以识别它，但耗时更长，并且需要已安装 OCR AI 功能包。",
+      runOcr: "对此 PDF 运行 OCR",
     },
     "pdf-to-word": {
       hint: "适用于文字型 PDF；扫描页面需要 OCR",
@@ -4410,6 +4420,7 @@ export const zhCN: TranslationKeys = {
         anchorLabel: "定位：",
         anchorAriaLabel: "定位到{position}",
         backgroundLabel: "背景：",
+        transparent: "透明",
         anchors: {
           topLeft: "左上",
           topCenter: "上中",
@@ -4911,6 +4922,7 @@ export const zhCN: TranslationKeys = {
       description: "管理用于高级文件处理的 AI 模型包。",
       installAll: "全部安装",
       diskUsage: "磁盘使用量：{size}",
+      statusStale: "无法刷新功能包状态，下方列表可能已过时。",
       sizeOnDisk: "占用磁盘 {size}",
       installed: "已安装",
       notInstalled: "未安装",
@@ -5329,6 +5341,7 @@ export const zhCN: TranslationKeys = {
     invalidSetting: "{setting} 的值无效。",
     network: "网络错误",
     invalidResponse: "无效响应",
+    staleVersionReload: "应用已更新。请刷新页面后重试。",
     failedWithStatus: "无法完成该请求，请重试。",
     processingFailedWithStatus: "无法处理此文件，请检查文件是否损坏后重试。",
     processingFailedNoDetail: "处理失败",
@@ -5551,6 +5564,7 @@ export const zhCN: TranslationKeys = {
       zh: "中文",
       ja: "日语",
       ko: "韩语",
+      ar: "阿拉伯语",
       id: "印度尼西亚语",
       th: "泰语",
       vi: "越南语",

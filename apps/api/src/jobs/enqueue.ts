@@ -13,6 +13,7 @@ import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { markQueueEventsJobFailure, markUpstreamError } from "../lib/error-report.js";
+import { logger } from "../lib/logger.js";
 import { toStorableJson } from "../lib/storable-json.js";
 import { bindJobAuditMetadata } from "../lib/tool-audit.js";
 import { clearTerminalReplayKey } from "../routes/progress.js";
@@ -38,7 +39,7 @@ function getQueueEvents(pool: Pool): QueueEvents {
     // into a bare console.error of the raw object. A named line is worth more
     // when a consumer is misbehaving.
     qe.on("error", (err) => {
-      console.error(`[queue-events] ${queueName(pool)} consumer error`, err);
+      logger.error({ err }, `[queue-events] ${queueName(pool)} consumer error`);
     });
     queueEventsMap.set(pool, qe);
     void superviseQueueEvents(pool, qe);
@@ -65,7 +66,7 @@ async function superviseQueueEvents(pool: Pool, qe: QueueEvents): Promise<void> 
       await qe.run();
       return;
     } catch (err) {
-      console.error(`[queue-events] ${queueName(pool)} consumer stopped; restarting`, err);
+      logger.error({ err }, `[queue-events] ${queueName(pool)} consumer stopped; restarting`);
       await new Promise<void>((resolve) => {
         setTimeout(resolve, QUEUE_EVENTS_RESTART_DELAY_MS).unref();
       });
@@ -115,7 +116,7 @@ export function getFlowProducer(): FlowProducer {
       }
     };
     fp.on("error", (err) => {
-      console.error("[flow-producer] connection error", err);
+      logger.error({ err }, "[flow-producer] connection error");
     });
     _flowProducer = fp;
   }
@@ -251,14 +252,14 @@ export async function upsertToolJobAlias(args: {
     // run falls back to the server jobId, so neither SSE progress nor
     // cancel by clientJobId resolves here; log the refusal instead of
     // leaving a silent 404 later (#808, #895).
-    console.warn(
+    logger.warn(
       `alias claim skipped for clientJobId ${args.clientJobId} (job ${args.jobId}); progress and cancel fell back to the server job id`,
     );
     return false;
   }
   if (rows[0].status === "queued" || rows[0].status === "processing") {
     await clearTerminalReplayKey(args.clientJobId).catch((err) => {
-      console.warn("terminal replay key clear failed", args.clientJobId, err);
+      logger.warn({ err, clientJobId: args.clientJobId }, "terminal replay key clear failed");
     });
   }
   return true;

@@ -88,6 +88,9 @@ vi.mock("@snapotter/ai", () => ({
     method: "esrgan",
   }),
   FAST_KOREAN_UNSUPPORTED_REASON: "mock",
+  FAST_ARABIC_UNSUPPORTED_REASON: "mock",
+  fastLanguageUnsupportedReason: (language?: string) =>
+    language === "ko" || language === "ar" ? "mock" : undefined,
   removeBackground: vi.fn().mockImplementation(async (buf) => buf),
   isMemoryAllocError: vi.fn().mockReturnValue(false),
   extractText: vi.fn().mockResolvedValue({ text: "mock", format: "png", width: 100, height: 100 }),

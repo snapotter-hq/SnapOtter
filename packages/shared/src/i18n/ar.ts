@@ -1433,6 +1433,8 @@ export const ar: TranslationKeys = {
       submit: "تغيير الحجم",
       submitBatch: "تغيير الحجم ({count} ملف)",
       progressLabel: "جاري تغيير الحجم",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
+      maxPercentageExceeded: "استخدم نسبة تكبير من 1 إلى {max}%.",
     },
     crop: {
       width: "العرض",
@@ -1972,6 +1974,8 @@ export const ar: TranslationKeys = {
         "يحسّن التباين المحلي قبل التعرّف. يطبّقه الوضع السريع مباشرةً؛ ويحتفظ به الوضعان المتوازن والأفضل فقط إذا حسّن التقييم المُعاير النتيجة.",
       fastKoreanUnsupported:
         "لا يدعم OCR السريع اللغة الكورية. ثبّت حزمة OCR الدقيقة واختر متوازن أو الأفضل.",
+      fastArabicUnsupported:
+        "لا يدعم OCR السريع اللغة العربية. ثبّت حزمة OCR الدقيقة واختر متوازن أو الأفضل.",
       language: "اللغة",
       autoDetect: "اكتشاف تلقائي",
       extractedText: "النص المستخرج",
@@ -2068,6 +2072,9 @@ export const ar: TranslationKeys = {
       submitSubject: "قص ذكي",
       submitFace: "قص الوجه",
       submitTrim: "تقليم الحدود",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
+      cropAreaExceeded:
+        "هذا الاقتصاص يتجاوز حد {max} بكسل. قلّل العرض أو الارتفاع أو المساحة الإضافية.",
     },
     imageEnhancement: {
       enhancementMode: "وضع التحسين",
@@ -2192,6 +2199,9 @@ export const ar: TranslationKeys = {
       submit: "تغيير الحجم",
       submitBatch: "تغيير الحجم ({count} ملف)",
       progressLabel: "تغيير حجم ذكي",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
+      areaExceeded:
+        "يقتصر تغيير الحجم المدرك للمحتوى على {max} بكسل إجمالًا. قلّل العرض أو الارتفاع.",
     },
     "ai-canvas-expand": {
       quality: "الجودة",
@@ -3234,6 +3244,7 @@ export const ar: TranslationKeys = {
       submit: "معالجة GIF",
       submitBatch: "معالجة ({count} ملف)",
       progressLabel: "جاري معالجة GIF",
+      maxDimensionExceeded: "استخدم مقاسًا من 1 إلى {max} بكسل.",
     },
     "image-to-base64": {
       converting: "جاري التحويل...",
@@ -3678,8 +3689,7 @@ export const ar: TranslationKeys = {
       bestEffortHint:
         "الحد الأقصى قدر الإمكان. ملفات PDF المستندة إلى الصور تقترب من هذا الحجم؛ أما ملفات PDF النصية فقد لا تنكمش إلى هذا الحجم.",
       targetReached: "تم الوصول إلى الحجم المستهدف {target} (النتيجة: {size}).",
-      targetMissed:
-        "تعذّر الوصول إلى {target}. أصغر حجم يمكن تحقيقه هو {size} لأن ملف PDF هذا يتكوّن في الغالب من نصوص أو رسومات متجهة لا يمكن لضغط الصور تصغيرها.",
+      targetMissed: "تعذّر الوصول إلى {target}. أصغر حجم يمكن تحقيقه هو {size}.",
     },
     "rotate-pdf": {
       angle: "زاوية التدوير",
@@ -3907,6 +3917,9 @@ export const ar: TranslationKeys = {
       submit: "استخراج النص",
       submitBatch: "استخراج النص ({count} ملفات)",
       progressLabel: "جارٍ الاستخراج",
+      scannedHint:
+        "هذا الملف ممسوح ضوئيًا، فلا يوجد نص لاستخراجه. يمكن للتعرّف الضوئي على الحروف قراءته، لكنه يستغرق وقتًا أطول ويتطلب تثبيت حزمة الذكاء الاصطناعي الخاصة به.",
+      runOcr: "تشغيل OCR على هذا الملف",
     },
     "pdf-to-word": {
       hint: "الأنسب لملفات PDF النصية؛ الصفحات الممسوحة تحتاج OCR",
@@ -4656,6 +4669,7 @@ export const ar: TranslationKeys = {
         anchorLabel: "نقطة الارتكاز:",
         anchorAriaLabel: "ارتكاز {position}",
         backgroundLabel: "الخلفية:",
+        transparent: "شفاف",
         anchors: {
           topLeft: "أعلى اليسار",
           topCenter: "أعلى الوسط",
@@ -5166,6 +5180,7 @@ export const ar: TranslationKeys = {
       description: "إدارة حزم نماذج AI لمعالجة الملفات المتقدمة.",
       installAll: "تثبيت الكل",
       diskUsage: "استخدام القرص: {size}",
+      statusStale: "تعذّر تحديث حالة الحزم. قد تكون القائمة أدناه غير محدّثة.",
       sizeOnDisk: "{size} على القرص",
       installed: "مُثبَّت",
       notInstalled: "غير مُثبَّت",
@@ -5595,6 +5610,7 @@ export const ar: TranslationKeys = {
     invalidSetting: "قيمة غير صالحة لـ {setting}.",
     network: "خطأ في الشبكة",
     invalidResponse: "استجابة غير صالحة",
+    staleVersionReload: "تم تحديث التطبيق. أعد تحميل الصفحة وحاول مرة أخرى.",
     failedWithStatus: "تعذّر إكمال هذا الطلب. يرجى المحاولة مرة أخرى.",
     processingFailedWithStatus: "تعذّرت معالجة هذا الملف. تأكد من أن الملف غير تالف وحاول مرة أخرى.",
     processingFailedNoDetail: "فشلت المعالجة",
@@ -5818,6 +5834,7 @@ export const ar: TranslationKeys = {
       zh: "الصينية",
       ja: "اليابانية",
       ko: "الكورية",
+      ar: "العربية",
       id: "الإندونيسية",
       th: "التايلاندية",
       vi: "الفيتنامية",

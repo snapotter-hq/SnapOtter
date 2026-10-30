@@ -1451,6 +1451,8 @@ export const ptBR: TranslationKeys = {
       submit: "Redimensionar",
       submitBatch: "Redimensionar ({count} arquivos)",
       progressLabel: "Redimensionando",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
+      maxPercentageExceeded: "Use uma escala de 1 a {max}%.",
     },
     crop: {
       width: "Largura",
@@ -1997,6 +1999,8 @@ export const ptBR: TranslationKeys = {
         "Melhora o contraste local antes do reconhecimento. Rápido aplica diretamente; Equilibrado e Melhor só mantêm a variante quando a pontuação calibrada melhora o resultado.",
       fastKoreanUnsupported:
         "O OCR rápido não oferece suporte a coreano. Instale o pacote de OCR preciso e escolha Equilibrado ou Melhor.",
+      fastArabicUnsupported:
+        "O OCR rápido não oferece suporte a árabe. Instale o pacote de OCR preciso e escolha Equilibrado ou Melhor.",
       language: "Idioma",
       autoDetect: "Detecção automática",
       extractedText: "Texto extraído",
@@ -2093,6 +2097,9 @@ export const ptBR: TranslationKeys = {
       submitSubject: "Corte inteligente",
       submitFace: "Corte por rosto",
       submitTrim: "Cortar bordas",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
+      cropAreaExceeded:
+        "Este recorte ultrapassa o limite de {max} pixels. Reduza a largura, a altura ou o preenchimento.",
     },
     imageEnhancement: {
       enhancementMode: "Modo de melhoria",
@@ -2219,6 +2226,9 @@ export const ptBR: TranslationKeys = {
       submit: "Redimensionar",
       submitBatch: "Redimensionar ({count} arquivos)",
       progressLabel: "Redimensionamento inteligente",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
+      areaExceeded:
+        "O redimensionamento com reconhecimento de conteúdo é limitado a {max} pixels no total. Reduza a largura ou a altura.",
     },
     "ai-canvas-expand": {
       quality: "Qualidade",
@@ -3267,6 +3277,7 @@ export const ptBR: TranslationKeys = {
       submit: "Processar GIF",
       submitBatch: "Processar ({count} arquivos)",
       progressLabel: "Processando GIF",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
     },
     "image-to-base64": {
       converting: "Convertendo...",
@@ -3712,8 +3723,7 @@ export const ptBR: TranslationKeys = {
       bestEffortHint:
         "Máximo possível. PDFs baseados em imagens chegam perto; PDFs somente com texto podem não reduzir para este tamanho.",
       targetReached: "Alvo de {target} atingido (resultado: {size}).",
-      targetMissed:
-        "Não foi possível atingir {target}. O menor tamanho possível foi {size} porque este PDF é composto principalmente de texto ou vetores, que a compressão de imagem não consegue reduzir.",
+      targetMissed: "Não foi possível atingir {target}. O menor tamanho possível foi {size}.",
     },
     "rotate-pdf": {
       angle: "Ângulo de rotação",
@@ -3943,6 +3953,9 @@ export const ptBR: TranslationKeys = {
       submit: "Extrair Texto",
       submitBatch: "Extrair Texto ({count} arquivos)",
       progressLabel: "Extraindo",
+      scannedHint:
+        "Este PDF é digitalizado, então não há texto para extrair. O OCR consegue lê-lo, mas leva mais tempo e exige o pacote de IA de OCR instalado.",
+      runOcr: "Executar OCR neste PDF",
     },
     "pdf-to-word": {
       hint: "Ideal para PDFs com texto; páginas digitalizadas precisam de OCR",
@@ -4696,6 +4709,7 @@ export const ptBR: TranslationKeys = {
         anchorLabel: "Âncora:",
         anchorAriaLabel: "Âncora {position}",
         backgroundLabel: "Fundo:",
+        transparent: "Transparente",
         anchors: {
           topLeft: "superior esquerdo",
           topCenter: "superior central",
@@ -5224,6 +5238,8 @@ export const ptBR: TranslationKeys = {
       description: "Gerencie pacotes de modelos de IA para processamento avançado de arquivos.",
       installAll: "Instalar tudo",
       diskUsage: "Uso do disco: {size}",
+      statusStale:
+        "Não foi possível atualizar o status dos pacotes. A lista abaixo pode estar desatualizada.",
       sizeOnDisk: "{size} em disco",
       installed: "Instalado",
       notInstalled: "Não instalado",
@@ -5664,6 +5680,7 @@ export const ptBR: TranslationKeys = {
     invalidSetting: "Valor inválido para {setting}.",
     network: "Erro de rede",
     invalidResponse: "Resposta inválida",
+    staleVersionReload: "O app foi atualizado. Recarregue a página e tente novamente.",
     failedWithStatus: "Não foi possível concluir essa solicitação. Tente novamente.",
     processingFailedWithStatus:
       "Não foi possível processar este arquivo. Verifique se ele não está corrompido e tente novamente.",
@@ -5895,6 +5912,7 @@ export const ptBR: TranslationKeys = {
       zh: "Chinês",
       ja: "Japonês",
       ko: "Coreano",
+      ar: "Árabe",
       id: "Indonésio",
       th: "Tailandês",
       vi: "Vietnamita",

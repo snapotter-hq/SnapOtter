@@ -116,11 +116,8 @@ describe("NonNativePreview source fetch (#1286)", () => {
     expect(screen.getByText(en.toolPage.previewFailed)).toBeTruthy();
     expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
     expect(screen.getByRole("button", { name: en.common.retry })).toBeTruthy();
-    expect(captureHandledError).toHaveBeenCalledTimes(1);
-    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
-    expect(error.message).toBe("Media preview request failed");
-    expect((error as Error).cause).toBe(networkError);
-    expect(tags).toEqual({ error_class: "operational" });
+    // A dropped connection is already in Sentry's IGNORE_ERRORS (#4106).
+    expect(captureHandledError).not.toHaveBeenCalled();
   });
 
   // Only the source fetch's 404 means the result is gone. The preview

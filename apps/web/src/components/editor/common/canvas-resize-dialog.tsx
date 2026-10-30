@@ -47,6 +47,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
   // shows the committed color again, as in the color panel's hex field (#2068).
   const [fill, setFill] = useState("#ffffff");
   const [draft, setDraft] = useState<string | null>(null);
+  const [transparent, setTransparent] = useState(false);
   // Resizes queue behind each other now, so a second click would commit a second,
   // identical resize (and another full-size bitmap in undo history).
   const [applying, setApplying] = useState(false);
@@ -74,7 +75,9 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
     if (applying || rebaking) return;
     setApplying(true);
     try {
-      const applied = await resizeCanvas(width, height, anchor, fill);
+      const applied = transparent
+        ? await resizeCanvas(width, height, anchor)
+        : await resizeCanvas(width, height, anchor, fill);
       if (applied !== false) onClose();
     } catch (err) {
       // A refused color or a rebake that failed. A toast alone leaves nothing to debug
@@ -88,7 +91,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
     } finally {
       setApplying(false);
     }
-  }, [applying, rebaking, width, height, anchor, fill, resizeCanvas, onClose, t]);
+  }, [applying, rebaking, width, height, anchor, fill, transparent, resizeCanvas, onClose, t]);
 
   if (!open) return null;
 
@@ -204,7 +207,8 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
               type="color"
               value={fill}
               onChange={(e) => handleFillPick(e.target.value)}
-              className="h-7 w-7 cursor-pointer rounded border border-border"
+              disabled={transparent}
+              className="h-7 w-7 cursor-pointer rounded border border-border disabled:cursor-not-allowed disabled:opacity-50"
             />
             <input
               type="text"
@@ -213,13 +217,30 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
               onBlur={() => setDraft(null)}
               maxLength={7}
               spellCheck={false}
+              disabled={transparent}
               aria-label={t.a11y.hexColorValue}
               data-testid="canvas-fill-hex"
               className={cn(
                 "h-7 w-20 rounded border border-border bg-card px-1.5 text-xs text-foreground",
                 "focus:border-ring focus:outline-none",
+                "disabled:cursor-not-allowed disabled:opacity-50",
               )}
             />
+            <div className="ms-auto flex items-center gap-1.5">
+              <input
+                id="canvas-transparent"
+                type="checkbox"
+                checked={transparent}
+                onChange={(e) => setTransparent(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              <label
+                htmlFor="canvas-transparent"
+                className="cursor-pointer text-xs text-muted-foreground select-none"
+              >
+                {t.editor.ui.canvasResize.transparent}
+              </label>
+            </div>
           </div>
         </div>
 

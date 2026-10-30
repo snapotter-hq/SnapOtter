@@ -2,9 +2,11 @@
 # custom-model path traversal) pulls numpy>=2.3, scipy>=1.16 and
 # scikit-image>=0.26 -- a numpy 2.x closure that is incompatible with this
 # numpy==1.26.4-locked stack (realesrgan 0.3.0 and codeformer-pip 0.0.4 break
-# on numpy 2.x). Both advisories are unreachable here: rembg is used purely as
-# a library (we never run `rembg s`), and new_session() only ever receives
-# allowlisted model names (remove_bg.py ALLOWED_MODELS), never user paths.
+# on numpy 2.x). CVE-2026-115924 (the `s` command's SAM model injection) is
+# fixed only in 2.0.82, another numpy 2.x release. All three advisories are
+# unreachable here: rembg is used purely as a library (we never run
+# `rembg s`), and new_session() only ever receives allowlisted model names
+# (remove_bg.py ALLOWED_MODELS), never user paths.
 rembg[cpu]==2.0.69
 realesrgan==0.3.0
 mediapipe>=0.10.21

@@ -23,20 +23,23 @@ export function CompressPdfSettings() {
     (settings.mode === "targetSize" && Number(settings.targetSizeKb) > 0);
 
   // Honest reporting for target-size mode: whether we actually hit the ceiling.
-  // The verdict is the selected file's own (#1292): single runs and batches
-  // both store it on the entry, so it can't describe another file or a run
-  // that's been cleared.
+  // The verdict is the selected file's own (#1292, #1375): single runs and
+  // batches both store it on the entry, so it can't describe another file,
+  // a file that hasn't finished processing, or a run that's been cleared.
   const done = currentEntry?.status === "completed";
-  const notes = done ? currentEntry.resultNotes : null;
-  const targetMet = notes?.targetMet;
+  const achieved = done ? currentEntry.processedSize : null;
+  const notes = done && achieved != null ? currentEntry.resultNotes : null;
   const targetKb = notes?.targetKb;
-  const processedSize = done ? currentEntry.processedSize : null;
+  const targetMet = targetKb != null ? notes?.targetMet : undefined;
   // Same decimal KB the server measured against, exact to the byte, so a miss
   // can't read as "couldn't reach 100 KB, smallest was 98 KB" (#1272).
   const targetLabel = targetKb != null ? formatTargetKb(kbToBytes(targetKb)) : "";
-  const achievedLabel = processedSize != null ? formatTargetKb(processedSize) : "";
+  const achievedLabel = achieved != null ? formatTargetKb(achieved) : "";
   const missed = entries.filter(
-    (entry) => entry.status === "completed" && entry.resultNotes?.targetMet === false,
+    (entry) =>
+      entry.status === "completed" &&
+      entry.processedSize != null &&
+      entry.resultNotes?.targetMet === false,
   );
   const missedKb = missed[0]?.resultNotes?.targetKb;
 

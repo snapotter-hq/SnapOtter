@@ -253,7 +253,7 @@ def main():
             except Exception as e:
                 import traceback
                 detail = str(e).strip() or type(e).__name__
-                print(f"[colorize] DDColor failed: {detail}", file=sys.stderr, flush=True)
+                print(json.dumps({"warning": f"[colorize] DDColor failed: {detail}"}), file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
                 print(json.dumps({
                     "success": False,
@@ -276,7 +276,7 @@ def main():
             except Exception as e:
                 import traceback
                 detail = str(e).strip() or type(e).__name__
-                print(f"[colorize] OpenCV failed: {detail}", file=sys.stderr, flush=True)
+                print(json.dumps({"warning": f"[colorize] OpenCV failed: {detail}"}), file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
                 if is_oom_error(e):
                     print(json.dumps({

@@ -151,3 +151,158 @@ describe("redactMessage custom roots and media extensions (#4086)", () => {
     expect(redactMessage("failed in rounded-crop.ts")).toBe("failed in rounded-crop.ts");
   });
 });
+
+describe("redactMessage paths with spaces, unknown roots, and UNC (#4093)", () => {
+  it("masks a known-root path whose directory or filename has spaces", () => {
+    expect(redactMessage("open /Volumes/My Passport/vacation photo.jpg failed")).toBe(
+      "open <path> failed",
+    );
+    expect(redactMessage("open /data/uploads/9f/Q3 Layoffs final.wma failed")).toBe(
+      "open <path> failed",
+    );
+    expect(redactMessage("open C:\\Users\\Jane Doe\\photo.jpg failed")).toBe("open <path> failed");
+  });
+
+  it("masks an unknown-root path with or without an extension", () => {
+    expect(redactMessage("scandir /tank/john-nas/outputs failed")).toBe("scandir <path> failed");
+    expect(redactMessage("open /tank/My Holiday Video.mp4 failed")).toBe("open <path> failed");
+    expect(redactMessage("open /nfs-pool/9f/Jane_Doe_final failed")).toBe("open <path> failed");
+  });
+
+  it("masks UNC shares", () => {
+    expect(redactMessage("open \\\\fileserver\\media\\My Photo.jpg failed")).toBe(
+      "open <path> failed",
+    );
+    expect(redactMessage("open \\\\fileserver\\share failed")).toBe("open <path> failed");
+  });
+
+  it("masks quoted paths that contain spaces", () => {
+    expect(redactMessage("open '/data/uploads/9f/Q3 Layoffs.wma' failed")).toBe(
+      "open '<path>' failed",
+    );
+    expect(redactMessage("open `/tank/My Holiday Video.mp4` failed")).toBe("open `<path>` failed");
+  });
+
+  it("masks env-style assignments with spaced paths", () => {
+    expect(redactMessage("FILES_STORAGE_PATH=/tank/Jane Doe failed")).toBe(
+      "FILES_STORAGE_PATH=<path> failed",
+    );
+  });
+
+  it("masks relative storage keys whose filename has spaces", () => {
+    expect(redactMessage("ENOENT uploads/3f2a/My Holiday Photo.jpg missing")).toBe(
+      "ENOENT <path> missing",
+    );
+  });
+
+  it("keeps punctuation outside the mask", () => {
+    expect(redactMessage("open /tank/My Holiday Video.mp4. failed")).toBe("open <path>. failed");
+  });
+
+  it("masks spaced filenames with parentheses", () => {
+    expect(redactMessage("open /tank/photo (1).jpg failed")).toBe("open <path> failed");
+    expect(redactMessage("open (/tank/My Holiday Video.mp4)")).toBe("open (<path>)");
+  });
+
+  it("does not merge two paths into one mask", () => {
+    expect(redactMessage("open /data/file.mp4 and /tmp/other.mp4")).toBe("open <path> and <path>");
+    expect(redactMessage("open /tank/My file.wma and /tank/Other file.wma")).toBe(
+      "open <path> and <path>",
+    );
+  });
+
+  it("masks a spaced directory path that ends in a separator", () => {
+    expect(redactMessage("open /tank/My Documents/")).toBe("open <path>");
+  });
+
+  it("masks extensionless spaced paths under known roots", () => {
+    expect(redactMessage("ENOENT /Users/jane/My Documents/tax return 2024")).toBe("ENOENT <path>");
+    expect(redactMessage("open /Volumes/My Passport/raw footage")).toBe("open <path>");
+    expect(redactMessage("at fn (/data/my app/src/index.js:10:5)")).toBe("at fn (<path>:10:5)");
+  });
+
+  it("masks extensionless spaced relative keys", () => {
+    expect(redactMessage("ENOENT uploads/3f2a/My Holiday Photo missing")).toBe(
+      "ENOENT <path> missing",
+    );
+    expect(redactMessage("ENOENT outputs/9b7c/final cut/ missing")).toBe("ENOENT <path> missing");
+  });
+
+  it("masks extensionless spaced drive and UNC paths", () => {
+    expect(redactMessage("open C:\\Users\\Jane Doe\\My Documents\\taxes failed")).toBe(
+      "open <path> failed",
+    );
+    expect(redactMessage("open \\\\fileserver\\share\\My Folder (1)\\raw failed")).toBe(
+      "open <path> failed",
+    );
+    expect(redactMessage("PATH=C:\\Program Files\\SnapOtter\\bin; failed")).toBe(
+      "PATH=<path>; failed",
+    );
+  });
+
+  it("masks filenames containing apostrophes and commas", () => {
+    expect(redactMessage("open /tank/John's vacation photo.jpg failed")).toBe("open <path> failed");
+    expect(redactMessage("open /Users/jane/Q3 Layoffs, final.wma failed")).toBe(
+      "open <path> failed",
+    );
+  });
+
+  it("masks long and multi-token paths", () => {
+    const longName = `${"x".repeat(250)}.mp4`;
+    expect(redactMessage(`open /tank/${longName} failed`)).toBe("open <path> failed");
+    expect(redactMessage("open /tank/alpha bravo charlie delta echo foxtrot golf.mp4 failed")).toBe(
+      "open <path> failed",
+    );
+  });
+
+  it("leaves quoted MIME types, routes, and prose apostrophes alone", () => {
+    expect(redactMessage('unsupported media type "application/json"')).toBe(
+      'unsupported media type "application/json"',
+    );
+    expect(redactMessage("it's a n/a case, isn't it")).toBe("it's a n/a case, isn't it");
+    expect(redactMessage("route '/api/v1/jobs/1' failed")).toBe("route '/api/v1/jobs/1' failed");
+  });
+
+  it("does not cut directories named with conjunctions or symbols", () => {
+    expect(redactMessage("ENOENT /tank/Photos and Videos/raw footage")).toBe("ENOENT <path>");
+    expect(redactMessage("ENOENT /mnt/media/Movies and TV/Shows/clip.mkv")).toBe("ENOENT <path>");
+    expect(redactMessage("ENOENT /home/jane/Trips to Japan/IMG_1234.jpg")).toBe("ENOENT <path>");
+    expect(redactMessage("ENOENT /Volumes/My Passport/Photos & Videos/raw")).toBe("ENOENT <path>");
+  });
+
+  it("keeps a colon reason or a trailing option outside the mask", () => {
+    expect(redactMessage("write /data/x: disk full")).toBe("write <path>: disk full");
+    expect(redactMessage("open /data/x: stale file handle")).toBe("open <path>: stale file handle");
+    expect(redactMessage("ENOENT /data/My Documents - retry")).toBe("ENOENT <path> - retry");
+  });
+
+  it("keeps a URL placeholder after a spaced path outside the mask", () => {
+    expect(redactMessage("ENOENT /data/My Documents https://example.com/x")).toBe(
+      "ENOENT <path> <url>",
+    );
+    expect(redactMessage("GET https://h/u/p.jpg then /tmp/z and blob:xyz")).toBe(
+      "GET <url> then <path> and <blob>",
+    );
+  });
+
+  it("bounds route allowlist prefixes to whole segments", () => {
+    expect(redactMessage("ENOENT /healthcare/patient_Jane_Doe/scan.pdf")).toBe("ENOENT <path>");
+    expect(redactMessage("GET /health/live failed")).toBe("GET /health/live failed");
+    expect(redactMessage("GET /openapi.yaml failed")).toBe("GET /openapi.yaml failed");
+  });
+
+  it("stays linear on a long punctuation run", () => {
+    const input = `Error at (/tank/${".".repeat(80_000)}/index.ts)`;
+    const start = performance.now();
+    redactMessage(input);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+
+  it("leaves app routes, public assets, and code filenames alone", () => {
+    expect(redactMessage("GET /api/v1/jobs/123 failed")).toBe("GET /api/v1/jobs/123 failed");
+    expect(redactMessage("GET /api/v2.1/jobs failed")).toBe("GET /api/v2.1/jobs failed");
+    expect(redactMessage("GET /assets/logo.png failed")).toBe("GET /assets/<file> failed");
+    expect(redactMessage("failed in rounded-crop.ts")).toBe("failed in rounded-crop.ts");
+    expect(redactMessage("failed in vite.config.mts")).toBe("failed in vite.config.mts");
+  });
+});

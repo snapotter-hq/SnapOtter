@@ -12,9 +12,12 @@ on:
   pull_request:
     branches: [main]
 
+# PR branches cancel superseded runs. Main never does: a later merge would
+# otherwise cancel the run on the commit before it, and no commit on main
+# would get a completed post-merge signal (#4190, #2457). Main runs queue.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -131,10 +134,13 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
-    # Headroom for a degraded-apt-mirror day: the full bounded recovery
-    # ladder (~27m worst case) plus the tests still fit (#876). A 15m cap
-    # killed this job mid-recovery on a real degraded day.
-    timeout-minutes: 35
+    # Headroom for a degraded-apt-mirror day (#876, #2007). The apt-install
+    # ladder's worst case is ~34m since #1971 (120s update, two 360s
+    # post-swap updates, three 300s installs, a shared 300s dpkg wait), plus
+    # up to 3m of KILL grace if apt ignores TERM, plus the rest of the job,
+    # which took up to ~11m on main. A 15m cap killed this job mid-recovery
+    # on a real degraded day. Re-derive this if the ladder's budgets change.
+    timeout-minutes: 50
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
@@ -148,9 +154,9 @@ jobs:
       - name: Install the ImageMagick EXR coder and verify
         run: |
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
           else
             echo "No supported ImageMagick EXR coder package found" >&2
             exit 1
@@ -174,9 +180,11 @@ jobs:
   test-integration:
     name: Integration (${{ matrix.shard }}/8)
     runs-on: ubuntu-latest
-    # Headroom for a degraded-apt-mirror day: both bounded install attempts
-    # plus the tests still fit (#876).
-    timeout-minutes: 40
+    # Headroom for a degraded-apt-mirror day (#876, #2007). Same apt-install
+    # ladder as test-unit (~34m worst case since #1971, plus up to 3m of KILL
+    # grace), plus the rest of a shard, which took up to ~8m on main. Re-derive
+    # this if the ladder's budgets change.
+    timeout-minutes: 45
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
@@ -201,9 +209,9 @@ jobs:
       - name: Install the ImageMagick EXR coder and verify the format toolchain
         run: |
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
           else
             echo "No supported ImageMagick EXR coder package found" >&2
             exit 1
@@ -478,17 +486,22 @@ jobs:
         # (all last_affected at or below 2.10.0, resolves to 2.13.0), joblib
         # (not in the closure), markdown (last_affected 3.8, resolves 3.10.2).
         # PYSEC-2025-194 was a duplicate of CVE-2025-3000, which is itself now
-        # dead. Re-check the three below whenever requirements.txt moves.
+        # dead. Re-check the four below whenever requirements.txt moves.
         #
         # CVE-2024-27763: basicsr, no fixed release exists in any channel.
         # CVE-2026-40086 + GHSA-55v6-g8pm-pw4c: rembg 2.0.69. The fix is
         #   rembg 2.0.75, held back by the numpy 1.26.4 pin (see the rationale
         #   in packages/ai/python/requirements.txt).
+        # CVE-2026-115924: rembg 2.0.69, fixed only in 2.0.82, which requires
+        #   numpy 2.x and holds back the same pin. The vulnerable surface is the
+        #   `rembg s` HTTP command, which this repo never runs (the sidecar
+        #   imports rembg as a library).
         run: >-
           pip-audit -r packages/ai/python/requirements.txt
           --ignore-vuln CVE-2024-27763
           --ignore-vuln CVE-2026-40086
           --ignore-vuln GHSA-55v6-g8pm-pw4c
+          --ignore-vuln CVE-2026-115924
           --strict
 
       # hf-release-requirements.txt is the tooling the ai-bundles publish job

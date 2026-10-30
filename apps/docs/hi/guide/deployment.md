@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter को Docker के साथ प्रोडक्शन में डिप्लॉय करें। हार्डवेयर आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik, तथा Cloudflare के लिए रिवर्स प्रॉक्सी कॉन्फ़िग।"
-i18n_source_hash: 4db97ead24e0
+i18n_source_hash: 4cae787c775e
 i18n_provenance: human
 i18n_output_hash: b9a7b7ba3a5a
 i18n_hash_version: 2
@@ -15,7 +15,7 @@ GPU सेटअप, Docker Compose उदाहरणों, और वर्�
 
 <!-- korean-ocr-contract:start -->
 ::: info कोरियाई OCR संगतता
-तेज़ OCR `auto`, `en`, `de`, `es`, `fr`, `zh` और `ja` का समर्थन करता है, लेकिन कोरियाई (`ko`) का नहीं। कोरियाई के लिए सटीक OCR पैक और `balanced` या `best` आवश्यक है। पैक आधिकारिक Linux amd64 और arm64 कंटेनरों पर चलता है; NVIDIA होस्ट पर भी OCR CPU पर ही चलता है। असमर्थित सिस्टम स्पष्ट संगतता त्रुटि लौटाते हैं और चुपचाप `fast` पर वापस नहीं जाते। कोरियाई के साथ `fast` या पुराने `tesseract` नाम को कतार में डालने से पहले `FEATURE_INCOMPATIBLE` और `fast-korean-unsupported` के साथ अस्वीकार किया जाता है।
+तेज़ OCR `auto`, `en`, `de`, `es`, `fr`, `zh` और `ja` का समर्थन करता है, लेकिन कोरियाई (`ko`) और अरबी (`ar`) का नहीं। कोरियाई और अरबी, दोनों के लिए सटीक OCR पैक और `balanced` या `best` आवश्यक है। पैक आधिकारिक Linux amd64 और arm64 कंटेनरों पर चलता है; NVIDIA होस्ट पर भी OCR CPU पर ही चलता है। असमर्थित सिस्टम स्पष्ट संगतता त्रुटि लौटाते हैं और चुपचाप `fast` पर वापस नहीं जाते। कोरियाई या अरबी के साथ `fast` या पुराने `tesseract` नाम को कतार में डालने से पहले `FEATURE_INCOMPATIBLE` और `fast-korean-unsupported` के साथ अस्वीकार किया जाता है।
 :::
 <!-- korean-ocr-contract:end -->
 ## Quick Start (CPU) {#quick-start-cpu}

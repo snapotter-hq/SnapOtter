@@ -2,6 +2,7 @@ import type Konva from "konva";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Circle, Ellipse, Group, Line, Rect, Shape } from "react-konva";
 import { useTranslation } from "@/contexts/i18n-context";
+import { quietImport } from "@/lib/chunk-reload";
 import { useEditorStore } from "@/stores/editor-store";
 import type { SelectionMode, SelectionState } from "@/types/editor";
 import { captureDocumentContext, readDocumentPixels, reportCaptureFailure } from "../stage-capture";
@@ -24,13 +25,17 @@ function useMarchingAnts(layerRef: React.RefObject<Konva.Layer | null>) {
     if (!layer) return;
 
     // Dynamically import Konva for Animation
-    import("konva").then((KonvaModule) => {
-      const anim = new KonvaModule.default.Animation(() => {
-        dashOffsetRef.current -= MARCH_SPEED;
-      }, layer);
-      animRef.current = anim;
-      anim.start();
-    });
+    // The marching-ants animation is cosmetic: a konva chunk gone after a deploy
+    // must not reload the editor under the user's work (#4141).
+    quietImport(() => import("konva"))
+      .then((KonvaModule) => {
+        const anim = new KonvaModule.default.Animation(() => {
+          dashOffsetRef.current -= MARCH_SPEED;
+        }, layer);
+        animRef.current = anim;
+        anim.start();
+      })
+      .catch(() => {});
 
     return () => {
       animRef.current?.stop();

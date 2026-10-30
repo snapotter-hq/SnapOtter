@@ -1424,6 +1424,8 @@ export const th: TranslationKeys = {
       submit: "ปรับขนาด",
       submitBatch: "ปรับขนาด ({count} ไฟล์)",
       progressLabel: "กำลังปรับขนาด",
+      maxDimensionExceeded: "ใช้ขนาดตั้งแต่ 1 ถึง {max} px",
+      maxPercentageExceeded: "ใช้มาตราส่วนตั้งแต่ 1 ถึง {max}%",
     },
     crop: {
       width: "ความกว้าง",
@@ -1957,6 +1959,7 @@ export const th: TranslationKeys = {
       enhanceHint:
         "ปรับคอนทราสต์เฉพาะจุดก่อนการรู้จำ แบบเร็วจะใช้โดยตรง ส่วนแบบสมดุลและดีที่สุดจะเก็บไว้เฉพาะเมื่อคะแนนที่ปรับเทียบแล้วทำให้ผลลัพธ์ดีขึ้น",
       fastKoreanUnsupported: "OCR แบบเร็วไม่รองรับภาษาเกาหลี ติดตั้งแพ็ก OCR แบบแม่นยำแล้วเลือกสมดุลหรือดีที่สุด",
+      fastArabicUnsupported: "OCR แบบเร็วไม่รองรับภาษาอาหรับ ติดตั้งแพ็ก OCR แบบแม่นยำแล้วเลือกสมดุลหรือดีที่สุด",
       language: "ภาษา",
       autoDetect: "ตรวจจับอัตโนมัติ",
       extractedText: "ข้อความที่แยกได้",
@@ -2048,6 +2051,8 @@ export const th: TranslationKeys = {
       submitSubject: "ครอปอัจฉริยะ",
       submitFace: "ครอปใบหน้า",
       submitTrim: "ตัดขอบ",
+      maxDimensionExceeded: "ใช้ขนาดตั้งแต่ 1 ถึง {max} px",
+      cropAreaExceeded: "การครอปนี้เกินขีดจำกัด {max} พิกเซล ลดความกว้าง ความสูง หรือระยะห่างภายในลง",
     },
     imageEnhancement: {
       enhancementMode: "โหมดปรับปรุง",
@@ -2173,6 +2178,8 @@ export const th: TranslationKeys = {
       submit: "ปรับขนาด",
       submitBatch: "ปรับขนาด ({count} ไฟล์)",
       progressLabel: "กำลังปรับขนาดแบบรับรู้เนื้อหา",
+      maxDimensionExceeded: "ใช้ขนาดตั้งแต่ 1 ถึง {max} px",
+      areaExceeded: "การปรับขนาดแบบรับรู้เนื้อหาจำกัดที่ {max} พิกเซลรวม ลดความกว้างหรือความสูง",
     },
     "ai-canvas-expand": {
       quality: "คุณภาพ",
@@ -3214,6 +3221,7 @@ export const th: TranslationKeys = {
       submit: "ประมวลผล GIF",
       submitBatch: "ประมวลผล ({count} ไฟล์)",
       progressLabel: "กำลังประมวลผล GIF",
+      maxDimensionExceeded: "ใช้ขนาดตั้งแต่ 1 ถึง {max} px",
     },
     "image-to-base64": {
       converting: "กำลังแปลง...",
@@ -3656,8 +3664,7 @@ export const th: TranslationKeys = {
       bestEffortHint:
         "ค่าสูงสุดเท่าที่ทำได้ PDF ที่เป็นรูปภาพจะได้ขนาดใกล้เคียง ส่วน PDF ที่มีแต่ข้อความอาจย่อไม่ถึงขนาดนี้",
       targetReached: "ถึงเป้าหมาย {target} ที่คุณตั้งไว้แล้ว (ผลลัพธ์: {size})",
-      targetMissed:
-        "ไม่สามารถทำได้ถึง {target} ขนาดเล็กที่สุดที่ทำได้คือ {size} เนื่องจาก PDF นี้ส่วนใหญ่เป็นข้อความหรือเวกเตอร์ ซึ่งการบีบอัดรูปภาพไม่สามารถย่อได้",
+      targetMissed: "ไม่สามารถทำได้ถึง {target} ขนาดเล็กที่สุดที่ทำได้คือ {size}",
     },
     "rotate-pdf": {
       angle: "มุมหมุน",
@@ -3883,6 +3890,9 @@ export const th: TranslationKeys = {
       submit: "แยกข้อความ",
       submitBatch: "แยกข้อความ ({count} ไฟล์)",
       progressLabel: "กำลังแยกข้อความ",
+      scannedHint:
+        "PDF นี้เป็นไฟล์สแกน จึงไม่มีข้อความให้แยก OCR อ่านได้ แต่ใช้เวลานานกว่าและต้องติดตั้งชุด AI สำหรับ OCR ก่อน",
+      runOcr: "เรียกใช้ OCR กับ PDF นี้",
     },
     "pdf-to-word": {
       hint: "เหมาะสำหรับ PDF ที่เป็นข้อความ หน้าที่สแกนต้องใช้ OCR",
@@ -4632,6 +4642,7 @@ export const th: TranslationKeys = {
         anchorLabel: "จุดยึด:",
         anchorAriaLabel: "จุดยึด {position}",
         backgroundLabel: "พื้นหลัง:",
+        transparent: "โปร่งใส",
         anchors: {
           topLeft: "บนซ้าย",
           topCenter: "บนกลาง",
@@ -5133,6 +5144,7 @@ export const th: TranslationKeys = {
       description: "จัดการชุดโมเดล AI สำหรับการประมวลผลไฟล์ขั้นสูง",
       installAll: "ติดตั้งทั้งหมด",
       diskUsage: "การใช้พื้นที่ดิสก์: {size}",
+      statusStale: "ไม่สามารถรีเฟรชสถานะแพ็กเกจได้ รายการด้านล่างอาจไม่เป็นปัจจุบัน",
       sizeOnDisk: "{size} บนดิสก์",
       installed: "ติดตั้งแล้ว",
       notInstalled: "ยังไม่ได้ติดตั้ง",
@@ -5554,6 +5566,7 @@ export const th: TranslationKeys = {
     invalidSetting: "ค่าของ {setting} ไม่ถูกต้อง",
     network: "ข้อผิดพลาดเครือข่าย",
     invalidResponse: "การตอบกลับไม่ถูกต้อง",
+    staleVersionReload: "แอปได้รับการอัปเดตแล้ว โหลดหน้านี้ใหม่แล้วลองอีกครั้ง",
     failedWithStatus: "ไม่สามารถดำเนินการตามคำขอได้ โปรดลองอีกครั้ง",
     processingFailedWithStatus: "ไม่สามารถประมวลผลไฟล์นี้ได้ โปรดตรวจสอบว่าไฟล์ไม่เสียหายแล้วลองอีกครั้ง",
     processingFailedNoDetail: "ประมวลผลล้มเหลว",
@@ -5777,6 +5790,7 @@ export const th: TranslationKeys = {
       zh: "ภาษาจีน",
       ja: "ภาษาญี่ปุ่น",
       ko: "ภาษาเกาหลี",
+      ar: "ภาษาอาหรับ",
       id: "ภาษาอินโดนีเซีย",
       th: "ภาษาไทย",
       vi: "ภาษาเวียดนาม",

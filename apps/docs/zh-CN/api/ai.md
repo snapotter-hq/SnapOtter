@@ -1,7 +1,7 @@
 ---
 description: "AI 引擎参考，涵盖所有本地 ML 工具。抠图、放大、OCR、人脸检测、照片修复等。"
 i18n_output_hash: ff4f3f1c541b
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -18,7 +18,7 @@ NVIDIA CUDA 由支持它的运行时自动检测和使用。 OCR 在每个主机
 
 <!-- korean-ocr-contract:start -->
 ::: info 韩语 OCR 兼容性
-快速 OCR 支持 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支持韩语 (`ko`)。韩语需要精确 OCR 包以及 `balanced` 或 `best`。该包可在官方 Linux amd64 和 arm64 容器上运行；即使是 NVIDIA 主机，OCR 仍使用 CPU。不受支持的系统会返回明确的兼容性错误，绝不会静默回退到 `fast`。韩语与 `fast` 或旧版 `tesseract` 别名的组合会在入队前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒绝。
+快速 OCR 支持 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支持韩语 (`ko`) 和阿拉伯语 (`ar`)。韩语和阿拉伯语需要精确 OCR 包以及 `balanced` 或 `best`。该包可在官方 Linux amd64 和 arm64 容器上运行；即使是 NVIDIA 主机，OCR 仍使用 CPU。不受支持的系统会返回明确的兼容性错误，绝不会静默回退到 `fast`。韩语或阿拉伯语与 `fast` 或旧版 `tesseract` 别名的组合会在入队前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒绝。
 :::
 <!-- korean-ocr-contract:end -->
 
@@ -190,12 +190,12 @@ done
 
 | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
-| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。快速层不支持 `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语和阿拉伯语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
+| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。快速层不支持 `ko` 和 `ar` |
 | `enhance` | boolean | 取决于层级 | 提高局部对比度。快速层直接应用；精确层级只有在校准评分能改善 OCR 时才保留该变体。Best 默认开启 |
 | `engine` | string | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不会加载 PaddlePaddle |
 
-返回提取的文本以及来源元数据：引擎、请求的和实际的质量、设备、提供商、降级状态、警告，以及适用时的精确运行时/模型版本。显式指定的质量层级绝不会回退到其他层级。如果 `balanced` 或 `best` 不可用，API 会返回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是静默运行 `fast`。显式指定 Fast 或旧版 `tesseract` 并搭配韩语时，会在作业入队前返回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"` 以及精确包的指引。
+返回提取的文本以及来源元数据：引擎、请求的和实际的质量、设备、提供商、降级状态、警告，以及适用时的精确运行时/模型版本。显式指定的质量层级绝不会回退到其他层级。如果 `balanced` 或 `best` 不可用，API 会返回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是静默运行 `fast`。显式指定 Fast 或旧版 `tesseract` 并搭配韩语或阿拉伯语时，会在作业入队前返回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"` 以及精确包的指引。
 
 ## PDF OCR {#pdf-ocr}
 
@@ -206,13 +206,13 @@ done
 
 | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
-| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`。快速层不支持 `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语和阿拉伯语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
+| `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。快速层不支持 `ko` 和 `ar` |
 | `pages` | string | `"all"` | 页面选择：`"all"`、`"1-3"`、`"1,3,5"` |
 | `enhance` | boolean | 取决于层级 | 提高局部对比度。快速层直接应用；精确层级只有在校准评分能改善 OCR 时才保留该变体。Best 默认开启 |
 | `engine` | string | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不会加载 PaddlePaddle |
 
-同样的不降级与韩语兼容性规则也适用于 PDF OCR。PDF 页面在识别前会先栅格化，单次请求最多可选择 50 页。
+同样的不降级与韩语和阿拉伯语兼容性规则也适用于 PDF OCR。PDF 页面在识别前会先栅格化，单次请求最多可选择 50 页。
 
 ## 人脸 / PII 模糊 {#face-pii-blur}
 

@@ -1395,6 +1395,8 @@ export const en = {
       submit: "Resize",
       submitBatch: "Resize ({count} files)",
       progressLabel: "Resizing",
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
+      maxPercentageExceeded: "Use a scale from 1 to {max}%.",
     },
     crop: {
       yOfMax: "Y (of {max})",
@@ -1935,6 +1937,8 @@ export const en = {
         "Improves local contrast before recognition. Fast applies it directly; Balanced and Best keep it only when calibrated scoring improves the result.",
       fastKoreanUnsupported:
         "Fast OCR does not support Korean. Install the Accurate OCR pack and choose Balanced or Best.",
+      fastArabicUnsupported:
+        "Fast OCR does not support Arabic. Install the Accurate OCR pack and choose Balanced or Best.",
       language: "Language",
       autoDetect: "Auto-detect",
       extractedText: "Extracted Text",
@@ -2028,6 +2032,9 @@ export const en = {
       padColor: "Pad color",
       trimHint:
         'Removes uniform-color borders around your subject. Enable "Pad to square" for e-commerce ready images.',
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
+      cropAreaExceeded:
+        "This crop is over the {max} pixel limit. Lower the width, height, or padding.",
       submitSubject: "Smart Crop",
       submitFace: "Face Crop",
       submitTrim: "Trim Borders",
@@ -2156,6 +2163,9 @@ export const en = {
       submit: "Resize",
       submitBatch: "Resize ({count} files)",
       progressLabel: "Content-aware resizing",
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
+      areaExceeded:
+        "Content-aware resize is capped at {max} total pixels. Lower the width or height.",
     },
     "ai-canvas-expand": {
       quality: "Quality",
@@ -3200,6 +3210,7 @@ export const en = {
       submit: "Process GIF",
       submitBatch: "Process ({count} files)",
       progressLabel: "Processing GIF",
+      maxDimensionExceeded: "Use a size from 1 to {max} px.",
     },
     "image-to-base64": {
       converting: "Converting...",
@@ -3644,8 +3655,7 @@ export const en = {
       bestEffortHint:
         "Best-effort maximum. Image-based PDFs land close; text-only PDFs may not shrink to this size.",
       targetReached: "Reached your {target} target (result: {size}).",
-      targetMissed:
-        "Couldn't reach {target}. Smallest achievable was {size} because this PDF is mostly text or vectors, which image compression can't shrink.",
+      targetMissed: "Couldn't reach {target}. Smallest achievable was {size}.",
     },
     "rotate-pdf": {
       angle: "Rotation angle",
@@ -3872,6 +3882,9 @@ export const en = {
       submit: "Extract Text",
       submitBatch: "Extract Text ({count} files)",
       progressLabel: "Extracting",
+      scannedHint:
+        "This PDF is scanned, so there's no text to extract. OCR can read it, but it takes longer and needs the OCR AI bundle installed.",
+      runOcr: "Run OCR on this PDF",
     },
     "pdf-to-word": {
       hint: "Best for text-based PDFs; scanned pages need OCR",
@@ -4622,6 +4635,7 @@ export const en = {
         anchorLabel: "Anchor:",
         anchorAriaLabel: "Anchor {position}",
         backgroundLabel: "Background:",
+        transparent: "Transparent",
         anchors: {
           topLeft: "top left",
           topCenter: "top center",
@@ -5121,6 +5135,7 @@ export const en = {
       description: "Manage AI model bundles for advanced file processing.",
       installAll: "Install All",
       diskUsage: "Disk usage: {size}",
+      statusStale: "Couldn't refresh the bundle status. The list below may be out of date.",
       sizeOnDisk: "{size} on disk",
       installed: "Installed",
       notInstalled: "Not installed",
@@ -5571,6 +5586,7 @@ export const en = {
     invalidSetting: "Invalid value for {setting}.",
     network: "Network error",
     invalidResponse: "Invalid response",
+    staleVersionReload: "The app was updated. Reload the page and try again.",
     failedWithStatus: "We couldn't complete that request. Please try again.",
     processingFailedWithStatus:
       "We couldn't process this file. Check that the file isn't damaged and try again.",
@@ -5797,6 +5813,7 @@ export const en = {
       zh: "Chinese",
       ja: "Japanese",
       ko: "Korean",
+      ar: "Arabic",
       id: "Indonesian",
       th: "Thai",
       vi: "Vietnamese",

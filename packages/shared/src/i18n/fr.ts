@@ -1457,6 +1457,8 @@ export const fr: TranslationKeys = {
       submit: "Redimensionner",
       submitBatch: "Redimensionner ({count} fichiers)",
       progressLabel: "Redimensionnement en cours",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      maxPercentageExceeded: "Utilisez une échelle de 1 à {max} %.",
     },
     crop: {
       width: "Largeur",
@@ -2005,6 +2007,8 @@ export const fr: TranslationKeys = {
         "Améliore le contraste local avant la reconnaissance. Rapide l’applique directement ; Équilibré et Optimal ne conservent la variante que si le score étalonné améliore le résultat.",
       fastKoreanUnsupported:
         "L’OCR rapide ne prend pas en charge le coréen. Installez le pack d’OCR précis et choisissez Équilibré ou Optimal.",
+      fastArabicUnsupported:
+        "L’OCR rapide ne prend pas en charge l’arabe. Installez le pack d’OCR précis et choisissez Équilibré ou Optimal.",
       language: "Langue",
       autoDetect: "Détection automatique",
       extractedText: "Texte extrait",
@@ -2101,6 +2105,9 @@ export const fr: TranslationKeys = {
       submitSubject: "Recadrage intelligent",
       submitFace: "Recadrage par visage",
       submitTrim: "Rogner les bordures",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      cropAreaExceeded:
+        "Ce recadrage dépasse la limite de {max} pixels. Réduisez la largeur, la hauteur ou la marge intérieure.",
     },
     imageEnhancement: {
       enhancementMode: "Mode d'amélioration",
@@ -2227,6 +2234,9 @@ export const fr: TranslationKeys = {
       submit: "Redimensionner",
       submitBatch: "Redimensionner ({count} fichiers)",
       progressLabel: "Redimensionnement intelligent",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      areaExceeded:
+        "Le redimensionnement sensible au contenu est limité à {max} pixels au total. Réduisez la largeur ou la hauteur.",
     },
     "ai-canvas-expand": {
       quality: "Qualité",
@@ -3278,6 +3288,7 @@ export const fr: TranslationKeys = {
       submit: "Traiter le GIF",
       submitBatch: "Traiter ({count} fichiers)",
       progressLabel: "Traitement du GIF",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
     },
     "image-to-base64": {
       converting: "Conversion en cours...",
@@ -3723,8 +3734,7 @@ export const fr: TranslationKeys = {
       bestEffortHint:
         "Maximum au mieux. Les PDF composés d'images s'en approchent ; les PDF uniquement texte peuvent ne pas atteindre cette taille.",
       targetReached: "Objectif de {target} atteint (résultat : {size}).",
-      targetMissed:
-        "Impossible d'atteindre {target}. La plus petite taille possible était {size}, car ce PDF est principalement composé de texte ou de vecteurs, que la compression d'images ne peut pas réduire.",
+      targetMissed: "Impossible d'atteindre {target}. La plus petite taille possible était {size}.",
     },
     "rotate-pdf": {
       angle: "Angle de rotation",
@@ -3955,6 +3965,9 @@ export const fr: TranslationKeys = {
       submit: "Extraire le texte",
       submitBatch: "Extraire le texte ({count} fichiers)",
       progressLabel: "Extraction",
+      scannedHint:
+        "Ce PDF est numérisé, il n'y a donc pas de texte à extraire. L'OCR peut le lire, mais c'est plus long et cela demande que le pack d'IA OCR soit installé.",
+      runOcr: "Lancer l'OCR sur ce PDF",
     },
     "pdf-to-word": {
       hint: "Idéal pour les PDF textuels ; les pages numérisées nécessitent l'OCR",
@@ -4708,6 +4721,7 @@ export const fr: TranslationKeys = {
         anchorLabel: "Ancrage :",
         anchorAriaLabel: "Ancrage {position}",
         backgroundLabel: "Arrière-plan :",
+        transparent: "Transparent",
         anchors: {
           topLeft: "en haut à gauche",
           topCenter: "en haut au centre",
@@ -5240,6 +5254,8 @@ export const fr: TranslationKeys = {
       description: "Gérez les paquets de modèles AI pour le traitement avancé de fichiers.",
       installAll: "Tout installer",
       diskUsage: "Utilisation du disque : {size}",
+      statusStale:
+        "Impossible d’actualiser l’état des bundles. La liste ci-dessous est peut-être obsolète.",
       sizeOnDisk: "{size} sur le disque",
       installed: "Installé",
       notInstalled: "Non installé",
@@ -5685,6 +5701,7 @@ export const fr: TranslationKeys = {
     invalidSetting: "Valeur non valide pour {setting}.",
     network: "Erreur réseau",
     invalidResponse: "Réponse invalide",
+    staleVersionReload: "L'application a été mise à jour. Rechargez la page et réessayez.",
     failedWithStatus: "Impossible de terminer cette requête. Veuillez réessayer.",
     processingFailedWithStatus:
       "Impossible de traiter ce fichier. Vérifiez qu'il n'est pas endommagé et réessayez.",
@@ -5916,6 +5933,7 @@ export const fr: TranslationKeys = {
       zh: "Chinois",
       ja: "Japonais",
       ko: "Coréen",
+      ar: "Arabe",
       id: "Indonésien",
       th: "Thaï",
       vi: "Vietnamien",

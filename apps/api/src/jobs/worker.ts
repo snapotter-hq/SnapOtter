@@ -63,7 +63,7 @@ import {
   isBinarySpawnFailure,
   probeFailureLevel,
 } from "../lib/binary-overrides.js";
-import { allFailedFault, type BatchFault } from "../lib/engine-unavailable.js";
+import { allFailedFault, allFailedInputCode, type BatchFault } from "../lib/engine-unavailable.js";
 import { resolveConcurrency, resolveWorkerThreads } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
@@ -118,6 +118,7 @@ import {
   runAiToolJob,
 } from "./ai-handlers.js";
 import { isBatchCanceled, readBatchCounters, recordChildOutcome } from "./batch-progress.js";
+import { batchChildDirs, reclaimBatchChildStorage } from "./batch-reclaim.js";
 import {
   claimFinalize,
   registerCancelable,
@@ -2301,9 +2302,13 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
   let canceledChildren = 0;
   let parentStepCount: number | undefined | null = null;
+  // Every key the child rows name, so the cleanup below finds step and flow
+  // directories without listing the workspace.
+  const childKeys: string[] = [];
   for (let i = 0; i < flowChildCount; i++) {
     const childId = `${data.jobId}-f${i}`;
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
+    if (row) childKeys.push(...(row.inputRefs ?? []), ...(row.outputRefs ?? []));
 
     if (!row) {
       const err = new Error("Child job row not found");
@@ -2450,6 +2455,34 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   // file completed first, and that batch completes normally.
   const canceled = canceledChildren > 0;
 
+  // Once the batch is terminal nothing reads a child's input or output: the
+  // ZIP is what downloads serve. Freeing them here keeps one large batch from
+  // holding the workspace cap for FILE_MAX_AGE_HOURS (#1241).
+  const reclaimNow = async () => {
+    let stepCount = settings.stepCount ?? parentStepCount ?? undefined;
+    if (stepCount === undefined && data.toolId === "pipeline-batch") {
+      const [parentRow] = await db
+        .select({ settings: schema.jobs.settings })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, data.jobId))
+        .catch(() => []);
+      stepCount = (parentRow?.settings as { stepCount?: number } | null)?.stepCount;
+    }
+    await reclaimBatchChildStorage({
+      parentId: data.jobId,
+      userId: data.userId,
+      dirs: batchChildDirs(data.jobId, flowChildCount, stepCount, childKeys),
+    });
+  };
+  // Started, not awaited: the ZIP and the terminal frame are already settled,
+  // and a sync client or the single-slot system pool should not sit through
+  // thousands of deletes. A miss is left to the storage sweep (#4184).
+  const reclaimChildStorage = () => {
+    void reclaimNow().catch((err) => {
+      logger.warn({ err, jobId: data.jobId }, "batch child storage cleanup failed");
+    });
+  };
+
   if (canceled && successEntries.length === 0) {
     await cancelBatchJob({
       jobId: data.jobId,
@@ -2458,6 +2491,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       failedFiles,
       errors: [{ filename: "", error: "Canceled" }, ...batchErrors],
     });
+    reclaimChildStorage();
     return {
       outputRefs: [],
       filename: "",
@@ -2479,6 +2513,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       childFaults,
       flowChildCount,
     );
+    const inputCode = fault
+      ? undefined
+      : allFailedInputCode(
+          settings.preFailureFaults,
+          totalFiles - flowChildCount,
+          childFaults,
+          flowChildCount,
+        );
+    const batchCode = fault?.code ?? inputCode ?? undefined;
     // Otherwise one shared reason (the workspace cap on every output write)
     // becomes the batch's own message and a blank-name entry the client reads
     // as the run's error, appended after the per-file entries like the
@@ -2497,7 +2540,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       failedFiles,
       errors: shared ? [...batchErrors, { filename: "", error: shared }] : batchErrors,
       message: fault?.error ?? shared ?? "All files failed processing",
-      ...(fault && { code: fault.code }),
+      ...(batchCode && { code: batchCode }),
       ...(fault?.details && { details: fault.details }),
     });
     if (!applied) {
@@ -2506,13 +2549,19 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
         "batch-finalize progress row was missing or already terminal; no terminal frame announced",
       );
     }
+    reclaimChildStorage();
     return {
       outputRefs: [],
       filename: "",
       contentType: "application/json",
       originalSize: 0,
       processedSize: 0,
-      resultPayload: { manifest, allFailed: true, ...(fault && { fault }) },
+      resultPayload: {
+        manifest,
+        allFailed: true,
+        ...(fault && { fault }),
+        ...(inputCode && { sharedCode: inputCode }),
+      },
     };
   }
 
@@ -2575,6 +2624,9 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
           "failed to record batch packaging failure",
         );
       });
+    // The failed batch has no ZIP, so its child outputs are unreachable;
+    // keeping them is what leaves the next request on a full workspace.
+    reclaimChildStorage();
     throw err instanceof Error ? err : new Error(String(err));
   }
 
@@ -2598,6 +2650,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       bytesOut: zipSize,
       result,
     });
+    reclaimChildStorage();
   } else {
     await completeBatchJob({
       jobId: data.jobId,
@@ -2617,6 +2670,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       processedSize: zipSize,
       durationMs: Date.now() - startTime,
     });
+    reclaimChildStorage();
   }
 
   return {

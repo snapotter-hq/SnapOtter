@@ -41,6 +41,7 @@ export function AiFeaturesSection() {
   const { t } = useTranslation();
   const {
     bundles,
+    bundlesStale,
     fetch,
     installing,
     errors,
@@ -103,6 +104,11 @@ export function AiFeaturesSection() {
       </div>
 
       <div className="space-y-3">
+        {bundlesStale && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t.settings.aiFeatures.statusStale}
+          </p>
+        )}
         {bundles.map((bundle) => (
           <BundleCard
             key={bundle.id}

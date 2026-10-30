@@ -17,7 +17,6 @@ import {
   type Dirent,
   existsSync,
   readdirSync,
-  readFileSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -74,6 +73,7 @@ import {
   isFeatureInstalled,
   isManagedAiEnvironment,
   markUninstalled,
+  readManifest,
   releaseInstallLock,
   resetAiEnvironment,
   setInstallProgress,
@@ -734,14 +734,7 @@ export interface Manifest {
   bundles: Record<string, ManifestBundle>;
 }
 
-export function readManifest(manifestPath = getManifestPath()): Manifest | null {
-  if (!existsSync(manifestPath)) return null;
-  try {
-    return JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
-  } catch {
-    return null;
-  }
-}
+export { readManifest };
 
 export function collectProtectedBundleTargets(
   manifest: Manifest,

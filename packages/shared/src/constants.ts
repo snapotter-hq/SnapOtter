@@ -13,6 +13,25 @@ export const PDF_MULTI_TOOL_LIMITS = { documents: 20, outputPages: 1200 } as con
  */
 export const MAX_RESIZE_OUTPUT_DIMENSION = 16383;
 
+/**
+ * Largest width x height product the resize-style tools accept, in pixels (64 MP).
+ * Defined here for the same reason as the side ceiling: the API schemas and the web
+ * panels must agree on it, and the panels cannot import the Node image engine.
+ */
+export const MAX_RESIZE_OUTPUT_PIXELS = 67_108_864;
+
+/**
+ * Largest scale factor, in percent, the resize route accepts.
+ */
+export const MAX_RESIZE_PERCENTAGE = 1000;
+
+/**
+ * Largest width x height product the content-aware resize route accepts, in pixels
+ * (25 MP). Seam carving is far more expensive than a plain resize, so it cannot use
+ * the full MAX_RESIZE_OUTPUT_PIXELS budget.
+ */
+export const MAX_CONTENT_AWARE_RESIZE_PIXELS = 25_000_000;
+
 export const CATEGORIES: CategoryInfo[] = [
   // Image
   { id: "essentials", name: "Essentials", icon: "Layers", color: "#3B82F6" },

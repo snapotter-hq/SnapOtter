@@ -31,6 +31,8 @@ function selectChain<T>(result: T) {
   return chain;
 }
 
+const loggerMock = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }));
+
 async function loadEnqueueModule(
   options: {
     /** Whether the enterprise team_retention_overrides feature is enabled. */
@@ -156,6 +158,9 @@ async function loadEnqueueModule(
     }));
   }
 
+  loggerMock.error.mockClear();
+  loggerMock.warn.mockClear();
+  vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
   vi.doMock("../../../../apps/api/src/lib/ai-quota.js", () => ({
     assertAiJobQuota: assertAiJobQuotaMock,
   }));
@@ -435,7 +440,7 @@ describe("job enqueue helpers", () => {
 
   it("restarts a consumer loop that stops, instead of leaving the pool deaf", async () => {
     vi.useFakeTimers();
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errors = loggerMock.error;
     try {
       const { mod } = await loadEnqueueModule();
       // BullMQ's autorun would emit 'error' here and never run again, so every
@@ -450,8 +455,8 @@ describe("job enqueue helpers", () => {
 
       expect(queueEventRun).toHaveBeenCalledTimes(2);
       expect(errors).toHaveBeenCalledWith(
+        { err: expect.any(Error) },
         expect.stringContaining("consumer stopped; restarting"),
-        expect.any(Error),
       );
     } finally {
       vi.useRealTimers();
@@ -460,7 +465,6 @@ describe("job enqueue helpers", () => {
 
   it("stops supervising once the consumer has been closed", async () => {
     vi.useFakeTimers();
-    vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const { mod } = await loadEnqueueModule();
       queueEventRun.mockImplementation(() => Promise.reject(new Error("consumer connection lost")));
@@ -478,7 +482,7 @@ describe("job enqueue helpers", () => {
   });
 
   it("getFlowProducer returns the same cached instance on repeated calls and attaches an error listener", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = loggerMock.error;
     const { mod } = await loadEnqueueModule();
     const a = mod.getFlowProducer();
     const b = mod.getFlowProducer();
@@ -488,7 +492,7 @@ describe("job enqueue helpers", () => {
     const handler = flowProducerOn.mock.calls[0][1] as (err: Error) => void;
     const boom = new Error("flow redis blip");
     handler(boom);
-    expect(errorSpy).toHaveBeenCalledWith("[flow-producer] connection error", boom);
+    expect(errorSpy).toHaveBeenCalledWith({ err: boom }, "[flow-producer] connection error");
 
     const { classifyError } = await import("../../../../apps/api/src/lib/error-report.js");
     const flow = { name: "parent", queueName: "snapotter-system", data: {} };
@@ -762,7 +766,7 @@ describe("alias claim outcomes (#895)", () => {
   });
 
   it("enqueueToolJob strips clientJobId from job data when upsertToolJobAlias is refused", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = loggerMock.warn;
     const { mod } = await loadEnqueueModule();
     onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 0 });
 
@@ -863,7 +867,7 @@ describe("alias claim outcomes (#895)", () => {
   });
 
   it("upsertToolJobAlias preserves the terminal replay key when a same-run validation-window cancel already settled the row (#2740)", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = loggerMock.warn;
     const { mod } = await loadEnqueueModule();
     onConflictDoUpdateMock.mockResolvedValueOnce([{ status: "canceled" }]);
 
@@ -889,9 +893,8 @@ describe("alias claim outcomes (#895)", () => {
       }),
     ).resolves.toBe(true);
     expect(warnSpy).toHaveBeenCalledWith(
+      { err: expect.any(Error), clientJobId: "reused-id" },
       "terminal replay key clear failed",
-      "reused-id",
-      expect.any(Error),
     );
   });
 });

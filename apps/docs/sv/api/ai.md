@@ -1,7 +1,7 @@
 ---
 description: "Referens för AI-motorn med alla lokala ML-verktyg. Bakgrundsborttagning, uppskalning, OCR, ansiktsdetektering, fotorestaurering och mer."
 i18n_output_hash: dee9a6647e0e
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -17,8 +17,8 @@ Acceleration via Intel/AMD-iGPU genom VA-API, Quick Sync eller OpenCL stöds int
 
 
 <!-- korean-ocr-contract:start -->
-::: info Kompatibilitet för koreansk OCR
-Snabb OCR stöder `auto`, `en`, `de`, `es`, `fr`, `zh` och `ja`, men inte koreanska (`ko`). Koreanska kräver det exakta OCR-paketet och `balanced` eller `best`. Paketet fungerar i officiella Linux amd64- och arm64-containrar, även på NVIDIA-värdar där OCR fortsätter köras på CPU. System som inte stöds får ett uttryckligt kompatibilitetsfel och faller aldrig tyst tillbaka till `fast`. Koreanska med `fast` eller det äldre aliaset `tesseract` avvisas före köläggning med `FEATURE_INCOMPATIBLE` och `fast-korean-unsupported`.
+::: info Kompatibilitet för koreansk och arabisk OCR
+Snabb OCR stöder `auto`, `en`, `de`, `es`, `fr`, `zh` och `ja`, men inte koreanska (`ko`) eller arabiska (`ar`). Koreanska och arabiska kräver det exakta OCR-paketet och `balanced` eller `best`. Paketet fungerar i officiella Linux amd64- och arm64-containrar, även på NVIDIA-värdar där OCR fortsätter köras på CPU. System som inte stöds får ett uttryckligt kompatibilitetsfel och faller aldrig tyst tillbaka till `fast`. Koreanska eller arabiska med `fast` eller det äldre aliaset `tesseract` avvisas före köläggning med `FEATURE_INCOMPATIBLE` och `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## Arkitektur {#architecture}
@@ -189,12 +189,12 @@ Gör bakgrunden oskarp samtidigt som motivet hålls skarpt.
 
 | Parameter | Typ | Standard | Beskrivning |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
-| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast stöder inte `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska och arabiska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
+| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast stöder inte `ko` eller `ar` |
 | `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
 | `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
 
-Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och korrekt körtid/modellversioner när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` i stället för att köra `fast` tyst. Explicit Fast eller det äldre `tesseract` med koreanska returnerar `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` och hänvisning till det exakta paketet innan ett jobb köas.
+Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och korrekt körtid/modellversioner när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` i stället för att köra `fast` tyst. Explicit Fast eller det äldre `tesseract` med koreanska eller arabiska returnerar `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` och hänvisning till det exakta paketet innan ett jobb köas.
 
 ## PDF-OCR {#pdf-ocr}
 
@@ -205,13 +205,13 @@ Extraherar text från inskannade PDF-dokument med AI-driven OCR, sida för sida.
 
 | Parameter | Typ | Standard | Beskrivning |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
-| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast stöder inte `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska och arabiska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
+| `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast stöder inte `ko` eller `ar` |
 | `pages` | string | `"all"` | Sidval: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
 | `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
 
-Samma regler om ingen nedgradering och koreansk kompatibilitet gäller för PDF-OCR. PDF-sidor rastreras före igenkänning, och en begäran kan välja högst 50 sidor.
+Samma regler om ingen nedgradering och koreansk och arabisk kompatibilitet gäller för PDF-OCR. PDF-sidor rastreras före igenkänning, och en begäran kan välja högst 50 sidor.
 
 ## Oskärp ansikten / PII {#face-pii-blur}
 

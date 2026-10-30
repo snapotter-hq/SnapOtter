@@ -236,7 +236,9 @@ export function rebuildErrorValue(err: unknown): string | null {
     }
     for (const l of links) {
       if (typeof l.code === "string" && NODE_CODE.test(l.code)) {
-        return typeof l.syscall === "string" ? `${l.code} ${l.syscall}` : l.code;
+        // spawn failures carry `spawn <file as passed>` (#1588): keep the verb only.
+        const verb = typeof l.syscall === "string" ? l.syscall.split(" ")[0] : "";
+        return SAFE_NAME.test(verb) ? `${l.code} ${verb}` : l.code;
       }
     }
     if (top.name === "ReplyError" && typeof top.message === "string") {

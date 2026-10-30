@@ -9,6 +9,13 @@ import { preparePdfOcrPages, runTesseractPdf } from "./tesseract-pdf.js";
 export type OcrQuality = "fast" | "balanced" | "best";
 export const FAST_KOREAN_UNSUPPORTED_REASON =
   "Fast OCR does not support Korean. Install the Accurate OCR bundle and choose Balanced or Best.";
+export const FAST_ARABIC_UNSUPPORTED_REASON =
+  "Fast OCR does not support Arabic. Install the Accurate OCR bundle and choose Balanced or Best.";
+/** Languages that only the Accurate runtime's dedicated recognizers can read. */
+const FAST_UNSUPPORTED_LANGUAGE_REASONS = new Map<string, string>([
+  ["ko", FAST_KOREAN_UNSUPPORTED_REASON],
+  ["ar", FAST_ARABIC_UNSUPPORTED_REASON],
+]);
 export const MAX_OCR_INPUT_PIXELS = 40_000_000;
 /** Bound pathological aspect ratios so tiled OCR cannot fan out into thousands of sessions. */
 export const MAX_OCR_INPUT_DIMENSION = 40_000;
@@ -60,9 +67,14 @@ function resolveQuality(options: OcrOptions): OcrQuality {
   return "fast";
 }
 
+export function fastLanguageUnsupportedReason(language: string | undefined): string | undefined {
+  return language === undefined ? undefined : FAST_UNSUPPORTED_LANGUAGE_REASONS.get(language);
+}
+
 function assertFastLanguageSupported(quality: OcrQuality, language: string | undefined): void {
-  if (quality === "fast" && language === "ko") {
-    throw new ToolInputError(FAST_KOREAN_UNSUPPORTED_REASON);
+  const reason = quality === "fast" ? fastLanguageUnsupportedReason(language) : undefined;
+  if (reason) {
+    throw new ToolInputError(reason);
   }
 }
 

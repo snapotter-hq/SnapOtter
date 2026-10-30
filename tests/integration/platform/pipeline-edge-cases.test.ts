@@ -17,6 +17,7 @@ import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
+  loginAsUser,
   type TestApp,
 } from "../test-server.js";
 
@@ -763,11 +764,14 @@ describe("Pipeline batch execution", () => {
     expect(res.headers["x-job-id"]).toBe(clientJobId);
   });
 
-  // A taken id fails the parent insert on the primary key. That is the
-  // client's mistake: 409, and the existing row is left alone (#1689).
-  it("answers 409 for a clientJobId that is already in use", async () => {
+  // A taken id fails the parent insert on the primary key. The owner resending
+  // the same batch (a browser retrying a POST whose response it gave up on)
+  // attaches to the run already going: 202 sends the client to the SSE and its
+  // durable result, and the existing row is left alone (#4139, which replaced
+  // the owner's 409 from #1689). Someone else's id stays a conflict.
+  it("answers 202 for the owner's replay and 409 for another user's clientJobId", async () => {
     const clientJobId = `pipeline-batch-1689-${randomUUID()}`;
-    const post = () => {
+    const post = (token = adminToken) => {
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "dup.png", contentType: "image/png", content: PNG_200x150 },
         {
@@ -779,7 +783,7 @@ describe("Pipeline batch execution", () => {
       return app.inject({
         method: "POST",
         url: "/api/v1/pipeline/batch",
-        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        headers: { "content-type": contentType, authorization: `Bearer ${token}` },
         body,
       });
     };
@@ -789,8 +793,12 @@ describe("Pipeline batch execution", () => {
     const [before] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
 
     const second = await post();
-    expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
-    expect(second.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(202);
+    expect(second.json()).toEqual({ jobId: clientJobId, async: true });
+
+    const foreign = await post(await loginAsUser(app));
+    expect(foreign.statusCode, foreign.body.slice(0, 300)).toBe(409);
+    expect(foreign.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
 
     const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
     expect(after).toEqual(before);

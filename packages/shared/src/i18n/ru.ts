@@ -1450,6 +1450,8 @@ export const ru: TranslationKeys = {
       submit: "Изменить размер",
       submitBatch: "Изменить размер ({count} файлов)",
       progressLabel: "Изменение размера",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      maxPercentageExceeded: "Используйте масштаб от 1 до {max}%.",
     },
     crop: {
       width: "Ширина",
@@ -1996,6 +1998,8 @@ export const ru: TranslationKeys = {
         "Улучшает локальный контраст перед распознаванием. Быстрый режим применяет его сразу; Сбалансированный и Лучший сохраняют вариант только при улучшении калиброванной оценки.",
       fastKoreanUnsupported:
         "Быстрый OCR не поддерживает корейский язык. Установите пакет точного OCR и выберите «Сбалансированный» или «Лучший».",
+      fastArabicUnsupported:
+        "Быстрый OCR не поддерживает арабский язык. Установите пакет точного OCR и выберите «Сбалансированный» или «Лучший».",
       language: "Язык",
       autoDetect: "Автоопределение",
       extractedText: "Извлечённый текст",
@@ -2092,6 +2096,9 @@ export const ru: TranslationKeys = {
       submitSubject: "Умная обрезка",
       submitFace: "Обрезка по лицу",
       submitTrim: "Обрезать поля",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      cropAreaExceeded:
+        "Этот фрагмент превышает лимит в {max} пикселей. Уменьшите ширину, высоту или отступ.",
     },
     imageEnhancement: {
       enhancementMode: "Режим улучшения",
@@ -2218,6 +2225,9 @@ export const ru: TranslationKeys = {
       submit: "Изменить размер",
       submitBatch: "Изменить размер ({count} файлов)",
       progressLabel: "Контентно-зависимое масштабирование",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      areaExceeded:
+        "Изменение размера с учётом содержимого ограничено {max} пикселями в сумме. Уменьшите ширину или высоту.",
     },
     "ai-canvas-expand": {
       quality: "Качество",
@@ -3267,6 +3277,7 @@ export const ru: TranslationKeys = {
       submit: "Обработать GIF",
       submitBatch: "Обработать ({count} файлов)",
       progressLabel: "Обработка GIF",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
     },
     "image-to-base64": {
       converting: "Конвертация...",
@@ -3712,8 +3723,7 @@ export const ru: TranslationKeys = {
       bestEffortHint:
         "Максимум по возможности. PDF на основе изображений приближаются к этому размеру; PDF только с текстом могут не уменьшиться до него.",
       targetReached: "Целевой размер {target} достигнут (результат: {size}).",
-      targetMissed:
-        "Не удалось достичь {target}. Минимально возможный размер составил {size}, поскольку этот PDF состоит в основном из текста или векторной графики, которые сжатие изображений не может уменьшить.",
+      targetMissed: "Не удалось достичь {target}. Минимально возможный размер составил {size}.",
     },
     "rotate-pdf": {
       angle: "Угол поворота",
@@ -3943,6 +3953,9 @@ export const ru: TranslationKeys = {
       submit: "Извлечь текст",
       submitBatch: "Извлечь текст ({count} файлов)",
       progressLabel: "Извлечение текста",
+      scannedHint:
+        "Этот PDF отсканирован, поэтому извлекать из него нечего. OCR может его прочитать, но это дольше и требует установленного ИИ-пакета OCR.",
+      runOcr: "Запустить OCR для этого PDF",
     },
     "pdf-to-word": {
       hint: "Лучше всего подходит для текстовых PDF; для сканов нужен OCR",
@@ -4695,6 +4708,7 @@ export const ru: TranslationKeys = {
         anchorLabel: "Расположение:",
         anchorAriaLabel: "Расположение: {position}",
         backgroundLabel: "Фон:",
+        transparent: "Прозрачный",
         anchors: {
           topLeft: "сверху слева",
           topCenter: "сверху по центру",
@@ -5221,6 +5235,7 @@ export const ru: TranslationKeys = {
       description: "Управление пакетами AI-моделей для расширенной обработки файлов.",
       installAll: "Установить все",
       diskUsage: "Использование диска: {size}",
+      statusStale: "Не удалось обновить состояние пакетов. Список ниже может быть устаревшим.",
       sizeOnDisk: "{size} на диске",
       installed: "Установлено",
       notInstalled: "Не установлено",
@@ -5659,6 +5674,7 @@ export const ru: TranslationKeys = {
     invalidSetting: "Недопустимое значение параметра «{setting}».",
     network: "Сетевая ошибка",
     invalidResponse: "Некорректный ответ",
+    staleVersionReload: "Приложение обновлено. Перезагрузите страницу и повторите попытку.",
     failedWithStatus: "Не удалось выполнить запрос. Пожалуйста, попробуйте снова.",
     processingFailedWithStatus:
       "Не удалось обработать этот файл. Убедитесь, что файл не повреждён, и попробуйте снова.",
@@ -5888,6 +5904,7 @@ export const ru: TranslationKeys = {
       zh: "Китайский",
       ja: "Японский",
       ko: "Корейский",
+      ar: "Арабский",
       id: "Индонезийский",
       th: "Тайский",
       vi: "Вьетнамский",

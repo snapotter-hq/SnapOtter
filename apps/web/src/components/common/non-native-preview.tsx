@@ -1,4 +1,4 @@
-import { SafeError } from "@snapotter/shared";
+import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import { Play, RefreshCw, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -8,6 +8,7 @@ import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { format } from "@/lib/format";
 import { previewFailureEncoder } from "@/lib/preview-error";
+import { isIgnoredError } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 
 type PreviewState = "idle" | "generating" | "ready" | "error";
@@ -136,6 +137,16 @@ export function NonNativePreview({
       }
 
       const blob = await response.blob();
+      // A 200 is not proof of media: a proxy or captive portal can answer with
+      // HTML. The route answers with video/mp4 or audio/mpeg depending on the
+      // source, so anything else (or nothing) is a failed preview, not a
+      // broken player (#4107).
+      const isMedia = blob.type.startsWith("video/") || blob.type.startsWith("audio/");
+      if (blob.size === 0 || !isMedia) {
+        throw new SafeError("Media preview returned a non-media body", {
+          code: "preview-not-media",
+        });
+      }
       const url = URL.createObjectURL(blob);
 
       // Revoke previous URL if any
@@ -147,18 +158,23 @@ export function NonNativePreview({
       // Checked on the signal, not the error: an abort while the error body
       // was being read surfaces as an ordinary failure.
       if (!controller.signal.aborted) {
-        const status = err instanceof SafeError ? err.statusCode : undefined;
+        const status = isSafeMessageError(err) ? err.statusCode : undefined;
         setMissingEncoder(encoder);
         setTooLarge(status === 413);
         setSourceExpired(expired);
         setState("error");
         // A 413 (over the upload limit) or 422 (ffmpeg couldn't decode it, or
         // lacks the encoder) is about the file, and the panel says so.
-        // Anything else, whether a 5xx, an expired session, a rate limit, or a
-        // failed request, is a fault nobody would otherwise hear about (#1280).
-        if (status !== 413 && status !== 422) {
+        // Anything else, whether a 5xx, an expired session, or a rate limit, is
+        // a fault nobody would otherwise hear about (#1280). A dropped
+        // connection is already in Sentry's IGNORE_ERRORS, so wrapping one in
+        // a SafeError would defeat that filter (#4106).
+        const reportable = isSafeMessageError(err)
+          ? status !== 413 && status !== 422
+          : !isIgnoredError(err);
+        if (reportable) {
           void captureHandledError(
-            err instanceof SafeError
+            isSafeMessageError(err)
               ? err
               : new SafeError("Media preview request failed", {
                   code: "preview-request",

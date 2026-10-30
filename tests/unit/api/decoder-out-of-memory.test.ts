@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -193,6 +194,17 @@ const LIBGOMP = "\nlibgomp: Thread creation failed: Resource temporarily unavail
 
 function failure(fields: Record<string, unknown>): Error {
   return Object.assign(new Error("Command failed: magick"), fields);
+}
+
+/**
+ * dcraw_emu is built from LibRaw source in the production image, but the lean
+ * docker test image ships only libraw-dev. Without the binary decodeRaw falls
+ * through to a preview tier, so the mocked TIFF read this case relies on never
+ * happens (#4099). Skip where it is absent, as the other binary-gated suites do.
+ */
+function hasDcrawEmu(): boolean {
+  const probe = spawnSync("dcraw_emu", ["-version"], { stdio: "ignore" });
+  return (probe.error as NodeJS.ErrnoException | undefined)?.code !== "ENOENT";
 }
 
 describe("asDecoderOutOfMemory", () => {
@@ -489,19 +501,22 @@ describe("decodeRaw and preflight/post-decode fault handling (#1758)", () => {
     expect((err as Error).name).toBe("DecoderOutOfMemoryError");
   });
 
-  it("ends decodeRaw as a 503 when reading dcraw_emu's TIFF output fails to allocate", async () => {
-    const { fixtures, readFixture } = await import("../../fixtures/index.js");
-    failures.read = new RangeError("Array buffer allocation failed");
+  it.skipIf(!hasDcrawEmu())(
+    "ends decodeRaw as a 503 when reading dcraw_emu's TIFF output fails to allocate",
+    async () => {
+      const { fixtures, readFixture } = await import("../../fixtures/index.js");
+      failures.read = new RangeError("Array buffer allocation failed");
 
-    const err = await decodeToSharpCompat(
-      readFixture(fixtures.image.formats("dng")),
-      "raw",
-      "dng",
-    ).catch((e: unknown) => e as Error);
+      const err = await decodeToSharpCompat(
+        readFixture(fixtures.image.formats("dng")),
+        "raw",
+        "dng",
+      ).catch((e: unknown) => e as Error);
 
-    expect(isDecoderUnavailable(err)).toBe(true);
-    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
-  });
+      expect(isDecoderUnavailable(err)).toBe(true);
+      expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+    },
+  );
 
   it("ends decodeRaw as a 503 when dcraw_emu rejects and exiftool's preview extract is killed", async () => {
     failures.byCommand.dcraw_emu = {

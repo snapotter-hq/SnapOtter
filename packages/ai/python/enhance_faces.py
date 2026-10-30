@@ -393,7 +393,7 @@ def main():
                             raise
                         import traceback
                         detail = str(e).strip() or type(e).__name__
-                        print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {detail}", file=sys.stderr, flush=True)
+                        print(json.dumps({"warning": f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {detail}"}), file=sys.stderr, flush=True)
                         traceback.print_exc(file=sys.stderr)
                         emit_progress(50, "Falling back to GFPGAN")
                         try:

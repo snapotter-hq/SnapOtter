@@ -1406,6 +1406,8 @@ export const ja: TranslationKeys = {
       submit: "リサイズ",
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "リサイズ中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      maxPercentageExceeded: "1〜{max}% の倍率を指定してください。",
     },
     crop: {
       width: "幅",
@@ -1948,6 +1950,8 @@ export const ja: TranslationKeys = {
         "認識前に局所コントラストを改善します。高速では直接適用し、バランスと最高では調整済みスコアで結果が改善する場合のみ採用します。",
       fastKoreanUnsupported:
         "高速 OCR は韓国語に対応していません。高精度 OCR パックをインストールし、バランスまたは最高を選択してください。",
+      fastArabicUnsupported:
+        "高速 OCR はアラビア語に対応していません。高精度 OCR パックをインストールし、バランスまたは最高を選択してください。",
       language: "言語",
       autoDetect: "自動検出",
       extractedText: "抽出テキスト",
@@ -2044,6 +2048,9 @@ export const ja: TranslationKeys = {
       submitSubject: "スマートクロップ",
       submitFace: "顔クロップ",
       submitTrim: "ボーダートリム",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      cropAreaExceeded:
+        "この切り抜きは {max} ピクセルの上限を超えています。幅、高さ、パディングを小さくしてください。",
     },
     imageEnhancement: {
       enhancementMode: "エンハンスモード",
@@ -2169,6 +2176,9 @@ export const ja: TranslationKeys = {
       submit: "リサイズ",
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "コンテンツ認識リサイズ中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      areaExceeded:
+        "コンテンツ認識リサイズは合計 {max} ピクセルまでです。幅または高さを小さくしてください。",
     },
     "ai-canvas-expand": {
       quality: "品質",
@@ -3214,6 +3224,7 @@ export const ja: TranslationKeys = {
       submit: "GIF処理",
       submitBatch: "処理（{count}ファイル）",
       progressLabel: "GIFを処理中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
     },
     "image-to-base64": {
       converting: "変換中...",
@@ -3658,8 +3669,7 @@ export const ja: TranslationKeys = {
       bestEffortHint:
         "可能な限りの上限です。画像ベースのPDFはこのサイズに近づきますが、テキストのみのPDFはこのサイズまで縮小できない場合があります。",
       targetReached: "目標の{target}に到達しました（結果: {size}）。",
-      targetMissed:
-        "{target}に到達できませんでした。このPDFは主にテキストまたはベクターで構成されており、画像圧縮では縮小できないため、達成できた最小サイズは{size}でした。",
+      targetMissed: "{target}に到達できませんでした。達成できた最小サイズは{size}でした。",
     },
     "rotate-pdf": {
       angle: "回転角度",
@@ -3887,6 +3897,9 @@ export const ja: TranslationKeys = {
       submit: "テキストを抽出",
       submitBatch: "テキストを抽出 ({count}ファイル)",
       progressLabel: "抽出中",
+      scannedHint:
+        "このPDFはスキャンされた画像のため、抽出できるテキストがありません。OCRなら読み取れますが、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+      runOcr: "このPDFでOCRを実行",
     },
     "pdf-to-word": {
       hint: "テキストベースのPDFに最適です。スキャンページにはOCRが必要です",
@@ -4639,6 +4652,7 @@ export const ja: TranslationKeys = {
         anchorLabel: "基準位置：",
         anchorAriaLabel: "基準位置 {position}",
         backgroundLabel: "背景：",
+        transparent: "透明",
         anchors: {
           topLeft: "左上",
           topCenter: "上中央",
@@ -5156,6 +5170,7 @@ export const ja: TranslationKeys = {
       description: "高度なファイル処理のためのAIモデルバンドルを管理します。",
       installAll: "すべてインストール",
       diskUsage: "ディスク使用量: {size}",
+      statusStale: "バンドルの状態を更新できませんでした。下の一覧は最新でない可能性があります。",
       sizeOnDisk: "ディスク上 {size}",
       installed: "インストール済み",
       notInstalled: "未インストール",
@@ -5597,6 +5612,7 @@ export const ja: TranslationKeys = {
     invalidSetting: "{setting} の値が無効です。",
     network: "ネットワークエラー",
     invalidResponse: "無効な応答",
+    staleVersionReload: "アプリが更新されました。ページを再読み込みして、もう一度お試しください。",
     failedWithStatus: "リクエストを完了できませんでした。もう一度お試しください。",
     processingFailedWithStatus:
       "このファイルを処理できませんでした。ファイルが破損していないか確認して、もう一度お試しください。",
@@ -5824,6 +5840,7 @@ export const ja: TranslationKeys = {
       zh: "中国語",
       ja: "日本語",
       ko: "韓国語",
+      ar: "アラビア語",
       id: "インドネシア語",
       th: "タイ語",
       vi: "ベトナム語",

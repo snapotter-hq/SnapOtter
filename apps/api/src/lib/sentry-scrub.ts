@@ -163,14 +163,43 @@ function isHttpOp(op: unknown): boolean {
   return typeof op === "string" && op.startsWith("http");
 }
 
+// Hosts whose name says which provider was called and holds no secret. Every
+// other host is cut to its registrable domain (#1926).
+const KEEP_HOSTS = new Set(["hooks.slack.com", "discord.com", "discordapp.com"]);
+// Second-level labels that, under a two-letter country code, belong to the
+// public suffix (example.co.uk): a crude stand-in for a public-suffix list.
+const SUFFIX_SLDS = new Set(["co", "com", "org", "net", "gov", "edu", "ac"]);
+
 /**
- * scheme://host[:port] of an absolute url, or undefined when there is none to
- * parse. Path, query, fragment, and userinfo all go.
+ * A hostname with its leading labels replaced by "*": some webhook services put
+ * the secret in the subdomain (abc123.m.pipedream.net). IP addresses and
+ * single-label hosts carry no such secret and stay; a registrable domain is the
+ * last two labels, or three under a country-code suffix such as co.uk.
+ */
+function maskHost(host: string): string {
+  const lower = host.toLowerCase();
+  if (KEEP_HOSTS.has(lower) || lower.startsWith("[") || /^[\d.]+$/.test(lower)) return host;
+  const labels = lower.split(".");
+  const keep =
+    labels.length >= 3 &&
+    labels[labels.length - 1].length === 2 &&
+    SUFFIX_SLDS.has(labels[labels.length - 2])
+      ? 3
+      : 2;
+  if (labels.length <= keep) return host;
+  return `*.${labels.slice(-keep).join(".")}`;
+}
+
+/**
+ * scheme://host[:port] of an absolute url, with the host masked by maskHost, or
+ * undefined when there is none to parse. Path, query, fragment, and userinfo
+ * all go.
  */
 function originOf(url: string): string | undefined {
   try {
-    const origin = new URL(url).origin;
-    return origin === "null" ? undefined : origin;
+    const u = new URL(url);
+    if (u.origin === "null") return undefined;
+    return `${u.protocol}//${maskHost(u.hostname)}${u.port ? `:${u.port}` : ""}`;
   } catch {
     return undefined;
   }
@@ -180,12 +209,21 @@ function originOf(url: string): string | undefined {
 // hold only its path.
 const OUTGOING_URL_DATA_KEYS = new Set(["url", "url.full", "http.url"]);
 const OUTGOING_PATH_DATA_KEYS = new Set(["url.path", "http.target"]);
+// Data keys of an outgoing request that hold only its hostname (http.host may
+// carry a :port).
+const OUTGOING_HOST_DATA_KEYS = new Set([
+  "url.domain",
+  "server.address",
+  "net.peer.name",
+  "http.host",
+]);
 
 /**
  * Span or breadcrumb data of an outgoing request, scrubbed as scrubUrlData
- * does and with every url cut to its origin. The url belongs to a third party,
- * whose path can be the secret itself: a Slack or Discord webhook carries its
- * token there (#1899). A url that does not parse is dropped.
+ * does and with every url cut to its origin and every hostname masked. The url
+ * belongs to a third party, whose path can be the secret itself (a Slack or
+ * Discord webhook carries its token there, #1899) and whose subdomain can be
+ * (#1926). A url that does not parse is dropped.
  */
 function scrubOutgoingData(value: unknown): unknown {
   const data = asObj(scrubUrlData(value));
@@ -197,6 +235,13 @@ function scrubOutgoingData(value: unknown): unknown {
       // Anything but a parseable string (an attribute array, say) goes too.
       const origin = typeof v === "string" ? originOf(v) : undefined;
       if (origin) out[key] = origin;
+      continue;
+    }
+    if (OUTGOING_HOST_DATA_KEYS.has(key)) {
+      // As with the url keys, anything but a string goes.
+      if (typeof v !== "string") continue;
+      const port = /:\d+$/.exec(v)?.[0] ?? "";
+      out[key] = maskHost(v.slice(0, v.length - port.length)) + port;
       continue;
     }
     out[key] = v;

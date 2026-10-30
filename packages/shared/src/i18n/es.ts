@@ -1436,6 +1436,8 @@ export const es: TranslationKeys = {
       submit: "Redimensionar",
       submitBatch: "Redimensionar ({count} archivos)",
       progressLabel: "Redimensionando",
+      maxDimensionExceeded: "Usa un tamaño de 1 a {max} px.",
+      maxPercentageExceeded: "Usa una escala de 1 a {max} %.",
     },
     crop: {
       width: "Ancho",
@@ -1984,6 +1986,8 @@ export const es: TranslationKeys = {
         "Mejora el contraste local antes del reconocimiento. Rápido lo aplica directamente; Equilibrado y Óptimo solo conservan la variante si la puntuación calibrada mejora el resultado.",
       fastKoreanUnsupported:
         "El OCR rápido no admite coreano. Instala el paquete de OCR preciso y elige Equilibrado u Óptimo.",
+      fastArabicUnsupported:
+        "El OCR rápido no admite árabe. Instala el paquete de OCR preciso y elige Equilibrado u Óptimo.",
       language: "Idioma",
       autoDetect: "Detección automática",
       extractedText: "Texto extraído",
@@ -2080,6 +2084,9 @@ export const es: TranslationKeys = {
       submitSubject: "Recorte inteligente",
       submitFace: "Recorte facial",
       submitTrim: "Recortar bordes",
+      maxDimensionExceeded: "Usa un tamaño de 1 a {max} px.",
+      cropAreaExceeded:
+        "Este recorte supera el límite de {max} píxeles. Reduce el ancho, el alto o el relleno.",
     },
     imageEnhancement: {
       enhancementMode: "Modo de mejora",
@@ -2206,6 +2213,9 @@ export const es: TranslationKeys = {
       submit: "Redimensionar",
       submitBatch: "Redimensionar ({count} archivos)",
       progressLabel: "Redimensionando con reconocimiento de contenido",
+      maxDimensionExceeded: "Usa un tamaño de 1 a {max} px.",
+      areaExceeded:
+        "El cambio de tamaño según el contenido está limitado a {max} píxeles en total. Reduce la anchura o la altura.",
     },
     "ai-canvas-expand": {
       quality: "Calidad",
@@ -3255,6 +3265,7 @@ export const es: TranslationKeys = {
       submit: "Procesar GIF",
       submitBatch: "Procesar ({count} archivos)",
       progressLabel: "Procesando GIF",
+      maxDimensionExceeded: "Usa un tamaño de 1 a {max} px.",
     },
     "image-to-base64": {
       converting: "Convirtiendo...",
@@ -3700,8 +3711,7 @@ export const es: TranslationKeys = {
       bestEffortHint:
         "Máximo posible. Los PDF basados en imágenes se acercan; los PDF de solo texto quizá no se reduzcan a este tamaño.",
       targetReached: "Se alcanzó el objetivo de {target} (resultado: {size}).",
-      targetMissed:
-        "No se pudo alcanzar {target}. El tamaño más pequeño posible fue {size} porque este PDF es principalmente texto o vectores, que la compresión de imágenes no puede reducir.",
+      targetMissed: "No se pudo alcanzar {target}. El tamaño más pequeño posible fue {size}.",
     },
     "rotate-pdf": {
       angle: "Ángulo de rotación",
@@ -3931,6 +3941,9 @@ export const es: TranslationKeys = {
       submit: "Extraer texto",
       submitBatch: "Extraer texto ({count} archivos)",
       progressLabel: "Extrayendo",
+      scannedHint:
+        "Este PDF está escaneado, así que no hay texto que extraer. El OCR puede leerlo, pero tarda más y requiere tener instalado el paquete de IA de OCR.",
+      runOcr: "Ejecutar OCR en este PDF",
     },
     "pdf-to-word": {
       hint: "Ideal para PDF con texto; las páginas escaneadas requieren OCR",
@@ -4685,6 +4698,7 @@ export const es: TranslationKeys = {
         anchorLabel: "Anclaje:",
         anchorAriaLabel: "Anclaje {position}",
         backgroundLabel: "Fondo:",
+        transparent: "Transparente",
         anchors: {
           topLeft: "superior izquierda",
           topCenter: "superior centro",
@@ -5217,6 +5231,8 @@ export const es: TranslationKeys = {
       description: "Gestiona paquetes de modelos AI para procesamiento avanzado de archivos.",
       installAll: "Instalar todo",
       diskUsage: "Uso del disco: {size}",
+      statusStale:
+        "No se pudo actualizar el estado de los paquetes. La lista puede estar desactualizada.",
       sizeOnDisk: "{size} en disco",
       installed: "Instalado",
       notInstalled: "No instalado",
@@ -5661,6 +5677,7 @@ export const es: TranslationKeys = {
     invalidSetting: "Valor no válido para {setting}.",
     network: "Error de red",
     invalidResponse: "Respuesta no válida",
+    staleVersionReload: "La aplicación se actualizó. Recarga la página e inténtalo de nuevo.",
     failedWithStatus: "No pudimos completar esa solicitud. Inténtalo de nuevo.",
     processingFailedWithStatus:
       "No pudimos procesar este archivo. Comprueba que no esté dañado e inténtalo de nuevo.",
@@ -5893,6 +5910,7 @@ export const es: TranslationKeys = {
       zh: "Chino",
       ja: "Japonés",
       ko: "Coreano",
+      ar: "Árabe",
       id: "Indonesio",
       th: "Tailandés",
       vi: "Vietnamita",

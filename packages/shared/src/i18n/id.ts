@@ -1446,6 +1446,8 @@ export const id: TranslationKeys = {
       submit: "Ubah Ukuran",
       submitBatch: "Ubah Ukuran ({count} file)",
       progressLabel: "Mengubah ukuran",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
+      maxPercentageExceeded: "Gunakan skala dari 1 hingga {max}%.",
     },
     crop: {
       width: "Lebar",
@@ -1989,6 +1991,8 @@ export const id: TranslationKeys = {
         "Memperbaiki kontras lokal sebelum pengenalan. Cepat menerapkannya langsung; Seimbang dan Terbaik hanya mempertahankannya jika skor terkalibrasi memperbaiki hasil.",
       fastKoreanUnsupported:
         "OCR Cepat tidak mendukung bahasa Korea. Instal paket OCR Akurat lalu pilih Seimbang atau Terbaik.",
+      fastArabicUnsupported:
+        "OCR Cepat tidak mendukung bahasa Arab. Instal paket OCR Akurat lalu pilih Seimbang atau Terbaik.",
       language: "Bahasa",
       autoDetect: "Deteksi otomatis",
       extractedText: "Teks yang Diekstrak",
@@ -2085,6 +2089,9 @@ export const id: TranslationKeys = {
       submitSubject: "Potong Cerdas",
       submitFace: "Potong Wajah",
       submitTrim: "Trim Border",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
+      cropAreaExceeded:
+        "Potongan ini melebihi batas {max} piksel. Kurangi lebar, tinggi, atau padding.",
     },
     imageEnhancement: {
       enhancementMode: "Mode Peningkatan",
@@ -2211,6 +2218,9 @@ export const id: TranslationKeys = {
       submit: "Ubah Ukuran",
       submitBatch: "Ubah Ukuran ({count} file)",
       progressLabel: "Mengubah ukuran content-aware",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
+      areaExceeded:
+        "Ubah ukuran sadar konten dibatasi {max} piksel total. Kurangi lebar atau tinggi.",
     },
     "ai-canvas-expand": {
       quality: "Kualitas",
@@ -3259,6 +3269,7 @@ export const id: TranslationKeys = {
       submit: "Proses GIF",
       submitBatch: "Proses ({count} file)",
       progressLabel: "Memproses GIF",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
     },
     "image-to-base64": {
       converting: "Mengonversi...",
@@ -3705,7 +3716,7 @@ export const id: TranslationKeys = {
         "Maksimum sebisa mungkin. PDF berbasis gambar mendekati ukuran ini; PDF berisi teks saja mungkin tidak menyusut ke ukuran ini.",
       targetReached: "Target {target} tercapai (hasil: {size}).",
       targetMissed:
-        "Tidak dapat mencapai {target}. Ukuran terkecil yang bisa dicapai adalah {size} karena PDF ini sebagian besar berupa teks atau vektor, yang tidak dapat diperkecil oleh kompresi gambar.",
+        "Tidak dapat mencapai {target}. Ukuran terkecil yang bisa dicapai adalah {size}.",
     },
     "rotate-pdf": {
       angle: "Sudut rotasi",
@@ -3935,6 +3946,9 @@ export const id: TranslationKeys = {
       submit: "Ekstrak Teks",
       submitBatch: "Ekstrak Teks ({count} file)",
       progressLabel: "Mengekstrak",
+      scannedHint:
+        "PDF ini hasil pindaian, jadi tidak ada teks yang bisa diekstrak. OCR bisa membacanya, tetapi butuh waktu lebih lama dan paket AI OCR harus terpasang.",
+      runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-to-word": {
       hint: "Terbaik untuk PDF berbasis teks; halaman pindaian memerlukan OCR",
@@ -4686,6 +4700,7 @@ export const id: TranslationKeys = {
         anchorLabel: "Jangkar:",
         anchorAriaLabel: "Jangkar {position}",
         backgroundLabel: "Latar Belakang:",
+        transparent: "Transparan",
         anchors: {
           topLeft: "kiri atas",
           topCenter: "tengah atas",
@@ -5209,6 +5224,7 @@ export const id: TranslationKeys = {
       description: "Kelola bundel model AI untuk pemrosesan file tingkat lanjut.",
       installAll: "Instal Semua",
       diskUsage: "Penggunaan disk: {size}",
+      statusStale: "Gagal memperbarui status paket. Daftar di bawah mungkin sudah tidak terbaru.",
       sizeOnDisk: "{size} di disk",
       installed: "Terinstal",
       notInstalled: "Belum terinstal",
@@ -5647,6 +5663,7 @@ export const id: TranslationKeys = {
     invalidSetting: "Nilai tidak valid untuk {setting}.",
     network: "Kesalahan jaringan",
     invalidResponse: "Respons tidak valid",
+    staleVersionReload: "Aplikasi telah diperbarui. Muat ulang halaman dan coba lagi.",
     failedWithStatus: "Kami tidak dapat menyelesaikan permintaan tersebut. Silakan coba lagi.",
     processingFailedWithStatus:
       "Kami tidak dapat memproses file ini. Pastikan file tidak rusak dan coba lagi.",
@@ -5875,6 +5892,7 @@ export const id: TranslationKeys = {
       zh: "Tionghoa",
       ja: "Jepang",
       ko: "Korea",
+      ar: "Arab",
       id: "Indonesia",
       th: "Thai",
       vi: "Vietnam",

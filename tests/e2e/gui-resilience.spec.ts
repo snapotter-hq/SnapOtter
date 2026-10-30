@@ -1043,9 +1043,13 @@ test.describe("Server Error Handling", () => {
 
     await page.getByTestId("stitch-submit").click();
 
-    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+    // The settings panel shows the same copy under its submit button; assert on
+    // the preview card so the locator stays unambiguous (#4097).
+    await expect(
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("Invalid response", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("stitch-submit")).toBeEnabled();
     await expect(page.getByTestId("stitch-download")).toHaveCount(0);
   });
@@ -1090,9 +1094,11 @@ test.describe("Server Error Handling", () => {
 
     await page.getByTestId("stitch-submit").click();
 
-    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("Invalid response", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("stitch-submit")).toBeEnabled();
     await expect(page.getByTestId("stitch-download")).toHaveCount(0);
   });
@@ -1137,7 +1143,7 @@ test.describe("Server Error Handling", () => {
   // #1858: panels that post for themselves read a failed answer as
   // `body.error || fallback`, so an object-valued error showed as
   // "[object Object]" and a details-only answer lost its reason.
-  test("stitch shows its status line, not [object Object], for an object error", async ({
+  test("stitch shows the failure copy, not [object Object], for an object error", async ({
     loggedInPage: page,
   }) => {
     await page.goto("/image/stitch");
@@ -1158,7 +1164,9 @@ test.describe("Server Error Handling", () => {
     await page.getByTestId("stitch-submit").click();
 
     await expect(
-      page.getByText("We couldn't complete that request. Please try again.", { exact: true }),
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("We couldn't complete that request. Please try again.", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("[object Object]")).toHaveCount(0);
     await expect(page.getByTestId("stitch-submit")).toBeEnabled();
@@ -1197,9 +1205,11 @@ test.describe("Server Error Handling", () => {
 
     await page.getByTestId("compare-submit").click();
 
-    await expect(page.getByText("Not enough memory", { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("Not enough memory", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
 

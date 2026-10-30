@@ -951,6 +951,27 @@ describe("useToolProcessor batch recovery (#750)", () => {
     unmount();
   });
 
+  it("keeps the server's code on the store error so a panel can offer the next step (#4143)", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].response = new Blob(
+        [JSON.stringify({ error: "All files failed processing", code: "NO_TEXT_LAYER" })],
+        { type: "application/json" },
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().processing).toBe(false);
+    });
+    expect(useFileStore.getState().errorCode).toBe("NO_TEXT_LAYER");
+
+    unmount();
+  });
+
   it("reports the server's error code as the reason when the body carries one (#1161)", async () => {
     const { unmount } = startBatchRun();
 
@@ -1646,6 +1667,25 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
     unmount();
   });
 
+  it("keeps the failed frame's code on the store error (#4143)", () => {
+    const { unmount } = startBatchRun();
+    degrade();
+
+    act(() => {
+      sendBatchFrame({
+        status: "failed",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [],
+        code: "NO_TEXT_LAYER",
+      });
+    });
+
+    expect(useFileStore.getState().errorCode).toBe("NO_TEXT_LAYER");
+    unmount();
+  });
+
   it("ends the run with the frame's own error when failing the entries throws", () => {
     const { unmount } = startBatchRun();
     degrade();
@@ -2209,44 +2249,34 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805, #1929)", () => {
     ["does not decode", "%ZZ"],
     ["is not JSON", encodeURIComponent("{oops")],
     ["is not an object", encodeURIComponent("[1]")],
-  ])("logs and reports a file-results header that %s", async (_label, header) => {
-    const { unmount } = startBatchRun();
-    act(() => respond(zipBlob(), header));
+  ])(
+    "logs, reports and fails the batch on a file-results header that %s (#4081)",
+    async (_label, header) => {
+      const { unmount } = startBatchRun();
+      act(() => respond(zipBlob(), header));
 
-    await settled(() => expect(useFileStore.getState().processing).toBe(false));
-    // Only the length: the header holds file names.
-    expect(consoleError).toHaveBeenCalledWith("Ignoring unreadable X-File-Results", {
-      length: header.length,
-    });
-    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
-    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
-    expect(error).toMatchObject({
-      name: "FileResultsUnreadableError",
-      message: "Batch result file map could not be read",
-      statusCode: 200,
-    });
-    expect(error.cause).toBeUndefined();
-    expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
-    // No file can be matched to its result, as before, and batch_processed
-    // records the bad header as a failed batch (#1929).
-    expect(useFileStore.getState().entries.map((e) => e.error)).toEqual([
-      "File not found in batch results",
-      "File not found in batch results",
-    ]);
-    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
-      [
-        "batch_processed",
-        {
-          tool_id: "resize",
-          file_count: 2,
-          status: "failed",
-          reason: "bad-file-results",
-          total_bytes: 32,
-        },
-      ],
-    ]);
-    unmount();
-  });
+      await settled(() => expect(useFileStore.getState().processing).toBe(false));
+      // Only the length: the header holds file names.
+      expect(consoleError).toHaveBeenCalledWith("Ignoring unreadable X-File-Results", {
+        length: header.length,
+      });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error).toMatchObject({
+        name: "FileResultsUnreadableError",
+        message: "Batch result file map could not be read",
+        statusCode: 200,
+      });
+      expect(error.cause).toBeUndefined();
+      expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
+      // An unreadable header is not "no results": the batch fails with the
+      // header's own reason instead of blaming every file (#4081).
+      expectBatchFailed(en.errors.batchFailed, "bad-file-results");
+      // Nothing can be matched to a result, so the ZIP is not offered either.
+      expect(useFileStore.getState().batchZipBlob).toBeNull();
+      unmount();
+    },
+  );
 
   it("reads a missing file-results header as no results, without a report", async () => {
     const { unmount } = startBatchRun();
@@ -2254,6 +2284,14 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805, #1929)", () => {
 
     await settled(() => expect(useFileStore.getState().processing).toBe(false));
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    // The absent-header half of the distinction #4081 relies on: no results,
+    // not a failed batch, and the ZIP stays available.
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries.map((e) => e.error)).toEqual([
+      "File not found in batch results",
+      "File not found in batch results",
+    ]);
+    expect(useFileStore.getState().batchZipBlob).not.toBeNull();
     expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
       [
         "batch_processed",
@@ -2464,6 +2502,8 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805, #1929)", () => {
 
     await settled(() => expect(useFileStore.getState().processing).toBe(false));
     expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    // The cancel outranks the unreadable header: no batch failure is shown.
+    expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().entries.map((e) => e.error)).toEqual(["Canceled", "Canceled"]);
     expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
       [

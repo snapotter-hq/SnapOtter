@@ -1446,6 +1446,8 @@ export const sv: TranslationKeys = {
       submit: "Ändra storlek",
       submitBatch: "Ändra storlek ({count} filer)",
       progressLabel: "Ändrar storlek",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      maxPercentageExceeded: "Använd en skala från 1 till {max} %.",
     },
     crop: {
       width: "Bredd",
@@ -1989,6 +1991,8 @@ export const sv: TranslationKeys = {
         "Förbättrar lokal kontrast före igenkänning. Snabb använder den direkt; Balanserad och Bäst behåller varianten bara när den kalibrerade poängen förbättrar resultatet.",
       fastKoreanUnsupported:
         "Snabb OCR stöder inte koreanska. Installera paketet för exakt OCR och välj Balanserad eller Bäst.",
+      fastArabicUnsupported:
+        "Snabb OCR stöder inte arabiska. Installera paketet för exakt OCR och välj Balanserad eller Bäst.",
       language: "Språk",
       autoDetect: "Automatisk detektion",
       extractedText: "Extraherad text",
@@ -2085,6 +2089,9 @@ export const sv: TranslationKeys = {
       submitSubject: "Smart beskärning",
       submitFace: "Ansiktsbeskärning",
       submitTrim: "Trimma kanter",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      cropAreaExceeded:
+        "Det här utsnittet överskrider gränsen på {max} pixlar. Minska bredden, höjden eller utfyllnaden.",
     },
     imageEnhancement: {
       enhancementMode: "Förstärkningsmetod",
@@ -2211,6 +2218,9 @@ export const sv: TranslationKeys = {
       submit: "Ändra storlek",
       submitBatch: "Ändra storlek ({count} filer)",
       progressLabel: "Innehållsmedveten storleksändring",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      areaExceeded:
+        "Innehållsmedveten storleksändring är begränsad till {max} pixlar totalt. Minska bredden eller höjden.",
     },
     "ai-canvas-expand": {
       quality: "Kvalitet",
@@ -3256,6 +3266,7 @@ export const sv: TranslationKeys = {
       submit: "Bearbeta GIF",
       submitBatch: "Bearbeta ({count} filer)",
       progressLabel: "Bearbetar GIF",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
     },
     "image-to-base64": {
       converting: "Konverterar...",
@@ -3700,8 +3711,7 @@ export const sv: TranslationKeys = {
       bestEffortHint:
         "Bästa möjliga maximum. Bildbaserade PDF:er kommer nära; PDF:er med enbart text krymper kanske inte till denna storlek.",
       targetReached: "Målet på {target} uppnåddes (resultat: {size}).",
-      targetMissed:
-        "Kunde inte nå {target}. Minsta möjliga storlek var {size} eftersom denna PDF mestadels består av text eller vektorer, som bildkomprimering inte kan krympa.",
+      targetMissed: "Kunde inte nå {target}. Minsta möjliga storlek var {size}.",
     },
     "rotate-pdf": {
       angle: "Rotationsvinkel",
@@ -3932,6 +3942,9 @@ export const sv: TranslationKeys = {
       submit: "Extrahera text",
       submitBatch: "Extrahera text ({count} filer)",
       progressLabel: "Extraherar",
+      scannedHint:
+        "Den här PDF:en är skannad, så det finns ingen text att extrahera. OCR kan läsa den, men det tar längre tid och kräver att OCR-AI-paketet är installerat.",
+      runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-to-word": {
       hint: "Bäst för textbaserade PDF-filer; skannade sidor kräver OCR",
@@ -4684,6 +4697,7 @@ export const sv: TranslationKeys = {
         anchorLabel: "Ankare:",
         anchorAriaLabel: "Ankare {position}",
         backgroundLabel: "Bakgrund:",
+        transparent: "Transparent",
         anchors: {
           topLeft: "uppe till vänster",
           topCenter: "uppe i mitten",
@@ -5208,6 +5222,7 @@ export const sv: TranslationKeys = {
       description: "Hantera AI-modellpaket för avancerad filbehandling.",
       installAll: "Installera alla",
       diskUsage: "Diskanvändning: {size}",
+      statusStale: "Det gick inte att uppdatera paketstatusen. Listan nedan kan vara inaktuell.",
       sizeOnDisk: "{size} på disk",
       installed: "Installerad",
       notInstalled: "Inte installerad",
@@ -5643,6 +5658,7 @@ export const sv: TranslationKeys = {
     invalidSetting: "Ogiltigt värde för {setting}.",
     network: "Nätverksfel",
     invalidResponse: "Ogiltigt svar",
+    staleVersionReload: "Appen har uppdaterats. Ladda om sidan och försök igen.",
     failedWithStatus: "Det gick inte att slutföra begäran. Försök igen.",
     processingFailedWithStatus:
       "Det gick inte att bearbeta den här filen. Kontrollera att filen inte är skadad och försök igen.",
@@ -5871,6 +5887,7 @@ export const sv: TranslationKeys = {
       zh: "Kinesiska",
       ja: "Japanska",
       ko: "Koreanska",
+      ar: "Arabiska",
       id: "Indonesiska",
       th: "Thailändska",
       vi: "Vietnamesiska",

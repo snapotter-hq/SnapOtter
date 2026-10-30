@@ -11,6 +11,25 @@ def test_redact_masks_paths_and_files():
     assert redact("torch 2.2.0 ok") == "torch 2.2.0 ok"
 
 
+def test_redact_masks_every_root_the_node_redactor_masks():
+    assert redact("open /Volumes/Photos/in.bin") == "open <path>"
+    assert redact("open /volume1/photos/in.bin") == "open <path>"
+    assert redact("open /private/var/in.bin") == "open <path>"
+    assert redact("open /media/usb/in.bin") == "open <path>"
+    assert redact("open /run/user/in.bin") == "open <path>"
+    assert redact("open /storage/emulated/in.bin") == "open <path>"
+    assert redact("open /scratch/in.bin") == "open <path>"
+    assert redact("open /workspace/in.bin") == "open <path>"
+
+
+def test_redact_masks_the_formats_the_node_redactor_masks():
+    assert redact("cannot read holiday.HEIC") == "cannot read <file>"
+    assert redact("cannot read clip.heif") == "cannot read <file>"
+    assert redact("cannot read song.wma") == "cannot read <file>"
+    assert redact("cannot read dump.jxl") == "cannot read <file>"
+    assert redact("torch 2.2.0 ok") == "torch 2.2.0 ok"
+
+
 def test_envelope_shape_and_frames():
     try:
         raise RuntimeError("CUDA out of memory for /data/x.png")
@@ -36,6 +55,8 @@ def test_envelope_falls_back_to_exception_type_when_message_is_empty():
 
 if __name__ == "__main__":
     test_redact_masks_paths_and_files()
+    test_redact_masks_every_root_the_node_redactor_masks()
+    test_redact_masks_the_formats_the_node_redactor_masks()
     test_envelope_shape_and_frames()
     test_envelope_falls_back_to_exception_type_when_message_is_empty()
     print("ok")

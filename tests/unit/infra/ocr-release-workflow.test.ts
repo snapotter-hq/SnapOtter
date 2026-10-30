@@ -151,6 +151,7 @@ describe("OCR v3 bundle release workflow", () => {
         "--ignore-vuln CVE-2024-27763",
         "--ignore-vuln CVE-2026-40086",
         "--ignore-vuln GHSA-55v6-g8pm-pw4c",
+        "--ignore-vuln CVE-2026-115924",
         "--strict",
       ].join(" "),
     );

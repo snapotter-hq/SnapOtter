@@ -187,3 +187,10 @@ export function getRequiredBundlesForTool(toolId: string): string[] {
   const extras = TOOL_EXTRA_BUNDLES[toolId] ?? [];
   return [...new Set([primary, ...extras])];
 }
+
+/**
+ * Languages that only the Accurate runtime's dedicated recognizers can read.
+ * Fast runs on the bundled Tesseract tier, which has no model for them, so
+ * Fast is rejected for each one and the Accurate tiers are required instead.
+ */
+export const OCR_FAST_UNSUPPORTED_LANGUAGES = ["ko", "ar"] as const;

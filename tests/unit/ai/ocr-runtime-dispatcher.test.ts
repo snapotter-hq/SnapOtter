@@ -920,6 +920,71 @@ describe("runOcrRuntime", () => {
     await shutdown;
   });
 
+  it("logs the signal and stderr when an idle runtime dies with no request in flight (#1656)", async () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child.process);
+    await publishRuntime(child, aiDataDir);
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const request = runOcrRuntime("ocr", ["/tmp/input.png", "{}"], { aiDataDir });
+    respondLine(child, 1, { text: "ok" });
+    await expect(request).resolves.toMatchObject({ result: { text: "ok" } });
+
+    child.stderr.write("Traceback (most recent call last):\nMemoryError: out of memory\n");
+    child.close(null, "SIGKILL");
+
+    expect(sink.warn.mock.calls.map((call) => call[0])).toEqual([
+      "[ocr-runtime] Accurate OCR runtime exited while idle: exit code null, signal SIGKILL; last stderr: Traceback (most recent call last): | MemoryError: out of memory",
+    ]);
+  });
+
+  it("stays silent when an idle runtime exits after a requested shutdown (#1656)", async () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child.process);
+    await publishRuntime(child, aiDataDir);
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const request = runOcrRuntime("ocr", ["/tmp/input.png", "{}"], { aiDataDir });
+    respondLine(child, 1, { text: "ok" });
+    await request;
+
+    const shutdown = shutdownOcrDispatcher();
+    child.close(null, "SIGTERM");
+    await shutdown;
+
+    expect(sink.warn).not.toHaveBeenCalled();
+    expect(sink.error).not.toHaveBeenCalled();
+  });
+
+  it("still logs an idle runtime killed while draining (#1656)", async () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child.process);
+    await publishRuntime(child, aiDataDir);
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const request = runOcrRuntime("ocr", ["/tmp/input.png", "{}"], { aiDataDir });
+    respondLine(child, 1, { text: "ok" });
+    await request;
+
+    // A drain only ends stdin. A SIGKILL here is not a shutdown we asked for.
+    const drain = drainOcrDispatcher();
+    child.close(null, "SIGKILL");
+    await drain;
+
+    expect(sink.warn.mock.calls.map((call) => call[0])).toEqual([
+      "[ocr-runtime] Accurate OCR runtime exited while idle: exit code null, signal SIGKILL",
+    ]);
+  });
+
   it("actively terminates a child after its process error event", async () => {
     const child = createMockChild();
     mockSpawn.mockReturnValue(child.process);

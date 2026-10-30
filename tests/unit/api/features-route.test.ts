@@ -273,6 +273,49 @@ describe("readManifest", () => {
     const result = readManifest(filePath);
     expect(Object.keys(result?.bundles ?? {})).toHaveLength(2);
   });
+
+  describe("unreadable manifest logging (#1668)", () => {
+    async function spyOnWarn() {
+      const { logger } = await import("../../../apps/api/src/lib/logger.js");
+      return vi.spyOn(logger, "warn").mockImplementation(() => {});
+    }
+
+    it("does not log when the manifest is absent", async () => {
+      const warn = await spyOnWarn();
+      readManifest(join(MANIFEST_DIR, "absent-for-logging.json"));
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it("logs the path and parse error once for a manifest that does not parse", async () => {
+      const warn = await spyOnWarn();
+      const filePath = join(MANIFEST_DIR, "broken-logged.json");
+      writeFileSync(filePath, "{ not json");
+
+      expect(readManifest(filePath)).toBeNull();
+      expect(readManifest(filePath)).toBeNull();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatchObject({ path: filePath });
+      expect(warn.mock.calls[0][0]).toHaveProperty("err");
+      warn.mockRestore();
+    });
+
+    it("logs again after a good read in between", async () => {
+      const warn = await spyOnWarn();
+      const filePath = join(MANIFEST_DIR, "flapping.json");
+      writeFileSync(filePath, "{ not json");
+      readManifest(filePath);
+
+      writeFileSync(filePath, JSON.stringify({ bundles: {} }));
+      expect(readManifest(filePath)).not.toBeNull();
+
+      writeFileSync(filePath, "{ not json");
+      readManifest(filePath);
+      expect(warn).toHaveBeenCalledTimes(2);
+      warn.mockRestore();
+    });
+  });
 });
 
 // ── getDirSize tests ────────────────────────────────────────────────────

@@ -161,10 +161,7 @@ export function registerImageToBase64(app: FastifyInstance) {
                 if (probeErr instanceof DecoderOutOfMemoryError) {
                   throw probeErr;
                 }
-                if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                  throw decodeErr;
-                }
-                throw rawProbeErr;
+                throw decodeErr;
               }
             }
           }

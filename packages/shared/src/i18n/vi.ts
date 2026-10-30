@@ -1446,6 +1446,8 @@ export const vi: TranslationKeys = {
       submit: "Thay đổi kích thước",
       submitBatch: "Thay đổi kích thước ({count} tệp)",
       progressLabel: "Đang thay đổi kích thước",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
+      maxPercentageExceeded: "Dùng tỉ lệ từ 1 đến {max}%.",
     },
     crop: {
       width: "Chiều rộng",
@@ -1989,6 +1991,8 @@ export const vi: TranslationKeys = {
         "Cải thiện độ tương phản cục bộ trước khi nhận dạng. Nhanh áp dụng trực tiếp; Cân bằng và Tốt nhất chỉ giữ biến thể khi điểm đã hiệu chỉnh cải thiện kết quả.",
       fastKoreanUnsupported:
         "OCR Nhanh không hỗ trợ tiếng Hàn. Hãy cài đặt gói OCR Chính xác rồi chọn Cân bằng hoặc Tốt nhất.",
+      fastArabicUnsupported:
+        "OCR Nhanh không hỗ trợ tiếng Ả Rập. Hãy cài đặt gói OCR Chính xác rồi chọn Cân bằng hoặc Tốt nhất.",
       language: "Ngôn ngữ",
       autoDetect: "Tự động nhận diện",
       extractedText: "Văn bản trích xuất",
@@ -2085,6 +2089,9 @@ export const vi: TranslationKeys = {
       submitSubject: "Cắt thông minh",
       submitFace: "Cắt khuôn mặt",
       submitTrim: "Cắt viền",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
+      cropAreaExceeded:
+        "Vùng cắt này vượt giới hạn {max} pixel. Giảm chiều rộng, chiều cao hoặc khoảng đệm.",
     },
     imageEnhancement: {
       enhancementMode: "Chế độ nâng cao",
@@ -2211,6 +2218,9 @@ export const vi: TranslationKeys = {
       submit: "Thay đổi kích thước",
       submitBatch: "Thay đổi kích thước ({count} tệp)",
       progressLabel: "Đang thay đổi kích thước thông minh",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
+      areaExceeded:
+        "Thay đổi kích thước nhận biết nội dung được giới hạn ở tổng {max} pixel. Giảm chiều rộng hoặc chiều cao.",
     },
     "ai-canvas-expand": {
       quality: "Chất lượng",
@@ -3256,6 +3266,7 @@ export const vi: TranslationKeys = {
       submit: "Xử lý GIF",
       submitBatch: "Xử lý ({count} tệp)",
       progressLabel: "Đang xử lý GIF",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
     },
     "image-to-base64": {
       converting: "Đang chuyển đổi...",
@@ -3700,8 +3711,7 @@ export const vi: TranslationKeys = {
       bestEffortHint:
         "Mức tối đa trong khả năng. PDF chứa hình ảnh sẽ đạt gần mức này; PDF chỉ có văn bản có thể không thu nhỏ được xuống kích thước này.",
       targetReached: "Đã đạt mục tiêu {target} (kết quả: {size}).",
-      targetMissed:
-        "Không thể đạt {target}. Kích thước nhỏ nhất có thể đạt là {size} vì PDF này chủ yếu là văn bản hoặc vector, mà nén ảnh không thể thu nhỏ.",
+      targetMissed: "Không thể đạt {target}. Kích thước nhỏ nhất có thể đạt là {size}.",
     },
     "rotate-pdf": {
       angle: "Góc xoay",
@@ -3929,6 +3939,9 @@ export const vi: TranslationKeys = {
       submit: "Trích xuất văn bản",
       submitBatch: "Trích xuất văn bản ({count} tệp)",
       progressLabel: "Đang trích xuất",
+      scannedHint:
+        "PDF này là bản quét nên không có văn bản để trích xuất. OCR có thể đọc được, nhưng mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+      runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-to-word": {
       hint: "Phù hợp nhất cho PDF dạng văn bản; trang quét cần OCR",
@@ -4679,6 +4692,7 @@ export const vi: TranslationKeys = {
         anchorLabel: "Neo:",
         anchorAriaLabel: "Neo {position}",
         backgroundLabel: "Nền:",
+        transparent: "Trong suốt",
         anchors: {
           topLeft: "trên trái",
           topCenter: "trên giữa",
@@ -5197,6 +5211,7 @@ export const vi: TranslationKeys = {
       description: "Quản lý các gói mô hình AI cho xử lý tệp nâng cao.",
       installAll: "Cài đặt tất cả",
       diskUsage: "Dung lượng đĩa: {size}",
+      statusStale: "Không thể làm mới trạng thái gói. Danh sách bên dưới có thể đã cũ.",
       sizeOnDisk: "{size} trên ổ đĩa",
       installed: "Đã cài đặt",
       notInstalled: "Chưa cài đặt",
@@ -5630,6 +5645,7 @@ export const vi: TranslationKeys = {
     invalidSetting: "Giá trị không hợp lệ cho {setting}.",
     network: "Lỗi mạng",
     invalidResponse: "Phản hồi không hợp lệ",
+    staleVersionReload: "Ứng dụng đã được cập nhật. Hãy tải lại trang và thử lại.",
     failedWithStatus: "Không thể hoàn tất yêu cầu đó. Vui lòng thử lại.",
     processingFailedWithStatus:
       "Không thể xử lý tệp này. Hãy kiểm tra xem tệp có bị hỏng không rồi thử lại.",
@@ -5856,6 +5872,7 @@ export const vi: TranslationKeys = {
       zh: "Tiếng Trung",
       ja: "Tiếng Nhật",
       ko: "Tiếng Hàn",
+      ar: "Tiếng Ả Rập",
       id: "Tiếng Indonesia",
       th: "Tiếng Thái",
       vi: "Tiếng Việt",

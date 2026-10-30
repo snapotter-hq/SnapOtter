@@ -92,3 +92,43 @@ describe("compress-pdf verdict per file (#1292)", () => {
     expect(screen.getByText(/Reached your 100 KB target/)).toBeTruthy();
   });
 });
+
+describe("compress-pdf target verdict gating and messaging (#1375)", () => {
+  it("says nothing when a completed file has no processed size", () => {
+    stage([
+      {
+        status: "completed",
+        processedSize: null,
+        resultNotes: { targetKb: 100, targetMet: false },
+      },
+    ]);
+    render(<CompressPdfSettings />);
+    expect(screen.queryByText(/Couldn't reach|Reached your/)).toBeNull();
+  });
+
+  it("says nothing when a completed file has no targetKb", () => {
+    stage([
+      {
+        status: "completed",
+        processedSize: 50_000,
+        resultNotes: null,
+      },
+    ]);
+    render(<CompressPdfSettings />);
+    expect(screen.queryByText(/Couldn't reach|Reached your/)).toBeNull();
+  });
+
+  it("states the miss result without guessing why", () => {
+    stage([
+      {
+        status: "completed",
+        processedSize: 140_200,
+        resultNotes: { targetKb: 100, targetMet: false },
+      },
+    ]);
+    render(<CompressPdfSettings />);
+    const msg = screen.getByText(/Couldn't reach 100 KB/);
+    expect(msg.textContent).toBe("Couldn't reach 100 KB. Smallest achievable was 140.2 KB.");
+    expect(msg.textContent).not.toMatch(/mostly text|vectors|image compression can't shrink/);
+  });
+});

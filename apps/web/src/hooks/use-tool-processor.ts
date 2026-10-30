@@ -50,6 +50,8 @@ interface BatchProgressFrame {
   currentFile?: string;
   /** Terminal frames carry the durable batch result (#750). */
   result?: Record<string, unknown>;
+  /** A failed frame's shared reason, such as NO_TEXT_LAYER (#4143). */
+  code?: string;
 }
 
 export interface ToolProgress {
@@ -870,7 +872,11 @@ export function useToolProcessor(toolId: string) {
 
             // Ends the run on the server's word: a failed frame, or a
             // completed one with nothing to download.
-            const endFailedRun = (message: string, category?: FeedbackErrorCategory) => {
+            const endFailedRun = (
+              message: string,
+              category?: FeedbackErrorCategory,
+              code?: string,
+            ) => {
               clearRequestTimer();
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -890,7 +896,7 @@ export function useToolProcessor(toolId: string) {
               // passes it on (#1890).
               const teardownError = runEndWrites([
                 clearActiveJob,
-                () => setError(message),
+                () => setError(message, code),
                 () => setProcessing(false),
               ]);
               settleProcessingEntries(message, category);
@@ -976,7 +982,11 @@ export function useToolProcessor(toolId: string) {
             }
 
             if (data.phase === "failed") {
-              endFailedRun(failedFrameMessage(data, tRef.current.errors.processingFailedNoDetail));
+              endFailedRun(
+                failedFrameMessage(data, tRef.current.errors.processingFailedNoDetail),
+                undefined,
+                typeof data.code === "string" && data.code.length > 0 ? data.code : undefined,
+              );
               return;
             }
 
@@ -1467,13 +1477,13 @@ export function useToolProcessor(toolId: string) {
         // (#1698). Returns the first teardown error, for the caller to rethrow
         // so it still reaches Sentry.
         const endSyncRun = (
-          failure: { message: string; category?: FeedbackErrorCategory } | null,
+          failure: { message: string; category?: FeedbackErrorCategory; code?: string } | null,
         ): { cause: unknown } | null => {
           clearRequestTimer();
           setProgress(IDLE_PROGRESS);
           const firstError = runEndWrites([
             clearActiveJob,
-            ...(failure ? [() => setError(failure.message)] : []),
+            ...(failure ? [() => setError(failure.message, failure.code)] : []),
             () => setProcessing(false),
           ]);
           if (failure) failEntry(failure.message, failure.category);
@@ -1577,7 +1587,11 @@ export function useToolProcessor(toolId: string) {
           // must not read as "Invalid response" and must still surface (#1354,
           // the sync twin of #1287).
           let handlingError: { cause: unknown } | null = null;
-          let failure: { message: string; category?: FeedbackErrorCategory } | null = null;
+          let failure: {
+            message: string;
+            category?: FeedbackErrorCategory;
+            code?: string;
+          } | null = null;
           if (xhr.status >= 200 && xhr.status < 300) {
             let result: ProcessResult | null = null;
             try {
@@ -1595,8 +1609,11 @@ export function useToolProcessor(toolId: string) {
             }
           } else {
             let message: string;
+            let code: string | undefined;
             try {
               const body = JSON.parse(xhr.responseText);
+              const bodyCode = (body as { code?: unknown } | null)?.code;
+              if (typeof bodyCode === "string" && bodyCode.length > 0) code = bodyCode;
               // Store the canonical "Canceled" sentinel so displayStoredError
               // translates it in the active locale, matching the batch and
               // pipeline paths (#1436, #4009).
@@ -1622,7 +1639,11 @@ export function useToolProcessor(toolId: string) {
             // Our API's 413 and a reverse proxy's (an HTML body-size page) mean
             // the same thing to the user, in their language (#1341).
             if (xhr.status === 413) message = t.errors.fileTooLarge;
-            failure = { message, category: xhr.status === 413 ? "upload_error" : undefined };
+            failure = {
+              message,
+              category: xhr.status === 413 ? "upload_error" : undefined,
+              ...(code ? { code } : {}),
+            };
           }
 
           if (handlingError) {
@@ -1897,11 +1918,16 @@ export function useToolProcessor(toolId: string) {
         // the run stays live, as before. The SSE handler's own failure path
         // (#1287) then ends it with a message, and on the other paths the
         // cancel button stays armed, so a second click can still end it.
-        const failRun = (message: string, reason: string, category?: FeedbackErrorCategory) => {
+        const failRun = (
+          message: string,
+          reason: string,
+          category?: FeedbackErrorCategory,
+          code?: string,
+        ) => {
           let teardownError: { cause: unknown } | null = null;
           try {
             try {
-              setError(message);
+              setError(message, code);
             } catch (cause) {
               if (useFileStore.getState().error !== message) throw cause;
               console.error("Ending the run failed", cause);
@@ -1961,11 +1987,12 @@ export function useToolProcessor(toolId: string) {
           if (teardownError) throw teardownError.cause;
         };
 
-        // How a ZIP answer settles. A null fileResults means X-File-Results
-        // was present on the response and could not be read (#1805, #1929);
-        // `status` is the HTTP status of a sync answer.
+        // How a ZIP answer settles. A null fileResults never reaches here: the
+        // sync handler fails the batch first, and the cached-download and
+        // canceled paths coalesce it to an empty map (#4081, #4045). `status`
+        // is the HTTP status of a sync answer.
         interface ZipSettle {
-          fileResults: Record<string, string> | null;
+          fileResults: Record<string, string>;
           fileNotes: Record<string, unknown>;
           status?: number;
         }
@@ -2026,7 +2053,7 @@ export function useToolProcessor(toolId: string) {
               continue;
             }
             const entryId = captured.id;
-            const processedName = fileResults?.[String(i)];
+            const processedName = fileResults[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
               let processedSize = null;
@@ -2076,8 +2103,8 @@ export function useToolProcessor(toolId: string) {
 
           const teardownError = finishRun();
           trackBatch(
-            canceledByUser ? "canceled" : fileResults === null ? "failed" : "completed",
-            canceledByUser ? "canceled" : fileResults === null ? "bad-file-results" : undefined,
+            canceledByUser ? "canceled" : "completed",
+            canceledByUser ? "canceled" : undefined,
           );
           // Every entry has settled, so settleOrFail passes this on to the
           // global handler instead of failing the run.
@@ -2228,6 +2255,8 @@ export function useToolProcessor(toolId: string) {
             failRun(
               syntheticError ?? (allFilesFailed ? t.errors.allFilesFailed : t.errors.batchFailed),
               !syntheticError && allFilesFailed ? "all-files-failed" : "server-failed",
+              undefined,
+              frame.code,
             );
           },
         };
@@ -2360,13 +2389,24 @@ export function useToolProcessor(toolId: string) {
               status: xhr.status,
               toolId,
             });
+            // A header that was present but unreadable is not "no results":
+            // settling from an empty map would mark every file "not found in
+            // batch results" and hide the real failure (#4081, the twin of the
+            // pipeline's #4045). A canceled run keeps its cancel outcome, so it
+            // falls through and settles every entry as "Canceled" (#1929).
+            if (fileResults === null && !canceledByUser) {
+              failRun(t.errors.batchFailed, "bad-file-results");
+              return;
+            }
             // Absent on servers from before #1292, which is no notes. A header
             // that doesn't parse to an object only costs the notes, never the
             // results, but it's logged: silently dropping it would settle every
             // file as fine, the exact thing the notes exist to prevent.
             const fileNotes = parseFileNotesHeader(xhr.getResponseHeader("X-File-Notes"));
             void settleOrFail(xhr.response as Blob, {
-              fileResults,
+              // Only a canceled run reaches this with null, where an empty map
+              // settles the entries as "Canceled" (see above).
+              fileResults: fileResults ?? {},
               fileNotes,
               status: xhr.status,
             });
@@ -2390,6 +2430,7 @@ export function useToolProcessor(toolId: string) {
             // the bare status as the failure reason: the cap and the disk floor
             // are both 503s, and telling them apart is what the reason is for.
             let reason = `http-${xhr.status}`;
+            let serverCode: string | undefined;
             let body: unknown;
             let parsedJson = true;
             try {
@@ -2417,7 +2458,10 @@ export function useToolProcessor(toolId: string) {
               // instead of being repainted as "Canceled".
               serverCanceled = record.canceled === true;
               const code = record.code;
-              if (typeof code === "string" && code.length > 0) reason = code;
+              if (typeof code === "string" && code.length > 0) {
+                reason = code;
+                serverCode = code;
+              }
               const parsed = parseApiError(
                 record,
                 xhr.status,
@@ -2439,6 +2483,7 @@ export function useToolProcessor(toolId: string) {
               serverCanceled ? "Canceled" : errorMsg,
               reason,
               !serverCanceled && xhr.status === 413 ? "upload_error" : undefined,
+              serverCanceled ? undefined : serverCode,
             );
           })();
         };

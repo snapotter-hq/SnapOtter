@@ -72,7 +72,11 @@ describe("useFeaturesStore", () => {
     FakeEventSource.reset();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // The store is a singleton, so pollers and streams started by one test
+    // would keep ticking into the next. resetEnvironment stops all of them.
+    apiPostMock.mockResolvedValueOnce({ ok: true });
+    await useFeaturesStore.getState().resetEnvironment();
     vi.restoreAllMocks();
   });
 
@@ -346,6 +350,26 @@ describe("useFeaturesStore", () => {
       es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
       await promise;
       expect(useFeaturesStore.getState().installing["test-bundle"]).toBeUndefined();
+    });
+
+    it("logs a malformed progress frame with its raw payload", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-log-malformed" });
+
+      const promise = useFeaturesStore.getState().installBundle("test-bundle");
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances).toHaveLength(1);
+      });
+
+      const es = FakeEventSource.instances[0];
+      es.onmessage?.({ data: "not json" });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("progress frame"),
+        expect.objectContaining({ bundleId: "test-bundle", raw: "not json" }),
+      );
+
+      es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      await promise;
     });
 
     // #1287: the onmessage catch used to wrap the whole handler, so a throw
@@ -1118,6 +1142,13 @@ describe("useFeaturesStore", () => {
   });
 
   describe("refresh()", () => {
+    // The failure streak lives in the store closure, which setState does not
+    // reset. A successful refresh clears it, so each test starts from zero.
+    const resetFailureStreak = async (bundles: FeatureBundleState[]) => {
+      apiGetMock.mockResolvedValueOnce({ bundles });
+      await useFeaturesStore.getState().refresh();
+    };
+
     it("refreshes bundles from API", async () => {
       const bundles = [makeBundleState({ id: "refreshed" })];
       apiGetMock.mockResolvedValueOnce({ bundles });
@@ -1136,6 +1167,97 @@ describe("useFeaturesStore", () => {
       await useFeaturesStore.getState().refresh();
 
       expect(useFeaturesStore.getState().bundles).toEqual([makeBundleState({ id: "existing" })]);
+    });
+
+    // #1138: one failed refresh is often a blip, so the notice waits for a
+    // second consecutive failure. The poller ticks every 3s, so a single
+    // failure flapping the notice on and off would read as noise.
+    it("marks the list stale after two consecutive failed refreshes and clears it on success", async () => {
+      const known = [makeBundleState({ id: "known", status: "installed" })];
+      await resetFailureStreak(known);
+      useFeaturesStore.setState({ bundles: known, loaded: true });
+      apiGetMock.mockRejectedValue(new Error("down"));
+
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().bundlesStale).toBe(false);
+
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().bundlesStale).toBe(true);
+      expect(useFeaturesStore.getState().bundles).toEqual(known);
+
+      apiGetMock.mockResolvedValue({ bundles: known });
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().bundlesStale).toBe(false);
+    });
+
+    it("counts only consecutive failures toward the stale notice", async () => {
+      await resetFailureStreak([]);
+      useFeaturesStore.setState({ loaded: true });
+      apiGetMock
+        .mockRejectedValueOnce(new Error("blip"))
+        .mockResolvedValueOnce({ bundles: [] })
+        .mockRejectedValueOnce(new Error("blip again"));
+
+      await useFeaturesStore.getState().refresh();
+      await useFeaturesStore.getState().refresh();
+      await useFeaturesStore.getState().refresh();
+
+      expect(useFeaturesStore.getState().bundlesStale).toBe(false);
+    });
+
+    // #4174: a poll tick that finds the bundle missing or not_installed means
+    // the install did not finish. Settling it as success clears the pill with
+    // no error, so the user sees neither installed nor failed.
+    it.each([
+      ["missing from the list", []],
+      ["reported not_installed", [makeBundleState({ id: "test-bundle", status: "not_installed" })]],
+    ])(
+      "records an error when the install's bundle is %s on a poll tick",
+      async (_label, bundles) => {
+        apiPostMock.mockResolvedValueOnce({ jobId: "job-vanished" });
+        const promise = useFeaturesStore.getState().installBundle("test-bundle");
+        await vi.waitFor(() => {
+          expect(FakeEventSource.instances).toHaveLength(1);
+        });
+        await promise;
+        const es = FakeEventSource.instances[0];
+
+        vi.useFakeTimers();
+        try {
+          apiGetMock.mockResolvedValue({ bundles });
+          es.onerror?.();
+          await vi.advanceTimersByTimeAsync(3_000);
+
+          expect(useFeaturesStore.getState().errors["test-bundle"]).toBeTruthy();
+          expect(useFeaturesStore.getState().installing["test-bundle"]).toBeUndefined();
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
+
+    it("keeps the status poller running after a failed refresh tick", async () => {
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-poll-refresh-fail" });
+      const promise = useFeaturesStore.getState().installBundle("test-bundle");
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances).toHaveLength(1);
+      });
+      await promise;
+      const es = FakeEventSource.instances[0];
+
+      vi.useFakeTimers();
+      try {
+        apiGetMock.mockRejectedValue(new Error("down"));
+        es.onerror?.();
+        await vi.advanceTimersByTimeAsync(3_000);
+        await vi.advanceTimersByTimeAsync(3_000);
+
+        const featureCalls = apiGetMock.mock.calls.filter((call) => call[0] === "/v1/features");
+        expect(featureCalls.length).toBeGreaterThanOrEqual(2);
+        expect(useFeaturesStore.getState().installing["test-bundle"]).toBeDefined();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

@@ -180,8 +180,8 @@ Blurs the background while keeping the subject sharp.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
-| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean and Arabic never select `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
+| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast does not support `ko` or `ar` |
 | `enhance` | boolean | Tier-dependent | Improve local contrast. Fast applies it directly; accurate tiers keep the variant only when calibrated scoring improves OCR. Defaults on for Best |
 | `engine` | string | - | Deprecated compatibility alias. Maps `tesseract` to `fast` and the legacy `paddleocr` value to `balanced`; it does not load PaddlePaddle |
 
@@ -196,13 +196,13 @@ Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
-| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean and Arabic never select `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
+| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast does not support `ko` or `ar` |
 | `pages` | string | `"all"` | Page selection: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Tier-dependent | Improve local contrast. Fast applies it directly; accurate tiers keep the variant only when calibrated scoring improves OCR. Defaults on for Best |
 | `engine` | string | - | Deprecated compatibility alias. Maps `tesseract` to `fast` and the legacy `paddleocr` value to `balanced`; it does not load PaddlePaddle |
 
-The same no-downgrade and Korean compatibility rules apply to PDF OCR. PDF pages are rasterized before recognition, and one request can select at most 50 pages.
+The same no-downgrade and Korean and Arabic compatibility rules apply to PDF OCR. PDF pages are rasterized before recognition, and one request can select at most 50 pages.
 
 ## Face / PII Blur {#face-pii-blur}
 

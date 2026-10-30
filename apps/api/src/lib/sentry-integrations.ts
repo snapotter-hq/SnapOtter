@@ -39,7 +39,15 @@ export function buildSentryIntegrations(
   // integration (the array form is additive and would keep it). With tracing
   // off, the array form is fine: no sampler means the defaults never start a
   // transaction, so they stay inert.
+  //
+  // The default Fastify integration also captures every thrown 5xx, raw and
+  // unthrottled, and its event reaches Sentry instead of reportError's
+  // classified one (#1645). Re-adding it with a filter that never matches
+  // keeps its route spans and leaves reportError the only error path.
   return tracingEnabled
-    ? (defaults) => defaults.filter((i) => i.name !== "Redis").concat(ours)
+    ? (defaults) =>
+        defaults
+          .filter((i) => i.name !== "Redis" && i.name !== "Fastify")
+          .concat(ours, Sentry.fastifyIntegration({ shouldHandleError: () => false }))
     : ours;
 }

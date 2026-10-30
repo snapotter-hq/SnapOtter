@@ -76,4 +76,4 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 
 ### SDK-generated events
 
-posthog-js also captures `$pageview` and `$pageleave` on route changes, plus `$web_vitals`. These skip the `track()` allowlist, so the `before_send` hook that strips query strings and fragments from URLs is the boundary for them.
+posthog-js also captures `$pageview` and `$pageleave` on route changes, plus `$web_vitals`. It also attaches session-entry and initial-URL properties (`$session_entry_url`, `$session_entry_referrer`, `$initial_*`) to every event. These skip the `track()` allowlist, so the `before_send` hook is the boundary for them. It strips query strings and fragments from every URL property, and deletes campaign parameters (`utm_*`, `gclid`, and the other ad-click ids) wherever posthog-js puts them, top-level or as `$session_entry_*` or `$initial_*` copies.

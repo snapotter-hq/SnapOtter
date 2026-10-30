@@ -844,10 +844,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               if (probeErr instanceof DecoderOutOfMemoryError) {
                 throw probeErr;
               }
-              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                throw decodeErr;
-              }
-              throw err;
+              throw decodeErr;
             }
           }
         }

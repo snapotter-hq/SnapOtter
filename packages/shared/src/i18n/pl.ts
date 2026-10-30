@@ -1448,6 +1448,8 @@ export const pl: TranslationKeys = {
       submit: "Zmień rozmiar",
       submitBatch: "Zmień rozmiar ({count} plików)",
       progressLabel: "Zmiana rozmiaru",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
+      maxPercentageExceeded: "Użyj skali od 1 do {max}%.",
     },
     crop: {
       width: "Szerokość",
@@ -1997,6 +1999,8 @@ export const pl: TranslationKeys = {
         "Poprawia lokalny kontrast przed rozpoznawaniem. Tryb Szybki stosuje go bezpośrednio; Zrównoważony i Najlepszy zachowują wariant tylko wtedy, gdy skalibrowany wynik poprawia rezultat.",
       fastKoreanUnsupported:
         "Szybki OCR nie obsługuje języka koreańskiego. Zainstaluj pakiet dokładnego OCR i wybierz Zrównoważony lub Najlepszy.",
+      fastArabicUnsupported:
+        "Szybki OCR nie obsługuje języka arabskiego. Zainstaluj pakiet dokładnego OCR i wybierz Zrównoważony lub Najlepszy.",
       language: "Język",
       autoDetect: "Automatyczne wykrywanie",
       extractedText: "Wyodrębniony tekst",
@@ -2093,6 +2097,9 @@ export const pl: TranslationKeys = {
       submitSubject: "Inteligentne kadrowanie",
       submitFace: "Kadrowanie twarzy",
       submitTrim: "Przytnij krawędzie",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
+      cropAreaExceeded:
+        "Ten kadr przekracza limit {max} pikseli. Zmniejsz szerokość, wysokość lub margines wewnętrzny.",
     },
     imageEnhancement: {
       enhancementMode: "Tryb ulepszenia",
@@ -2219,6 +2226,9 @@ export const pl: TranslationKeys = {
       submit: "Zmień rozmiar",
       submitBatch: "Zmień rozmiar ({count} plików)",
       progressLabel: "Zmiana rozmiaru z uwzględnieniem treści",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
+      areaExceeded:
+        "Zmiana rozmiaru z uwzględnieniem treści jest ograniczona do łącznie {max} pikseli. Zmniejsz szerokość lub wysokość.",
     },
     "ai-canvas-expand": {
       quality: "Jakość",
@@ -3267,6 +3277,7 @@ export const pl: TranslationKeys = {
       submit: "Przetwórz GIF",
       submitBatch: "Przetwórz ({count} plików)",
       progressLabel: "Przetwarzanie GIF",
+      maxDimensionExceeded: "Użyj rozmiaru od 1 do {max} px.",
     },
     "image-to-base64": {
       converting: "Konwersja...",
@@ -3712,8 +3723,7 @@ export const pl: TranslationKeys = {
       bestEffortHint:
         "Maksimum w miarę możliwości. Pliki PDF oparte na obrazach zbliżają się do tego rozmiaru; pliki PDF zawierające tylko tekst mogą się do niego nie zmniejszyć.",
       targetReached: "Osiągnięto docelowy rozmiar {target} (wynik: {size}).",
-      targetMissed:
-        "Nie udało się osiągnąć {target}. Najmniejszy możliwy rozmiar to {size}, ponieważ ten plik PDF składa się głównie z tekstu lub wektorów, których kompresja obrazu nie może zmniejszyć.",
+      targetMissed: "Nie udało się osiągnąć {target}. Najmniejszy możliwy rozmiar to {size}.",
     },
     "rotate-pdf": {
       angle: "Kąt obrotu",
@@ -3944,6 +3954,9 @@ export const pl: TranslationKeys = {
       submit: "Wyodrębnij tekst",
       submitBatch: "Wyodrębnij tekst ({count} plików)",
       progressLabel: "Wyodrębnianie",
+      scannedHint:
+        "Ten PDF jest skanem, więc nie ma tekstu do wyodrębnienia. OCR może go odczytać, ale trwa to dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
+      runOcr: "Uruchom OCR dla tego PDF-a",
     },
     "pdf-to-word": {
       hint: "Najlepiej dla PDF tekstowych; zeskanowane strony wymagają OCR",
@@ -4696,6 +4709,7 @@ export const pl: TranslationKeys = {
         anchorLabel: "Kotwica:",
         anchorAriaLabel: "Kotwica: {position}",
         backgroundLabel: "Tło:",
+        transparent: "Przezroczyste",
         anchors: {
           topLeft: "lewy górny",
           topCenter: "górny środek",
@@ -5228,6 +5242,7 @@ export const pl: TranslationKeys = {
       description: "Zarządzanie pakietami modeli AI do zaawansowanego przetwarzania plików.",
       installAll: "Zainstaluj wszystkie",
       diskUsage: "Wykorzystanie dysku: {size}",
+      statusStale: "Nie udało się odświeżyć stanu pakietów. Poniższa lista może być nieaktualna.",
       sizeOnDisk: "{size} na dysku",
       installed: "Zainstalowane",
       notInstalled: "Niezainstalowane",
@@ -5668,6 +5683,7 @@ export const pl: TranslationKeys = {
     invalidSetting: "Nieprawidłowa wartość: {setting}.",
     network: "Błąd sieci",
     invalidResponse: "Nieprawidłowa odpowiedź",
+    staleVersionReload: "Aplikacja została zaktualizowana. Odśwież stronę i spróbuj ponownie.",
     failedWithStatus: "Nie udało się zrealizować tego żądania. Spróbuj ponownie.",
     processingFailedWithStatus:
       "Nie udało się przetworzyć tego pliku. Sprawdź, czy plik nie jest uszkodzony, i spróbuj ponownie.",
@@ -5900,6 +5916,7 @@ export const pl: TranslationKeys = {
       zh: "Chiński",
       ja: "Japoński",
       ko: "Koreański",
+      ar: "Arabski",
       id: "Indonezyjski",
       th: "Tajski",
       vi: "Wietnamski",

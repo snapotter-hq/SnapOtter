@@ -120,7 +120,10 @@ export function registerInfo(app: FastifyInstance) {
               throw probeErr;
             }
             if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-            throw rawProbeErr;
+            // The Sharp probe is the weaker signal: it only says Sharp can't read
+            // the bytes, while the decoder's error says why the format failed.
+            request.log?.warn({ err: decodeErr, toolId: "info" }, "Decode failed");
+            throw decodeErr;
           }
         }
       } else {

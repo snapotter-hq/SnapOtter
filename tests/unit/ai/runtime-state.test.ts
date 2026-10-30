@@ -20,6 +20,7 @@ import { setAiLogger } from "../../../packages/ai/src/log.js";
 import type { OcrRuntimeTrustKey } from "../../../packages/ai/src/runtime-index.js";
 import {
   getOcrRuntimeCapability,
+  installedOptionalLanguages,
   OCR_RUNTIME_PROTOCOL_VERSION,
   readActiveRuntime,
   readCommittedOcrRuntimeActivationIdentity,
@@ -802,8 +803,20 @@ describe("getOcrRuntimeCapability", () => {
       status: "ready",
       qualities: ["balanced", "best"],
       providers: ["CPUExecutionProvider"],
+      installedLanguages: [],
       descriptor: { family: "ocr", generation: "generation-test" },
     });
+  });
+
+  it("lists an optional language only when its whole recognizer is in the signed model set", () => {
+    expect(installedOptionalLanguages({ "pp-ocrv6-small": "a" })).toEqual([]);
+    expect(
+      installedOptionalLanguages({
+        "arabic-pp-ocrv5-mobile-rec": "a",
+        "arabic-pp-ocrv5-dictionary": "b",
+      }),
+    ).toEqual(["ar"]);
+    expect(installedOptionalLanguages({ "arabic-pp-ocrv5-mobile-rec": "a" })).toEqual([]);
   });
 
   it("returns empty capabilities when runtime state is unavailable", () => {

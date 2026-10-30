@@ -1034,6 +1034,73 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     }
   }, 20_000);
 
+  // iOS Safari requests the callback twice with the same code and state; the
+  // IdP rejects the reused code, and the browser used to show that second
+  // response, a login error, after a successful sign-in (#4021).
+  describe("a repeated callback for a state a login already used (#4021)", () => {
+    function callbackFor(state: string) {
+      return oidcApp.app.inject({
+        method: "GET",
+        url: `${env.BASE_PATH}/api/auth/oidc/callback?code=code-abc&state=${state}`,
+        cookies: { "oidc-state": signState(state) },
+      });
+    }
+
+    it("redirects the repeat into the app without a second token exchange", async () => {
+      const sub = `sub-dup-${Math.random().toString(36).slice(2, 10)}`;
+      const state = `st-${Math.random().toString(36).slice(2, 10)}`;
+      authorizationCodeGrantMock.mockResolvedValueOnce({
+        claims: () => ({ sub, preferred_username: sub }),
+        id_token: "fake-id-token",
+      });
+      const first = await callbackFor(state);
+      expect(first.headers.location).toBe(`${env.BASE_PATH}/`);
+
+      authorizationCodeGrantMock.mockRejectedValueOnce(new Error("invalid_grant"));
+      const second = await callbackFor(state);
+
+      expect(second.statusCode).toBe(302);
+      expect(second.headers.location).toBe(`${env.BASE_PATH}/`);
+      expect(authorizationCodeGrantMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("redirects into the app when the twin finishes its login during this exchange", async () => {
+      const sub = `sub-race-${Math.random().toString(36).slice(2, 10)}`;
+      const state = `st-${Math.random().toString(36).slice(2, 10)}`;
+      let failSecond!: (err: Error) => void;
+      authorizationCodeGrantMock.mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failSecond = reject;
+          }),
+      );
+      const pending = callbackFor(state);
+      await vi.waitFor(() => expect(authorizationCodeGrantMock).toHaveBeenCalledTimes(1));
+
+      authorizationCodeGrantMock.mockResolvedValueOnce({
+        claims: () => ({ sub, preferred_username: sub }),
+        id_token: "fake-id-token",
+      });
+      const winner = await callbackFor(state);
+      expect(winner.headers.location).toBe(`${env.BASE_PATH}/`);
+      failSecond(new Error("invalid_grant"));
+
+      const loser = await pending;
+      expect(loser.headers.location).toBe(`${env.BASE_PATH}/`);
+    });
+
+    it("still sends a failed login to the error page, and does not mark its state used", async () => {
+      const state = `st-${Math.random().toString(36).slice(2, 10)}`;
+      authorizationCodeGrantMock.mockRejectedValue(new Error("invalid_grant"));
+
+      const first = await callbackFor(state);
+      const second = await callbackFor(state);
+
+      expect(first.headers.location).toBe("/login?error=oidc_auth_failed");
+      expect(second.headers.location).toBe("/login?error=oidc_auth_failed");
+    });
+  });
+
   it("fails with oidc_auth_failed when the token response carries no ID-token claims", async () => {
     const res = await callbackWithClaims(null);
 

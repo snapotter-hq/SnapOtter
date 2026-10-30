@@ -1,7 +1,7 @@
 ---
 description: "使用內建 Tesseract 或可選的高精度 RapidOCR 運行時從本地掃描的 PDF 中提取文字。"
 i18n_output_hash: 01d4565a7e86
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ i18n_provenance: human
 
 <!-- korean-ocr-contract:start -->
 ::: info 韓語 OCR 相容性
-快速 OCR 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支援韓語 (`ko`)。韓語需要精確 OCR 套件以及 `balanced` 或 `best`。此套件可在官方 Linux amd64 和 arm64 容器上執行；即使是 NVIDIA 主機，OCR 仍使用 CPU。不受支援的系統會傳回明確的相容性錯誤，絕不會靜默回退至 `fast`。韓語搭配 `fast` 或舊版 `tesseract` 別名時，會在排入佇列前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒絕。
+快速 OCR 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支援韓語 (`ko`) 和阿拉伯語 (`ar`)。韓語和阿拉伯語需要精確 OCR 套件以及 `balanced` 或 `best`。此套件可在官方 Linux amd64 和 arm64 容器上執行；即使是 NVIDIA 主機，OCR 仍使用 CPU。不受支援的系統會傳回明確的相容性錯誤，絕不會靜默回退至 `fast`。韓語或阿拉伯語搭配 `fast` 或舊版 `tesseract` 別名時，會在排入佇列前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒絕。
 :::
 <!-- korean-ocr-contract:end -->
 ## API 端點 {#api-endpoint}
@@ -27,12 +27,12 @@ i18n_provenance: human
 |-----------|------|----------|---------|-------------|
 | file | file | 是的 | - | PDF 檔案（多部分），最多 512 個 MiB 編碼；較低的運營商上傳限制仍然適用 |
 | quality | string | 不 | 動態的 | OCR 品質等級：`fast`、`balanced` 或 `best` |
-| language | string | 否 | `"auto"` | 文件語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko` |
+| language | string | 否 | `"auto"` | 文件語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar` |
 | pages | string | 否 | `"all"` | 頁面選擇，例如 `"all"`、`"1-3"`、`"1,3,5"` |
 | enhance | boolean | 不 | 取決於層級 | 提高辨識前的局部對比。快速直接應用；僅當校準評分改善結果時，平衡和最佳才會保留變異。對於 `best` 預設為 `true`，對於 `fast`/`balanced` 預設為 `false` |
 | engine | string | 不 | - | 已棄用的兼容性別名。請改用 `quality`。 `tesseract` 對應到 `fast`；舊版 `paddleocr` 值對應到 `balanced` 但不載入 PaddlePaddle |
 
-省略 `quality` 和 `engine` 時，SnapOtter 會依 `best`、`balanced`、`fast` 的順序選擇可用的最高品質層。韓語絕不會選擇 `fast`；它會使用 `best`，其次是 `balanced`，否則傳回精確執行階段的安裝或相容性錯誤。
+省略 `quality` 和 `engine` 時，SnapOtter 會依 `best`、`balanced`、`fast` 的順序選擇可用的最高品質層。韓語和阿拉伯語絕不會選擇 `fast`；它們會使用 `best`，其次是 `balanced`，否則傳回精確執行階段的安裝或相容性錯誤。
 
 ## 範例請求 {#example-request}
 

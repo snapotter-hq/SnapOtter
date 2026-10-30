@@ -1,3 +1,4 @@
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { FlipHorizontal2, FlipVertical2, Link, RotateCw, Unlink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -5,6 +6,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useGifInfo } from "@/hooks/use-gif-info";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { isDimensionWithinLimit } from "@/lib/dimension-limits";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -270,6 +272,12 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
     rotate: t.toolSettings["gif-tools"].rotateMode,
   };
 
+  const widthOverLimit =
+    resizeTab === "pixel" && width !== "" && !isDimensionWithinLimit(Number(width));
+  const heightOverLimit =
+    resizeTab === "pixel" && height !== "" && !isDimensionWithinLimit(Number(height));
+  const dimensionsOverLimit = widthOverLimit || heightOverLimit;
+
   const maxFrame =
     initialSettings === undefined && info != null ? Math.max(0, info.pages - 1) : undefined;
 
@@ -365,45 +373,62 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
           </div>
 
           {resizeTab === "pixel" ? (
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <label htmlFor="gif-width" className="text-xs text-muted-foreground">
-                  {t.toolSettings["gif-tools"].widthPx}
-                </label>
-                <input
-                  id="gif-width"
-                  type="number"
-                  value={width}
-                  onChange={(e) => setWidth(e.target.value)}
-                  placeholder={t.toolSettings["gif-tools"].auto}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-                />
+            <div>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label htmlFor="gif-width" className="text-xs text-muted-foreground">
+                    {t.toolSettings["gif-tools"].widthPx}
+                  </label>
+                  <input
+                    id="gif-width"
+                    type="number"
+                    value={width}
+                    onChange={(e) => setWidth(e.target.value)}
+                    placeholder={t.toolSettings["gif-tools"].auto}
+                    min={1}
+                    max={MAX_RESIZE_OUTPUT_DIMENSION}
+                    aria-invalid={widthOverLimit || undefined}
+                    aria-describedby={dimensionsOverLimit ? "gif-dimension-error" : undefined}
+                    className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLockAspect(!lockAspect)}
+                  className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
+                  title={
+                    lockAspect
+                      ? t.toolSettings["gif-tools"].unlockAspectRatio
+                      : t.toolSettings["gif-tools"].lockAspectRatio
+                  }
+                >
+                  {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
+                </button>
+                <div className="flex-1">
+                  <label htmlFor="gif-height" className="text-xs text-muted-foreground">
+                    {t.toolSettings["gif-tools"].heightPx}
+                  </label>
+                  <input
+                    id="gif-height"
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    placeholder={t.toolSettings["gif-tools"].auto}
+                    min={1}
+                    max={MAX_RESIZE_OUTPUT_DIMENSION}
+                    aria-invalid={heightOverLimit || undefined}
+                    aria-describedby={dimensionsOverLimit ? "gif-dimension-error" : undefined}
+                    className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+                  />
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setLockAspect(!lockAspect)}
-                className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
-                title={
-                  lockAspect
-                    ? t.toolSettings["gif-tools"].unlockAspectRatio
-                    : t.toolSettings["gif-tools"].lockAspectRatio
-                }
-              >
-                {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
-              </button>
-              <div className="flex-1">
-                <label htmlFor="gif-height" className="text-xs text-muted-foreground">
-                  {t.toolSettings["gif-tools"].heightPx}
-                </label>
-                <input
-                  id="gif-height"
-                  type="number"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  placeholder={t.toolSettings["gif-tools"].auto}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-                />
-              </div>
+              {dimensionsOverLimit && (
+                <p id="gif-dimension-error" className="mt-1 text-xs text-destructive-ink">
+                  {format(t.toolSettings["gif-tools"].maxDimensionExceeded, {
+                    max: MAX_RESIZE_OUTPUT_DIMENSION,
+                  })}
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -799,6 +824,11 @@ export function GifToolsSettings() {
   };
 
   const hasFile = files.length > 0;
+  const dimensionInvalid =
+    settings.mode === "resize" &&
+    [settings.width, settings.height].some(
+      (value) => typeof value === "number" && !isDimensionWithinLimit(value),
+    );
 
   return (
     <div className="space-y-4">
@@ -840,7 +870,7 @@ export function GifToolsSettings() {
           type="button"
           data-testid="gif-tools-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || dimensionInvalid}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {files.length > 1

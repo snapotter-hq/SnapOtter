@@ -323,7 +323,7 @@ def main():
 
             except (ImportError, FileNotFoundError, RuntimeError, MemoryError, OSError) as e:
                 import traceback
-                print(f"[upscale] Real-ESRGAN failed: {e}", file=sys.stderr, flush=True)
+                print(json.dumps({"warning": f"[upscale] Real-ESRGAN failed: {e}"}), file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
                 print(json.dumps({
                     "success": False,

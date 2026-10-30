@@ -435,7 +435,7 @@ def _cleanup_after_request():
     except ImportError:
         pass
     except Exception as e:
-        print(f"[dispatcher] GPU cache cleanup failed: {e}", file=sys.stderr, flush=True)
+        print(json.dumps({"warning": f"[dispatcher] GPU cache cleanup failed: {e}"}), file=sys.stderr, flush=True)
 
 
 def main():
@@ -447,7 +447,7 @@ def main():
         gpu = gpu_available()
         gpu_frameworks = gpu_frameworks_available()
     except Exception as e:
-        print(f"[dispatcher] GPU detection failed: {e}", file=sys.stderr, flush=True)
+        print(json.dumps({"warning": f"[dispatcher] GPU detection failed: {e}"}), file=sys.stderr, flush=True)
     print(
         json.dumps({"ready": True, "gpu": gpu, "gpuFrameworks": gpu_frameworks}),
         file=sys.stderr,

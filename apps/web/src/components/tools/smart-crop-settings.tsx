@@ -1,10 +1,21 @@
-import { SMART_CROP_FACE_PRESETS, SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
+import {
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_OUTPUT_PIXELS,
+  SMART_CROP_FACE_PRESETS,
+  SOCIAL_MEDIA_PRESETS,
+} from "@snapotter/shared";
 import { ArrowLeftRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import {
+  isDimensionWithinLimit,
+  isSmartCropAreaWithinLimit,
+  isSmartCropTargetSizeWithinLimit,
+  MAX_SMART_CROP_TARGET_SIZE,
+} from "@/lib/dimension-limits";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -106,7 +117,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
         padToSquare,
         padColor,
         quality,
-        ...(padToSquare ? { targetSize: Number(targetSize) } : {}),
+        ...(padToSquare && targetSize.trim() !== "" ? { targetSize: Number(targetSize) } : {}),
       });
     }
   }, [
@@ -156,49 +167,93 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
   const subTabClass = (t: SubjectTab) =>
     `flex-1 text-[11px] py-1 rounded ${subjectTab === t ? "bg-primary/15 text-foreground font-medium" : "text-muted-foreground"}`;
 
+  const widthValue = width === "" ? undefined : Number(width);
+  const heightValue = height === "" ? undefined : Number(height);
+  const widthOverLimit = widthValue !== undefined && !isDimensionWithinLimit(widthValue);
+  const heightOverLimit = heightValue !== undefined && !isDimensionWithinLimit(heightValue);
+  const dimensionOverLimit = widthOverLimit || heightOverLimit;
+  const areaOverLimit =
+    !dimensionOverLimit &&
+    (mode === "subject" || mode === "face") &&
+    widthValue !== undefined &&
+    heightValue !== undefined &&
+    isDimensionWithinLimit(widthValue) &&
+    isDimensionWithinLimit(heightValue) &&
+    !isSmartCropAreaWithinLimit(widthValue, heightValue, padding);
+  const targetSizeOverLimit =
+    mode === "trim" &&
+    padToSquare &&
+    targetSize.trim() !== "" &&
+    !isSmartCropTargetSizeWithinLimit(Number(targetSize));
+
+  const dimensionError =
+    dimensionOverLimit || areaOverLimit ? (
+      <p id="sc-dimension-error" className="mt-1 text-xs text-destructive-ink">
+        {format(
+          dimensionOverLimit
+            ? t.toolSettings["smart-crop"].maxDimensionExceeded
+            : t.toolSettings["smart-crop"].cropAreaExceeded,
+          { max: dimensionOverLimit ? MAX_RESIZE_OUTPUT_DIMENSION : MAX_RESIZE_OUTPUT_PIXELS },
+        )}
+      </p>
+    ) : null;
+
   // Shared dimension inputs with swap button
   const dimensionInputs = (
-    <div className="flex items-end gap-2">
-      <div className="flex-1">
-        <label htmlFor="sc-width" className="text-xs text-muted-foreground">
-          {t.toolSettings["smart-crop"].widthPx}
-        </label>
-        <input
-          id="sc-width"
-          type="number"
-          value={width}
-          onChange={(e) => {
-            setWidth(e.target.value);
-            setSelectedPreset(null);
-          }}
-          min={1}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        />
+    <div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <label htmlFor="sc-width" className="text-xs text-muted-foreground">
+            {t.toolSettings["smart-crop"].widthPx}
+          </label>
+          <input
+            id="sc-width"
+            type="number"
+            value={width}
+            onChange={(e) => {
+              setWidth(e.target.value);
+              setSelectedPreset(null);
+            }}
+            min={1}
+            max={MAX_RESIZE_OUTPUT_DIMENSION}
+            aria-invalid={widthOverLimit || undefined}
+            aria-describedby={
+              dimensionOverLimit || areaOverLimit ? "sc-dimension-error" : undefined
+            }
+            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={swapDimensions}
+          className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
+          title={t.toolSettings["smart-crop"].swapWidthAndHeight}
+        >
+          <ArrowLeftRight className="h-4 w-4" />
+        </button>
+        <div className="flex-1">
+          <label htmlFor="sc-height" className="text-xs text-muted-foreground">
+            {t.toolSettings["smart-crop"].heightPx}
+          </label>
+          <input
+            id="sc-height"
+            type="number"
+            value={height}
+            onChange={(e) => {
+              setHeight(e.target.value);
+              setSelectedPreset(null);
+            }}
+            min={1}
+            max={MAX_RESIZE_OUTPUT_DIMENSION}
+            aria-invalid={heightOverLimit || undefined}
+            aria-describedby={
+              dimensionOverLimit || areaOverLimit ? "sc-dimension-error" : undefined
+            }
+            className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+          />
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={swapDimensions}
-        className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
-        title={t.toolSettings["smart-crop"].swapWidthAndHeight}
-      >
-        <ArrowLeftRight className="h-4 w-4" />
-      </button>
-      <div className="flex-1">
-        <label htmlFor="sc-height" className="text-xs text-muted-foreground">
-          {t.toolSettings["smart-crop"].heightPx}
-        </label>
-        <input
-          id="sc-height"
-          type="number"
-          value={height}
-          onChange={(e) => {
-            setHeight(e.target.value);
-            setSelectedPreset(null);
-          }}
-          min={1}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        />
-      </div>
+      {dimensionError}
     </div>
   );
 
@@ -287,6 +342,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
 
           {subjectTab === "presets" ? (
             <div className="space-y-3 max-h-[50dvh] overflow-y-auto pe-1">
+              {dimensionError}
               {platforms.map((platform) => (
                 <div key={platform}>
                   <p className="text-xs font-medium text-muted-foreground mb-1.5">{platform}</p>
@@ -509,8 +565,18 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
                   value={targetSize}
                   onChange={(e) => setTargetSize(e.target.value)}
                   min={1}
+                  max={MAX_SMART_CROP_TARGET_SIZE}
+                  aria-invalid={targetSizeOverLimit || undefined}
+                  aria-describedby={targetSizeOverLimit ? "sc-target-size-error" : undefined}
                   className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
                 />
+                {targetSizeOverLimit && (
+                  <p id="sc-target-size-error" className="mt-1 text-xs text-destructive-ink">
+                    {format(t.toolSettings["smart-crop"].maxDimensionExceeded, {
+                      max: MAX_SMART_CROP_TARGET_SIZE,
+                    })}
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="sc-pad-color" className="text-xs text-muted-foreground">
@@ -563,7 +629,25 @@ export function SmartCropSettings() {
 
   const hasFile = files.length > 0;
   const mode = settings.mode as string;
-  const canProcess = mode === "trim" || (Number(settings.width) > 0 && Number(settings.height) > 0);
+  const width = typeof settings.width === "number" ? settings.width : undefined;
+  const height = typeof settings.height === "number" ? settings.height : undefined;
+  const padding = typeof settings.padding === "number" ? settings.padding : 0;
+  const dimensionsInvalid =
+    (mode === "subject" || mode === "face") &&
+    ((width !== undefined && !isDimensionWithinLimit(width)) ||
+      (height !== undefined && !isDimensionWithinLimit(height)) ||
+      (width !== undefined &&
+        height !== undefined &&
+        isDimensionWithinLimit(width) &&
+        isDimensionWithinLimit(height) &&
+        !isSmartCropAreaWithinLimit(width, height, padding)));
+  const targetSize = typeof settings.targetSize === "number" ? settings.targetSize : undefined;
+  const targetSizeInvalid =
+    mode === "trim" && targetSize !== undefined && !isSmartCropTargetSizeWithinLimit(targetSize);
+  const canProcess =
+    !dimensionsInvalid &&
+    !targetSizeInvalid &&
+    (mode === "trim" || (Number(settings.width) > 0 && Number(settings.height) > 0));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

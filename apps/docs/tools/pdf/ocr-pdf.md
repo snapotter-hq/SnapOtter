@@ -18,12 +18,12 @@ Accepts multipart form data with a PDF file and an optional JSON `settings` fiel
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | PDF file (multipart), up to 512 MiB encoded; a lower operator upload limit still applies |
 | quality | string | No | Dynamic | OCR quality tier: `fast`, `balanced`, or `best` |
-| language | string | No | `"auto"` | Document language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
+| language | string | No | `"auto"` | Document language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast does not support `ko` or `ar` |
 | pages | string | No | `"all"` | Page selection, e.g. `"all"`, `"1-3"`, `"1,3,5"` |
 | enhance | boolean | No | Tier-dependent | Improve local contrast before recognition. Fast applies it directly; Balanced and Best retain the variant only when calibrated scoring improves the result. Defaults to `true` for `best` and `false` for `fast`/`balanced` |
 | engine | string | No | - | Deprecated compatibility alias. Use `quality` instead. `tesseract` maps to `fast`; the legacy `paddleocr` value maps to `balanced` but does not load PaddlePaddle |
 
-If `quality` and the deprecated `engine` field are both omitted, SnapOtter selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; it uses `best`, then `balanced`, or returns the accurate-runtime install or compatibility error.
+If `quality` and the deprecated `engine` field are both omitted, SnapOtter selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean and Arabic never select `fast`; they use `best`, then `balanced`, or return the accurate-runtime install or compatibility error.
 
 ## Example Request {#example-request}
 
@@ -49,9 +49,9 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 
 - Accepted input format: `.pdf`.
 - `fast` is built in and adds about 25 MiB to the official image. `balanced` and `best` require the optional accurate OCR pack (about 208-234 MiB to download and 409-488 MiB installed, depending on the target).
-- Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`). Korean requires the accurate pack and `balanced` or `best`.
-- The accurate pack supports official Linux amd64 and arm64 containers and uses ONNX Runtime on CPU, including on NVIDIA hosts. Unsupported hosts receive an explicit incompatibility error for Korean rather than a Fast fallback.
-- An explicitly requested tier is never silently downgraded. If `balanced` or `best` is unavailable, the API returns `501` with `FEATURE_NOT_INSTALLED` or `FEATURE_INCOMPATIBLE`. Explicit Fast or legacy `tesseract` with Korean returns `FEATURE_INCOMPATIBLE` and `fast-korean-unsupported` before queueing.
+- Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`) or Arabic (`ar`). Both require the accurate pack and `balanced` or `best`.
+- The accurate pack supports official Linux amd64 and arm64 containers and uses ONNX Runtime on CPU, including on NVIDIA hosts. Unsupported hosts receive an explicit incompatibility error for Korean or Arabic rather than a Fast fallback.
+- An explicitly requested tier is never silently downgraded. If `balanced` or `best` is unavailable, the API returns `501` with `FEATURE_NOT_INSTALLED` or `FEATURE_INCOMPATIBLE`. Explicit Fast or legacy `tesseract` with Korean or Arabic returns `FEATURE_INCOMPATIBLE` and `fast-korean-unsupported` before queueing.
 - PDF pages are rasterized at high resolution before OCR. `best` runs the higher-accuracy medium PP-OCRv6 models and scores orientation and enhancement variants, improving recognition at the cost of speed.
 - The `auto` language setting enables recognition across the supported script set; an explicit hint can improve results for a known document language.
 - You can target specific pages using ranges (`"1-3"`), comma-separated lists (`"1,3,5"`), or `"all"` for every page.

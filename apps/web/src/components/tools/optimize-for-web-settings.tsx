@@ -1,13 +1,15 @@
-import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
+import { isSafeMessageError, MAX_RESIZE_OUTPUT_DIMENSION, SafeError } from "@snapotter/shared";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { captureHandledError } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
+import { isIgnoredError } from "@/lib/sentry-scrub";
 import type { ComparisonPreview } from "@/lib/tool-registry";
 import { useFileStore } from "@/stores/file-store";
 
@@ -18,7 +20,20 @@ interface PreviewState {
   previewUrl: string | null;
   processedSize: number | null;
   originalSize: number | null;
+  /** Why the last attempt failed, shown in place of the size card (#2185). */
+  error: string | null;
 }
+
+const IDLE_PREVIEW: PreviewState = {
+  loading: false,
+  previewUrl: null,
+  processedSize: null,
+  originalSize: null,
+  error: null,
+};
+
+/** Answers about the file or the account: the panel shows them, Sentry does not. */
+const UNREPORTED_PREVIEW_STATUSES = new Set([401, 403, 413, 422]);
 
 const FORMAT_LABELS: Record<WebFormat, string> = {
   webp: "WebP",
@@ -62,18 +77,17 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
   const [showDimensions, setShowDimensions] = useState(false);
 
   // Preview state
-  const [preview, setPreview] = useState<PreviewState>({
-    loading: false,
-    previewUrl: null,
-    processedSize: null,
-    originalSize: null,
-  });
+  const [preview, setPreview] = useState<PreviewState>(IDLE_PREVIEW);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevPreviewUrlRef = useRef<string | null>(null);
   const settingsEditedAfterRunRef = useRef(false);
   const onComparisonPreviewRef = useRef(onComparisonPreview);
   onComparisonPreviewRef.current = onComparisonPreview;
+  // fetchPreview's dependencies are settings-only, so hold the catalog in a
+  // ref for the messages it builds on failure.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const hasFile = files.length > 0;
 
@@ -126,10 +140,14 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setPreview((prev) => ({ ...prev, loading: true }));
+    setPreview((prev) => ({ ...prev, loading: true, error: null }));
 
     const entryId = entryIdRef.current;
     const settings = buildSettings();
+    const copy = tRef.current;
+    // Set by the non-OK branch so the catch can show the API's reason without
+    // handing a server-authored string to Sentry (#2185).
+    let failureMessage: string | null = null;
     const formData = new FormData();
     formData.append("file", file);
     formData.append("settings", JSON.stringify(settings));
@@ -141,13 +159,44 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`Preview failed: ${response.status}`);
+        if (!response.ok) {
+          const body = await response.json().catch((error: unknown) => {
+            // A proxy can answer with HTML; keep the reason the body was
+            // unreadable visible, like api.ts does (#4062). An abort while the
+            // body was being read is this preview being replaced, not a fault.
+            if (!controller.signal.aborted) {
+              console.warn(
+                `Failed to parse preview error response (status: ${response.status}):`,
+                error,
+              );
+            }
+            return null;
+          });
+          failureMessage = failedAnswerMessage(
+            copy,
+            body,
+            response.status,
+            copy.toolPage.previewFailed,
+          );
+          throw new SafeError("Optimize for Web preview request failed", {
+            code: "preview-request",
+            statusCode: response.status,
+          });
+        }
 
         const originalSize = Number(response.headers.get("X-Original-Size") ?? "0");
         const processedSize = Number(response.headers.get("X-Processed-Size") ?? "0");
         const blob = await response.blob();
         if (abortRef.current === controller) abortRef.current = null;
         if (controller.signal.aborted || entryIdRef.current !== entryId) return;
+        // A 200 is not proof of an image: a proxy or captive portal can answer
+        // with HTML. The route always sets an image Content-Type, so a missing
+        // or foreign one is a failed preview, not a broken <img> (#4107).
+        if (blob.size === 0 || !blob.type.startsWith("image/")) {
+          throw new SafeError("Optimize for Web preview returned a non-image body", {
+            code: "preview-not-image",
+          });
+        }
         const previewUrl = URL.createObjectURL(blob);
 
         // Revoke previous preview URL
@@ -181,22 +230,44 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
           previewUrl,
           processedSize,
           originalSize,
+          error: null,
         });
       })
       .catch((err) => {
         if (abortRef.current === controller) abortRef.current = null;
-        if (err instanceof Error && err.name === "AbortError") return;
+        // An abort is this preview being replaced (new settings, another file,
+        // submit), not a failure to report.
+        if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError"))
+          return;
+        // A failure for a file the viewer has moved off says nothing about the
+        // one on screen.
+        if (entryIdRef.current !== entryId) return;
         if (prevPreviewUrlRef.current) {
           URL.revokeObjectURL(prevPreviewUrlRef.current);
           prevPreviewUrlRef.current = null;
         }
         onComparisonPreviewRef.current?.(null);
-        setPreview({
-          loading: false,
-          previewUrl: null,
-          processedSize: null,
-          originalSize: null,
-        });
+        setPreview({ ...IDLE_PREVIEW, error: failureMessage ?? copy.toolPage.previewFailed });
+
+        // A signed-out, denied, too-large, or undecodable answer is about this
+        // file or account, and the panel says so. Anything else (settings the
+        // API rejects, rate limit, 5xx) is a fault nobody would otherwise hear
+        // about. A dropped connection is already in Sentry's IGNORE_ERRORS, so
+        // wrapping one in a SafeError would defeat that filter.
+        const reportable = isSafeMessageError(err)
+          ? !UNREPORTED_PREVIEW_STATUSES.has(err.statusCode ?? 0)
+          : !isIgnoredError(err);
+        if (reportable) {
+          void captureHandledError(
+            isSafeMessageError(err)
+              ? err
+              : new SafeError("Optimize for Web preview request failed", {
+                  code: "preview-request",
+                  cause: err,
+                }),
+            { error_class: "operational", tool_id: "optimize-for-web" },
+          );
+        }
       });
   }, [buildSettings]);
 
@@ -239,12 +310,7 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
         prevPreviewUrlRef.current = null;
       }
       onComparisonPreviewRef.current?.(null);
-      setPreview({
-        loading: false,
-        previewUrl: null,
-        processedSize: null,
-        originalSize: null,
-      });
+      setPreview(IDLE_PREVIEW);
       if (selectedEntryId !== null && hasFile) {
         fetchPreview();
       }
@@ -264,7 +330,10 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
 
   // Final process handler (creates workspace + download link)
   const handleProcess = () => {
-    const hadPendingPreview = debounceRef.current !== null || abortRef.current !== null;
+    // A failed preview's message describes the settings the run is replacing,
+    // so it clears with the rest of the preview state (#2185).
+    const hadPendingPreview =
+      debounceRef.current !== null || abortRef.current !== null || preview.error !== null;
     settingsEditedAfterRunRef.current = false;
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -279,12 +348,7 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
         URL.revokeObjectURL(prevPreviewUrlRef.current);
         prevPreviewUrlRef.current = null;
       }
-      setPreview({
-        loading: false,
-        previewUrl: null,
-        processedSize: null,
-        originalSize: null,
-      });
+      setPreview(IDLE_PREVIEW);
       onComparisonPreviewRef.current?.(null);
     } else if (preview.previewUrl && entryIdRef.current && format !== "jxl") {
       onComparisonPreviewRef.current?.({
@@ -437,6 +501,16 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
           />
         </button>
       </div>
+
+      {/* The last preview failed: say why instead of leaving the panel silent (#2185). */}
+      {preview.error && (
+        <p
+          role="alert"
+          className="rounded-lg border border-border bg-muted/50 p-3 text-xs text-destructive-ink"
+        >
+          {preview.error}
+        </p>
+      )}
 
       {/* Size comparison card */}
       {(preview.originalSize || preview.loading) && (

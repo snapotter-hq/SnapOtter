@@ -20,6 +20,13 @@ describe("rebuildErrorValue", () => {
     expect(rebuildErrorValue(sysErr("EACCES", "mkdir"))).toBe("EACCES mkdir");
     expect(rebuildErrorValue(sysErr("ENOSPC"))).toBe("ENOSPC");
   });
+  it("keeps only the verb of a spawn syscall, never the binary path (#1588)", () => {
+    expect(rebuildErrorValue(sysErr("EACCES", "spawn /opt/bin/notexec.sh"))).toBe("EACCES spawn");
+    expect(rebuildErrorValue(sysErr("ENOENT", "spawn ffmpeg"))).toBe("ENOENT spawn");
+  });
+  it("drops a path-shaped syscall entirely rather than echoing it", () => {
+    expect(rebuildErrorValue(sysErr("EACCES", "/opt/bin/notexec.sh"))).toBe("EACCES");
+  });
   it("resolves a 5-char EPIPE as a node code, not a SQLSTATE", () => {
     expect(rebuildErrorValue(sysErr("EPIPE", "write"))).toBe("EPIPE write");
   });

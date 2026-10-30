@@ -14,7 +14,12 @@ _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _BLOB = re.compile(r"blob:[^\s\"')]+")
 _DATA = re.compile(r"data:[^\s\"')]+")
 _URL = re.compile(r"https?://[^\s\"')]+")
-_PATH = re.compile(r"(?:/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-z]:\\)[^\s\"')]*")
+# Root list mirrors UNIX_ROOTS in packages/shared/src/analytics/redact-message.ts.
+# Keep the two in sync; a root added on one side only leaks on the other.
+_PATH = re.compile(
+    r"(?:/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv|Volumes|private|media|run|"
+    r"storage|scratch|workspace|volume\d+)|[A-Za-z]:\\)[^\s\"')]*"
+)
 # Relative object-storage keys (uploads/<jobId>/…, outputs/…, previews/…) carry a
 # user-supplied filename tail; mask them like absolute paths. Runs after _PATH,
 # which already swallows the absolute /data/uploads/… form.
@@ -30,10 +35,12 @@ _IPV6 = re.compile(
     r"(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?)(?![\w:])"
 )
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+# Extension list mirrors USER_FILE_EXT in redact-message.ts, same sync rule as _PATH.
 _USER_FILE_EXT = (
-    "jpe?g|png|gif|webp|avif|heif?|tiff?|bmp|svg|raw|psd|mp4|mov|avi|mkv|webm|"
-    "flv|wmv|m4v|mp3|wav|flac|aac|ogg|m4a|opus|pdf|docx?|xlsx?|pptx?|odt|ods|"
-    "odp|txt|csv|epub|zip"
+    "jpe?g|png|gif|webp|avif|hei[cf]|tiff?|bmp|svg|raw|psd|jxl|mp4|mov|avi|mkv|webm|"
+    "flv|wmv|m4v|3gp|3g2|vob|m2ts|ogv|rmvb|asf|f4v|mxf|wtv|mp3|wav|flac|aac|ogg|m4a|"
+    "opus|wma|amr|ape|ac3|aiff|aif|wv|tta|dsf|dff|mka|caf|pdf|docx?|xlsx?|pptx?|odt|"
+    "ods|odp|txt|csv|epub|zip"
 )
 _FILE = re.compile(r"\b[\w-]{1,80}\.(?:" + _USER_FILE_EXT + r")\b", re.IGNORECASE)
 _QUOTED = re.compile(r"(['\"])(.{24,}?)\1")

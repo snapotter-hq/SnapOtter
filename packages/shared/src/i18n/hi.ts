@@ -1263,6 +1263,8 @@ export const hi: TranslationKeys = {
       submit: "रीसाइज़ करें",
       submitBatch: "रीसाइज़ करें ({count} फाइलें)",
       progressLabel: "रीसाइज़ हो रहा है",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
+      maxPercentageExceeded: "1 से {max}% तक का स्केल इस्तेमाल करें।",
     },
     crop: {
       width: "चौड़ाई",
@@ -1800,6 +1802,8 @@ export const hi: TranslationKeys = {
         "पहचान से पहले स्थानीय कॉन्ट्रास्ट सुधारता है। तेज़ मोड इसे सीधे लागू करता है; संतुलित और सर्वोत्तम मोड इसे तभी रखते हैं जब कैलिब्रेटेड स्कोर परिणाम सुधारता है।",
       fastKoreanUnsupported:
         "तेज़ OCR कोरियाई का समर्थन नहीं करता। सटीक OCR पैक इंस्टॉल करें और संतुलित या सर्वोत्तम चुनें।",
+      fastArabicUnsupported:
+        "तेज़ OCR अरबी का समर्थन नहीं करता। सटीक OCR पैक इंस्टॉल करें और संतुलित या सर्वोत्तम चुनें।",
       language: "भाषा",
       autoDetect: "ऑटो-डिटेक्ट",
       extractedText: "निकाला गया टेक्स्ट",
@@ -1896,6 +1900,8 @@ export const hi: TranslationKeys = {
       submitSubject: "स्मार्ट क्रॉप",
       submitFace: "फेस क्रॉप",
       submitTrim: "बॉर्डर ट्रिम",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
+      cropAreaExceeded: "यह क्रॉप {max} पिक्सेल की सीमा से बड़ा है। चौड़ाई, ऊंचाई या पैडिंग कम करें।",
     },
     imageEnhancement: {
       enhancementMode: "एन्हांसमेंट मोड",
@@ -2021,6 +2027,8 @@ export const hi: TranslationKeys = {
       submit: "रीसाइज़ करें",
       submitBatch: "रीसाइज़ करें ({count} फाइलें)",
       progressLabel: "कंटेंट-अवेयर रीसाइज़िंग",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
+      areaExceeded: "कंटेंट-अवेयर रीसाइज़ कुल {max} पिक्सेल तक सीमित है। चौड़ाई या ऊंचाई कम करें।",
     },
     "ai-canvas-expand": {
       quality: "क्वालिटी",
@@ -3064,6 +3072,7 @@ export const hi: TranslationKeys = {
       submit: "GIF प्रोसेस करें",
       submitBatch: "प्रोसेस करें ({count} फाइलें)",
       progressLabel: "GIF प्रोसेस हो रहा है",
+      maxDimensionExceeded: "1 से {max} px तक का आकार इस्तेमाल करें।",
     },
     "image-to-base64": {
       converting: "कन्वर्ट हो रहा है...",
@@ -3508,8 +3517,7 @@ export const hi: TranslationKeys = {
       bestEffortHint:
         "अधिकतम संभव प्रयास. छवि-आधारित PDF इसके करीब पहुंचती हैं; केवल-टेक्स्ट वाली PDF शायद इस आकार तक न सिकुड़ें.",
       targetReached: "आपका {target} लक्ष्य पूरा हुआ (परिणाम: {size}).",
-      targetMissed:
-        "{target} तक नहीं पहुंच सके. सबसे छोटा संभव आकार {size} था क्योंकि यह PDF मुख्य रूप से टेक्स्ट या वेक्टर से बनी है, जिन्हें छवि संपीड़न छोटा नहीं कर सकता.",
+      targetMissed: "{target} तक नहीं पहुंच सके. सबसे छोटा संभव आकार {size} था.",
     },
     "rotate-pdf": {
       angle: "घुमाव कोण",
@@ -3735,6 +3743,9 @@ export const hi: TranslationKeys = {
       submit: "टेक्स्ट निकालें",
       submitBatch: "टेक्स्ट निकालें ({count} फ़ाइलें)",
       progressLabel: "निकाला जा रहा है",
+      scannedHint:
+        "यह PDF स्कैन किया हुआ है, इसलिए निकालने के लिए कोई टेक्स्ट नहीं है। OCR इसे पढ़ सकता है, लेकिन इसमें ज़्यादा समय लगता है और OCR AI बंडल इंस्टॉल होना चाहिए।",
+      runOcr: "इस PDF पर OCR चलाएँ",
     },
     "pdf-to-word": {
       hint: "टेक्स्ट-आधारित PDF के लिए सर्वोत्तम; स्कैन किए पृष्ठों के लिए OCR आवश्यक",
@@ -4485,6 +4496,7 @@ export const hi: TranslationKeys = {
         anchorLabel: "एंकर:",
         anchorAriaLabel: "एंकर {position}",
         backgroundLabel: "बैकग्राउंड:",
+        transparent: "पारदर्शी",
         anchors: {
           topLeft: "ऊपर बाएं",
           topCenter: "ऊपर मध्य",
@@ -4995,6 +5007,7 @@ export const hi: TranslationKeys = {
       description: "उन्नत फ़ाइल प्रोसेसिंग के लिए AI मॉडल बंडल प्रबंधित करें।",
       installAll: "सभी इंस्टॉल करें",
       diskUsage: "डिस्क उपयोग: {size}",
+      statusStale: "बंडल की स्थिति ताज़ा नहीं हो सकी। नीचे की सूची पुरानी हो सकती है।",
       sizeOnDisk: "डिस्क पर {size}",
       installed: "इंस्टॉल किया गया",
       notInstalled: "इंस्टॉल नहीं है",
@@ -5424,6 +5437,7 @@ export const hi: TranslationKeys = {
     invalidSetting: "{setting} के लिए अमान्य मान।",
     network: "नेटवर्क त्रुटि",
     invalidResponse: "अमान्य प्रतिक्रिया",
+    staleVersionReload: "ऐप अपडेट हो गया है। पेज को फिर से लोड करें और दोबारा कोशिश करें।",
     failedWithStatus: "हम वह अनुरोध पूरा नहीं कर सके। कृपया फिर से प्रयास करें।",
     processingFailedWithStatus:
       "हम इस फ़ाइल को प्रोसेस नहीं कर सके। जाँचें कि फ़ाइल खराब नहीं है और फिर से प्रयास करें।",
@@ -5648,6 +5662,7 @@ export const hi: TranslationKeys = {
       zh: "चीनी",
       ja: "जापानी",
       ko: "कोरियाई",
+      ar: "अरबी",
       id: "इंडोनेशियाई",
       th: "थाई",
       vi: "वियतनामी",

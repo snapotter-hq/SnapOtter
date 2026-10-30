@@ -22,6 +22,12 @@
  * navigation is pushState, so only cross-document history pays for it.
  * iOS Safari skips beforeunload, so a cross-document `navigate` event from
  * the Navigation API starts the same window there (#1479).
+ *
+ * A reload is only worth its cost for route and tool chunks, where the
+ * alternative is a crash screen. An import started from an event handler
+ * (a download button that loads a zip library) has the user's work on the
+ * page, and a reload would throw it away. Those go through quietImport(): the
+ * handler leaves the failure alone and the caller's own catch reports it.
  */
 
 export const CHUNK_RELOAD_GUARD_KEY = "snapotter-chunk-reload-at";
@@ -64,6 +70,26 @@ export function isAbortedByLeaving(error: unknown): boolean {
   return typeof error === "object" && error !== null && abortedByLeaving.has(error);
 }
 
+// Vite fires vite:preloadError before the importer's catch runs and gives the
+// event no way to name the failing import, so quietImport counts the imports
+// in flight instead. A route chunk failing during one is left to the error
+// boundary rather than reloaded; the window is a few hundred milliseconds.
+let quietImportsInFlight = 0;
+
+/**
+ * Runs a dynamic import whose failure the caller handles itself. A stale-deploy
+ * 404 rejects the returned promise without reloading the page, so the caller
+ * can say so and keep the user's files.
+ */
+export async function quietImport<T>(load: () => Promise<T>): Promise<T> {
+  quietImportsInFlight++;
+  try {
+    return await load();
+  } finally {
+    quietImportsInFlight--;
+  }
+}
+
 /** Returns an uninstall function (used by tests; the app installs once for its lifetime). */
 export function installChunkReloadHandler(
   reload: () => void = () => window.location.reload(),
@@ -95,6 +121,8 @@ export function installChunkReloadHandler(
     if (event.persisted) leavingAt = Number.NEGATIVE_INFINITY;
   };
   const onPreloadError = (event: Event) => {
+    // Not preventDefault'd: Vite must reject the import so the caller's catch runs.
+    if (quietImportsInFlight > 0) return;
     // Unhandled on purpose: if the leave is cancelled after all, the error
     // boundary shows the real chunk error rather than an undefined module.
     if (Date.now() - leavingAt < LEAVING_WINDOW_MS) {

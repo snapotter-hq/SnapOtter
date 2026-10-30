@@ -22,6 +22,7 @@ import {
   withImageEncodeContext,
   withImageEncodeContextV2,
 } from "../../../apps/api/src/lib/image-error.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
@@ -525,6 +526,26 @@ describe("asInputErrorIfUndecodable", () => {
     expect(isToolInputError(err)).toBe(true);
     expect(err.message).toBe(UNDECODABLE_IMAGE_MESSAGE);
     expect(err.cause).toBe(sharpErr);
+  });
+
+  it("logs the probe's libvips reason as a string, since pino serializes only the err key", async () => {
+    // pino turns an Error under any other key into `{}`, which hid the reason.
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    try {
+      const sharpErr = new Error("VipsJpeg: premature end of JPEG image");
+      await asInputErrorIfUndecodable(truncatedJpg, sharpErr);
+      expect(info).toHaveBeenCalledTimes(1);
+      const [fields, message] = info.mock.calls[0] as unknown as [
+        { err: unknown; probeErr: unknown },
+        string,
+      ];
+      expect(message).toBe("undecodable image input rejected");
+      expect(fields.err).toBe(sharpErr);
+      expect(typeof fields.probeErr).toBe("string");
+      expect(fields.probeErr).not.toBe("");
+    } finally {
+      info.mockRestore();
+    }
   });
 
   it("classifies a multi-frame GIF with corrupt frame 2 data as ToolInputError", async () => {

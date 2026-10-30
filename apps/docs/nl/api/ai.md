@@ -1,7 +1,7 @@
 ---
 description: "AI-engine-referentie met alle lokale ML-tools. Achtergrondverwijdering, upscaling, OCR, gezichtsdetectie, fotorestauratie en meer."
 i18n_output_hash: 16ab8891ec80
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -101,11 +101,11 @@ Twee dingen die je kunt verwachten. De `ocr`-bundel voert een preflight op hostc
 
 ### Nauwkeurige OCR runtime-installatie {#accurate-ocr-runtime-installation}
 
-Het nauwkeurige OCR-pakket is een platformspecifieke runtime voor de officiële Linux amd64 of Linux arm64-container. De amd64-build maakt gebruik van Python 3.12; de arm64-build maakt gebruik van Python 3.11. Beide builds draaien RapidOCR via ONNX Runtime's `CPUExecutionProvider`, dus hetzelfde pakket werkt zowel op hosts met alleen een CPU als op NVIDIA Docker-hosts. De nauwkeurige runtime vereist minimaal 4 GiB effectief geheugen: de geconfigureerde container cgroup-limiet, anders hostgeheugen. Een systeem onder het ondertekende compatibiliteitsminimum wordt vóór het downloaden afgewezen. Deze vereiste geldt niet voor ingebouwde Fast OCR. Bare-metal-builds worden afgewezen omdat hun libc en Python ABI niet veilig kunnen worden afgeleid; Snelle OCR blijft beschikbaar wanneer de host Tesseract en Ghostscript biedt. Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`). Koreaans vereist daarom een ondersteunde nauwkeurige runtime en een `balanced`- of `best`-niveau; niet-ondersteunde hosts krijgen een expliciete incompatibiliteitsrespons in plaats van een stille terugval op `fast`.
+Het nauwkeurige OCR-pakket is een platformspecifieke runtime voor de officiële Linux amd64 of Linux arm64-container. De amd64-build maakt gebruik van Python 3.12; de arm64-build maakt gebruik van Python 3.11. Beide builds draaien RapidOCR via ONNX Runtime's `CPUExecutionProvider`, dus hetzelfde pakket werkt zowel op hosts met alleen een CPU als op NVIDIA Docker-hosts. De nauwkeurige runtime vereist minimaal 4 GiB effectief geheugen: de geconfigureerde container cgroup-limiet, anders hostgeheugen. Een systeem onder het ondertekende compatibiliteitsminimum wordt vóór het downloaden afgewezen. Deze vereiste geldt niet voor ingebouwde Fast OCR. Bare-metal-builds worden afgewezen omdat hun libc en Python ABI niet veilig kunnen worden afgeleid; Snelle OCR blijft beschikbaar wanneer de host Tesseract en Ghostscript biedt. Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`) of Arabisch (`ar`). Koreaans en Arabisch vereisen daarom een ondersteunde nauwkeurige runtime en een `balanced`- of `best`-niveau; niet-ondersteunde hosts krijgen een expliciete incompatibiliteitsrespons in plaats van een stille terugval op `fast`.
 
 <!-- korean-ocr-contract:start -->
-::: info Compatibiliteit voor Koreaanse OCR
-Fast OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`). Koreaans vereist het nauwkeurige OCR-pakket en `balanced` of `best`. Het pakket draait in officiële Linux amd64- en arm64-containers, ook op NVIDIA-hosts nog steeds op de CPU. Niet-ondersteunde systemen krijgen een expliciete compatibiliteitsfout en geen stille terugval op `fast`. Koreaans met `fast` of de oude alias `tesseract` wordt vóór het in de wachtrij plaatsen geweigerd met `FEATURE_INCOMPATIBLE` en `fast-korean-unsupported`.
+::: info Compatibiliteit voor Koreaanse en Arabische OCR
+Fast OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`) of Arabisch (`ar`). Koreaans en Arabisch vereisen het nauwkeurige OCR-pakket en `balanced` of `best`. Het pakket draait in officiële Linux amd64- en arm64-containers, ook op NVIDIA-hosts nog steeds op de CPU. Niet-ondersteunde systemen krijgen een expliciete compatibiliteitsfout en geen stille terugval op `fast`. Koreaans of Arabisch met `fast` of de oude alias `tesseract` wordt vóór het in de wachtrij plaatsen geweigerd met `FEATURE_INCOMPATIBLE` en `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 
@@ -189,8 +189,8 @@ Vervaagt de achtergrond terwijl het onderwerp scherp blijft.
 
 | Parameter | Type | Standaard | Beschrijving |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verwerkingsniveau. Als `quality` ontbreekt, wordt het hoogste beschikbare niveau in deze volgorde gekozen: `best`, `balanced`, `fast`. Voor Koreaans wordt `fast` nooit gekozen; zonder een nauwkeurig niveau retourneert de API de installatie- of compatibiliteitsfout voor de nauwkeurige runtime. |
-| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast ondersteunt `ko` niet |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verwerkingsniveau. Als `quality` ontbreekt, wordt het hoogste beschikbare niveau in deze volgorde gekozen: `best`, `balanced`, `fast`. Voor Koreaans en Arabisch wordt `fast` nooit gekozen; zonder een nauwkeurig niveau retourneert de API de installatie- of compatibiliteitsfout voor de nauwkeurige runtime. |
+| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast ondersteunt `ko` of `ar` niet |
 | `enhance` | boolean | Niveau-afhankelijk | Verbeter het lokale contrast. Fast past het direct toe; nauwkeurige niveaus behouden de variant alleen als de gekalibreerde score OCR verbetert. Standaard ingeschakeld voor `best` |
 | `engine` | string | - | Verouderde compatibiliteitsalias. Wijst `tesseract` toe aan `fast` en de oude `paddleocr`-waarde aan `balanced`; PaddlePaddle wordt niet geladen |
 
@@ -205,13 +205,13 @@ Extraheert tekst uit gescande PDF-documenten met AI-gestuurde OCR, pagina voor p
 
 | Parameter | Type | Standaard | Beschrijving |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verwerkingsniveau. Als `quality` ontbreekt, wordt het hoogste beschikbare niveau in deze volgorde gekozen: `best`, `balanced`, `fast`. Voor Koreaans wordt `fast` nooit gekozen; zonder een nauwkeurig niveau retourneert de API de installatie- of compatibiliteitsfout voor de nauwkeurige runtime. |
-| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast ondersteunt `ko` niet |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verwerkingsniveau. Als `quality` ontbreekt, wordt het hoogste beschikbare niveau in deze volgorde gekozen: `best`, `balanced`, `fast`. Voor Koreaans en Arabisch wordt `fast` nooit gekozen; zonder een nauwkeurig niveau retourneert de API de installatie- of compatibiliteitsfout voor de nauwkeurige runtime. |
+| `language` | string | `"auto"` | Taal: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast ondersteunt `ko` of `ar` niet |
 | `pages` | string | `"all"` | Paginaselectie: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Niveau-afhankelijk | Verbeter het lokale contrast. Fast past het direct toe; nauwkeurige niveaus behouden de variant alleen als de gekalibreerde score OCR verbetert. Standaard ingeschakeld voor `best` |
 | `engine` | string | - | Verouderde compatibiliteitsalias. Wijst `tesseract` toe aan `fast` en de oude `paddleocr`-waarde aan `balanced`; PaddlePaddle wordt niet geladen |
 
-Dezelfde regels voor het niet terugvallen op een lager niveau en de Koreaanse compatibiliteit gelden voor PDF-OCR. PDF-pagina's worden vóór herkenning gerasterd, en één verzoek kan maximaal 50 pagina's selecteren.
+Dezelfde regels voor het niet terugvallen op een lager niveau en de Koreaanse en Arabische compatibiliteit gelden voor PDF-OCR. PDF-pagina's worden vóór herkenning gerasterd, en één verzoek kan maximaal 50 pagina's selecteren.
 
 ## Gezicht / PII vervagen {#face-pii-blur}
 

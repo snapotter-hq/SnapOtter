@@ -3446,7 +3446,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   ocr: {
     searchTitle: "OCR - Extract Text from Image Online",
     longDescription:
-      "Extract text from images locally with built-in Tesseract or the optional high-accuracy RapidOCR runtime and pinned PP-OCR ONNX models. Choose automatic recognition or an English, German, French, Spanish, Chinese, Japanese, or Korean language hint. The image and extracted text stay on your self-hosted server.",
+      "Extract text from images locally with built-in Tesseract or the optional high-accuracy RapidOCR runtime and pinned PP-OCR ONNX models. Choose automatic recognition or an English, German, French, Spanish, Chinese, Japanese, Korean, or Arabic language hint. The image and extracted text stay on your self-hosted server.",
     useCases: [
       "Digitize text from scanned documents and receipts",
       "Extract data from screenshots and whiteboard photos",
@@ -3457,14 +3457,14 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Built-in Fast tier powered by Tesseract",
       "Optional Balanced and Best tiers powered by RapidOCR and PP-OCRv6 ONNX models",
       "Printed document and scene-text recognition with orientation handling",
-      "Automatic, English, German, French, Spanish, Chinese, Japanese, and Korean language modes",
+      "Automatic, English, German, French, Spanish, Chinese, Japanese, Korean, and Arabic language modes",
       "Portable Linux amd64/arm64 accurate runtime that also works on NVIDIA hosts",
       "Batch OCR across multiple images",
     ],
     faqs: [
       {
         q: "What languages does the OCR support?",
-        a: "SnapOtter exposes automatic recognition plus explicit English, German, French, Spanish, Chinese, Japanese, and Korean modes. Automatic, English, German, French, Spanish, Chinese, and Japanese work with every tier. Korean requires the Balanced or Best tier and the optional accurate runtime; Fast returns an incompatibility error for Korean instead of silently using another language or tier.",
+        a: "SnapOtter exposes automatic recognition plus explicit English, German, French, Spanish, Chinese, Japanese, Korean, and Arabic modes. Automatic, English, German, French, Spanish, Chinese, and Japanese work with every tier. Korean requires the Balanced or Best tier and the optional accurate runtime; Fast returns an incompatibility error for Korean and Arabic instead of silently using another language or tier.",
       },
       {
         q: "Can OCR read handwritten text?",
@@ -4582,7 +4582,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     features: [
       "Built-in Fast Tesseract tier plus optional RapidOCR Balanced and Best tiers",
       "Page-range selection for up to 50 pages per request",
-      "Automatic, English, German, French, Spanish, Chinese, Japanese, and Korean modes",
+      "Automatic, English, German, French, Spanish, Chinese, Japanese, Korean, and Arabic modes",
       "Plain-text output with page boundaries",
       "Portable Linux amd64/arm64 accurate runtime that also works on NVIDIA hosts",
       "Local processing without a third-party OCR API",
@@ -4594,7 +4594,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "Does it support non-English documents?",
-        a: "Yes. Choose automatic recognition or an explicit English, German, French, Spanish, Chinese, Japanese, or Korean hint. Processing happens on your server without an external OCR API.",
+        a: "Yes. Choose automatic recognition or an explicit English, German, French, Spanish, Chinese, Japanese, Korean, or Arabic hint. Processing happens on your server without an external OCR API.",
       },
       {
         q: "Can I process confidential legal or medical PDFs?",

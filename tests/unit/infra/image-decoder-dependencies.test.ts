@@ -28,10 +28,35 @@ describe("cross-platform image decoder dependencies", () => {
     const workflow = read(".github/workflows/ci.yml");
     expectImageMagickExtraCoders(workflowJob(workflow, "test-unit", "test-integration"));
     expectImageMagickExtraCoders(workflowJob(workflow, "test-integration", "test-e2e-smoke"));
+    // Bounded so a degraded mirror cannot hang the job until its ceiling (#4124).
+    for (const job of [
+      workflowJob(workflow, "test-unit", "test-integration"),
+      workflowJob(workflow, "test-integration", "test-e2e-smoke"),
+    ]) {
+      expect(job).toContain("timeout -k 30 300 apt-get install");
+    }
   });
 
   it("installs the same coders in production and test containers", () => {
     expectImageMagickExtraCoders(read("docker/Dockerfile"));
     expectImageMagickExtraCoders(read("docker/Dockerfile.test"));
+  });
+
+  it("bounds the EXR coder and libx265 installs in both images so a stalled mirror cannot hang the build (#4132, #4134)", () => {
+    for (const path of ["docker/Dockerfile", "docker/Dockerfile.test"]) {
+      const source = read(path);
+      expect(source, path).toContain(
+        "timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra",
+      );
+      expect(source, path).toContain(
+        "timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra",
+      );
+      expect(source, path).toContain(
+        "timeout -k 30 300 apt-get install -y --no-install-recommends libx265-199",
+      );
+      expect(source, path).toContain(
+        "timeout -k 30 300 apt-get install -y --no-install-recommends libx265-209",
+      );
+    }
   });
 });

@@ -1,7 +1,7 @@
 ---
 description: "Referensi mesin AI dengan semua alat ML lokal. Penghapusan latar belakang, upscaling, OCR, deteksi wajah, restorasi foto, dan lainnya."
 i18n_output_hash: b099908e2002
-i18n_source_hash: a12d261d0b8d
+i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---
 
@@ -18,7 +18,7 @@ Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak
 
 <!-- korean-ocr-contract:start -->
 ::: info Kompatibilitas OCR bahasa Korea
-OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`). Bahasa Korea memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
+OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`) maupun bahasa Arab (`ar`). Keduanya memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea atau Arab dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## Arsitektur {#architecture}
@@ -190,11 +190,11 @@ Memburamkan latar belakang sambil menjaga subjek tetap tajam.
 | Parameter | Tipe | Default | Deskripsi |
 |-----------|------|---------|-------------|
 | `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Tingkat pemrosesan. `quality` yang dihilangkan memilih tingkat tertinggi yang tersedia dalam urutan ini: `best`, `balanced`, `fast`. Bahasa Korea tidak pernah memilih `fast`; tanpa tingkat akurat, ia mengembalikan kesalahan instalasi runtime akurat atau kesalahan kompatibilitas |
-| `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast tidak mendukung `ko` |
+| `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast tidak mendukung `ko` maupun `ar` |
 | `enhance` | boolean | Bergantung pada tingkatan | Tingkatkan kontras lokal. Fast menerapkannya secara langsung; tingkatan akurat mempertahankan varian hanya ketika skor yang dikalibrasi meningkatkan OCR. Defaultnya aktif untuk yang Terbaik |
 | `engine` | string | - | Alias kompatibilitas yang tidak digunakan lagi. Memetakan `tesseract` ke `fast` dan nilai `paddleocr` lama ke `balanced`; tidak memuat PaddlePaddle |
 
-Mengembalikan teks yang diekstraksi ditambah metadata asal: mesin, kualitas yang diminta dan aktual, perangkat, penyedia, status degradasi, peringatan, dan versi runtime/model yang akurat bila berlaku. Permintaan kualitas eksplisit tidak pernah kembali ke tingkat lain. Jika `balanced` atau `best` tidak tersedia, API mengembalikan `FEATURE_NOT_INSTALLED` atau `FEATURE_INCOMPATIBLE` alih-alih menjalankan `fast` secara diam-diam. Fast eksplisit atau `tesseract` lama dengan bahasa Korea mengembalikan `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, dan panduan paket akurat sebelum job diantrekan.
+Mengembalikan teks yang diekstraksi ditambah metadata asal: mesin, kualitas yang diminta dan aktual, perangkat, penyedia, status degradasi, peringatan, dan versi runtime/model yang akurat bila berlaku. Permintaan kualitas eksplisit tidak pernah kembali ke tingkat lain. Jika `balanced` atau `best` tidak tersedia, API mengembalikan `FEATURE_NOT_INSTALLED` atau `FEATURE_INCOMPATIBLE` alih-alih menjalankan `fast` secara diam-diam. Fast eksplisit atau `tesseract` lama dengan bahasa Korea atau Arab mengembalikan `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, dan panduan paket akurat sebelum job diantrekan.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -206,7 +206,7 @@ Mengekstrak teks dari dokumen PDF hasil pindaian menggunakan OCR bertenaga AI, h
 | Parameter | Tipe | Default | Deskripsi |
 |-----------|------|---------|-------------|
 | `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Tingkat pemrosesan. `quality` yang dihilangkan memilih tingkat tertinggi yang tersedia dalam urutan ini: `best`, `balanced`, `fast`. Bahasa Korea tidak pernah memilih `fast`; tanpa tingkat akurat, ia mengembalikan kesalahan instalasi runtime akurat atau kesalahan kompatibilitas |
-| `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast tidak mendukung `ko` |
+| `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast tidak mendukung `ko` maupun `ar` |
 | `pages` | string | `"all"` | Pemilihan halaman: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Bergantung pada tingkatan | Tingkatkan kontras lokal. Fast menerapkannya secara langsung; tingkatan akurat mempertahankan varian hanya ketika skor yang dikalibrasi meningkatkan OCR. Defaultnya aktif untuk yang Terbaik |
 | `engine` | string | - | Alias kompatibilitas yang tidak digunakan lagi. Memetakan `tesseract` ke `fast` dan nilai `paddleocr` lama ke `balanced`; tidak memuat PaddlePaddle |

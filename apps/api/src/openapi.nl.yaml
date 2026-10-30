@@ -186,7 +186,7 @@ components:
             - fast
             - balanced
             - best
-          description: OCR tier that could not be honored; Fast is reported when Korean is explicitly requested with Fast or the legacy Tesseract alias
+          description: OCR tier that could not be honored; Fast is reported when Korean or Arabic is explicitly requested with Fast or the legacy Tesseract alias
         compatibilityReason:
           type: string
           description: Machine-readable runtime compatibility reason, when available
@@ -4294,7 +4294,7 @@ paths:
                   description: |
                     JSON string with options:
                     - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko, ar. Korean and Arabic are unsupported by fast and the legacy tesseract alias
                     - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
                     - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
@@ -12407,7 +12407,7 @@ paths:
                   description: |
                     JSON string with options:
                     - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko, ar. Korean and Arabic are unsupported by fast and the legacy tesseract alias
                     - `pages` (string, default "all") - Page selection, e.g. "all", "1-3", "1,3,5"
                     - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
                     - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle

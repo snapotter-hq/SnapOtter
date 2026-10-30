@@ -66,6 +66,8 @@ function renderDialog() {
 
 const picker = () => screen.getByLabelText("Background:") as HTMLInputElement;
 const hexField = () => screen.getByTestId("canvas-fill-hex") as HTMLInputElement;
+const transparentCheckbox = () =>
+  screen.getByRole("checkbox", { name: "Transparent" }) as HTMLInputElement;
 const apply = () => fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
 beforeEach(() => {
@@ -314,5 +316,45 @@ describe("Canvas Size dialog background color (#2068)", () => {
     expect(applyCrop).not.toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
     expect(onExport).not.toHaveBeenCalled();
+  });
+});
+
+describe("Canvas Size dialog transparent background (#2274)", () => {
+  it("defaults to unchecked and leaves color inputs enabled", () => {
+    renderDialog();
+    expect(transparentCheckbox().checked).toBe(false);
+    expect(picker()).toBeEnabled();
+    expect(hexField()).toBeEnabled();
+  });
+
+  it("disables color inputs and calls resizeCanvas with three arguments when checked", async () => {
+    const { onClose } = renderDialog();
+    fireEvent.change(picker(), { target: { value: "#112233" } });
+    fireEvent.click(transparentCheckbox());
+    expect(transparentCheckbox().checked).toBe(true);
+    expect(picker()).toBeDisabled();
+    expect(hexField()).toBeDisabled();
+
+    apply();
+    await waitFor(() => expect(resizeCanvas).toHaveBeenCalledWith(800, 600, "center"));
+    expect(resizeCanvas.mock.calls[0]).toHaveLength(3);
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("re-enables color inputs and passes the fill when unchecked", async () => {
+    renderDialog();
+    fireEvent.change(picker(), { target: { value: "#112233" } });
+    fireEvent.click(transparentCheckbox());
+    expect(picker()).toBeDisabled();
+    expect(hexField()).toBeDisabled();
+
+    fireEvent.click(transparentCheckbox());
+    expect(transparentCheckbox().checked).toBe(false);
+    expect(picker()).toBeEnabled();
+    expect(hexField()).toBeEnabled();
+
+    apply();
+    await waitFor(() => expect(resizeCanvas).toHaveBeenCalledWith(800, 600, "center", "#112233"));
+    expect(resizeCanvas.mock.calls[0]).toHaveLength(4);
   });
 });

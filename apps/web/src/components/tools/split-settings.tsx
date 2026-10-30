@@ -6,6 +6,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { quietImport } from "@/lib/chunk-reload";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import type { SplitMode } from "@/stores/split-store";
@@ -160,7 +161,12 @@ export function SplitSettings() {
       }
       const settingsJson = JSON.stringify(settings);
 
-      const JSZip = (await import("jszip")).default;
+      const jszip = await quietImport(() => import("jszip")).catch(() => null);
+      if (!jszip) {
+        setError(t.errors.staleVersionReload);
+        return;
+      }
+      const JSZip = jszip.default;
       if (isCanceled()) return;
       const combinedZip = new JSZip();
       const multiFile = files.length > 1;

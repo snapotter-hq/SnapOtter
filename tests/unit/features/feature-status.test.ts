@@ -248,6 +248,7 @@ let installedPath: string;
 let lockPath: string;
 let kernelLockPath: string;
 let mutationEpochPath: string;
+let logger: typeof import("../../../apps/api/src/lib/logger.js").logger;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -295,6 +296,7 @@ beforeEach(async () => {
   process.env.FEATURE_MANIFEST_PATH = join(tempDir, "feature-manifest.json");
 
   mod = await import("../../../apps/api/src/lib/feature-status.js");
+  logger = (await import("../../../apps/api/src/lib/logger.js")).logger;
 });
 
 afterEach(() => {
@@ -1015,7 +1017,7 @@ describe("resetAiEnvironment", () => {
     const venvPython = join(aiDir, "venv", "bin", "python3");
     mkdirSync(join(aiDir, "venv", "bin"), { recursive: true });
     writeFileSync(venvPython, "#!/bin/sh\n");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     expect(mod.resetAiEnvironment()).toEqual({ venvReseeded: false });
     expect(childProcessFaults.reseedCalls).toHaveLength(0);
@@ -1029,7 +1031,7 @@ describe("resetAiEnvironment", () => {
     mkdirSync(join(aiDir, "venv", "bin"), { recursive: true });
     writeFileSync(venvPython, "#!/bin/sh\n");
     writeFileSync(join(modelsDir, "some-model.onnx"), "fake weights");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     const result = mod.resetAiEnvironment();
 
@@ -1523,8 +1525,8 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
 
   it("polls for a missing AI data directory without logging", async () => {
     vi.useFakeTimers();
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
     try {
       rmSync(aiDir, { recursive: true, force: true });
       const recovered = vi.fn();
@@ -1555,7 +1557,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "transcription", startedAt: new Date().toISOString() }),
     );
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     expect(mod.recoverInterruptedInstalls()).toBe(false);
     expect(existsSync(marker)).toBe(true);
@@ -1576,7 +1578,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
         marker,
         JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
       );
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = vi.spyOn(logger, "error").mockImplementation(() => {});
       const recovered = vi.fn();
 
       mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
@@ -1602,7 +1604,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "ocr", startedAt: "2026-01-01T00:00:00.000Z" }),
     );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     expect(() => mod.recoverInterruptedInstalls()).not.toThrow();
 
@@ -1626,8 +1628,8 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
     );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     expect(mod.recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(marker)).toBe(false);
@@ -1652,8 +1654,8 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
     );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     expect(mod.recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(marker)).toBe(false);
@@ -1678,7 +1680,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
         marker,
         JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
       );
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const recovered = vi.fn(() => true);
 
       mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
@@ -1790,7 +1792,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     const offlineUpload = join(aiDir, ".offline-import-v2-logged-failure");
     mkdirSync(offlineUpload, { recursive: true });
     fsFaults.denyRecursiveRemovePath = offlineUpload;
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
     try {
       expect(mod.recoverInterruptedInstalls()).toBe(false);
       const logged = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
@@ -1802,7 +1804,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       // errno must not be warned about again on each attempt.
       const warnsForEntry = () =>
         warn.mock.calls.filter((call) =>
-          String(call[0]).includes(".offline-import-v2-logged-failure"),
+          call.map(String).join(" ").includes(".offline-import-v2-logged-failure"),
         ).length;
       expect(mod.recoverInterruptedInstalls()).toBe(false);
       expect(warnsForEntry()).toBe(1);
@@ -1814,7 +1816,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
 
   it("logs the errno when the AI directory can't be listed for import staging (#1565)", () => {
     fsFaults.denyReaddirPath = aiDir;
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
     try {
       expect(mod.recoverInterruptedInstalls()).toBe(false);
       const logged = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
@@ -2473,8 +2475,9 @@ describe("ensureAiDirs", () => {
     writeTestManifest({});
     vi.resetModules();
     mod = await import("../../../apps/api/src/lib/feature-status.js");
+    logger = (await import("../../../apps/api/src/lib/logger.js")).logger;
 
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     expect(() => mod.ensureAiDirs()).not.toThrow();
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Cannot create AI directories"));
     errorSpy.mockRestore();

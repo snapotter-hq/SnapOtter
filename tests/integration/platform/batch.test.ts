@@ -28,6 +28,7 @@ import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
+  loginAsUser,
   type TestApp,
 } from "../test-server.js";
 
@@ -449,12 +450,14 @@ describe("ClientJobId passthrough", () => {
     expect((res.headers["x-job-id"] as string).length).toBeGreaterThan(0);
   });
 
-  // The parent insert fails on the primary key when the id is taken. That is
-  // the client's mistake, not a server fault, so it answers 409 and leaves the
-  // existing row alone (#1687).
-  it("answers 409 for a clientJobId that is already in use", async () => {
-    const clientJobId = `batch-1687-${randomUUID()}`;
-    const post = () => {
+  // A browser can resend the batch POST on a fresh connection when it gave up
+  // on the first one, and the XHR then reports whichever answer arrives. The
+  // owner's replay attaches to the batch already running: 202 hands the client
+  // to the SSE and its durable result, and nothing is inserted or processed
+  // twice (#2015, which replaced the owner's 409 from #1687).
+  it("answers 202 and attaches when the owner replays a clientJobId", async () => {
+    const clientJobId = `batch-2015-${randomUUID()}`;
+    const post = (token: string) => {
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
         { name: "settings", content: JSON.stringify({ width: 100 }) },
@@ -463,21 +466,27 @@ describe("ClientJobId passthrough", () => {
       return app.inject({
         method: "POST",
         url: "/api/v1/tools/image/resize/batch",
-        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        headers: { "content-type": contentType, authorization: `Bearer ${token}` },
         body,
       });
     };
 
-    const first = await post();
+    const first = await post(adminToken);
     expect(first.statusCode).toBe(200);
     const [before] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
 
-    const second = await post();
-    expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
-    expect(second.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    const second = await post(adminToken);
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(202);
+    expect(second.json()).toEqual({ jobId: clientJobId, async: true });
 
     const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
     expect(after).toEqual(before);
+
+    // Someone else's job id stays a conflict: attaching would leak the result.
+    const userToken = await loginAsUser(app);
+    const foreign = await post(userToken);
+    expect(foreign.statusCode, foreign.body.slice(0, 300)).toBe(409);
+    expect(foreign.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
   });
 
   // A free clientJobId can still collide when the route inserts its per-file

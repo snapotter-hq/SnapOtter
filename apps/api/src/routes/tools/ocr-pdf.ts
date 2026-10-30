@@ -36,7 +36,7 @@ import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   quality: z.enum(["fast", "balanced", "best"]).optional(),
-  language: z.enum(["auto", "en", "de", "fr", "es", "zh", "ja", "ko"]).default("auto"),
+  language: z.enum(["auto", "en", "de", "fr", "es", "zh", "ja", "ko", "ar"]).default("auto"),
   pages: z.string().max(100).default("all"),
   enhance: z.boolean().optional(),
   // Backward compat with the image OCR contract.

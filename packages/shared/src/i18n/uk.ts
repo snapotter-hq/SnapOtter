@@ -1449,6 +1449,8 @@ export const uk: TranslationKeys = {
       submit: "Змінити розмір",
       submitBatch: "Змінити розмір ({count} файлів)",
       progressLabel: "Зміна розміру",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      maxPercentageExceeded: "Використовуйте масштаб від 1 до {max}%.",
     },
     crop: {
       width: "Ширина",
@@ -1999,6 +2001,8 @@ export const uk: TranslationKeys = {
         "Покращує локальний контраст перед розпізнаванням. Швидкий режим застосовує його одразу; Збалансований і Найкращий зберігають варіант лише за покращення каліброваної оцінки.",
       fastKoreanUnsupported:
         "Швидкий OCR не підтримує корейську мову. Установіть пакет точного OCR і виберіть «Збалансований» або «Найкращий».",
+      fastArabicUnsupported:
+        "Швидкий OCR не підтримує арабську мову. Установіть пакет точного OCR і виберіть «Збалансований» або «Найкращий».",
       language: "Мова",
       autoDetect: "Автовизначення",
       extractedText: "Витягнутий текст",
@@ -2095,6 +2099,9 @@ export const uk: TranslationKeys = {
       submitSubject: "Розумна обрізка",
       submitFace: "Обрізка по обличчю",
       submitTrim: "Обрізати поля",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      cropAreaExceeded:
+        "Цей фрагмент перевищує ліміт у {max} пікселів. Зменште ширину, висоту або відступ.",
     },
     imageEnhancement: {
       enhancementMode: "Режим поліпшення",
@@ -2221,6 +2228,9 @@ export const uk: TranslationKeys = {
       submit: "Змінити розмір",
       submitBatch: "Змінити розмір ({count} файлів)",
       progressLabel: "Контентно-залежне масштабування",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      areaExceeded:
+        "Зміна розміру з урахуванням вмісту обмежена {max} пікселями загалом. Зменште ширину або висоту.",
     },
     "ai-canvas-expand": {
       quality: "Якість",
@@ -3268,6 +3278,7 @@ export const uk: TranslationKeys = {
       submit: "Обробити GIF",
       submitBatch: "Обробити ({count} файлів)",
       progressLabel: "Обробка GIF",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
     },
     "image-to-base64": {
       converting: "Конвертація...",
@@ -3713,8 +3724,7 @@ export const uk: TranslationKeys = {
       bestEffortHint:
         "Максимум за можливості. PDF на основі зображень наближаються до цього розміру; PDF лише з текстом можуть не зменшитися до нього.",
       targetReached: "Досягнуто цільового розміру {target} (результат: {size}).",
-      targetMissed:
-        "Не вдалося досягти {target}. Найменший можливий розмір становив {size}, оскільки цей PDF складається переважно з тексту або векторної графіки, які стиснення зображень не може зменшити.",
+      targetMissed: "Не вдалося досягти {target}. Найменший можливий розмір становив {size}.",
     },
     "rotate-pdf": {
       angle: "Кут повороту",
@@ -3943,6 +3953,9 @@ export const uk: TranslationKeys = {
       submit: "Витягти текст",
       submitBatch: "Витягти текст ({count} файлів)",
       progressLabel: "Витягнення",
+      scannedHint:
+        "Цей PDF відсканований, тож тексту для вилучення немає. OCR може його прочитати, але це довше й потребує встановленого ШІ-пакета OCR.",
+      runOcr: "Запустити OCR для цього PDF",
     },
     "pdf-to-word": {
       hint: "Найкраще для текстових PDF; скановані сторінки потребують OCR",
@@ -4696,6 +4709,7 @@ export const uk: TranslationKeys = {
         anchorLabel: "Прив'язка:",
         anchorAriaLabel: "Прив'язка {position}",
         backgroundLabel: "Фон:",
+        transparent: "Прозорий",
         anchors: {
           topLeft: "вгорі ліворуч",
           topCenter: "вгорі по центру",
@@ -5219,6 +5233,7 @@ export const uk: TranslationKeys = {
       description: "Керування пакетами AI-моделей для розширеної обробки файлів.",
       installAll: "Встановити все",
       diskUsage: "Використання диска: {size}",
+      statusStale: "Не вдалося оновити стан пакетів. Список нижче може бути застарілим.",
       sizeOnDisk: "{size} на диску",
       installed: "Встановлено",
       notInstalled: "Не встановлено",
@@ -5658,6 +5673,7 @@ export const uk: TranslationKeys = {
     invalidSetting: "Неприпустиме значення параметра «{setting}».",
     network: "Помилка мережі",
     invalidResponse: "Некоректна відповідь",
+    staleVersionReload: "Застосунок оновлено. Перезавантажте сторінку й спробуйте ще раз.",
     failedWithStatus: "Не вдалося виконати цей запит. Спробуйте ще раз.",
     processingFailedWithStatus:
       "Не вдалося обробити цей файл. Перевірте, чи файл не пошкоджений, і спробуйте ще раз.",
@@ -5887,6 +5903,7 @@ export const uk: TranslationKeys = {
       zh: "Китайська",
       ja: "Японська",
       ko: "Корейська",
+      ar: "Арабська",
       id: "Індонезійська",
       th: "Тайська",
       vi: "В'єтнамська",
