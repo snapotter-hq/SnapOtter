@@ -57,7 +57,7 @@ describe("Dockerfile build args", () => {
 
   it("pins fixed Go toolchains and checksummed dependency overrides for shipped binaries", () => {
     const goBuilder =
-      "golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58";
+      "golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61";
     expect(dockerfile.split(goBuilder)).toHaveLength(3);
 
     // Transitive modules pinned above what the application itself requires, so
