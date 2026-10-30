@@ -102,11 +102,13 @@ beforeEach(() => {
   capturedModalOnImports.length = 0;
   vi.stubGlobal("localStorage", localStorageMock);
   let blobCounter = 0;
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => `blob:original-input-${++blobCounter}`,
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => `blob:original-input-${++blobCounter}`,
+      revokeObjectURL: () => {},
+    }),
+  );
   class MockResizeObserver {
     observe() {}
     unobserve() {}

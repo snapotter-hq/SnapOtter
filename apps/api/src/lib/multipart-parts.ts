@@ -1,5 +1,5 @@
 import type { Readable } from "node:stream";
-import { Busboy, type BusboyHeaders } from "@fastify/busboy";
+import { Busboy, type BusboyHeaders, type BusboyInstance } from "@fastify/busboy";
 import type { FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { stripInternalPaths } from "./errors.js";
@@ -144,7 +144,7 @@ export async function* multipartParts(
   const raw = request.raw;
   const fileSizeLimit =
     limits.fileSize ?? (env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * MIB : undefined);
-  let bb: Busboy;
+  let bb: BusboyInstance;
   try {
     bb = new Busboy({
       headers: raw.headers as BusboyHeaders,
