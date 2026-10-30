@@ -78,7 +78,7 @@
     "tsx": "^4.23.15",
     "yauzl": "^3.4.0",
     "zod": "^3.24.0",
-    "zxing-wasm": "^3.1.6"
+    "zxing-wasm": "^3.1.2"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",

@@ -343,8 +343,8 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
       zxing-wasm:
-        specifier: ^3.1.6
-        version: 3.1.6(@types/emscripten@1.41.5)
+        specifier: ^3.1.2
+        version: 3.1.2(@types/emscripten@1.41.5)
     devDependencies:
       '@types/archiver':
         specifier: ^7.0.0
@@ -8791,8 +8791,8 @@ packages:
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
-  zxing-wasm@3.1.6:
-    resolution: {integrity: sha512-mU7UNuvl+hOT+nlSOQTMHZ2tM8lRMsbjDIp5IO/+HmBl/FOq77q0OSZPJ3cm42A9c1MKU6Uve67FiGdkhsrT9g==}
+  zxing-wasm@3.1.2:
+    resolution: {integrity: sha512-yHloUw+h43r9QhFwVEbdkfmsl9h3rHRpgvvVd9WdhipM3TCYYzGVACmnT+i/YPrNK/eZRgs1ZMISsyJtAoimzA==}
     peerDependencies:
       '@types/emscripten': '>=1.39.6'
 
@@ -17436,7 +17436,7 @@ snapshots:
 
   zwitch@2.0.4: {}
 
-  zxing-wasm@3.1.6(@types/emscripten@1.41.5):
+  zxing-wasm@3.1.2(@types/emscripten@1.41.5):
     dependencies:
       '@types/emscripten': 1.41.5
       type-fest: 5.10.0
