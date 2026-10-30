@@ -27,6 +27,7 @@ import io
 import os
 import traceback
 
+import session_cache
 from sidecar_errors import build_error_envelope
 
 
@@ -208,6 +209,10 @@ if DISPATCHER_PROFILE == "ai":
 # capturing stdout. The scripts remain unchanged.
 
 
+# Scripts that load their rembg sessions through session_cache.
+_SESSION_CACHE_SCRIPTS = frozenset({"remove_bg", "gif_remove_bg"})
+
+
 def _run_script_main(script_name, args):
     """
     Import and run a script's main() function, capturing its stdout output.
@@ -281,6 +286,11 @@ def _run_script_main(script_name, args):
     drain_thread.start()
 
     exit_code = 0
+    if script_name not in _SESSION_CACHE_SCRIPTS:
+        # Cached sessions hold up to 40% of VRAM; another GPU tool gets the
+        # card to itself instead of competing with models it never asked for.
+        session_cache.evict_all(f"running {script_name}")
+    session_cache.request_started()
     try:
         sys.argv = ["script.py"] + args
 
@@ -309,6 +319,8 @@ def _run_script_main(script_name, args):
         sys.stdout.flush()
         exit_code = 1
     finally:
+        session_cache.request_finished()
+
         # Flush before restoring
         sys.stdout.flush()
 
@@ -455,6 +467,7 @@ def main():
     )
     print(f"[dispatcher] Ready. GPU: {gpu}. Max requests: {MAX_REQUESTS}. Modules: {list(available_modules.keys())}", file=sys.stderr, flush=True)
 
+    session_cache.start_idle_reaper()
     _init_tracing()
 
     request_count = 0

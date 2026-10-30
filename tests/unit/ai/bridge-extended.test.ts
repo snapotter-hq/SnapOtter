@@ -1428,6 +1428,27 @@ describe("bridge - env passthrough for sidecar-specific vars", () => {
     expect(getLastSpawnEnv()?.DISPATCHER_MAX_REQUESTS).toBe("100");
   });
 
+  it("passes the AI session cache knobs to subprocess", async () => {
+    process.env.AI_SESSION_CACHE_BYTES = "8589934592";
+    process.env.AI_SESSION_IDLE_TIMEOUT = "300";
+
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    try {
+      const promise = runPythonWithProgress("test.py", []);
+      mock.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+      mock.emitEvent("close", 0, null);
+      await promise;
+
+      expect(getLastSpawnEnv()?.AI_SESSION_CACHE_BYTES).toBe("8589934592");
+      expect(getLastSpawnEnv()?.AI_SESSION_IDLE_TIMEOUT).toBe("300");
+    } finally {
+      delete process.env.AI_SESSION_CACHE_BYTES;
+      delete process.env.AI_SESSION_IDLE_TIMEOUT;
+    }
+  });
+
   it("defaults data/model paths but does not include other unset vars in subprocess env", async () => {
     delete process.env.U2NET_HOME;
     delete process.env.DATA_DIR;

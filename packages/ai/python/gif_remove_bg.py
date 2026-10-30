@@ -277,8 +277,32 @@ def _ensure_model_available(model, model_home):
         ensure_download_allowed(f"Background removal model '{model}'")
 
 
-def _create_session(model, providers, device):
+def _model_home():
+    return os.path.expanduser(
+        os.getenv("U2NET_HOME", os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".u2net"))
+    )
+
+
+def _cached_session(model, providers):
+    """Build or reuse the rembg session through the cache shared with remove_bg.
+
+    Sharing the cache matters for the budget: a session built outside it would
+    sit next to a cached BiRefNet without being counted against VRAM.
+    """
     from rembg import new_session
+
+    from session_cache import get_session, session_cost
+
+    model_path = os.path.join(_model_home(), f"{model}.onnx")
+    return get_session(
+        model,
+        providers,
+        lambda: new_session(model, providers=providers),
+        session_cost(model_path, providers),
+    )
+
+
+def _create_session(model, providers, device):
     from rembg.sessions import sessions_class
 
     from remove_bg import _register_hr_matting_session, _register_matting_session
@@ -286,19 +310,27 @@ def _create_session(model, providers, device):
     _register_matting_session(sessions_class)
     _register_hr_matting_session(sessions_class)
     try:
-        return new_session(model, providers=providers), device
+        return _cached_session(model, providers), device
     except Exception as e:
         if (
             "CUDAExecutionProvider" in providers
             and not _is_host_oom(e)
             and not _is_model_load_error(e)
         ):
+            from session_cache import evict_all
+
+            if _is_oom(e) and evict_all("GPU out of memory loading a session"):
+                # The cache was holding VRAM that is free now; stay on the GPU.
+                try:
+                    return _cached_session(model, providers), device
+                except Exception as retry_err:
+                    e = retry_err
             print(
                 f"[gif-remove-bg] CUDA session for '{model}' failed ({e}); falling back to CPU",
                 file=sys.stderr,
                 flush=True,
             )
-            return new_session(model, providers=["CPUExecutionProvider"]), "cpu"
+            return _cached_session(model, ["CPUExecutionProvider"]), "cpu"
         raise
 
 
@@ -383,9 +415,7 @@ def main():
         bg_img = Image.open(bg_path).convert("RGBA") if bg_path else None
 
         # Offline guard for the chosen model (mirrors remove_bg.py home resolution).
-        model_home = os.path.expanduser(
-            os.getenv("U2NET_HOME", os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".u2net"))
-        )
+        model_home = _model_home()
         _ensure_model_available(model, model_home)
 
         emit_progress(5, "Loading model")
@@ -416,6 +446,9 @@ def main():
                 detail = str(e).strip() or type(e).__name__
                 session = None
                 e.__traceback__ = None
+                from session_cache import evict_all
+
+                evict_all("out of memory")
                 model = "u2net"
                 sys.stderr.write(
                     json.dumps(

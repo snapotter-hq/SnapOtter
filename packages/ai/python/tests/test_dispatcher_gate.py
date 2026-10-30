@@ -267,4 +267,60 @@ def test_main_recycles_after_consecutive_script_failures(monkeypatch, capsys):
     assert "shutting down for restart" in captured.err
 
 
+# --- session cache wiring (#776) --------------------------------------------
+
+
+@pytest.fixture
+def probe_script(monkeypatch, tmp_path):
+    """Run _run_script_main against a throwaway script in a temp script dir."""
+    import session_cache
+
+    (tmp_path / "probe.py").write_text("import session_cache\nprint(session_cache._busy)\n")
+    monkeypatch.setattr(dispatcher, "__file__", str(tmp_path / "dispatcher.py"))
+    monkeypatch.setattr(dispatcher, "ALLOWED_SCRIPTS", set(dispatcher.ALLOWED_SCRIPTS) | {"probe"})
+    return session_cache
+
+
+def test_requests_are_marked_busy_while_a_script_runs(probe_script):
+    out, code = dispatcher._run_script_main("probe", [])
+    assert (out, code) == ("True", 0)
+    assert probe_script._busy is False
+
+
+def test_busy_flag_clears_when_the_script_raises(tmp_path, probe_script):
+    (tmp_path / "probe.py").write_text("raise RuntimeError('boom')\n")
+    _, code = dispatcher._run_script_main("probe", [])
+    assert code == 1
+    assert probe_script._busy is False
+
+
+def test_other_gpu_tools_get_the_card_without_cached_sessions(probe_script, monkeypatch):
+    monkeypatch.setenv("AI_SESSION_CACHE_BYTES", str(100 * 1024 * 1024))
+    probe_script.get_session("u2net", ["CUDAExecutionProvider"], object, 1024)
+    assert probe_script._entries
+    dispatcher._run_script_main("probe", [])
+    assert not probe_script._entries
+
+
+def test_cache_scripts_keep_their_sessions(probe_script, monkeypatch):
+    monkeypatch.setenv("AI_SESSION_CACHE_BYTES", str(100 * 1024 * 1024))
+    monkeypatch.setattr(dispatcher, "_SESSION_CACHE_SCRIPTS", frozenset({"probe"}))
+    probe_script.get_session("u2net", ["CUDAExecutionProvider"], object, 1024)
+    dispatcher._run_script_main("probe", [])
+    assert probe_script._entries
+
+
+def test_main_starts_the_idle_reaper(monkeypatch):
+    import io
+    import gpu
+    import session_cache
+
+    monkeypatch.setattr(gpu, "gpu_available", lambda: False)
+    started = []
+    monkeypatch.setattr(session_cache, "start_idle_reaper", lambda: started.append(True))
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    dispatcher.main()
+    assert started == [True]
+
+
 

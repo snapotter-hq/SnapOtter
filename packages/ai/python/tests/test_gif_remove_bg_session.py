@@ -166,3 +166,33 @@ def test_cuda_session_model_load_error_reraises_without_cpu_retry(capsys):
         assert calls == [["CUDAExecutionProvider", "CPUExecutionProvider"]]
         assert "falling back" not in capsys.readouterr().err
 
+
+
+def test_gif_sessions_share_the_cache_with_remove_bg(tmp_path, monkeypatch):
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    import session_cache
+
+    home = tmp_path / "u2net"
+    home.mkdir()
+    (home / "u2net.onnx").write_bytes(b"x" * 1024)
+    monkeypatch.setenv("U2NET_HOME", str(home))
+    monkeypatch.setenv("AI_SESSION_CACHE_BYTES", str(10 * 1024 * 1024))
+    session_cache._entries.clear()
+    cuda = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    calls = []
+
+    def new_session(model, providers=None):
+        calls.append((model, tuple(providers)))
+        return object()
+
+    mod = load_gif_module(new_session)
+    try:
+        first, _ = mod._create_session("u2net", cuda, "cuda")
+        second, device = mod._create_session("u2net", cuda, "cuda")
+        # remove_bg asks the same cache for the same key, so it reuses the GIF's session.
+        from_still = session_cache.get_session("u2net", cuda, lambda: object(), 1024 * 8)
+    finally:
+        session_cache._entries.clear()
+    assert first is second is from_still
+    assert device == "cuda"
+    assert calls == [("u2net", tuple(cuda))]

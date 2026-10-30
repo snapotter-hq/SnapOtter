@@ -91,6 +91,7 @@ import enhance_faces  # noqa: E402
 import gif_remove_bg  # noqa: E402
 import gpu  # noqa: E402
 import remove_bg  # noqa: E402
+import session_cache  # noqa: E402
 import restore  # noqa: E402
 import upscale  # noqa: E402
 assert colorize._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
@@ -394,6 +395,7 @@ def _verify_gif_cpu_oom_handling():
             stderr_captured = []
 
             def _run_main(settings_dict):
+                session_cache.evict_all("test isolation")
                 created_models.clear()
                 removed_sessions.clear()
                 live_sessions.clear()
@@ -1362,6 +1364,9 @@ def _verify_remove_bg_oom_handling():
             os.environ["U2NET_HOME"] = tmpdir
 
             def _run_remove_bg_main(settings_dict):
+                # Each simulated request must build its own session; a GPU host has a
+                # non-zero auto budget and would otherwise cache the fake model file.
+                session_cache.evict_all("test isolation")
                 rembg_calls.clear()
                 session_calls.clear()
                 info_msgs.clear()
