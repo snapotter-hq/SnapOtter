@@ -59,6 +59,7 @@ function stubDir(first: FirstInstall, opts: StubOpts = {}) {
   const bin = join(dir, "bin");
   const lock = join(dir, "dpkg.lock");
   const calls = join(dir, "calls.log");
+  const budgets = join(dir, "budgets.log");
   if (opts.lockedAtStartSeconds) {
     writeFileSync(lock, "");
     spawn("/bin/sh", ["-c", `/bin/sleep ${opts.lockedAtStartSeconds}; rm -f "${lock}"`], {
@@ -69,7 +70,9 @@ function stubDir(first: FirstInstall, opts: StubOpts = {}) {
   const stubs: Record<string, string> = {
     sudo: 'exec "$@"',
     // timeout -k <grace> <budget> cmd...: run cmd as-is; the stubs decide its outcome.
-    timeout: 'shift 3; exec "$@"',
+    // Records the budget of each `apt-get update` so tests can check how long each refresh got.
+    timeout: `case " $* " in *" update "*) echo "$3" >> "${budgets}" ;; esac
+shift 3; exec "$@"`,
     sleep: "exec /bin/sleep 0.05",
     // The index knows every requested package, unless the test says otherwise.
     "apt-cache": opts.indexUnready ? "exit 1" : "exit 0",
@@ -119,7 +122,7 @@ touch "${dir}/installed"`,
     writeFileSync(path, `#!/bin/bash\n${body}\n`, { flag: "w" });
     chmodSync(path, 0o755);
   }
-  return { dir, bin, calls, ...aptDirs(dir) };
+  return { dir, bin, calls, budgets, ...aptDirs(dir) };
 }
 
 function runScript(
@@ -128,7 +131,7 @@ function runScript(
   opts: StubOpts = {},
   layout?: AptLayout,
 ) {
-  const { dir, bin, calls, etc, lists } = stubDir(first, opts);
+  const { dir, bin, calls, budgets, etc, lists } = stubDir(first, opts);
   layout?.(etc, lists);
   const res = spawnSync("bash", [SCRIPT], {
     encoding: "utf8",
@@ -149,6 +152,8 @@ function runScript(
     output: `${res.stdout}${res.stderr}`,
     installed: existsSync(join(dir, "installed")),
     calls: existsSync(calls) ? readFileSync(calls, "utf8") : "",
+    /** The budget, in seconds, of each `apt-get update` in order. */
+    budgets: existsSync(budgets) ? readFileSync(budgets, "utf8").trim().split("\n") : [],
     etc,
     lists,
   };
@@ -218,6 +223,23 @@ describe.skipIf(process.platform === "win32")(
       expect(run.status, run.output).toBe(0);
       expect(run.installed).toBe(true);
       expect(run.output).toContain(NO_USABLE_INDEX);
+    });
+
+    it("gives the second refresh one budget when the first one timed out (#4193)", () => {
+      // The first post-swap refresh used its full 3x budget on a timeout, so a
+      // second try at 3x only waits another full budget on the same dead
+      // mirror. The second gets the plain budget instead.
+      const run = runScript("succeeds", {}, { updateExit: 124 });
+      expect(run.status, run.output).toBe(0);
+      expect(run.budgets).toEqual(["1", "3", "1"]);
+    });
+
+    it("keeps the 3x budget for a second refresh when the first one failed without timing out (#4193)", () => {
+      // Exit 1 is a real apt error, not a stalled mirror, so the second try
+      // keeps its full budget.
+      const run = runScript("succeeds", {}, { updateExitSeq: [124, 1, 1] });
+      expect(run.status, run.output).toBe(0);
+      expect(run.budgets).toEqual(["1", "3", "3"]);
     });
 
     it("warns when both post-swap updates exit 0 without reaching the mirror", () => {

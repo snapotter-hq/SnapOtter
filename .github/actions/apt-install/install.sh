@@ -287,7 +287,14 @@ if $azure_lists_ok; then
 else
   # A second, equally patient try when the first errored or couldn't reach
   # the archive (apt reports the latter with exit 0).
-  if ! apt_update "$((update_budget * 3))" || $ubuntu_unreachable; then
+  first_rc=0
+  apt_update "$((update_budget * 3))" || first_rc=$?
+  if [ "$first_rc" -ne 0 ] || $ubuntu_unreachable; then
+    # A first refresh that timed out (124, or 137 after timeout's KILL) has
+    # already spent its 3x budget on a mirror that didn't answer. A second
+    # try gets the plain budget, not another 3x (#4193).
+    second_budget=$((update_budget * 3))
+    case "$first_rc" in 124 | 137) second_budget=$update_budget ;; esac
     # This one used to be bare, so a timeout here ended the whole script on
     # its exit code and the re-rolls below never ran (#1971). Keep going
     # instead: the runner image ships an index, so install against whatever
@@ -295,7 +302,7 @@ else
     # the same way it would have anyway, and the script still exits 1. The
     # check matches the branch above because apt-get update exits 0 when it
     # only couldn't reach a mirror, which the exit code alone would miss.
-    if ! apt_update "$((update_budget * 3))" || $ubuntu_unreachable || ! index_ready; then
+    if ! apt_update "$second_budget" || $ubuntu_unreachable || ! index_ready; then
       echo "::warning::no usable apt index after the mirror swap; installing against whatever apt has, which may leave the packages unresolved"
     fi
   fi
