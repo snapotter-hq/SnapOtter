@@ -8,9 +8,11 @@ on:
   schedule:
     - cron: "30 6 * * 6"
 
+# Same shape as ci.yml: PRs cancel superseded runs, every main commit gets
+# its own run so a burst of merges can't cancel or replace one.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions: {}
 

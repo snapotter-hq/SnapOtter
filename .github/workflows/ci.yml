@@ -14,9 +14,11 @@ on:
 
 # PR branches cancel superseded runs. Main never does: a later merge would
 # otherwise cancel the run on the commit before it, and no commit on main
-# would get a completed post-merge signal (#4190, #2457). Main runs queue.
+# would get a completed post-merge signal (#4190, #2457). Main also needs a
+# group per commit: a group holds one running and one pending run, and a
+# third merge replaces the pending one, so the middle commit is never tested.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
