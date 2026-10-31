@@ -55,9 +55,9 @@ describe("production dependency advisory policy", () => {
   it("resolves only the patched versions in the frozen lockfile", () => {
     const lockfile = readFileSync(resolve(root, "pnpm-lock.yaml"), "utf8");
 
-    expect(lockfile).toContain("'@fastify/static@10.1.7'");
+    expect(lockfile).toContain("'@fastify/static@10.1.8'");
     expect(lockfile).toContain("brace-expansion@5.0.8");
-    expect(lockfile).toContain("react-router@8.5.0");
+    expect(lockfile).toContain("react-router@8.5.1");
     expect(lockfile).toContain("tar@7.5.22");
     expect(lockfile).not.toContain("'@fastify/static@9.3.0'");
     expect(lockfile).not.toMatch(/\n {2}brace-expansion@5\.0\.7:\n/);
