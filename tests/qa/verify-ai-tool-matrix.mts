@@ -588,8 +588,9 @@ async function downloadArtifactWithMime(
     if (typeof accepted.jobId !== "string") throw new Error("202 response without a jobId");
     ({ downloadUrl } = await readTerminal(sessionToken, accepted.jobId));
   } else {
-    downloadUrl = accepted.downloadUrl;
-    if (typeof downloadUrl !== "string") throw new Error("200 response without a downloadUrl");
+    const acceptedUrl = accepted.downloadUrl;
+    if (typeof acceptedUrl !== "string") throw new Error("200 response without a downloadUrl");
+    downloadUrl = acceptedUrl;
   }
   const response = await fetch(new URL(downloadUrl, BASE), {
     headers: { authorization: `Bearer ${sessionToken}` },

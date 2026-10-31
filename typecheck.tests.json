@@ -28,6 +28,8 @@
     "tests/e2e-docs/**/*",
     "tests/e2e-editor/**/*",
     "tests/e2e-landing/**/*",
-    "tests/e2e-noauth/**/*"
+    "tests/e2e-noauth/**/*",
+    "tests/e2e/**/*",
+    "tests/qa/**/*"
   ]
 }

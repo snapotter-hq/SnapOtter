@@ -136,7 +136,7 @@ base.describe("RBAC Full — People Management UI", () => {
     storageState: authFile,
   });
 
-  base.test(
+  base(
     "admin sees role dropdown with admin/editor/user options when adding members",
     async ({ page }) => {
       await page.goto("/");
@@ -169,14 +169,14 @@ base.describe("RBAC Full — Roles Management UI", () => {
     storageState: authFile,
   });
 
-  base.test("admin sees Roles tab in settings", async ({ page }) => {
+  base("admin sees Roles tab in settings", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
 
     await expect(page.getByRole("button", { name: /^roles$/i })).toBeVisible();
   });
 
-  base.test("roles section shows built-in roles with Built-in badge", async ({ page }) => {
+  base("roles section shows built-in roles with Built-in badge", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /^roles$/i }).click();
@@ -202,14 +202,14 @@ base.describe("RBAC Full — Audit Log UI", () => {
     storageState: authFile,
   });
 
-  base.test("admin sees Audit Log tab in settings", async ({ page }) => {
+  base("admin sees Audit Log tab in settings", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
 
     await expect(page.getByRole("button", { name: /audit log/i })).toBeVisible();
   });
 
-  base.test("audit log displays LOGIN_SUCCESS entries", async ({ page }) => {
+  base("audit log displays LOGIN_SUCCESS entries", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /audit log/i }).click();
@@ -239,7 +239,7 @@ base.describe("RBAC Full — API Key Scoping UI", () => {
     storageState: authFile,
   });
 
-  base.test("API Keys section has permission scoping toggle", async ({ page }) => {
+  base("API Keys section has permission scoping toggle", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /api keys/i }).click();
@@ -289,7 +289,7 @@ base.describe("RBAC Full — Custom Role User", () => {
     await deleteRoleByName(adminToken, CUSTOM_ROLE);
   });
 
-  base.test("custom role user only sees permitted tabs (no admin tabs)", async ({ page }) => {
+  base("custom role user only sees permitted tabs (no admin tabs)", async ({ page }) => {
     await login(page, CUSTOM_USER, CUSTOM_PASSWORD);
 
     await openSettings(page);
@@ -316,7 +316,7 @@ base.describe("RBAC Full — Custom Role User", () => {
     expect(await page.locator(".w-48 button").count()).toBe(3);
   });
 
-  base.test(
+  base(
     "custom role user gets correct API permissions (settings:read OK, settings:write 403)",
     async ({ page }) => {
       await login(page, CUSTOM_USER, CUSTOM_PASSWORD);
