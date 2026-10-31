@@ -110,7 +110,7 @@ export async function buildGeneratedProcessInputs(
     const inputs: ToolProcessInputV2[] = [];
     for (let index = 0; index < selected.length; index++) {
       const fixture = selected[index];
-      let buffer = await readFile(join(fixture.dir, fixture.filename));
+      let buffer: Buffer = await readFile(join(fixture.dir, fixture.filename));
       let filename = fixture.filename;
       if (modality && preparationDir) {
         const kind = config.inputKinds?.[Math.min(index, config.inputKinds.length - 1)];

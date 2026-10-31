@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@snapotter/shared": ["packages/shared/src/index.ts"],
+      "@snapotter/shared/*": ["packages/shared/src/*"],
+      "@snapotter/enterprise": ["packages/enterprise/src/index.ts"],
+      "@snapotter/image-engine": ["packages/image-engine/src/index.ts"],
+      "@snapotter/media-engine": ["packages/media-engine/src/index.ts"],
+      "@snapotter/doc-engine": ["packages/doc-engine/src/index.ts"],
+      "@snapotter/ai": ["packages/ai/src/index.ts"],
+      "*": ["apps/api/node_modules/@types/*", "apps/api/node_modules/*"]
+    }
+  },
+  "include": [
+    "tests/helpers/**/*",
+    "tests/setup/**/*",
+    "tests/e2e-analytics/**/*",
+    "tests/e2e-demo/**/*",
+    "tests/e2e-docker/**/*",
+    "tests/e2e-docs/**/*",
+    "tests/e2e-editor/**/*",
+    "tests/e2e-landing/**/*",
+    "tests/e2e-noauth/**/*"
+  ]
+}

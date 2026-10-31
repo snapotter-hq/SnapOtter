@@ -22,6 +22,7 @@ type StageView = {
       x(): number;
       y(): number;
       scaleX(): number;
+      scaleY(): number;
       find(selector: string): Array<{
         id(): string;
         getLayer(): {
