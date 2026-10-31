@@ -12,7 +12,7 @@ const s3ClientConfigs = vi.hoisted(() => [] as Record<string, unknown>[]);
 const middlewareStackAdd = vi.hoisted(() => vi.fn());
 
 vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@aws-sdk/client-s3")>();
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     S3Client: class {

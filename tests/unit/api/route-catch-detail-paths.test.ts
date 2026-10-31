@@ -11,7 +11,7 @@ import multipart from "@fastify/multipart";
 import { apiToolPath, ToolInputError } from "@snapotter/shared";
 import AdmZip from "adm-zip";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
-import sharp from "sharp";
+import sharp, { type Metadata, type Sharp } from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const putObject = vi.fn();
@@ -271,14 +271,12 @@ describe("route catches strip internal paths from details and log raw errors (#1
   });
 
   it("color-palette masks server paths in 422 outer catch and 400 settings catch and logs 422", async () => {
-    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
-    ) {
+    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (this: Sharp) {
       return {
         toBuffer: async () => {
           throw new Error(`vips raw failed at ${sampleTempPath}`);
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     const { app, logLines } = await buildLoggedApp(registerColorPalette);
     try {
@@ -321,14 +319,12 @@ describe("route catches strip internal paths from details and log raw errors (#1
     const classifySpy = vi
       .spyOn(imageErrorMod, "asInputErrorIfUndecodable")
       .mockRejectedValueOnce(new Error(`hash probe failed at ${sampleTempPath}`));
-    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
-    ) {
+    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (this: Sharp) {
       return {
         toBuffer: async () => {
           throw new Error("hash step failed");
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     const { app, logLines } = await buildLoggedApp(registerFindDuplicates);
     try {
@@ -463,7 +459,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
     const origMeta = sharp.prototype.metadata;
     let icoMetaCalls = 0;
     const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       icoMetaCalls += 1;
       if (icoMetaCalls >= 1) {
@@ -702,7 +698,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
       const metaSpy = vi
         .spyOn(sharp.prototype, "metadata")
         .mockRejectedValueOnce(new Error(`strip metadata failed on ${sampleTempPath}`))
-        .mockResolvedValueOnce({ format: "svg" } as sharp.Metadata)
+        .mockResolvedValueOnce({ format: "svg" } as Metadata)
         .mockRejectedValueOnce(new Error(`strip outer failed on ${sampleTempPath}`));
       try {
         const stripRes1 = await app.inject({

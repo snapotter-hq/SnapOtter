@@ -80,8 +80,6 @@ const DECODED = Buffer.from("decoded");
 const ORIENTED = Buffer.from("oriented");
 
 beforeEach(() => {
-  if (typeof mocks.__test_clearFallbackReported === "function")
-    mocks.__test_clearFallbackReported();
   vi.clearAllMocks();
   mocks.autoOrient.mockResolvedValue(ORIENTED);
   mocks.decodeAnyFormat.mockResolvedValue(DECODED);

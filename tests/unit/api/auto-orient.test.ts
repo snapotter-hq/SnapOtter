@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const loggerMock = vi.hoisted(() => ({
@@ -580,7 +580,7 @@ describe("autoOrient", () => {
       const realMetadata = sharp.prototype.metadata;
       const secondMetaSpy = vi
         .spyOn(sharp.prototype, "metadata")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return realMetadata.call(this);
         })
         .mockRejectedValueOnce(oomErr);

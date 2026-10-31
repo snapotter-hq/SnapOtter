@@ -8,7 +8,7 @@ import {
   SafeError,
 } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
@@ -660,13 +660,13 @@ describe("asInputErrorIfUndecodable", () => {
       new Error("heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed"),
     ]) {
       const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-        this: sharp.Sharp,
+        this: Sharp,
       ) {
         return {
           toBuffer: async () => {
             throw probeOom;
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
       try {
         const classifiedProbe = await asInputErrorIfUndecodable(
@@ -1276,13 +1276,13 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
     const maskKeyTrunc = "uploads/test-erase-oom/mask-trunc.jpg";
     await putObject(maskKeyTrunc, truncatedJpg);
     const eraseRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       return {
         toBuffer: async () => {
           throw v8Oom;
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     try {
       const eraseErr = await runAiToolJob(
@@ -1319,7 +1319,7 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
 
     let eraseMaskRawCalls = 0;
     const eraseMaskRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementation(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       eraseMaskRawCalls++;
       if (eraseMaskRawCalls === 2) {
@@ -1327,7 +1327,7 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
           toBuffer: async () => {
             throw v8Oom;
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       }
       return origRaw.call(this);
     });
@@ -1373,13 +1373,13 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
 
     const gifInputMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(sidecarBug);
     const gifInputRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       return {
         toBuffer: async () => {
           throw v8Oom;
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     try {
       const gifInputOomErr = await runAiToolJob(
@@ -1417,16 +1417,14 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
 
     let rawCalls = 0;
     const gifBgMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(sidecarBug);
-    const gifBgRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementation(function (
-      this: sharp.Sharp,
-    ) {
+    const gifBgRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementation(function (this: Sharp) {
       rawCalls++;
       if (rawCalls === 2) {
         return {
           toBuffer: async () => {
             throw v8Oom;
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       }
       return origRaw.call(this);
     });
@@ -1508,13 +1506,13 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
 
     const regProbeMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(sidecarBug);
     const regRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       return {
         toBuffer: async () => {
           throw v8Oom;
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     try {
       const regProbeOomErr = await gifConfig
@@ -1597,13 +1595,13 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
       .spyOn(sharp.prototype, "metadata")
       .mockRejectedValueOnce(new Error("gifload_buffer: Invalid GIF header"));
     const gifToolsProbeRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       return {
         toBuffer: async () => {
           throw v8Oom;
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     try {
       const gifToolsProbeOom = await gifToolsConfig

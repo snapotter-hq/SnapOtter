@@ -8,7 +8,7 @@
 import multipart from "@fastify/multipart";
 import { apiToolPath, hasServerErrorStatus, SafeError } from "@snapotter/shared";
 import Fastify, { type FastifyRequest } from "fastify";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const putObject = vi.fn();
@@ -190,14 +190,12 @@ describe("svg-to-raster", () => {
   });
 
   it("surfaces a 503 ENGINE_UNAVAILABLE when Sharp conversion hits a V8 buffer allocation RangeError (#3620)", async () => {
-    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
-      this: sharp.Sharp,
-    ) {
+    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (this: Sharp) {
       return {
         toBuffer: async () => {
           throw new RangeError("Array buffer allocation failed");
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     const app = await buildApp(registerSvgToRaster);
     try {
@@ -1073,7 +1071,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
     const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
     let animatedFault: Error | null = null;
     const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       const pages = (this as unknown as { options?: { input?: { pages?: number } } }).options?.input
         ?.pages;
@@ -1199,21 +1197,21 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       // 1. Thumbnail generation (sharp.prototype.jpeg) hits V8 buffer allocation RangeError or ENOSPC -> 503
       const jpegOomSpy = vi
         .spyOn(sharp.prototype, "jpeg")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Array buffer allocation failed");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         })
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
                 code: "ENOSPC",
               });
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         });
       try {
         const thumbOomRes = await sendPair();
@@ -1235,13 +1233,13 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
 
       // Non-OOM RangeError in thumbnail generation still degrades to thumbnail: null (200)
       const jpegNonOomSpy = vi.spyOn(sharp.prototype, "jpeg").mockImplementationOnce(function (
-        this: sharp.Sharp,
+        this: Sharp,
       ) {
         return {
           toBuffer: async () => {
             throw new RangeError("Invalid quality");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
       try {
         const thumbFallbackRes = await sendPair();
@@ -1254,21 +1252,21 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       // 2. Per-file dHash (sharp.prototype.raw) hits V8 buffer allocation RangeError or ENOSPC -> 503
       const rawOomSpy = vi
         .spyOn(sharp.prototype, "raw")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Array buffer allocation failed");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         })
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
                 code: "ENOSPC",
               });
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         });
       try {
         const hashOomRes = await sendPair();
@@ -1296,19 +1294,19 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
         .mockRejectedValueOnce(new RangeError("Invalid count"));
       const rawThrowSpy = vi
         .spyOn(sharp.prototype, "raw")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new Error("hash step failed");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         })
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new Error("hash step failed");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         });
       try {
         const outerOomRes = await sendPair();
@@ -1350,26 +1348,26 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
       .toBuffer();
     const rawSpy = vi
       .spyOn(sharp.prototype, "raw")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" });
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Invalid raw parameter");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     const app = await buildApp(registerColorPalette);
     try {
@@ -1412,7 +1410,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
     let callCount = 0;
     let thirdCallError: Error = new RangeError("Array buffer allocation failed");
     const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       callCount += 1;
       // Call 1: validateImageBuffer, Call 2: autoOrient, Call 3: outer try block in split.ts
@@ -1640,19 +1638,19 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
       // processMeme (final output metadata read), on both HTTP routes and registered process fns
       const webpSpy = vi
         .spyOn(sharp.prototype, "webp")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Array buffer allocation failed");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         })
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Array buffer allocation failed");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         });
       try {
         const beautifyHttpOom = await app.inject({
@@ -1690,7 +1688,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
       const origMeta = sharp.prototype.metadata;
       let memeMetaCall = 0;
       const memeMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
-        this: sharp.Sharp,
+        this: Sharp,
       ) {
         memeMetaCall += 1;
         // Call 1: validateImageBuffer, Call 2: autoOrient, Call 3: processMeme input metadata, Call 4: processMeme output metadata
@@ -1886,13 +1884,13 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
       // Direct post-prepare processing step faults:
       // 1. compare diff PNG encode (sharp.prototype.png) hits V8 RangeError
       const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
-        this: sharp.Sharp,
+        this: Sharp,
       ) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
       try {
         const compareStepOom = await app.inject({
@@ -1915,7 +1913,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
       // 2. watermark-image and compose composite step (sharp.prototype.composite) hits V8 RangeError
       const compositeSpy = vi
         .spyOn(sharp.prototype, "composite")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Array buffer allocation failed");
@@ -1925,9 +1923,9 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
                 throw new RangeError("Array buffer allocation failed");
               },
             }),
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         })
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Array buffer allocation failed");
@@ -1937,7 +1935,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
                 throw new RangeError("Array buffer allocation failed");
               },
             }),
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         });
       try {
         const wmStepOom = await app.inject({
@@ -1974,23 +1972,23 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
       // 3. vectorize grayscale step (sharp.prototype.grayscale) hits V8 RangeError on HTTP route and registered process fn
       const grayscaleSpy = vi
         .spyOn(sharp.prototype, "grayscale")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             png: () => ({
               toBuffer: async () => {
                 throw new RangeError("Array buffer allocation failed");
               },
             }),
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         })
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             png: () => ({
               toBuffer: async () => {
                 throw new RangeError("Array buffer allocation failed");
               },
             }),
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         });
       try {
         const vectorizeStepOom = await app.inject({

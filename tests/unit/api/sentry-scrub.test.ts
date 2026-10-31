@@ -5,6 +5,8 @@ import {
 } from "../../../apps/api/src/lib/sentry-scrub.js";
 
 type AnyEvent = Record<string, any>;
+// The scrubber is typed over `unknown` payloads; tests drill into the result, so widen it.
+type Sender = (event: AnyEvent, hint: AnyEvent) => AnyEvent | null;
 const evt = (over: AnyEvent = {}): AnyEvent => ({
   message: "raw message",
   server_name: "users-macbook",
@@ -35,7 +37,7 @@ const evt = (over: AnyEvent = {}): AnyEvent => ({
 });
 
 describe("buildBeforeSend (api)", () => {
-  let send: ReturnType<typeof buildBeforeSend>;
+  let send: Sender;
   beforeEach(() => {
     send = buildBeforeSend(() => true);
   });
@@ -298,6 +300,16 @@ describe("buildBeforeSend diagnostic request scrub (#1880)", () => {
   });
 });
 
+// Runs the transaction scrubber and returns the event it kept, failing the test
+// if it dropped it, so a case can assert on the scrubbed fields without null checks.
+const scrubTxn =
+  (isActive: () => boolean, diagnostic = false) =>
+  (event: AnyEvent): AnyEvent => {
+    const out = buildBeforeSendTransaction(isActive, diagnostic)(event);
+    if (!out) throw new Error("the transaction scrubber dropped the event");
+    return out;
+  };
+
 describe("buildBeforeSendTransaction (#1880)", () => {
   const on = () => true;
   const txn = (): AnyEvent => ({
@@ -364,7 +376,7 @@ describe("buildBeforeSendTransaction (#1880)", () => {
   };
 
   it("drops the request and strict-scrubs breadcrumbs by default", () => {
-    const out = buildBeforeSendTransaction(on)(txn());
+    const out = scrubTxn(on)(txn());
     expect(out.request).toBeUndefined();
     expect(out.breadcrumbs).toEqual([{ category: "http", data: { method: "GET" } }]);
     expect(out.transaction).toBe("GET /api/auth/oidc/callback");
@@ -380,7 +392,7 @@ describe("buildBeforeSendTransaction (#1880)", () => {
     expect(out.spans[3]).toBeNull();
   });
   it("keeps the allowlisted request and breadcrumb data in diagnostic mode", () => {
-    const out = buildBeforeSendTransaction(on, true)(txn());
+    const out = scrubTxn(on, true)(txn());
     expect(out.request).toEqual({
       method: "POST",
       url: "https://host/api/auth/login",
@@ -428,7 +440,7 @@ describe("buildBeforeSendTransaction (#1880)", () => {
     expect(buildBeforeSendTransaction(broken)(txn())).toBeNull();
   });
   it("leaves a non-http transaction name alone and tolerates a bare event", () => {
-    const out = buildBeforeSendTransaction(on)({
+    const out = scrubTxn(on)({
       transaction: "job resize#2",
       contexts: { trace: { op: "queue.process" } },
     });
@@ -492,7 +504,7 @@ describe("outgoing request urls (#1899)", () => {
 
   it("reduces http.client spans to method and origin, keeping host, method, and status", () => {
     for (const diagnostic of [false, true]) {
-      const out = buildBeforeSendTransaction(
+      const out = scrubTxn(
         () => true,
         diagnostic,
       )({
@@ -523,7 +535,7 @@ describe("outgoing request urls (#1899)", () => {
 
   it("reduces an outgoing request that is itself the transaction's root span", () => {
     const span = clientSpan(SLACK);
-    const out = buildBeforeSendTransaction(() => true)({
+    const out = scrubTxn(() => true)({
       transaction: span.description,
       contexts: { trace: { op: "http.client", data: span.data } },
     });
@@ -533,7 +545,7 @@ describe("outgoing request urls (#1899)", () => {
   });
 
   it("drops userinfo and keeps a non-default port", () => {
-    const out = buildBeforeSendTransaction(() => true)({
+    const out = scrubTxn(() => true)({
       spans: [clientSpan("http://user:pass@hooks.internal:8080/hook/tok")],
     });
     expect(out.spans[0].description).toBe("POST http://hooks.internal:8080");
@@ -542,7 +554,7 @@ describe("outgoing request urls (#1899)", () => {
   });
 
   it("drops an outgoing url it cannot parse rather than send it whole", () => {
-    const out = buildBeforeSendTransaction(() => true)({
+    const out = scrubTxn(() => true)({
       spans: [
         { op: "http.client", description: "GET /relative/tok", data: { url: "/relative/tok" } },
         { op: "http.client", description: "not a url", data: { "url.full": "::bad::" } },
@@ -550,7 +562,7 @@ describe("outgoing request urls (#1899)", () => {
     });
     expect(out.spans[0]).toEqual({ op: "http.client", description: "GET", data: {} });
     expect(out.spans[1]).toEqual({ op: "http.client", description: "not", data: {} });
-    const odd = buildBeforeSendTransaction(() => true)({
+    const odd = scrubTxn(() => true)({
       spans: [
         { op: "http.client", description: "POST", data: { "url.full": [SLACK] } },
         { op: "http.client", description: SLACK, data: { url: 42 } },
@@ -582,7 +594,7 @@ describe("outgoing request urls (#1899)", () => {
       "net.peer.name": "abc123secret.m.pipedream.net",
       "http.host": "abc123secret.m.pipedream.net:8443",
     };
-    const out = buildBeforeSendTransaction(() => true)({ spans: [span] });
+    const out = scrubTxn(() => true)({ spans: [span] });
     expect(JSON.stringify(out)).not.toContain("abc123secret");
     expect(out.spans[0].description).toBe("POST https://*.pipedream.net");
     expect(out.spans[0].data["server.address"]).toBe("*.pipedream.net");
@@ -596,7 +608,7 @@ describe("outgoing request urls (#1899)", () => {
   });
 
   it("drops a hostname key that is not a string rather than pass it through (#1926)", () => {
-    const out = buildBeforeSendTransaction(() => true)({
+    const out = scrubTxn(() => true)({
       spans: [{ op: "http.client", description: "POST", data: { "server.address": ["a.b.c"] } }],
     });
     expect(out.spans[0].data).toEqual({});
@@ -604,7 +616,7 @@ describe("outgoing request urls (#1899)", () => {
 
   it("keeps the registrable domain under a country-code suffix, and bare hosts as they are", () => {
     const desc = (url: string) =>
-      buildBeforeSendTransaction(() => true)({ spans: [clientSpan(url)] }).spans[0].description;
+      scrubTxn(() => true)({ spans: [clientSpan(url)] }).spans[0].description;
     expect(desc("https://tok.hooks.example.co.uk/x")).toBe("POST https://*.example.co.uk");
     expect(desc("https://tok.example.com:9000/x")).toBe("POST https://*.example.com:9000");
     expect(desc("https://example.com/x")).toBe("POST https://example.com");

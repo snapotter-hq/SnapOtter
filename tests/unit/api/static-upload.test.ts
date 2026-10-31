@@ -65,11 +65,11 @@ describe("registerStatic", () => {
 
   it("sets SPA not-found handler that returns 404 for API routes", async () => {
     existsSyncMock.mockReturnValue(true);
-    let notFoundHandler: (request: unknown, reply: unknown) => void;
+    let notFoundHandler = undefined as ((request: unknown, reply: unknown) => void) | undefined;
     const app = {
       get: vi.fn(),
       register: vi.fn().mockResolvedValue(undefined),
-      setNotFoundHandler: vi.fn((handler: typeof notFoundHandler) => {
+      setNotFoundHandler: vi.fn((handler: NonNullable<typeof notFoundHandler>) => {
         notFoundHandler = handler;
       }),
       hasReplyDecorator: vi.fn().mockReturnValue(false),
@@ -91,11 +91,11 @@ describe("registerStatic", () => {
 
   it("sets SPA not-found handler that serves index.html for non-API routes", async () => {
     existsSyncMock.mockReturnValue(true);
-    let notFoundHandler: (request: unknown, reply: unknown) => void;
+    let notFoundHandler = undefined as ((request: unknown, reply: unknown) => void) | undefined;
     const app = {
       get: vi.fn(),
       register: vi.fn().mockResolvedValue(undefined),
-      setNotFoundHandler: vi.fn((handler: typeof notFoundHandler) => {
+      setNotFoundHandler: vi.fn((handler: NonNullable<typeof notFoundHandler>) => {
         notFoundHandler = handler;
       }),
       hasReplyDecorator: vi.fn().mockReturnValue(false),

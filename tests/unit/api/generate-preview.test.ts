@@ -10,7 +10,7 @@
  */
 
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The route's permission gate is covered by
@@ -391,19 +391,19 @@ describe("generatePreview honesty (#746)", () => {
     loggerMock.warn.mockReset();
     const webpSpy = vi
       .spyOn(sharp.prototype, "webp")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Invalid WebP parameter");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     try {
       const webpOomKey = await generatePreview(tiffHeadedDng, "image/tiff", JOB_ID, "convert");
@@ -434,13 +434,13 @@ describe("generatePreview honesty (#746)", () => {
       .spyOn(formatDecoders, "decodeToSharpCompat")
       .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
     const rawProbeSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       return {
         toBuffer: async () => {
           throw new RangeError("Array buffer allocation failed");
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     try {
       const dngProbeOomKey = await generatePreview(
@@ -1052,19 +1052,19 @@ describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
     // 1. Inline preview sharp(previewInput).webp({ quality: 80 }).toBuffer() rejects with V8 RangeError
     const webpSpy = vi
       .spyOn(sharp.prototype, "webp")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Invalid WebP parameter");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     try {
       const tiffReply = makeReply();
@@ -1101,14 +1101,12 @@ describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
     const dngUnavailableSpy = vi
       .spyOn(formatDecoders, "decodeToSharpCompat")
       .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
-    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-      this: sharp.Sharp,
-    ) {
+    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (this: Sharp) {
       return {
         toBuffer: async () => {
           throw new RangeError("Array buffer allocation failed");
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     try {
       const dngProbeOomReply = makeReply();
@@ -1469,19 +1467,19 @@ describe("registerSvgToRaster JXL preview generation (#3179)", () => {
     // 1. Inline preview sharp(previewInput).resize(...).webp({ quality: 80 }).toBuffer() rejects with V8 RangeError
     const webpSpy = vi
       .spyOn(sharp.prototype, "webp")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Invalid WebP parameter");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     try {
       const tiffReply = makeReply();
@@ -1927,13 +1925,13 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
         .spyOn(formatDecoders, "decodeToSharpCompat")
         .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
       const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-        this: sharp.Sharp,
+        this: Sharp,
       ) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
       try {
         const probeOomReply = makeReply();
@@ -2019,19 +2017,19 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
       // 1. Inline preview sharp(decodedBuffer).webp({ quality: 80 }).toBuffer() rejects with V8 RangeError
       const webpSpy = vi
         .spyOn(sharp.prototype, "webp")
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Array buffer allocation failed");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         })
-        .mockImplementationOnce(function (this: sharp.Sharp) {
+        .mockImplementationOnce(function (this: Sharp) {
           return {
             toBuffer: async () => {
               throw new RangeError("Invalid WebP parameter");
             },
-          } as unknown as sharp.Sharp;
+          } as unknown as Sharp;
         });
       try {
         const tiffReply = makeReply();

@@ -89,7 +89,7 @@ function makeBuilder() {
     from(table: unknown) {
       const name = tableNameOf(table);
       const queue = selectQueues[name];
-      const next = queue.length > 0 ? queue.shift() : [];
+      const next: unknown = queue.length > 0 ? queue.shift() : [];
       if (next === THROW) {
         rejection = THROW.__throw;
         resolved = [];

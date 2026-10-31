@@ -54,7 +54,7 @@ describe("anonymous user when AUTH_ENABLED=false", () => {
 
     await authMiddleware(app);
 
-    let capturedUser: ReturnType<typeof getAuthUser> = null;
+    let capturedUser = null as ReturnType<typeof getAuthUser>;
     app.get("/test", (request, reply) => {
       capturedUser = getAuthUser(request);
       reply.send({ ok: true });

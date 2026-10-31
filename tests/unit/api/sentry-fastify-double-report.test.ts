@@ -4,7 +4,7 @@
  * reportError, once raw from the integration (#1645).
  */
 import * as Sentry from "@sentry/node";
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   __resetGateForTests,
@@ -19,7 +19,7 @@ import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handle
 
 type Payload = { exception?: { values?: Array<{ mechanism?: { type?: string } }> } };
 const events: Payload[] = [];
-let app: ReturnType<typeof Fastify>;
+let app: FastifyInstance;
 let base: string;
 
 beforeAll(async () => {

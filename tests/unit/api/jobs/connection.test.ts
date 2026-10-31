@@ -294,7 +294,8 @@ describe("Redis connection factory", () => {
     try {
       const { createRedisSubscriberConnection } = await freshModule();
 
-      const subscriber = createRedisSubscriberConnection();
+      // The stub implements the Redis surface the module touches and adds emit helpers.
+      const subscriber = createRedisSubscriberConnection() as unknown as RedisStub;
       subscriber.emitOnce("end");
       await vi.advanceTimersByTimeAsync(60_000);
 
@@ -311,7 +312,7 @@ describe("Redis connection factory", () => {
     try {
       const { createRedisSubscriberConnection } = await freshModule();
 
-      const subscriber = createRedisSubscriberConnection();
+      const subscriber = createRedisSubscriberConnection() as unknown as RedisStub;
       subscriber.ping.mockRejectedValue(new Error("Connection is closed."));
       await vi.advanceTimersByTimeAsync(10_000);
 
@@ -497,7 +498,17 @@ describe("Redis connection factory", () => {
       createdWorkers.push(worker);
       worker.on("error", () => {});
       await worker.waitUntilReady();
-      const bclient = await worker.blockingConnection.client;
+      // blockingConnection is private in bullmq; the test reaches in to drop the live socket.
+      const { blockingConnection } = worker as unknown as {
+        blockingConnection: {
+          client: Promise<{
+            status: string;
+            disconnect(reconnect: boolean): void;
+            once(event: string, listener: () => void): unknown;
+          }>;
+        };
+      };
+      const bclient = await blockingConnection.client;
       await new Promise((resolve) => setTimeout(resolve, 30));
       bclient.disconnect(true);
       await new Promise<void>((resolve) => bclient.once("reconnecting", resolve));

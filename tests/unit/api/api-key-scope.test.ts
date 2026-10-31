@@ -108,7 +108,7 @@ describe("POST /api/v1/api-keys database failure handling", () => {
     const app = Fastify({ logger: false });
     const logErrors: unknown[] = [];
     app.addHook("onRequest", async (req) => {
-      req.user = { id: "u1", username: "admin", role: "admin" };
+      Object.assign(req, { user: { id: "u1", username: "admin", role: "admin" } });
       const origError = req.log.error.bind(req.log);
       req.log.error = ((...args: unknown[]) => {
         logErrors.push(args);

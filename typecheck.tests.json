@@ -36,6 +36,7 @@
     "tests/unit/*.ts",
     "tests/unit/*.mts",
     "tests/unit/ai/**/*",
+    "tests/unit/api/**/*",
     "tests/unit/docs/**/*",
     "tests/unit/features/**/*",
     "tests/unit/fixtures/**/*",

@@ -340,7 +340,7 @@ function createMockRequest(opts: {
       info: vi.fn(),
       // request.log.child({ jobId, toolId }) is what the factory hands the
       // input handler (#1417); tests read the bindings off this spy.
-      child: vi.fn(() => childLog),
+      child: vi.fn((_bindings: Record<string, unknown>) => childLog),
     },
   };
 }
@@ -354,7 +354,7 @@ function createMockRequest(opts: {
  */
 function answerJobRowLookup(rows: unknown[]): () => void {
   const select = vi.mocked(db.select);
-  const original = select.getMockImplementation();
+  const original = select.getMockImplementation() as ((fields?: unknown) => unknown) | undefined;
   select.mockImplementation(((fields?: Record<string, unknown>) =>
     fields && "id" in fields
       ? { from: () => ({ where: () => Promise.resolve(rows) }) }
@@ -808,7 +808,9 @@ describe("createToolRoute", () => {
       const dbErr = new Error("db connection lost");
       vi.mocked(enqueueToolJob).mockRejectedValueOnce(new Error("queue add failed"));
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) =>
         fields && "id" in fields
           ? { from: () => ({ where: () => Promise.reject(dbErr) }) }
@@ -837,7 +839,9 @@ describe("createToolRoute", () => {
 
     it("rejects and discards the upload without enqueuing when reading maxConcurrentJobsPerUser fails (#2545)", async () => {
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) =>
         fields && "value" in fields
           ? {
@@ -866,7 +870,9 @@ describe("createToolRoute", () => {
 
     it("returns 429 and discards the upload when activeJobs reaches maxConcurrentJobsPerUser (#2545)", async () => {
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) => {
         if (fields && "value" in fields) {
           return {
@@ -911,7 +917,9 @@ describe("createToolRoute", () => {
 
     it("enqueues normally when activeJobs is strictly below maxConcurrentJobsPerUser (#2545)", async () => {
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) => {
         if (fields && "value" in fields) {
           return {
@@ -953,7 +961,9 @@ describe("createToolRoute", () => {
 
     it("rejects and discards the upload when the activeJobs count query fails (#2545)", async () => {
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) => {
         if (fields && "value" in fields) {
           return {
@@ -991,7 +1001,9 @@ describe("createToolRoute", () => {
 
     it("treats blank or out-of-range maxConcurrentJobsPerUser values as disabled (0) (#2545)", async () => {
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       let storedRaw = "";
       let countQueries = 0;
       select.mockImplementation(((fields?: Record<string, unknown>) => {
@@ -1339,7 +1351,9 @@ describe("createToolRoute", () => {
       vi.mocked(reportError).mockClear();
       jobRows.rows = [{ status: "failed", error: { message: "Canceled" } }];
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) =>
         fields && "status" in fields && !("error" in fields)
           ? { from: () => ({ where: () => Promise.reject(statusReadErr) }) }
@@ -1393,7 +1407,9 @@ describe("createToolRoute", () => {
       vi.mocked(reportError).mockClear();
       jobRows.rows = [{ status: "canceled", error: { message: "Canceled" } }];
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) =>
         fields && "status" in fields && !("error" in fields)
           ? { from: () => ({ where: () => Promise.reject(statusReadErr) }) }
@@ -1446,7 +1462,9 @@ describe("createToolRoute", () => {
       vi.mocked(waitForJob).mockRejectedValueOnce(workerErr);
       vi.mocked(reportError).mockClear();
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) =>
         fields && "error" in fields
           ? { from: () => ({ where: () => Promise.reject(errorReadErr) }) }
@@ -1458,7 +1476,7 @@ describe("createToolRoute", () => {
       const reply = createMockReply();
       const req = Object.assign(
         createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" }),
-        { method: "POST", routeOptions: { url: apiToolPath(id) } },
+        { method: "POST", url: apiToolPath(id), routeOptions: { url: apiToolPath(id) } },
       );
 
       try {
@@ -1674,7 +1692,9 @@ describe("createToolRoute", () => {
       });
       vi.mocked(waitForJob).mockRejectedValueOnce(redisDownErr);
       const select = vi.mocked(db.select);
-      const original = select.getMockImplementation();
+      const original = select.getMockImplementation() as
+        | ((fields?: unknown) => unknown)
+        | undefined;
       select.mockImplementation(((fields?: Record<string, unknown>) =>
         fields && "error" in fields
           ? { from: () => ({ where: () => Promise.reject(errorReadErr) }) }
@@ -1897,7 +1917,7 @@ describe("createToolRoute", () => {
           info: vi.fn(),
           // request.log.child({ jobId, toolId }) is what the factory hands the
           // input handler (#1417); tests read the bindings off this spy.
-          child: vi.fn(() => childLog),
+          child: vi.fn((_bindings: Record<string, unknown>) => childLog),
         },
       };
 

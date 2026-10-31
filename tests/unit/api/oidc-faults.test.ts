@@ -15,7 +15,18 @@ import {
   oidcTokenExchangeFaultCode,
 } from "../../../apps/api/src/lib/oidc-faults.js";
 
-function bodyError(status: number, body: Record<string, string>): Error {
+// openid-client's runtime constructor takes `{ code, cause }`, but its typings
+// declare no options, so the construction goes through a widened signature.
+const ClientErrorWithOptions = ClientError as unknown as new (
+  message: string,
+  options: { code: string; cause?: unknown },
+) => ClientError;
+
+function clientError(message: string, options: { code: string; cause?: unknown }): ClientError {
+  return new ClientErrorWithOptions(message, options);
+}
+
+function bodyError(status: number, body: { error: string; [field: string]: string }): Error {
   return new ResponseBodyError("server responded with an error in the response body", {
     cause: body,
     response: new Response(JSON.stringify(body), { status }),
@@ -39,7 +50,7 @@ function fetchFailed(code: string): Error {
 
 describe("oidcDiscoveryFault", () => {
   it("names an http issuer on an https deployment instead of calling the IdP unreachable", () => {
-    const cause = new ClientError("only requests to HTTPS are allowed", {
+    const cause = clientError("only requests to HTTPS are allowed", {
       code: "OAUTH_HTTP_REQUEST_FORBIDDEN",
     });
     const fault = oidcDiscoveryFault(cause);
@@ -60,7 +71,7 @@ describe("oidcDiscoveryFault", () => {
   });
 
   it("gives openid-client's timeout its own code", () => {
-    const cause = new ClientError("operation timed out", {
+    const cause = clientError("operation timed out", {
       code: "OAUTH_TIMEOUT",
       cause: new DOMException("The operation timed out.", "TimeoutError"),
     });
@@ -72,7 +83,7 @@ describe("oidcDiscoveryFault", () => {
   it.each([
     [
       "a 404 discovery document",
-      new ClientError("unexpected HTTP response status code", {
+      clientError("unexpected HTTP response status code", {
         code: "OAUTH_RESPONSE_IS_NOT_CONFORM",
       }),
     ],
@@ -104,7 +115,7 @@ describe("oidcTokenExchangeFaultCode", () => {
   it.each([
     [
       "a token endpoint timeout",
-      new ClientError("operation timed out", { code: "OAUTH_TIMEOUT" }),
+      clientError("operation timed out", { code: "OAUTH_TIMEOUT" }),
       "OIDC_TOKEN_TIMEOUT",
     ],
     ["a refused connection", fetchFailed("ECONNREFUSED"), "OIDC_TOKEN_UNREACHABLE"],
@@ -118,7 +129,7 @@ describe("oidcTokenExchangeFaultCode", () => {
     ],
     [
       "a 502 with no OAuth body",
-      new ClientError("unexpected HTTP response status code", {
+      clientError("unexpected HTTP response status code", {
         code: "OAUTH_RESPONSE_IS_NOT_CONFORM",
         cause: new Response("bad gateway", { status: 502 }),
       }),
@@ -169,7 +180,7 @@ describe("oidcTokenExchangeFaultCode", () => {
     ],
     [
       "a 404 token endpoint",
-      new ClientError("unexpected HTTP response status code", {
+      clientError("unexpected HTTP response status code", {
         code: "OAUTH_RESPONSE_IS_NOT_CONFORM",
         cause: new Response("", { status: 404 }),
       }),
@@ -177,7 +188,7 @@ describe("oidcTokenExchangeFaultCode", () => {
     ],
     [
       "an ID token outside its validity window (clock skew)",
-      new ClientError("JWT timestamp claim value failed validation", {
+      clientError("JWT timestamp claim value failed validation", {
         code: "OAUTH_JWT_TIMESTAMP_CHECK",
       }),
       "OIDC_TOKEN_EXCHANGE_FAILED",

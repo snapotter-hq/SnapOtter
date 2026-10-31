@@ -498,7 +498,8 @@ describe("pipeline tool registry lookup", () => {
 
   it("registered tool process function executes correctly", async () => {
     const config = getToolConfig(testToolId);
-    const result = await config?.process(Buffer.from("test"), {}, "input.png");
+    if (!config) throw new Error(`${testToolId} is not registered`);
+    const result = await config.process(Buffer.from("test"), {}, "input.png");
     expect(result.buffer).toEqual(Buffer.from("test"));
     expect(result.filename).toBe("out.png");
     expect(result.contentType).toBe("image/png");
