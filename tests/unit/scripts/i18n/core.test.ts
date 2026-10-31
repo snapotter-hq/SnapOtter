@@ -65,7 +65,7 @@ describe("collectPending", () => {
   it("marks a new unit pending", () => {
     const units = [{ id: "a", sourceText: "hi" }];
     const { pending, merged, stats } = collectPending(units, new Map());
-    expect(pending.map((p) => p.unit.id)).toEqual(["a"]);
+    expect(pending.map((p: { unit: { id: string } }) => p.unit.id)).toEqual(["a"]);
     expect(stats).toMatchObject({ skipped: 0, stale: 0 });
     expect(merged.has("a")).toBe(false);
   });

@@ -265,7 +265,7 @@ describe("detectFaceLandmarks", () => {
     it("omits onProgress when not provided", async () => {
       await detectFaceLandmarks(FAKE_INPUT);
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.onProgress).toBeUndefined();
     });
 

@@ -29,7 +29,19 @@
     "tests/e2e-editor/**/*",
     "tests/e2e-landing/**/*",
     "tests/e2e-noauth/**/*",
-    "tests/integration/**/*"
+    "tests/integration/**/*",
+    "tests/types/**/*",
+    "tests/unit/*.ts",
+    "tests/unit/*.mts",
+    "tests/unit/ai/**/*",
+    "tests/unit/docs/**/*",
+    "tests/unit/features/**/*",
+    "tests/unit/fixtures/**/*",
+    "tests/unit/image-engine/**/*",
+    "tests/unit/infra/**/*",
+    "tests/unit/landing/**/*",
+    "tests/unit/scripts/**/*",
+    "tests/unit/security/**/*"
   ],
   "exclude": [
     "tests/integration/generated/catalog-integrity.test.ts",

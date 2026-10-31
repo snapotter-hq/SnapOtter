@@ -78,7 +78,7 @@ function harness(runId: string) {
       },
       async teardown() {
         await teardownPlaywrightBackingState(state, {
-          async deleteRedisKeys(_ownedState, ownsKey) {
+          async deleteRedisKeys(_ownedState: unknown, ownsKey: (key: string) => boolean) {
             let deleted = 0;
             for (const key of [...redisKeys]) {
               if (!ownsKey(key)) continue;
@@ -87,7 +87,7 @@ function harness(runId: string) {
             }
             return deleted;
           },
-          async dropDatabase(ownedState) {
+          async dropDatabase(ownedState: { databaseName: string }) {
             databases.delete(ownedState.databaseName);
           },
         });

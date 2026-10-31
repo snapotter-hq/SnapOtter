@@ -1,12 +1,16 @@
-import { formatCompact, formatPulls, parseGhcrDownloads } from "@landing/lib/stats";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  formatCompact,
+  formatPulls,
+  parseGhcrDownloads,
+} from "../../../apps/landing/src/lib/stats.js";
 
 // getStarCount/getImagePulls memoize per module instance so a build fetches once
 // rather than once per page. Tests therefore need a FRESH module each time, or
 // the first test's cached result leaks into every later assertion.
 async function freshStats() {
   vi.resetModules();
-  return import("@landing/lib/stats");
+  return import("../../../apps/landing/src/lib/stats.js");
 }
 
 // Match the exact host, not a substring. `url.includes("hub.docker.com")` would

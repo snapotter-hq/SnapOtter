@@ -257,7 +257,7 @@ describe("noiseRemoval", () => {
     it("omits onProgress when not provided", async () => {
       await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.onProgress).toBeUndefined();
     });
 
@@ -279,7 +279,7 @@ describe("noiseRemoval", () => {
       await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
       // 800x600 = 0.48 MP, 0.48 * 120000 = 57600 < 300000
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.timeout).toBe(300000);
     });
 
@@ -296,7 +296,7 @@ describe("noiseRemoval", () => {
       await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
       // 4000x3000 = 12 MP, 12 * 120000 = 1440000 > 300000
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.timeout).toBe(1440000);
     });
 
@@ -319,7 +319,7 @@ describe("noiseRemoval", () => {
       await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
       // Timeout is based on the metadata call, which returns dimensions
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.timeout).toBeGreaterThanOrEqual(300000);
     });
   });
@@ -377,7 +377,7 @@ describe("noiseRemoval", () => {
       await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
       // Should not throw; dimensions default to 0
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.timeout).toBe(300000); // min timeout since megapixels = 0
     });
 

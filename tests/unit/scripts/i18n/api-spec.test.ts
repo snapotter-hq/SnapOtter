@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeApiSpecAdapter } from "../../../../scripts/i18n/adapters/api-spec.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 
+type Unit = { id: string; sourceText: string };
+
 // A tiny OpenAPI 3.1 document exercising every translatable prose family:
 // info.description, a tag description, and an op summary + description.
 // A schema description and a parameter name are present to prove they are NOT extracted.
@@ -53,7 +55,7 @@ describe("api-spec adapter extract", () => {
   it("yields exactly the prose fields with stable pointer ids", async () => {
     const adapter = makeApiSpecAdapter({ dir });
     const units = await adapter.extract();
-    const byId = new Map(units.map((u) => [u.id, u]));
+    const byId = new Map<string, Unit>(units.map((u: Unit) => [u.id, u]));
 
     expect([...byId.keys()].sort()).toEqual(
       [
@@ -74,11 +76,11 @@ describe("api-spec adapter extract", () => {
 
   it("does not extract schema, parameter, response, or operationId text", async () => {
     const adapter = makeApiSpecAdapter({ dir });
-    const ids = (await adapter.extract()).map((u) => u.id);
-    expect(ids.some((id) => id.includes("responses"))).toBe(false);
-    expect(ids.some((id) => id.includes("parameters"))).toBe(false);
-    expect(ids.some((id) => id.includes("schemas"))).toBe(false);
-    expect(ids.some((id) => id.includes("operationId"))).toBe(false);
+    const ids = (await adapter.extract()).map((u: Unit) => u.id);
+    expect(ids.some((id: string) => id.includes("responses"))).toBe(false);
+    expect(ids.some((id: string) => id.includes("parameters"))).toBe(false);
+    expect(ids.some((id: string) => id.includes("schemas"))).toBe(false);
+    expect(ids.some((id: string) => id.includes("operationId"))).toBe(false);
   });
 
   it("marks every unit as text kind (spec prose, not markdown structure)", async () => {

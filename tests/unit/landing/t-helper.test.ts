@@ -1,6 +1,6 @@
 // tests/unit/landing/t-helper.test.ts
 import { describe, expect, it } from "vitest";
-import { isRtl, LANDING_LOCALES, t } from "../../../apps/landing/src/i18n/index.ts";
+import { isRtl, LANDING_LOCALES, t } from "../../../apps/landing/src/i18n/index.js";
 
 describe("landing t() helper", () => {
   it("returns the English string for a known key", () => {

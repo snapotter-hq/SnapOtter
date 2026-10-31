@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeLandingSeoAdapter } from "../../../../scripts/i18n/adapters/landing-seo.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 
+type Unit = { id: string; sourceText: string };
+
 let dir: string;
 
 const ALTERNATIVES = [
@@ -39,13 +41,13 @@ function make() {
 describe("landing-seo adapter", () => {
   it("extracts only alternatives prose units with stable indexed ids", async () => {
     const units = await make().extract();
-    const ids = units.map((u) => u.id);
+    const ids = units.map((u: Unit) => u.id);
     expect(ids).toContain("alt:smallpdf:h1");
     expect(ids).toContain("alt:smallpdf:metaDescription");
     expect(ids).toContain("alt:smallpdf:rows.0.snapotter");
     expect(ids).toContain("alt:smallpdf:faqs.0.q");
     // Tool-detail pages are English-only, so no seo:* units are extracted.
-    expect(ids.some((id) => id.startsWith("seo:"))).toBe(false);
+    expect(ids.some((id: string) => id.startsWith("seo:"))).toBe(false);
   });
 
   it("write then load round-trips StoredEntry with inline _sourceHash", async () => {

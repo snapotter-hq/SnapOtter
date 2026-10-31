@@ -281,7 +281,7 @@ describe("upscale", () => {
     it("omits onProgress when not provided", async () => {
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.onProgress).toBeUndefined();
     });
   });
@@ -290,7 +290,7 @@ describe("upscale", () => {
     it("passes a timeout to runPythonWithProgress", async () => {
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.timeout).toBeTypeOf("number");
       expect(options.timeout).toBeGreaterThan(0);
     });
@@ -307,7 +307,7 @@ describe("upscale", () => {
 
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.timeout).toBe(600_000);
     });
 
@@ -322,11 +322,11 @@ describe("upscale", () => {
       );
 
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
-      const timeout2x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+      const timeout2x = vi.mocked(runPythonWithProgress).mock.calls[0][2]!.timeout!;
 
       vi.mocked(runPythonWithProgress).mockClear();
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
-      const timeout4x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+      const timeout4x = vi.mocked(runPythonWithProgress).mock.calls[0][2]!.timeout!;
 
       expect(timeout4x).toBeGreaterThan(timeout2x);
     });
@@ -342,11 +342,11 @@ describe("upscale", () => {
       );
 
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
-      const timeout2x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+      const timeout2x = vi.mocked(runPythonWithProgress).mock.calls[0][2]!.timeout!;
 
       vi.mocked(runPythonWithProgress).mockClear();
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
-      const timeout4x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+      const timeout4x = vi.mocked(runPythonWithProgress).mock.calls[0][2]!.timeout!;
 
       // 4x scale has 4x the effective megapixels vs 2x scale (16/4 = 4)
       expect(timeout4x / timeout2x).toBe(4);
@@ -364,12 +364,12 @@ describe("upscale", () => {
 
       vi.mocked(isGpuAvailable).mockReturnValue(false);
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
-      const cpuTimeout = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+      const cpuTimeout = vi.mocked(runPythonWithProgress).mock.calls[0][2]!.timeout!;
 
       vi.mocked(runPythonWithProgress).mockClear();
       vi.mocked(isGpuAvailable).mockReturnValue(true);
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
-      const gpuTimeout = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+      const gpuTimeout = vi.mocked(runPythonWithProgress).mock.calls[0][2]!.timeout!;
 
       expect(gpuTimeout).toBeLessThan(cpuTimeout);
     });
@@ -387,7 +387,7 @@ describe("upscale", () => {
       vi.mocked(isGpuAvailable).mockReturnValue(false);
 
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
 
       // ~1.92MP * 16 (4^2) * 180_000ms = ~55 minutes. Must be well above 10 min.
       expect(options.timeout).toBeGreaterThan(10 * 60 * 1000);
@@ -404,7 +404,7 @@ describe("upscale", () => {
       );
 
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
 
       // 4MP * 4 (2^2) * 180_000 = 2_880_000ms
       expect(options.timeout).toBe(2_880_000);
@@ -421,7 +421,7 @@ describe("upscale", () => {
       );
 
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       // 0 MP: timeout = max(600_000, 0) = 600_000
       expect(options.timeout).toBe(600_000);
     });
