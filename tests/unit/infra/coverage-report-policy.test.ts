@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import rootConfig from "../../../vitest.config.ts";
+import rootConfig from "../../../vitest.config.js";
 
 /**
  * Vitest defaults `coverage.reportOnFailure` to false, which means a single

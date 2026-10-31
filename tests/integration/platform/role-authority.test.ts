@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import type { LightMyRequestResponse } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { canManageTargetRole, hasToolAccess } from "../../../apps/api/src/permissions.js";
@@ -506,7 +507,7 @@ describe("role authority containment", () => {
     const memberUsername = uniqueName("race-upd-member");
     await createUserAndLogin(memberUsername, targetName);
 
-    const response = await raceRowLocks(
+    const response = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -560,7 +561,7 @@ describe("role authority containment", () => {
     // still passes canManageRoleDefinition. Only re-computing the prospective
     // definition from the locked row catches that adding tools:use would combine
     // with the newly null toolPermissions to grant unrestricted tool access.
-    const response = await raceRowLocks(
+    const response = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -593,7 +594,7 @@ describe("role authority containment", () => {
       allowed: ["image"],
     });
 
-    const symResponse = await raceRowLocks(
+    const symResponse = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -656,7 +657,7 @@ describe("role authority containment", () => {
     const memberUsername = uniqueName("race-del-member");
     await createUserAndLogin(memberUsername, targetName);
 
-    const response = await raceRowLocks(
+    const response = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -712,7 +713,7 @@ describe("role authority containment", () => {
     const memberUsername = uniqueName("race-actor-member");
     await createUserAndLogin(memberUsername, targetName);
 
-    const putRes = await raceRowLocks(
+    const putRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -751,7 +752,7 @@ describe("role authority containment", () => {
       .from(schema.users)
       .where(eq(schema.users.username, admin3Username));
 
-    const delRes = await raceRowLocks(
+    const delRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -783,7 +784,7 @@ describe("role authority containment", () => {
     // When the acting admin is disabled (disabled:admin) AND the target role is
     // deleted in the race window, 403 ESCALATION_DENIED wins over 404 NOT_FOUND.
     const vanishPutId = await createRoleAsAdmin(uniqueName("race-van-put"), ["tools:use"]);
-    const disabledAdminPutRes = await raceRowLocks(
+    const disabledAdminPutRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -809,7 +810,7 @@ describe("role authority containment", () => {
     });
 
     const vanishDelId = await createRoleAsAdmin(uniqueName("race-van-del"), ["tools:use"]);
-    const disabledAdminDelRes = await raceRowLocks(
+    const disabledAdminDelRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -859,7 +860,7 @@ describe("role authority containment", () => {
 
     // Narrow the actor's custom role to ["tools:use"] (losing security:manage while
     // still containing targetName's ["tools:use"]) right before the PUT lock completes.
-    const putRes = await raceRowLocks(
+    const putRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -895,7 +896,7 @@ describe("role authority containment", () => {
       .from(schema.users)
       .where(eq(schema.users.username, delActorUsername));
 
-    const delRes = await raceRowLocks(
+    const delRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -957,7 +958,7 @@ describe("role authority containment", () => {
     // Move the actor onto narrowManagerRole before the PUT row lock: the actor
     // still holds security:manage and can still manage locked ["tools:use"],
     // but canGrantRoleDefinition must reject granting ["tools:use", "files:own"].
-    const putRes = await raceRowLocks(
+    const putRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -988,7 +989,7 @@ describe("role authority containment", () => {
     // but canAssignRole(currentActor, "user") must reject inside the transaction.
     await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, actorRow.id));
 
-    const delRes = await raceRowLocks(
+    const delRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -1028,7 +1029,7 @@ describe("role authority containment", () => {
       .set({ role: broadManagerRole })
       .where(eq(schema.users.id, actorRow.id));
 
-    const widerPutRes = await raceRowLocks(
+    const widerPutRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>
@@ -1051,7 +1052,7 @@ describe("role authority containment", () => {
     });
 
     await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, actorRow.id));
-    const widerDelRes = await raceRowLocks(
+    const widerDelRes = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () =>

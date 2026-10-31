@@ -57,6 +57,7 @@ import { WelcomeScreen } from "@/components/editor/common/welcome-screen";
 import { captureHandledError } from "@/lib/analytics";
 import { EditorPage } from "@/pages/editor-page";
 import { useEditorStore } from "@/stores/editor-store";
+import type { CanvasObject } from "@/types/editor";
 
 const SOURCE_IMAGE_FAILED = en.editor.ui.captureFailure.sourceImageFailed;
 
@@ -1461,11 +1462,21 @@ describe("EditorPage Open Image server decode (#2530)", () => {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
     );
 
-    const copiedRect = {
+    const copiedRect: CanvasObject = {
       id: "obj-1",
-      type: "rect" as const,
+      type: "rect",
       layerId: "layer-1",
-      attrs: { x: 10, y: 20, width: 50, height: 40, fill: "#ff0000" },
+      attrs: {
+        x: 10,
+        y: 20,
+        width: 50,
+        height: 40,
+        fill: "#ff0000",
+        strokeWidth: 0,
+        cornerRadius: 0,
+        rotation: 0,
+        opacity: 1,
+      },
     };
 
     useEditorStore.temporal.getState().clear();

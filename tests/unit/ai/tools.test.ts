@@ -180,7 +180,7 @@ describe("removeBackground", () => {
       model: "birefnet-general",
     });
 
-    const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+    const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
     // birefnet base timeout is 600000 vs 300000 for others
     expect(options.timeout).toBeGreaterThanOrEqual(600000);
   });
@@ -1571,7 +1571,6 @@ describe("option serialization", () => {
 
   it("restorePhoto passes all option fields", async () => {
     await restorePhoto(FAKE_INPUT, FAKE_OUTPUT_DIR, {
-      mode: "auto",
       scratchRemoval: true,
       faceEnhancement: true,
       fidelity: 0.8,
@@ -1582,7 +1581,6 @@ describe("option serialization", () => {
 
     const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
     expect(JSON.parse(args[2])).toEqual({
-      mode: "auto",
       scratchRemoval: true,
       faceEnhancement: true,
       fidelity: 0.8,
@@ -1660,7 +1658,7 @@ describe("OCR dynamic timeout", () => {
 
     // sharp metadata returns 800x600 = 0.48MP
     // timeout = max(600_000, 0.48 * 30 * 1000) = 600_000
-    const options = vi.mocked(runAdaptiveTesseract).mock.calls[0][1];
+    const options = vi.mocked(runAdaptiveTesseract).mock.calls[0][1]!;
     expect(options.timeoutMs).toBeGreaterThanOrEqual(600_000);
   });
 });
@@ -1675,7 +1673,7 @@ describe("removeBackground dynamic timeout", () => {
 
     // sharp metadata returns 800x600 = 0.48MP; isGpuAvailable is mocked false
     // baseTimeout = 600000 (CPU), timeout = max(600000, 0.48 * 180 * 1000)
-    const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+    const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
     expect(options.timeout).toBe(600000);
   });
 });

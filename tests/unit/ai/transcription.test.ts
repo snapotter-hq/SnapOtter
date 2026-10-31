@@ -60,7 +60,7 @@ describe("transcribeAudio", () => {
     it("uses 30 minute timeout", async () => {
       await transcribeAudio(FAKE_AUDIO, { language: "auto" });
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.timeout).toBe(30 * 60_000);
     });
   });
@@ -278,7 +278,7 @@ describe("transcribeAudio", () => {
     it("omits onProgress when not provided", async () => {
       await transcribeAudio(FAKE_AUDIO, { language: "auto" });
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.onProgress).toBeUndefined();
     });
 

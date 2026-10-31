@@ -1,5 +1,22 @@
-if git diff --cached --name-only HEAD@{1}..HEAD 2>/dev/null | grep -q "^\.local-wiki/" || \
-   git log --name-only --pretty=format: @{u}..HEAD 2>/dev/null | grep -q "^\.local-wiki/"; then
-  echo "ERROR: .local-wiki/ files detected in push. This directory is private and must never be pushed."
+# Blocks a push that would publish local-only paths (AGENTS.md, "Local-Only Files").
+# Only added or modified files count, so removing a path that was once public is
+# allowed. Without an upstream, the commits checked are the ones no remote has yet.
+if git rev-parse -q --verify '@{u}' >/dev/null 2>&1; then
+  pushed_commits() { git log --name-only --diff-filter=AM --pretty=format: '@{u}..HEAD' 2>/dev/null; }
+else
+  pushed_commits() { git log --name-only --diff-filter=AM --pretty=format: HEAD --not --remotes 2>/dev/null; }
+fi
+
+local_only='^(docs/|\.local-wiki/|\.claude/|\.codex/|\.superpowers/|\.qa-maps/|pentest-results/|apps/videos/|remotion/|demo/|branding/|scripts/branding/|scripts/generate-license\.mjs$|AGENTS\.md$|CLAUDE\.md$|CONTEXT\.md$|PRD\.md$|\.license-signing-key$|(.*/)?\.env(\..*)?$|(.*/)?cloudflare\.env$)'
+kept='^(branding/(dashboard\.gif|social-preview\.png|sponsor-banner\.svg)|(.*/)?\.env\.example)$'
+
+# Husky runs this with `sh -e`, and grep exits 1 when nothing matches, so the
+# empty result must not abort the script.
+offenders=$(pushed_commits | sort -u | grep -E "$local_only" | grep -v -E "$kept") || true
+
+if [ -n "$offenders" ]; then
+  echo "ERROR: local-only paths detected in this push (AGENTS.md, Local-Only Files). They must never reach the public repo:" >&2
+  echo "$offenders" | sed 's/^/  /' >&2
+  echo "Remove those paths from the commits being pushed." >&2
   exit 1
 fi

@@ -26,7 +26,7 @@ import { eq } from "drizzle-orm";
 // ---------------------------------------------------------------------------
 // 2. Import app modules. config.ts already captured our env vars.
 // ---------------------------------------------------------------------------
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import { afterAll } from "vitest";
 import { env } from "../../apps/api/src/config.js";
 import { db, schema } from "../../apps/api/src/db/index.js";
@@ -138,10 +138,10 @@ afterAll(async () => {
  * buildTestApp(). Each hook receives the Fastify instance and can register
  * extra routes (createToolRoute, etc.) before app.ready() is called.
  */
-export const preReadyHooks: Array<(app: ReturnType<typeof Fastify>) => void | Promise<void>> = [];
+export const preReadyHooks: Array<(app: FastifyInstance) => void | Promise<void>> = [];
 
 export interface TestApp {
-  app: ReturnType<typeof Fastify>;
+  app: FastifyInstance;
   cleanup: () => Promise<void>;
 }
 
@@ -384,7 +384,7 @@ export async function buildTestApp(): Promise<TestApp> {
 // ---------------------------------------------------------------------------
 
 /** Log in as the default admin and return the session token. */
-export async function loginAsAdmin(app: ReturnType<typeof Fastify>): Promise<string> {
+export async function loginAsAdmin(app: FastifyInstance): Promise<string> {
   const res = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -411,7 +411,7 @@ export async function loginAsAdmin(app: ReturnType<typeof Fastify>): Promise<str
  * the same way the admin seed does.
  */
 export async function createUserAndLogin(
-  app: ReturnType<typeof Fastify>,
+  app: FastifyInstance,
   username: string,
   role = "user",
   password = "Userpass1",
@@ -460,7 +460,7 @@ export async function createUserAndLogin(
  * Log in as a default non-admin `user`-role account, returning its session
  * token. Thin wrapper over {@link createUserAndLogin} kept for existing callers.
  */
-export async function loginAsUser(app: ReturnType<typeof Fastify>): Promise<string> {
+export async function loginAsUser(app: FastifyInstance): Promise<string> {
   const { token } = await createUserAndLogin(app, "plainuser");
   return token;
 }

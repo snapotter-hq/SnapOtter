@@ -661,7 +661,7 @@ describe("erase-object single file: every other way the request ends", () => {
     renderPanel();
 
     const xhr = await submit();
-    act(() => xhr.onerror?.(new Event("error")));
+    act(() => xhr.onerror?.());
 
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe(en.errors.network);
@@ -673,7 +673,7 @@ describe("erase-object single file: every other way the request ends", () => {
     renderPanel();
 
     const xhr = await submit();
-    act(() => xhr.ontimeout?.(new Event("timeout")));
+    act(() => xhr.ontimeout?.());
 
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe(en.toolSettings["erase-object"].timeoutOverloaded);

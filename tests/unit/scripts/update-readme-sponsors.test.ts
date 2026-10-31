@@ -23,7 +23,11 @@ describe("selectSponsors", () => {
       node("kkwpsi", "2026-06-08T19:43:55Z", { isActive: false }),
       node("highb", "2026-08-30T04:17:49Z", { isActive: true }),
     ]);
-    expect(sponsors.map((s) => s.login)).toEqual(["kkwpsi", "highb", "dominic427"]);
+    expect(sponsors.map((s: { login: string }) => s.login)).toEqual([
+      "kkwpsi",
+      "highb",
+      "dominic427",
+    ]);
   });
 
   it("leaves private sponsorships out", () => {
@@ -31,7 +35,7 @@ describe("selectSponsors", () => {
       node("highb", "2026-08-30T04:17:49Z"),
       node("zakka258", "2026-09-25T07:18:23Z", { privacyLevel: "PRIVATE" }),
     ]);
-    expect(sponsors.map((s) => s.login)).toEqual(["highb"]);
+    expect(sponsors.map((s: { login: string }) => s.login)).toEqual(["highb"]);
   });
 
   it("lists someone who sponsored more than once a single time, at their first date", () => {
@@ -40,7 +44,7 @@ describe("selectSponsors", () => {
       node("kkwpsi", "2026-09-20T00:00:00Z"),
       node("kkwpsi", "2026-06-08T19:43:55Z"),
     ]);
-    expect(sponsors.map((s) => s.login)).toEqual(["kkwpsi", "highb"]);
+    expect(sponsors.map((s: { login: string }) => s.login)).toEqual(["kkwpsi", "highb"]);
   });
 
   it("keeps the earliest date when the earlier sponsorship comes first", () => {
@@ -49,7 +53,7 @@ describe("selectSponsors", () => {
       node("highb", "2026-08-30T04:17:49Z"),
       node("kkwpsi", "2026-09-20T00:00:00Z"),
     ]);
-    expect(sponsors.map((s) => s.login)).toEqual(["kkwpsi", "highb"]);
+    expect(sponsors.map((s: { login: string }) => s.login)).toEqual(["kkwpsi", "highb"]);
   });
 
   // GitHub keeps showing a public sponsorship publicly, so one is enough to list
@@ -60,7 +64,7 @@ describe("selectSponsors", () => {
       node("mixed", "2026-06-01T00:00:00Z", { privacyLevel: "PRIVATE" }),
       node("mixed", "2026-09-01T00:00:00Z"),
     ]);
-    expect(sponsors.map((s) => s.login)).toEqual(["highb", "mixed"]);
+    expect(sponsors.map((s: { login: string }) => s.login)).toEqual(["highb", "mixed"]);
   });
 
   it("uses the display name when there is one and falls back to the login", () => {
@@ -80,7 +84,7 @@ describe("selectSponsors", () => {
       node("highb", "2026-08-30T04:17:49Z"),
       { createdAt: "2026-07-01T00:00:00Z", privacyLevel: "PUBLIC", sponsorEntity: null },
     ]);
-    expect(sponsors.map((s) => s.login)).toEqual(["highb"]);
+    expect(sponsors.map((s: { login: string }) => s.login)).toEqual(["highb"]);
   });
 });
 

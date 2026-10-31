@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import rootConfig from "../../../vitest.config.ts";
+import rootConfig from "../../../vitest.config.js";
 
 const repoRoot = path.resolve(__dirname, "../../..");
 
@@ -118,7 +118,7 @@ function isDisallowedHookTimeout(match: HookTimeoutMatch): boolean {
 }
 
 describe("integration lifecycle hook timeout policy (#3357, #3584, #3595)", () => {
-  it("configures a global hookTimeout of at least 30_000ms in vitest.config.ts", () => {
+  it("configures a global hookTimeout of at least 30_000ms in vitest.config.js", () => {
     expect(rootConfig.test?.hookTimeout).toBeGreaterThanOrEqual(30_000);
   });
 

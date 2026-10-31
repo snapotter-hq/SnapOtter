@@ -129,7 +129,7 @@ describe("multi-modality tool x format matrix", () => {
   for (const tool of NON_IMAGE_TOOLS) {
     const toolId = tool.id;
     const selectedFixtures = selectFixturesForTool(FIXTURES_BY_EXT, tool);
-    const isAiTool = PYTHON_SIDECAR_TOOLS.includes(toolId);
+    const isAiTool = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId);
     const isMultiInput = MULTI_INPUT_TOOLS.has(toolId);
 
     // Tools with empty acceptedInputs that aren't in the non-image set

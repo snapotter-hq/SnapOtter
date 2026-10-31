@@ -96,6 +96,12 @@ import {
   createDefaultLayers,
   useEditorStore,
 } from "@/stores/editor-store";
+import type { CanvasObject } from "@/types/editor";
+
+// Only image objects carry a src; the union members have no common field.
+function imageSrcOf(object: CanvasObject | undefined): string | undefined {
+  return object?.type === "image" ? object.attrs.src : undefined;
+}
 
 const markClean = vi.fn();
 const TOO_LARGE = en.editor.ui.exportDialog.tooLarge;
@@ -972,6 +978,8 @@ describe("Load Project (#1622)", () => {
             y: 0,
             width: 10,
             height: 10,
+            strokeWidth: 0,
+            cornerRadius: 0,
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
@@ -1705,7 +1713,11 @@ describe("Autosave validation and state reconciliation (#2658)", () => {
     useEditorStore.setState({
       isDirty: false,
       activeLayerId: "layer-current",
-      selection: { x: 10, y: 10, width: 50, height: 50, type: "rect" },
+      selection: {
+        type: "rect",
+        points: [],
+        bounds: { x: 10, y: 10, width: 50, height: 50 },
+      },
       cropState: { x: 0, y: 0, width: 100, height: 100, aspectRatio: null },
       isCropping: true,
       editingTextId: "obj-1",
@@ -1720,6 +1732,8 @@ describe("Autosave validation and state reconciliation (#2658)", () => {
             y: 0,
             width: 10,
             height: 10,
+            strokeWidth: 0,
+            cornerRadius: 0,
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
@@ -1860,6 +1874,8 @@ describe("Autosave validation and state reconciliation (#2658)", () => {
             y: 0,
             width: 10,
             height: 10,
+            strokeWidth: 0,
+            cornerRadius: 0,
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
@@ -2197,7 +2213,7 @@ describe("Autosave IndexedDB storage and quota failure handling (#2173)", () => 
       "blob:http://localhost:1351/restored-6000",
     );
     expect(useEditorStore.getState().objects).toHaveLength(1);
-    expect(useEditorStore.getState().objects[0]?.attrs.src).toBe(
+    expect(imageSrcOf(useEditorStore.getState().objects[0])).toBe(
       "blob:http://localhost:1351/restored-3500",
     );
     expect(lsStore.get("snapotter-editor-autosave")).toBeUndefined();
@@ -2486,7 +2502,7 @@ describe("Autosave IndexedDB storage and quota failure handling (#2173)", () => 
     const unhydrated = loadAutosaveState();
     if (!unhydrated) throw new Error("Expected unhydrated autosave state");
     expect(unhydrated.state.sourceImageUrl).toBe("idb://snapotter-editor-autosave/source");
-    expect(unhydrated.state.objects[0]?.attrs.src).toBe(
+    expect(imageSrcOf(unhydrated.state.objects[0])).toBe(
       "idb://snapotter-editor-autosave/object/img-obj-1",
     );
 
@@ -2501,7 +2517,7 @@ describe("Autosave IndexedDB storage and quota failure handling (#2173)", () => 
       expect(useEditorStore.getState().sourceImageUrl).toBe("blob:http://localhost:1351/direct-8");
     });
     expect(useEditorStore.getState().objects).toHaveLength(1);
-    expect(useEditorStore.getState().objects[0]?.attrs.src).toBe(
+    expect(imageSrcOf(useEditorStore.getState().objects[0])).toBe(
       "blob:http://localhost:1351/direct-3",
     );
   });

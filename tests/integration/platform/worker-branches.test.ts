@@ -129,6 +129,10 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 
+// The jobs.progress column is typed without the batch counters the worker
+// persists into the same jsonb value; the cast lets a seed row carry them.
+type JobProgress = NonNullable<typeof schema.jobs.$inferInsert.progress>;
+
 // Capture the worker's analytics emissions without a PostHog client.
 // importOriginal keeps the rest of the module real (captureException etc.).
 vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
@@ -2129,7 +2133,7 @@ describe("batch children and finalize", () => {
       status: "processing",
       pool: "system",
       inputRefs: [],
-      progress: { percent: 50, totalFiles: 1, completedFiles: 1, failedFiles: 0 },
+      progress: { percent: 50, totalFiles: 1, completedFiles: 1, failedFiles: 0 } as JobProgress,
     });
     await putObject("outputs/seed-net/ok.png", Buffer.from("net-bytes"));
     await db.insert(schema.jobs).values({

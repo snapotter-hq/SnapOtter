@@ -95,7 +95,7 @@ describe("extractText error and progress behavior", () => {
         onProgress: expect.any(Function),
       }),
     );
-    const relayedProgress = vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1].onProgress;
+    const relayedProgress = vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1]?.onProgress;
     relayedProgress?.(42, "Recognizing text");
     expect(onProgress).toHaveBeenCalledWith(42, "Recognizing text");
   });
@@ -284,7 +284,7 @@ describe("extractText error and progress behavior", () => {
 
     await extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "ja" });
     const fallbackInputProvider =
-      vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1].fallbackInputProvider;
+      vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1]?.fallbackInputProvider;
     await expect(fallbackInputProvider?.()).resolves.toEqual([
       "/tmp/ocr/input_ocr_scene_upper.png",
       "/tmp/ocr/input_ocr_scene_lower.png",
@@ -329,7 +329,7 @@ describe("extractText error and progress behavior", () => {
 
     await extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "ja" });
     const denseCjkInputProvider =
-      vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1].denseCjkInputProvider;
+      vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1]?.denseCjkInputProvider;
     expect(denseCjkInputProvider).toEqual(expect.any(Function));
     expect(densePipeline.grayscale).not.toHaveBeenCalled();
 

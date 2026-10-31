@@ -86,7 +86,7 @@ describe("Playwright backing-state ownership", () => {
     ]);
 
     const result = await teardownPlaywrightBackingState(state, {
-      async deleteRedisKeys(_ownedState, ownsKey) {
+      async deleteRedisKeys(_ownedState: unknown, ownsKey: (key: string) => boolean) {
         let deleted = 0;
         for (const key of [...redisKeys]) {
           if (!ownsKey(key)) continue;
@@ -95,7 +95,7 @@ describe("Playwright backing-state ownership", () => {
         }
         return deleted;
       },
-      async dropDatabase(ownedState) {
+      async dropDatabase(ownedState: { databaseName: string }) {
         databases.delete(ownedState.databaseName);
       },
     });
@@ -122,13 +122,13 @@ describe("Playwright backing-state ownership", () => {
 
       await expect(
         teardownPlaywrightBackingState(tampered, {
-          async deleteRedisKeys(_ownedState, ownsKey) {
+          async deleteRedisKeys(_ownedState: unknown, ownsKey: (key: string) => boolean) {
             for (const key of [...redisKeys]) {
               if (ownsKey(key)) redisKeys.delete(key);
             }
             return 0;
           },
-          async dropDatabase(ownedState) {
+          async dropDatabase(ownedState: { databaseName: string }) {
             databases.delete(ownedState.databaseName);
           },
         }),
@@ -147,7 +147,7 @@ describe("Playwright backing-state ownership", () => {
 
     await expect(
       teardownPlaywrightBackingState(state, {
-        async deleteRedisKeys(_ownedState, ownsKey) {
+        async deleteRedisKeys(_ownedState: unknown, ownsKey: (key: string) => boolean) {
           for (const key of [...redisKeys]) {
             if (ownsKey(key)) redisKeys.delete(key);
           }

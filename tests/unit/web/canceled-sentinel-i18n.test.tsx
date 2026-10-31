@@ -66,7 +66,7 @@ function seedCanceledEntry(opts?: { count?: number; mime?: string; name?: string
     useFileStore.getState().updateEntry(i, {
       status: "failed",
       error: "Canceled",
-      errorCategory: "canceled",
+      errorCategory: null,
     });
   }
 }

@@ -277,32 +277,27 @@ describe("Smart Crop", () => {
     }
   }, 60_000);
 
-  it(
-    "handles HEIC input",
-    { timeout: 120_000 },
-    async () => {
-      const { body, contentType } = createMultipartPayload([
-        { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
-        {
-          name: "settings",
-          content: JSON.stringify({ mode: "subject", width: 100, height: 100 }),
-        },
-      ]);
+  it("handles HEIC input", { timeout: 120_000 }, async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      {
+        name: "settings",
+        content: JSON.stringify({ mode: "subject", width: 100, height: 100 }),
+      },
+    ]);
 
-      const res = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/smart-crop",
-        headers: {
-          authorization: `Bearer ${adminToken}`,
-          "content-type": contentType,
-        },
-        body,
-      });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/smart-crop",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
 
-      expect([200, 202, 501]).toContain(res.statusCode);
-    },
-    60_000,
-  );
+    expect([200, 202, 501]).toContain(res.statusCode);
+  });
 
   it("handles 1x1 pixel input", async () => {
     const { body, contentType } = createMultipartPayload([

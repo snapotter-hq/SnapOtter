@@ -56,6 +56,8 @@ function seedEntry(overrides: { previewLoading?: boolean } = {}) {
         processedPreviewUrl: null,
         processedFilename: null,
         processedSize: null,
+        resultNotes: null,
+        claimed: false,
         originalSize: file.size,
         originalWidth: null,
         originalHeight: null,

@@ -127,7 +127,7 @@ describe("wrapper propagation (sidecar reason survives the Sentry scrubber)", ()
 
     let caught: unknown;
     try {
-      await transcribeAudio("/nonexistent/input.wav", {});
+      await transcribeAudio("/nonexistent/input.wav", { language: "en" });
     } catch (e) {
       caught = e;
     }

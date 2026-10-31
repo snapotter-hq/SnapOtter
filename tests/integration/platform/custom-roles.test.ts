@@ -1,4 +1,5 @@
 import { eq, inArray, sql } from "drizzle-orm";
+import type { LightMyRequestResponse } from "fastify";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -284,7 +285,7 @@ describe("custom roles", () => {
     expect(created.statusCode).toBe(201);
     const roleId = JSON.parse(created.body).id;
 
-    const res = await raceRowLocks(
+    const res = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () => rename(roleId, `race-gone-${suffix}-x`),
@@ -369,7 +370,7 @@ describe("custom roles", () => {
     expect(created.statusCode).toBe(201);
     const roleId = JSON.parse(created.body).id;
 
-    const res = await raceRowLocks(
+    const res = await raceRowLocks<LightMyRequestResponse>(
       "roles",
       1,
       () => remove(roleId),

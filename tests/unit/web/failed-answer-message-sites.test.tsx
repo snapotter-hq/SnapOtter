@@ -2,7 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { en } from "@snapotter/shared";
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { de } from "@snapotter/shared/i18n/de.js";
 import {
   act,
@@ -134,7 +134,7 @@ interface StoreRow {
   site: string;
   fallback: string;
   /** Runs the request with the given locale and answers the text it ended on. */
-  run: (t: typeof en) => Promise<string | null | undefined>;
+  run: (t: TranslationKeys) => Promise<string | null | undefined>;
 }
 
 const STORES: StoreRow[] = [
@@ -394,7 +394,7 @@ const PIPELINE_FILE = JSON.stringify({
 });
 
 /** Lands on /automate in the viewer's locale and picks a pipeline file to import. */
-async function importPipeline(t: typeof en): Promise<void> {
+async function importPipeline(t: TranslationKeys): Promise<void> {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {

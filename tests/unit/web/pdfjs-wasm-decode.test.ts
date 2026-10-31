@@ -8,7 +8,6 @@ import { decodeFirstImage, PDFJS_WASM_DIR } from "./ccitt-pdf-fixture";
 // decode helper cleans the document up, which resets pdf.js's cached decoder.
 describe("pdf.js image decoding needs wasmUrl (#2082)", () => {
   it("leaves a CCITT Group 4 image undecoded without wasmUrl and decodes it with the shipped directory", async () => {
-    // @ts-expect-error legacy build ships no types; the main build needs a DOM worker
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
     expect(await decodeFirstImage(pdfjs, {})).toBeNull();

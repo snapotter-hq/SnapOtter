@@ -12,6 +12,10 @@ import {
 import { mockEnterpriseFeatures } from "../../helpers/enterprise-mock.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
+// The seed rows store a JSON string in the jsonb steps column, so the string is cast
+// to the column's array type instead of changing what lands in the database.
+type PipelineSteps = NonNullable<typeof schema.pipelines.$inferInsert.steps>;
+
 let testApp: TestApp;
 let app: TestApp["app"];
 let adminToken: string;
@@ -64,7 +68,9 @@ describe("FK constraint with anonymous userId", () => {
         id: randomUUID(),
         userId: "anonymous",
         name: "FK test pipeline",
-        steps: JSON.stringify([{ toolId: "resize", settings: { width: 100 } }]),
+        steps: JSON.stringify([
+          { toolId: "resize", settings: { width: 100 } },
+        ]) as unknown as PipelineSteps,
       }),
     ).resolves.toBeDefined();
   });
@@ -378,7 +384,9 @@ describe("admin mutations of the synthetic anonymous row (#4047)", () => {
       id: pipelineId,
       userId: "anonymous",
       name: "anonymous delete guard",
-      steps: JSON.stringify([{ toolId: "resize", settings: { width: 100 } }]),
+      steps: JSON.stringify([
+        { toolId: "resize", settings: { width: 100 } },
+      ]) as unknown as PipelineSteps,
     });
 
     try {

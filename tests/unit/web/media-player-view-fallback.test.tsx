@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 function stubFetch(sourcePayload: () => Promise<unknown>) {
-  const fetchMock = vi.fn((input: string) => {
+  const fetchMock = vi.fn((input: string, _init?: RequestInit) => {
     if (input === PROCESSED_URL) {
       return sourcePayload();
     }

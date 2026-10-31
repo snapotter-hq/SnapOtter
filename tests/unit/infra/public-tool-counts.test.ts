@@ -5,7 +5,7 @@ import { SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 /**
- * README and DOCKERHUB carry the only exact numbers CLAUDE.md allows on a public
+ * README and DOCKERHUB carry the only exact numbers allowed on a public
  * surface: per-section tool counts derived from toolSection(). Both had Image at
  * 105 against a live 107, DOCKERHUB had PDF at 28 against 29, both claimed 14
  * output formats against a convert enum of 17, and DOCKERHUB advertised
