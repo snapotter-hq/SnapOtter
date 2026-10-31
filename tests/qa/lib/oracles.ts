@@ -296,6 +296,13 @@ async function decodePdf(data: Buffer, facts: OutputFacts): Promise<void> {
   }
 }
 
+// adm-zip is imported dynamically with no types, so describe only the fields read below.
+interface ZipEntry {
+  isDirectory: boolean;
+  entryName: string;
+  header: { size: number };
+}
+
 async function decodeZip(data: Buffer, facts: OutputFacts): Promise<void> {
   try {
     const AdmZipModule = await import(join(ROOT_NODE_MODULES, "adm-zip", "adm-zip.js"));
@@ -303,8 +310,8 @@ async function decodeZip(data: Buffer, facts: OutputFacts): Promise<void> {
     const zip = new AdmZip(data);
     const members = zip
       .getEntries()
-      .filter((entry) => !entry.isDirectory)
-      .map((entry) => ({ name: entry.entryName, size: entry.header.size }));
+      .filter((entry: ZipEntry) => !entry.isDirectory)
+      .map((entry: ZipEntry) => ({ name: entry.entryName, size: entry.header.size }));
     facts.zip = { count: members.length, members };
     if (members.length === 0) facts.decodeError = "archive contains no file members";
   } catch (error) {

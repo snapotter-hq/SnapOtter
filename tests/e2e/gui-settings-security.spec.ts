@@ -30,7 +30,7 @@ let throwawayUserSeq = 0;
 async function createThrowawayUser(adminPage: Page, password: string) {
   const username = `pwtest-${Date.now()}-${++throwawayUserSeq}`;
   const token = await adminPage.evaluate(() => localStorage.getItem("snapotter-token"));
-  const headers = token ? { authorization: `Bearer ${token}` } : {};
+  const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
 
   const res = await adminPage.request.post("/api/auth/register", {
     headers,
