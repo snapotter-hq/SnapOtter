@@ -14,10 +14,14 @@ vi.mock("@/lib/api", () => ({
   apiPut: vi.fn(() => Promise.resolve({ ok: true })),
 }));
 
-const resize = TOOLS.find((tool) => tool.id === "resize");
-if (!resize) throw new Error("resize tool missing from TOOLS");
-const passportPhoto = TOOLS.find((tool) => tool.id === "passport-photo");
-if (!passportPhoto) throw new Error("passport-photo tool missing from TOOLS");
+function requireTool(id: string) {
+  const found = TOOLS.find((tool) => tool.id === id);
+  if (!found) throw new Error(`${id} tool missing from TOOLS`);
+  return found;
+}
+
+const resize = requireTool("resize");
+const passportPhoto = requireTool("passport-photo");
 
 function makeBundleState(overrides: Partial<FeatureBundleState> = {}): FeatureBundleState {
   return {

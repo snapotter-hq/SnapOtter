@@ -56,6 +56,8 @@ function seedFile() {
         processedPreviewUrl: null,
         processedFilename: null,
         processedSize: null,
+        resultNotes: null,
+        claimed: false,
         originalSize: file.size,
         originalWidth: null,
         originalHeight: null,
@@ -121,7 +123,7 @@ describe("shared-data labels are translatable (#906 follow-up)", () => {
 
 describe("slider ids stay locale-stable (#906 follow-up)", () => {
   it("keeps the color slider ids English under a German render", async () => {
-    renderDe(<ColorSettings />);
+    renderDe(<ColorSettings toolId="adjust-colors" />);
     await screen.findByText(de.toolSettings.color.brightness);
     expect(document.getElementById("color-slider-brightness")).toBeTruthy();
   });

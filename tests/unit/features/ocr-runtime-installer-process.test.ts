@@ -58,6 +58,7 @@ function release(): DownloadedOcrRuntimeRelease {
     archiveSha256: "a".repeat(64),
     archiveSize: 1,
     archiveExpandedSize: 1,
+    minimumMemoryBytes: 4 * 1024 ** 3,
     indexPath: "/data/ai/v3/downloads/index.json",
     archivePath: "/data/ai/v3/downloads/archive.tar.gz",
   };

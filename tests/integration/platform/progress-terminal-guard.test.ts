@@ -36,6 +36,10 @@ import {
 } from "../../../apps/api/src/routes/progress.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
+// The jobs.progress column is typed without the batch counters the worker
+// persists into the same jsonb value; the cast lets a seed row carry them.
+type JobProgress = NonNullable<typeof schema.jobs.$inferInsert.progress>;
+
 let testApp: TestApp;
 
 beforeAll(async () => {
@@ -139,8 +143,14 @@ describe("late batch frames and the failBatchJob guard", () => {
       completedAt: status === "processing" ? null : new Date(),
       progress:
         status === "completed"
-          ? { percent: 100, totalFiles: 1, completedFiles: 1, failedFiles: 0, result: BATCH_RESULT }
-          : { percent: 0, totalFiles: 1, completedFiles: 0, failedFiles: 0 },
+          ? ({
+              percent: 100,
+              totalFiles: 1,
+              completedFiles: 1,
+              failedFiles: 0,
+              result: BATCH_RESULT,
+            } as JobProgress)
+          : ({ percent: 0, totalFiles: 1, completedFiles: 0, failedFiles: 0 } as JobProgress),
     });
     return id;
   }

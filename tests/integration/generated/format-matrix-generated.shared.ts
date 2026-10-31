@@ -157,7 +157,7 @@ export function registerToolFormatMatrix(part: number): void {
         continue;
       }
       it(`${toolId} handles every input format cleanly`, async (context) => {
-        if (PYTHON_SIDECAR_TOOLS.includes(toolId) && !REQUIRE_AI_FEATURES) {
+        if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) && !REQUIRE_AI_FEATURES) {
           return context.skip(
             `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
           );
@@ -202,7 +202,10 @@ export function registerToolFormatMatrix(part: number): void {
           });
           accounting.attempt();
 
-          if (res.statusCode === 501 && PYTHON_SIDECAR_TOOLS.includes(toolId)) {
+          if (
+            res.statusCode === 501 &&
+            (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId)
+          ) {
             const payload = JSON.parse(res.body) as { code?: unknown };
             const disposition = featureUnavailableDisposition({
               toolId,

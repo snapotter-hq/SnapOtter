@@ -1,4 +1,5 @@
 // @vitest-environment node
+import type { AnalyticsConfig } from "@snapotter/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockInit = vi.fn(() => ({
@@ -20,7 +21,28 @@ vi.mock("posthog-js", () => ({
   default: { init: mockInit },
 }));
 
-const mockSentryInit = vi.fn();
+// The slice of the Sentry init options and scrubbed event these tests read. The
+// hooks are typed as always returning an event; tests that expect a drop assert
+// toBeNull() on the result.
+interface ScrubbedEvent {
+  user?: unknown;
+  message?: unknown;
+  request?: unknown;
+  breadcrumbs?: unknown;
+  exception: {
+    values: {
+      value: string;
+      stacktrace: { frames: { filename: string; abs_path: string; lineno: number }[] };
+    }[];
+  };
+  debug_meta: { images: { code_file: string; debug_id: string }[] };
+}
+interface SentryInitOptions {
+  beforeSend?: (event: unknown) => ScrubbedEvent;
+  beforeBreadcrumb?: (breadcrumb: unknown) => unknown;
+}
+
+const mockSentryInit = vi.fn<(options: SentryInitOptions) => void>();
 const mockBrowserTracingIntegration = vi.fn(() => ({ name: "BrowserTracing" }));
 vi.mock("@sentry/react", () => ({
   init: mockSentryInit,
@@ -43,10 +65,11 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-const enabledConfig = {
+const enabledConfig: AnalyticsConfig = {
   enabled: true,
   posthogApiKey: "phc_test",
   posthogHost: "https://ph.test",
+  posthogProxyPath: "",
   feedbackSink: true,
   sentryDsn: "https://sentry.test/123",
   sentryDsnWeb: "https://sentry.test/web/456",
@@ -54,10 +77,11 @@ const enabledConfig = {
   instanceId: "inst-1",
 };
 
-const disabledConfig = {
+const disabledConfig: AnalyticsConfig = {
   enabled: false,
   posthogApiKey: "key",
   posthogHost: "https://ph.test",
+  posthogProxyPath: "",
   feedbackSink: false,
   sentryDsn: "",
   sentryDsnWeb: "",
@@ -260,7 +284,7 @@ describe("analytics lib (baked model)", () => {
     async function getBeforeSend() {
       mockSentryInit.mockClear();
       await mod.initAnalytics(enabledConfig);
-      const sentryCall = mockSentryInit.mock.calls.find((call: unknown[]) => call[0]?.beforeSend);
+      const sentryCall = mockSentryInit.mock.calls.find((call) => call[0]?.beforeSend);
       return sentryCall ? sentryCall[0].beforeSend : null;
     }
 

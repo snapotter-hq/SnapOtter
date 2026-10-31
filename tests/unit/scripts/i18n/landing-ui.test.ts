@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeLandingUiAdapter } from "../../../../scripts/i18n/adapters/landing-ui.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 
+type Unit = { id: string; sourceText: string };
+
 let dir: string;
 
 beforeEach(async () => {
@@ -25,7 +27,7 @@ describe("landing-ui adapter", () => {
     const adapter = makeLandingUiAdapter({ dir });
     const units = await adapter.extract();
     expect(units).toHaveLength(2);
-    const byId = new Map(units.map((u) => [u.id, u]));
+    const byId = new Map<string, Unit>(units.map((u: Unit) => [u.id, u]));
     expect(byId.get("nav.pricing")).toEqual({
       id: "nav.pricing",
       sourceText: "Pricing",

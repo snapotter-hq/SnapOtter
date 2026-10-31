@@ -27,7 +27,7 @@ function temporaryOutput(): string {
 
 function runWriter(
   output: string,
-  environment: Record<string, string>,
+  environment: Record<string, string | undefined>,
 ): ReturnType<typeof spawnSync> {
   return spawnSync(
     process.execPath,

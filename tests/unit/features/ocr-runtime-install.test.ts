@@ -2221,7 +2221,11 @@ describe("downloadVerifiedRuntimeRelease", () => {
     truncateSync(archivePath, archiveSize);
     const nativeSetTimeout = globalThis.setTimeout;
     let startDeadline: (() => void) | undefined;
-    vi.spyOn(globalThis, "setTimeout").mockImplementation(((handler, delay, ...args) => {
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+      handler: () => void,
+      delay?: number,
+      ...args: unknown[]
+    ) => {
       if (delay !== 20 || startDeadline) return nativeSetTimeout(handler, delay, ...args);
       const placeholder = nativeSetTimeout(() => {}, 60_000);
       startDeadline = () => {
@@ -2254,9 +2258,13 @@ describe("downloadVerifiedRuntimeRelease", () => {
     const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-retry-abort-"));
     temporaryDirectories.push(directory);
     const nativeSetTimeout = globalThis.setTimeout;
-    const retryTimers: ReturnType<typeof setTimeout>[] = [];
+    const retryTimers: number[] = [];
     let startDeadline: (() => void) | undefined;
-    vi.spyOn(globalThis, "setTimeout").mockImplementation(((handler, delay, ...args) => {
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+      handler: () => void,
+      delay?: number,
+      ...args: unknown[]
+    ) => {
       // Defer the overall 100ms deadline until the first fetch is dispatched, so a
       // loaded CI runner cannot fire it before fetch is even called (the source of
       // this test's flakiness). Mirrors the deferred-deadline trick used above.

@@ -519,29 +519,24 @@ describe("watermark-text", () => {
 
   // ── HEIF input ───────────────────────────────────────────────────
 
-  it(
-    "handles HEIF input (motorcycle.heif)",
-    { timeout: 120_000 },
-    async () => {
-      const HEIF = readFixture(fixtures.image.motorcycle);
-      const { body, contentType } = createMultipartPayload([
-        { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
-        { name: "settings", content: JSON.stringify({ text: "HEIF Test" }) },
-      ]);
+  it("handles HEIF input (motorcycle.heif)", { timeout: 120_000 }, async () => {
+    const HEIF = readFixture(fixtures.image.motorcycle);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      { name: "settings", content: JSON.stringify({ text: "HEIF Test" }) },
+    ]);
 
-      const res = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/watermark-text",
-        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-        body,
-      });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
 
-      expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
-      expect(json.downloadUrl).toBeDefined();
-    },
-    60_000,
-  );
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
 
   // ── Animated GIF input ──────────────────────────────────────────
 

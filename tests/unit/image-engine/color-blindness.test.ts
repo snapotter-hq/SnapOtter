@@ -1,6 +1,6 @@
 import type { ColorBlindnessType } from "@snapotter/image-engine";
 import { COLOR_BLINDNESS_MATRICES, colorBlindness } from "@snapotter/image-engine";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { describe, expect, it } from "vitest";
 
 const ALL_TYPES: ColorBlindnessType[] = [
@@ -14,7 +14,7 @@ const ALL_TYPES: ColorBlindnessType[] = [
   "blueConeMonochromacy",
 ];
 
-function makeColorImage(r: number, g: number, b: number): sharp.Sharp {
+function makeColorImage(r: number, g: number, b: number): Sharp {
   return sharp({
     create: { width: 10, height: 10, channels: 3, background: { r, g, b } },
   }).png();

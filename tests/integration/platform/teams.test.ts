@@ -7,6 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
+import type { LightMyRequestResponse } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
@@ -425,7 +426,7 @@ describe("PUT /api/v1/teams/:id", () => {
   ])(
     "returns 404 when a team is deleted between the pre-checks and UPDATE on $label (#3159)",
     async ({ payload }) => {
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "teams",
         1,
         () =>
@@ -832,7 +833,7 @@ describe("DELETE /api/v1/teams/:id", () => {
       .where(eq(schema.teams.id, defaultTeamId));
 
     try {
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "teams",
         1,
         () =>

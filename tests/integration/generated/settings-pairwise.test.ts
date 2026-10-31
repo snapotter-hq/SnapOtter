@@ -62,7 +62,7 @@ describe("pairwise settings matrix", () => {
 
   for (const toolId of toolIds) {
     it(`${toolId} survives its pairwise settings matrix`, async (context) => {
-      if (PYTHON_SIDECAR_TOOLS.includes(toolId) && !REQUIRE_AI_FEATURES) {
+      if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) && !REQUIRE_AI_FEATURES) {
         return context.skip(
           `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
         );

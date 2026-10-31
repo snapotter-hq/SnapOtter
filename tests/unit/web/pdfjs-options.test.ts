@@ -66,7 +66,6 @@ describe("pdf.js asset options (#1084)", () => {
   });
 
   it("a non-embedded CID font renders text only when the CMap options are given", async () => {
-    // @ts-expect-error legacy build ships no types; the main build needs a DOM worker
     const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const pdfjsRoot = path.resolve(WEB_SRC, "../node_modules/pdfjs-dist");
     const data = readFileSync(
@@ -75,7 +74,7 @@ describe("pdf.js asset options (#1084)", () => {
     const extract = async (opts: object) => {
       const doc = await getDocument({ data: new Uint8Array(data), verbosity: 0, ...opts }).promise;
       const content = await (await doc.getPage(1)).getTextContent();
-      return content.items.map((i: { str: string }) => i.str).join("");
+      return content.items.map((i) => ("str" in i ? i.str : "")).join("");
     };
 
     expect(await extract({})).toBe("");

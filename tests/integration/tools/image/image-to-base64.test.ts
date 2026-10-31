@@ -794,29 +794,24 @@ describe("image-to-base64", () => {
 
   // ── HEIF input (alternative extension) ───────────────────────────
 
-  it(
-    "converts HEIF to JPEG in original mode",
-    { timeout: 120_000 },
-    async () => {
-      const HEIF = readFixture(fixtures.image.motorcycle);
-      const { body, contentType } = createMultipartPayload([
-        { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
-        { name: "settings", content: JSON.stringify({}) },
-      ]);
+  it("converts HEIF to JPEG in original mode", { timeout: 120_000 }, async () => {
+    const HEIF = readFixture(fixtures.image.motorcycle);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
 
-      const res = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/image-to-base64",
-        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-        body,
-      });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
 
-      expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
-      expect(json.results[0].mimeType).toBe("image/jpeg");
-    },
-    60_000,
-  );
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
 
   // ── Quality=1 minimum ────────────────────────────────────────────
 

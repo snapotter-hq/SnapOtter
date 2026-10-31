@@ -2,6 +2,7 @@
 //
 // Proves the invariant: PostHog and Sentry are NEVER called when
 // analytics is disabled in the baked config.
+import type { AnalyticsConfig } from "@snapotter/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPosthogInit = vi.fn(() => ({
@@ -21,7 +22,30 @@ vi.mock("posthog-js", () => ({
   default: { init: mockPosthogInit },
 }));
 
-const mockSentryInit = vi.fn();
+// The slice of the Sentry init options and scrubbed event these tests read. The
+// hooks are typed as always returning an event; tests that expect a drop assert
+// toBeNull() on the result.
+interface ScrubbedEvent {
+  user?: unknown;
+  message?: unknown;
+  request?: unknown;
+  breadcrumbs?: unknown;
+  exception: {
+    values: {
+      value: string;
+      stacktrace: { frames: { filename: string; abs_path: string; lineno: number }[] };
+    }[];
+  };
+  debug_meta: { images: { code_file: string; debug_id: string }[] };
+}
+interface SentryInitOptions {
+  beforeSend?: (event: unknown) => ScrubbedEvent;
+  beforeBreadcrumb?: (breadcrumb: unknown) => unknown;
+  sendClientReports?: boolean;
+  integrations?: (defaults: { name: string }[]) => { name: string }[];
+}
+
+const mockSentryInit = vi.fn<(options: SentryInitOptions) => void>();
 const mockBrowserTracingIntegration = vi.fn(() => ({ name: "BrowserTracing" }));
 vi.mock("@sentry/react", () => ({
   init: mockSentryInit,
@@ -44,10 +68,11 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-const enabledConfig = {
+const enabledConfig: AnalyticsConfig = {
   enabled: true,
   posthogApiKey: "phc_test",
   posthogHost: "https://ph.test",
+  posthogProxyPath: "",
   feedbackSink: true,
   sentryDsn: "https://sentry.test/123",
   sentryDsnWeb: "https://sentry.test/web/456",
@@ -55,10 +80,11 @@ const enabledConfig = {
   instanceId: "inst-1",
 };
 
-const disabledConfig = {
+const disabledConfig: AnalyticsConfig = {
   enabled: false,
   posthogApiKey: "",
   posthogHost: "",
+  posthogProxyPath: "",
   feedbackSink: false,
   sentryDsn: "",
   sentryDsnWeb: "",
@@ -143,6 +169,8 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
 
     it("filters the release-health session integration out of the defaults", async () => {
       const options = await getSentryOptions();
+      if (!options?.integrations)
+        throw new Error("Sentry was initialised without an integrations hook");
       const filtered = options.integrations([{ name: "BrowserSession" }, { name: "Dedupe" }]);
       expect(filtered).toEqual([{ name: "Dedupe" }]);
     });
@@ -154,7 +182,11 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
   });
 
   describe("web-DSN-only init (no PostHog key)", () => {
-    const sentryOnlyConfig = { ...enabledConfig, posthogApiKey: "", posthogHost: "" };
+    const sentryOnlyConfig: AnalyticsConfig = {
+      ...enabledConfig,
+      posthogApiKey: "",
+      posthogHost: "",
+    };
 
     it("skips posthog.init entirely but still initializes Sentry", async () => {
       await mod.initAnalytics(sentryOnlyConfig);
@@ -168,7 +200,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
     it("keeps beforeSend active: error events still pass the enabled gate", async () => {
       await mod.initAnalytics(sentryOnlyConfig);
       const beforeSend = mockSentryInit.mock.calls[0]?.[0]?.beforeSend;
-      expect(beforeSend).toBeDefined();
+      if (!beforeSend) throw new Error("Sentry was initialised without a beforeSend hook");
       const result = beforeSend({
         exception: { values: [{ type: "TypeError", value: "boom" }] },
       });
@@ -189,6 +221,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
     it("an instance-wide opt-out seen after init stops Sentry", async () => {
       await mod.initAnalytics(sentryOnlyConfig);
       const beforeSend = mockSentryInit.mock.calls[0]?.[0]?.beforeSend;
+      if (!beforeSend) throw new Error("Sentry was initialised without a beforeSend hook");
 
       await mod.applyInstanceAnalytics({ ...sentryOnlyConfig, enabled: false });
 
@@ -206,7 +239,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
   describe("PII never leaks even when analytics enabled", () => {
     it("Sentry strips the entire user object from events", async () => {
       await mod.initAnalytics(enabledConfig);
-      const sentryCall = mockSentryInit.mock.calls.find((call: unknown[]) => call[0]?.beforeSend);
+      const sentryCall = mockSentryInit.mock.calls.find((call) => call[0]?.beforeSend);
       const beforeSend = sentryCall?.[0].beforeSend;
       if (!beforeSend) return;
 
@@ -221,7 +254,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
 
     it("Sentry removes free-text and paths from exception values", async () => {
       await mod.initAnalytics(enabledConfig);
-      const sentryCall = mockSentryInit.mock.calls.find((call: unknown[]) => call[0]?.beforeSend);
+      const sentryCall = mockSentryInit.mock.calls.find((call) => call[0]?.beforeSend);
       const beforeSend = sentryCall?.[0].beforeSend;
       if (!beforeSend) return;
 
@@ -248,7 +281,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
 
     it("Sentry keeps a host-stripped path for app bundle frames so maps symbolicate", async () => {
       await mod.initAnalytics(enabledConfig);
-      const sentryCall = mockSentryInit.mock.calls.find((call: unknown[]) => call[0]?.beforeSend);
+      const sentryCall = mockSentryInit.mock.calls.find((call) => call[0]?.beforeSend);
       const beforeSend = sentryCall?.[0].beforeSend;
       if (!beforeSend) return;
 
@@ -297,9 +330,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
 
     it("Sentry blocks ui.click breadcrumbs", async () => {
       await mod.initAnalytics(enabledConfig);
-      const sentryCall = mockSentryInit.mock.calls.find(
-        (call: unknown[]) => call[0]?.beforeBreadcrumb,
-      );
+      const sentryCall = mockSentryInit.mock.calls.find((call) => call[0]?.beforeBreadcrumb);
       const beforeBreadcrumb = sentryCall?.[0].beforeBreadcrumb;
       if (!beforeBreadcrumb) return;
 
@@ -308,9 +339,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
 
     it("Sentry blocks fetch breadcrumbs to file URLs", async () => {
       await mod.initAnalytics(enabledConfig);
-      const sentryCall = mockSentryInit.mock.calls.find(
-        (call: unknown[]) => call[0]?.beforeBreadcrumb,
-      );
+      const sentryCall = mockSentryInit.mock.calls.find((call) => call[0]?.beforeBreadcrumb);
       const beforeBreadcrumb = sentryCall?.[0].beforeBreadcrumb;
       if (!beforeBreadcrumb) return;
 

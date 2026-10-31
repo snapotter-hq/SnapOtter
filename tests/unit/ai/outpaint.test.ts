@@ -312,7 +312,7 @@ describe("outpaint", () => {
       };
       await outpaint(FAKE_INPUT, options, FAKE_OUTPUT_DIR);
 
-      const bridgeOptions = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const bridgeOptions = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(bridgeOptions.onProgress).toBeUndefined();
     });
   });

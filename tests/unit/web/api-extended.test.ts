@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { en } from "@snapotter/shared";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Global mocks
 const fetchMock = vi.fn();

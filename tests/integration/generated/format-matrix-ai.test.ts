@@ -516,7 +516,7 @@ describe("AI tool cross-format matrix", () => {
               // 400 or 422 error -- verify clean error shape
               expect(body.error).toBeDefined();
               expect(typeof body.error).toBe("string");
-              expect(body.error.length).toBeGreaterThan(0);
+              expect((body.error as string).length).toBeGreaterThan(0);
             }
           },
           perTestTimeout,

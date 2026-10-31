@@ -86,15 +86,28 @@ pass "bundle.json valid"
 
 # ── Phase 2: Install (into /opt/venv + models dir) ──────────────────────────
 log "Phase 2: Install"
+# Merge each top-level entry into place, then delete it from staging. A plain
+# `cp -a` of the whole tree holds staging and the installed copy at once, which
+# doubles the writable-layer footprint (about 20 GB for inpaint-hq); this keeps
+# the peak at staging plus the largest single entry.
+move_into() {
+  local src="$1" dst="$2" entry
+  mkdir -p "${dst}"
+  for entry in "${src}"/* "${src}"/.[!.]*; do
+    [[ -e "${entry}" ]] || continue
+    cp -a "${entry}" "${dst}/"
+    rm -rf "${entry}"
+  done
+}
 if [[ -d "${STAGING}/site-packages" ]]; then
-  cp -a "${STAGING}/site-packages/." "${SITE_PACKAGES}/"
+  move_into "${STAGING}/site-packages" "${SITE_PACKAGES}"
   pass "site-packages merged into ${SITE_PACKAGES}"
 fi
-mkdir -p "${MODELS_PATH}"
 if [[ -d "${STAGING}/models" ]]; then
-  cp -a "${STAGING}/models/." "${MODELS_PATH}/"
+  move_into "${STAGING}/models" "${MODELS_PATH}"
   pass "models copied to ${MODELS_PATH}"
 fi
+mkdir -p "${MODELS_PATH}"
 if [[ -d "${STAGING}/fixups" ]] && compgen -G "${STAGING}/fixups/*.whl" >/dev/null; then
   run_python -m pip install --no-index --no-cache-dir "${STAGING}/fixups"/*.whl
   pass "fixup wheels installed"

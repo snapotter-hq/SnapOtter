@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
+import type { Metadata, Sharp } from "sharp";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(
@@ -8,7 +9,7 @@ const require = createRequire(
 const sharp = require("sharp") as typeof import("sharp").default;
 const exifReader = require(
   path.resolve(__dirname, "../../../packages/image-engine/node_modules/exif-reader"),
-) as typeof import("exif-reader").default;
+) as typeof import("exif-reader");
 
 import { editMetadata } from "@snapotter/image-engine";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -21,7 +22,7 @@ beforeAll(() => {
   png200x150 = readFixture(fixtures.image.base.png200);
 });
 
-async function getExif(img: sharp.Sharp) {
+async function getExif(img: Sharp) {
   const buf = await img.toBuffer();
   const meta = await sharp(buf).metadata();
   if (!meta.exif) return null;
@@ -287,9 +288,7 @@ describe("editMetadata", () => {
     });
 
     const img = sharp(jpgWithExif);
-    const metaSpy = vi
-      .spyOn(img, "metadata")
-      .mockResolvedValue({ exif: exifOomBuf } as sharp.Metadata);
+    const metaSpy = vi.spyOn(img, "metadata").mockResolvedValue({ exif: exifOomBuf } as Metadata);
     try {
       await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(v8Oom);
       await expect(editMetadata(img, { clearGps: true })).rejects.toThrow(v8Oom);
@@ -303,7 +302,7 @@ describe("editMetadata", () => {
     });
     const rangeMetaSpy = vi
       .spyOn(img, "metadata")
-      .mockResolvedValueOnce({ exif: nonOomRangeBuf } as sharp.Metadata);
+      .mockResolvedValueOnce({ exif: nonOomRangeBuf } as Metadata);
     try {
       await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(
         "Cannot safely edit metadata because existing EXIF data is invalid",
@@ -318,7 +317,7 @@ describe("editMetadata", () => {
     });
     const nonRangeMetaSpy = vi
       .spyOn(img, "metadata")
-      .mockResolvedValueOnce({ exif: nonRangeOomMsgBuf } as sharp.Metadata);
+      .mockResolvedValueOnce({ exif: nonRangeOomMsgBuf } as Metadata);
     try {
       await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(
         "Cannot safely edit metadata because existing EXIF data is invalid",

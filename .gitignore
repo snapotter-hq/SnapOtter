@@ -48,7 +48,12 @@ CONTEXT.md
 .codex/
 .superpowers/
 docs/*
-!docs/COMMUNITY_GUIDE.md
+branding/*
+!branding/dashboard.gif
+!branding/social-preview.png
+!branding/sponsor-banner.svg
+scripts/branding/
+scripts/generate-license.mjs
 PRD.md
 
 # Docker Hub publish script (maintainer-local ops)

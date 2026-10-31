@@ -220,7 +220,7 @@ describe("Batch progress tracking", () => {
     expect(job?.status).toBe("completed");
     // Should have error info for the failed file
     if (job?.error) {
-      const errorObj = job.error as { message: string };
+      const errorObj = job.error as { message: string; details: unknown[] };
       const errors = errorObj.details;
       expect(errors.length).toBeGreaterThanOrEqual(1);
     }
@@ -363,7 +363,7 @@ describe("SSE progress endpoint", () => {
     // Parse the SSE data
     const dataMatch = body.match(/data: (.+)/);
     expect(dataMatch).not.toBeNull();
-    const event = JSON.parse(dataMatch?.[1]);
+    const event = JSON.parse(dataMatch?.[1] as string);
     expect(event.status).toBe("completed");
     expect(event.type).toBe("batch");
   });
@@ -394,7 +394,7 @@ describe("SSE progress endpoint", () => {
     const body = res.body;
     const dataMatch = body.match(/data: (.+)/);
     expect(dataMatch).not.toBeNull();
-    const event = JSON.parse(dataMatch?.[1]);
+    const event = JSON.parse(dataMatch?.[1] as string);
     expect(event.status).toBe("failed");
     expect(event.failedFiles).toBe(1);
     expect(event.errors).toHaveLength(1);
@@ -475,7 +475,7 @@ describe("updateJobProgress direct calls", () => {
     expect(job).toBeDefined();
     expect(job?.status).toBe("failed");
     expect(job?.error).not.toBeNull();
-    const errorObj = job?.error as { message: string };
+    const errorObj = job?.error as { message: string; details: unknown[] };
     const errors = errorObj.details;
     expect(errors).toHaveLength(2);
   });

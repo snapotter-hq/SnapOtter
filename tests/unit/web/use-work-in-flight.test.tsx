@@ -217,6 +217,7 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
           useBase64Store.setState({
             results: [
               {
+                entryId: "a.png",
                 filename: "a.png",
                 mimeType: "image/png",
                 width: 1,
@@ -235,6 +236,7 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
           useBase64Store.setState({
             results: [
               {
+                entryId: "a.png",
                 filename: "a.png",
                 mimeType: "image/png",
                 width: 1,
@@ -320,6 +322,7 @@ const SEED_TILE = { row: 0, col: 0, label: "1", width: 10, height: 10, blobUrl: 
 
 /** One encoded file, for the per-item tests below. */
 const BASE64_SEED = {
+  entryId: "a.png",
   filename: "a.png",
   mimeType: "image/png",
   width: 1,
@@ -912,8 +915,8 @@ describe("tools that keep their results outside the file store", () => {
     });
 
     it("goes quiet once every encoded file is taken", () => {
-      const a = { ...BASE64_SEED, filename: "a.png" };
-      const b = { ...BASE64_SEED, filename: "b.png" };
+      const a = { ...BASE64_SEED, entryId: "a.png", filename: "a.png" };
+      const b = { ...BASE64_SEED, entryId: "b.png", filename: "b.png" };
       useBase64Store.setState({ results: [a, b] });
       claimToolResultItem("image-to-base64", base64FileKey(a));
 

@@ -154,7 +154,7 @@ describe("operator recovery policy", () => {
     expect(unit, "docs adapter must extract guide/account-recovery.md").toBeDefined();
     const expectedSourceHash = hash(unit?.sourceText ?? "");
 
-    for (const locale of localeCodes().filter((c) => c !== "en")) {
+    for (const locale of localeCodes().filter((c: string) => c !== "en")) {
       const rawGuide = source(`apps/docs/${locale}/guide/account-recovery.md`);
       const stored = await adapter.load(locale);
       const entry = stored.get("guide/account-recovery.md");
@@ -186,7 +186,7 @@ describe("operator recovery policy", () => {
 
   it("preserves executable Markdown structures in every localized operator guide", () => {
     const guides = ["account-recovery", "database", "developer", "getting-started", "security"];
-    const locales = localeCodes().filter((locale) => locale !== "en");
+    const locales = localeCodes().filter((locale: string) => locale !== "en");
 
     for (const guide of guides) {
       const expected = countStructures(source(`apps/docs/guide/${guide}.md`));

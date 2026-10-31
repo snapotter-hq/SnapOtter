@@ -2,7 +2,16 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 import { env } from "../../../../apps/api/src/config.js";
 import { db, schema } from "../../../../apps/api/src/db/index.js";
 import {
@@ -54,7 +63,7 @@ let app: TestApp["app"];
 let adminToken: string;
 let scratchRoot: string;
 let originalScratchPath: string;
-let prepareSpy: ReturnType<typeof vi.spyOn>;
+let prepareSpy: MockInstance<DocumentInputHandler["prepare"]>;
 
 beforeAll(async () => {
   scratchRoot = await mkdtemp(join(tmpdir(), "snapotter-ocr-pdf-routes-"));

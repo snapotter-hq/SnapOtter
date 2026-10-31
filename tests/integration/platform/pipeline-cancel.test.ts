@@ -417,7 +417,7 @@ async function finalizeReturnValue(flowId: string): Promise<Record<string, unkno
     const j = await getQueue("image").getJob(flowId);
     return j?.returnvalue ? j : undefined;
   });
-  return job.returnvalue as Record<string, unknown>;
+  return job.returnvalue as unknown as Record<string, unknown>;
 }
 
 beforeAll(async () => {
@@ -1064,7 +1064,7 @@ describe("pipeline-batch cancel", () => {
 
     const returned = await waitFor(async () => {
       const j = await getQueue("system").getJob(parentId);
-      return j?.returnvalue ? (j.returnvalue as Record<string, unknown>) : undefined;
+      return j?.returnvalue ? (j.returnvalue as unknown as Record<string, unknown>) : undefined;
     });
     const payload = returned.resultPayload as {
       canceled?: boolean;

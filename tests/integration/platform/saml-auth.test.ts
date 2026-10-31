@@ -34,7 +34,7 @@ const samlMock = vi.hoisted(() => ({
 // Records the options each `new SAML(...)` receives, so a test can check the
 // ACS callbackUrl and issuer the IdP will be told about (#1297).
 const samlCtorMock = vi.hoisted(() => vi.fn());
-const mfaOutcomeMock = vi.hoisted(() => vi.fn(() => "proceed"));
+const mfaOutcomeMock = vi.hoisted(() => vi.fn((..._args: unknown[]) => "proceed"));
 // A controllable handle for getMfaPolicy so a single test can make the MFA
 // policy lookup reject and drive saml.ts's policy-read catch. Since #815 a
 // failed policy read no longer falls back to "proceed": the caller passes the

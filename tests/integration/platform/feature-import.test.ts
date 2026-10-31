@@ -19,6 +19,7 @@ import {
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // tar lives in apps/api/node_modules; resolve via createRequire (same
@@ -622,11 +623,7 @@ describe("site-packages import", () => {
 });
 
 describe("POST /api/v1/admin/features/import", () => {
-  let app: Awaited<ReturnType<typeof import("fastify")>>["default"] extends (
-    ...args: infer _A
-  ) => infer R
-    ? R
-    : never;
+  let app: FastifyInstance;
   let token: string;
   let responseLockObservedHeld: boolean | null = null;
   let importRouteRateLimit: unknown;
