@@ -29,10 +29,10 @@
       "estimatedSize": "4-5 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/background-removal-amd64-gpu-r2.tar.gz",
-          "sha256": "61a7036d3c78a410b2237bd158b8f9d6ac51c38a623f3506243b608e62f92d33",
-          "compressedSize": 4826542966,
-          "extractedSize": 7177444273
+          "file": "v2.0.0/background-removal-amd64-gpu-r3.tar.gz",
+          "sha256": "18cbe7881abc0aec019824dcf6dacfc47608bc8bf55af3ca48c840735c77a714",
+          "compressedSize": 4833204151,
+          "extractedSize": 7197559452
         },
         "arm64-cpu": {
           "file": "v2.0.0/background-removal-arm64-cpu-r2.tar.gz",
