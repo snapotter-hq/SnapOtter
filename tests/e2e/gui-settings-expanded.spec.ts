@@ -1196,7 +1196,7 @@ base.describe("RBAC API - Editor expanded endpoint checks", () => {
     await deleteUser(adminToken, EDITOR_EXP);
   });
 
-  base.test("editor gets 403 on DELETE user endpoint", async ({ page }) => {
+  base("editor gets 403 on DELETE user endpoint", async ({ page }) => {
     await login(page, EDITOR_EXP, EDITOR_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1210,7 +1210,7 @@ base.describe("RBAC API - Editor expanded endpoint checks", () => {
     expect(res.status).toBe(403);
   });
 
-  base.test("editor gets 403 on PUT settings endpoint", async ({ page }) => {
+  base("editor gets 403 on PUT settings endpoint", async ({ page }) => {
     await login(page, EDITOR_EXP, EDITOR_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1227,7 +1227,7 @@ base.describe("RBAC API - Editor expanded endpoint checks", () => {
     expect(res.status).toBe(403);
   });
 
-  base.test("editor gets 403 on POST roles endpoint", async ({ page }) => {
+  base("editor gets 403 on POST roles endpoint", async ({ page }) => {
     await login(page, EDITOR_EXP, EDITOR_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1244,7 +1244,7 @@ base.describe("RBAC API - Editor expanded endpoint checks", () => {
     expect(res.status).toBe(403);
   });
 
-  base.test("editor can access own session endpoint", async ({ page }) => {
+  base("editor can access own session endpoint", async ({ page }) => {
     await login(page, EDITOR_EXP, EDITOR_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1275,7 +1275,7 @@ base.describe("RBAC API - User expanded endpoint checks", () => {
     await deleteUser(adminToken, USER_EXP);
   });
 
-  base.test("user gets 403 on DELETE user endpoint", async ({ page }) => {
+  base("user gets 403 on DELETE user endpoint", async ({ page }) => {
     await login(page, USER_EXP, USER_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1288,7 +1288,7 @@ base.describe("RBAC API - User expanded endpoint checks", () => {
     expect(res.status).toBe(403);
   });
 
-  base.test("user gets 403 on POST teams endpoint", async ({ page }) => {
+  base("user gets 403 on POST teams endpoint", async ({ page }) => {
     await login(page, USER_EXP, USER_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1305,7 +1305,7 @@ base.describe("RBAC API - User expanded endpoint checks", () => {
     expect(res.status).toBe(403);
   });
 
-  base.test("user gets 403 on POST roles endpoint", async ({ page }) => {
+  base("user gets 403 on POST roles endpoint", async ({ page }) => {
     await login(page, USER_EXP, USER_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1322,7 +1322,7 @@ base.describe("RBAC API - User expanded endpoint checks", () => {
     expect(res.status).toBe(403);
   });
 
-  base.test("user gets 403 on PUT settings endpoint", async ({ page }) => {
+  base("user gets 403 on PUT settings endpoint", async ({ page }) => {
     await login(page, USER_EXP, USER_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1339,7 +1339,7 @@ base.describe("RBAC API - User expanded endpoint checks", () => {
     expect(res.status).toBe(403);
   });
 
-  base.test("user can change own password via API", async ({ page }) => {
+  base("user can change own password via API", async ({ page }) => {
     await login(page, USER_EXP, USER_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1360,7 +1360,7 @@ base.describe("RBAC API - User expanded endpoint checks", () => {
     expect(res.status).toBe(200);
   });
 
-  base.test("user can generate own API key", async ({ page }) => {
+  base("user can generate own API key", async ({ page }) => {
     await login(page, USER_EXP, USER_EXP_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -1401,7 +1401,7 @@ base.describe("RBAC GUI - Admin admin-only tab deep access", () => {
   // path leaves the block signed out, so every case here drove the login page.
   base.use({ storageState: authFile });
 
-  base.test("admin can open Roles tab and see Create Custom Role button", async ({ page }) => {
+  base("admin can open Roles tab and see Create Custom Role button", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /^roles$/i }).click();
@@ -1410,7 +1410,7 @@ base.describe("RBAC GUI - Admin admin-only tab deep access", () => {
     await expect(page.getByRole("button", { name: /create custom role/i })).toBeVisible();
   });
 
-  base.test("admin can open Audit Log and filter by specific action", async ({ page }) => {
+  base("admin can open Audit Log and filter by specific action", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /audit log/i }).click();
@@ -1424,7 +1424,7 @@ base.describe("RBAC GUI - Admin admin-only tab deep access", () => {
     await page.waitForTimeout(1_000);
   });
 
-  base.test("admin can save system settings without error", async ({ page }) => {
+  base("admin can save system settings without error", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /system settings/i }).click();
@@ -1453,7 +1453,7 @@ base.describe("RBAC GUI - Editor tab content access", () => {
     await deleteUser(adminToken, EDITOR_GUI);
   });
 
-  base.test("editor can change password from Security tab", async ({ page }) => {
+  base("editor can change password from Security tab", async ({ page }) => {
     await login(page, EDITOR_GUI, EDITOR_GUI_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /security/i }).click();
@@ -1466,7 +1466,7 @@ base.describe("RBAC GUI - Editor tab content access", () => {
     await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
   });
 
-  base.test("editor can generate and delete API key from GUI", async ({ page }) => {
+  base("editor can generate and delete API key from GUI", async ({ page }) => {
     await login(page, EDITOR_GUI, EDITOR_GUI_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /api keys/i }).click();
@@ -1484,7 +1484,7 @@ base.describe("RBAC GUI - Editor tab content access", () => {
     await expect(page.getByText(keyName)).not.toBeVisible({ timeout: 5_000 });
   });
 
-  base.test("editor can view About tab with version info", async ({ page }) => {
+  base("editor can view About tab with version info", async ({ page }) => {
     await login(page, EDITOR_GUI, EDITOR_GUI_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /about/i }).click();
@@ -1509,7 +1509,7 @@ base.describe("RBAC GUI - User tab content access", () => {
     await deleteUser(adminToken, USER_GUI);
   });
 
-  base.test("user can save General tab preferences", async ({ page }) => {
+  base("user can save General tab preferences", async ({ page }) => {
     await login(page, USER_GUI, USER_GUI_PASS);
     await openSettings(page);
 
@@ -1518,7 +1518,7 @@ base.describe("RBAC GUI - User tab content access", () => {
     await expect(page.getByText("Settings saved.")).toBeVisible({ timeout: 5_000 });
   });
 
-  base.test("user can change own password from Security tab", async ({ page }) => {
+  base("user can change own password from Security tab", async ({ page }) => {
     await login(page, USER_GUI, USER_GUI_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /security/i }).click();
@@ -1531,7 +1531,7 @@ base.describe("RBAC GUI - User tab content access", () => {
     await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
   });
 
-  base.test("user cannot access the Tools tab (requires settings:write)", async ({ page }) => {
+  base("user cannot access the Tools tab (requires settings:write)", async ({ page }) => {
     await login(page, USER_GUI, USER_GUI_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
@@ -1541,7 +1541,7 @@ base.describe("RBAC GUI - User tab content access", () => {
     await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
   });
 
-  base.test("user can generate API key from GUI", async ({ page }) => {
+  base("user can generate API key from GUI", async ({ page }) => {
     await login(page, USER_GUI, USER_GUI_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /api keys/i }).click();

@@ -72,7 +72,7 @@ base.describe("People Management — API", () => {
 
   // ── GET /api/auth/users ───────────────────────────────────────────
 
-  base.test("GET /api/auth/users returns users with team and maxUsers", async () => {
+  base("GET /api/auth/users returns users with team and maxUsers", async () => {
     const res = await fetch(`${API}/api/auth/users`, {
       headers: authOnly(token),
     });
@@ -85,7 +85,7 @@ base.describe("People Management — API", () => {
 
   // ── POST /api/auth/register ───────────────────────────────────────
 
-  base.test("register a new user with team", async () => {
+  base("register a new user with team", async () => {
     const res = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -103,7 +103,7 @@ base.describe("People Management — API", () => {
     expect(data.team).toBe("Engineering");
   });
 
-  base.test("register defaults team to Default", async () => {
+  base("register defaults team to Default", async () => {
     const res = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -118,7 +118,7 @@ base.describe("People Management — API", () => {
     expect(data.team).toBe("Default");
   });
 
-  base.test("register allows unlimited users when MAX_USERS=0", async () => {
+  base("register allows unlimited users when MAX_USERS=0", async () => {
     for (let i = 1; i <= 3; i++) {
       const res = await fetch(`${API}/api/auth/register`, {
         method: "POST",
@@ -133,7 +133,7 @@ base.describe("People Management — API", () => {
     }
   });
 
-  base.test("register rejects duplicate username", async () => {
+  base("register rejects duplicate username", async () => {
     await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -148,7 +148,7 @@ base.describe("People Management — API", () => {
     expect(res.status).toBe(409);
   });
 
-  base.test("register rejects weak password", async () => {
+  base("register rejects weak password", async () => {
     const res = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -159,7 +159,7 @@ base.describe("People Management — API", () => {
 
   // ── PUT /api/auth/users/:id ───────────────────────────────────────
 
-  base.test("update user role and team", async () => {
+  base("update user role and team", async () => {
     const createRes = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -184,7 +184,7 @@ base.describe("People Management — API", () => {
     expect(updated.team).toBe("Design");
   });
 
-  base.test("cannot demote yourself", async () => {
+  base("cannot demote yourself", async () => {
     const sessionRes = await fetch(`${API}/api/auth/session`, {
       headers: authOnly(token),
     });
@@ -200,7 +200,7 @@ base.describe("People Management — API", () => {
     expect(data.code).toBe("SELF_DEMOTE");
   });
 
-  base.test("update nonexistent user returns 404", async () => {
+  base("update nonexistent user returns 404", async () => {
     const res = await fetch(`${API}/api/auth/users/nonexistent-id`, {
       method: "PUT",
       headers: authJson(token),
@@ -211,7 +211,7 @@ base.describe("People Management — API", () => {
 
   // ── POST /api/auth/users/:id/reset-password ──────────────────────
 
-  base.test("admin can reset another user password", async () => {
+  base("admin can reset another user password", async () => {
     const createRes = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -235,7 +235,7 @@ base.describe("People Management — API", () => {
     expect(loginRes.status).toBe(200);
   });
 
-  base.test("reset password rejects weak password", async () => {
+  base("reset password rejects weak password", async () => {
     const createRes = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -251,7 +251,7 @@ base.describe("People Management — API", () => {
     expect(res.status).toBe(400);
   });
 
-  base.test("reset password for nonexistent user returns 404", async () => {
+  base("reset password for nonexistent user returns 404", async () => {
     const res = await fetch(`${API}/api/auth/users/nonexistent-id/reset-password`, {
       method: "POST",
       headers: authJson(token),
@@ -262,7 +262,7 @@ base.describe("People Management — API", () => {
 
   // ── DELETE /api/auth/users/:id ────────────────────────────────────
 
-  base.test("delete a user", async () => {
+  base("delete a user", async () => {
     const createRes = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -284,7 +284,7 @@ base.describe("People Management — API", () => {
     expect(users.find((u: { id: string }) => u.id === id)).toBeUndefined();
   });
 
-  base.test("cannot delete yourself", async () => {
+  base("cannot delete yourself", async () => {
     const sessionRes = await fetch(`${API}/api/auth/session`, {
       headers: authOnly(token),
     });
@@ -299,7 +299,7 @@ base.describe("People Management — API", () => {
 
   // ── Non-admin access ──────────────────────────────────────────────
 
-  base.test("non-admin cannot access user management", async () => {
+  base("non-admin cannot access user management", async () => {
     await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),

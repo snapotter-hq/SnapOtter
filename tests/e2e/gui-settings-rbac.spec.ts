@@ -113,7 +113,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
   // path leaves the block signed out, so every case here drove the login page.
   base.use({ storageState: authFile });
 
-  base.test("admin sees all settings tabs including admin-only ones", async ({ page }) => {
+  base("admin sees all settings tabs including admin-only ones", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
 
@@ -134,7 +134,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     await expect(page.getByRole("button", { name: /ai features/i })).toBeVisible();
   });
 
-  base.test("admin can navigate to People tab and see user table", async ({ page }) => {
+  base("admin can navigate to People tab and see user table", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /people/i }).click();
@@ -143,7 +143,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     await expect(page.getByText("admin").first()).toBeVisible();
   });
 
-  base.test("admin can navigate to Audit Log tab and see entries", async ({ page }) => {
+  base("admin can navigate to Audit Log tab and see entries", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /audit log/i }).click();
@@ -155,7 +155,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     ).toBeVisible();
   });
 
-  base.test("admin sees all 12 nav items", async ({ page }) => {
+  base("admin sees all 12 nav items", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
 
@@ -165,7 +165,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     expect(count).toBe(12);
   });
 
-  base.test("admin can navigate to System Settings and see configuration", async ({ page }) => {
+  base("admin can navigate to System Settings and see configuration", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /system settings/i }).click();
@@ -175,7 +175,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     await expect(page.getByText("Default Theme")).toBeVisible();
   });
 
-  base.test("admin can navigate to Teams tab and see team list", async ({ page }) => {
+  base("admin can navigate to Teams tab and see team list", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /teams/i }).click();
@@ -184,7 +184,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     await expect(page.getByText("Default").first()).toBeVisible();
   });
 
-  base.test("admin can navigate to Roles tab and see built-in roles", async ({ page }) => {
+  base("admin can navigate to Roles tab and see built-in roles", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /^roles$/i }).click();
@@ -193,7 +193,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     await expect(page.getByText("Built-in").first()).toBeVisible();
   });
 
-  base.test("admin can navigate to AI Features tab", async ({ page }) => {
+  base("admin can navigate to AI Features tab", async ({ page }) => {
     await page.goto("/");
     await openSettings(page);
     await page.getByRole("button", { name: /ai features/i }).click();
@@ -201,7 +201,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     await expect(page.locator("h3").filter({ hasText: "AI Features" })).toBeVisible();
   });
 
-  base.test("admin has full API access to admin endpoints", async ({ page }) => {
+  base("admin has full API access to admin endpoints", async ({ page }) => {
     await page.goto("/");
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -240,7 +240,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await deleteUser(adminToken, EDITOR_USER);
   });
 
-  base.test("editor sees general, security, api-keys, about", async ({ page }) => {
+  base("editor sees general, security, api-keys, about", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
 
@@ -251,7 +251,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
   });
 
-  base.test(
+  base(
     "editor does NOT see system settings, people, teams, roles, audit log, usage, ai features, tools",
     async ({ page }) => {
       await login(page, EDITOR_USER, EDITOR_PASS);
@@ -273,7 +273,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     },
   );
 
-  base.test("editor sees exactly 4 nav items", async ({ page }) => {
+  base("editor sees exactly 4 nav items", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
@@ -283,7 +283,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     expect(count).toBe(4);
   });
 
-  base.test("editor can access Security tab and see change password form", async ({ page }) => {
+  base("editor can access Security tab and see change password form", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /security/i }).click();
@@ -292,7 +292,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await expect(page.getByPlaceholder("Current Password")).toBeVisible();
   });
 
-  base.test("editor can access API Keys tab and generate a key", async ({ page }) => {
+  base("editor can access API Keys tab and generate a key", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /api keys/i }).click();
@@ -300,7 +300,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await expect(page.getByRole("button", { name: /generate api key/i })).toBeVisible();
   });
 
-  base.test("editor cannot access the Tools tab (requires settings:write)", async ({ page }) => {
+  base("editor cannot access the Tools tab (requires settings:write)", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
@@ -309,7 +309,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
   });
 
-  base.test("editor General tab shows correct username and role", async ({ page }) => {
+  base("editor General tab shows correct username and role", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
 
@@ -318,7 +318,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await expect(page.getByText("editor").first()).toBeVisible();
   });
 
-  base.test("editor gets 403 on admin API endpoints", async ({ page }) => {
+  base("editor gets 403 on admin API endpoints", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -362,7 +362,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await deleteUser(adminToken, USER_USER);
   });
 
-  base.test("user sees general, security, api-keys, about", async ({ page }) => {
+  base("user sees general, security, api-keys, about", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
 
@@ -372,7 +372,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
   });
 
-  base.test(
+  base(
     "user does NOT see system settings, people, teams, roles, audit log, usage, ai features, tools",
     async ({ page }) => {
       await login(page, USER_USER, USER_PASS);
@@ -392,7 +392,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     },
   );
 
-  base.test("user sees exactly 4 nav items", async ({ page }) => {
+  base("user sees exactly 4 nav items", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
@@ -402,7 +402,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     expect(count).toBe(4);
   });
 
-  base.test("user can access About tab and see version", async ({ page }) => {
+  base("user can access About tab and see version", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /about/i }).click();
@@ -411,7 +411,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByText("Version:")).toBeVisible();
   });
 
-  base.test("user General tab shows correct username and role", async ({ page }) => {
+  base("user General tab shows correct username and role", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
 
@@ -420,7 +420,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByText("user").first()).toBeVisible();
   });
 
-  base.test("user cannot access the Tools tab (requires settings:write)", async ({ page }) => {
+  base("user cannot access the Tools tab (requires settings:write)", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
@@ -429,7 +429,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
   });
 
-  base.test("user can access Security tab and change password form", async ({ page }) => {
+  base("user can access Security tab and change password form", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /security/i }).click();
@@ -438,7 +438,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByPlaceholder("Current Password")).toBeVisible();
   });
 
-  base.test("user gets 403 on admin and editor API endpoints", async ({ page }) => {
+  base("user gets 403 on admin and editor API endpoints", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -475,7 +475,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     expect(teamsRes.status).toBe(403);
   });
 
-  base.test("user can still navigate to a tool page and use it", async ({ page }) => {
+  base("user can still navigate to a tool page and use it", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
 
     // Navigate to the resize tool page -- user role should have tools:use permission
@@ -493,7 +493,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     expect(dropzoneVisible || headingVisible).toBe(true);
   });
 
-  base.test("user can upload an image to a tool page", async ({ page }) => {
+  base("user can upload an image to a tool page", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
 
     // Navigate to the resize tool
@@ -532,7 +532,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     }
   });
 
-  base.test("user can access API Keys tab", async ({ page }) => {
+  base("user can access API Keys tab", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /api keys/i }).click();
@@ -541,7 +541,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByRole("button", { name: /generate api key/i })).toBeVisible();
   });
 
-  base.test("user gets 403 on roles endpoint", async ({ page }) => {
+  base("user gets 403 on roles endpoint", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -555,7 +555,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     expect(rolesRes.status).toBe(403);
   });
 
-  base.test("user cannot register new users via API", async ({ page }) => {
+  base("user cannot register new users via API", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -597,7 +597,7 @@ base.describe("RBAC API Endpoints - Editor (extended)", () => {
     await deleteUser(adminToken, EDITOR_EXT);
   });
 
-  base.test("editor gets 403 on teams endpoint", async ({ page }) => {
+  base("editor gets 403 on teams endpoint", async ({ page }) => {
     await login(page, EDITOR_EXT, EDITOR_EXT_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -611,7 +611,7 @@ base.describe("RBAC API Endpoints - Editor (extended)", () => {
     expect(teamsRes.status).toBe(403);
   });
 
-  base.test("editor gets 403 on roles endpoint", async ({ page }) => {
+  base("editor gets 403 on roles endpoint", async ({ page }) => {
     await login(page, EDITOR_EXT, EDITOR_EXT_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -625,7 +625,7 @@ base.describe("RBAC API Endpoints - Editor (extended)", () => {
     expect(rolesRes.status).toBe(403);
   });
 
-  base.test("editor cannot register new users via API", async ({ page }) => {
+  base("editor cannot register new users via API", async ({ page }) => {
     await login(page, EDITOR_EXT, EDITOR_EXT_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -647,7 +647,7 @@ base.describe("RBAC API Endpoints - Editor (extended)", () => {
     expect(registerRes.status).toBe(403);
   });
 
-  base.test("editor can read own settings via API", async ({ page }) => {
+  base("editor can read own settings via API", async ({ page }) => {
     await login(page, EDITOR_EXT, EDITOR_EXT_PASS);
 
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
@@ -664,7 +664,7 @@ base.describe("RBAC API Endpoints - Editor (extended)", () => {
     expect(session.user.role).toBe("editor");
   });
 
-  base.test("editor About tab shows correct role", async ({ page }) => {
+  base("editor About tab shows correct role", async ({ page }) => {
     await login(page, EDITOR_EXT, EDITOR_EXT_PASS);
     await openSettings(page);
     await page.getByRole("button", { name: /about/i }).click();
@@ -692,33 +692,30 @@ base.describe("RBAC -- Editor and User see identical tabs (intentional)", () => 
     await deleteUser(adminToken, RBAC_USER);
   });
 
-  base.test(
-    "editor and user see the same 4 tabs (correct behavior, not a bug)",
-    async ({ page }) => {
-      // Verify editor tab count
-      await login(page, RBAC_EDITOR, RBAC_EDITOR_PASS);
-      await openSettings(page);
-      await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
-      const editorNavButtons = page.locator(".w-48 button");
-      const editorCount = await editorNavButtons.count();
+  base("editor and user see the same 4 tabs (correct behavior, not a bug)", async ({ page }) => {
+    // Verify editor tab count
+    await login(page, RBAC_EDITOR, RBAC_EDITOR_PASS);
+    await openSettings(page);
+    await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
+    const editorNavButtons = page.locator(".w-48 button");
+    const editorCount = await editorNavButtons.count();
 
-      // Close and switch to user
-      await page.keyboard.press("Escape");
-      await page.goto("/login");
-      await login(page, RBAC_USER, RBAC_USER_PASS);
-      await openSettings(page);
-      await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
-      const userNavButtons = page.locator(".w-48 button");
-      const userCount = await userNavButtons.count();
+    // Close and switch to user
+    await page.keyboard.press("Escape");
+    await page.goto("/login");
+    await login(page, RBAC_USER, RBAC_USER_PASS);
+    await openSettings(page);
+    await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
+    const userNavButtons = page.locator(".w-48 button");
+    const userCount = await userNavButtons.count();
 
-      // Both should see exactly 4 tabs
-      expect(editorCount).toBe(4);
-      expect(userCount).toBe(4);
-      expect(editorCount).toBe(userCount);
-    },
-  );
+    // Both should see exactly 4 tabs
+    expect(editorCount).toBe(4);
+    expect(userCount).toBe(4);
+    expect(editorCount).toBe(userCount);
+  });
 
-  base.test("editor and user both see the same set of tab labels", async ({ page }) => {
+  base("editor and user both see the same set of tab labels", async ({ page }) => {
     const expectedTabs = ["General", "Security", "API Keys", "About"];
 
     // Check editor

@@ -62,7 +62,13 @@ test.describe("Axe a11y audit -- desktop EN", () => {
     loggedInPage: page,
     browser,
   }) => {
-    const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
+    const allViolations: {
+      key: string;
+      impact: string;
+      description: string;
+      count: number;
+      targets: string[];
+    }[] = [];
 
     for (const p of DESKTOP_A11Y_PAGES.en) {
       if (p.needsAuth) {
@@ -108,7 +114,13 @@ test.describe("Axe a11y audit -- desktop EN", () => {
 test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
   test.setTimeout(60_000);
   test("has no accessibility violations on RTL pages", async ({ loggedInPage: page, browser }) => {
-    const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
+    const allViolations: {
+      key: string;
+      impact: string;
+      description: string;
+      count: number;
+      targets: string[];
+    }[] = [];
 
     for (const p of DESKTOP_A11Y_PAGES.ar) {
       if (p.needsAuth) {
