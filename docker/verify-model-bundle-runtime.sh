@@ -17,7 +17,7 @@ set -euo pipefail
 #
 # Usage: verify-model-bundle-runtime.sh <bundleId> <arch>
 #   bundleId : background-removal, face-detection, object-eraser-colorize,
-#              upscale-enhance, photo-restoration, transcription
+#              upscale-enhance, photo-restoration, transcription, inpaint-hq
 #   arch     : amd64-gpu | arm64-cpu
 #
 # Expects (read-only mounts):
@@ -231,13 +231,61 @@ PY
   pass "transcribe returned non-empty segments"
 }
 
+oracle_inpaint_hq() {
+  # Fixture: smooth blue gradient with a saturated red square; the mask covers the
+  # square. A working bundle returns the same dimensions, replaces the red inside
+  # the mask, and leaves pixels far outside the crop window byte-identical.
+  # Steps are capped (the 28 default is far slower on CPU); the oracle checks the
+  # pipeline runs and fills, not output quality.
+  local in="/tmp/vmbr-inpaint-in.png" mask="/tmp/vmbr-inpaint-mask.png" out="/tmp/vmbr-inpaint-out.png"
+  run_python - "$in" "$mask" <<'PY'
+import sys
+from PIL import Image, ImageDraw
+W, H = 384, 288
+img = Image.new("RGB", (W, H))
+px = img.load()
+for y in range(H):
+    for x in range(W):
+        px[x, y] = (30 + x // 8, 60 + y // 8, 150 + x // 16)
+ImageDraw.Draw(img).rectangle([160, 112, 223, 175], fill=(220, 20, 30))
+img.save(sys.argv[1])
+mask = Image.new("L", (W, H), 0)
+ImageDraw.Draw(mask).rectangle([160, 112, 223, 175], fill=255)
+mask.save(sys.argv[2])
+PY
+  SD15_INPAINT_STEPS="${VMBR_INPAINT_STEPS:-12}" run_tool "${AI_SCRIPTS}/inpaint_hq.py" "$in" "$mask" "$out" 2>/dev/null \
+    || fail "inpaint_hq crashed (diffusers/torch/model regression?)" 3
+  run_python - "$in" "$out" <<'PY' || fail "inpaint_hq oracle: mask not filled or image altered" 3
+import sys
+import numpy as np
+from PIL import Image
+i = np.array(Image.open(sys.argv[1]).convert("RGB")).astype(int)
+o = np.array(Image.open(sys.argv[2]).convert("RGB")).astype(int)
+if o.shape != i.shape:
+    sys.exit(f"dimensions changed: {i.shape} -> {o.shape}")
+# Interior of the masked square, away from the feathered edge.
+a, b = i[120:168, 168:216], o[120:168, 168:216]
+diff = np.abs(a - b).mean()
+red_in, red_out = (a[..., 0] - a[..., 2]).mean(), (b[..., 0] - b[..., 2]).mean()
+if diff < 40 or red_out > red_in - 100:
+    sys.exit(f"mask not filled: mean abs diff={diff:.1f} red-blue {red_in:.0f} -> {red_out:.0f}")
+# Border strips lie outside the crop window, so compositing must not touch them.
+for name, s in (("top", np.s_[:24, :]), ("bottom", np.s_[-24:, :]), ("left", np.s_[:, :24]), ("right", np.s_[:, -24:])):
+    if not np.array_equal(i[s], o[s]):
+        sys.exit(f"{name} border outside the mask was altered")
+print(f"  inpaint_hq: {o.shape[1]}x{o.shape[0]}, masked-area diff={diff:.1f}, red-blue {red_in:.0f} -> {red_out:.0f}, border untouched")
+PY
+  pass "inpaint_hq filled the masked region and left the rest untouched"
+}
+
 case "${BUNDLE_ID}" in
-  background-removal)      oracle_background_removal ;;
+  background-removal)     oracle_background_removal ;;
   face-detection)         oracle_face_detection ;;
   object-eraser-colorize) oracle_object_eraser_colorize ;;
   upscale-enhance)        oracle_upscale_enhance ;;
   photo-restoration)      oracle_photo_restoration ;;
   transcription)          oracle_transcription ;;
+  inpaint-hq)             oracle_inpaint_hq ;;
   ocr)                    fail "OCR uses the signed v3 runtime pipeline (verify-ocr-runtime.sh), not this gate" 1 ;;
   *)                      fail "Unknown model bundle: ${BUNDLE_ID}" 1 ;;
 esac
