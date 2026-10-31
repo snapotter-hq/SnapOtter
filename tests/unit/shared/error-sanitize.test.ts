@@ -2,6 +2,7 @@ import {
   connectivityClass,
   extractErrorCode,
   isClientAbort,
+  isEnvironmentalDbError,
   rebuildErrorValue,
   SafeError,
 } from "@snapotter/shared";
@@ -535,6 +536,31 @@ describe("connectivityClass", () => {
     expect(
       connectivityClass(Object.assign(new Error("ERR unknown command"), { name: "ReplyError" })),
     ).toBeNull();
+  });
+});
+
+describe("isEnvironmentalDbError", () => {
+  // The code lives on the inner pg error; chain() walks `cause`, so the shape a
+  // drizzle caller actually sees is the wrapped one.
+  const pgCause = (code: string) =>
+    Object.assign(new Error(`pg ${code}`), { code, severity: "ERROR", routine: "mdopenfork" });
+
+  it("treats a damaged data directory (class 58) as environmental (#4202)", () => {
+    for (const code of ["58P01", "58P02", "58030"]) {
+      const err = Object.assign(new Error("Failed query: select * from jobs"), {
+        name: "DrizzleQueryError",
+        cause: pgCause(code),
+      });
+      expect(isEnvironmentalDbError(err)).toBe(true);
+    }
+  });
+
+  it("keeps an ordinary query error (class 42) a bug", () => {
+    const err = Object.assign(new Error("Failed query: select"), {
+      name: "DrizzleQueryError",
+      cause: pgCause("42601"),
+    });
+    expect(isEnvironmentalDbError(err)).toBe(false);
   });
 });
 

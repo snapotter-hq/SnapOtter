@@ -341,13 +341,16 @@ export function connectivityClass(err: unknown): ConnectivityClass | null {
   }
 }
 
-// pg SQLSTATE classes that mean the deployment's database is misconfigured or
-// resource-starved (the operator's environment), not that our code is wrong:
-// class 28 (invalid authorization), 53 (insufficient resources), 57 (operator
-// intervention). 42501 is insufficient_privilege, the one access code in class
-// 42 (otherwise our query bugs). Connection loss (class 08 / 57P0x) is already
-// covered by connectivityClass; overlap here is harmless.
-const ENVIRONMENTAL_PG_CLASS = /^(28|53|57)/;
+// pg SQLSTATE classes that mean the deployment's database is misconfigured,
+// resource-starved or damaged (the operator's environment), not that our code
+// is wrong: class 28 (invalid authorization), 53 (insufficient resources), 57
+// (operator intervention), 58 (system error: 58P01 undefined_file, 58P02
+// duplicate_file, 58030 io_error - Postgres cannot open a relation file, so the
+// data directory is damaged or unreadable, #4202). 42501 is
+// insufficient_privilege, the one access code in class 42 (otherwise our query
+// bugs). Connection loss (class 08 / 57P0x) is already covered by
+// connectivityClass; overlap here is harmless.
+const ENVIRONMENTAL_PG_CLASS = /^(28|53|57|58)/;
 
 /**
  * True when the error chain carries a pg SQLSTATE indicating an environmental

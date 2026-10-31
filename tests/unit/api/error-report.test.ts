@@ -64,6 +64,20 @@ describe("classifyError", () => {
       ),
     ).toBe("operational");
   });
+  it("operational: a pg system error means a damaged data directory (#4202)", () => {
+    // 58P01 undefined_file: Postgres cannot open a relation file, so the data
+    // directory is damaged or unreadable. That is the operator's environment,
+    // and it used to fall through to "bug" and report at error level.
+    const err = Object.assign(new Error("Failed query: select * from jobs"), {
+      name: "DrizzleQueryError",
+      cause: Object.assign(new Error("pg 58P01 mdopenfork"), {
+        code: "58P01",
+        severity: "ERROR",
+        routine: "mdopenfork",
+      }),
+    });
+    expect(classifyError(err, "cron")).toBe("operational");
+  });
   it("operational: a worker fetch with no route to the network (ENETUNREACH, #1992)", () => {
     const err = new TypeError("fetch failed", {
       cause: Object.assign(new Error("connect ENETUNREACH 10.0.0.1:443"), {
