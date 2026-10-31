@@ -94,6 +94,31 @@ def _nvidia_smi_gpu_name():
     return None
 
 
+def _cuda_driver_usable():
+    """True if the NVIDIA CUDA driver actually initializes on this host.
+
+    This is what torch and onnxruntime do internally to bind CUDA: map libcuda
+    (the driver library a container receives when launched with GPU access) and
+    call cuInit(0), which succeeds only when a real, usable driver is present.
+    Unlike nvidia-smi, it does not depend on the CLI binary being on PATH, so a
+    GPU exposed with only the `compute` capability (no `utility`, hence no
+    nvidia-smi) is still detected. On a CPU-only host libcuda is absent or
+    cuInit fails, so this returns False.
+    """
+    import ctypes
+
+    for soname in ("libcuda.so.1", "libcuda.so"):
+        try:
+            lib = ctypes.CDLL(soname)
+        except OSError:
+            continue
+        try:
+            return lib.cuInit(0) == 0  # 0 == CUDA_SUCCESS
+        except (AttributeError, OSError):
+            return False
+    return False
+
+
 def _override_disables_gpu():
     """True if SNAPOTTER_GPU is explicitly set to a falsy value (0/false/no)."""
     override = os.environ.get("SNAPOTTER_GPU")
@@ -118,8 +143,8 @@ def gpu_available():
     if torch_available:
         return True
 
-    # torch either isn't installed or can't use CUDA. Fall through to
-    # ONNX Runtime + nvidia-smi so ONNX-based tools can still use GPU.
+    # torch either isn't installed or can't use CUDA. Fall through to ONNX
+    # Runtime + the CUDA driver probe so ONNX-based tools can still use GPU.
     onnx_available = _try_onnx_cuda()
     if onnx_available:
         return True
@@ -283,20 +308,27 @@ def _try_torch_cuda():
 
 
 def _try_onnx_cuda():
-    """Check GPU via ONNX Runtime CUDAExecutionProvider + nvidia-smi."""
+    """Check GPU via ONNX Runtime's CUDA provider confirmed by a driver probe.
+
+    CUDAExecutionProvider being listed only means onnxruntime was built with
+    CUDA support, not that CUDA can bind here, so it is confirmed against the
+    driver (cuInit). nvidia-smi is now only a secondary signal for naming the
+    GPU in the log; it is no longer required, because a container exposed with
+    the `compute` capability alone has a usable driver but no nvidia-smi on PATH
+    (RVA-20260727-001).
+    """
     try:
         import onnxruntime as _ort
-        providers = _ort.get_available_providers()
-        if "CUDAExecutionProvider" not in providers:
+        if "CUDAExecutionProvider" not in _ort.get_available_providers():
             return False
-        gpu_name = _nvidia_smi_gpu_name()
-        if gpu_name:
-            print(f"[gpu] CUDA available via ONNX Runtime + nvidia-smi: {gpu_name}",
-                  file=sys.stderr, flush=True)
-            return True
-        return False
+        if not _cuda_driver_usable():
+            return False
     except Exception:
         return False
+    label = _nvidia_smi_gpu_name() or "CUDA driver present (nvidia-smi not on PATH)"
+    print(f"[gpu] CUDA available via ONNX Runtime: {label}",
+          file=sys.stderr, flush=True)
+    return True
 
 
 def torch_gpu_available():
