@@ -358,37 +358,32 @@ describe("Content-Aware Resize", () => {
     expect(result.error).toMatch(/invalid image/i);
   });
 
-  it(
-    "handles HEIC input (decodes before processing)",
-    { timeout: 120_000 },
-    async () => {
-      const { body, contentType } = createMultipartPayload([
-        { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
-        { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
-      ]);
+  it("handles HEIC input (decodes before processing)", { timeout: 120_000 }, async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
+    ]);
 
-      const res = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/content-aware-resize",
-        headers: {
-          authorization: `Bearer ${adminToken}`,
-          "content-type": contentType,
-        },
-        body,
-      });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
 
-      // HEIC decode or caire may not be available (503 ENGINE_UNAVAILABLE)
-      expect([200, 503]).toContain(res.statusCode);
+    // HEIC decode or caire may not be available (503 ENGINE_UNAVAILABLE)
+    expect([200, 503]).toContain(res.statusCode);
 
-      if (res.statusCode === 200) {
-        const resBody = JSON.parse(res.body);
-        expect(resBody.downloadUrl).toBeDefined();
-      } else {
-        expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
-      }
-    },
-    60_000,
-  );
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+    }
+  });
 
   it("processes both width and height simultaneously", async () => {
     const { body, contentType } = createMultipartPayload([

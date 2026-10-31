@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
+import type { LightMyRequestResponse } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { ANONYMOUS_USER_ID } from "../../../apps/api/src/lib/anonymous-user.js";
@@ -1852,7 +1853,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const concurrentName = uniqueName("scim-put-lock-concurrent");
       const user = await createScimUser({ userName: originalName });
 
-      const restoreRes = await raceRowLocks(
+      const restoreRes = await raceRowLocks<LightMyRequestResponse>(
         "users",
         1,
         () =>
@@ -1893,7 +1894,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       //    SELECT and before updateScimUser locks the row; PUT sending targetName
       //    sees the locked row already holds targetName and omits "username" from changes.
       const targetName = uniqueName("scim-put-lock-target");
-      const sameRes = await raceRowLocks(
+      const sameRes = await raceRowLocks<LightMyRequestResponse>(
         "users",
         1,
         () =>
@@ -2560,7 +2561,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     it("returns SCIM 404 and skips SCIM_USER_UPDATED when a user is deleted before PUT locks the user row (#3317)", async () => {
       const user = await createScimUser({ userName: uniqueName("scim-put-user-del-race") });
 
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "users",
         1,
         () =>
@@ -2598,7 +2599,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     it("returns SCIM 404 and skips SCIM_USER_UPDATED when a user is deleted before PATCH locks the user row (#3317)", async () => {
       const user = await createScimUser({ userName: uniqueName("scim-patch-user-del-race") });
 
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "users",
         1,
         () =>
@@ -2643,7 +2644,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     it("returns SCIM 404 and skips SCIM_USER_DEPROVISIONED when a user is deleted before DELETE locks the user row (#3317)", async () => {
       const user = await createScimUser({ userName: uniqueName("scim-del-user-del-race") });
 
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "users",
         1,
         () =>
@@ -2678,7 +2679,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const user = await createScimUser({ userName: uniqueName("scim-del-user-rename-old") });
       const renamedUsername = uniqueName("scim-del-user-rename-new");
 
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "users",
         1,
         () =>
@@ -3053,7 +3054,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     function expectRefused(
       res: { statusCode: number; body: string },
       detail: string,
-      scimType: "invalidValue" | "invalidSyntax" | "invalidPath" = "invalidValue",
+      scimType: "invalidValue" | "invalidSyntax" | "invalidPath" | "noTarget" = "invalidValue",
     ) {
       expect(res.statusCode, res.body).toBe(400);
       expect(JSON.parse(res.body)).toEqual({
@@ -4670,7 +4671,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
 
       try {
-        const res = await raceRowLocks(
+        const res = await raceRowLocks<LightMyRequestResponse>(
           "teams",
           1,
           () =>
@@ -4796,7 +4797,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         displayName: uniqueName("scim-put-del-race-grp"),
       });
 
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "teams",
         1,
         () =>
@@ -4839,7 +4840,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         displayName: uniqueName("scim-patch-del-race-grp"),
       });
 
-      const res = await raceRowLocks(
+      const res = await raceRowLocks<LightMyRequestResponse>(
         "teams",
         1,
         () =>
@@ -4896,7 +4897,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
       try {
         // 1. Renamed to Default by a concurrent transaction before the row lock is acquired
-        const res = await raceRowLocks(
+        const res = await raceRowLocks<LightMyRequestResponse>(
           "teams",
           1,
           () =>
@@ -4992,7 +4993,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
       try {
         // 1. Renamed to Default by a concurrent transaction before the row lock is acquired
-        const raceRes = await raceRowLocks(
+        const raceRes = await raceRowLocks<LightMyRequestResponse>(
           "teams",
           1,
           () =>

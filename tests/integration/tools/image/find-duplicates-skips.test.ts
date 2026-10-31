@@ -321,7 +321,7 @@ describe("find-duplicates skip paths (#1493)", () => {
       expect(lines[0][1]).toBe("find-duplicates: hash failed on a decodable image");
       expect(decoderMocks.reportError).toHaveBeenCalledTimes(1);
       // the reported error is the one that was logged
-      expect(decoderMocks.reportError.mock.calls[0][0]).toBe(lines[0][0].err);
+      expect(decoderMocks.reportError.mock.calls[0][0]).toBe((lines[0][0] as { err: unknown }).err);
       expect(decoderMocks.reportError.mock.calls[0][1]).toMatchObject({
         source: "http",
         toolId: "find-duplicates",
@@ -361,13 +361,13 @@ describe("find-duplicates skip paths (#1493)", () => {
     const errorSpy = vi.spyOn(logger, "error");
     try {
       const jpegSpy = vi.spyOn(sharp.prototype, "jpeg").mockImplementationOnce(function (
-        this: sharp.Sharp,
+        this: ReturnType<typeof sharp>,
       ) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as ReturnType<typeof sharp>;
       });
       try {
         const thumbRes = await post([
@@ -384,13 +384,13 @@ describe("find-duplicates skip paths (#1493)", () => {
       }
 
       const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-        this: sharp.Sharp,
+        this: ReturnType<typeof sharp>,
       ) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as ReturnType<typeof sharp>;
       });
       try {
         const hashRes = await post([

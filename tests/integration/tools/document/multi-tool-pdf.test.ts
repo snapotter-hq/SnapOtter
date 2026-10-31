@@ -38,7 +38,7 @@ interface TestFile {
 }
 
 async function runTool(files: TestFile[], items: PlanItem[]) {
-  const parts = files.map((f) => ({
+  const parts: Parameters<typeof createMultipartPayload>[0] = files.map((f) => ({
     name: "file",
     filename: f.name,
     contentType: "application/pdf",

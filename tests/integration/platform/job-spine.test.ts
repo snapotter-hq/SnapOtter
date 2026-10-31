@@ -274,7 +274,11 @@ describe("BullMQ connection teardown (#3284)", () => {
         .filter((line) => forkClientPrefixes.some((prefix) => line.includes(prefix))).length;
     };
 
-    const initSpy = vi.spyOn(RedisConnection.prototype, "init");
+    // init is private in bullmq's typings; the cast only exposes it to spyOn.
+    const initSpy = vi.spyOn(
+      RedisConnection.prototype as unknown as { init: () => Promise<unknown> },
+      "init",
+    );
     let cleanupResults: PromiseSettledResult<void>[] = [];
 
     try {
@@ -362,7 +366,11 @@ describe("BullMQ connection teardown (#3284)", () => {
   });
 
   it("closeWorkers() resolves when worker blocking connections are in reconnecting state (#3604)", async () => {
-    const initSpy = vi.spyOn(RedisConnection.prototype, "init");
+    // init is private in bullmq's typings; the cast only exposes it to spyOn.
+    const initSpy = vi.spyOn(
+      RedisConnection.prototype as unknown as { init: () => Promise<unknown> },
+      "init",
+    );
 
     try {
       await closeWorkers();

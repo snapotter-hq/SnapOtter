@@ -17,6 +17,7 @@
 import { randomUUID } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import type { LightMyRequestResponse } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // Canned sync-wait failures, keyed by pool: lets the route's catch branch
@@ -301,7 +302,7 @@ describe("route-stamped alias metadata (#808)", () => {
     const queue = getQueue("image");
     await queue.pause();
     enqueueMock.timeoutOnce = true;
-    let ssePromise: ReturnType<typeof app.inject> | undefined;
+    let ssePromise: Promise<LightMyRequestResponse> | undefined;
     try {
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },

@@ -543,24 +543,19 @@ describe("No-op effect", () => {
 
 // ── HEIF input ──────────────────────────────────────────────────
 describe("HEIF input", () => {
-  it(
-    "processes HEIF input (motorcycle.heif)",
-    { timeout: 120_000 },
-    async () => {
-      const HEIF = readFixture(fixtures.image.motorcycle);
-      const res = await postTool(
-        "adjust-colors",
-        { brightness: 20 },
-        HEIF,
-        "photo.heif",
-        "image/heif",
-      );
-      expect(res.statusCode).toBe(200);
-      const result = JSON.parse(res.body);
-      expect(result.downloadUrl).toBeDefined();
-    },
-    60_000,
-  );
+  it("processes HEIF input (motorcycle.heif)", { timeout: 120_000 }, async () => {
+    const HEIF = readFixture(fixtures.image.motorcycle);
+    const res = await postTool(
+      "adjust-colors",
+      { brightness: 20 },
+      HEIF,
+      "photo.heif",
+      "image/heif",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
 });
 
 // ── Animated GIF input ──────────────────────────────────────────

@@ -28,6 +28,14 @@
     "tests/e2e-docs/**/*",
     "tests/e2e-editor/**/*",
     "tests/e2e-landing/**/*",
-    "tests/e2e-noauth/**/*"
+    "tests/e2e-noauth/**/*",
+    "tests/integration/**/*"
+  ],
+  "exclude": [
+    "tests/integration/generated/catalog-integrity.test.ts",
+    "tests/integration/platform/s3-download-fault.test.ts",
+    "tests/integration/platform/s3-result-download-fault.test.ts",
+    "tests/integration/platform/s3-storage.test.ts",
+    "tests/integration/platform/tracing-lifecycle.test.ts"
   ]
 }
