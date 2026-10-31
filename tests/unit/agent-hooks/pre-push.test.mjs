@@ -1,24 +1,29 @@
 // Tests for .husky/pre-push, the guard that keeps local-only paths out of pushes.
-// Run with: node --test scripts/agent-hooks/pre-push.test.cjs
+import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const { describe, it, before, after } = require("node:test");
-const assert = require("node:assert/strict");
-const { execFileSync, spawnSync } = require("node:child_process");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-
-const PRE_PUSH = path.resolve(__dirname, "../../.husky/pre-push");
+const PRE_PUSH = path.resolve(import.meta.dirname, "../../../.husky/pre-push");
 
 let scratch;
-before(() => {
+let counter = 0;
+
+beforeAll(() => {
   scratch = fs.mkdtempSync(path.join(os.tmpdir(), "pre-push-test-"));
 });
-after(() => {
+afterAll(() => {
   fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-let counter = 0;
+function git(dir, args) {
+  return execFileSync("git", ["-C", dir, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
 function newRepo() {
   const dir = path.join(scratch, `repo-${counter++}`);
   fs.mkdirSync(dir);
@@ -28,11 +33,10 @@ function newRepo() {
   return dir;
 }
 
-function git(dir, args) {
-  return execFileSync("git", ["-C", dir, ...args], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+function newRemote() {
+  const remote = path.join(scratch, `remote-${counter++}.git`);
+  git(scratch, ["init", "-q", "--bare", remote]);
+  return remote;
 }
 
 // Writes each file, then commits them all in one commit.
@@ -53,26 +57,26 @@ function runPrePush(dir) {
 }
 
 describe("pre-push guard without an upstream", () => {
-  const blocked = {
-    "docs/plan.md": "internal plan\n",
-    "AGENTS.md": "local rules\n",
-    "CLAUDE.md": "local shim\n",
-    ".claude/settings.json": "{}\n",
-    ".env": "TOKEN=x\n",
-    "apps/web/.env.local": "TOKEN=x\n",
-    "branding/logo-512.png": "png\n",
-    "scripts/branding/sync-og.sh": "echo\n",
-    "scripts/generate-license.mjs": "export {};\n",
-    "remotion/index.ts": "export {};\n",
-  };
-  for (const [file] of Object.entries(blocked)) {
+  const blocked = [
+    "docs/plan.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".claude/settings.json",
+    ".env",
+    "apps/web/.env.local",
+    "branding/logo-512.png",
+    "scripts/branding/sync-og.sh",
+    "scripts/generate-license.mjs",
+    "remotion/index.ts",
+  ];
+  for (const file of blocked) {
     it(`blocks a push that adds ${file}`, () => {
       const repo = newRepo();
       commitFiles(repo, { [file]: "x\n" });
       const result = runPrePush(repo);
-      assert.equal(result.status, 1, result.stderr);
-      assert.match(result.stderr, /local-only paths detected/);
-      assert.match(result.stderr, new RegExp(file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      expect(result.status, result.stderr).toBe(1);
+      expect(result.stderr).toMatch(/local-only paths detected/);
+      expect(result.stderr).toContain(file);
     });
   }
 
@@ -89,7 +93,7 @@ describe("pre-push guard without an upstream", () => {
     it(`allows a push that adds ${file}`, () => {
       const repo = newRepo();
       commitFiles(repo, { [file]: "x\n" });
-      assert.equal(runPrePush(repo).status, 0);
+      expect(runPrePush(repo).status).toBe(0);
     });
   }
 });
@@ -97,58 +101,51 @@ describe("pre-push guard without an upstream", () => {
 describe("pre-push guard with an upstream", () => {
   it("allows deleting a path that was already public", () => {
     const repo = newRepo();
-    const remote = path.join(scratch, `remote-${counter++}.git`);
-    git(scratch, ["init", "-q", "--bare", remote]);
-    git(repo, ["remote", "add", "origin", remote]);
+    git(repo, ["remote", "add", "origin", newRemote()]);
     commitFiles(repo, { "branding/logo-64.png": "png\n" }, "add logo");
     git(repo, ["push", "-q", "-u", "origin", "HEAD"]);
 
     git(repo, ["rm", "-q", "branding/logo-64.png"]);
     git(repo, ["commit", "-q", "-m", "drop logo"]);
-    assert.equal(runPrePush(repo).status, 0);
+    expect(runPrePush(repo).status).toBe(0);
   });
 
   it("blocks a new local-only add on top of an upstream", () => {
     const repo = newRepo();
-    const remote = path.join(scratch, `remote-${counter++}.git`);
-    git(scratch, ["init", "-q", "--bare", remote]);
-    git(repo, ["remote", "add", "origin", remote]);
+    git(repo, ["remote", "add", "origin", newRemote()]);
     commitFiles(repo, { "README.md": "public\n" }, "public");
     git(repo, ["push", "-q", "-u", "origin", "HEAD"]);
 
     commitFiles(repo, { "docs/new-plan.md": "private\n" }, "add plan");
     const result = runPrePush(repo);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /docs\/new-plan\.md/);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("docs/new-plan.md");
   });
+});
 
-  // A new branch has no upstream yet, but its history is already on the remote.
-  // Old public files in that history must not block the push.
-  it("checks only unpushed commits when a new branch has no upstream", () => {
+describe("pre-push guard on a new branch with no upstream", () => {
+  // The history is already on the remote. Old public files in it must not block.
+  it("checks only unpushed commits", () => {
     const repo = newRepo();
-    const remote = path.join(scratch, `remote-${counter++}.git`);
-    git(scratch, ["init", "-q", "--bare", remote]);
-    git(repo, ["remote", "add", "origin", remote]);
+    git(repo, ["remote", "add", "origin", newRemote()]);
     commitFiles(repo, { "branding/dashboard.gif": "gif\n" }, "public history");
     git(repo, ["push", "-q", "origin", "HEAD:refs/heads/main"]);
 
     git(repo, ["checkout", "-q", "-b", "feature/clean"]);
     commitFiles(repo, { "src/app.ts": "export {};\n" }, "clean change");
-    assert.equal(runPrePush(repo).status, 0);
+    expect(runPrePush(repo).status).toBe(0);
   });
 
-  it("blocks a local-only add on a new branch with no upstream", () => {
+  it("blocks a local-only add on the new branch", () => {
     const repo = newRepo();
-    const remote = path.join(scratch, `remote-${counter++}.git`);
-    git(scratch, ["init", "-q", "--bare", remote]);
-    git(repo, ["remote", "add", "origin", remote]);
+    git(repo, ["remote", "add", "origin", newRemote()]);
     commitFiles(repo, { "README.md": "public\n" }, "public");
     git(repo, ["push", "-q", "origin", "HEAD:refs/heads/main"]);
 
     git(repo, ["checkout", "-q", "-b", "feature/leak"]);
     commitFiles(repo, { "docs/leak.md": "private\n" }, "leak");
     const result = runPrePush(repo);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /docs\/leak\.md/);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("docs/leak.md");
   });
 });
