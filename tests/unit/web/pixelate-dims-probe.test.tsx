@@ -50,6 +50,8 @@ function seedFile(
         processedPreviewUrl: null,
         processedFilename: null,
         processedSize: null,
+        resultNotes: null,
+        claimed: false,
         originalSize: file.size,
         originalWidth: overrides.originalWidth ?? null,
         originalHeight: overrides.originalHeight ?? null,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { en } from "@snapotter/shared";
+import { en, type SignPlacement } from "@snapotter/shared";
 import { de } from "@snapotter/shared/i18n/de.js";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,7 +22,7 @@ import { FaviconSettings } from "@/components/tools/favicon-settings";
 import { FindDuplicatesSettings } from "@/components/tools/find-duplicates-settings";
 import { ImageToPdfSettings } from "@/components/tools/image-to-pdf-settings";
 import { OcrSettings, ocrOneFile, resetOcrResult } from "@/components/tools/ocr-settings";
-import type { SignCanvasRef, SignPlacement } from "@/components/tools/sign-canvas";
+import type { SignCanvasRef } from "@/components/tools/sign-canvas";
 import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { getDistinctId } from "@/lib/analytics";

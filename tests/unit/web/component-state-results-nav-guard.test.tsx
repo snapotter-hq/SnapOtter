@@ -192,7 +192,8 @@ beforeEach(() => {
     bundles: Object.values(FEATURE_BUNDLES).map((b) => ({
       ...b,
       status: "installed" as const,
-      installedAt: "2026-01-01T00:00:00Z",
+      installedVersion: "1.0.0",
+      progress: null,
       error: null,
     })),
     loaded: true,

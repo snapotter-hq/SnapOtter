@@ -17,7 +17,6 @@ describe("pdf.js decodes through the JS fallback with useWasm off (#2082)", () =
     });
     WebAssembly.instantiate = instantiate as unknown as typeof WebAssembly.instantiate;
     try {
-      // @ts-expect-error legacy build ships no types; the main build needs a DOM worker
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
       expect(await decodeFirstImage(pdfjs, { wasmUrl: PDFJS_WASM_DIR, useWasm: false })).toEqual({

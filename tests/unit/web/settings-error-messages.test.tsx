@@ -102,7 +102,17 @@ beforeEach(() => {
     totpEnabled: false,
   });
   useAnalyticsStore.setState({
-    config: { enabled: true, posthogApiKey: "test", feedbackSink: true },
+    config: {
+      enabled: true,
+      posthogApiKey: "test",
+      posthogHost: "",
+      posthogProxyPath: "",
+      feedbackSink: true,
+      sentryDsn: "",
+      sentryDsnWeb: "",
+      posthogSampleRate: 1,
+      instanceId: "instance-1",
+    },
     configLoaded: true,
   });
   apiGet.mockImplementation(async (path: string) => {
