@@ -114,7 +114,7 @@ async function createOidcSession(
 async function _createHybridUser(
   passwordHash: string,
   opts: { username?: string; email?: string } = {},
-): { userId: string; username: string; sessionToken: string } {
+): Promise<{ userId: string; username: string; sessionToken: string }> {
   const userId = randomUUID();
   const username =
     opts.username || `hybrid_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -953,7 +953,7 @@ describe("OIDC callback edge cases", () => {
     const cookieMatch = cookieStr.match(/oidc-state=([^;]+)/);
     expect(cookieMatch).toBeTruthy();
     // The cookie value may be URL-encoded; decode for inject()
-    const cookieValue = decodeURIComponent(cookieMatch?.[1]);
+    const cookieValue = decodeURIComponent(cookieMatch?.[1] as string);
 
     const redirectUrl = new URL(loginRes.headers.location as string);
     const state = redirectUrl.searchParams.get("state");

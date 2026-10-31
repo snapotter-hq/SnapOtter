@@ -137,8 +137,8 @@ describe("Login failures", () => {
     const auditRow = rows.find((r) => (r.details as any)?.username === username);
 
     expect(auditRow).toBeDefined();
-    expect(auditRow.action).toBe("LOGIN_FAILED");
-    const details = auditRow.details as any;
+    expect(auditRow?.action).toBe("LOGIN_FAILED");
+    const details = auditRow?.details as any;
     expect(details?.reason).toBe("password_too_long");
   });
 

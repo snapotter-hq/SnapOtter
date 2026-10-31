@@ -485,31 +485,26 @@ describe("watermark-image", () => {
 
   // ── HEIF input ────────────────────────────────────────────────────
 
-  it(
-    "processes HEIF main image (motorcycle.heif)",
-    { timeout: 120_000 },
-    async () => {
-      const HEIF = readFixture(fixtures.image.motorcycle);
-      const { body, contentType } = createMultipartPayload([
-        { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
-        { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
-        { name: "settings", content: JSON.stringify({ scale: 10 }) },
-      ]);
+  it("processes HEIF main image (motorcycle.heif)", { timeout: 120_000 }, async () => {
+    const HEIF = readFixture(fixtures.image.motorcycle);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
+      { name: "settings", content: JSON.stringify({ scale: 10 }) },
+    ]);
 
-      const res = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/watermark-image",
-        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-        body,
-      });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
 
-      expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
-      expect(json.downloadUrl).toBeDefined();
-      expect(json.processedSize).toBeGreaterThan(0);
-    },
-    60_000,
-  );
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
 
   // ── Animated GIF input ──────────────────────────────────────────
 

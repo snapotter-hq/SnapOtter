@@ -225,7 +225,7 @@ describe("Bulk Rename", () => {
     const entry = zip.getEntry("renamed-1.png");
     expect(entry).not.toBeNull();
 
-    const content = entry?.getData();
+    const content = entry?.getData() as Buffer;
     expect(content.length).toBe(PNG.length);
     expect(content.equals(PNG)).toBe(true);
   });

@@ -8,6 +8,10 @@ import { db, schema } from "../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
+// The jobs.progress column is typed without the batch counters the worker
+// persists into the same jsonb value; the cast lets a seed row carry them.
+type JobProgress = NonNullable<typeof schema.jobs.$inferInsert.progress>;
+
 /**
  * #750 contracts, the batch counterpart of job-survives-disconnect (#722).
  * The client degrades a dead batch POST to the async path, which is only
@@ -161,7 +165,7 @@ describe("batch survival and progress replay across client disconnects (#750)", 
       id: jobId,
       type: "batch",
       status: "processing",
-      progress: { percent: 40, totalFiles: 5, completedFiles: 2, failedFiles: 0 },
+      progress: { percent: 40, totalFiles: 5, completedFiles: 2, failedFiles: 0 } as JobProgress,
       inputRefs: [],
     });
 
@@ -195,7 +199,7 @@ describe("batch survival and progress replay across client disconnects (#750)", 
           downloadUrl: `/api/v1/download/${jobId}/batch-resize-abc.zip`,
           fileResults: { "0": "a.png", "1": "b.png" },
         },
-      },
+      } as JobProgress,
       inputRefs: [],
     });
 

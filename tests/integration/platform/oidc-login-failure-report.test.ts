@@ -311,10 +311,11 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
     it("reports openid-client's discovery timeout with its own code", async () => {
       setIssuer("/t/invalid-grant");
       discoverySpy.mockRejectedValueOnce(
+        // The constructor reads `code` at runtime but its typings only declare ErrorOptions.
         new oidc.ClientError("operation timed out", {
           code: "OAUTH_TIMEOUT",
           cause: new DOMException("The operation timed out.", "TimeoutError"),
-        }),
+        } as ErrorOptions),
       );
       const res = await login();
 
@@ -367,10 +368,11 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
     it("reports and audits a timed-out callback discovery with its own code", async () => {
       setIssuer("/t/invalid-grant");
       discoverySpy.mockRejectedValueOnce(
+        // The constructor reads `code` at runtime but its typings only declare ErrorOptions.
         new oidc.ClientError("operation timed out", {
           code: "OAUTH_TIMEOUT",
           cause: new DOMException("The operation timed out.", "TimeoutError"),
-        }),
+        } as ErrorOptions),
       );
       const before = await failedLoginRows("discovery_timeout");
       const { res } = await callback();

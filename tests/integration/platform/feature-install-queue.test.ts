@@ -15,6 +15,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mocks (spawn + venv lock) ────────────────────────────
@@ -102,7 +103,7 @@ const hoisted = vi.hoisted(() => {
     archivePath: "/tmp/offline-archive.tar.gz",
   }));
   const assertOcrRuntimeInstallDiskSpaceMock = vi.fn(async () => {});
-  const runOcrRuntimeInstallerMock = vi.fn(async () => ({
+  const runOcrRuntimeInstallerMock = vi.fn(async (_options?: { timeoutMs?: number }) => ({
     family: "ocr",
     generation: "test-generation",
   }));
@@ -258,11 +259,7 @@ async function tick(): Promise<void> {
 }
 
 describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
-  let app: Awaited<ReturnType<typeof import("fastify")>>["default"] extends (
-    ...args: infer _A
-  ) => infer R
-    ? R
-    : never;
+  let app: FastifyInstance;
   let token: string;
 
   beforeAll(async () => {

@@ -83,7 +83,8 @@ preReadyHooks.push((app) => {
 });
 
 vi.mock("archiver", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("archiver")>();
+  // archiver is `export =` in its typings, but the ESM namespace vitest hands back carries it as `default`.
+  const actual = await importOriginal<{ default: typeof import("archiver") }>();
   const wrapped = (...args: Parameters<typeof actual.default>) => {
     const archive = actual.default(...args);
     if (faults.archiverMode === "pre-destroyed-reply") {

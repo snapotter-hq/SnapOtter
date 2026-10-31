@@ -104,7 +104,7 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
     it(`${toolId} never crashes on schema-valid settings`, {
       timeout: budget.targetTimeoutMs,
     }, async (context) => {
-      if (PYTHON_SIDECAR_TOOLS.includes(toolId) && !REQUIRE_AI_FEATURES) {
+      if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) && !REQUIRE_AI_FEATURES) {
         return context.skip(
           `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
         );
