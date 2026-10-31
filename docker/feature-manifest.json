@@ -29,20 +29,20 @@
       "estimatedSize": "4-5 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/background-removal-amd64-gpu-r2.tar.gz",
-          "sha256": "61a7036d3c78a410b2237bd158b8f9d6ac51c38a623f3506243b608e62f92d33",
-          "compressedSize": 4826542966,
-          "extractedSize": 7177444273
+          "file": "v2.0.0/background-removal-amd64-gpu-r3.tar.gz",
+          "sha256": "18cbe7881abc0aec019824dcf6dacfc47608bc8bf55af3ca48c840735c77a714",
+          "compressedSize": 4833204151,
+          "extractedSize": 7197559452
         },
         "arm64-cpu": {
-          "file": "v2.0.0/background-removal-arm64-cpu-r2.tar.gz",
-          "sha256": "eb453211098ca6a90b23bae987c3be6873cf7f0f7d67e1855d34f335a2add076",
-          "compressedSize": 4535687017,
-          "extractedSize": 6375426284
+          "file": "v2.0.0/background-removal-arm64-cpu-r3.tar.gz",
+          "sha256": "a31f5f8677dde1da34dfde992f177e9315548b6c5afa95a0a53620f61ea52a10",
+          "compressedSize": 4541593265,
+          "extractedSize": 6393738831
         }
       },
       "packages": {
-        "common": ["rembg==2.0.62"],
+        "common": ["rembg==2.0.69"],
         "amd64": ["onnxruntime-gpu==1.20.2", "mediapipe>=0.10.21"],
         "arm64": ["onnxruntime==1.20.1", "mediapipe>=0.10.18"]
       },
