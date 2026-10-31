@@ -9,6 +9,11 @@ on:
       release_commit:
         type: string
         required: true
+      verify_model_bundles:
+        description: Run every published model bundle against the unpublished release image
+        type: boolean
+        required: false
+        default: false
     secrets:
       GHCR_TOKEN:
         required: true
@@ -1390,6 +1395,123 @@ jobs:
               }
               process.stdout.write(`PASS: image-baked trust verified ${target} for ${version}\n`);
             '
+
+  verify-model-bundles:
+    name: Verify model bundles (${{ matrix.arch }})
+    # Opt-in: release.yml does not pass verify_model_bundles yet, and publish does
+    # not depend on this job, so it cannot affect a release until the owner wires it.
+    needs: [validate-inputs, build-ocr]
+    if: inputs.verify_model_bundles
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64-gpu
+            image_platform: linux-amd64
+            runner: ubuntu-latest
+          - arch: arm64-cpu
+            image_platform: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo docker system prune -af
+          df -h /
+
+      - name: Checkout release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Download unpublished image digest
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: digests-${{ matrix.image_platform }}
+          path: /tmp/image-digest
+
+      - name: Resolve exact release image
+        env:
+          IMAGE_PLATFORM: ${{ matrix.image_platform }}
+        run: |
+          mapfile -t digest_files < <(find /tmp/image-digest -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one ${IMAGE_PLATFORM} image digest"
+            exit 1
+          }
+          digest="$(basename "${digest_files[0]}")"
+          [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid image digest artifact"
+            exit 1
+          }
+          echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      # Install every published model bundle into the exact unpublished release
+      # image and run its tool against a fixture, asserting the real output oracle
+      # (not a hardcoded import list). One bundle at a time so a runner's disk holds
+      # only a single multi-GB archive. Offline (`--network none`) so a bundle can
+      # never mask a missing dependency with a runtime download. The OCR bundle is
+      # excluded -- it has its own signed v3 runtime pipeline above.
+      - name: Run each published model bundle against the release image
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          manifest=docker/feature-manifest.json
+          bundle_repo="$(jq -r '.bundleRepo // "deepsafe/feature-bundles"' "$manifest")"
+          # Explicit list: the verifier has an oracle per bundle. inpaint-hq has none yet.
+          bundles=(background-removal face-detection object-eraser-colorize upscale-enhance photo-restoration transcription)
+          for bundle in "${bundles[@]}"; do
+            jq -e --arg b "$bundle" '.bundles[$b]' "$manifest" >/dev/null || { echo "::error::${bundle} missing from manifest"; exit 1; }
+          done
+          mkdir -p /tmp/mb
+          for bundle in "${bundles[@]}"; do
+            echo "::group::verify ${bundle} (${ARCH})"
+            file="$(jq -r --arg b "$bundle" --arg a "$ARCH" '.bundles[$b].archives[$a].file' "$manifest")"
+            sha="$(jq -r --arg b "$bundle" --arg a "$ARCH" '.bundles[$b].archives[$a].sha256' "$manifest")"
+            [[ "$file" != "null" && "$sha" =~ ^[a-f0-9]{64}$ ]] || { echo "::error::missing ${ARCH} archive for ${bundle}"; exit 1; }
+            tar="/tmp/mb/${bundle}-${ARCH}.tar.gz"
+            curl --fail --location --show-error --silent --proto '=https' --tlsv1.2 --retry 3 \
+              -o "$tar" "https://huggingface.co/${bundle_repo}/resolve/main/${file}"
+            echo "${sha}  ${tar}" | sha256sum --check --strict -
+            printf '%s\n' "$sha" > "${tar}.sha256"
+            docker run --rm --network none --entrypoint bash \
+              -v "$PWD/docker/verify-model-bundle-runtime.sh:/verify-model-bundle-runtime.sh:ro" \
+              -v "/tmp/mb:/bundles:ro" \
+              -v "$PWD/tests/fixtures:/fixtures:ro" \
+              "${SNAPOTTER_BUNDLE_IMAGE}" \
+              /verify-model-bundle-runtime.sh "${bundle}" "${ARCH}"
+            rm -f "$tar" "${tar}.sha256"
+            echo "::endgroup::"
+          done
+          echo "All ${#bundles[@]} model bundles ran correctly against the release image for ${ARCH}"
 
   audit-hf-release-lock:
     name: Audit hf CLI release lock
