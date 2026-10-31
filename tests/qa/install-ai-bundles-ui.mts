@@ -1,6 +1,6 @@
 // Drives the REAL in-app AI bundle install flow (Settings > AI Features > Install
 // All) against a running Docker container, exactly as a user would click through
-// it. This is the primary AI-install path per docs/prompts/engineering/QA_PROMPT.md
+// it. This is the primary AI-install path per the engineering QA prompt
 // Phase 2: the curl-based /api/v1/admin/features/<bundle>/install route is a
 // verification/fallback path only, never the primary install.
 //
