@@ -1236,9 +1236,10 @@ describe("OCR v3 bundle release workflow", () => {
     );
     expect(bundles).toContain("release_commit:");
     expect(bundles).toContain("required: true");
-    // Build, both verifies, sign, publish, the hf lock audit (#1838), and the
-    // OCR lock audit (#1950).
-    expect(bundles.match(/ref: \$\{\{ inputs\.release_commit \}\}/g)).toHaveLength(7);
+    // Build, both verifies, sign, publish, the hf lock audit (#1838), the
+    // OCR lock audit (#1950), and the opt-in model-bundle verifier, which
+    // checks out the same release commit to run the verifier script.
+    expect(bundles.match(/ref: \$\{\{ inputs\.release_commit \}\}/g)).toHaveLength(8);
     expect(bundles).toContain('git rev-parse "refs/tags/v${VERSION}^{commit}"');
     expect(bundles).toContain('[[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}"');
     expect(bundles).toContain('"${tag_commit}" == "${RELEASE_COMMIT}"');
