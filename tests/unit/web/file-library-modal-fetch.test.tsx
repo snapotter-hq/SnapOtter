@@ -64,7 +64,7 @@ describe("FileLibraryModal list fetch (#1933)", () => {
     const cause = new Error("API down");
     apiListFiles.mockRejectedValueOnce(cause);
 
-    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(en.files.loadFailed);
     expect(screen.queryByText(en.files.noFilesFound)).not.toBeInTheDocument();
@@ -81,7 +81,7 @@ describe("FileLibraryModal list fetch (#1933)", () => {
   it("keeps the search term when retrying a failed search", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     apiListFiles.mockResolvedValueOnce({ files: [], total: 0 });
-    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
     await waitFor(() => expect(apiListFiles).toHaveBeenCalledTimes(1));
 
     apiListFiles.mockRejectedValueOnce(new Error("API down"));
@@ -102,7 +102,7 @@ describe("FileLibraryModal list fetch (#1933)", () => {
   it("drops the previous list and its ticks when a later search fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     apiListFiles.mockResolvedValueOnce({ files: [userFile("a", "beaver.png")], total: 1 });
-    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
     fireEvent.click(await screen.findByText("beaver.png"));
     expect(
       screen.getByRole("button", {
@@ -125,7 +125,9 @@ describe("FileLibraryModal list fetch (#1933)", () => {
 
   it("ignores a search answer that lands after a reopen's unfiltered list", async () => {
     apiListFiles.mockResolvedValueOnce({ files: [], total: 0 });
-    const { rerender } = render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    const { rerender } = render(
+      <FileLibraryModal open onClose={() => {}} onImport={() => undefined} />,
+    );
     await waitFor(() => expect(apiListFiles).toHaveBeenCalledTimes(1));
 
     // The search goes out and is still in flight when the modal closes.
@@ -139,10 +141,10 @@ describe("FileLibraryModal list fetch (#1933)", () => {
     });
     expect(apiListFiles).toHaveBeenCalledTimes(2);
 
-    rerender(<FileLibraryModal open={false} onClose={() => {}} onImport={() => {}} />);
+    rerender(<FileLibraryModal open={false} onClose={() => {}} onImport={() => undefined} />);
     const reopenList = deferred<ListResult>();
     apiListFiles.mockReturnValueOnce(reopenList.promise);
-    rerender(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    rerender(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
     expect(apiListFiles).toHaveBeenCalledTimes(3);
 
     await act(async () => {
@@ -165,7 +167,7 @@ describe("FileLibraryModal list fetch (#1933)", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const first = deferred<ListResult>();
     apiListFiles.mockReturnValueOnce(first.promise);
-    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
 
     const second = deferred<ListResult>();
     apiListFiles.mockReturnValueOnce(second.promise);
@@ -652,7 +654,7 @@ describe("FileLibraryModal AuthImage (#2957)", () => {
       ),
     );
 
-    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
 
     const img = await screen.findByRole("img", { name: "corrupt.png" });
     expect(img).toHaveAttribute("src", "blob:thumb");

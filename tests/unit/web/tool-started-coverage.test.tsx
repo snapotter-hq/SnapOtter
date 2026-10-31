@@ -339,7 +339,7 @@ describe("tool_started funnel coverage (#1160)", () => {
         hasPlacements: () => true,
         exportPlacements: vi.fn(async () => ({
           pngs: [new Blob(["sig"], { type: "image/png" })],
-          placements: [{ page: 0, x: 0.1, y: 0.1, width: 0.2, height: 0.1, signatureIndex: 0 }],
+          placements: [{ sig: 0, page: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.1 }],
         })),
       },
     };
@@ -462,7 +462,10 @@ describe("tool_started funnel coverage (#1160)", () => {
       selectedTemplate: {
         id: "drake",
         name: "Drake",
-        imageUrl: "/templates/drake.jpg",
+        aliases: [],
+        tags: [],
+        filename: "drake.jpg",
+        popularity: 1,
         width: 500,
         height: 500,
         category: "classic",

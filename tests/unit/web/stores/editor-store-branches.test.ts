@@ -45,9 +45,13 @@ function makeLine(id: string, points = [0, 0, 10, 10]): CanvasObject {
     attrs: {
       points,
       strokeWidth: 2,
-      rotation: 0,
+      tension: 0,
+      lineCap: "round",
+      lineJoin: "round",
+      opacity: 1,
+      globalCompositeOperation: "source-over",
     },
-  } as CanvasObject;
+  };
 }
 
 function makeEllipse(id: string): CanvasObject {
@@ -154,6 +158,7 @@ describe("editor store branch helpers", () => {
     useEditorStore.setState({ canvasSize: { width: 4, height: 3 } });
     const geometricSelection: SelectionState = {
       type: "rect",
+      points: [],
       bounds: { x: 1, y: 1, width: 2, height: 1 },
     };
 
@@ -165,6 +170,7 @@ describe("editor store branch helpers", () => {
 
     const maskedSelection: SelectionState = {
       type: "wand",
+      points: [],
       bounds: { x: 1, y: 0, width: 2, height: 2 },
       mask: new Uint8Array([1, 0, 0, 1]),
     };

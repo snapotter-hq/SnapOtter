@@ -565,6 +565,7 @@ describe("useBase64Store expanded", () => {
 
   it("addResult followed by addError does not clear results", () => {
     const r: Base64Result = {
+      entryId: "ok.png",
       filename: "ok.png",
       mimeType: "image/png",
       width: 10,
@@ -576,13 +577,14 @@ describe("useBase64Store expanded", () => {
       dataUri: "data:image/png;base64,x",
     };
     useBase64Store.getState().addResult(r);
-    useBase64Store.getState().addError({ filename: "bad.png", error: "fail" });
+    useBase64Store.getState().addError({ entryId: "bad.png", filename: "bad.png", error: "fail" });
     expect(useBase64Store.getState().results).toHaveLength(1);
     expect(useBase64Store.getState().errors).toHaveLength(1);
   });
 
   it("setResults replaces previous results entirely", () => {
     const r1: Base64Result = {
+      entryId: "a.png",
       filename: "a.png",
       mimeType: "image/png",
       width: 1,
@@ -594,9 +596,9 @@ describe("useBase64Store expanded", () => {
       dataUri: "data:image/png;base64,a",
     };
     useBase64Store.getState().addResult(r1);
-    useBase64Store.getState().addResult({ ...r1, filename: "b.png" });
+    useBase64Store.getState().addResult({ ...r1, entryId: "b.png", filename: "b.png" });
 
-    const newResults: Base64Result[] = [{ ...r1, filename: "c.png" }];
+    const newResults: Base64Result[] = [{ ...r1, entryId: "c.png", filename: "c.png" }];
     useBase64Store.getState().setResults(newResults, []);
     expect(useBase64Store.getState().results).toHaveLength(1);
     expect(useBase64Store.getState().results[0].filename).toBe("c.png");

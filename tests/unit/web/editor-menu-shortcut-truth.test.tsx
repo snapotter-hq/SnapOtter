@@ -39,6 +39,7 @@ import { I18nProvider } from "@/contexts/i18n-context";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { useEditorStore } from "@/stores/editor-store";
+import type { CanvasObject } from "@/types/editor";
 
 const CHROME_WINDOWS =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
@@ -325,11 +326,21 @@ describe("editor menu bar hints name keys that run the command (#1943)", () => {
     const onFillEvent = (e: Event) => fillEvents.push(e);
     window.addEventListener("snapotter:open-fill-dialog", onFillEvent);
 
-    const copiedRect = {
+    const copiedRect: CanvasObject = {
       id: "obj-1",
-      type: "rect" as const,
+      type: "rect",
       layerId: "layer-1",
-      attrs: { x: 10, y: 20, width: 50, height: 40, fill: "#ff0000" },
+      attrs: {
+        x: 10,
+        y: 20,
+        width: 50,
+        height: 40,
+        fill: "#ff0000",
+        strokeWidth: 0,
+        cornerRadius: 0,
+        rotation: 0,
+        opacity: 1,
+      },
     };
     useEditorStore.setState({
       activeTool: "move",

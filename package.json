@@ -40,7 +40,7 @@
     "lint:fix": "biome check --write .",
     "clean": "turbo clean",
     "typecheck": "turbo typecheck",
-    "typecheck:tests": "tsc -p typecheck.tests.json",
+    "typecheck:tests": "tsc -p typecheck.tests.json && tsc -p typecheck.tests-web.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run --config vitest.config.ts tests/unit",
