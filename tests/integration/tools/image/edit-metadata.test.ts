@@ -9,6 +9,9 @@
  * the tests gracefully handle the 422 response.
  */
 
+import { gzipSync } from "node:zlib";
+import AdmZip from "adm-zip";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -30,11 +33,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makePayload(
   settings: Record<string, unknown>,
@@ -281,6 +284,66 @@ describe("Different input formats", () => {
     const res = await postTool({ copyright: "JPG Copyright" }, JPG, "test.jpg", "image/jpeg");
     if (res.statusCode === 422) return;
     expect(res.statusCode).toBe(200);
+  });
+
+  it.each([
+    ["psd", "image/vnd.adobe.photoshop"],
+    ["jxl", "image/jxl"],
+    ["jp2", "image/jp2"],
+    ["qoi", "image/qoi"],
+    ["tga", "image/x-tga"],
+    ["ico", "image/x-icon"],
+    ["ppm", "image/x-portable-pixmap"],
+    ["hdr", "image/vnd.radiance"],
+  ])(
+    "generates a working preview.webp for CLI-decoded %s output (#2704)",
+    { timeout: 60_000 },
+    async (ext, mime) => {
+      const buf = readFixture(fixtures.image.formats(ext));
+      // Empty settings avoids ExifTool write support gaps on niche formats
+      // while exercising the edit-metadata route's output + preview pipeline.
+      const res = await postTool({}, buf, `sample.${ext}`, mime);
+      if (ext !== "qoi" && (res.statusCode === 422 || res.statusCode === 503)) return;
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+      expect(result.previewUrl).toBe(`/api/v1/download/${result.jobId}/preview.webp`);
+
+      const previewRes = await app.inject({
+        method: "GET",
+        url: result.previewUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(previewRes.statusCode).toBe(200);
+      expect(previewRes.headers["content-type"]).toBe("image/webp");
+      const meta = await sharp(previewRes.rawPayload).metadata();
+      expect(meta.format).toBe("webp");
+    },
+  );
+
+  it("preserves non-Sharp container extensions in edit-metadata batch runs (#3180)", async () => {
+    const bmpBuf = readFixture(fixtures.image.formats("bmp"));
+    const qoiBuf = readFixture(fixtures.image.formats("qoi"));
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "sample.bmp", contentType: "image/bmp", content: bmpBuf },
+      { name: "file", filename: "sample.qoi", contentType: "image/qoi", content: qoiBuf },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/batch",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const zipEntries = new AdmZip(res.rawPayload)
+      .getEntries()
+      .map((e) => e.entryName)
+      .sort();
+    expect(zipEntries).toEqual(["sample_edit-metadata.bmp", "sample_edit-metadata.qoi"]);
   });
 });
 
@@ -806,5 +869,138 @@ describe("Author field", () => {
     const res = await postTool({ author: "Author Name Test" });
     if (res.statusCode === 422) return;
     expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── SVG and SVGZ sanitization (#3095, #3505) ─────────────────────
+describe("SVG and SVGZ sanitization (#3095, #3505)", () => {
+  it("sanitizes .svg and decompresses .svgz outputs, and rejects invalid SVGZ or over-cap SVG with 400", async () => {
+    const dirtySvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><script>alert(1)</script><rect width="100" height="100" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgRes = await postTool({}, dirtySvg, "dirty.svg", "image/svg+xml");
+    expect(svgRes.statusCode).toBe(200);
+    const svgBody = JSON.parse(svgRes.body);
+    const svgDl = await app.inject({
+      method: "GET",
+      url: svgBody.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(svgDl.statusCode).toBe(200);
+    expect(svgDl.body).toContain("<svg");
+    expect(svgDl.body).not.toContain("<script");
+    expect(svgDl.body).not.toContain("alert(1)");
+
+    const dirtySvgz = gzipSync(dirtySvg);
+    const svgzRes = await postTool({}, dirtySvgz, "icon.svgz", "image/svg+xml");
+    expect(svgzRes.statusCode).toBe(200);
+    const svgzBody = JSON.parse(svgzRes.body);
+    const svgzDl = await app.inject({
+      method: "GET",
+      url: svgzBody.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(svgzDl.statusCode).toBe(200);
+    expect(svgzDl.body).toContain("<svg");
+    expect(svgzDl.body).not.toContain("<script");
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const badSvgzRes = await postTool({}, badSvgz, "bad.svgz", "image/svg+xml");
+    expect(badSvgzRes.statusCode).toBe(400);
+    expect(JSON.parse(badSvgzRes.body).error).toContain("valid SVG content");
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const overCapRes = await postTool({}, overCapSvg, "too-many.svg", "image/svg+xml");
+    expect(overCapRes.statusCode).toBe(400);
+    expect(JSON.parse(overCapRes.body).error).toContain("maximum element count");
+  });
+
+  it("decompresses and sanitizes .svgz and .svg on inspect, and rejects invalid SVGZ or over-cap SVG with 400 (#3505)", async () => {
+    const xmpSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><metadata><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title><rdf:Alt><rdf:li xml:lang="x-default">Test Icon Title</rdf:li></rdf:Alt></dc:title><dc:subject><rdf:Bag><rdf:li>vector</rdf:li><rdf:li>icon</rdf:li></rdf:Bag></dc:subject></rdf:Description></rdf:RDF></x:xmpmeta></metadata><script>alert(1)</script><rect width="100" height="80" fill="red"/></svg>',
+      "utf-8",
+    );
+    const xmpSvgz = gzipSync(xmpSvg);
+    const { body: okBody, contentType: okCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: xmpSvgz },
+    ]);
+    const okRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/inspect",
+      payload: okBody,
+      headers: { "content-type": okCt, authorization: `Bearer ${adminToken}` },
+    });
+    const exiftoolMissing =
+      okRes.statusCode === 422 && JSON.parse(okRes.body).details?.includes("ExifTool not found");
+    if (!exiftoolMissing) {
+      expect(okRes.statusCode).toBe(200);
+      const okPayload = JSON.parse(okRes.body);
+      expect(okPayload.filename).toBe("icon.svgz");
+      expect(okPayload.fileSize).toBe(xmpSvgz.length);
+      expect(okPayload.xmp).toMatchObject({ Title: "Test Icon Title" });
+      expect(okPayload.keywords).toEqual(["vector", "icon"]);
+
+      const { body: svgBody, contentType: svgCt } = createMultipartPayload([
+        { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: xmpSvg },
+      ]);
+      const svgRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/edit-metadata/inspect",
+        payload: svgBody,
+        headers: { "content-type": svgCt, authorization: `Bearer ${adminToken}` },
+      });
+      expect(svgRes.statusCode).toBe(200);
+      const svgPayload = JSON.parse(svgRes.body);
+      expect(svgPayload.filename).toBe("icon.svg");
+      expect(svgPayload.fileSize).toBe(xmpSvg.length);
+      expect(svgPayload.xmp).toMatchObject({ Title: "Test Icon Title" });
+      expect(svgPayload.keywords).toEqual(["vector", "icon"]);
+    }
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const { body: badBody, contentType: badCt } = createMultipartPayload([
+      { name: "file", filename: "bad.svgz", contentType: "image/svg+xml", content: badSvgz },
+    ]);
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/inspect",
+      payload: badBody,
+      headers: { "content-type": badCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(badRes.statusCode).toBe(400);
+    expect(JSON.parse(badRes.body).error).toContain("valid SVG content");
+
+    const nonGzipSvgz = Buffer.from("not gzip and not an image", "utf-8");
+    const { body: nonGzipBody, contentType: nonGzipCt } = createMultipartPayload([
+      { name: "file", filename: "broken.svgz", contentType: "image/svg+xml", content: nonGzipSvgz },
+    ]);
+    const nonGzipRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/inspect",
+      payload: nonGzipBody,
+      headers: { "content-type": nonGzipCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(nonGzipRes.statusCode).toBe(400);
+    expect(JSON.parse(nonGzipRes.body)).toEqual({ error: "Invalid SVGZ file" });
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const { body: capBody, contentType: capCt } = createMultipartPayload([
+      { name: "file", filename: "too-many.svg", contentType: "image/svg+xml", content: overCapSvg },
+    ]);
+    const capRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/inspect",
+      payload: capBody,
+      headers: { "content-type": capCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(capRes.statusCode).toBe(400);
+    expect(JSON.parse(capRes.body).error).toContain("maximum element count");
   });
 });

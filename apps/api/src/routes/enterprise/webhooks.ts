@@ -7,14 +7,18 @@
  *
  * Gated behind the `webhooks:manage` permission + `admin_alerts` enterprise feature.
  */
-import { eq } from "drizzle-orm";
+import { SafeError } from "@snapotter/shared";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { encrypt } from "../../lib/encryption.js";
+import { decryptSettingWithRotation, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { reportError } from "../../lib/error-report.js";
+import { stripInternalPaths } from "../../lib/errors.js";
+import { logger } from "../../lib/logger.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
 import { deliverWebhook } from "../../lib/webhook-delivery.js";
 import { requirePermission } from "../../permissions.js";
@@ -33,19 +37,45 @@ const webhookSchema = z.object({
 
 export type WebhookDestination = z.infer<typeof webhookSchema>;
 
-async function readDestinations(): Promise<WebhookDestination[]> {
+async function readDestinationsWithRaw(): Promise<{
+  destinations: WebhookDestination[];
+  rawJson: string | null;
+}> {
   const [row] = await db
     .select({ value: schema.settings.value })
     .from(schema.settings)
     .where(eq(schema.settings.key, SETTINGS_KEY));
 
-  if (!row) return [];
+  if (!row) return { destinations: [], rawJson: null };
 
   try {
-    return JSON.parse(row.value) as WebhookDestination[];
-  } catch {
-    return [];
+    const parsed: unknown = JSON.parse(row.value);
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every((d) => Boolean(d) && typeof d === "object" && !Array.isArray(d))
+    ) {
+      logger.warn(
+        { key: SETTINGS_KEY },
+        "webhooks: stored webhook_destinations is not a JSON array",
+      );
+      return { destinations: [], rawJson: null };
+    }
+    return {
+      destinations: parsed as WebhookDestination[],
+      rawJson: row.value,
+    };
+  } catch (err) {
+    logger.warn(
+      { err, key: SETTINGS_KEY },
+      "webhooks: failed to parse stored webhook_destinations JSON",
+    );
+    return { destinations: [], rawJson: null };
   }
+}
+
+async function readDestinations(): Promise<WebhookDestination[]> {
+  const { destinations } = await readDestinationsWithRaw();
+  return destinations;
 }
 
 async function writeDestinations(destinations: WebhookDestination[]): Promise<void> {
@@ -85,7 +115,7 @@ async function validateWebhookDestinationUrl(url: string, reply: FastifyReply): 
   } catch (err) {
     reply.status(400).send({
       error: "Webhook URL must resolve to a public HTTP(S) destination",
-      details: err instanceof Error ? err.message : String(err),
+      details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
     });
     return false;
   }
@@ -103,7 +133,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
     // Mask auth headers in response
     const masked = destinations.map((d) => ({
       ...d,
-      authHeader: d.authHeader ? "***" : "",
+      authHeader: typeof d.authHeader === "string" && d.authHeader ? "***" : "",
     }));
 
     return reply.send({ destinations: masked });
@@ -179,8 +209,32 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       const dest = { ...parsed.data };
       if (!(await validateWebhookDestinationUrl(dest.url, reply))) return;
 
-      // Encrypt the auth header before storage
-      if (dest.authHeader && env.DATA_ENCRYPTION_KEY) {
+      // GET masks a non-empty authHeader as "***"; preserve the stored secret
+      // when a client echoes the mask back on update (#2531), rotating it to
+      // DATA_ENCRYPTION_KEY when stored under DATA_ENCRYPTION_KEY_PREVIOUS (#2852).
+      if (dest.authHeader === "***") {
+        const existingAuth =
+          typeof destinations[index].authHeader === "string" ? destinations[index].authHeader : "";
+        if (
+          existingAuth &&
+          isEncrypted(existingAuth) &&
+          env.DATA_ENCRYPTION_KEY &&
+          env.DATA_ENCRYPTION_KEY_PREVIOUS
+        ) {
+          const decrypted = await decryptSettingWithRotation(existingAuth);
+          if (decrypted === null) {
+            request.log.warn(
+              { index, name: dest.name, type: dest.type },
+              "webhooks: preserved authHeader could not be decrypted for key rotation; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+            );
+          }
+          dest.authHeader = decrypted?.reencrypted ?? existingAuth;
+        } else {
+          dest.authHeader = existingAuth;
+        }
+      }
+      if (dest.authHeader && env.DATA_ENCRYPTION_KEY && !isEncrypted(dest.authHeader)) {
+        // Encrypt the auth header before storage
         dest.authHeader = await encrypt(dest.authHeader, env.DATA_ENCRYPTION_KEY);
       }
 
@@ -245,7 +299,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
         return reply.status(400).send({ error: "Invalid index" });
       }
 
-      const destinations = await readDestinations();
+      const { destinations, rawJson } = await readDestinationsWithRaw();
       if (index >= destinations.length) {
         return reply.status(404).send({ error: "Webhook destination not found" });
       }
@@ -253,17 +307,41 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       const dest = destinations[index];
 
       // Decrypt auth header if needed
-      let authHeader = dest.authHeader;
+      let authHeader = typeof dest.authHeader === "string" ? dest.authHeader : "";
       if (authHeader) {
-        try {
-          const { isEncrypted, decrypt } = await import("../../lib/encryption.js");
-          if (isEncrypted(authHeader) && env.DATA_ENCRYPTION_KEY) {
-            const decrypted = await decrypt(authHeader, env.DATA_ENCRYPTION_KEY);
-            authHeader = decrypted ?? "";
-          }
-        } catch {
-          // Use raw value if decryption fails
+        const decrypted = await decryptSettingWithRotation(authHeader);
+        if (decrypted === null) {
+          request.log.error(
+            { index, name: dest.name, type: dest.type },
+            "webhooks: stored webhook authHeader could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+          );
+          void reportError(
+            new SafeError("Failed to decrypt webhook auth header", {
+              kind: "operational",
+              code: "WEBHOOK_DECRYPTION_FAILED",
+              statusCode: 500,
+            }),
+            {
+              source: "http",
+              route: request.routeOptions?.url,
+              method: request.method,
+              statusCode: 500,
+              subsystem: "webhooks",
+            },
+          );
+          return reply.status(500).send({
+            error: "Failed to decrypt webhook auth header",
+            code: "DECRYPTION_FAILED",
+          });
         }
+        if (decrypted.reencrypted && rawJson !== null) {
+          dest.authHeader = decrypted.reencrypted;
+          await db
+            .update(schema.settings)
+            .set({ value: JSON.stringify(destinations), updatedAt: new Date() })
+            .where(and(eq(schema.settings.key, SETTINGS_KEY), eq(schema.settings.value, rawJson)));
+        }
+        authHeader = decrypted.value;
       }
 
       const testEvent = [

@@ -1,9 +1,11 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, Loader2 } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
-import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import {
   COLLAGE_TEMPLATES,
   type CollageTemplate,
@@ -12,19 +14,30 @@ import {
   getTemplatesForCount,
 } from "@/lib/collage-templates";
 import { format, plural } from "@/lib/format";
+import { showIntakeIgnored } from "@/lib/intake-notice";
+import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
 import { cn } from "@/lib/utils";
-import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
+import {
+  type AspectRatio,
+  beginCollageRun,
+  type OutputFormat,
+  useCollageStore,
+} from "@/stores/collage-store";
 import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
 
-const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
-  { value: "free", label: "Free" },
-  { value: "1:1", label: "1:1" },
-  { value: "4:3", label: "4:3" },
-  { value: "3:2", label: "3:2" },
-  { value: "16:9", label: "16:9" },
-  { value: "9:16", label: "9:16" },
-  { value: "4:5", label: "4:5" },
-];
+/** What the panel reads off the answer besides its URL. The API always sends them (#1857). */
+const RESULT_FIELDS = ["jobId", "originalSize", "processedSize"] as const;
+
+interface CollageResult {
+  downloadUrl: string;
+  processedSize: number;
+  originalSize: number;
+  jobId: string;
+}
+
+const ASPECT_RATIOS: AspectRatio[] = ["free", "1:1", "4:3", "3:2", "16:9", "9:16", "4:5"];
 
 const OUTPUT_FORMATS: { value: OutputFormat; label: string }[] = [
   { value: "png", label: "PNG" },
@@ -35,14 +48,23 @@ const OUTPUT_FORMATS: { value: OutputFormat; label: string }[] = [
 ];
 
 const BG_PRESETS = [
-  { id: "white" as const, label: "White", color: "#FFFFFF", border: true },
-  { id: "black" as const, label: "Black", color: "#000000", border: false },
-  { id: "transparent" as const, label: "None", color: "transparent", border: true },
-  { id: "custom" as const, label: "Custom", color: null, border: true },
+  { id: "white" as const, color: "#FFFFFF", border: true },
+  { id: "black" as const, color: "#000000", border: false },
+  { id: "transparent" as const, color: "transparent", border: true },
+  { id: "custom" as const, color: null, border: true },
 ];
+
+let activeCollageWatchdog: XhrWatchdog | null = null;
+let collagePanelPaused = false;
 
 export function CollageSettings() {
   const { t } = useTranslation();
+  const bgPresetLabels: Record<(typeof BG_PRESETS)[number]["id"], string> = {
+    white: t.toolSettings.collage.bgWhite,
+    black: t.toolSettings.collage.bgBlack,
+    transparent: t.toolSettings.collage.bgNone,
+    custom: t.toolSettings.collage.bgCustom,
+  };
   const store = useCollageStore();
   const {
     images,
@@ -66,26 +88,73 @@ export function CollageSettings() {
   const template = getTemplateById(templateId);
   const imageCount = images.length;
   const hasImages = imageCount > 0;
+  const assignedCount = template
+    ? template.cells.reduce((count, _, i) => {
+        const imgIdx = cellAssignments[i] ?? -1;
+        return imgIdx >= 0 && images[imgIdx] ? count + 1 : count;
+      }, 0)
+    : 0;
+
+  useEffect(() => {
+    collagePanelPaused = false;
+    activeCollageWatchdog?.resume();
+    return () => {
+      collagePanelPaused = true;
+      activeCollageWatchdog?.pause();
+    };
+  }, []);
 
   const handleProcess = useCallback(async () => {
-    if (!hasImages || !template) return;
+    if (!hasImages || !template || assignedCount === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "collage",
+      is_batch: false,
+      file_count: assignedCount,
+    });
 
     store.setPhase("processing");
     store.setProgress(0);
     store.setError(null);
 
+    activeCollageWatchdog?.clear();
+    activeCollageWatchdog = null;
+
+    let activeXhr: XMLHttpRequest | null = null;
+    let watchdog: XhrWatchdog | null = null;
+    let rejectXhr: ((err: Error) => void) | null = null;
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+    let resolveDelay: (() => void) | null = null;
+    const clearWatchdog = () => {
+      watchdog?.clear();
+      if (activeCollageWatchdog === watchdog) {
+        activeCollageWatchdog = null;
+      }
+    };
+    const run = beginCollageRun(() => {
+      clearWatchdog();
+      activeXhr?.abort();
+      rejectXhr?.(new DOMException("Aborted", "AbortError"));
+      if (delayTimer !== null) {
+        clearTimeout(delayTimer);
+        delayTimer = null;
+      }
+      resolveDelay?.();
+    });
+
+    let result: CollageResult;
     try {
       const formData = new FormData();
-      for (let i = 0; i < template.cells.length; i++) {
-        const imgIdx = cellAssignments[i] ?? -1;
-        if (imgIdx >= 0 && images[imgIdx]) {
-          formData.append("file", images[imgIdx].file);
-        }
-      }
-
+      let nextFileIndex = 0;
       const cells = template.cells.map((_, i) => {
+        const imgIdx = cellAssignments[i] ?? -1;
+        const img = imgIdx >= 0 ? images[imgIdx] : undefined;
+        const imageIndex = img ? nextFileIndex++ : -1;
+        if (img) {
+          formData.append("file", img.file);
+        }
         const t = cellTransforms[i] ?? { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
-        return { imageIndex: i, panX: t.panX, panY: t.panY, zoom: t.zoom, objectFit: t.objectFit };
+        return { imageIndex, panX: t.panX, panY: t.panY, zoom: t.zoom, objectFit: t.objectFit };
       });
 
       formData.append(
@@ -103,13 +172,16 @@ export function CollageSettings() {
       );
 
       const startTime = Date.now();
-      const result = await new Promise<{
-        downloadUrl: string;
-        processedSize: number;
-        originalSize: number;
-        jobId: string;
-      }>((resolve, reject) => {
+      result = await new Promise<CollageResult>((resolve, reject) => {
+        rejectXhr = reject;
         const xhr = new XMLHttpRequest();
+        activeXhr = xhr;
+        const xhrWatchdog = createXhrWatchdog(xhr, 300_000, () => run.isCurrent());
+        if (collagePanelPaused) {
+          xhrWatchdog.pause();
+        }
+        watchdog = xhrWatchdog;
+        activeCollageWatchdog = xhrWatchdog;
         xhr.open("POST", appUrl("/api/v1/tools/image/collage"));
 
         const headers = formatHeaders();
@@ -118,44 +190,138 @@ export function CollageSettings() {
         });
 
         xhr.upload.onprogress = (e) => {
+          if (!run.isCurrent()) {
+            clearWatchdog();
+            return;
+          }
+          xhrWatchdog.onUploadProgress(e);
           if (e.lengthComputable) {
             store.setProgress(Math.round((e.loaded / e.total) * 80));
           }
         };
 
+        xhr.upload.onload = () => {
+          if (!run.isCurrent()) {
+            clearWatchdog();
+            return;
+          }
+          xhrWatchdog.onUploadLoad();
+        };
+
         xhr.onload = () => {
+          clearWatchdog();
+          if (!run.isCurrent()) return;
           if (xhr.status >= 200 && xhr.status < 300) {
-            store.setProgress(100);
+            // Only a body that isn't a result is the server's fault, and it
+            // gets reported (#1740, #1795). A throw from our own progress write
+            // ends the run as ours, the same as landing the result below.
+            let result: CollageResult;
             try {
-              resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
-            } catch {
-              reject(new Error("Invalid response"));
+              result = parseResultBody<CollageResult>(xhr.responseText, RESULT_FIELDS);
+            } catch (err) {
+              reject(new Error(t.errors.invalidResponse));
+              reportMalformedResult(err, { status: xhr.status, toolId: "collage" });
+              return;
             }
+            try {
+              store.setProgress(100);
+            } catch (err) {
+              reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+              throw err;
+            }
+            resolve(result);
           } else {
             try {
               const body = JSON.parse(xhr.responseText);
-              reject(new Error(body.error || `Failed: ${xhr.status}`));
+              reject(
+                new Error(
+                  failedAnswerMessage(
+                    t,
+                    body,
+                    xhr.status,
+                    format(t.errors.failedWithStatus, { status: xhr.status }),
+                  ),
+                ),
+              );
             } catch {
-              reject(new Error(`Failed: ${xhr.status}`));
+              reject(
+                new Error(
+                  failedAnswerMessage(
+                    t,
+                    null,
+                    xhr.status,
+                    format(t.errors.failedWithStatus, { status: xhr.status }),
+                  ),
+                ),
+              );
             }
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.send(formData);
+        xhr.onerror = () => {
+          clearWatchdog();
+          if (!run.isCurrent()) return;
+          reject(new Error(t.errors.network));
+        };
 
-        store.setProgress(5);
+        xhr.ontimeout = () => {
+          clearWatchdog();
+          if (!run.isCurrent()) return;
+          reject(new Error(t.errors.requestTimedOut));
+        };
+
+        xhrWatchdog.send(formData);
+
+        if (run.isCurrent()) {
+          store.setProgress(5);
+        }
       });
 
       const elapsed = Date.now() - startTime;
-      if (elapsed < 800) await new Promise((r) => setTimeout(r, 800 - elapsed));
+      if (elapsed < 800 && run.isCurrent()) {
+        await new Promise<void>((r) => {
+          resolveDelay = r;
+          delayTimer = setTimeout(() => {
+            delayTimer = null;
+            r();
+          }, 800 - elapsed);
+        });
+      }
+    } catch (err) {
+      clearWatchdog();
+      run.end();
+      if (!run.isCurrent()) return;
+      store.setError(err instanceof Error ? err.message : t.toolSettings.collage.collageFailed);
+      return;
+    }
+
+    clearWatchdog();
+    run.end();
+    if (!run.isCurrent()) return;
+
+    // A throw while landing a good result is our own store write failing, not
+    // a bad answer: it ends the run with the tracking message and is rethrown
+    // so it still surfaces (#1795, after #1354).
+    try {
       store.setResult(result.downloadUrl, result.processedSize, result.originalSize, result.jobId);
     } catch (err) {
-      store.setError(err instanceof Error ? err.message : "Collage failed");
+      try {
+        store.setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
+      } catch (teardownErr) {
+        console.error("Ending the run after a result handling error failed", teardownErr);
+        // The console alone never reaches Sentry (#1882).
+        reportRunEndFailure(
+          "Ending a Collage run after a result handling error failed",
+          teardownErr,
+          "collage",
+        );
+      }
+      throw err;
     }
   }, [
     hasImages,
     template,
+    assignedCount,
     store,
     cellAssignments,
     cellTransforms,
@@ -167,6 +333,7 @@ export function CollageSettings() {
     aspectRatio,
     outputFormat,
     quality,
+    t,
   ]);
 
   // Group templates by image count, prioritizing current count
@@ -187,7 +354,13 @@ export function CollageSettings() {
           </span>
           <button
             type="button"
-            onClick={() => store.clearImages()}
+            onClick={() => {
+              if (useCollageStore.getState().phase === "processing") {
+                showIntakeIgnored(t.dropzone.ignoredWhileRunning);
+                return;
+              }
+              store.clearImages();
+            }}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             {t.toolPage.clearAll}
@@ -293,7 +466,7 @@ export function CollageSettings() {
                           ? backgroundColor
                           : (p.color ?? undefined),
                   }}
-                  title={p.label}
+                  title={bgPresetLabels[p.id]}
                 />
               ))}
               {bgPreset === "custom" && (
@@ -321,17 +494,17 @@ export function CollageSettings() {
           <div className="flex flex-wrap gap-1 mt-1">
             {ASPECT_RATIOS.map((ar) => (
               <button
-                key={ar.value}
+                key={ar}
                 type="button"
-                onClick={() => store.setAspectRatio(ar.value)}
+                onClick={() => store.setAspectRatio(ar)}
                 className={cn(
                   "px-2 py-1 text-xs rounded-md transition-colors",
-                  aspectRatio === ar.value
+                  aspectRatio === ar
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80",
                 )}
               >
-                {ar.label}
+                {ar === "free" ? t.toolSettings.collage.ratioFree : ar}
               </button>
             ))}
           </div>
@@ -391,13 +564,13 @@ export function CollageSettings() {
         type="button"
         data-testid="collage-submit"
         onClick={handleProcess}
-        disabled={!hasImages || phase === "processing"}
+        disabled={!hasImages || !template || assignedCount === 0 || phase === "processing"}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {phase === "processing" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {phase === "processing"
           ? t.toolSettings.collage.creating
-          : format(t.toolSettings.collage.submitWithCount, { count: imageCount })}
+          : format(t.toolSettings.collage.submitWithCount, { count: assignedCount })}
       </button>
 
       {resultUrl && (
@@ -414,7 +587,7 @@ export function CollageSettings() {
       )}
 
       {/* Size info */}
-      {originalSize != null && resultSize != null && (
+      {resultUrl && originalSize != null && resultSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
           <p>
             {format(t.toolSettings.collage.inputTotalKb, {

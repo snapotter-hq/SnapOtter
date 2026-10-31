@@ -4,6 +4,9 @@ export type EraserMode = "brush" | "block";
 
 export type SelectionMode = "new" | "add" | "subtract";
 
+/** Side of the square the eyedropper averages: a point, 3x3 or 5x5. */
+export type EyedropperSampleSize = 1 | 3 | 5;
+
 export type StrokeDashStyle = "solid" | "dashed" | "dotted";
 
 export type ToolType =
@@ -117,6 +120,12 @@ export interface ImageAttrs {
   scaleY?: number;
   opacity: number;
   src: string;
+  /**
+   * Runtime only. A live canvas a brush tool is painting into during a stroke;
+   * the renderer shows it in place of `src`. The brush clears it on mouse up and
+   * stores the result as `src`, so it must never outlive a stroke or be saved.
+   */
+  image?: CanvasImageSource;
 }
 
 export interface ArrowAttrs {
@@ -232,6 +241,55 @@ export interface CropState {
   aspectRatio: string | null;
 }
 
+/**
+ * What an undo step did, as a stable id plus the values its label needs. The
+ * History panel turns it into display text through i18n (#1592), so nothing
+ * here is English copy.
+ */
+export type HistoryActionId =
+  | "initialState"
+  | "loadImage"
+  | "loadProject"
+  | "restoreAutosave"
+  | "resizeCanvas"
+  | "resizeImage"
+  | "flipHorizontal"
+  | "flipVertical"
+  | "trimCanvas"
+  | "layerEffect"
+  | "delete"
+  | "bringToFront"
+  | "bringForward"
+  | "sendBackward"
+  | "sendToBack"
+  | "addLayer"
+  | "deleteLayer"
+  | "duplicateLayer"
+  | "reorderLayers"
+  | "mergeDown"
+  | "flattenAll"
+  | "resetAdjustments"
+  | "levels"
+  | "curves"
+  | "resetLevels"
+  | "resetCurves"
+  | "resetAll"
+  | "crop"
+  | "cut"
+  | "paste"
+  | "pasteInPlace"
+  | "nudge"
+  | "brushStroke"
+  | "eraserStroke";
+
+export type HistoryAction =
+  | { id: HistoryActionId }
+  | { id: "rotateCanvas"; degrees: number }
+  | { id: "addObject"; objectType: CanvasObject["type"] }
+  | { id: "adjust"; key: keyof AdjustmentValues }
+  | { id: "toggleFilter"; filter: string }
+  | { id: "setFilterParam"; filter: string; param: string };
+
 export interface AdjustmentValues {
   brightness: number;
   contrast: number;
@@ -300,6 +358,10 @@ export interface EditorState {
   brushFlow: number;
   eraserMode: EraserMode;
 
+  // Eyedropper
+  eyedropperSampleSize: EyedropperSampleSize;
+  eyedropperSampledColor: string | null;
+
   // Colors
   foregroundColor: string;
   backgroundColor: string;
@@ -322,6 +384,8 @@ export interface EditorState {
   // Crop
   cropState: CropState | null;
   isCropping: boolean;
+  cropApplying: boolean;
+  rebaking: boolean;
 
   // Adjustments & Filters
   adjustments: AdjustmentValues;
@@ -386,7 +450,7 @@ export interface EditorState {
   loadingState: LoadingState | null;
 
   // History tracking
-  lastAction: string;
+  lastAction: HistoryAction;
   _historyVersion: number;
 
   // --- Actions ---
@@ -399,12 +463,24 @@ export interface EditorState {
   setZoom: (zoom: number) => void;
   setPanOffset: (offset: { x: number; y: number }) => void;
   loadImage: (url: string, width: number, height: number) => void;
-  resizeCanvas: (width: number, height: number, anchor: AnchorPosition, fill?: string) => void;
-  resizeImage: (width: number, height: number, resample?: string) => void;
-  rotateCanvas: (degrees: 90 | 180 | 270) => void;
-  flipCanvasHorizontal: () => void;
-  flipCanvasVertical: () => void;
-  trimCanvas: () => void;
+  // `fill` is a #rrggbb color painted into the added room when the canvas grows;
+  // omitted, the room stays transparent. Anything else is refused. Resolves with
+  // `true` when committed and `false` when dropped because the document changed
+  // underneath while the bitmap was being built (#2116).
+  resizeCanvas: (
+    width: number,
+    height: number,
+    anchor: AnchorPosition,
+    fill?: string,
+  ) => Promise<boolean>;
+  resizeImage: (width: number, height: number, resample?: string) => Promise<boolean>;
+  // These rebuild the source bitmap, so like resizeCanvas they resolve once the change
+  // is committed (`true`) or dropped (`false`), and reject (leaving the editor
+  // untouched) if the bitmap can't be built.
+  rotateCanvas: (degrees: 90 | 180 | 270) => Promise<boolean>;
+  flipCanvasHorizontal: () => Promise<boolean>;
+  flipCanvasVertical: () => Promise<boolean>;
+  trimCanvas: () => Promise<boolean>;
 
   // Colors
   setForegroundColor: (color: string) => void;
@@ -448,7 +524,11 @@ export interface EditorState {
 
   // Crop
   setCropState: (state: CropState | null) => void;
-  applyCrop: () => void;
+  applyCrop: () => Promise<boolean>;
+
+  // Eyedropper
+  setEyedropperSampleSize: (size: EyedropperSampleSize) => void;
+  setEyedropperSampledColor: (color: string | null) => void;
 
   // Brush
   setBrushSize: (size: number) => void;

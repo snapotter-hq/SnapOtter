@@ -31,6 +31,7 @@ export const nl: TranslationKeys = {
     clear: "Wissen",
     copy: "Kopiëren",
     copied: "Gekopieerd!",
+    copyFailed: "Kopiëren mislukt",
     noResults: "Geen resultaten gevonden",
     showLess: "Minder tonen",
     showMore: "{count} meer tonen",
@@ -1104,6 +1105,11 @@ export const nl: TranslationKeys = {
       name: "PDF organiseren",
       description: "Herorden pagina's met een expliciete paginavolgorde",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Herorden, draai en verwijder pagina's en neem pagina's over uit andere PDF's in één editor",
+    },
     "protect-pdf": {
       name: "PDF beveiligen",
       description: "Voeg wachtwoordbeveiliging toe (AES-256-encryptie)",
@@ -1242,7 +1248,13 @@ export const nl: TranslationKeys = {
       name: "Pipeline-builder",
       description: "Meerdere tools koppelen tot een workflow",
     },
-    processing: { canceled: "Verwerking geannuleerd" },
+    processing: {
+      canceled: "Verwerking geannuleerd",
+      cancelUnavailable: "Deze verwerking kan nu niet worden geannuleerd. Hij loopt nog.",
+      cancelNotAllowed:
+        "Annuleren lukt niet: je bent afgemeld of mag deze verwerking niet stoppen. Hij loopt nog.",
+      cancelFailed: "Annuleren is mislukt. De verwerking loopt nog, probeer het opnieuw.",
+    },
     mediaPlayer: {
       unsupported: "Je browser ondersteunt dit mediaformaat niet.",
     },
@@ -1268,7 +1280,6 @@ export const nl: TranslationKeys = {
       paintOverObjectsToErase: "Verf over objecten die je wilt verwijderen",
     },
     "crop-canvas": {
-      original: "Origineel:",
       cropPreview: "Bijsnijvoorbeeld",
       cropRegionSize: "Bijsnijgebied: {width} x {height}",
       originalSize: "Origineel: {width} x {height}",
@@ -1301,7 +1312,6 @@ export const nl: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} raster . {count} tegels",
     },
     "remove-bg": {
-      original: "Origineel:",
       transparent: "Transparant",
       color: "Kleur",
       gradient: "Verloop",
@@ -1329,7 +1339,6 @@ export const nl: TranslationKeys = {
         "De geëxtraheerde tekst verschijnt hier nadat je OCR hebt uitgevoerd.",
     },
     "image-enhancement": {
-      original: "Origineel:",
       removesNoiseAndArtifactsUsing: "Verwijdert ruis en artefacten met AI",
       analyzingImage: "Afbeelding analyseren...",
       imageLooksGoodFineTune: "De afbeelding ziet er goed uit. Verfijn met de intensiteitsschuif.",
@@ -1341,8 +1350,6 @@ export const nl: TranslationKeys = {
       enhancedSizeKb: "Verbeterd: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Alles",
-      group: "Groep",
       dimensions: "Afmetingen",
       format: "Formaat",
       scanned: "Gescand:",
@@ -1377,7 +1384,6 @@ export const nl: TranslationKeys = {
       pageSize: "Paginaformaat",
     },
     color: {
-      original: "Origineel:",
       light: "Licht",
       brightness: "Helderheid",
       contrast: "Contrast",
@@ -1415,6 +1421,8 @@ export const nl: TranslationKeys = {
       submitBatch: "Comprimeren ({count} bestanden)",
       submitTarget: "Comprimeren tot {size} KB",
       resizedToFit: "Verkleind tot {width} × {height} om binnen {size} KB te passen",
+      batchResized:
+        "{count} van {total} afbeeldingen zijn verkleind om binnen {size} KB te passen.",
       progressLabel: "Comprimeren",
       original: "Origineel: {size} KB",
       processed: "Verwerkt: {size} KB",
@@ -1446,6 +1454,8 @@ export const nl: TranslationKeys = {
       submit: "Formaat wijzigen",
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Formaat wijzigen",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      maxPercentageExceeded: "Gebruik een schaal van 1 tot {max}%.",
     },
     crop: {
       width: "Breedte",
@@ -1469,6 +1479,7 @@ export const nl: TranslationKeys = {
       submit: "Bijsnijden",
       submitBatch: "Bijsnijden ({count} bestanden)",
       progressLabel: "Bijsnijden",
+      free: "Vrij",
     },
     rotate: {
       rotate90CounterClockwise: "90° linksom draaien",
@@ -1488,7 +1499,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Toepassen",
     },
     convert: {
-      original: "Origineel:",
       originalSizeKb: "Origineel: {size} KB",
       processedSizeKb: "Verwerkt: {size} KB",
       targetFormat: "Doelformaat",
@@ -1518,7 +1528,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Optimaliseren",
     },
     "strip-metadata": {
-      original: "Origineel:",
       iccProfile: "Heeft ICC",
       originalSize: "Origineel: {size} KB",
       processedSize: "Verwerkt: {size} KB",
@@ -1542,9 +1551,9 @@ export const nl: TranslationKeys = {
       metadataRemoved: "Metadata verwijderd: {size} KB",
       submit: "Metadata verwijderen",
       progressLabel: "Metadata verwijderen",
+      inspectFailed: "Metadata inspecteren mislukt",
     },
     "edit-metadata": {
-      original: "Origineel:",
       imageDescription: "Afbeeldingsbeschrijving",
       photographerCreatorName: "Naam fotograaf/maker",
       imageTitle: "Afbeeldingstitel",
@@ -1604,6 +1613,7 @@ export const nl: TranslationKeys = {
       datesShifted: "datums verschoven",
       submit: "Metadata toepassen",
       progressLabel: "Metadata schrijven",
+      inspectFailed: "Bestand inspecteren mislukt",
     },
     "bulk-rename": {
       pattern: "Patroon",
@@ -1614,6 +1624,7 @@ export const nl: TranslationKeys = {
       renaming: "Hernoemen...",
       submit: "{count} bestanden hernoemen",
       zipDownloaded: "ZIP succesvol gedownload",
+      renameFailed: "Hernoemen mislukt",
     },
     "image-to-pdf": {
       preview: "Voorbeeld",
@@ -1643,10 +1654,13 @@ export const nl: TranslationKeys = {
       progressLabel: "PDF aanmaken",
       uploadingImages: "Afbeeldingen uploaden...",
       processingPages: "{count} pagina's verwerken...",
+      parseResponseFailed: "Serverantwoord verwerken mislukt",
+      creationFailedWithStatus:
+        "De PDF kon niet worden gemaakt. Controleer je afbeeldingen en probeer het opnieuw.",
+      networkErrorCreation: "Netwerkfout tijdens het maken van de PDF",
+      requestTimedOut: "Time-out van verzoek: de server is mogelijk overbelast",
     },
     "pdf-to-image": {
-      converting2: "Converteren",
-      page: "pagina",
       custom: "Aangepast",
       uploadAPdfToGet: "Upload een PDF om te beginnen",
       generatingPagePreviews: "Paginavoorbeelden genereren...",
@@ -1703,6 +1717,12 @@ export const nl: TranslationKeys = {
       submitPlural: "Favicons genereren ({count} afbeeldingen)",
       downloadZip: "Favicons-ZIP downloaden",
       progressLabel: "Favicons genereren",
+      generationFailed: "De favicon kon niet worden gegenereerd. Probeer een andere afbeelding.",
+      networkError: "Netwerkfout tijdens het genereren van de favicon",
+      timeout: "Time-out van verzoek: de server is mogelijk overbelast",
+      uploadingImages: "Afbeeldingen uploaden...",
+      processingImagesOne: "{count} afbeelding verwerken...",
+      processingImagesOther: "{count} afbeeldingen verwerken...",
     },
     "adjust-colors": {
       light: "Licht",
@@ -1734,7 +1754,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Kleuren aanpassen",
     },
     sharpening: {
-      original: "Origineel:",
       originalSize: "Origineel: {size} KB",
       processedSize: "Verwerkt: {size} KB",
       method: "Methode",
@@ -1761,9 +1780,17 @@ export const nl: TranslationKeys = {
       submit: "Verscherpen",
       submitBatch: "Verscherpen ({count} bestanden)",
       progressLabel: "Verscherpen",
+      presetNames: {
+        light: "Licht",
+        medium: "Gemiddeld",
+        strong: "Sterk",
+        portrait: "Portret",
+        landscape: "Landschap",
+        detail: "Detail",
+        print: "Afdrukken",
+      },
     },
     "replace-color": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       sourceColor: "Bronkleur (te vervangen)",
@@ -1777,7 +1804,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Kleur vervangen",
     },
     "color-blindness": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       simulationType: "Simulatietype",
@@ -1787,6 +1813,41 @@ export const nl: TranslationKeys = {
       submit: "Simuleren",
       submitBatch: "Simuleren ({count} bestanden)",
       progressLabel: "Kleurenblindheid simuleren",
+      types: {
+        protanopia: {
+          label: "Protanopie",
+          description: "Geen rode kegeltjes. Rood lijkt donker. ~1% van de mannen.",
+        },
+        protanomaly: {
+          label: "Protanomalie",
+          description: "Verminderde roodgevoeligheid. ~1% van de mannen.",
+        },
+        deuteranopia: {
+          label: "Deuteranopie",
+          description: "Geen groene kegeltjes. Rood en groen lijken op elkaar. ~1% van de mannen.",
+        },
+        deuteranomaly: {
+          label: "Deuteranomalie",
+          description: "Verminderde groengevoeligheid. Meest voorkomende type. ~5% van de mannen.",
+        },
+        tritanopia: {
+          label: "Tritanopie",
+          description: "Geen blauwe kegeltjes. Blauw en groen lijken op elkaar. Zeer zeldzaam.",
+        },
+        tritanomaly: {
+          label: "Tritanomalie",
+          description: "Verminderde blauwgevoeligheid. Zeer zeldzaam.",
+        },
+        achromatopsia: {
+          label: "Achromatopsie",
+          description: "Volledige kleurenblindheid. Ziet alleen helderheid. Zeer zeldzaam.",
+        },
+        blueConeMonochromacy: {
+          label: "Blauwe-kegeltjesmonochromasie",
+          description:
+            "Alleen de blauwe kegeltjes werken. Zeer beperkt kleurenzicht. Zeer zeldzaam.",
+        },
+      },
     },
     "remove-background": {
       subject: "Onderwerp",
@@ -1824,6 +1885,28 @@ export const nl: TranslationKeys = {
       submitBatch: "Achtergrond verwijderen ({count} bestanden)",
       progressLabel: "Achtergrond verwijderen",
       cpuNote: "Gebruikt een AI-model. Zonder GPU kan een grote afbeelding even duren.",
+      colorPresets: {
+        white: "Wit",
+        black: "Zwart",
+        red: "Rood",
+        green: "Groen",
+        blue: "Blauw",
+      },
+      gradientPresets: {
+        purple: "Paars",
+        pink: "Roze",
+        blue: "Blauw",
+        green: "Groen",
+        sunset: "Zonsondergang",
+        lavender: "Lavendel",
+      },
+      effectsProcessingFailed: "Effecten verwerken mislukt",
+      effectsExpired:
+        "De eerdere achtergrondverwijdering is verlopen, dus die wordt opnieuw uitgevoerd. Pas de effecten toe zodra dat klaar is.",
+      refineChanged:
+        "Onderwerp, kwaliteit, randverzachting en kleurdecontaminatie worden toegepast bij het verwijderen van de achtergrond. Voer het opnieuw uit om de nieuwe instellingen te gebruiken.",
+      backgroundImageRequired: "Kies een achtergrondafbeelding om door te gaan.",
+      invalidHexColor: "Gebruik een hex-kleur zoals #FF5500 of #F50.",
     },
     "remove-gif-background": {
       quality: "Kwaliteit",
@@ -1862,7 +1945,6 @@ export const nl: TranslationKeys = {
       download: "Downloaden",
     },
     upscale: {
-      original: "Origineel:",
       off: "Uit",
       originalKb: "Origineel: {size} KB",
       upscaledKb: "Opgeschaald: {size} KB",
@@ -1879,9 +1961,11 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "{count} afbeeldingen opschalen",
       cpuNote:
         "AI-opschaling is rekenintensief. Zonder GPU kan een grote afbeelding enkele minuten duren.",
+      qualityFast: "Snel",
+      qualityBalanced: "Gebalanceerd",
+      qualityBest: "Beste",
     },
     "erase-object": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       qualityFast: "Snel",
@@ -1898,12 +1982,17 @@ export const nl: TranslationKeys = {
       outputFormat: "Uitvoerformaat",
       quality: "Kwaliteit",
       paintHint:
-        "Verf over de objecten die je wilt verwijderen. Gebruik Ctrl+Z om ongedaan te maken.",
+        "Verf over de objecten die je wilt verwijderen. Gebruik {shortcut} om ongedaan te maken.",
       lassoHint:
-        "Teken een lus rond het object dat je wilt verwijderen. Gebruik Ctrl+Z om ongedaan te maken.",
+        "Teken een lus rond het object dat je wilt verwijderen. Gebruik {shortcut} om ongedaan te maken.",
       submit: "Object verwijderen",
       submitBatch: "Alles verwijderen ({count})",
       progressLabel: "Object verwijderen",
+      stall: "Verwerking duurde te lang zonder voortgang. Probeer het opnieuw.",
+      stallBatch: "Verwerking duurde te lang. Probeer het opnieuw.",
+      timeoutOverloaded:
+        "Time-out van verzoek: de server is mogelijk overbelast. Probeer het opnieuw.",
+      erasingProgress: "Wissen {current}/{total}",
     },
     ocr: {
       copied: "Gekopieerd",
@@ -1913,6 +2002,8 @@ export const nl: TranslationKeys = {
         "Verbetert lokaal contrast vóór herkenning. Snel past dit direct toe; Gebalanceerd en Beste behouden de variant alleen als de gekalibreerde score het resultaat verbetert.",
       fastKoreanUnsupported:
         "Snelle OCR ondersteunt geen Koreaans. Installeer het pakket voor nauwkeurige OCR en kies Gebalanceerd of Beste.",
+      fastArabicUnsupported:
+        "Snelle OCR ondersteunt geen Arabisch. Installeer het pakket voor nauwkeurige OCR en kies Gebalanceerd of Beste.",
       language: "Taal",
       autoDetect: "Automatisch detecteren",
       extractedText: "Geextraheerde tekst",
@@ -1921,6 +2012,9 @@ export const nl: TranslationKeys = {
       submit: "Tekst extraheren",
       submitBatch: "Tekst extraheren ({count} bestanden)",
       progressLabel: "Tekst extraheren",
+      filesFailed: "{failed} van {total} bestanden mislukt",
+      noTextDetectedInline: "(geen tekst gedetecteerd)",
+      fileErrorInline: "(fout: {message})",
     },
     "ocr-pdf": {
       quality: "Kwaliteit",
@@ -1934,7 +2028,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Tekst uit PDF extraheren",
     },
     "blur-faces": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       blurRadius: "Vervagingsradius",
@@ -1947,7 +2040,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Gezichten vervagen",
     },
     "enhance-faces": {
-      original: "Origineel:",
       subtle: "Subtiel",
       maximum: "Maximaal",
       fewerFaces: "Minder gezichten",
@@ -2008,6 +2100,9 @@ export const nl: TranslationKeys = {
       submitSubject: "Slim bijsnijden",
       submitFace: "Gezicht bijsnijden",
       submitTrim: "Randen bijsnijden",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      cropAreaExceeded:
+        "Deze uitsnede overschrijdt de limiet van {max} pixels. Verklein de breedte, hoogte of opvulling.",
     },
     imageEnhancement: {
       enhancementMode: "Verbeteringsmodus",
@@ -2043,6 +2138,14 @@ export const nl: TranslationKeys = {
         "Diepte-verbetering vereist de Opschalen & Verbeteren-bundel, die niet is geïnstalleerd, dus je krijgt de standaardverbetering.",
       deepEnhanceSkippedAnimated:
         "Diepte-verbetering werkt niet op geanimeerde afbeeldingen, dus elk frame kreeg de standaardverbetering.",
+      batchDeepEnhanceSkipped:
+        "Diepte-verbetering is op {count} van {total} afbeeldingen niet uitgevoerd, dus die kregen de standaardverbetering.",
+      batchDeepEnhanceSkippedFailed:
+        "Diepte-verbetering is mislukt op {count} van {total} afbeeldingen, dus die kregen de standaardverbetering.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Diepte-verbetering is op {count} van {total} afbeeldingen niet uitgevoerd, omdat de Opschalen & Verbeteren-bundel niet is geïnstalleerd.",
+      batchDeepEnhanceSkippedAnimated:
+        "Diepte-verbetering heeft {count} van {total} afbeeldingen overgeslagen, omdat ze geanimeerd zijn.",
     },
     "noise-removal": {
       off: "Uit",
@@ -2074,7 +2177,6 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "Ruis verwijderen uit {count} afbeeldingen",
     },
     "red-eye-removal": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       fixedKb: "Gecorrigeerd: {size} KB",
       sensitivity: "Gevoeligheid",
@@ -2091,7 +2193,6 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "Rode ogen corrigeren in {count} afbeeldingen",
     },
     "restore-photo": {
-      original: "Origineel:",
       subtle: "Subtiel",
       strong: "Sterk",
       originalKb: "Origineel: {size} KB",
@@ -2128,6 +2229,9 @@ export const nl: TranslationKeys = {
       submit: "Formaat wijzigen",
       submitBatch: "Formaat wijzigen ({count} bestanden)",
       progressLabel: "Inhoudsbewust schalen",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
+      areaExceeded:
+        "Inhoudsbewust formaat wijzigen is beperkt tot {max} pixels in totaal. Verlaag de breedte of hoogte.",
     },
     "ai-canvas-expand": {
       quality: "Kwaliteit",
@@ -2149,7 +2253,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Canvas uitbreiden",
     },
     colorize: {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       colorizedKb: "Ingekleurd: {size} KB",
       aiModel: "AI-model",
@@ -2296,6 +2399,13 @@ export const nl: TranslationKeys = {
       dragToAdjust: "Sleep om aan te passen",
       scrollToZoom: "Scroll om te zoomen",
       photoGenerated: "Foto gegenereerd. Download via het linkerpaneel.",
+      analysisFailedWithStatus:
+        "Deze foto kon niet worden geanalyseerd. Probeer een scherpere foto.",
+      faceAnalysisFailed: "Gezichtsanalyse mislukt",
+      generationFailedWithStatus: "De pasfoto kon niet worden gegenereerd. Probeer het opnieuw.",
+      photoGenerationFailed: "Foto genereren mislukt",
+      analysisExpired:
+        "De analyse is verlopen, dus de foto wordt opnieuw geanalyseerd. Genereer zodra dat klaar is.",
     },
     "transcribe-audio": {
       language: "Taal",
@@ -2355,7 +2465,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Achtergrond vervagen",
     },
     "watermark-text": {
-      original: "Origineel:",
       applyWatermark: "Watermerk toepassen",
       tiledRepeating: "Betegeld (herhalend)",
       originalKb: "Origineel: {size} KB",
@@ -2378,7 +2487,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Watermerk toevoegen",
     },
     "watermark-image": {
-      original: "Origineel:",
       center: "Midden",
       topLeft: "Linksboven",
       topRight: "Rechtsboven",
@@ -2397,7 +2505,6 @@ export const nl: TranslationKeys = {
       submitBatch: "Watermerk toepassen ({count} bestanden)",
     },
     "text-overlay": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       text: "Tekst",
@@ -2417,7 +2524,6 @@ export const nl: TranslationKeys = {
       defaultText: "Jouw tekst hier",
     },
     compose: {
-      original: "Origineel:",
       screen: "Scherm",
       processing: "Verwerken...",
       overlayImage: "Overlay-afbeelding",
@@ -2472,9 +2578,6 @@ export const nl: TranslationKeys = {
       backToGallery: "Terug naar galerij",
     },
     info: {
-      min: "min:",
-      max: "max:",
-      mean: "gem:",
       minValue: "min:{value}",
       maxValue: "max:{value}",
       meanValue: "gem:{value}",
@@ -2511,6 +2614,7 @@ export const nl: TranslationKeys = {
       similarity: "Gelijkenis: {percent}%",
       submit: "Vergelijken",
       downloadDiff: "Verschil downloaden",
+      comparisonFailed: "Vergelijking mislukt",
     },
     "find-duplicates": {
       sensitivity: "Gevoeligheid",
@@ -2540,6 +2644,10 @@ export const nl: TranslationKeys = {
       threshold: "Drempel",
       submit: "Scannen op duplicaten",
       scanning: "Scannen...",
+      parseResultsFailed: "Scanresultaten verwerken mislukt",
+      networkErrorUpload:
+        "Netwerkfout tijdens het uploaden. Probeer het met minder bestanden of controleer je verbinding.",
+      requestTimedOut: "Time-out van verzoek. Probeer het met minder bestanden.",
     },
     "color-palette": {
       colors: "Kleuren",
@@ -2610,6 +2718,26 @@ export const nl: TranslationKeys = {
       downloadFormat: "Downloadformaat",
       submit: "QR-code genereren",
       download: "QR-code downloaden",
+      styleSquare: "Vierkant",
+      styleRounded: "Afgerond",
+      styleDots: "Stippen",
+      styleClassy: "Chic",
+      styleClassyRounded: "Chic rond",
+      styleExtraRounded: "Extra rond",
+      styleDot: "Stip",
+      formatDescPng: "Beste voor digitaal",
+      formatDescSvg: "Beste voor print",
+      formatDescJpeg: "Kleiner bestand",
+      formatDescWebp: "Modern formaat",
+      vcardFirstName: "Voornaam",
+      vcardFirstNamePlaceholder: "Jan",
+      vcardLastName: "Achternaam",
+      vcardLastNamePlaceholder: "Jansen",
+      vcardOrganization: "Organisatie",
+      vcardOrganizationPlaceholder: "Bedrijf",
+      vcardJobTitle: "Functietitel",
+      vcardJobTitlePlaceholder: "Ontwikkelaar",
+      vcardWebsite: "Website",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2659,6 +2787,10 @@ export const nl: TranslationKeys = {
       noBarcodesFound: "Geen barcodes gevonden",
       barcodesFound: "{count} barcode gevonden",
       barcodesFoundPlural: "{count} barcodes gevonden",
+      scanningFile: "{name} scannen...",
+      scanningFailedWithStatus:
+        "Deze afbeelding kon niet worden gescand. Probeer een andere afbeelding.",
+      filesFailed: "{count} van {total} bestanden mislukt",
     },
     collage: {
       sideBySide: "Naast elkaar",
@@ -2679,9 +2811,6 @@ export const nl: TranslationKeys = {
       mosaic: "Mozaïek",
       uploadingImages: "Afbeeldingen uploaden...",
       processingCollage: "Collage verwerken...",
-      loaded: "geladen",
-      images: "afbeeldingen",
-      collage: "Collage:",
       snapotter: "SnapOtter",
       background: "Achtergrond",
       format: "Formaat",
@@ -2717,6 +2846,12 @@ export const nl: TranslationKeys = {
       quality: "Kwaliteit",
       submit: "Collage maken",
       downloadCollage: "Collage downloaden",
+      ratioFree: "Vrij",
+      bgWhite: "Wit",
+      bgBlack: "Zwart",
+      bgNone: "Geen",
+      bgCustom: "Aangepast",
+      collageFailed: "Collage maken mislukt",
     },
     stitch: {
       format: "Formaat",
@@ -2746,6 +2881,7 @@ export const nl: TranslationKeys = {
       outputFormat: "Uitvoerformaat",
       quality: "Kwaliteit",
       submit: "Afbeeldingen samenvoegen",
+      stitchFailed: "Samenvoegen mislukt",
     },
     split: {
       splitMode: "Splitsmodus",
@@ -2774,6 +2910,21 @@ export const nl: TranslationKeys = {
       submit: "Afbeelding splitsen",
       downloadAll: "Alles downloaden (ZIP)",
       tileWarningSmall: "Tegels worden erg klein ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Horizontale helft",
+        verticalHalf: "Verticale helft",
+        quarters: "Kwarten",
+        horizontalStrip: "Horizontale strook",
+        verticalStrip: "Verticale strook",
+        grid9: "Raster van 9 tegels",
+        portrait6: "6 tegels staand",
+        landscape6: "6 tegels liggend",
+        grid16: "Raster van 16 tegels",
+      },
+      keepOriginal: "Origineel behouden",
+      auto: "Automatisch",
+      splitFailed: "Splitsen mislukt",
+      failedToSplit: "Splitsen van {name} mislukt: {detail}",
     },
     border: {
       blur: "Vervaging",
@@ -2799,6 +2950,16 @@ export const nl: TranslationKeys = {
       submit: "Rand toevoegen",
       submitBatch: "Rand toevoegen ({count} bestanden)",
       progressLabel: "Rand toevoegen",
+      presetNames: {
+        cleanWhite: "Zuiver wit",
+        galleryBlack: "Galerijzwart",
+        shadow: "Schaduw",
+        rounded: "Afgerond",
+        polaroid: "Polaroid",
+        vintage: "Vintage",
+        minimal: "Minimaal",
+        cinematic: "Filmisch",
+      },
     },
     beautify: {
       background: "Achtergrond",
@@ -2815,7 +2976,6 @@ export const nl: TranslationKeys = {
       text: "Tekst",
       position: "Positie",
       newTab: "Nieuw tabblad",
-      frame: "Frame",
       quickPresets: "Snelle voorinstellingen",
       linear: "Lineair",
       radial: "Radiaal",
@@ -2843,6 +3003,33 @@ export const nl: TranslationKeys = {
       submit: "Verfraaien",
       submitBatch: "Verfraaien ({count} bestanden)",
       progressLabel: "Screenshot verfraaien",
+      presetPurpleHaze: "Paarse nevel",
+      presetFlamingo: "Flamingo",
+      presetOcean: "Oceaan",
+      presetMidnight: "Middernacht",
+      presetMint: "Mint",
+      presetSunset: "Zonsondergang",
+      presetCleanWhite: "Zuiver wit",
+      presetNoBackground: "Geen achtergrond",
+      bgGradient: "Verloop",
+      bgSolid: "Effen",
+      bgImage: "Afbeelding",
+      none: "Geen",
+      frameBrowser: "Browser",
+      shadowSubtle: "Subtiel",
+      shadowMedium: "Gemiddeld",
+      shadowDramatic: "Dramatisch",
+      shadowCustom: "Aangepast",
+      socialOriginal: "Origineel",
+      socialIgSquare: "IG vierkant",
+      socialIgStory: "IG Story",
+      positionTopLeft: "Linksboven",
+      positionTopRight: "Rechtsboven",
+      positionCenter: "Midden",
+      positionBottomLeft: "Linksonder",
+      positionBottomRight: "Rechtsonder",
+      processingFailed: "Verwerking mislukt",
+      processingFailedStatus: "Deze afbeelding kon niet worden verwerkt. Probeer het opnieuw.",
     },
     "circle-crop": {
       border: "Rand",
@@ -2881,6 +3068,16 @@ export const nl: TranslationKeys = {
       submit: "Duotoon toepassen",
       submitBatch: "Duotoon toepassen ({count} bestanden)",
       progressLabel: "Duotoon toepassen",
+      presetNames: {
+        classic: "Klassiek",
+        noir: "Noir",
+        sepia: "Sepia",
+        midnight: "Middernacht",
+        sunset: "Zonsondergang",
+        cyber: "Cyber",
+        ocean: "Oceaan",
+        forest: "Bos",
+      },
     },
     "image-pad": {
       background: "Achtergrond",
@@ -2893,6 +3090,7 @@ export const nl: TranslationKeys = {
       submit: "Afbeelding opvullen",
       submitBatch: "Afbeelding opvullen ({count} bestanden)",
       progressLabel: "Afbeelding opvullen",
+      custom: "Aangepast",
     },
     pixelate: {
       blockSize: "Blokgrootte",
@@ -2995,7 +3193,6 @@ export const nl: TranslationKeys = {
       progressLabel: "SVG converteren",
     },
     vectorize: {
-      original: "Origineel:",
       detail: "Detail",
       smoothing: "Vloeiendheid",
       blackWhite: "Zwart-wit",
@@ -3032,7 +3229,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Vectoriseren",
     },
     "gif-tools": {
-      original: "Origineel:",
       widthPx: "Breedte (px)",
       auto: "Automatisch",
       heightPx: "Hoogte (px)",
@@ -3090,6 +3286,7 @@ export const nl: TranslationKeys = {
       submit: "GIF verwerken",
       submitBatch: "Verwerken ({count} bestanden)",
       progressLabel: "GIF verwerken",
+      maxDimensionExceeded: "Gebruik een formaat van 1 tot {max} px.",
     },
     "image-to-base64": {
       converting: "Converteren...",
@@ -3124,6 +3321,7 @@ export const nl: TranslationKeys = {
       includeText: "Tekst tonen",
       submit: "Barcode genereren",
       download: "Barcode downloaden",
+      generateFailed: "Barcode genereren mislukt",
     },
     "chart-maker": {
       optionalChartTitle: "Optionele grafiektitel",
@@ -3134,6 +3332,11 @@ export const nl: TranslationKeys = {
       submit: "Grafiek maken",
       submitBatch: "Grafiek maken ({count} bestanden)",
       progressLabel: "Grafiek maken",
+      kindBar: "Staaf",
+      kindLine: "Lijn",
+      kindPie: "Taart",
+      rowsSkipped:
+        "Rijen in de grafiek: {charted}. Overgeslagen omdat de waardekolom geen getal bevatte: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Model",
@@ -3524,12 +3727,12 @@ export const nl: TranslationKeys = {
       submit: "Comprimeren",
       submitBatch: "Comprimeren ({count} bestanden)",
       submitTarget: "Comprimeren tot {size}",
+      batchMissed: "{count} van {total} bestanden kwamen niet onder {target}.",
       progressLabel: "Comprimeren",
       bestEffortHint:
         "Maximaal haalbaar. Op afbeeldingen gebaseerde PDF's komen dichtbij; PDF's met alleen tekst worden mogelijk niet tot deze grootte verkleind.",
       targetReached: "Doel van {target} bereikt (resultaat: {size}).",
-      targetMissed:
-        "Kon {target} niet bereiken. De kleinst haalbare grootte was {size}, omdat deze PDF voornamelijk uit tekst of vectoren bestaat, die beeldcompressie niet kan verkleinen.",
+      targetMissed: "Kon {target} niet bereiken. De kleinst haalbare grootte was {size}.",
     },
     "rotate-pdf": {
       angle: "Rotatiehoek",
@@ -3598,6 +3801,30 @@ export const nl: TranslationKeys = {
       pageLabel: "Pagina {n}",
       orderTooLong:
         "Te veel afzonderlijke verplaatsingen om te verzenden. Herstel en probeer het met minder wijzigingen.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maximaal {docs} PDF’s en {pages} uitvoerpagina’s.",
+      addDocument: "PDF toevoegen",
+      addAll: "Alle pagina's toevoegen",
+      allPages: "Alle in plan",
+      addPage: "Pagina {n} toevoegen",
+      dragHint:
+        "Sleep om pagina's te herordenen, draaien of verwijderen. Voeg PDF's toe om pagina's over te nemen.",
+      reset: "Plan herstellen",
+      emptyPlan: "Nog geen pagina's in het plan. Voeg pagina's toe vanuit de documenten hierboven.",
+      docFailed: "Een document kon niet worden gelezen.",
+      skippedNotPdf: "{count} bestand(en) overgeslagen: alleen PDF’s kunnen worden toegevoegd.",
+      skippedOverLimit: "{count} PDF(’s) niet toegevoegd: de editor bevat maximaal {docs} PDF’s.",
+      pageLabel: "Positie {n}",
+      planSummary: "{pages} pagina('s) uit {docs} document(en) worden samengesteld.",
+      submit: "PDF maken ({pages} pagina's)",
+      progressLabel: "Samenstellen",
+      rotateLeft: "Links draaien",
+      rotateRight: "Rechts draaien",
+      removePage: "Pagina verwijderen",
+      removeDoc: "PDF verwijderen",
+      zoomIn: "Inzoomen",
+      zoomOut: "Uitzoomen",
     },
     "protect-pdf": {
       userPassword: "Gebruikerswachtwoord",
@@ -3719,6 +3946,9 @@ export const nl: TranslationKeys = {
         uploadHint:
           "Zet een PNG / JPG neer of klik om te kiezen. Een transparante PNG werkt het best.",
       },
+      exportFailed: "Kan de geplaatste handtekeningen niet lezen. Probeer het opnieuw.",
+      stall: "Verwerking duurde te lang. Probeer het opnieuw.",
+      timeout: "Time-out van verzoek. Probeer het opnieuw.",
     },
     "redact-pdf": {
       terms: "Te censureren termen",
@@ -3732,6 +3962,9 @@ export const nl: TranslationKeys = {
       submit: "Tekst extraheren",
       submitBatch: "Tekst extraheren ({count} bestanden)",
       progressLabel: "Extraheren",
+      scannedHint:
+        "Deze pdf is gescand, dus er is geen tekst om te extraheren. OCR kan hem lezen, maar dat duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+      runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-to-word": {
       hint: "Geschikt voor tekst-PDF's; gescande pagina's vereisen OCR",
@@ -3888,6 +4121,8 @@ export const nl: TranslationKeys = {
     importFromFiles: "Importeren uit Bestanden",
     saveToFiles: "Opslaan in Bestanden",
     savedToFiles: "Opgeslagen in Bestanden",
+    resultExpired: "Dit resultaat is verlopen. Voer de tool opnieuw uit.",
+    libraryFull: "Je bestandsopslag is vol. Verwijder een paar bestanden en probeer het opnieuw.",
     librarySaveTitle: "Dit bestand komt uit je Bestanden",
     librarySaveAsNew: "Resultaat opslaan als nieuw bestand",
     librarySaveAsNewHint: "Het origineel blijft in je Bestanden",
@@ -4109,7 +4344,7 @@ export const nl: TranslationKeys = {
       dropDescription: "Sleep een afbeelding hierheen om te beginnen",
       openImageButton: "Afbeelding openen",
       newDocumentButton: "Nieuw document",
-      pasteHint: "Of plak vanuit het klembord (Ctrl+V)",
+      pasteHint: "Of plak vanuit het klembord ({shortcut})",
     },
     mobile: {
       heading: "Desktop aanbevolen",
@@ -4162,6 +4397,7 @@ export const nl: TranslationKeys = {
         ratioLabel: "Verhouding:",
         applyTitle: "Bijsnijden toepassen (Enter)",
         cancelTitle: "Bijsnijden annuleren (Escape)",
+        free: "Vrij",
       },
       dodgeBurn: {
         dodge: "Tegenhouden",
@@ -4178,6 +4414,9 @@ export const nl: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Monster:",
         toggleDropdown: "Keuzelijst in-/uitklappen",
+        samplePoint: "Punt (1x1)",
+        sampleAverage3: "3x3 gemiddelde",
+        sampleAverage5: "5x5 gemiddelde",
       },
       fill: {
         tolerance: "Tolerantie",
@@ -4274,6 +4513,68 @@ export const nl: TranslationKeys = {
         grain: "Korrel",
         resetAll: "Alles resetten",
         apply: "Toepassen",
+        autoButtons: {
+          autoTone: "Automatische tinten",
+          autoContrast: "Automatisch contrast",
+          autoColor: "Automatische kleur",
+          autoEnhance: "Automatisch verbeteren",
+        },
+        sliders: {
+          brightness: "Helderheid",
+          contrast: "Contrast",
+          hue: "Kleurtoon",
+          saturation: "Verzadiging",
+          luminance: "Luminantie",
+          exposure: "Belichting",
+          vibrance: "Levendigheid",
+          warmth: "Warmte",
+        },
+        filters: {
+          grayscale: "Grijstinten",
+          sepia: "Sepia",
+          invert: "Inverteren",
+          solarize: "Solariseren",
+          blur: "Vervagen",
+          sharpen: "Verscherpen",
+          noise: "Ruis",
+          pixelate: "Pixeleren",
+          emboss: "Reliefdruk",
+          posterize: "Posteriseren",
+          threshold: "Drempel",
+          kaleidoscope: "Caleidoscoop",
+          motionBlur: "Bewegingsonscherpte",
+          radialBlur: "Radiaal vervagen",
+          surfaceBlur: "Oppervlaktevervaging",
+        },
+        params: {
+          radius: "Straal",
+          amount: "Sterkte",
+          size: "Grootte",
+          strength: "Intensiteit",
+          levels: "Niveaus",
+          level: "Niveau",
+          power: "Kracht",
+          angle: "Hoek",
+          distance: "Afstand",
+          centerX: "Middelpunt X",
+          centerY: "Middelpunt Y",
+          threshold: "Drempel",
+          midpoint: "Middelpunt",
+          roundness: "Rondheid",
+          feather: "Doezelaar",
+          roughness: "Ruwheid",
+        },
+        curvePresets: {
+          linear: "Lineair",
+          darken: "Donkerder",
+          lighten: "Lichter",
+          increaseContrast: "Contrast verhogen",
+          decreaseContrast: "Contrast verlagen",
+          mediumContrast: "Gemiddeld contrast",
+          strongContrast: "Sterk contrast",
+          crossProcess: "Crossprocessing",
+          negative: "Negatief",
+        },
       },
       color: {
         channelAriaLabel: "Kleurkanaal {channel}",
@@ -4289,12 +4590,64 @@ export const nl: TranslationKeys = {
         median: "Mediaan",
       },
       history: {
-        undoTitle: "Ongedaan maken (Ctrl+Z)",
-        redoTitle: "Opnieuw (Ctrl+Shift+Z)",
+        undoTitle: "Ongedaan maken ({shortcut})",
+        redoTitle: "Opnieuw ({shortcut})",
         empty: "Nog geen geschiedenis",
+        unknown: "Onbekend",
+        actions: {
+          initialState: "Beginstatus",
+          loadImage: "Afbeelding laden",
+          loadProject: "Project laden",
+          restoreAutosave: "Automatische opslag herstellen",
+          resizeCanvas: "Canvasformaat wijzigen",
+          resizeImage: "Afbeelding herschalen",
+          rotateCanvas: "Canvas draaien {degrees}",
+          flipHorizontal: "Horizontaal spiegelen",
+          flipVertical: "Verticaal spiegelen",
+          trimCanvas: "Canvas bijsnijden",
+          addObject: "{type} toevoegen",
+          layerEffect: "Laageffect",
+          delete: "Verwijderen",
+          bringToFront: "Naar voren brengen",
+          bringForward: "Een laag naar voren",
+          sendBackward: "Een laag naar achteren",
+          sendToBack: "Naar achteren sturen",
+          addLayer: "Laag toevoegen",
+          deleteLayer: "Laag verwijderen",
+          duplicateLayer: "Laag dupliceren",
+          reorderLayers: "Lagen herschikken",
+          mergeDown: "Samenvoegen met onderliggende",
+          flattenAll: "Alles samenvoegen",
+          adjust: "{name} aanpassen",
+          resetAdjustments: "Aanpassingen resetten",
+          levels: "Niveaus",
+          curves: "Curven",
+          resetLevels: "Niveaus resetten",
+          resetCurves: "Curven resetten",
+          resetAll: "Alles resetten",
+          toggleFilter: "Filter {name} aan/uit",
+          setFilterParam: "{filter} {param} instellen",
+          crop: "Bijsnijden",
+          cut: "Knippen",
+          paste: "Plakken",
+          pasteInPlace: "Op dezelfde plek plakken",
+          nudge: "Verschuiven",
+          brushStroke: "Penseelstreek",
+          eraserStroke: "Gumstreek",
+        },
+        objectTypes: {
+          line: "Lijn",
+          rect: "Rechthoek",
+          ellipse: "Ellips",
+          text: "Tekst",
+          image: "Afbeelding",
+          arrow: "Pijl",
+          polygon: "Veelhoek",
+          star: "Ster",
+        },
       },
       layers: {
-        newLayerTitle: "Nieuwe laag (Ctrl+Shift+N)",
+        newLayerTitle: "Nieuwe laag ({shortcut})",
         blend: "Overvloeien",
         opacity: "Dekking",
         hideLayer: "Laag verbergen",
@@ -4322,9 +4675,34 @@ export const nl: TranslationKeys = {
           positionCenter: "Midden",
           positionOutside: "Buiten",
         },
+        blendModes: {
+          normal: "Normaal",
+          multiply: "Vermenigvuldigen",
+          screen: "Scherm",
+          overlay: "Bedekken",
+          darken: "Donkerder",
+          lighten: "Lichter",
+          colorDodge: "Kleur tegenhouden",
+          colorBurn: "Kleur doordrukken",
+          hardLight: "Fel licht",
+          softLight: "Zacht licht",
+          difference: "Verschil",
+          exclusion: "Uitsluiting",
+          hue: "Kleurtoon",
+          saturation: "Verzadiging",
+          color: "Kleur",
+          luminosity: "Luminantie",
+        },
+        duplicate: "Dupliceren",
+        flattenAll: "Alles samenvoegen",
       },
       navigator: {
         noImageLoaded: "Geen afbeelding geladen",
+      },
+      tabs: {
+        layers: "Lagen",
+        adjustments: "Aanpassingen",
+        history: "Geschiedenis",
       },
     },
     ui: {
@@ -4340,6 +4718,7 @@ export const nl: TranslationKeys = {
         anchorLabel: "Ankerpunt:",
         anchorAriaLabel: "Ankerpunt {position}",
         backgroundLabel: "Achtergrond:",
+        transparent: "Transparant",
         anchors: {
           topLeft: "linksboven",
           topCenter: "midden boven",
@@ -4357,6 +4736,14 @@ export const nl: TranslationKeys = {
         original: "Origineel: {width} x {height} px",
         note: "Schaalt alle objecten evenredig mee naar de nieuwe afmetingen.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Deze afbeelding is te groot om in de browser met dit gereedschap te bewerken. Probeer een kleiner canvasformaat.",
+        crossOriginBlocked:
+          "De editor kan de pixels van een afbeelding van een andere site niet lezen. Download de afbeelding en open het bestand.",
+        sourceImageFailed:
+          "De afbeelding kon niet worden geladen. Staat ze op een andere site, dan moet die site toegang vanaf andere oorsprongen toestaan.",
+      },
       exportDialog: {
         heading: "Afbeelding exporteren",
         previewAlt: "Exportvoorbeeld",
@@ -4370,13 +4757,19 @@ export const nl: TranslationKeys = {
         exportButton: "Exporteren",
         copied: "Gekopieerd",
         copyFailed: "Kopiëren mislukt",
+        exportFailed: "Exporteren mislukt. Probeer het opnieuw of kies een ander formaat.",
+        tooLarge:
+          "Deze export is te groot voor de browser om te verwerken. Probeer kleinere afmetingen.",
         saveProject: "Project opslaan",
         loadProject: "Project laden",
+        invalidProject: "Dit bestand is geen geldig SnapOtter-project.",
       },
       autosaveRecovery: {
         message: "Niet-opgeslagen werk van {time} hersteld.",
         restore: "Herstellen",
         discard: "Verwerpen",
+        saveFailed:
+          "Kon je werk niet opslaan in deze browser. Exporteer of gebruik Project opslaan om een kopie te bewaren.",
       },
       fillDialog: {
         heading: "Vullen",
@@ -4402,6 +4795,7 @@ export const nl: TranslationKeys = {
           black: "Zwart",
           transparent: "Transparant",
         },
+        presetCustom: "Aangepast",
       },
       colorSwatch: {
         ariaLabel: "Kleur {color}",
@@ -4411,6 +4805,25 @@ export const nl: TranslationKeys = {
         noneSelected: "{label}: geen",
         setNone: "Geen {label}",
       },
+      contextMenu: {
+        duplicate: "Dupliceren",
+        selectAll: "Alles selecteren",
+      },
+    },
+    toolbar: {
+      move: "Verplaatsen",
+      marquee: "Selectiekader",
+      crop: "Bijsnijden",
+      eyedropper: "Pipet",
+      brush: "Penseel",
+      pencil: "Potlood",
+      cloneStamp: "Kloonstempel",
+      eraser: "Gum",
+      paintBucket: "Verfemmer",
+      gradient: "Verloop",
+      text: "Tekst",
+      hand: "Hand",
+      zoom: "Zoom",
     },
   },
   settings: {
@@ -4443,6 +4856,7 @@ export const nl: TranslationKeys = {
       saveButton: "Instellingen opslaan",
       saveSuccess: "Instellingen opgeslagen.",
       saveFailed: "Instellingen opslaan mislukt.",
+      loadFailed: "Voorkeuren laden mislukt.",
       roleUnknown: "onbekend",
     },
     system: {
@@ -4468,6 +4882,7 @@ export const nl: TranslationKeys = {
       saveButton: "Instellingen opslaan",
       saveSuccess: "Instellingen opgeslagen.",
       saveFailed: "Instellingen opslaan mislukt.",
+      loadFailed: "Systeeminstellingen laden mislukt.",
       limitsAndResources: "Limieten & Bronnen",
       maxFileSize: "Max bestandsgrootte",
       maxBatchSize: "Max batchgrootte",
@@ -4505,10 +4920,10 @@ export const nl: TranslationKeys = {
       newPasswordPlaceholder: "Nieuw wachtwoord",
       confirmPasswordPlaceholder: "Nieuw wachtwoord bevestigen",
       passwordsMismatch: "Wachtwoorden komen niet overeen",
-      passwordTooShort: "Wachtwoord moet minimaal 4 tekens lang zijn",
       changeSuccess: "Wachtwoord succesvol gewijzigd",
       changeFailed: "Wachtwoord wijzigen mislukt",
       currentPasswordIncorrect: "Huidig wachtwoord is onjuist",
+      passwordChangedElsewhere: "Je wachtwoord is ergens anders gewijzigd. Log opnieuw in.",
       changePasswordButton: "Wachtwoord wijzigen",
       loginAttemptLimitNote: "Inlogpogingslimieten kun je instellen bij Systeeminstellingen.",
       twoFactorHeading: "Tweefactorauthenticatie",
@@ -4557,6 +4972,8 @@ export const nl: TranslationKeys = {
       passwordMinLengthDesc: "Minimaal aantal tekens vereist voor wachtwoorden.",
       passwordRequireUppercase: "Hoofdletter vereist",
       passwordRequireUppercaseDesc: "Minimaal een hoofdletter vereist.",
+      passwordRequireLowercase: "Kleine letter vereist",
+      passwordRequireLowercaseDesc: "Minimaal een kleine letter vereist.",
       passwordRequireNumber: "Cijfer vereist",
       passwordRequireNumberDesc: "Minimaal een cijfer vereist.",
       passwordRequireSpecial: "Speciaal teken vereist",
@@ -4564,6 +4981,13 @@ export const nl: TranslationKeys = {
       passwordPolicyHeading: "Wachtwoordbeleid",
       securitySettingsSaved: "Beveiligingsinstellingen opgeslagen",
       securitySettingsFailed: "Beveiligingsinstellingen opslaan mislukt",
+      adminSettingsLoadFailed: "Beveiligingsinstellingen laden mislukt.",
+      twoFactorStateChanged:
+        "Tweefactorauthenticatie is in een ander venster gewijzigd. Laad opnieuw en probeer het nog eens.",
+      twoFactorUnreadable:
+        "De server kan je instellingen voor tweefactorauthenticatie niet lezen. Neem contact op met een beheerder.",
+      ssoNeedsProvider:
+        "Om SSO af te dwingen moet eerst een OIDC- of SAML-provider zijn ingesteld.",
     },
     people: {
       heading: "Personen",
@@ -4596,7 +5020,7 @@ export const nl: TranslationKeys = {
       updateFailed: "Gebruiker bijwerken mislukt",
       cannotRemoveOwnAdmin: "Je kunt je eigen beheerdersrol niet verwijderen",
       resetPasswordHeading: "Wachtwoord resetten voor {username}",
-      newPasswordLabel: "Nieuw wachtwoord (min. 8 tekens)",
+      newPasswordLabel: "Nieuw wachtwoord",
       resetPasswordButton: "Wachtwoord resetten",
       resetPasswordWarning: "Dit maakt alle sessies en API-sleutels van deze gebruiker ongeldig.",
       resetSuccess: "Wachtwoord succesvol gereset",
@@ -4606,6 +5030,7 @@ export const nl: TranslationKeys = {
       tableHeaderTeam: "Team",
       noSearchResults: "Geen leden gevonden bij je zoekopdracht.",
       noUsersFound: "Geen gebruikers gevonden.",
+      loadFailed: "Gebruikers laden mislukt.",
       authBadgeLocalOidc: "Lokaal + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Rol / Team bewerken",
@@ -4618,6 +5043,13 @@ export const nl: TranslationKeys = {
         "Kopieer dit wachtwoord nu. U kunt het niet meer zien na het aanmaken van de gebruiker.",
       memberCount: "{count} lid",
       memberCountPlural: "{count} leden",
+      usernameTaken: "Die gebruikersnaam is al in gebruik",
+      lastAdmin: "Er moet altijd minstens één beheerder zijn",
+      cannotDeleteSelf: "Je kunt je eigen account niet verwijderen",
+      usernameInvalid:
+        "Een gebruikersnaam moet 3 tot 50 tekens lang zijn en mag alleen a-z, A-Z, 0-9, punten, koppeltekens en onderstrepingstekens bevatten",
+      roleNotFound: "Die rol bestaat niet meer",
+      teamNotFound: "Dat team bestaat niet meer",
     },
     teams: {
       heading: "Teams",
@@ -4639,6 +5071,7 @@ export const nl: TranslationKeys = {
       tableHeaderTeamName: "Teamnaam",
       tableHeaderMembers: "Leden",
       emptyState: "Geen teams gevonden.",
+      loadFailed: "Teams laden mislukt.",
       renameSaveButton: "Opslaan",
       renameCancelButton: "Annuleren",
       renameAction: "Hernoemen",
@@ -4653,6 +5086,7 @@ export const nl: TranslationKeys = {
       teamRetentionHoursDesc:
         "Bewaartermijn voor verwerkingsbestanden van dit team. Laat leeg voor de standaardwaarde.",
       quotaSaved: "Teaminstellingen opgeslagen",
+      quotaSaveFailed: "Teaminstellingen opslaan mislukt",
     },
     roles: {
       heading: "Rollen",
@@ -4678,6 +5112,7 @@ export const nl: TranslationKeys = {
       deleteSuccess: 'Rol "{name}" verwijderd',
       deleteFailed: "Rol verwijderen mislukt",
       emptyState: "Geen rollen gevonden.",
+      loadFailed: "Rollen laden mislukt.",
       builtInBadge: "Ingebouwd",
       userCountBadge: "{count} gebruiker(s)",
       editRoleTitle: "Rol bewerken",
@@ -4691,12 +5126,17 @@ export const nl: TranslationKeys = {
         users: "Gebruikers",
         teams: "Teams",
         system: "Systeem",
+        enterpriseAdmin: "Enterprise-beheer",
       },
+      nameInvalid:
+        "Een rolnaam moet 2 tot 30 tekens lang zijn en mag alleen a-z, 0-9, koppeltekens en onderstrepingstekens bevatten",
+      permissionsRequired: "Kies minstens één recht",
     },
     auditLog: {
       heading: "Auditlog",
       allActionsFilter: "Alle acties",
       emptyState: "Geen auditlog-vermeldingen.",
+      loadFailed: "Auditlog laden mislukt.",
       tableHeaderTime: "Tijd",
       tableHeaderUser: "Gebruiker",
       tableHeaderAction: "Actie",
@@ -4739,6 +5179,7 @@ export const nl: TranslationKeys = {
       teamColumn: "Team",
       storageColumn: "Opslag",
       usersColumn: "Gebruikers",
+      loadFailed: "Gebruiksgegevens laden mislukt.",
     },
     apiKeys: {
       heading: "API-sleutels",
@@ -4748,6 +5189,7 @@ export const nl: TranslationKeys = {
       removeScopingLabel: "Rechtenbegrenzing verwijderen",
       restrictPermissionsLabel: "Rechten beperken (optioneel)",
       expiresLabel: "Verloopt:",
+      expiresInPast: "De vervaldatum moet in de toekomst liggen.",
       clearButton: "Wissen",
       copyTitle: "Kopiëren",
       keyWarning: "Bewaar deze sleutel veilig. Hij wordt niet opnieuw getoond.",
@@ -4758,6 +5200,7 @@ export const nl: TranslationKeys = {
       deleteKeyTitle: "Sleutel verwijderen",
       deleteConfirm: "Deze API-sleutel verwijderen? Integraties die hem gebruiken zullen stoppen.",
       emptyState: "Nog geen API-sleutels. Genereer er een om te beginnen.",
+      loadFailed: "API-sleutels laden mislukt.",
     },
     tools: {
       heading: "Gereedschap",
@@ -4801,6 +5244,8 @@ export const nl: TranslationKeys = {
       description: "Beheer AI-modelbundels voor geavanceerde bestandsverwerking.",
       installAll: "Alles installeren",
       diskUsage: "Schijfgebruik: {size}",
+      statusStale:
+        "De bundelstatus kon niet worden bijgewerkt. De lijst hieronder is mogelijk verouderd.",
       sizeOnDisk: "{size} op schijf",
       installed: "Geïnstalleerd",
       notInstalled: "Niet geïnstalleerd",
@@ -4831,6 +5276,9 @@ export const nl: TranslationKeys = {
       resetFailed: "Resetten mislukt: {error}",
       resetVenvKept:
         "De gedeelde Python-omgeving is blijven staan: deze installatie heeft geen meegeleverde basis om die opnieuw op te bouwen. Modellen, de downloadcache en de installatiegegevens zijn gewist. Maak die omgeving zelf opnieuw aan als een verouderd pakket erin het probleem is.",
+      importBusy:
+        "Er loopt al een andere installatie of import. Probeer het opnieuw als die klaar is.",
+      importNoSpace: "De server heeft niet genoeg schijfruimte voor deze bundel.",
     },
     about: {
       heading: "Over",
@@ -4850,6 +5298,9 @@ export const nl: TranslationKeys = {
   auth: {
     login: "Inloggen",
     logout: "Uitloggen",
+    logoutFailed: "Uitloggen is mislukt. Probeer het opnieuw.",
+    idpLogoutFailed:
+      "Je bent uitgelogd bij SnapOtter, maar je sessie bij de SSO-provider staat mogelijk nog open. Log daar ook uit.",
     username: "Gebruikersnaam",
     password: "Wachtwoord",
     loginButton: "Inloggen",
@@ -4879,11 +5330,23 @@ export const nl: TranslationKeys = {
     verify: "Verifieer",
     verifying: "Verifieren...",
     mfaInvalidCode: "Ongeldige code. Probeer het opnieuw.",
+    mfaAttemptsExhausted: "Te veel ongeldige codes. Log opnieuw in.",
+    mfaEnrollmentAttemptsExhausted:
+      "Te veel ongeldige codes. Log opnieuw in voor een nieuwe QR-code en nieuwe herstelcodes; de eerder getoonde codes werken niet meer.",
+    mfaExpired: "Uw verificatiesessie is verlopen. Log opnieuw in.",
+    mfaEnrollmentExpired:
+      "Uw installatiesessie is verlopen. Log opnieuw in voor een nieuwe QR-code en nieuwe herstelcodes; de eerder getoonde codes werken niet meer.",
+    mfaNotConfigured: "Tweefactorauthenticatie is niet ingesteld. Log opnieuw in.",
+    mfaAlreadyEnabled: "Tweefactorauthenticatie is al ingeschakeld. Log opnieuw in.",
+    mfaUnreadable:
+      "De server kan uw gegevens voor tweefactorauthenticatie niet lezen. Neem contact op met een beheerder.",
     mfaEnrollmentHeading: "Stel tweefactorauthenticatie in om door te gaan",
     mfaEnrollmentRequired:
       "Uw organisatie vereist meerfactorauthenticatie. Stel MFA in via uw accountinstellingen.",
     mfaPolicyUnavailable:
       "Het MFA-beleid kon niet worden gecontroleerd. Probeer het over enkele ogenblikken opnieuw.",
+    accountDisabled: "Dit account is uitgeschakeld. Neem contact op met een beheerder.",
+    ipNotAllowed: "Uw IP-adres is niet toegestaan. Neem contact op met een beheerder.",
     loginThrottled: "Te veel aanmeldpogingen. Probeer het over {minutes} minuut opnieuw.",
     loginThrottledPlural: "Te veel aanmeldpogingen. Probeer het over {minutes} minuten opnieuw.",
     loginThrottledUnknownWait:
@@ -4927,14 +5390,13 @@ export const nl: TranslationKeys = {
   },
   changePassword: {
     title: "Wachtwoord wijzigen",
-    description:
-      "Je moet een nieuw wachtwoord instellen voordat je verder kunt. Je wachtwoord moet minimaal 8 tekens bevatten met hoofd- en kleine letters en een cijfer.",
+    description: "Je moet een nieuw wachtwoord instellen voordat je verder kunt.",
     usernameLabel: "Gebruikersnaam",
     currentPasswordLabel: "Huidig wachtwoord",
     currentPasswordPlaceholder: "Voer huidig wachtwoord in",
     newPasswordLabel: "Nieuw wachtwoord",
     generateButton: "Sterk wachtwoord genereren",
-    newPasswordPlaceholder: "Minimaal 8 tekens",
+    newPasswordPlaceholder: "Voer nieuw wachtwoord in",
     confirmPasswordLabel: "Nieuw wachtwoord bevestigen",
     confirmPasswordPlaceholder: "Herhaal nieuw wachtwoord",
     passwordsMismatch: "Wachtwoorden komen niet overeen",
@@ -4945,6 +5407,7 @@ export const nl: TranslationKeys = {
     sidebarTitle: "Bijna klaar",
     sidebarDescription:
       "Stel een sterk wachtwoord in om je account te beveiligen, dan ben je er klaar voor.",
+    sessionEnded: "Je sessie is verlopen. Log opnieuw in om je wachtwoord te wijzigen.",
   },
   automate: {
     title: "Automatiseren",
@@ -4954,6 +5417,15 @@ export const nl: TranslationKeys = {
     noSteps: "Pipelinebestand heeft geen stappen",
     importFailed: "Importeren mislukt",
     couldNotRead: "Pipelinebestand kon niet worden gelezen",
+    importListRefreshFailed:
+      "Pipeline geïmporteerd, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om hem te zien.",
+    saveFailed: "Pipeline opslaan mislukt",
+    deleteFailed: "Pipeline verwijderen mislukt",
+    loadFailed: "Opgeslagen pipelines laden mislukt.",
+    saveListRefreshFailed:
+      "Pipeline opgeslagen, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om hem te zien.",
+    deleteListRefreshFailed:
+      "Pipeline verwijderd, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om de wijziging te zien.",
     fileCount: "{count} bestand",
     fileCountPlural: "{count} bestanden",
     importFromLibrary: "Importeren uit bibliotheek",
@@ -5039,6 +5511,7 @@ export const nl: TranslationKeys = {
     fileCount: "{count} bestanden",
     fileCountSingular: "{count} bestand",
     noFilesFound: "Geen bestanden gevonden",
+    loadFailed: "Je bestanden laden mislukt.",
     selectFilePrompt: "Selecteer een bestand om details te bekijken",
     openFile: "Bestand openen",
     selectFile: "Bestand selecteren",
@@ -5057,6 +5530,7 @@ export const nl: TranslationKeys = {
     download: "Downloaden",
     details: {
       previewFailedRetry: "Voorbeeld genereren mislukt. Probeer het opnieuw.",
+      loadFailed: "Dit bestand kon niet worden geladen.",
     },
   },
   dropzone: {
@@ -5076,6 +5550,8 @@ export const nl: TranslationKeys = {
     filesSelected: "{count} bestanden geselecteerd",
     dropToAdd: "Laat los om bestanden toe te voegen",
     dropToReplace: "Laat los om bestand te vervangen",
+    ignoredWhileRunning:
+      "Er loopt een verwerking. Wacht tot die klaar is voordat je bestanden toevoegt.",
     reorderHint: "Sleep de miniaturen om te herordenen, of keer de volgorde om, voordat je start.",
   },
   reviewPanel: {
@@ -5107,6 +5583,8 @@ export const nl: TranslationKeys = {
     lessThanMinute: "Minder dan een minuut resterend",
     oneMinuteLeft: "~1 minuut resterend",
     minutesLeft: "~{mins} minuten resterend",
+    minutesLeftFew: "~{mins} minuten resterend",
+    minutesLeftTwo: "~{mins} minuten resterend",
     progressMessages: [
       "Bijna klaar... waarschijnlijk...",
       "Goede dingen kosten tijd...",
@@ -5183,6 +5661,60 @@ export const nl: TranslationKeys = {
     networkError: "Netwerkfout. Controleer je verbinding.",
     invalidCredentials: "Ongeldige gebruikersnaam of wachtwoord",
     connectionError: "Verbindingsfout",
+    fileTooLarge:
+      "Dit bestand is te groot om te uploaden. Probeer een kleiner bestand of vraag de serverbeheerder om de uploadlimiet te verhogen.",
+    featureNotInstalledForTool:
+      '{tool} heeft de functie "{feature}" nodig. Schakel deze in via Instellingen → AI-functies.',
+    featureNotInstalled:
+      'De functie "{feature}" is niet geïnstalleerd. Schakel deze in via Instellingen → AI-functies.',
+    featureIncompatible:
+      'De functie "{feature}" kan niet worden uitgevoerd op de hardware van deze server.',
+    passwordTooShort: "Het wachtwoord moet minimaal {minLength} tekens lang zijn.",
+    passwordNeedsUppercase: "Het wachtwoord moet een hoofdletter bevatten.",
+    passwordNeedsLowercase: "Het wachtwoord moet een kleine letter bevatten.",
+    passwordNeedsDigit: "Het wachtwoord moet een cijfer bevatten.",
+    passwordNeedsSpecial: "Het wachtwoord moet een speciaal teken bevatten.",
+    passwordNoControlCharacters: "Het wachtwoord mag geen besturingstekens bevatten.",
+    passwordTooLong: "Het wachtwoord mag maximaal {maxLength} tekens lang zijn.",
+    passwordTooLongAdminReset:
+      "Wachtwoord is te lang (max {maxLength} tekens). Een beheerder moet het opnieuw instellen.",
+    passwordNoInvalidCharacters: "Het wachtwoord mag geen ongeldige tekens bevatten.",
+    tooManyRequests: "Te veel pogingen. Wacht een minuut en probeer het opnieuw.",
+    escalationDenied: "Daarvoor heb je meer rechten nodig dan je rol heeft.",
+    featureNotLicensed: "Hiervoor is een enterprise-licentie nodig.",
+    sessionEnded: "Je sessie is verlopen. Log opnieuw in.",
+    forbidden: "Je hebt geen toestemming om dat te doen.",
+    invalidSetting: "Ongeldige waarde voor {setting}.",
+    network: "Netwerkfout",
+    invalidResponse: "Ongeldig antwoord",
+    staleVersionReload: "De app is bijgewerkt. Laad de pagina opnieuw en probeer het nog eens.",
+    failedWithStatus: "Het verzoek kon niet worden voltooid. Probeer het opnieuw.",
+    processingFailedWithStatus:
+      "Dit bestand kon niet worden verwerkt. Controleer of het bestand niet beschadigd is en probeer het opnieuw.",
+    processingFailedNoDetail: "Verwerking mislukt",
+    canceled: "Verwerking geannuleerd",
+    jobTrackingFailed: "Er ging iets mis bij het volgen van deze taak. Probeer het opnieuw.",
+    requestTimedOut: "Time-out van verzoek",
+    runInterrupted: "De verwerking is onderbroken. Voer het opnieuw uit.",
+    requestFailedWithStatus: "Het verzoek kon niet worden voltooid. Probeer het opnieuw.",
+    invalidServerResponse: "Ongeldig antwoord van server",
+    batchFailed: "Batchverwerking mislukt",
+    batchFailedWithStatus: "De batchverwerking kon niet worden voltooid. Probeer het opnieuw.",
+    allFilesFailed: "Verwerking van alle bestanden is mislukt",
+    filesFailedSuffix_one: " (1 bestand mislukt)",
+    filesFailedSuffix_other: " ({count} bestanden mislukt)",
+    uploadTimeout:
+      "De time-out voor de upload is verstreken. Controleer je verbinding of probeer een kleiner bestand.",
+    processingInterrupted:
+      "De verwerking is onderbroken. Probeer het opnieuw zodra je weer verbonden bent.",
+    processingInterruptedUnconfirmed:
+      "De verwerking werd onderbroken en de server heeft de taak nooit bevestigd. Probeer het opnieuw zodra je weer verbonden bent.",
+    resultNoLongerAvailable:
+      "Het voltooide resultaat is niet meer beschikbaar. Voer de taak opnieuw uit.",
+    batchDownloadFailed:
+      "De voltooide batch kon niet worden gedownload. Vernieuw de pagina en probeer het opnieuw.",
+    fileNotFoundInBatch: "Bestand niet gevonden in batchresultaten",
+    noFilesSelected: "Geen bestanden geselecteerd",
   },
   sidebar: {
     sponsor: "Steun ons",
@@ -5218,6 +5750,7 @@ export const nl: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Steun SnapOtter op GitHub Sponsors",
     skipToContent: "Ga naar hoofdinhoud",
     openSidebar: "Zijbalk openen",
@@ -5240,6 +5773,8 @@ export const nl: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "Zoombediening",
     dragToReorder: "Sleep om te herordenen",
+    resultResizedToFit: "Verkleind om binnen de doelgrootte te passen",
+    resultMissedTarget: "Doelgrootte niet gehaald",
     reverseOrder: "Volgorde omkeren",
     whiteBackground: "Witte achtergrond",
     blackBackground: "Zwarte achtergrond",
@@ -5323,11 +5858,47 @@ export const nl: TranslationKeys = {
       description: "Repareer, kleur in en vergroot een oude of beschadigde foto met AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Achtergrondverwijdering",
+      description: "Verwijder achtergronden uit afbeeldingen met AI",
+    },
+    "face-detection": {
+      name: "Gezichtsdetectie",
+      description: "Detecteer en vervaag gezichten, corrigeer rode ogen, slim bijsnijden",
+    },
+    "object-eraser-colorize": {
+      name: "Objectgum & inkleuren",
+      description: "Verwijder objecten uit foto's en kleur zwart-witafbeeldingen in",
+    },
+    "inpaint-hq": {
+      name: "Hoogwaardige inpainting",
+      description:
+        "Objectverwijdering op basis van diffusie voor grote objecten, gedetailleerde texturen en gestructureerde achtergronden",
+    },
+    "upscale-enhance": {
+      name: "Opschalen & verbeteren",
+      description: "AI-opschaling, gezichtsverbetering en ruisverwijdering",
+    },
+    "photo-restoration": {
+      name: "Fotorestauratie",
+      description: "Herstel oude of beschadigde foto's",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Haal tekst uit afbeeldingen en pdf's",
+    },
+    transcription: {
+      name: "Transcriptie",
+      description: "Spraak naar tekst voor audio en video (ondertitels)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importeren...",
       importCount: "Importeren ({count})",
       import: "Importeren",
+      importFailed: "{failed} van {total} bestanden konden niet worden geïmporteerd.",
     },
     metadataGrid: {
       noData: "Geen gegevens",
@@ -5340,6 +5911,19 @@ export const nl: TranslationKeys = {
     waveform: {
       play: "Afspelen",
       pause: "Pauzeren",
+    },
+    languageNames: {
+      en: "Engels",
+      de: "Duits",
+      fr: "Frans",
+      es: "Spaans",
+      zh: "Chinees",
+      ja: "Japans",
+      ko: "Koreaans",
+      ar: "Arabisch",
+      id: "Indonesisch",
+      th: "Thais",
+      vi: "Vietnamees",
     },
   },
   privacyPolicy: {

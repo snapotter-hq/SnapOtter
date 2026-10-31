@@ -99,7 +99,11 @@ export function CropCanvas({
   const pixelHeight = imgDimensions ? Math.round((crop.height / 100) * imgDimensions.height) : 0;
 
   return (
-    <div ref={containerRef} className="flex flex-col w-full h-full max-w-4xl mx-auto outline-none">
+    <div
+      ref={containerRef}
+      tabIndex={-1}
+      className="flex flex-col w-full h-full max-w-4xl mx-auto outline-none"
+    >
       {/* Crop area */}
       <div className="flex-1 flex items-center justify-center overflow-hidden bg-muted/20 p-4 min-h-0">
         <ReactCrop
@@ -113,7 +117,7 @@ export function CropCanvas({
           // it. Without this a tall portrait renders at full natural height
           // and overflows the viewport. max-h-full doesn't help because the
           // ancestor chain isn't reliably height-bounded.
-          className="max-h-[calc(100dvh-12rem)]"
+          className="max-md:max-h-full md:max-h-[calc(100dvh-12rem)]"
           ruleOfThirds={showGrid}
         >
           <img
@@ -121,7 +125,7 @@ export function CropCanvas({
             src={imageSrc}
             alt={t.toolSettings["crop-canvas"].cropPreview}
             onLoad={handleImageLoad}
-            className="max-w-full max-h-[calc(100dvh-12rem)] select-none"
+            className="max-w-full max-md:max-h-full md:max-h-[calc(100dvh-12rem)] select-none"
             draggable={false}
           />
         </ReactCrop>

@@ -1,9 +1,13 @@
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import type { EditMetadataSettings } from "../../../apps/api/src/lib/exiftool.js";
 import {
   buildTagArgs,
   inspectMetadata,
+  readImageDimensions,
   writeMetadata,
 } from "../../../apps/api/src/lib/exiftool.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -321,6 +325,14 @@ describe("inspectMetadata", () => {
     expect(result.xmp).toBeNull();
     expect(result.gps).toBeNull();
   });
+
+  it("handles a filename ending with a trailing dot by falling back to .jpg (#3279)", async () => {
+    const buf = readFixture(fixtures.image.exifGps);
+    const result = await inspectMetadata(buf, "DSCF0001.");
+    expect(result.filename).toBe("DSCF0001.");
+    expect(result.fileSize).toBe(buf.length);
+    expect(result.exif).not.toBeNull();
+  });
 });
 
 describe("writeMetadata", () => {
@@ -328,6 +340,13 @@ describe("writeMetadata", () => {
     const buf = readFixture(fixtures.image.exifGps);
     const result = await writeMetadata(buf, "test-with-exif.jpg", []);
     expect(Buffer.compare(result, buf)).toBe(0);
+  });
+
+  it("handles a filename ending with a trailing dot by falling back to .jpg (#3279)", async () => {
+    const buf = readFixture(fixtures.image.exifGps);
+    const written = await writeMetadata(buf, "DSCF0001.", ["-Artist=TrailingDot"]);
+    const result = await inspectMetadata(written, "DSCF0001.");
+    expect(result.exif?.Artist).toBe("TrailingDot");
   });
 
   it("writing -Artist=TestArtist then inspecting shows the artist", async () => {
@@ -356,5 +375,40 @@ describe("writeMetadata", () => {
     expect(meta.format).toBe("jpeg");
     expect(meta.width).toBeGreaterThan(0);
     expect(meta.height).toBeGreaterThan(0);
+  });
+});
+
+describe("readImageDimensions", () => {
+  it("reads positive numeric dimensions from a valid image", async () => {
+    const buf = readFixture(fixtures.image.exifGps);
+    const dims = await readImageDimensions(buf, "jpg");
+    expect(dims).not.toBeNull();
+    expect(dims?.width).toBeGreaterThan(0);
+    expect(dims?.height).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ["negative ImageWidth", '[{"ImageWidth":-10,"ImageHeight":200}]'],
+    ["negative ImageHeight", '[{"ImageWidth":200,"ImageHeight":-10}]'],
+    ["string zero values", '[{"ImageWidth":"0","ImageHeight":"0"}]'],
+    ["non-numeric string dimensions", '[{"ImageWidth":"100x200","ImageHeight":200}]'],
+  ] as const)("returns null when exiftool -json emits %s (#3343)", async (_label, jsonOutput) => {
+    const originalPath = process.env.PATH;
+    const shimDir = mkdtempSync(join(tmpdir(), "exiftool-shim-"));
+    try {
+      const shimPath = join(shimDir, "exiftool");
+      writeFileSync(
+        shimPath,
+        `#!/bin/sh\nif [ "$1" = "-ver" ]; then echo "12.76"; exit 0; fi\nprintf '%s\\n' '${jsonOutput}'\n`,
+      );
+      chmodSync(shimPath, 0o755);
+      process.env.PATH = shimDir;
+
+      const dims = await readImageDimensions(Buffer.from("test"), "dng");
+      expect(dims).toBeNull();
+    } finally {
+      process.env.PATH = originalPath;
+      rmSync(shimDir, { recursive: true, force: true });
+    }
   });
 });

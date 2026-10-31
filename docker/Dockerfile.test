@@ -6,7 +6,7 @@
 # ============================================
 # Stage 1: Build libheif from source
 # ============================================
-FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS libheif-builder
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS libheif-builder
 
 ARG LIBHEIF_VERSION=1.23.4
 ARG LIBDE265_VERSION=1.1.3
@@ -58,7 +58,7 @@ RUN curl --fail --location --silent --show-error --retry 3 \
 # ============================================
 # Stage 2: Test runner
 # ============================================
-FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
@@ -70,21 +70,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjxl-tools \
     ghostscript \
     qpdf \
+    python3-venv \
     tesseract-ocr \
     tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra \
     tesseract-ocr-spa tesseract-ocr-chi-sim tesseract-ocr-jpn \
     && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
        else \
          echo "No supported ImageMagick EXR coder package found" >&2; exit 1; \
        fi \
     && convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)' \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-199; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-209; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-209; \
        fi \
     && rm -rf /var/lib/apt/lists/*
 
@@ -105,6 +106,23 @@ RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
         sed -i "s/<policy domain=\"coder\" rights=\"none\" pattern=\"${CODER}\"/<policy domain=\"coder\" rights=\"read|write\" pattern=\"${CODER}\"/" "$POLICY_FILE"; \
       done; \
     fi
+
+# PyMuPDF for the fitz-gated suites: pdf-to-text, sign/redact/flatten-pdf, the
+# fitz block of docs-dispatcher, and the fitz tools in the generated format and
+# settings matrices. PR CI shards don't install it, so before #1610 they skipped
+# in every lane; this nightly lane is now the one that runs them (the fuzz and
+# FULL_MATRIX runs live in a host job that still lacks it). Pinned to the
+# production image's version. It lives at /app/.venv, the repo-root venv
+# tests/helpers/python-gate.ts and the sidecar bridge try first, rather than
+# /opt/venv plus PYTHON_VENV_PATH: the API reads /opt/venv as the baked base it
+# reseeds AI venvs from and PYTHON_VENV_PATH as the venv bundle installs write
+# into, and the feature tests must not see either one. It sits above the
+# workspace COPYs so a lockfile change doesn't reinstall it, and
+# docker-compose.test.yml sets REQUIRE_PYTHON_FITZ=1 so a venv the suite can't
+# find fails the run instead of skipping it.
+RUN python3 -m venv /app/.venv && \
+    /app/.venv/bin/pip install --no-cache-dir PyMuPDF==1.27.2.3 && \
+    /app/.venv/bin/python -c "import fitz"
 
 WORKDIR /app
 

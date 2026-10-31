@@ -8,12 +8,17 @@ import {
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const captureFeedback = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+// Whether the instance has a PostHog client for feedback to land in. The test
+// instance bakes none, so the route's answer is stubbed to a PostHog-baked
+// instance by default and flipped for the Sentry-only case (#2198).
+const sink = vi.hoisted(() => ({ present: true }));
 
 vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
   return {
     ...actual,
     captureFeedback,
+    hasFeedbackSink: () => sink.present,
   };
 });
 
@@ -31,6 +36,7 @@ afterEach(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
   delete process.env.ANALYTICS_BAKED_OVERRIDE;
   captureFeedback.mockClear();
+  sink.present = true;
   __resetGateForTests();
 });
 
@@ -74,6 +80,27 @@ describe("POST /api/v1/feedback", () => {
         toolId: "resize",
         jobStatus: "completed",
       },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, accepted: false });
+    expect(captureFeedback).not.toHaveBeenCalled();
+  });
+
+  it("declines feedback it has nowhere to send, so the dialog offers the handoff (#2198)", async () => {
+    // A Sentry-only bake: telemetry is on, but there is no PostHog client, and
+    // feedback lives only in PostHog events. Answering accepted would show the
+    // thank-you for feedback that was dropped.
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
+    sink.present = false;
+    const token = await loginAsAdmin(testApp.app);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/feedback",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { source: "global", sentiment: "great" },
     });
 
     expect(res.statusCode).toBe(200);

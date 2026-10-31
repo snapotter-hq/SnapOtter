@@ -30,6 +30,24 @@ describe("formatDate", () => {
     expect(result).toContain("Dec");
     expect(result).toContain("2024");
   });
+
+  it("formats a numeric epoch timestamp", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDate(ts, "de")).toBe(formatDate(new Date(ts), "de"));
+  });
+
+  it("falls back to English when given a malformed locale tag instead of throwing RangeError", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDate(ts, "en_US")).toBe(formatDate(ts, "en"));
+  });
+
+  it("returns --- when given an unparseable date string, NaN, or invalid Date object (#3955)", () => {
+    expect(formatDate("not-a-date", "de")).toBe("---");
+    expect(formatDate("", "de")).toBe("---");
+    expect(formatDate(Number.NaN, "de")).toBe("---");
+    expect(formatDate(Number.POSITIVE_INFINITY, "de")).toBe("---");
+    expect(formatDate(new Date("not-a-date"), "de")).toBe("---");
+  });
 });
 
 describe("formatDateTime", () => {
@@ -56,5 +74,23 @@ describe("formatDateTime", () => {
     expect(result).toContain("Jun");
     expect(result).toContain("2025");
     expect(result).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("formats a numeric epoch timestamp", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDateTime(ts, "de")).toBe(formatDateTime(new Date(ts), "de"));
+  });
+
+  it("falls back to English when given a malformed locale tag instead of throwing RangeError", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDateTime(ts, "en_US")).toBe(formatDateTime(ts, "en"));
+  });
+
+  it("returns --- when given an unparseable date string, NaN, or invalid Date object (#3955)", () => {
+    expect(formatDateTime("not-a-date", "de")).toBe("---");
+    expect(formatDateTime("", "de")).toBe("---");
+    expect(formatDateTime(Number.NaN, "de")).toBe("---");
+    expect(formatDateTime(Number.POSITIVE_INFINITY, "de")).toBe("---");
+    expect(formatDateTime(new Date("not-a-date"), "de")).toBe("---");
   });
 });

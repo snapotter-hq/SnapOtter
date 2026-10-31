@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { probeMedia } from "@snapotter/media-engine";
+import { FfprobeTimeoutError, probeMedia } from "@snapotter/media-engine";
 import { SUBTITLE_INPUTS } from "@snapotter/shared";
 import { env } from "../config.js";
+import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
@@ -11,18 +12,28 @@ export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
 const SUBTITLE_EXT_SET = new Set<string>(SUBTITLE_INPUTS);
 const MAX_SUBTITLE_BYTES = 1 * 1024 * 1024; // 1 MiB
 
+/** instanceof plus name/message checks so a dual copy of media-engine cannot revert timeouts to "Unrecognized". */
+function isFfprobeTimeout(err: unknown): boolean {
+  return (
+    err instanceof FfprobeTimeoutError ||
+    (err instanceof Error &&
+      (err.name === "FfprobeTimeoutError" || /^ffprobe timed out after \d+s$/.test(err.message)))
+  );
+}
+
 /**
  * True when the probe failed because the engine is missing or misconfigured,
  * rather than because the file is bad. Two ways to get here: nothing on PATH
- * and no override, which media-engine reports before spawning; or FFPROBE_PATH
- * pointing somewhere that does not exist, which fails at spawn with ENOENT.
+ * and no override, which media-engine reports before spawning; or a spawn
+ * failure (ENOENT for a missing FFPROBE_PATH, EACCES for a directory or missing
+ * execute bit, ENOEXEC for a wrong-architecture binary, ENOMEM/EAGAIN).
  * Both are the operator's container. A real parse failure carries ffprobe's own
  * stderr and must keep being treated as a client error.
  */
 function isEngineUnavailable(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   if (/\bffprobe binary not found\b/.test(err.message)) return true;
-  return (err as NodeJS.ErrnoException).code === "ENOENT";
+  return isBinarySpawnFailure(err);
 }
 
 /**
@@ -37,8 +48,9 @@ export class MediaInputHandler implements InputHandler {
   async prepare(
     raw: Buffer,
     filename: string,
-    opts: { scratchDir: string },
+    opts: { scratchDir: string; signal?: AbortSignal },
   ): Promise<PreparedInput> {
+    opts.signal?.throwIfAborted();
     if (this.kind === "subtitle") {
       return this.prepareSubtitle(raw, filename);
     }
@@ -47,20 +59,32 @@ export class MediaInputHandler implements InputHandler {
     await mkdir(probeDir, { recursive: true });
     const probePath = join(probeDir, "input");
     try {
-      await writeFile(probePath, raw);
+      opts.signal?.throwIfAborted();
+      await writeFile(probePath, raw, { signal: opts.signal });
       let info: Awaited<ReturnType<typeof probeMedia>>;
       try {
-        info = await probeMedia(probePath);
+        info = await probeMedia(probePath, { signal: opts.signal });
       } catch (err) {
+        opts.signal?.throwIfAborted();
+        if (err instanceof Error && err.name === "AbortError") {
+          throw err;
+        }
         // An absent engine is the operator's container, not the caller's file.
         // Reporting it as a corrupt upload sends them to inspect a file that is
         // perfectly fine, and hides the one fact that would fix it.
         if (isEngineUnavailable(err)) {
-          throw new InputValidationError(
+          const converted = new InputValidationError(
             "Media processing is unavailable on this server because ffmpeg is not installed.",
             503,
             "Install ffmpeg in the container or set FFMPEG_PATH and FFPROBE_PATH.",
             "ENGINE_UNAVAILABLE",
+          );
+          converted.cause = err;
+          throw converted;
+        }
+        if (isFfprobeTimeout(err)) {
+          throw new InputValidationError(
+            `Could not inspect this ${this.kind} file within the time limit. It may be malformed; try a different file.`,
           );
         }
         // ffprobe could not parse the upload. Surface a clean message; the raw
@@ -70,6 +94,7 @@ export class MediaInputHandler implements InputHandler {
           `Unrecognized ${this.kind} file. It may be corrupt or in an unsupported format.`,
         );
       }
+      opts.signal?.throwIfAborted();
       const hasVideo = info.streams.some((s) => s.type === "video");
       const hasAudio = info.streams.some((s) => s.type === "audio");
 
@@ -91,13 +116,17 @@ export class MediaInputHandler implements InputHandler {
       }
 
       if (this.kind === "video" && !hasVideo) {
-        throw new InputValidationError("File contains no video stream");
+        throw new InputValidationError(
+          "This file has no video track (no video stream). Choose a video file and try again.",
+        );
       }
       if (this.kind === "video" && isStillImage) {
         throw new InputValidationError("File is a still image, not a video");
       }
       if (this.kind === "audio" && !hasAudio) {
-        throw new InputValidationError("File contains no audio stream");
+        throw new InputValidationError(
+          "This file has no audio track (no audio stream). Choose a file with audio and try again.",
+        );
       }
       const durationCap =
         this.kind === "video" ? env.MAX_VIDEO_DURATION_S : env.MAX_AUDIO_DURATION_S;
@@ -117,6 +146,9 @@ export class MediaInputHandler implements InputHandler {
         );
       }
       return { buffer: raw, filename };
+    } catch (err) {
+      opts.signal?.throwIfAborted();
+      throw err;
     } finally {
       await rm(probeDir, { recursive: true, force: true }).catch(() => {});
     }

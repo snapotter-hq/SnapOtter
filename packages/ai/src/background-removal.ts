@@ -13,24 +13,28 @@ import {
 
 export interface RemoveBackgroundOptions {
   model?: string;
+  oomFallbackModel?: string | false;
   backgroundColor?: string;
   edgeRefine?: number;
   decontaminate?: boolean;
   signal?: AbortSignal;
+  toolId?: string;
 }
 
 const MAX_REMBG_PX = Number(process.env.MAX_REMBG_PX) || 2048;
 const OOM_FALLBACK_MODEL = "u2net";
 
 /**
- * onnxruntime / CUDA surface allocation failures with several different
- * messages ("out of memory", "Failed to allocate memory for requested buffer",
- * CUBLAS_STATUS_ALLOC_FAILED, bad_alloc). Match them all so the lighter-model
- * fallback actually triggers instead of failing the job.
+ * onnxruntime / CUDA / PyTorch CPU allocator / NumPy surface allocation
+ * failures with several different messages ("out of memory", "not enough memory",
+ * "can't allocate memory", "cannot allocate memory", "Unable to allocate ...",
+ * "Failed to allocate memory for requested buffer",
+ * CUBLAS_STATUS_ALLOC_FAILED, bad_alloc, MemoryError). Match them all so the
+ * lighter-model fallback actually triggers instead of failing the job.
  */
 export function isMemoryAllocError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
-  return /out of memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc/i.test(
+  return /out of memory|not enough memory|can't allocate memory|cannot allocate memory|\[errno 12\]|unable to allocate|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i.test(
     err.message,
   );
 }
@@ -45,7 +49,7 @@ export async function removeBackground(
   options: RemoveBackgroundOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<Buffer> {
-  const { signal, ...sidecarOptions } = options;
+  const { oomFallbackModel, signal, toolId, ...sidecarOptions } = options;
   const id = randomUUID();
   const inputPath = join(tmpdir(), `rembg_in_${id}.png`);
   const outputPath = join(outputDir, `rembg_out_${id}.png`);
@@ -70,7 +74,7 @@ export async function removeBackground(
 
   try {
     const megapixels = (origW * origH) / 1_000_000;
-    const gpu = isGpuAvailable();
+    const gpu = isGpuAvailable("onnx");
     // CPU inference is ~50-100x slower than GPU; mirror the upscaler's CPU
     // rate, and give CPU runs a 10-minute floor since model load alone can
     // exceed 5 minutes on NAS-class hardware.
@@ -85,6 +89,8 @@ export async function removeBackground(
       onProgress,
       timeout,
       signal,
+      toolId,
+      oomFallbackModel,
     );
 
     if (needsDownscale) {
@@ -101,39 +107,52 @@ export async function removeBackground(
 async function runAndParse(
   inputPath: string,
   outputPath: string,
-  options: RemoveBackgroundOptions,
+  options: Omit<RemoveBackgroundOptions, "oomFallbackModel" | "signal" | "toolId">,
   onProgress: ProgressCallback | undefined,
   timeout: number,
   signal: AbortSignal | undefined,
+  toolId?: string,
+  oomFallbackModel?: string | false,
 ): Promise<Buffer> {
+  const runOptions = {
+    onProgress,
+    timeout,
+    signal,
+    ...(toolId ? { toolId } : {}),
+  };
   try {
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(options)],
-      { onProgress, timeout, signal },
+      runOptions,
     );
     const result = parseStdoutJson(stdout);
     if (!result.success) {
       throw toBgRemovalError(result.error || "Background removal failed");
     }
-    return readFile(outputPath);
+    return await readFile(outputPath);
   } catch (err) {
     const isOom = isMemoryAllocError(err);
-    const canFallback = isOom && options.model !== OOM_FALLBACK_MODEL;
-
-    if (!canFallback) throw toBgRemovalError(err);
-
-    onProgress?.(5, `Retrying with lighter model (${OOM_FALLBACK_MODEL})`);
-    const fallbackOpts = { ...options, model: OOM_FALLBACK_MODEL };
-    const { stdout } = await runPythonWithProgress(
-      "remove_bg.py",
-      [inputPath, outputPath, JSON.stringify(fallbackOpts)],
-      { onProgress, timeout, signal },
-    );
-    const result = parseStdoutJson(stdout);
-    if (!result.success) {
-      throw toBgRemovalError(result.error || "Background removal failed");
+    const fallbackModel = oomFallbackModel === undefined ? OOM_FALLBACK_MODEL : oomFallbackModel;
+    if (!isOom || !fallbackModel || options.model === fallbackModel) {
+      throw toBgRemovalError(err);
     }
-    return readFile(outputPath);
+
+    onProgress?.(5, `Retrying with lighter model (${fallbackModel})`);
+    const fallbackOpts = { ...options, model: fallbackModel };
+    try {
+      const { stdout } = await runPythonWithProgress(
+        "remove_bg.py",
+        [inputPath, outputPath, JSON.stringify(fallbackOpts)],
+        runOptions,
+      );
+      const result = parseStdoutJson(stdout);
+      if (!result.success) {
+        throw toBgRemovalError(result.error || "Background removal failed");
+      }
+      return await readFile(outputPath);
+    } catch (fallbackErr) {
+      throw toBgRemovalError(fallbackErr);
+    }
   }
 }

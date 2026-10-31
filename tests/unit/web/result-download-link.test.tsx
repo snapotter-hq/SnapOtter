@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { cleanup, fireEvent, render, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const imagePreviewMock = vi.hoisted(() => ({
@@ -17,6 +20,8 @@ vi.mock("@/lib/analytics", () => ({
 }));
 
 import { ResultDownloadLink } from "@/components/common/result-download-link";
+import { useWorkInFlight } from "@/hooks/use-work-in-flight";
+import { track } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 
 function makeFile(name: string): File {
@@ -35,7 +40,9 @@ beforeEach(() => {
     revokeObjectURL: () => {},
   });
   document.addEventListener("click", swallowNavigation, true);
+  window.history.replaceState({}, "", "/");
   useFileStore.getState().reset();
+  vi.mocked(track).mockClear();
 });
 
 afterEach(() => {
@@ -107,5 +114,91 @@ describe("ResultDownloadLink", () => {
     const { entries } = useFileStore.getState();
     expect(entries[1].claimed).toBe(true);
     expect(entries[0].claimed).toBe(false);
+  });
+
+  it("claims claimEntryId when provided even if selectedIndex points at another entry (#2731)", () => {
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    const entryA = useFileStore.getState().entries[0];
+    useFileStore.getState().updateEntryById(entryA.id, {
+      processedUrl: "/api/v1/download/job-a/a.png",
+      status: "completed",
+    });
+    useFileStore.getState().setSelectedIndex(1);
+    const { container } = render(
+      <ResultDownloadLink
+        href="/api/v1/download/job-a/a.png"
+        testId="convert-download"
+        claimEntryId={entryA.id}
+      />,
+    );
+
+    const routerWrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={["/image/compose"]}>{children}</MemoryRouter>
+    );
+    expect(renderHook(() => useWorkInFlight(), { wrapper: routerWrapper }).result.current).toEqual({
+      kind: "unsaved",
+      downloads: [
+        {
+          kind: "result",
+          index: 0,
+          url: "/api/v1/download/job-a/a.png",
+          filename: "a.png",
+        },
+      ],
+    });
+
+    fireEvent.click(container.querySelector("[data-testid='convert-download']") as HTMLElement);
+
+    const { entries } = useFileStore.getState();
+    expect(entries[0].claimed).toBe(true);
+    expect(entries[1].claimed).toBe(false);
+    expect(
+      renderHook(() => useWorkInFlight(), { wrapper: routerWrapper }).result.current,
+    ).toBeNull();
+  });
+
+  it("emits RESULT_DOWNLOADED from an explicit toolId prop (#3966)", () => {
+    useFileStore.getState().setFiles([makeFile("a.pdf")]);
+    const { container } = render(
+      <ResultDownloadLink href="blob:result" toolId="sign-pdf" testId="sign-pdf-download" />,
+    );
+
+    fireEvent.click(container.querySelector("[data-testid='sign-pdf-download']") as HTMLElement);
+
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "sign-pdf",
+    });
+  });
+
+  it("resolves tool_id from route params or location when no toolId prop is given (#3966)", () => {
+    useFileStore.getState().setFiles([makeFile("a.png")]);
+    const { container } = render(
+      <MemoryRouter initialEntries={["/image/jpg-to-png"]}>
+        <Routes>
+          <Route
+            path="/:section/:toolId"
+            element={<ResultDownloadLink href="blob:result" testId="preset-download" />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(container.querySelector("[data-testid='preset-download']") as HTMLElement);
+
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "jpg-to-png",
+    });
+  });
+
+  it("resolves tool_id from window.location.pathname when rendered outside a Router (#3966)", () => {
+    window.history.replaceState({}, "", "/pdf/sign-pdf");
+    useFileStore.getState().setFiles([makeFile("a.pdf")]);
+    const { container } = render(<ResultDownloadLink href="blob:result" />);
+
+    fireEvent.click(container.querySelector("a") as HTMLElement);
+
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "sign-pdf",
+    });
   });
 });

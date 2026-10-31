@@ -24,7 +24,7 @@ interface ZodDefLike {
   shape?: () => Record<string, ZodSchemaLike>;
   values?: unknown;
   options?: ZodSchemaLike[];
-  checks?: Array<{ kind: string; value?: number }>;
+  checks?: Array<{ kind: string; value?: number; inclusive?: boolean }>;
   value?: unknown;
 }
 
@@ -80,15 +80,38 @@ function deriveValues(field: ZodSchemaLike): unknown[] | null {
     case "ZodNumber": {
       const checks = def.checks ?? [];
       let min: number | undefined;
+      let minInclusive = true;
       let max: number | undefined;
+      let maxInclusive = true;
       let isInt = false;
       for (const c of checks) {
-        if (c.kind === "min") min = c.value;
-        if (c.kind === "max") max = c.value;
+        if (c.kind === "min" && c.value !== undefined) {
+          const inc = c.inclusive !== false;
+          if (min === undefined || c.value > min || (c.value === min && !inc)) {
+            min = c.value;
+            minInclusive = inc;
+          }
+        }
+        if (c.kind === "max" && c.value !== undefined) {
+          const inc = c.inclusive !== false;
+          if (max === undefined || c.value < max || (c.value === max && !inc)) {
+            max = c.value;
+            maxInclusive = inc;
+          }
+        }
         if (c.kind === "int") isInt = true;
       }
-      const lo = min ?? 0;
-      const hi = max ?? Math.max(lo + 100, 100);
+      let step = 1;
+      if (!isInt && min !== undefined && max !== undefined && max > min) {
+        const needed = (minInclusive ? 0 : 1) + (maxInclusive ? 0 : 1);
+        if (needed > 0 && max - min <= needed) {
+          step = (max - min) / 4;
+        }
+      }
+      const rawLo = min !== undefined ? (minInclusive ? min : min + step) : undefined;
+      const rawHi = max !== undefined ? (maxInclusive ? max : max - step) : undefined;
+      const lo = rawLo ?? (rawHi !== undefined && rawHi <= 0 ? rawHi - 100 : 0);
+      const hi = rawHi ?? Math.max(lo + 100, 100);
       const mid = isInt ? Math.round((lo + hi) / 2) : (lo + hi) / 2;
       values = [...new Set([lo, mid, hi])];
       break;

@@ -1,122 +1,137 @@
 // apps/web/src/components/editor/tools/eyedropper-tool.tsx
 
 import type Konva from "konva";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
-import type { SampleSize } from "../options/eyedropper-options";
-import { captureDocumentCanvas } from "../stage-capture";
-
-/**
- * Sample a single pixel or averaged region from a canvas context at (x, y).
- * Returns hex color string.
- */
-function samplePixelColor(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  sampleSize: SampleSize,
-): string {
-  const half = Math.floor(sampleSize / 2);
-  const startX = x - half;
-  const startY = y - half;
-
-  const imageData = ctx.getImageData(startX, startY, sampleSize, sampleSize);
-  const data = imageData.data;
-  const pixelCount = sampleSize * sampleSize;
-
-  let rSum = 0;
-  let gSum = 0;
-  let bSum = 0;
-
-  for (let i = 0; i < pixelCount; i++) {
-    rSum += data[i * 4];
-    gSum += data[i * 4 + 1];
-    bSum += data[i * 4 + 2];
-  }
-
-  const r = Math.round(rSum / pixelCount);
-  const g = Math.round(gSum / pixelCount);
-  const b = Math.round(bSum / pixelCount);
-
-  return rgbToHex(r, g, b);
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
-}
+import {
+  captureDocumentContext,
+  classifyCaptureError,
+  type DocumentContext,
+  reportCaptureFailure,
+} from "../stage-capture";
+import { samplePixelColor } from "./eyedropper-sample";
 
 interface UseEyedropperToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>;
-  sampleSize: SampleSize;
 }
 
-export function useEyedropperTool({
-  stageRef,
-  sampleSize: _sampleSizeProp,
-}: UseEyedropperToolOptions) {
+export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
   const setForegroundColor = useEditorStore((s) => s.setForegroundColor);
   const setBackgroundColor = useEditorStore((s) => s.setBackgroundColor);
+  const setSampledColor = useEditorStore((s) => s.setEyedropperSampledColor);
   const zoom = useEditorStore((s) => s.zoom);
   const panOffset = useEditorStore((s) => s.panOffset);
   const canvasSize = useEditorStore((s) => s.canvasSize);
-  // Use the sampleSize prop directly (caller wires it from options state)
-  const sampleSize: SampleSize = _sampleSizeProp;
-  const [sampledColor, setSampledColor] = useState<string | null>(null);
-  const canvasCache = useRef<HTMLCanvasElement | null>(null);
+  const historyVersion = useEditorStore((s) => s._historyVersion);
+  const sampleSize = useEditorStore((s) => s.eyedropperSampleSize);
+  const contextCache = useRef<CanvasRenderingContext2D | null>(null);
+  // Set when a capture couldn't be read. Sampling runs on every mousemove, so
+  // without it a tainted stage would throw, or toast, once per mouse event.
+  const captureFailed = useRef(false);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   /**
    * Export the document to a flat canvas at document resolution for pixel
    * sampling, ignoring the current zoom/pan transform.
-   * Cached so repeated clicks during one drag don't re-export.
+   * Cached so repeated moves during one drag don't re-export. A capture that
+   * can't be read is not retried until the next press, and only a press says so:
+   * a hover has no result to show, so it fails quietly (#2139).
    */
-  const getStageCanvas = useCallback((): HTMLCanvasElement | null => {
-    const stage = stageRef.current;
-    if (!stage) return null;
+  const getStageContext = useCallback(
+    (report: boolean): CanvasRenderingContext2D | null => {
+      if (captureFailed.current) return null;
+      const stage = stageRef.current;
+      if (!stage) return null;
 
-    const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
-    canvasCache.current = canvas;
-    return canvas;
-  }, [stageRef, canvasSize]);
+      let capture: DocumentContext;
+      try {
+        capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      } catch (err) {
+        // Not ours to explain, but one throw per press, not one per mousemove.
+        captureFailed.current = true;
+        setSampledColor(null);
+        throw err;
+      }
+      if (!capture.ok) {
+        captureFailed.current = true;
+        if (report) reportCaptureFailure(capture.reason, captureMessages);
+        return null;
+      }
+      contextCache.current = capture.ctx;
+      return capture.ctx;
+    },
+    [stageRef, canvasSize, captureMessages, setSampledColor],
+  );
 
   /**
-   * Invalidate the cache (call on mousedown so we get fresh data).
+   * Invalidate the cache and forgive a failed capture (call on mousedown so
+   * we get fresh data).
    */
   const invalidateCache = useCallback(() => {
-    canvasCache.current = null;
+    contextCache.current = null;
+    captureFailed.current = false;
   }, []);
+
+  // A resized canvas or a committed edit makes the cached capture, or the verdict
+  // on it, describe a document that is gone.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: both only signal that the document changed
+  useEffect(() => {
+    invalidateCache();
+    setSampledColor(null);
+  }, [canvasSize, historyVersion, invalidateCache, setSampledColor]);
 
   /**
    * Sample color at stage pointer position.
    * Returns the sampled hex color, or null if sampling failed.
    */
   const sampleAtPointer = useCallback(
-    (e: Konva.KonvaEventObject<MouseEvent>): string | null => {
+    (e: Konva.KonvaEventObject<MouseEvent>, report: boolean): string | null => {
       const stage = e.target.getStage();
-      if (!stage) return null;
-
-      const pointer = stage.getPointerPosition();
-      if (!pointer) return null;
-
-      const canvas = canvasCache.current ?? getStageCanvas();
-      if (!canvas) return null;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return null;
-
-      // Transform pointer coordinates from screen space to canvas space
-      const x = Math.round((pointer.x - panOffset.x) / zoom);
-      const y = Math.round((pointer.y - panOffset.y) / zoom);
-
-      // Bounds check against the actual canvas dimensions (unzoomed)
-      if (x < 0 || y < 0 || x >= canvasSize.width || y >= canvasSize.height) {
+      if (!stage) {
+        setSampledColor(null);
         return null;
       }
 
-      const color = samplePixelColor(ctx, x, y, sampleSize);
+      const pointer = stage.getPointerPosition();
+      if (!pointer) {
+        setSampledColor(null);
+        return null;
+      }
+
+      // Transform pointer coordinates from screen space to canvas space
+      const x = Math.floor((pointer.x - panOffset.x) / zoom);
+      const y = Math.floor((pointer.y - panOffset.y) / zoom);
+
+      // Bounds check against the actual canvas dimensions (unzoomed)
+      if (x < 0 || y < 0 || x >= canvasSize.width || y >= canvasSize.height) {
+        setSampledColor(null);
+        return null;
+      }
+
+      const ctx = contextCache.current ?? getStageContext(report);
+      if (!ctx) {
+        setSampledColor(null);
+        return null;
+      }
+
+      let color: string;
+      try {
+        color = samplePixelColor(ctx, x, y, sampleSize);
+      } catch (err) {
+        contextCache.current = null;
+        captureFailed.current = true;
+        setSampledColor(null);
+        const reason = classifyCaptureError(err);
+        if (!reason) throw err;
+        if (report) reportCaptureFailure(reason, captureMessages);
+        return null;
+      }
+
       setSampledColor(color);
       return color;
     },
-    [getStageCanvas, sampleSize, zoom, panOffset, canvasSize],
+    [getStageContext, sampleSize, zoom, panOffset, canvasSize, captureMessages, setSampledColor],
   );
 
   /**
@@ -127,7 +142,7 @@ export function useEyedropperTool({
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       invalidateCache();
 
-      const color = sampleAtPointer(e);
+      const color = sampleAtPointer(e, true);
       if (!color) return;
 
       if (e.evt.altKey) {
@@ -144,15 +159,20 @@ export function useEyedropperTool({
    */
   const handleEyedropperMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      sampleAtPointer(e);
+      sampleAtPointer(e, false);
     },
     [sampleAtPointer],
   );
 
-  return {
-    handleEyedropperClick,
-    handleEyedropperMove,
-    sampledColor,
-    invalidateCache,
-  };
+  return useMemo(
+    () => ({
+      handleEyedropperClick,
+      handleEyedropperMove,
+      get sampledColor() {
+        return useEditorStore.getState().eyedropperSampledColor;
+      },
+      invalidateCache,
+    }),
+    [handleEyedropperClick, handleEyedropperMove, invalidateCache],
+  );
 }

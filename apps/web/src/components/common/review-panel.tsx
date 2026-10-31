@@ -1,15 +1,19 @@
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, FolderPlus } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize, triggerDownload } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
+import { withAnalytics } from "@/lib/lazy-analytics";
+import { isIgnoredError } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
+import { type SaveFailure, useSaveToFilesStore } from "@/stores/save-to-files-store";
 import { ToolFeedbackPrompt } from "../feedback/tool-feedback-prompt";
 
 /** Tools whose primary output is text/data, not a downloadable file. */
@@ -38,12 +42,36 @@ const MULTI_OUTPUT_TOOLS = new Set([
   "split-csv",
 ]);
 
+/**
+ * Save failures about the user's own account (signed out, not allowed, over
+ * quota). The panel still shows them; there's nothing in them to fix.
+ */
+const UNREPORTED_SAVE_STATUSES = new Set([401, 403, 413]);
+
+/** What a failed library upload was about. Only 413s have a reason to show. */
+async function uploadFailure(res: Response): Promise<SaveFailure> {
+  if (res.status !== 413) return "generic";
+  // Both the quota and the upload size limit answer 413; only the quota
+  // carries this code. A reverse proxy's 413 is an HTML page: the size limit.
+  if (!res.headers.get("content-type")?.includes("application/json")) return "tooLarge";
+  try {
+    const body: unknown = await res.json();
+    return (body as { code?: unknown } | null)?.code === "STORAGE_QUOTA_EXCEEDED"
+      ? "quota"
+      : "tooLarge";
+  } catch {
+    // Our JSON answer, cut off before it could be read: it may have been the
+    // quota, so don't claim a reason, and leave the retry open.
+    return "generic";
+  }
+}
+
 interface ReviewPanelProps {
   filename: string;
-  fileSize: number;
+  fileSize: number | null;
   fileType: string;
   originalSize: number;
-  downloadUrl: string;
+  downloadUrl: string | null;
   onUndo: () => void;
   onStartOver: () => void;
   currentToolId: string;
@@ -74,28 +102,53 @@ export function ReviewPanel({
   const isMultiOutput = MULTI_OUTPUT_TOOLS.has(currentToolId);
 
   const sizeDelta = useMemo(() => {
+    if (fileSize == null) return 0;
     if (!originalSize || originalSize === 0) return 0;
     return Math.round((1 - fileSize / originalSize) * 100);
   }, [originalSize, fileSize]);
 
   const handleDownload = () => {
-    import("@/lib/analytics").then(({ track }) => {
+    withAnalytics(({ track }) => {
       track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: currentToolId });
     });
-    triggerDownload(downloadUrl, filename);
+    if (downloadUrl) triggerDownload(downloadUrl, filename);
     useFileStore.getState().claimSelected();
   };
 
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // Per result, keyed by its URL, in a store that outlives this panel (#1502).
+  const saveState = useSaveToFilesStore((s) => (downloadUrl ? s.byUrl[downloadUrl] : undefined));
+  const saveStatus = saveState?.status ?? "idle";
+  const saveFailure = saveState?.status === "error" ? saveState.failure : "generic";
 
   const handleSaveToFiles = useCallback(async () => {
-    // Capture before the awaits below: the thumbnail strip can move the
-    // selection while the upload is in flight, and the claim must land on the
-    // entry that was actually saved.
-    const claimIndex = useFileStore.getState().selectedIndex;
-    setSaveStatus("saving");
+    const url = downloadUrl;
+    if (!url) return;
+    // Capture the entry's stable id before the awaits below: the thumbnail
+    // strip can move the selection or reorder entries while the upload is in
+    // flight, and a re-run can replace or clear the result on that entry.
+    // The claim must land only on the entry and result that were saved.
+    const { entries, selectedIndex } = useFileStore.getState();
+    const claimEntry =
+      entries[selectedIndex]?.processedUrl === url
+        ? entries[selectedIndex]
+        : entries.find((e) => e.processedUrl === url);
+    const claimEntryId = claimEntry?.id;
+    const saves = useSaveToFilesStore.getState();
+    saves.saving(url);
+    let failure: SaveFailure = "generic";
     try {
-      const res = await fetch(downloadUrl);
+      const res = await fetch(url);
+      // An expired or missing result answers with an error page. Uploading
+      // that body would put a broken file in the library and say "Saved"
+      // (#1286). The message stays constant; captureHandledError tags the
+      // statusCode as status_code (#1351).
+      if (!res.ok) {
+        if (res.status === 404 || res.status === 410) failure = "expired";
+        throw new SafeError("Save to Files could not fetch the result", {
+          code: `save-result-fetch-${res.status}`,
+          statusCode: res.status,
+        });
+      }
       const blob = await res.blob();
       const formData = new FormData();
       // Record which tool produced this file so the library shows it under
@@ -107,18 +160,37 @@ export function ReviewPanel({
         headers: formatHeaders(),
         body: formData,
       });
-      if (!uploadRes.ok) throw new Error("Upload failed");
-      setSaveStatus("saved");
-      useFileStore.getState().markClaimed(claimIndex);
+      if (!uploadRes.ok) {
+        failure = await uploadFailure(uploadRes);
+        throw new SafeError("Save to Files upload failed", {
+          code: `save-upload-${uploadRes.status}`,
+          statusCode: uploadRes.status,
+        });
+      }
+      saves.saved(url);
+      if (claimEntryId) {
+        useFileStore.getState().markClaimedById(claimEntryId, url);
+      }
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
       // fired, so save-rate was unmeasurable.
-      import("@/lib/analytics").then(({ track }) => {
+      withAnalytics(({ track }) => {
         track(ANALYTICS_EVENTS.RESULT_SAVED, { tool_id: currentToolId });
       });
-    } catch {
-      setSaveStatus("error");
-      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch (err) {
+      console.error("Save to Files failed", err);
+      const reportable = isSafeMessageError(err)
+        ? !UNREPORTED_SAVE_STATUSES.has(err.statusCode ?? 0)
+        : !isIgnoredError(err);
+      if (reportable) {
+        void captureHandledError(
+          isSafeMessageError(err)
+            ? err
+            : new SafeError("Save to Files request failed", { code: "save-request", cause: err }),
+          { error_class: "operational", ...(currentToolId ? { tool_id: currentToolId } : {}) },
+        );
+      }
+      saves.failed(url, failure);
     }
   }, [downloadUrl, filename, fileType, currentToolId]);
 
@@ -150,7 +222,7 @@ export function ReviewPanel({
       )}
 
       {/* Size delta -- hidden for data-output tools */}
-      {!isDataOutput && originalSize > 0 && (
+      {!isDataOutput && originalSize > 0 && fileSize != null && (
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t.toolPage.original}</span>
@@ -158,7 +230,7 @@ export function ReviewPanel({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t.toolPage.processed}</span>
-            <span className="tabular-nums text-foreground">{formatFileSize(fileSize)}</span>
+            <span className="tabular-nums text-foreground">{formatFileSize(fileSize ?? 0)}</span>
           </div>
           {/* Only claim "Saved" when the output is actually smaller; growth or
               no-change is already visible from the Original/Processed sizes above. */}
@@ -178,18 +250,20 @@ export function ReviewPanel({
             <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
             <span className="text-muted-foreground">{t.toolPage.dataResultsHint}</span>
           </div>
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="w-full text-center text-xs text-primary-ink hover:text-primary-ink-strong underline underline-offset-2"
-          >
-            {t.toolPage.downloadAsFile}
-          </button>
+          {downloadUrl != null && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="w-full text-center text-xs text-primary-ink hover:text-primary-ink-strong underline underline-offset-2"
+            >
+              {t.toolPage.downloadAsFile}
+            </button>
+          )}
         </>
       )}
 
       {/* Download button -- primary for non-data tools */}
-      {!isDataOutput && (
+      {!isDataOutput && downloadUrl != null && (
         <button
           type="button"
           data-download-button
@@ -198,15 +272,15 @@ export function ReviewPanel({
         >
           <Download className="h-4 w-4" />
           {isMultiOutput
-            ? format(t.reviewPanel.downloadAllZipSize, { size: formatFileSize(fileSize) })
+            ? format(t.reviewPanel.downloadAllZipSize, { size: formatFileSize(fileSize ?? 0) })
             : hasBatchStats && successCount != null && successCount > 1
               ? format(t.reviewPanel.downloadFilesZipSize, {
                   count: successCount,
-                  size: formatFileSize(fileSize),
+                  size: formatFileSize(fileSize ?? 0),
                 })
               : format(t.reviewPanel.downloadTypeSize, {
                   type: fileType,
-                  size: formatFileSize(fileSize),
+                  size: formatFileSize(fileSize ?? 0),
                 })}
         </button>
       )}
@@ -224,21 +298,29 @@ export function ReviewPanel({
       )}
 
       {/* Save to Files -- subtle text link */}
-      {!isDataOutput && !savedLibraryFileId && (
+      {!isDataOutput && !savedLibraryFileId && downloadUrl != null && (
         <div className="flex justify-center">
           <button
             type="button"
             onClick={handleSaveToFiles}
-            disabled={saveStatus === "saving" || saveStatus === "saved"}
+            disabled={
+              saveStatus === "saving" ||
+              saveStatus === "saved" ||
+              (saveStatus === "error" && (saveFailure === "expired" || saveFailure === "tooLarge"))
+            }
             className={cn(
               "text-xs flex items-center gap-1.5 transition-colors",
               saveStatus === "saved"
                 ? "text-success-ink"
-                : "text-muted-foreground hover:text-foreground disabled:opacity-50",
+                : saveStatus === "error"
+                  ? "text-destructive-ink"
+                  : "text-muted-foreground hover:text-foreground disabled:opacity-50",
             )}
           >
             {saveStatus === "saved" ? (
               <CheckCircle2 className="h-3 w-3" />
+            ) : saveStatus === "error" ? (
+              <AlertCircle className="h-3 w-3" />
             ) : saveStatus === "saving" ? (
               <div className="h-3 w-3 border-1.5 border-current border-t-transparent rounded-full animate-spin" />
             ) : (
@@ -248,7 +330,14 @@ export function ReviewPanel({
               ? t.common.saving
               : saveStatus === "saved"
                 ? t.toolPage.savedToFiles
-                : t.toolPage.saveToFiles}
+                : saveStatus === "error"
+                  ? {
+                      expired: t.toolPage.resultExpired,
+                      quota: t.toolPage.libraryFull,
+                      tooLarge: t.errors.fileTooLarge,
+                      generic: t.common.error,
+                    }[saveFailure]
+                  : t.toolPage.saveToFiles}
           </button>
         </div>
       )}

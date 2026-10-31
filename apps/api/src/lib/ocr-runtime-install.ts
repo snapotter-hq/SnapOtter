@@ -780,7 +780,7 @@ async function openChildDirectory(
     }
     return opened.handle;
   } catch (error) {
-    await opened.handle.close();
+    await opened.handle.close().catch(() => {});
     throw error;
   }
 }
@@ -1081,6 +1081,7 @@ async function cachedFileEquals(path: string, expected: Buffer): Promise<boolean
   if (expectedIdentity === null || expectedIdentity.size !== BigInt(expected.length)) return false;
 
   const file = await open(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  let failed = false;
   try {
     const opened = regularFileIdentity(await file.stat({ bigint: true }), path);
     if (!sameFileIdentity(opened, expectedIdentity)) return false;
@@ -1089,8 +1090,13 @@ async function cachedFileEquals(path: string, expected: Buffer): Promise<boolean
     const contents = await file.readFile();
     const after = regularFileIdentity(await file.stat({ bigint: true }), path);
     return sameFileIdentity(before, after) && contents.equals(expected);
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
-    await file.close();
+    await file.close().catch((closeErr: unknown) => {
+      if (!failed) throw closeErr;
+    });
   }
 }
 
@@ -1114,8 +1120,9 @@ async function persistVerifiedIndex(
     await applyExactSharedMode(file, DOWNLOAD_CACHE_FILE_MODE, temporaryIndex);
     await writeBufferFully(file, rawIndex);
     await file.sync();
-    await file.close();
+    const pendingFile = file;
     file = undefined;
+    await pendingFile.close();
     await rename(temporaryIndex, indexPath);
     await cache.handle.sync();
     if (!(await cachedFileEquals(indexPath, rawIndex))) {
@@ -1123,7 +1130,7 @@ async function persistVerifiedIndex(
     }
   } finally {
     await file?.close().catch(() => {});
-    await rm(temporaryIndex, { force: true });
+    await rm(temporaryIndex, { force: true }).catch(() => {});
   }
 }
 
@@ -1161,6 +1168,7 @@ async function inspectArchiveFile(
   hardenCacheMode = false,
 ): Promise<{ identity: RegularFileIdentity; verified: boolean }> {
   const file = await open(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  let failed = false;
   try {
     throwIfAborted(signal);
     if (hardenCacheMode) await applyExactSharedMode(file, DOWNLOAD_CACHE_FILE_MODE, path);
@@ -1178,8 +1186,13 @@ async function inspectArchiveFile(
       identity: after,
       verified: digest === expectedSha256,
     };
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
-    await file.close();
+    await file.close().catch((closeErr: unknown) => {
+      if (!failed) throw closeErr;
+    });
   }
 }
 
@@ -1202,7 +1215,7 @@ async function openCurrentPartial(
     await assertPathIdentity(path, identity);
     return { file, identity };
   } catch (error) {
-    await file.close();
+    await file.close().catch(() => {});
     throw error;
   }
 }
@@ -1244,7 +1257,7 @@ async function createPartial(path: string): Promise<FileHandle> {
     await applyExactSharedMode(file, DOWNLOAD_CACHE_FILE_MODE, path);
     return file;
   } catch (error) {
-    await file.close();
+    await file.close().catch(() => {});
     throw error;
   }
 }
@@ -1566,8 +1579,9 @@ async function downloadArchive(
       if (pinnedPartial.identity.size > BigInt(expectedSize)) {
         await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
         await removeExistingPartial(cache, partialName, pinnedPartial.identity);
-        await pinnedPartial.file.close();
+        const closingPartial = pinnedPartial;
         pinnedPartial = null;
+        await closingPartial.file.close();
       } else {
         offset = Number(pinnedPartial.identity.size);
       }
@@ -1587,8 +1601,9 @@ async function downloadArchive(
       }
       await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
       await removeExistingPartial(cache, partialName, pinnedPartial.identity);
-      await pinnedPartial.file.close();
+      const closingPartial = pinnedPartial;
       pinnedPartial = null;
+      await closingPartial.file.close();
       offset = 0;
     }
 
@@ -1638,8 +1653,9 @@ async function downloadArchive(
             pinnedPartial.identity,
           );
           await removeExistingPartial(cache, partialName, pinnedPartial.identity);
-          await pinnedPartial.file.close();
+          const closingPartial = pinnedPartial;
           pinnedPartial = null;
+          await closingPartial.file.close();
         } catch (error) {
           cancelResponseBody(response);
           throw error;
@@ -1671,11 +1687,12 @@ async function downloadArchive(
       reader = response.body.getReader();
     } catch (error) {
       cancelResponseBody(response);
-      await file.close();
+      await file.close().catch(() => {});
       throw error;
     }
     let written = offset;
     let partialSynced = false;
+    let failed = false;
     try {
       while (true) {
         const { done, value } = await readWithStallTimeout(
@@ -1692,8 +1709,8 @@ async function downloadArchive(
         const percent = 10 + Math.floor((written / expectedSize) * 78);
         onProgress?.(Math.min(percent, 88), "Downloading OCR runtime");
       }
-      await file.sync();
       partialSynced = true;
+      await file.sync();
       if (written !== expectedSize) {
         throw new RetryableOcrDownloadError(
           `OCR runtime archive is truncated (${written}/${expectedSize} bytes)`,
@@ -1725,12 +1742,15 @@ async function downloadArchive(
       await promotePartial(cache, file, partialPath, finalPath, verifiedIdentity);
       return finalPublicPath;
     } catch (error) {
+      failed = true;
       cancelReader(reader, error);
-      if (!partialSynced) await file.sync();
+      if (!partialSynced) await file.sync().catch(() => {});
       throw error;
     } finally {
       reader.releaseLock();
-      await file.close();
+      await file.close().catch((closeErr: unknown) => {
+        if (!failed) throw closeErr;
+      });
     }
   } finally {
     await pinnedPartial?.file.close().catch(() => {});

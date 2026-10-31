@@ -50,7 +50,7 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
   return {
     ...actual,
-    cancelSingleJobGuarded: async (args: { jobId: string }) => {
+    cancelSingleJobGuarded: async (args: Parameters<typeof actual.cancelSingleJobGuarded>[0]) => {
       if (args.jobId === guardedWriteFault.target) {
         throw new Error("injected terminal-write outage");
       }
@@ -94,6 +94,7 @@ const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queue
 const { bullPrefix, queueName } = await import("../../../apps/api/src/jobs/types.js");
 const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/worker.js");
 const { getObjectBuffer, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
+const { cancelSingleJobGuarded } = await import("../../../apps/api/src/routes/progress.js");
 const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
 
 const passthroughSchema = { parse: (v: unknown) => v } as never;
@@ -271,7 +272,7 @@ async function buildPipelineFlow(
     toolId: "pipeline",
     pool: "image",
     status: "queued",
-    inputRefs: [],
+    inputRefs: opts.parentId ? [uploadKey] : [],
     // Cancel metadata is stamped on single-run flow rows only; per-file
     // rows of a batch resolve through the parent instead.
     settings: opts.parentId ? {} : { stepCount: totalSteps, clientJobId: progressId },
@@ -422,14 +423,14 @@ async function finalizeReturnValue(flowId: string): Promise<Record<string, unkno
 beforeAll(async () => {
   await startCancelListener();
   startWorkers();
-}, 30_000);
+});
 
 afterAll(async () => {
   await closeWorkers();
   await stopCancelListener();
   await closeQueues();
   await sharedRedis().quit();
-}, 20_000);
+});
 
 // ── requestCancel resolution ────────────────────────────────────
 
@@ -769,6 +770,155 @@ describe("cooperative step skip and canceled finalize", () => {
     expect((await jobRow(clientJobId))?.status).toBe("processing");
   });
 
+  it("leaves a re-pointed clientJobId alias row untouched when an earlier pipeline's step progress, finalize, or failed safety net settles (#2741, #3409)", async () => {
+    const clientJobId = randomUUID();
+    const liveFlowId = randomUUID();
+    const liveProgress = { percent: 0, stage: "Preparing pipeline..." };
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      type: "single",
+      status: "processing",
+      inputRefs: [],
+      progress: liveProgress,
+      settings: { pipelineFlowId: liveFlowId },
+    });
+
+    const enqueueStaleStep = async (inputKey: string): Promise<string> => {
+      const staleStepFlowId = randomUUID();
+      const stepJobId = `${staleStepFlowId}-s0`;
+      await db.insert(schema.jobs).values({
+        id: stepJobId,
+        type: "pipeline-step",
+        toolId: "wt-pipeline-cancel",
+        pool: "image",
+        status: "queued",
+        inputRefs: [inputKey],
+        settings: { mode: "fast", tag: `stale-step-${staleStepFlowId.slice(0, 8)}` },
+      });
+      await getQueue("image").add(
+        "wt-pipeline-cancel",
+        {
+          kind: "pipeline-step",
+          jobId: stepJobId,
+          toolId: "wt-pipeline-cancel",
+          userId: null,
+          pool: "image",
+          stepIndex: 0,
+          totalSteps: 2,
+          clientJobId,
+          inputRefs: [inputKey],
+          filename: "input.png",
+          settings: { mode: "fast", tag: `stale-step-${staleStepFlowId.slice(0, 8)}` },
+        } satisfies ToolJobData,
+        { jobId: stepJobId, attempts: 1 },
+      );
+      return stepJobId;
+    };
+
+    const enqueueStaleFinalize = async (
+      stepOverride: Partial<typeof schema.jobs.$inferInsert>,
+    ): Promise<string> => {
+      const staleFlowId = randomUUID();
+      await db.insert(schema.jobs).values([
+        {
+          id: `${staleFlowId}-s0`,
+          type: "pipeline-step",
+          toolId: "wt-pipeline-cancel",
+          pool: "image",
+          status: "completed",
+          inputRefs: [],
+          ...stepOverride,
+        },
+        {
+          id: staleFlowId,
+          type: "pipeline",
+          toolId: "pipeline",
+          pool: "image",
+          status: "processing",
+          inputRefs: [],
+          settings: { stepCount: 1, clientJobId },
+        },
+      ]);
+      await getQueue("image").add(
+        "pipeline-finalize",
+        {
+          kind: "pipeline-finalize",
+          jobId: staleFlowId,
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          clientJobId,
+          inputRefs: [],
+          filename: "input.png",
+          settings: {},
+        } satisfies ToolJobData,
+        { jobId: staleFlowId, attempts: 1 },
+      );
+      return staleFlowId;
+    };
+
+    const assertLiveAliasUntouched = async () => {
+      const alias = await jobRow(clientJobId);
+      expect(alias?.status).toBe("processing");
+      expect(alias?.completedAt).toBeNull();
+      expect(alias?.error).toBeNull();
+      expect(alias?.progress).toEqual(liveProgress);
+      expect(alias?.settings).toEqual({ pipelineFlowId: liveFlowId });
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    };
+
+    const completedOutputKey = `outputs/seed-${randomUUID()}/out.png`;
+    await putObject(completedOutputKey, Buffer.from("done"));
+
+    const [staleStepId, canceledFlowId, failedFlowId, completedFlowId, crashedFlowId] =
+      await Promise.all([
+        enqueueStaleStep(completedOutputKey),
+        enqueueStaleFinalize({
+          status: "canceled",
+          error: { message: "Canceled" },
+        }),
+        enqueueStaleFinalize({
+          status: "failed",
+          error: { message: "Step boom", code: "ENGINE_UNAVAILABLE", httpStatus: 503 },
+        }),
+        enqueueStaleFinalize({
+          status: "completed",
+          outputRefs: [completedOutputKey],
+          bytesIn: 4,
+          bytesOut: 4,
+        }),
+        enqueueStaleFinalize({
+          status: "completed",
+          outputRefs: [],
+        }),
+      ]);
+
+    const [staleStepRow, canceledRow, failedRow, completedRow, crashedRow] = await Promise.all([
+      terminalRow(staleStepId),
+      terminalRow(canceledFlowId),
+      terminalRow(failedFlowId),
+      terminalRow(completedFlowId),
+      terminalRow(crashedFlowId),
+    ]);
+    expect(staleStepRow.status).toBe("completed");
+    expect(canceledRow.status).toBe("canceled");
+    expect(failedRow.status).toBe("failed");
+    expect(completedRow.status).toBe("completed");
+    expect(crashedRow.status).toBe("failed");
+    expect((crashedRow.error as { message?: string } | null)?.message).toBe(
+      "Pipeline processing failed",
+    );
+
+    // Direct alias-heal guard: a stale expectedPipelineFlowId from an in-flight
+    // requestCancel heal leaves the re-pointed row alone (#2741).
+    await cancelSingleJobGuarded({
+      jobId: clientJobId,
+      expectedPipelineFlowId: canceledFlowId,
+    });
+    await assertLiveAliasUntouched();
+  });
+
   it("a cancel that lands after every step finished completes normally", async () => {
     const clientJobId = randomUUID();
     const tag = `late-${clientJobId.slice(0, 8)}`;
@@ -916,7 +1066,16 @@ describe("pipeline-batch cancel", () => {
       const j = await getQueue("system").getJob(parentId);
       return j?.returnvalue ? (j.returnvalue as Record<string, unknown>) : undefined;
     });
-    expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
+    const payload = returned.resultPayload as {
+      canceled?: boolean;
+      manifest?: Array<{ index: number; filename: string; error?: string }>;
+    };
+    expect(payload.canceled).toBe(true);
+    expect(payload.manifest?.[1]).toEqual({
+      index: 1,
+      filename: "slow.png",
+      error: "Canceled",
+    });
   });
 
   it("a full cancel before any step ran settles the batch with the Canceled synthetic", async () => {

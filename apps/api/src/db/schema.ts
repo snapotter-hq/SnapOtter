@@ -21,6 +21,9 @@ export const jobStatus = pgEnum("job_status", [
   "canceled",
 ]);
 
+/** The id ensureDefaultTeam() seeds the "Default" team with (1.x used the same one). */
+export const DEFAULT_TEAM_ID = "default-team-00000000";
+
 export const users = pgTable(
   "users",
   {
@@ -28,10 +31,17 @@ export const users = pgTable(
     username: text("username").notNull().unique(),
     passwordHash: text("password_hash"),
     role: text("role").notNull().default("user"),
-    team: text("team").notNull().default("Default"),
+    // A teams.id, never a name (#1474): every lookup matches on the id, and
+    // renaming a team must not orphan its members.
+    team: text("team").notNull().default(DEFAULT_TEAM_ID),
     mustChangePassword: boolean("must_change_password").notNull().default(true),
     authProvider: text("auth_provider").notNull().default("local"),
+    // The sign-in identity: OIDC subject or SAML NameID, keyed by authProvider.
     externalId: text("external_id"),
+    // The id the SCIM client provisioned this user under (#1510). Separate from
+    // externalId because an OIDC or SAML link rewrites that one, and the IdP
+    // still has to find the user by this one to update or deprovision them.
+    scimExternalId: text("scim_external_id"),
     email: text("email"),
     legalHold: boolean("legal_hold").notNull().default(false),
     storageUsed: bigint("storage_used", { mode: "number" }).notNull().default(0),
@@ -55,6 +65,10 @@ export const users = pgTable(
     uniqueIndex("users_auth_provider_external_id_unique")
       .on(table.authProvider, table.externalId)
       .where(sql`${table.externalId} IS NOT NULL`),
+    // One user per SCIM identity, whatever provider the user signs in with.
+    uniqueIndex("users_scim_external_id_unique")
+      .on(table.scimExternalId)
+      .where(sql`${table.scimExternalId} IS NOT NULL`),
   ],
 );
 
@@ -118,7 +132,12 @@ export const jobs = pgTable(
     inputRefs: jsonb("input_refs").$type<string[]>(),
     outputRefs: jsonb("output_refs").$type<string[]>(),
     settings: jsonb("settings").$type<Record<string, unknown>>(),
-    error: jsonb("error").$type<{ message: string; details?: unknown }>(),
+    error: jsonb("error").$type<{
+      message: string;
+      details?: unknown;
+      code?: string;
+      httpStatus?: number;
+    }>(),
     bytesIn: bigint("bytes_in", { mode: "number" }),
     bytesOut: bigint("bytes_out", { mode: "number" }),
     durationMs: integer("duration_ms"),

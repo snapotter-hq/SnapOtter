@@ -77,4 +77,22 @@ describe("filtered file imports", () => {
       }),
     ).toEqual([details(image)]);
   });
+
+  it("includes checked files from knownFiles that were hidden by the current search (#2904)", () => {
+    const staleSecondImage: UserFile = { ...secondImage, version: 1, originalName: "old-name.png" };
+    const freshSecondImage: UserFile = { ...secondImage, version: 2, originalName: "new-name.png" };
+    expect(
+      getFilesToOpen({
+        details: details(freshSecondImage),
+        files: [freshSecondImage],
+        knownFiles: new Map([
+          [image.id, image],
+          [secondImage.id, staleSecondImage],
+          [video.id, video],
+        ]),
+        checkedIds: new Set([image.id, secondImage.id, video.id]),
+        filterMimePrefix: "image/",
+      }),
+    ).toEqual([image, freshSecondImage]);
+  });
 });

@@ -23,6 +23,38 @@ test.describe("Keyboard Shortcuts", () => {
     await expect(searchInput).toHaveValue("");
   });
 
+  test("the search box hint names the modifier this host's handler listens for", async ({
+    loggedInPage: page,
+  }) => {
+    const hint = page.getByTestId("search-shortcut-hint");
+    await expect(hint).toHaveText(process.platform === "darwin" ? "⌘K" : "Ctrl+K");
+  });
+
+  // navigator.platform is what both the hint and the handler read, so forcing it
+  // proves they agree on each OS from any host: the hint's key must focus search.
+  for (const { platform, hint, key } of [
+    { platform: "Win32", hint: "Ctrl+K", key: "Control+k" },
+    { platform: "Linux x86_64", hint: "Ctrl+K", key: "Control+k" },
+    { platform: "MacIntel", hint: "⌘K", key: "Meta+k" },
+  ]) {
+    test(`on ${platform} the hint reads ${hint} and ${key} focuses search`, async ({
+      loggedInPage: page,
+    }) => {
+      await page.addInitScript((p) => {
+        Object.defineProperty(Navigator.prototype, "platform", { get: () => p });
+      }, platform);
+      await page.reload();
+
+      await expect(page.getByTestId("search-shortcut-hint")).toHaveText(hint);
+
+      const searchInput = page.locator("[data-search-input]");
+      await expect(searchInput).not.toBeFocused();
+      await page.keyboard.press(key);
+      await expect(searchInput).toBeFocused();
+      await expect(searchInput).toHaveValue("");
+    });
+  }
+
   test("typing while the Settings dialog is open does not reach the search bar", async ({
     loggedInPage: page,
   }) => {

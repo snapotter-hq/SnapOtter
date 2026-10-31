@@ -1,8 +1,8 @@
 ---
 description: "アイデンティティプロバイダーからSnapOtterへユーザーとグループを同期するSCIM 2.0プロビジョニングを設定します。Okta、Azure AD / Entra ID、カスタム連携をカバーします。"
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: ed7b44a3f0db
+i18n_output_hash: 832077edd9ba
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdPが1分あたり1000件を超えるリクエストを送信しています。
 ### ユーザーがデプロビジョニングされたがUIから削除されない {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIMのDELETEはソフト無効化です。無効化されたユーザーは、無効ステータスで管理者のユーザー一覧に引き続き表示されます。これはデータを保持するための仕様です。ロールは`disabled:<original-role>`として表示されます。
+
+### `externalId` フィルターが OIDC または SAML でサインインするユーザーを見つけられない {#recover-scim-ids-in-oidc-or-saml-users}
+
+SCIM の `externalId` に専用のカラム（`users.scim_external_id`）ができる前は、OIDC または SAML のサインインで既にリンク済みのユーザーに対して SCIM の `PUT` や `PATCH` を実行すると、SCIM ID がそのユーザーのサインイン ID に書き込まれていました。アップグレード時のマイグレーションは、その値を本物の OIDC サブジェクトや SAML NameID と区別できないため、該当ユーザーはそのままにされます。そうしたユーザーでは、IdP が `externalId` を含む更新をもう一度送るまで、`filter=externalId eq "..."` は何も返しません。
+
+IdP を待ちたくない場合、監査ログが ID の裏付けになります。SCIM は各ユーザーを作成したときの `externalId` を伴う `SCIM_USER_PROVISIONED` 行を書き込みます。`scim_external_id` カラムがあるリリースにアップグレードしたら、SnapOtter データベースに対して `psql` を開き（[アカウント復旧ガイド](./account-recovery.md#older-images-and-fallbacks) に両方の構成での手順があります）、サインイン ID がまだその ID と等しいユーザーをプレビューします:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+リストが正しければ、ID を SCIM カラムにコピーします。`BEGIN;` の中で実行し、返された行を確認してから `COMMIT;` してください:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+2 回目の実行では何も一致しません。この更新は `external_id` をそのままにします。一部の IdP（Okta など）は同じ ID を OIDC の `sub` と SCIM の `externalId` の両方として送るため、それらではクリアすると OIDC サインインが壊れるからです。`external_id` が本当に迷い込んだ SCIM ID であるユーザーは、すでにサブジェクトの一致に失敗しています。`OIDC_AUTO_LINK_USERS`（または `SAML_AUTO_LINK_USERS`）を有効にしていれば、検証済みメールでの次回サインイン時にどちらの場合も再リンクされます。
+
+一部のユーザーは届かないままで、IdP の次回更新で ID を取り戻します:
+
+- サインイン リンクが SCIM ID を置き換え、その後に SCIM の書き込みがなかったユーザー。`external_id` が監査行と一致しなくなっているためです
+- プロビジョニング行の監査保持期間がすでに削除してしまったユーザー
+- 作成後に IdP が `externalId` を変更したユーザー（更新行はどのフィールドが変わったかを記録し、値は記録しません）
+- 同じ ID を持つ 2 人のユーザー。クエリは一意インデックスが失敗しないようスキップします。最後の条件を除いたプレビューで一覧表示されるので、どちらが ID を所有するかは判断してください

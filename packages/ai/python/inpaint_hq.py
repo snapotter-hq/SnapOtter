@@ -179,10 +179,11 @@ def main():
             import torch  # noqa: F401
             import diffusers  # noqa: F401
         except ImportError as e:
+            detail = str(e).strip() or type(e).__name__
             print(json.dumps({
                 "success": False,
                 "error": (
-                    f"Missing dependency: {e}. The High-Quality Inpainting bundle "
+                    f"Missing dependency: {detail}. The High-Quality Inpainting bundle "
                     "provides diffusers/torch; install it and retry."
                 ),
             }))
@@ -218,7 +219,7 @@ def main():
         print(json.dumps({"success": True, "method": "sd15-inpainting"}))
 
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

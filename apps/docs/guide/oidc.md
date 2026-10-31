@@ -152,6 +152,10 @@ services:
 Do not set `NODE_TLS_REJECT_UNAUTHORIZED=0`. This disables all TLS verification and is a security risk.
 :::
 
+## Plain-http issuers {#plain-http-issuers}
+
+SnapOtter accepts an `http://` issuer URL only when `EXTERNAL_URL` is also plain http, which suits a local or LAN test setup. Discovery, the login code exchange, and the tokens then cross the network unencrypted, so SnapOtter logs a warning at startup that names the issuer host. With an `https://` `EXTERNAL_URL`, an http issuer is refused at sign-in and the startup warning says so. Either way, the fix is to serve your identity provider over https.
+
 ## Troubleshooting {#troubleshooting}
 
 ### Redirect URI mismatch {#redirect-uri-mismatch}

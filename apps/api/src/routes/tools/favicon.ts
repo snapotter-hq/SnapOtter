@@ -1,20 +1,30 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
 
 const settingsSchema = z.object({
   background: z
@@ -99,10 +109,8 @@ export function registerFavicon(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (uploadedFiles.length === 0) {
@@ -128,8 +136,9 @@ export function registerFavicon(app: FastifyInstance) {
       }
 
       let buf = file.buffer;
-      const fileExt = file.filename.split(".").pop()?.toLowerCase();
+      const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
 
+      let fallbackFormat: string | undefined;
       try {
         // Decode HEIC/HEIF via system decoder
         if (validation.format === "heif") {
@@ -140,32 +149,84 @@ export function registerFavicon(app: FastifyInstance) {
         if (needsCliDecode(validation.format)) {
           try {
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch {
-            await sharp(buf).metadata();
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
+            try {
+              const meta = await sharp(buf).metadata();
+              fallbackFormat = meta.format;
+              if (fallbackFormat !== "svg") {
+                await sharp(buf).resize(1).raw().toBuffer();
+              }
+            } catch (rawProbeErr) {
+              const probeErr = asDecoderOutOfMemory(rawProbeErr);
+              if (probeErr instanceof DecoderOutOfMemoryError) {
+                throw probeErr;
+              }
+              throw decodeErr;
+            }
           }
         }
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        request.log?.warn(
+          { err, filename: file.filename, toolId: "favicon" },
+          "Favicon input decode failed",
+        );
+        const reason = stripInternalPaths(
+          err instanceof Error ? err.message : "Unknown decode error",
+        );
+        skippedFiles.push({ filename: file.filename, reason });
+        continue;
+      }
 
-        // Sanitize SVG input
-        if (validation.format === "svg") {
+      // Sanitize SVG input
+      if (validation.format === "svg" || fallbackFormat === "svg") {
+        try {
           buf = decompressSvgz(buf);
           buf = sanitizeSvg(buf);
+        } catch (err) {
+          if (!isSvgClientError(err)) throw asDecoderOutOfMemory(err);
+          request.log?.warn(
+            { err, filename: file.filename, toolId: "favicon" },
+            "Favicon SVG sanitize failed",
+          );
+          const reason = stripInternalPaths(
+            err instanceof Error ? err.message : "Unknown decode error",
+          );
+          skippedFiles.push({ filename: file.filename, reason });
+          continue;
         }
+        decodedFiles.push({ buffer: buf, filename: file.filename });
+        continue;
+      }
 
-        // Auto-orient EXIF rotation (skip for SVG)
-        if (validation.format !== "svg") {
-          buf = await autoOrient(buf);
-        }
+      try {
+        // Auto-orient EXIF rotation
+        buf = await autoOrient(buf);
 
         // Force a full pixel decode now. Header validation alone lets
         // truncated files through, and a decode failure after reply.hijack()
         // cannot be turned into an error response anymore.
-        if (validation.format !== "svg") {
-          await sharp(buf).stats();
-        }
+        await sharp(buf).stats();
 
         decodedFiles.push({ buffer: buf, filename: file.filename });
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : "Unknown decode error";
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        request.log?.warn(
+          { err, filename: file.filename, toolId: "favicon" },
+          "Favicon input decode failed",
+        );
+        const reason = stripInternalPaths(
+          err instanceof Error ? err.message : "Unknown decode error",
+        );
         skippedFiles.push({ filename: file.filename, reason });
       }
     }
@@ -297,11 +358,20 @@ export function registerFavicon(app: FastifyInstance) {
       }
 
       await archive.finalize();
+      await emitInlineRequestAuditIfNeeded(
+        request,
+        200,
+        JSON.stringify({
+          inputFileCount: decodedFiles.length,
+          originalSize: decodedFiles.reduce((sum, f) => sum + f.buffer.length, 0),
+        }),
+      );
     } catch (err) {
       if (!reply.raw.headersSent) {
+        request.log?.warn({ err, toolId: "favicon" }, "Favicon generation failed");
         return reply.status(422).send({
           error: "Favicon generation failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
       // The ZIP stream already started; end the connection so clients see a

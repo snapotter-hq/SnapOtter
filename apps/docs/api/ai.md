@@ -55,15 +55,16 @@ The Docker image ships the application plus the common runtime. Large model arch
 
 Most AI tools require one or more feature bundles before they can run. The admin UI installs those by tool through `POST /api/v1/admin/tools/:toolId/features/install`, which resolves the full bundle list, skips bundles that are already installed, and queues only the missing downloads. For example, enabling Passport Photo on a fresh instance queues `background-removal` and `face-detection`; enabling it after Background Removal is already installed queues only `face-detection`. OCR is the exception because `fast` needs no pack; install its optional accurate runtime through the UI or `POST /api/v1/admin/features/ocr/install`.
 
-| Bundle | Size | Shared dependency group | Tools that use it |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet background matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | MediaPipe face detection and landmarks | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa inpainting/outpainting and DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | scratch repair and restoration pipeline | restore-photo |
-| `ocr` | ~208-234 MiB download / ~409-488 MiB installed | Optional RapidOCR 3.9.1, ONNX Runtime 1.20.1, and pinned PP-OCR models | ocr, ocr-pdf (`balanced` and `best` only) |
-| `transcription` | ~600 MB | faster-whisper speech-to-text models | transcribe-audio, auto-subtitles |
+| Bundle | Size | CPU memory floor | Shared dependency group | Tools that use it |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (~2.5 GB free) | rembg / BiRefNet background matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (~0.5 GB free) | MediaPipe face detection and landmarks | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (~2 GB free) | LaMa inpainting/outpainting and DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB free) | Stable Diffusion 1.5 high-quality inpainting | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (~2.5 GB free) | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB free) | scratch repair and restoration pipeline | restore-photo |
+| `ocr` | ~208-234 MiB download / ~409-488 MiB installed | 4 GiB configured effective memory (`fast` runs on 2 GB) | Optional RapidOCR 3.9.1, ONNX Runtime 1.20.1, and pinned PP-OCR models | ocr, ocr-pdf (`balanced` and `best` only) |
+| `transcription` | ~600 MB | 4 GB RAM (~2 GB free) | faster-whisper speech-to-text models | transcribe-audio, auto-subtitles |
 
 Tools with cross-bundle dependencies:
 
@@ -73,6 +74,27 @@ Tools with cross-bundle dependencies:
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Detects faces before running GFPGAN or CodeFormer enhancement on the selected face regions. |
 
 A tool is available only when all of its required bundles are installed, except OCR: its built-in `fast` tier remains available without the optional OCR pack. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
+
+### Installing every bundle at once {#installing-every-bundle-at-once}
+
+Settings, AI Features has an **Install All** button that queues every bundle the host can run. It skips anything already installed, skips bundles reported incompatible with the host, and retries a failed bundle once before moving on. For a normal instance that button is the whole answer, and nothing below is needed.
+
+Budget the disk first. Together the bundles are roughly 20-25 GB installed, and they land in `/data/ai` on the data volume rather than in the image, so they survive `docker compose down` and container recreation. You install them once per host, not once per upgrade.
+
+For unattended provisioning where nobody is going to click anything, POST each bundle to the install endpoint with an admin API key. The server queues them, so send all eight without waiting:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Each call returns `202` with a `jobId` and a `queued` flag: `false` for the one that starts immediately, `true` for the rest. A bundle that is already installed returns `409` and is safe to ignore, which makes the loop re-runnable. Poll `GET /api/v1/features` for progress; every bundle reads `installed` when the run is done.
+
+Two things to expect. The `ocr` bundle runs a host-compatibility preflight and refuses hosts below its signed minimum, so it can fail while the other seven succeed (see [Accurate OCR runtime installation](#accurate-ocr-runtime-installation)). And `POST /api/v1/admin/features/reset` returns `409` while any install is in progress, so a run that is part way through has to finish or the container has to be restarted before the environment can be wiped.
 
 ### Accurate OCR runtime installation {#accurate-ocr-runtime-installation}
 
@@ -158,8 +180,8 @@ Blurs the background while keeping the subject sharp.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
-| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean and Arabic never select `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
+| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast does not support `ko` or `ar` |
 | `enhance` | boolean | Tier-dependent | Improve local contrast. Fast applies it directly; accurate tiers keep the variant only when calibrated scoring improves OCR. Defaults on for Best |
 | `engine` | string | - | Deprecated compatibility alias. Maps `tesseract` to `fast` and the legacy `paddleocr` value to `balanced`; it does not load PaddlePaddle |
 
@@ -174,13 +196,13 @@ Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
-| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean and Arabic never select `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
+| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast does not support `ko` or `ar` |
 | `pages` | string | `"all"` | Page selection: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Tier-dependent | Improve local contrast. Fast applies it directly; accurate tiers keep the variant only when calibrated scoring improves OCR. Defaults on for Best |
 | `engine` | string | - | Deprecated compatibility alias. Maps `tesseract` to `fast` and the legacy `paddleocr` value to `balanced`; it does not load PaddlePaddle |
 
-The same no-downgrade and Korean compatibility rules apply to PDF OCR. PDF pages are rasterized before recognition, and one request can select at most 50 pages.
+The same no-downgrade and Korean and Arabic compatibility rules apply to PDF OCR. PDF pages are rasterized before recognition, and one request can select at most 50 pages.
 
 ## Face / PII Blur {#face-pii-blur}
 
@@ -348,7 +370,7 @@ At least one extend direction must be greater than 0.
 | `sensitivity` | number (0-1) | `0.5` | Face detection threshold |
 | `threshold` | integer (0-255) | `30` | Background detection threshold (trim mode) |
 | `padToSquare` | boolean | `false` | Pad trimmed result to a square |
-| `padColor` | string | `"#ffffff"` | Background color for square padding |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Background color for square padding |
 | `targetSize` | integer | - | Target size for padded output (pixels) |
 | `quality` | integer (1-100) | - | Output quality |
 

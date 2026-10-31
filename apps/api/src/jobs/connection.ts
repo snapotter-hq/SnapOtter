@@ -9,6 +9,77 @@ import { SafeError } from "@snapotter/shared";
 import type { ConnectionOptions } from "bullmq";
 import Redis from "ioredis";
 import { env } from "../config.js";
+import { logger } from "../lib/logger.js";
+
+const RECONNECTING_PATCHED = Symbol.for("snapotter.ioredis.reconnectingDisconnectPatched");
+
+/**
+ * Work around redis/ioredis#2245: calling disconnect(false) (or quit() with an
+ * empty offline queue) while the client is in "reconnecting" cancels
+ * reconnectTimeout and calls connector.disconnect() on the already-closed
+ * socket from the previous connection. Because a closed net.Socket never emits
+ * "close" a second time, closeHandler never runs, status stays "reconnecting"
+ * forever, pending commands in commandQueue/offlineQueue never reject, and
+ * "end" never fires, deadlocking BullMQ's Worker.close() inside
+ * blockingConnection.disconnect(true) (#3604).
+ */
+export function patchIoredisDisconnect(
+  proto:
+    | {
+        disconnect?: (reconnect?: boolean) => void;
+        [key: symbol]: unknown;
+      }
+    | undefined = Redis.prototype as unknown as {
+    disconnect?: (reconnect?: boolean) => void;
+    [key: symbol]: unknown;
+  },
+): void {
+  if (!proto || typeof proto.disconnect !== "function" || proto[RECONNECTING_PATCHED]) {
+    return;
+  }
+  const origDisconnect = proto.disconnect;
+  proto.disconnect = function (
+    this: {
+      status?: string;
+      reconnectTimeout?: ReturnType<typeof setTimeout> | null;
+      manuallyClosing?: boolean;
+      prevCommandQueue?: {
+        shift: () => { command?: { reject: (err: Error) => void } } | undefined;
+      } | null;
+      setStatus?: (status: string) => void;
+      flushQueue?: (err: Error) => void;
+    },
+    reconnect = false,
+  ) {
+    const drainPrevCommandQueue = (err: Error) => {
+      if (!this.prevCommandQueue) return;
+      for (let item = this.prevCommandQueue.shift(); item; item = this.prevCommandQueue.shift()) {
+        item.command?.reject(err);
+      }
+      this.prevCommandQueue = null;
+    };
+    if (this.status === "reconnecting" && !reconnect) {
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
+      this.manuallyClosing = false;
+      this.setStatus?.("end");
+      const closedErr = new Error("Connection is closed.");
+      this.flushQueue?.(closedErr);
+      drainPrevCommandQueue(closedErr);
+      return;
+    }
+    const result = origDisconnect.call(this, reconnect);
+    if (!reconnect) {
+      drainPrevCommandQueue(new Error("Connection is closed."));
+    }
+    return result;
+  };
+  proto[RECONNECTING_PATCHED] = true;
+}
+
+patchIoredisDisconnect();
 
 /**
  * How long a connection may hear nothing while it is waiting for a reply
@@ -54,7 +125,7 @@ const SUBSCRIBER_PING_INTERVAL_MS = 10_000;
  */
 function swallowConnectionErrors(connection: Redis): Redis {
   connection.on("error", (err: Error) => {
-    console.error("[redis] connection error:", err.message);
+    logger.error({ err }, "[redis] connection error");
   });
   return connection;
 }
@@ -107,9 +178,17 @@ function keepSubscriberSocketProbed(connection: Redis): void {
   connection.once("end", () => clearInterval(timer));
 }
 
-// ioredis 5.11 vs BullMQ's bundled 5.10 type mismatch
+/**
+ * Return plain ConnectionOptions so BullMQ constructs and owns its ioredis
+ * instances (shared: false) and closes them on .close() (#3284).
+ */
 export function createBullMQConnection(): ConnectionOptions {
-  return createRedisConnection() as unknown as ConnectionOptions;
+  return {
+    url: env.REDIS_URL,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+    socketTimeout: SOCKET_TIMEOUT_MS,
+  };
 }
 
 let _shared: Redis | null = null;
@@ -159,7 +238,7 @@ export async function assertRedisCompatible(): Promise<void> {
   try {
     info = await sharedRedis().info("server");
   } catch {
-    console.warn("[redis] INFO not permitted; skipping version preflight");
+    logger.warn("[redis] INFO not permitted; skipping version preflight");
     return;
   }
   const err = checkRedisInfoCompatible(info);

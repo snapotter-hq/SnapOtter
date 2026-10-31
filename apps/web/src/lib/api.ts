@@ -1,5 +1,8 @@
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { getDistinctId } from "@/lib/analytics";
 import { appUrl } from "@/lib/app-url";
+import { featureIncompatibleMessage, featureNotInstalledMessage } from "@/lib/bundle-i18n";
+import { createXhrWatchdog } from "@/lib/xhr-watchdog";
 import { useConnectionStore } from "@/stores/connection-store";
 
 const API_BASE = appUrl("/api");
@@ -11,43 +14,129 @@ export interface FeatureNotInstalledError {
   estimatedSize: string;
 }
 
+export interface FeatureIncompatibleError {
+  type: "feature_incompatible";
+  feature: string;
+  featureName: string;
+  compatibilityReason: string;
+}
+
+/**
+ * Reads a failed answer's JSON body: `error`, then `details`, then `message`.
+ * Only string `error` and `message` count, so an object-valued one can never
+ * reach the screen as "[object Object]" (#1858). `fallback` is what a body
+ * that names no reason reads as.
+ */
 export function parseApiError(
-  body: Record<string, unknown>,
+  body: unknown,
   fallbackStatus: number,
-): string | FeatureNotInstalledError {
-  if (body.code === "FEATURE_NOT_INSTALLED") {
+  fallback = `Processing failed: ${fallbackStatus}`,
+): string | FeatureNotInstalledError | FeatureIncompatibleError {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return fallback;
+  }
+  const record = body as Record<string, unknown>;
+  const feature = typeof record.feature === "string" ? record.feature : "";
+  const featureName = typeof record.featureName === "string" ? record.featureName : "";
+  if (record.code === "FEATURE_NOT_INSTALLED" && (feature.length > 0 || featureName.length > 0)) {
     return {
       type: "feature_not_installed",
-      feature: body.feature as string,
-      featureName: body.featureName as string,
-      estimatedSize: body.estimatedSize as string,
+      feature,
+      featureName,
+      estimatedSize: typeof record.estimatedSize === "string" ? record.estimatedSize : "",
+    };
+  }
+  if (record.code === "FEATURE_INCOMPATIBLE" && (feature.length > 0 || featureName.length > 0)) {
+    return {
+      type: "feature_incompatible",
+      feature,
+      featureName,
+      compatibilityReason:
+        typeof record.compatibilityReason === "string" ? record.compatibilityReason : "",
     };
   }
 
-  const error = typeof body.error === "string" ? body.error : "";
-  const details = body.details;
-  if (!details) {
-    return error || (body.message as string) || `Processing failed: ${fallbackStatus}`;
-  }
-  let detailsStr: string;
+  const error = typeof record.error === "string" ? record.error : "";
+  const message = typeof record.message === "string" ? record.message : "";
+  const details = record.details;
+  let detailsStr = "";
   if (typeof details === "string") {
     detailsStr = details;
   } else if (Array.isArray(details)) {
     detailsStr = details
-      .map((d) =>
-        typeof d === "string" ? d : (d as Record<string, unknown>)?.message || JSON.stringify(d),
-      )
+      .map((d) => {
+        if (typeof d === "string") return d;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          const itemObj = d as Record<string, unknown>;
+          const itemMessage = itemObj.message;
+          if (typeof itemMessage === "string" && itemMessage) {
+            let itemPath = itemObj.path;
+            if (Array.isArray(itemPath)) {
+              itemPath = itemPath
+                .filter((p) => typeof p === "string" || typeof p === "number")
+                .join(".");
+            }
+            return typeof itemPath === "string" && itemPath
+              ? `${itemPath}: ${itemMessage}`
+              : itemMessage;
+          }
+        }
+        return JSON.stringify(d);
+      })
       .join("; ");
-  } else {
+  } else if (details) {
     detailsStr = JSON.stringify(details);
   }
-  return error ? `${error}: ${detailsStr}` : detailsStr;
+  // The API's error handler sends a 4xx's message as both fields, and masks
+  // unhandled 5xx responses as "Internal server error".
+  const primary = error === "Internal server error" ? "" : error;
+  const cleanMessage = message === "Internal server error" ? "" : message;
+  if (!detailsStr || detailsStr === error || detailsStr === "Internal server error") {
+    return primary || cleanMessage || fallback;
+  }
+  return primary ? `${primary}: ${detailsStr}` : detailsStr;
+}
+
+/**
+ * The text a tool panel shows for a non-2xx answer it posted for itself
+ * (#1858): parseApiError's reading of the body, the translated install
+ * message for FEATURE_NOT_INSTALLED, or the panel's own `fallback` when the
+ * body is not a JSON object or names no reason. Takes `unknown` because the
+ * body comes straight from JSON.parse or res.json(); pass null when it did not
+ * parse. A 413 reads as the translated file-too-large message whatever the
+ * body: the API's own 413 and a reverse proxy's HTML body-size page mean the
+ * same thing to the user, as they do in useToolProcessor (#1341, #1916). A
+ * caller on a route whose 413 means something else (the storage quota's
+ * STORAGE_QUOTA_EXCEEDED) handles it before calling this, as review-panel.tsx
+ * does.
+ */
+export function failedAnswerMessage(
+  t: TranslationKeys,
+  body: unknown,
+  status: number,
+  fallback: string,
+  toolName?: string,
+): string {
+  if (status === 413) return t.errors.fileTooLarge;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return fallback;
+  const record = body as Record<string, unknown>;
+  if (record.canceled === true) return t.errors.canceled;
+  const parsed = parseApiError(record, status, fallback);
+  if (typeof parsed === "string") return parsed;
+  return parsed.type === "feature_incompatible"
+    ? featureIncompatibleMessage(t, parsed)
+    : featureNotInstalledMessage(t, parsed, toolName);
 }
 
 // ── Auth Headers ───────────────────────────────────────────────
 
 function getBrowserStorage(): Storage | null {
-  return typeof window !== "undefined" ? window.localStorage : null;
+  try {
+    return typeof window !== "undefined" ? window.localStorage : null;
+  } catch (error) {
+    console.warn("Browser storage access denied. Authentication state will not persist.", error);
+    return null;
+  }
 }
 
 function getToken(): string {
@@ -73,16 +162,68 @@ export function formatHeaders(init?: HeadersInit): Headers {
   return headers;
 }
 
-async function throwWithMessage(res: Response): Promise<never> {
-  let msg = `API error: ${res.status}`;
-  try {
-    const body = await res.json();
-    if (body.error) msg = body.error;
-    else if (body.message) msg = body.message;
-  } catch {
-    // response wasn't JSON — use the default message
+/**
+ * A request the API answered with a non-2xx status. `message` is still the
+ * server's `error` text, for logs and for callers that haven't moved over,
+ * but that text is always English: UI copy should be chosen from `status`
+ * and `code` instead (#1445). `body` is the parsed JSON, or `{}`.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | undefined,
+    readonly body: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "ApiError";
   }
-  throw new Error(msg);
+}
+
+/**
+ * Translated copy for a failed request: the message `byCode` gives the
+ * error's code, then the refusals any request can meet (an ended session,
+ * a missing permission, a disallowed IP, a rate limit), else `fallback`.
+ * Never the server's English text (#1445).
+ */
+export function apiErrorMessage(
+  t: TranslationKeys,
+  err: unknown,
+  byCode: Partial<Record<string, string>>,
+  fallback: string,
+): string {
+  if (err instanceof ApiError) {
+    const byAnyCode: Partial<Record<string, string>> = {
+      AUTH_REQUIRED: t.errors.sessionEnded,
+      FORBIDDEN: t.errors.forbidden,
+      IP_NOT_ALLOWED: t.auth.ipNotAllowed,
+      ...byCode,
+    };
+    const mapped = err.code !== undefined ? byAnyCode[err.code] : undefined;
+    if (mapped) return mapped;
+    // A rate limiter's 429 carries no code.
+    if (err.status === 429) return t.errors.tooManyRequests;
+  }
+  // The screen shows only the translated fallback, so keep the server's
+  // reason where someone debugging can find it.
+  console.warn("Request failed:", err);
+  return fallback;
+}
+
+export async function throwWithMessage(res: Response): Promise<never> {
+  let msg = `API error: ${res.status}`;
+  let body: Record<string, unknown> = {};
+  try {
+    const parsed = await res.json();
+    if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>;
+    if (typeof body.error === "string" && body.error) msg = body.error;
+    else if (typeof body.message === "string" && body.message) msg = body.message;
+  } catch (error) {
+    // response wasn't JSON — use the default message, but keep the parse
+    // failure visible for proxies and gateways that answer with HTML (#4062)
+    console.warn(`Failed to parse non-2xx API response (status: ${res.status}):`, error);
+  }
+  throw new ApiError(msg, res.status, typeof body.code === "string" ? body.code : undefined, body);
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
@@ -240,6 +381,7 @@ export async function apiGetFileDetails(id: string): Promise<UserFileDetail> {
 export function apiUploadUserFiles(
   files: File[],
   onProgress?: (percent: number) => void,
+  t: TranslationKeys = en,
 ): Promise<{ files: Array<{ id: string; originalName: string; size: number; version: number }> }> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
@@ -247,7 +389,7 @@ export function apiUploadUserFiles(
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", appUrl("/api/v1/files/upload"));
-    xhr.timeout = 120_000;
+    const watchdog = createXhrWatchdog(xhr, 120_000);
 
     const headers = formatHeaders();
     headers.forEach((value, key) => {
@@ -256,36 +398,79 @@ export function apiUploadUserFiles(
       }
     });
 
-    if (onProgress) {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      };
-    }
+    xhr.upload.onprogress = (e) => {
+      watchdog.onUploadProgress(e);
+      if (onProgress && e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.upload.onload = () => {
+      watchdog.onUploadLoad();
+    };
 
     xhr.onload = () => {
+      watchdog.clear();
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error("Invalid server response"));
+        } catch (error) {
+          // Keep the parse failure and the raw body visible: a proxy can
+          // answer 2xx with an HTML error page instead of JSON (#4062).
+          console.warn(
+            "Failed to parse upload response:",
+            error,
+            xhr.responseText.substring(0, 200),
+          );
+          reject(new Error(t.errors.invalidResponse));
         }
       } else {
-        reject(new Error(`Upload failed: ${xhr.status}`));
+        let body: Record<string, unknown> | null = null;
+        try {
+          const parsed: unknown = JSON.parse(xhr.responseText);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            body = parsed as Record<string, unknown>;
+          }
+        } catch (error) {
+          // Keep the parse failure and the raw body visible: a proxy can
+          // answer with an HTML error page instead of JSON (#4062).
+          console.warn(
+            `Failed to parse upload error response (status: ${xhr.status}):`,
+            error,
+            xhr.responseText.substring(0, 200),
+          );
+        }
+        if (xhr.status === 413) {
+          const quotaMsg =
+            body?.code === "STORAGE_QUOTA_EXCEEDED" && typeof body.error === "string"
+              ? body.error
+              : "";
+          reject(new Error(quotaMsg || t.errors.fileTooLarge));
+          return;
+        }
+        const message = body
+          ? failedAnswerMessage(t, body, xhr.status, t.errors.failedWithStatus)
+          : t.errors.failedWithStatus;
+        reject(new Error(message));
       }
     };
 
     xhr.onerror = () => {
+      watchdog.clear();
       useConnectionStore.getState().setDisconnected();
       reject(new TypeError("Network error"));
     };
 
     xhr.ontimeout = () => {
+      watchdog.clear();
       reject(new Error("Upload timed out"));
     };
 
-    xhr.send(formData);
+    xhr.onabort = () => {
+      watchdog.clear();
+    };
+
+    watchdog.send(formData);
   });
 }
 

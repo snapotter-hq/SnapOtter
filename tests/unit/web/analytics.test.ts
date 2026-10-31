@@ -25,6 +25,8 @@ const mockBrowserTracingIntegration = vi.fn(() => ({ name: "BrowserTracing" }));
 vi.mock("@sentry/react", () => ({
   init: mockSentryInit,
   browserTracingIntegration: mockBrowserTracingIntegration,
+  getIsolationScope: () => ({ clearBreadcrumbs: vi.fn() }),
+  getCurrentScope: () => ({ clearBreadcrumbs: vi.fn() }),
 }));
 
 const noop = () => {};
@@ -45,6 +47,7 @@ const enabledConfig = {
   enabled: true,
   posthogApiKey: "phc_test",
   posthogHost: "https://ph.test",
+  feedbackSink: true,
   sentryDsn: "https://sentry.test/123",
   sentryDsnWeb: "https://sentry.test/web/456",
   posthogSampleRate: 1,
@@ -55,6 +58,7 @@ const disabledConfig = {
   enabled: false,
   posthogApiKey: "key",
   posthogHost: "https://ph.test",
+  feedbackSink: false,
   sentryDsn: "",
   sentryDsnWeb: "",
   posthogSampleRate: 1,
@@ -179,6 +183,23 @@ describe("analytics lib (baked model)", () => {
         status: "failed",
         reason: "http-503",
         total_bytes: 123_456,
+      });
+    });
+
+    // The export dialog reports how each attempt ended; without these keys on the
+    // allowlist every export would arrive with output_format alone (#2174).
+    it("forwards the editor_exported status and reason (#2174)", async () => {
+      await mod.initAnalytics(enabledConfig);
+      mod.track("editor_exported", {
+        output_format: "avif",
+        status: "failed",
+        reason: "server-convert",
+        width: 4000,
+      });
+      expect(mockCapture).toHaveBeenCalledWith("editor_exported", {
+        output_format: "avif",
+        status: "failed",
+        reason: "server-convert",
       });
     });
 
@@ -320,6 +341,91 @@ describe("privacy invariants (#1022)", () => {
     );
   });
 
+  it("sets exception and console-log capture locally so project remote config cannot enable them (#2285)", async () => {
+    await mod.initAnalytics(enabledConfig);
+    expect(mockInit).toHaveBeenCalledWith(
+      "phc_test",
+      expect.objectContaining({
+        capture_exceptions: false,
+        logs: { captureConsoleLogs: false },
+      }),
+    );
+  });
+
+  describe("log egress gate (#4145)", () => {
+    // Remote config can switch the SDK's logs extension on, and its queued
+    // records can flush after an opt-out. Both leave through _send_request,
+    // so that is where console-log egress is closed.
+    async function initWithSendSpy() {
+      const rawSend = vi.fn();
+      mockInit.mockReturnValueOnce({
+        capture: mockCapture,
+        startSessionRecording: vi.fn(),
+        opt_in_capturing: mockOptInCapturing,
+        opt_out_capturing: vi.fn(),
+        has_opted_out_capturing: vi.fn(() => false),
+        reset: vi.fn(),
+        register: vi.fn(),
+        get_distinct_id: vi.fn(() => "test-distinct-id"),
+        persistence: { disabled: false },
+        _send_request: rawSend,
+      } as never);
+      await mod.initAnalytics(enabledConfig);
+      const instance = mockInit.mock.results[0]?.value as {
+        _send_request: (o: {
+          batchKey?: string;
+          url: string;
+          fireCallbackOnDrop?: boolean;
+          callback?: (r: { statusCode: number }) => void;
+        }) => void;
+      };
+      return { rawSend, send: instance._send_request };
+    }
+
+    it("never sends a logs batch, even while analytics is on", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      send({ url: "https://ph.test/i/v1/logs?token=phc_test", batchKey: "logs" });
+      expect(rawSend).not.toHaveBeenCalled();
+    });
+
+    it("answers a dropped logs batch with a 4xx so the SDK discards it instead of retrying", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      const callback = vi.fn();
+      send({
+        url: "https://ph.test/i/v1/logs?token=phc_test",
+        batchKey: "logs",
+        fireCallbackOnDrop: true,
+        callback,
+      });
+      expect(rawSend).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith({ statusCode: 400 });
+    });
+
+    it("answers a request dropped after an opt-out too, when the SDK asked for an answer", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      mod.optOut();
+      const callback = vi.fn();
+      send({ url: "https://ph.test/e/", fireCallbackOnDrop: true, callback });
+      expect(rawSend).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith({ statusCode: 400 });
+    });
+
+    it("still sends ordinary events while analytics is on", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      send({ url: "https://ph.test/e/", batchKey: "events" });
+      send({ url: "https://ph.test/e/" });
+      expect(rawSend).toHaveBeenCalledTimes(2);
+    });
+
+    it("sends nothing after an opt-out", async () => {
+      const { rawSend, send } = await initWithSendSpy();
+      mod.optOut();
+      send({ url: "https://ph.test/e/", batchKey: "events" });
+      send({ url: "https://ph.test/i/v1/logs?token=phc_test", batchKey: "logs" });
+      expect(rawSend).not.toHaveBeenCalled();
+    });
+  });
+
   it("strips query and fragment from the nested $web_vitals_*_event $current_url", async () => {
     await mod.initAnalytics(enabledConfig);
     const [, options] = mockInit.mock.calls[0] as unknown as [
@@ -361,5 +467,57 @@ describe("privacy invariants (#1022)", () => {
     expect((result.properties.$web_vitals_CLS_event as { $current_url: string }).$current_url).toBe(
       "https://x.test/b",
     );
+  });
+
+  it("removes campaign parameters that posthog-js lifts into top-level and session/initial props (#1124)", async () => {
+    await mod.initAnalytics(enabledConfig);
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({
+      properties: {
+        tool_id: "pdf-to-word",
+        utm_source: "chatgpt.com",
+        utm_medium: null,
+        gclid: "abc",
+        $session_entry_utm_source: "chatgpt.com",
+        $session_entry_gclid: "abc",
+        $initial_utm_campaign: "spring",
+        $initial_fbclid: "xyz",
+      },
+    });
+    expect(result.properties.tool_id).toBe("pdf-to-word");
+    for (const key of [
+      "utm_source",
+      "utm_medium",
+      "gclid",
+      "$session_entry_utm_source",
+      "$session_entry_gclid",
+      "$initial_utm_campaign",
+      "$initial_fbclid",
+    ]) {
+      expect(result.properties).not.toHaveProperty(key);
+    }
+  });
+
+  it("strips query and fragment from the session-entry and initial URL/referrer properties (#1124)", async () => {
+    await mod.initAnalytics(enabledConfig);
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({
+      properties: {
+        $session_entry_url: "https://x.test/pdf?token=abc#frag",
+        $session_entry_referrer: "https://ref.test/page?q=secret",
+        $initial_current_url: "https://x.test/a?b=1",
+        $initial_referrer: "https://ref.test/c?d=2",
+      },
+    });
+    expect(result.properties.$session_entry_url).toBe("https://x.test/pdf");
+    expect(result.properties.$session_entry_referrer).toBe("https://ref.test/page");
+    expect(result.properties.$initial_current_url).toBe("https://x.test/a");
+    expect(result.properties.$initial_referrer).toBe("https://ref.test/c");
   });
 });

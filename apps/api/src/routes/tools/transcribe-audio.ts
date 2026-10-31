@@ -7,10 +7,22 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
-import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../../jobs/types.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import { type TranscriptSegment, toSrt, toVtt } from "../../lib/subtitle-format.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -44,7 +56,7 @@ registerAiJobHandler("transcribe-audio", async (input, data, ctx) => {
 
   const result = await transcribeAudio(
     audioPath,
-    { language: settings.language, signal: ctx.signal },
+    { language: settings.language, signal: ctx.signal, toolId: "transcribe-audio" },
     (percent, stage) => ctx.report(percent, stage),
   );
 
@@ -100,6 +112,7 @@ export function registerTranscribeAudio(app: FastifyInstance) {
       let filename = "audio";
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
       let fileId: string | null = null;
       let saveModeRaw: string | null = null;
       let inputKey: string | null = null;
@@ -114,10 +127,7 @@ export function registerTranscribeAudio(app: FastifyInstance) {
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           } else if (part.fieldname === "fileId") {
             fileId = part.value as string;
           } else if (part.fieldname === "saveMode") {
@@ -125,58 +135,83 @@ export function registerTranscribeAudio(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        await discardUnenqueuedUploads(jobId, request.log);
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
-      // Stamp the client-facing alias before any pre-enqueue work (#892): a
-      // cancel landing between parse and enqueueToolJob needs a durable pointer
-      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      if (!inputKey) {
-        return reply.status(400).send({ error: "No audio file provided" });
-      }
-
-      let settings: z.infer<typeof settingsSchema>;
+      let enqueued = false;
+      let aliasStamped = false;
       try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply.status(400).send({
-            error: "Invalid settings",
-            details: formatZodErrors(result.error.issues),
-          });
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
         }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
+        clientJobId = clientJobIdField ?? null;
+
+        // Stamp the client-facing alias before any pre-enqueue work (#892): a
+        // cancel landing between parse and enqueueToolJob needs a durable pointer
+        // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
+        }
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
+        }
+
+        if (!inputKey) {
+          return reply.status(400).send({ error: "No audio file provided" });
+        }
+
+        let settings: z.infer<typeof settingsSchema>;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply.status(400).send({
+              error: "Invalid settings",
+              details: formatZodErrors(result.error.issues),
+            });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [inputKey],
+          filename,
+          settings,
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        };
+        try {
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
+
+        return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      } finally {
+        if (!enqueued) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
+        }
       }
-
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [inputKey],
-        filename,
-        settings,
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-      });
-
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }

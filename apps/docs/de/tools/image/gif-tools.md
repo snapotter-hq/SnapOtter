@@ -1,8 +1,8 @@
 ---
 description: "Größe ändern, optimieren, Geschwindigkeit anpassen, umkehren, drehen und Frames aus animierten GIFs extrahieren, alles in einem Werkzeug."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 2c1a8704cbd1
+i18n_output_hash: 5d6fc2ff523d
 ---
 
 # GIF-Werkzeuge {#gif-tools}
@@ -34,7 +34,7 @@ Größe ändern, optimieren, Geschwindigkeit anpassen, umkehren, Frames extrahie
 
 | Parameter | Typ | Erforderlich | Standard | Beschreibung |
 |-----------|------|----------|---------|-------------|
-| colors | number | Nein | 256 | Maximale Anzahl an Farben in der Palette (2 bis 256) |
+| colors | number | Nein | 256 | Maximale Anzahl an Farben in der Palette (2, 4, 16 oder 256) |
 | dither | number | Nein | 1.0 | Dithering-Stärke (0 bis 1, wobei 0 das Dithering deaktiviert) |
 | effort | number | Nein | 7 | Optimierungsaufwand (1 bis 10, höher = langsamer, aber kleiner) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Beschleunigen {#speed-up}

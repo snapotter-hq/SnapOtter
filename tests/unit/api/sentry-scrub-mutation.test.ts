@@ -68,7 +68,7 @@ describe("sentry-scrub redaction placeholders (scrubText)", () => {
     expect(scrubMessage(send, "open C:\\Users\\me\\f.txt ok")).toBe("open <path> ok");
   });
 
-  it("redacts each of the seven sensitive unix roots the pattern lists", () => {
+  it("redacts each sensitive unix root the pattern lists", () => {
     // Kills mutants that drop any single root from the PATH_RE alternation.
     for (const root of [
       "Users",
@@ -81,7 +81,18 @@ describe("sentry-scrub redaction placeholders (scrubText)", () => {
       "opt",
       "mnt",
       "srv",
+      "Volumes",
+      "private",
+      "media",
+      "run",
+      "storage",
+      "scratch",
+      "workspace",
     ]) {
+      expect(scrubMessage(send, `x /${root}/secret y`)).toBe("x <path> y");
+    }
+    // The numbered volume roots share one alternative.
+    for (const root of ["volume1", "volume12"]) {
       expect(scrubMessage(send, `x /${root}/secret y`)).toBe("x <path> y");
     }
   });

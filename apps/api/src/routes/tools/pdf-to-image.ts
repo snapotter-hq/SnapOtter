@@ -1,24 +1,36 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath } from "@snapotter/shared";
+import { PassThrough } from "node:stream";
+import { apiToolPath, hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import * as mupdf from "mupdf";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
+import { db, schema } from "../../db/index.js";
+import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
+import { formatZodErrors, friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   deletePrefix,
   getObjectBuffer,
   getObjectStream,
+  isStorageServiceFault,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
+import { isUniqueViolation } from "../../lib/pg-errors.js";
+import { emitInlineBatchAudit } from "../../lib/tool-audit.js";
+import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
-import { updateJobProgress } from "../progress.js";
+import { failBatchJob, updateJobProgress } from "../progress.js";
 
 // ── Settings schema ──────────────────────────────────────────────
 const settingsSchema = z.object({
@@ -264,6 +276,24 @@ async function renderPdfPages(
 }
 
 /**
+ * Read back an output this route wrote a moment ago. A failure here is never
+ * the client's: an error without a 5xx status is tagged 500 so it reaches the
+ * error handler instead of the route's 422 catch-all (#2120).
+ */
+async function readOwnOutput(key: string): Promise<Buffer> {
+  try {
+    return await getObjectBuffer(key);
+  } catch (rawErr) {
+    const s3Normalized = isStorageServiceFault(rawErr) ? normalizeS3ReadFault(rawErr) : rawErr;
+    const err = normalizeOperationalWriteError(s3Normalized);
+    if (hasServerErrorStatus(err)) throw err;
+    throw Object.assign(new Error("Could not read back a stored output", { cause: rawErr }), {
+      statusCode: 500,
+    });
+  }
+}
+
+/**
  * Zip one job's already-stored page images, reading a single entry at a time.
  * The finished archive is materialized in memory, so peak cost is one whole
  * document's worth of encoded pages.
@@ -277,7 +307,7 @@ async function buildPagesZip(jobId: string, filenames: string[]): Promise<Buffer
     archive.on("error", reject);
   });
   for (const filename of filenames) {
-    archive.append(await getObjectBuffer(`outputs/${jobId}/${filename}`), { name: filename });
+    archive.append(await readOwnOutput(`outputs/${jobId}/${filename}`), { name: filename });
   }
   await archive.finalize();
   await done;
@@ -300,10 +330,8 @@ export function registerPdfToImageRoute(
       const result = await readPdfFromParts(request);
       fileBuffer = result.fileBuffer;
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -344,10 +372,8 @@ export function registerPdfToImageRoute(
       const result = await readPdfFromParts(request);
       fileBuffer = result.fileBuffer;
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -389,7 +415,16 @@ export function registerPdfToImageRoute(
       }
 
       return reply.send({ pageCount, thumbnails });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+        const unavailable = engineUnavailable(err);
+        reportEngineUnavailable(unavailable, opts.toolId, request.log);
+        return reply.status(unavailable.statusCode).send({
+          error: unavailable.message,
+          ...(unavailable.code !== undefined && { code: unavailable.code }),
+        });
+      }
       if (
         err instanceof Error &&
         (err.message.includes("password") || err.message.includes("Password"))
@@ -417,7 +452,8 @@ export function registerPdfToImageRoute(
     `${basePath}/batch`,
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
-      if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+      const authUser = await requireToolAccess(request, reply, opts.toolId);
+      if (!authUser) return;
 
       // Rasterizing several documents can outrun the default socket timeout.
       request.raw.socket?.setTimeout?.(0);
@@ -425,6 +461,7 @@ export function registerPdfToImageRoute(
       const files: Array<{ buffer: Buffer; filename: string }> = [];
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
 
       try {
         for await (const part of request.parts()) {
@@ -443,21 +480,21 @@ export function registerPdfToImageRoute(
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            // Doubles as an object-key segment and a response header value, so
-            // anything outside the key charset is ignored rather than allowed
-            // to fail every file or to break writeHead after hijack.
-            const raw = part.value as string;
-            if (typeof raw === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(raw)) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
+
+      // The id is also an object-key segment and a response header value after
+      // hijack; the shared pattern keeps both safe (no CR/LF, no '..').
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      clientJobId = clientJobIdField ?? null;
 
       if (files.length === 0) {
         return reply.status(400).send({ error: "No PDF files provided" });
@@ -490,10 +527,58 @@ export function registerPdfToImageRoute(
       }
 
       const jobId = clientJobId || randomUUID();
+
+      // Reserve the id before the first progress write. The progress persist
+      // updates whatever row already has this id, so a clientJobId naming
+      // another job would write into that job's row, and a fault would fail
+      // it (#1554). The insert makes a collision fail on the primary key.
+      // No toolId: reconciliation treats a non-terminal row with a tool id as
+      // queued work, and this inline run has no queue entry.
+      try {
+        await db.insert(schema.jobs).values({
+          id: jobId,
+          userId: authUser.id,
+          type: "batch",
+          status: "processing",
+          inputRefs: [],
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+        }
+        throw err;
+      }
+
       const results: Array<{ key: string; prefix: string; filename: string } | null> = new Array(
         files.length,
       ).fill(null);
       const errors: Array<{ filename: string; error: string }> = [];
+
+      const settleFaultedBatch = async (
+        failedFiles: number,
+        batchErrors: Array<{ filename: string; error: string }>,
+        message: string,
+        code?: string,
+      ) => {
+        const applied = await failBatchJob({
+          jobId,
+          totalFiles: files.length,
+          completedFiles: files.length,
+          failedFiles,
+          errors: batchErrors,
+          message,
+          ...(code ? { code } : {}),
+        }).catch((settleErr) => {
+          request.log.error({ err: settleErr, jobId }, "failed to settle a faulted PDF batch");
+          return null;
+        });
+        if (applied === false) {
+          request.log.warn(
+            { jobId },
+            "faulted PDF batch progress row was missing or already terminal; no terminal frame announced",
+          );
+        }
+      };
 
       const publishProgress = (completedFiles: number, currentFile?: string) =>
         updateJobProgress({
@@ -512,6 +597,7 @@ export function registerPdfToImageRoute(
       // so interleaving documents mostly multiplies peak memory.
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const childJobId = `${jobId}-f${i}`;
         try {
           publishProgress(i, file.filename);
           if (file.buffer.length === 0) {
@@ -520,18 +606,75 @@ export function registerPdfToImageRoute(
           if (!isPdfBuffer(file.buffer)) {
             throw new PdfInputError("Invalid or corrupt PDF file");
           }
-          const childJobId = `${jobId}-f${i}`;
           const prefix = `outputs/${childJobId}`;
           const { filenames } = await renderPdfPages(file.buffer, settings, childJobId);
           const zipName = `${file.filename.replace(/\.pdf$/i, "")}-pages.zip`;
           const key = `${prefix}/${zipName}`;
           await putObject(key, await buildPagesZip(childJobId, filenames));
           results[i] = { key, prefix, filename: zipName };
-        } catch (err) {
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           // A storage or infrastructure fault is not a bad document. Let it
           // reach the error handler (which logs it, reports it, and honors its
           // status) instead of telling the user their PDF is broken.
-          if (typeof (err as { statusCode?: number })?.statusCode === "number") throw err;
+          const statusCode = (err as { statusCode?: unknown })?.statusCode;
+          if (
+            isDecoderUnavailable(err) ||
+            hasServerErrorStatus(err) ||
+            typeof statusCode === "number"
+          ) {
+            const resolvedStatus = typeof statusCode === "number" ? statusCode : 503;
+            // But settle the progress row first: skipping the terminal frame
+            // below left a client watching this job over SSE on "processing"
+            // until the next restart (#1443). Guarded, so it never overwrites a
+            // terminal row, and a failed settle can't mask the real fault.
+            const safe = isSafeMessageError(err);
+            const message =
+              resolvedStatus >= 500 && !safe
+                ? "Internal server error"
+                : friendlyError(err instanceof Error ? err.message : String(err));
+            await settleFaultedBatch(
+              files.length,
+              [...errors, { filename: "", error: message }],
+              message,
+              safe ? err.code : undefined,
+            );
+            // Nothing will be sent, so what this run already rendered (every
+            // document up to this one) is only stranded storage with no jobs
+            // row for retention to find. On a full workspace this is the space
+            // the next request needs, so a failed delete is said out loud.
+            await Promise.all(
+              files.slice(0, i + 1).map((_, n) => {
+                const prefix = `outputs/${jobId}-f${n}`;
+                return deletePrefix(prefix).catch((cleanupErr) =>
+                  request.log.warn(
+                    { err: cleanupErr, jobId, prefix },
+                    "faulted PDF batch cleanup failed",
+                  ),
+                );
+              }),
+            );
+            if (isDecoderUnavailable(err)) {
+              const unavailable = engineUnavailable(err);
+              reportEngineUnavailable(unavailable, opts.toolId, request.log);
+              return reply.status(unavailable.statusCode).send({
+                error: unavailable.message,
+                ...(unavailable.code !== undefined && { code: unavailable.code }),
+              });
+            }
+            throw err;
+          }
+
+          // A file that fails mid-render leaves its already-written pages
+          // stranded on the volume. Clear its prefix now so it doesn't wait
+          // for the storage sweep.
+          await deletePrefix(`outputs/${childJobId}`).catch((cleanupErr) =>
+            request.log.warn(
+              { err: cleanupErr, jobId, childJobId, toolId: opts.toolId },
+              "cleanup of a failed PDF batch file failed",
+            ),
+          );
+
           if (err instanceof PdfInputError) {
             errors.push({ filename: file.filename, error: err.message });
           } else {
@@ -546,16 +689,10 @@ export function registerPdfToImageRoute(
         }
       }
 
-      updateJobProgress({
-        jobId,
-        status: errors.length === files.length ? "failed" : "completed",
-        totalFiles: files.length,
-        completedFiles: files.length,
-        failedFiles: errors.length,
-        errors,
-      });
-
       if (errors.length === files.length) {
+        // Awaited: this route owns the row, and until it is terminal it counts
+        // against the user's concurrent-job limit (#1688, #2765).
+        await settleFaultedBatch(errors.length, errors, "All files failed processing");
         // parseApiError on the client reads `error` and `details`, so the
         // per-file reasons have to ride in `details` to be seen at all.
         return reply.status(422).send({
@@ -586,50 +723,161 @@ export function registerPdfToImageRoute(
       });
 
       const archive = archiver("zip", { zlib: { level: 5 } });
+      const openedStreams: Array<{ destroy?: (err?: Error) => void }> = [];
 
       // Headers are already out, so a failure here cannot change the status.
       // Destroy the socket rather than end() it: a clean end on a chunked
       // response is indistinguishable from success, and the client would keep
       // a truncated ZIP believing it complete.
-      let streamFailed = false;
-      const failStream = (err: Error, msg: string) => {
-        if (streamFailed) return;
-        streamFailed = true;
+      let streamError = null as Error | null;
+      let rejectStream: ((err: Error) => void) | null = null;
+      const streamDone = new Promise<void>((resolve, reject) => {
+        rejectStream = reject;
+        archive.on("end", resolve);
+      });
+      streamDone.catch(() => {});
+
+      const failStream = (rawErr: unknown, msg: string) => {
+        if (streamError) return;
+        const normalized = normalizeOperationalWriteError(rawErr);
+        const err = normalized instanceof Error ? normalized : new Error(String(normalized));
+        streamError = err;
         request.log.error({ err, jobId }, msg);
         archive.abort();
-        reply.raw.destroy(err);
+        for (const s of openedStreams) {
+          s.destroy?.();
+        }
+        rejectStream?.(err);
       };
 
       archive.on("error", (err) => failStream(err, "Archiver error during PDF batch processing"));
-      archive.pipe(reply.raw);
-
-      try {
-        for (const entry of results) {
-          if (!entry) continue;
-          const stream = await getObjectStream(entry.key);
-          // The local backend resolves the stream and only then emits ENOENT,
-          // so the catch below never sees it. Without this listener the error
-          // is unhandled and the request hangs instead of terminating.
-          stream.on("error", (err: Error) =>
-            failStream(err, "Object stream error during PDF batch processing"),
+      const onReplyClose = () => {
+        if (!archive.readableEnded) {
+          failStream(
+            new Error("Response stream closed before PDF batch ZIP finished"),
+            "Response stream closed during PDF batch processing",
           );
-          archive.append(stream, { name: entry.filename });
         }
-        await archive.finalize();
-      } catch (err) {
-        failStream(
-          err instanceof Error ? err : new Error(String(err)),
-          "Failed to stream ZIP entries during PDF batch processing",
-        );
+      };
+      const onReplyError = (err: Error) =>
+        failStream(err, "Response stream error during PDF batch processing");
+      reply.raw.on("close", onReplyClose);
+      reply.raw.on("error", onReplyError);
+      // Keep reply.raw open until the terminal progress write settles (#1688,
+      // #1555): ending the socket is what resolves the client's request, so
+      // settling after pipe's default auto-end would race the next request's
+      // concurrency check, and settling before the stream finishes would leave
+      // the row completed when the ZIP stream fails.
+      archive.pipe(reply.raw, { end: false });
+      if (reply.raw.destroyed) {
+        onReplyClose();
       }
 
-      // The per-page images and per-document ZIPs exist only to build the
-      // response, which is now sent. Leaving them would strand every rendered
-      // page on the volume until the storage sweep, and they carry no jobs row
-      // for retention or GDPR deletion to find.
-      await Promise.all(
-        results.map((entry) => (entry ? deletePrefix(entry.prefix).catch(() => {}) : null)),
-      );
+      const normalizeSourceError = (err: unknown) =>
+        isStorageServiceFault(err) ? normalizeS3ReadFault(err) : err;
+
+      try {
+        try {
+          for (const entry of results) {
+            if (!entry) continue;
+            if (streamError) break;
+            let stream: Awaited<ReturnType<typeof getObjectStream>>;
+            try {
+              stream = await getObjectStream(entry.key);
+            } catch (err) {
+              throw normalizeSourceError(err);
+            }
+            const entryStream = new PassThrough();
+            // The local backend resolves the stream and only then emits ENOENT,
+            // so the catch below never sees it. Without this listener the error
+            // is unhandled and the request hangs instead of terminating. Never
+            // hand archiver a stream that can emit 'error' directly: end the
+            // PassThrough wrapper quietly after failStream aborts the archive.
+            stream.on("error", (err: Error) => {
+              failStream(
+                normalizeSourceError(err),
+                "Object stream error during PDF batch processing",
+              );
+              entryStream.end();
+            });
+            if (streamError) {
+              (stream as { destroy?: () => void }).destroy?.();
+              entryStream.destroy();
+              break;
+            }
+            openedStreams.push(stream as { destroy?: (err?: Error) => void });
+            stream.pipe(entryStream);
+            archive.append(entryStream, { name: entry.filename });
+          }
+          if (!streamError) {
+            void archive
+              .finalize()
+              .catch((err) =>
+                failStream(err, "Failed to finalize ZIP during PDF batch processing"),
+              );
+          }
+          await streamDone;
+        } catch (err) {
+          failStream(err, "Failed to stream ZIP entries during PDF batch processing");
+        }
+
+        // The per-page images and per-document ZIPs exist only to build the
+        // response, which is now buffered into the archive stream. Delete them
+        // before settling terminal progress so any reply.raw error during
+        // cleanup still routes through settleFaultedBatch.
+        await Promise.all(
+          results.map((entry) =>
+            entry
+              ? deletePrefix(entry.prefix).catch((cleanupErr) =>
+                  request.log.warn(
+                    { err: cleanupErr, jobId, prefix: entry.prefix },
+                    "failed to clean up temporary batch PDF prefix",
+                  ),
+                )
+              : null,
+          ),
+        );
+
+        if (streamError) {
+          const message = isSafeMessageError(streamError)
+            ? friendlyError(streamError.message)
+            : "Failed to package batch results";
+          await settleFaultedBatch(
+            errors.length,
+            [...errors, { filename: "", error: message }],
+            message,
+            isSafeMessageError(streamError) ? streamError.code : undefined,
+          );
+        } else {
+          await updateJobProgress({
+            jobId,
+            status: "completed",
+            totalFiles: files.length,
+            completedFiles: files.length,
+            failedFiles: errors.length,
+            errors,
+          }).catch((err) =>
+            request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
+          );
+          await emitInlineBatchAudit(request, {
+            totalFiles: files.length,
+            completedFiles: files.length - errors.length,
+            failedFiles: errors.length,
+          });
+        }
+      } finally {
+        reply.raw.removeListener("close", onReplyClose);
+        reply.raw.removeListener("error", onReplyError);
+      }
+
+      if (streamError) {
+        if (!reply.raw.destroyed) {
+          reply.raw.once("error", () => {});
+        }
+        reply.raw.destroy(streamError);
+      } else {
+        reply.raw.end();
+      }
     },
   );
 
@@ -645,10 +893,8 @@ export function registerPdfToImageRoute(
       fileBuffer = result.fileBuffer;
       settingsRaw = result.settingsRaw;
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -702,13 +948,34 @@ export function registerPdfToImageRoute(
         zipUrl,
         zipSize: zipBuffer.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      // Raised before the first page is written, so there is nothing to clear.
       if (err instanceof PdfInputError) {
         return reply.status(400).send({ error: err.message });
       }
+      // No response will link to the pages written so far, and no jobs row
+      // exists for retention or GDPR deletion to find them. On a full
+      // workspace they are also the space the next request needs (#2158).
+      await deletePrefix(`outputs/${jobId}`).catch((cleanupErr) =>
+        request.log.warn(
+          { err: cleanupErr, jobId, toolId: opts.toolId },
+          "cleanup of a failed PDF conversion failed",
+        ),
+      );
+      if (isDecoderUnavailable(err)) {
+        const unavailable = engineUnavailable(err);
+        reportEngineUnavailable(unavailable, opts.toolId, request.log);
+        return reply.status(unavailable.statusCode).send({
+          error: unavailable.message,
+          ...(unavailable.code !== undefined && { code: unavailable.code }),
+        });
+      }
+      if (hasServerErrorStatus(err)) throw err;
+      request.log.error({ err, toolId: opts.toolId }, "PDF conversion failed");
       return reply.status(422).send({
         error: "PDF conversion failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

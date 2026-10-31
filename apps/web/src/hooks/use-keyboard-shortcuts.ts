@@ -1,14 +1,8 @@
 import { TOOLS } from "@snapotter/shared";
 import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router";
+import { isApplePlatform } from "@/lib/platform";
 import { useTheme } from "./use-theme";
-
-/**
- * Detect if the current platform uses Cmd (macOS) or Ctrl.
- */
-function isMac(): boolean {
-  return typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-}
 
 /** A tool's section-prefixed page route (e.g. "/image/resize"), or "/" if unknown. */
 const routeOf = (id: string): string => TOOLS.find((t) => t.id === id)?.route ?? "/";
@@ -28,7 +22,7 @@ function matchesShortcut(e: KeyboardEvent, keys: string): boolean {
     .toLowerCase()
     .split("+")
     .map((s) => s.trim());
-  const mac = isMac();
+  const mac = isApplePlatform();
 
   const needsMod = parts.includes("mod");
   const needsShift = parts.includes("shift");
@@ -158,10 +152,12 @@ export function useKeyboardShortcuts() {
 }
 
 /**
- * Returns a human-readable label for a keyboard shortcut.
+ * Returns a human-readable label for a keyboard shortcut. `mac` picks the
+ * Apple glyphs; it defaults to this module's own handler's rule, so a hint for
+ * a key some other handler listens for (the editor's react-hotkeys-hook
+ * bindings) passes that handler's rule instead.
  */
-export function formatShortcut(keys: string): string {
-  const mac = isMac();
+export function formatShortcut(keys: string, mac: boolean = isApplePlatform()): string {
   return keys
     .split("+")
     .map((k) => {

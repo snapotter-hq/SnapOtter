@@ -1,4 +1,9 @@
-import { ANALYTICS_EVENTS, modalityForExtension, type PipelineTemplate } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  modalityForExtension,
+  type PipelineTemplate,
+  type TranslationKeys,
+} from "@snapotter/shared";
 import {
   CheckCircle2,
   ChevronDown,
@@ -21,7 +26,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, type RefObject, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { TemplatesSection } from "@/components/automate/templates-section";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
@@ -34,15 +39,19 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { PipelineBuilder } from "@/components/tools/pipeline-builder";
 import { ToolPalette } from "@/components/tools/tool-palette";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useIntakeGuard } from "@/hooks/use-intake-guard";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
-import { formatHeaders, getFileDownloadUrl } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, getFileDownloadUrl } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
+import { withAnalytics } from "@/lib/lazy-analytics";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { cn } from "@/lib/utils";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 import { type SavedPipeline, usePipelineStore } from "@/stores/pipeline-store";
 
 const MediaPlayerView = lazy(() =>
@@ -67,12 +76,68 @@ function previewIcon(kind: string) {
   }
 }
 
+/**
+ * Resets the file store when AutomatePage unmounts (#2634).
+ *
+ * Rendered as a sibling after AutomatePageContent so React runs
+ * usePipelineProcessor's unmount cleanup first (canceling any active server
+ * job while `processing` is still true) and then wipes the file store clean on
+ * the way out. In StrictMode, React's simulated unmount on initial mount runs
+ * while the DOM node is still connected; skipping that simulated pass
+ * preserves files being imported via `state: { libraryFileIds }`.
+ */
+function AutomatePageUnmountReset({
+  libraryImportAbortRef,
+}: {
+  libraryImportAbortRef: RefObject<AbortController | null>;
+}) {
+  const probeRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(
+    () => () => {
+      if (probeRef.current?.isConnected) return;
+      const teardownError = runEndWrites([
+        () => libraryImportAbortRef.current?.abort(),
+        () => useFileStore.getState().reset(),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a pipeline run after its panel unmounted failed",
+          teardownError.cause,
+        );
+      }
+    },
+    [libraryImportAbortRef],
+  );
+  return (
+    <span
+      ref={(el) => {
+        if (el) probeRef.current = el;
+      }}
+      hidden
+    />
+  );
+}
+
 export function AutomatePage() {
+  const libraryImportAbortRef = useRef<AbortController | null>(null);
+  return (
+    <>
+      <AutomatePageContent libraryImportAbortRef={libraryImportAbortRef} />
+      <AutomatePageUnmountReset libraryImportAbortRef={libraryImportAbortRef} />
+    </>
+  );
+}
+
+function AutomatePageContent({
+  libraryImportAbortRef,
+}: {
+  libraryImportAbortRef: RefObject<AbortController | null>;
+}) {
   const { t } = useTranslation();
   usePageTitle(t.sidebar.automate);
 
   useEffect(() => {
-    import("@/lib/analytics").then(({ track }) => track(ANALYTICS_EVENTS.PIPELINE_OPENED, {}));
+    withAnalytics(({ track }) => track(ANALYTICS_EVENTS.PIPELINE_OPENED, {}));
   }, []);
   const {
     files,
@@ -109,6 +174,9 @@ export function AutomatePage() {
   } = usePipelineStore();
 
   const { processSingle, processAll, processing, error, progress } = usePipelineProcessor();
+  const { allowIntake } = useIntakeGuard();
+  const allowIntakeRef = useRef(allowIntake);
+  allowIntakeRef.current = allowIntake;
   const isMobile = useMobile();
   const location = useLocation();
   const navigate = useNavigate();
@@ -123,9 +191,21 @@ export function AutomatePage() {
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [mobileToolPaletteOpen, setMobileToolPaletteOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [libraryImportFailed, setLibraryImportFailed] = useState<{
+    failed: number;
+    total: number;
+  } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [listLoadFailed, setListLoadFailed] = useState(false);
+  const listFetchSeqRef = useRef(0);
+  const importErrorSeqRef = useRef(0);
+  const initialLoadErrorRef = useRef<((tr: TranslationKeys) => string) | null>(null);
+  const deletingIdsRef = useRef<Set<string>>(new Set());
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const hasFile = files.length > 0;
-  const hasProcessed = !!processedUrl;
+  const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
   const hasMultiple = entries.length > 1;
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex < entries.length - 1;
@@ -137,51 +217,113 @@ export function AutomatePage() {
     : null;
 
   useEffect(() => {
+    let cancelled = false;
+    const seq = ++listFetchSeqRef.current;
+    const recordInitialLoadError = (formatter: (tr: TranslationKeys) => string) => {
+      setListLoadFailed(true);
+      initialLoadErrorRef.current = formatter;
+      if (importErrorSeqRef.current === 0) {
+        setImportError(formatter(tRef.current));
+      }
+    };
     (async () => {
+      let res: Response;
       try {
-        const res = await fetch(appUrl("/api/v1/pipeline/list"), {
+        res = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
-        if (res.ok) {
-          const data = await res.json();
-          setSavedPipelines(data.pipelines || []);
-        }
       } catch {
-        // Silently fail
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        recordInitialLoadError((tr) => tr.errors.networkError);
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        recordInitialLoadError((tr) =>
+          failedAnswerMessage(tr, body, res.status, tr.automate.loadFailed),
+        );
+        return;
+      }
+
+      try {
+        const data: unknown = await res.json();
+        const pipelines = (data as { pipelines?: unknown } | null)?.pipelines;
+        if (!Array.isArray(pipelines)) {
+          if (cancelled || seq !== listFetchSeqRef.current) return;
+          recordInitialLoadError((tr) => tr.automate.loadFailed);
+          return;
+        }
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        initialLoadErrorRef.current = null;
+        setListLoadFailed(false);
+        setSavedPipelines(pipelines);
+      } catch {
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        recordInitialLoadError((tr) => tr.automate.loadFailed);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [setSavedPipelines]);
+
+  useEffect(() => {
+    if (initialLoadErrorRef.current && importErrorSeqRef.current === 0) {
+      setImportError(initialLoadErrorRef.current(t));
+    }
+  }, [t]);
 
   useEffect(() => {
     const state = location.state as { libraryFileIds?: string[] } | null;
     if (!state?.libraryFileIds || libraryImportHandled.current) return;
     const fileIds = state.libraryFileIds;
     libraryImportHandled.current = true;
+    const controller = new AbortController();
+    libraryImportAbortRef.current = controller;
+    const { signal } = controller;
     navigate(location.pathname, { replace: true, state: null });
 
     (async () => {
-      const downloaded = await Promise.all(
+      const outcomes = await Promise.allSettled(
         fileIds.map(async (id) => {
-          try {
-            const res = await fetch(getFileDownloadUrl(id), { headers: formatHeaders() });
-            if (!res.ok) return null;
-            const blob = await res.blob();
-            const name =
-              res.headers.get("content-disposition")?.match(/filename="?(.+?)"?$/)?.[1] ??
-              `file-${id}`;
-            return new File([blob], name, { type: blob.type });
-          } catch {
-            return null;
+          const res = await fetch(getFileDownloadUrl(id), {
+            headers: formatHeaders(),
+            signal,
+          });
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
           }
+          const blob = await res.blob();
+          if (signal.aborted) return null;
+          const name =
+            res.headers.get("content-disposition")?.match(/filename="?(.+?)"?$/)?.[1] ??
+            `file-${id}`;
+          return new File([blob], name, { type: blob.type });
         }),
       );
-      const valid = downloaded.filter((f): f is File => f !== null);
+      if (signal.aborted) return;
+      const valid: File[] = [];
+      let failed = 0;
+      for (let i = 0; i < outcomes.length; i++) {
+        const outcome = outcomes[i];
+        if (outcome.status === "fulfilled") {
+          if (outcome.value) valid.push(outcome.value);
+        } else {
+          failed += 1;
+          console.error(`[automate-page] failed to download file ${fileIds[i]}`, outcome.reason);
+        }
+      }
+      resetFiles();
       if (valid.length > 0) {
-        resetFiles();
         setFiles(valid);
       }
+      if (failed > 0) {
+        setLibraryImportFailed({ failed, total: fileIds.length });
+      }
     })();
-  }, [location.state, location.pathname, navigate, resetFiles, setFiles]);
+  }, [location.state, location.pathname, navigate, resetFiles, setFiles, libraryImportAbortRef]);
 
   // Arrive with a clean file store, the way tool-page does on every tool change.
   //
@@ -199,8 +341,31 @@ export function AutomatePage() {
     if (!(location.state as { libraryFileIds?: string[] } | null)?.libraryFileIds) resetFiles();
   }, []);
 
+  useEffect(() => {
+    if (steps.length === 0) {
+      setShowSaveForm(false);
+      setSaveName("");
+      setSaveDescription("");
+      setSaveError(null);
+    }
+  }, [steps.length]);
+
+  useEffect(() => {
+    if (savedPipelines.length <= 3) {
+      setShowAllSaved(false);
+    }
+  }, [savedPipelines.length]);
+
+  const handleOpenLibrary = useCallback(() => {
+    if (!allowIntake()) return;
+    setLibraryModalOpen(true);
+  }, [allowIntake]);
+
   const handleLibraryImport = useCallback(
     (imported: File[]) => {
+      if (!allowIntakeRef.current()) return false;
+      libraryImportAbortRef.current?.abort();
+      setLibraryImportFailed(null);
       if (files.length === 0) {
         resetFiles();
         setFiles(imported);
@@ -208,27 +373,43 @@ export function AutomatePage() {
         addFiles(imported);
       }
     },
-    [files.length, resetFiles, setFiles, addFiles],
+    [libraryImportAbortRef, files.length, resetFiles, setFiles, addFiles],
   );
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
+      if (!allowIntakeRef.current()) return;
+      libraryImportAbortRef.current?.abort();
+      setLibraryImportFailed(null);
       resetFiles();
       setFiles(newFiles);
     },
-    [setFiles, resetFiles],
+    [libraryImportAbortRef, setFiles, resetFiles],
   );
 
   const handleAddMore = useCallback(() => {
+    if (!allowIntake()) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
     input.onchange = (e) => {
       const picked = Array.from((e.target as HTMLInputElement).files || []);
-      if (picked.length > 0) addFiles(picked);
+      if (picked.length > 0) {
+        if (!allowIntakeRef.current()) return;
+        libraryImportAbortRef.current?.abort();
+        setLibraryImportFailed(null);
+        addFiles(picked);
+      }
     };
     input.click();
-  }, [addFiles]);
+  }, [allowIntake, libraryImportAbortRef, addFiles]);
+
+  const handleClearFiles = useCallback(() => {
+    if (!allowIntake()) return;
+    libraryImportAbortRef.current?.abort();
+    setLibraryImportFailed(null);
+    resetFiles();
+  }, [allowIntake, libraryImportAbortRef, resetFiles]);
 
   const handleProcess = useCallback(() => {
     if (files.length === 0 || steps.length === 0) return;
@@ -242,57 +423,143 @@ export function AutomatePage() {
   const handleSave = useCallback(async () => {
     if (!saveName.trim() || steps.length === 0) return;
     setSaving(true);
+    setSaveError(null);
     try {
-      const res = await fetch(appUrl("/api/v1/pipeline/save"), {
-        method: "POST",
-        headers: formatHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          name: saveName.trim(),
-          description: saveDescription.trim() || undefined,
-          steps: steps.map((s) => ({ toolId: s.toolId, settings: s.settings })),
-        }),
-      });
-      if (res.ok) {
-        import("@/lib/analytics").then(({ track }) =>
-          track(ANALYTICS_EVENTS.PIPELINE_SAVED, { step_count: steps.length }),
-        );
+      let res: Response;
+      try {
+        res = await fetch(appUrl("/api/v1/pipeline/save"), {
+          method: "POST",
+          headers: formatHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            name: saveName.trim(),
+            description: saveDescription.trim() || undefined,
+            steps: steps.map((s) => ({ toolId: s.toolId, settings: s.settings })),
+          }),
+        });
+      } catch {
+        setSaveError(t.errors.networkError);
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setSaveError(failedAnswerMessage(t, body, res.status, t.automate.saveFailed));
+        return;
+      }
+
+      withAnalytics(({ track }) =>
+        track(ANALYTICS_EVENTS.PIPELINE_SAVED, { step_count: steps.length }),
+      );
+      setSaveName("");
+      setSaveDescription("");
+      setShowSaveForm(false);
+      const seq = ++listFetchSeqRef.current;
+
+      try {
         const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
-        if (listRes.ok) {
-          const data = await listRes.json();
-          setSavedPipelines(data.pipelines || []);
+        if (!listRes.ok) {
+          if (seq !== listFetchSeqRef.current) return;
+          setListLoadFailed(true);
+          setSaveError(t.automate.saveListRefreshFailed);
+          return;
         }
-        setSaveName("");
-        setSaveDescription("");
-        setShowSaveForm(false);
+        const listData: unknown = await listRes.json();
+        const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
+        if (!Array.isArray(pipelines)) {
+          if (seq !== listFetchSeqRef.current) return;
+          setListLoadFailed(true);
+          setSaveError(t.automate.saveListRefreshFailed);
+          return;
+        }
+        if (seq !== listFetchSeqRef.current) return;
+        initialLoadErrorRef.current = null;
+        setListLoadFailed(false);
+        if (importErrorSeqRef.current === 0) {
+          setImportError(null);
+        }
+        setSavedPipelines(pipelines);
+      } catch {
+        if (seq !== listFetchSeqRef.current) return;
+        setListLoadFailed(true);
+        setSaveError(t.automate.saveListRefreshFailed);
       }
-    } catch {
-      // Save failed silently
     } finally {
       setSaving(false);
     }
-  }, [saveName, saveDescription, steps, setSavedPipelines]);
+  }, [saveName, saveDescription, steps, setSavedPipelines, t]);
 
   const handleDeletePipeline = useCallback(
     async (id: string) => {
+      if (deletingIdsRef.current.has(id)) return;
+      deletingIdsRef.current.add(id);
+      const errorSeq = ++importErrorSeqRef.current;
+      initialLoadErrorRef.current = null;
+      setImportError(null);
       try {
-        await fetch(appUrl(`/api/v1/pipeline/${id}`), {
-          method: "DELETE",
-          headers: formatHeaders(),
-        });
-        const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
-          headers: formatHeaders(),
-        });
-        if (listRes.ok) {
-          const data = await listRes.json();
-          setSavedPipelines(data.pipelines || []);
+        let res: Response;
+        try {
+          res = await fetch(appUrl(`/api/v1/pipeline/${id}`), {
+            method: "DELETE",
+            headers: formatHeaders(),
+          });
+        } catch {
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.errors.networkError);
+          }
+          return;
         }
-      } catch {
-        // ignore
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(failedAnswerMessage(t, body, res.status, t.automate.deleteFailed));
+          }
+          return;
+        }
+
+        const seq = ++listFetchSeqRef.current;
+        try {
+          const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
+            headers: formatHeaders(),
+          });
+          if (!listRes.ok) {
+            if (seq !== listFetchSeqRef.current) return;
+            setListLoadFailed(true);
+            if (errorSeq === importErrorSeqRef.current) {
+              setImportError(t.automate.deleteListRefreshFailed);
+            }
+            return;
+          }
+          const listData: unknown = await listRes.json();
+          const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
+          if (!Array.isArray(pipelines)) {
+            if (seq !== listFetchSeqRef.current) return;
+            setListLoadFailed(true);
+            if (errorSeq === importErrorSeqRef.current) {
+              setImportError(t.automate.deleteListRefreshFailed);
+            }
+            return;
+          }
+          if (seq !== listFetchSeqRef.current) return;
+          setListLoadFailed(false);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(null);
+          }
+          setSavedPipelines(pipelines);
+        } catch {
+          if (seq !== listFetchSeqRef.current) return;
+          setListLoadFailed(true);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.automate.deleteListRefreshFailed);
+          }
+        }
+      } finally {
+        deletingIdsRef.current.delete(id);
       }
     },
-    [setSavedPipelines],
+    [setSavedPipelines, t],
   );
 
   const handleLoadPipeline = useCallback(
@@ -305,7 +572,7 @@ export function AutomatePage() {
   const handleUseTemplate = useCallback(
     (template: PipelineTemplate) => {
       loadSteps(template.steps);
-      import("@/lib/analytics").then(({ track }) =>
+      withAnalytics(({ track }) =>
         track(ANALYTICS_EVENTS.PIPELINE_TEMPLATE_SELECTED, { template_id: template.id }),
       );
     },
@@ -334,76 +601,123 @@ export function AutomatePage() {
   }, []);
 
   const handleImportPipeline = useCallback(async () => {
-    setImportError(null);
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json";
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      const errorSeq = ++importErrorSeqRef.current;
+      initialLoadErrorRef.current = null;
+      setImportError(null);
+      // Each stage fails on its own and gets its own message (#1956): a file
+      // that won't parse is a bad file, a save request that got no answer is
+      // a network error, and a failed refresh after a good save must say
+      // the list is stale rather than leave the new pipeline invisible.
+      let data: unknown;
       try {
-        const text = await file.text();
-        const data = JSON.parse(text);
+        data = JSON.parse(await file.text());
+      } catch {
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(t.automate.couldNotRead);
+        }
+        return;
+      }
+      if (errorSeq !== importErrorSeqRef.current) return;
 
-        if (data.format !== "snapotter-pipeline") {
-          setImportError(t.automate.invalidPipelineFile);
-          return;
-        }
-        if (typeof data.version !== "number" || data.version > 1) {
-          setImportError(t.automate.newerVersion);
-          return;
-        }
-        if (!data.name || typeof data.name !== "string") {
-          setImportError(t.automate.missingName);
-          return;
-        }
-        if (!Array.isArray(data.steps) || data.steps.length === 0) {
-          setImportError(t.automate.noSteps);
-          return;
-        }
+      if (
+        !data ||
+        typeof data !== "object" ||
+        (data as { format?: unknown }).format !== "snapotter-pipeline"
+      ) {
+        setImportError(t.automate.invalidPipelineFile);
+        return;
+      }
+      const pipeline = data as {
+        version?: unknown;
+        name?: unknown;
+        description?: unknown;
+        steps?: unknown;
+      };
+      if (typeof pipeline.version !== "number" || pipeline.version > 1) {
+        setImportError(t.automate.newerVersion);
+        return;
+      }
+      if (!pipeline.name || typeof pipeline.name !== "string") {
+        setImportError(t.automate.missingName);
+        return;
+      }
+      if (!Array.isArray(pipeline.steps) || pipeline.steps.length === 0) {
+        setImportError(t.automate.noSteps);
+        return;
+      }
 
-        const res = await fetch(appUrl("/api/v1/pipeline/save"), {
+      let res: Response;
+      try {
+        res = await fetch(appUrl("/api/v1/pipeline/save"), {
           method: "POST",
           headers: formatHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
-            name: data.name,
-            description: data.description || undefined,
-            steps: data.steps,
+            name: pipeline.name,
+            description: pipeline.description || undefined,
+            steps: pipeline.steps,
           }),
         });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: "Import failed" }));
-          setImportError(err.error || "Import failed");
-          return;
+      } catch {
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(t.errors.networkError);
         }
+        return;
+      }
 
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(failedAnswerMessage(t, body, res.status, t.automate.importFailed));
+        }
+        return;
+      }
+
+      const seq = ++listFetchSeqRef.current;
+      try {
         const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          setSavedPipelines(listData.pipelines || []);
+        if (!listRes.ok) {
+          if (seq !== listFetchSeqRef.current) return;
+          setListLoadFailed(true);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.automate.importListRefreshFailed);
+          }
+          return;
         }
+        const listData: unknown = await listRes.json();
+        const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
+        if (!Array.isArray(pipelines)) {
+          // An OK answer without the list (a proxy's `{}`) must not blank it.
+          if (seq !== listFetchSeqRef.current) return;
+          setListLoadFailed(true);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.automate.importListRefreshFailed);
+          }
+          return;
+        }
+        if (seq !== listFetchSeqRef.current) return;
+        setListLoadFailed(false);
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(null);
+        }
+        setSavedPipelines(pipelines);
       } catch {
-        setImportError(t.automate.couldNotRead);
+        if (seq !== listFetchSeqRef.current) return;
+        setListLoadFailed(true);
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(t.automate.importListRefreshFailed);
+        }
       }
     };
     input.click();
-  }, [
-    setSavedPipelines,
-    t.automate.invalidPipelineFile,
-    t.automate.noSteps,
-    t.automate.newerVersion,
-    t.automate.missingName,
-    t.automate.couldNotRead,
-  ]);
-
-  useEffect(() => {
-    if (!importError) return;
-    const timer = setTimeout(() => setImportError(null), 5000);
-    return () => clearTimeout(timer);
-  }, [importError]);
+  }, [setSavedPipelines, t]);
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
@@ -437,7 +751,7 @@ export function AutomatePage() {
   const handleAddStep = useCallback(
     (toolId: string) => {
       addStep(toolId);
-      import("@/lib/analytics").then(({ track }) =>
+      withAnalytics(({ track }) =>
         track(ANALYTICS_EVENTS.PIPELINE_STEP_ADDED, { tool_id: toolId }),
       );
       if (isMobile) setMobileToolPaletteOpen(false);
@@ -457,6 +771,28 @@ export function AutomatePage() {
     if (!sourceUrl) return null;
 
     if (mode === "result") {
+      // If we skipped extraction to save memory on a huge batch, there's no url to preview.
+      // Show the success card instead of failing or staying blank.
+      if (!processedUrl && currentEntry?.status === "completed") {
+        const fname = currentEntry.processedFilename ?? selectedFileName ?? files[0]?.name ?? "";
+        const ext = fname.split(".").pop()?.toUpperCase() ?? "";
+        return (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-6 max-w-xs">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-3">
+                <CheckCircle2 className="h-7 w-7 text-success-ink" />
+              </div>
+              <p className="font-medium text-foreground mb-1">{fname}</p>
+              {processedSize != null && (
+                <p className="text-xs text-muted-foreground">
+                  {ext} &middot; {formatFileSize(processedSize)}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      }
+
       if (!processedUrl) return null;
       if (kind === "image") {
         return (
@@ -580,6 +916,22 @@ export function AutomatePage() {
 
           {/* Mobile pipeline steps */}
           <div className="flex-1 overflow-y-auto px-4 py-3">
+            {libraryImportFailed && (
+              <div
+                role="alert"
+                className="mb-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 flex items-start gap-1.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => setLibraryImportFailed(null)}
+                  aria-label={t.common.close}
+                  className="shrink-0 mt-0.5 hover:opacity-80"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <span>{format(t.commonUi.fileLibrary.importFailed, libraryImportFailed)}</span>
+              </div>
+            )}
             {!hasFile && (
               <div className="mb-4 space-y-2">
                 <Dropzone
@@ -590,7 +942,7 @@ export function AutomatePage() {
                 />
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary-ink border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
                 >
                   <FolderOpen className="h-4 w-4" />
@@ -614,14 +966,14 @@ export function AutomatePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
                   {t.automate.libraryButton}
                 </button>
                 <button
                   type="button"
-                  onClick={() => resetFiles()}
+                  onClick={handleClearFiles}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
                   {t.automate.clearButton}
@@ -653,7 +1005,8 @@ export function AutomatePage() {
             {hasFile && !hasProcessed && currentEntry?.status === "failed" && (
               <div className="mb-3 rounded-lg border border-border p-3 text-center">
                 <p className="text-sm text-destructive-ink">
-                  {currentEntry.error ?? t.toolPage.processingFailed}
+                  {displayStoredError(currentEntry.error, t.tools.processing.canceled) ??
+                    t.toolPage.processingFailed}
                 </p>
               </div>
             )}
@@ -819,13 +1172,28 @@ export function AutomatePage() {
             </div>
             {importError && (
               <div className="text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 mb-1.5 flex items-start gap-1.5">
-                <X className="h-3 w-3 shrink-0 mt-0.5" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    importErrorSeqRef.current += 1;
+                    initialLoadErrorRef.current = null;
+                    setImportError(null);
+                  }}
+                  aria-label={t.common.close}
+                  className="shrink-0 mt-0.5 hover:opacity-80"
+                >
+                  <X className="h-3 w-3" />
+                </button>
                 <span>{importError}</span>
               </div>
             )}
             {savedPipelines.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">{t.automate.noSavedPipelines}</p>
-            ) : showAllSaved ? (
+              !listLoadFailed && (
+                <p className="text-xs text-muted-foreground italic">
+                  {t.automate.noSavedPipelines}
+                </p>
+              )
+            ) : showAllSaved && savedPipelines.length > 3 ? (
               <div className="space-y-1 max-h-36 overflow-y-auto">
                 {savedPipelines.map((p) => (
                   <div key={p.id} className="flex items-center gap-1 group">
@@ -871,7 +1239,7 @@ export function AutomatePage() {
             ) : (
               <div className="space-y-1">
                 {savedPipelines.slice(0, 3).map((p) => (
-                  <div key={p.id} className="flex items-center gap-1">
+                  <div key={p.id} className="flex items-center gap-1 group">
                     <button
                       type="button"
                       onClick={() => handleLoadPipeline(p)}
@@ -892,6 +1260,14 @@ export function AutomatePage() {
                       title={t.automate.exportPipeline}
                     >
                       <Download className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePipeline(p.id)}
+                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"
+                      title={t.automate.deletePipeline}
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </button>
                   </div>
                 ))}
@@ -955,7 +1331,7 @@ export function AutomatePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong flex items-center gap-1"
                 >
                   <FolderOpen className="h-3 w-3" />
@@ -963,7 +1339,7 @@ export function AutomatePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => resetFiles()}
+                  onClick={handleClearFiles}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
                   {t.automate.clearButton}
@@ -976,7 +1352,7 @@ export function AutomatePage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong flex items-center gap-1"
                 >
                   <FolderOpen className="h-3 w-3" />
@@ -990,6 +1366,22 @@ export function AutomatePage() {
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             {/* Pipeline steps area */}
             <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
+              {libraryImportFailed && (
+                <div
+                  role="alert"
+                  className="mb-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-2 flex items-start gap-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setLibraryImportFailed(null)}
+                    aria-label={t.common.close}
+                    className="shrink-0 mt-0.5 hover:opacity-80"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                  <span>{format(t.commonUi.fileLibrary.importFailed, libraryImportFailed)}</span>
+                </div>
+              )}
               {error && (
                 <div className="mb-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-2 flex items-start gap-1.5">
                   <X className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -1062,10 +1454,27 @@ export function AutomatePage() {
 
               <span className="flex-1" />
 
+              {saveError && (
+                <div className="text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 flex items-start gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSaveError(null)}
+                    aria-label={t.common.close}
+                    className="shrink-0 mt-0.5 hover:opacity-80"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  <span>{saveError}</span>
+                </div>
+              )}
+
               {steps.length > 0 && !showSaveForm && (
                 <button
                   type="button"
-                  onClick={() => setShowSaveForm(true)}
+                  onClick={() => {
+                    setSaveError(null);
+                    setShowSaveForm(true);
+                  }}
                   className="px-4 py-2 rounded-lg border border-border text-muted-foreground font-medium flex items-center gap-2 hover:bg-muted hover:text-foreground text-sm"
                 >
                   <Save className="h-4 w-4" />
@@ -1073,19 +1482,25 @@ export function AutomatePage() {
                 </button>
               )}
 
-              {showSaveForm && (
+              {steps.length > 0 && showSaveForm && (
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={saveName}
-                    onChange={(e) => setSaveName(e.target.value)}
+                    onChange={(e) => {
+                      setSaveName(e.target.value);
+                      setSaveError(null);
+                    }}
                     placeholder={t.automate.pipelineName}
                     className="text-sm px-2.5 py-1.5 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground w-36"
                   />
                   <input
                     type="text"
                     value={saveDescription}
-                    onChange={(e) => setSaveDescription(e.target.value)}
+                    onChange={(e) => {
+                      setSaveDescription(e.target.value);
+                      setSaveError(null);
+                    }}
                     placeholder={t.automate.descriptionPlaceholder}
                     className="text-sm px-2.5 py-1.5 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground w-36"
                   />
@@ -1103,6 +1518,7 @@ export function AutomatePage() {
                       setShowSaveForm(false);
                       setSaveName("");
                       setSaveDescription("");
+                      setSaveError(null);
                     }}
                     className="px-2 py-1.5 rounded text-sm text-muted-foreground hover:bg-muted"
                   >
@@ -1188,7 +1604,7 @@ export function AutomatePage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setLibraryModalOpen(true)}
+                          onClick={handleOpenLibrary}
                           className="flex items-center gap-2 px-4 py-1.5 text-sm text-primary-ink border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
                         >
                           <FolderOpen className="h-4 w-4" />
@@ -1200,7 +1616,8 @@ export function AutomatePage() {
                     {hasFile && !hasProcessed && currentEntry?.status === "failed" && (
                       <div className="flex flex-col items-center justify-center gap-2 h-full text-center px-4">
                         <p className="text-sm text-destructive-ink">
-                          {currentEntry.error ?? t.toolPage.processingFailed}
+                          {displayStoredError(currentEntry.error, t.tools.processing.canceled) ??
+                            t.toolPage.processingFailed}
                         </p>
                       </div>
                     )}

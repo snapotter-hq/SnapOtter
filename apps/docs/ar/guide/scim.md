@@ -1,8 +1,8 @@
 ---
 description: "إعداد توفير SCIM 2.0 لمزامنة المستخدمين والمجموعات من موفّر الهوية لديك إلى SnapOtter. يغطي Okta وAzure AD / Entra ID والتكاملات المخصّصة."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 4e8347dee40e
+i18n_output_hash: 2c19bdc8e58c
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 ### أُلغي توفير المستخدمين لكن لم يُزالوا من الواجهة {#users-deprovisioned-but-not-removed-from-the-ui}
 
 عملية SCIM DELETE هي تعطيل مبدئي. يظلّ المستخدمون المُعطَّلون يظهرون في قائمة مستخدمي المسؤول بحالة معطّلة. هذا مقصود بالتصميم للحفاظ على بياناتهم. يظهر دورهم بوصفه `disabled:<original-role>`.
+
+### مرشّح `externalId` يفوّت مستخدمًا يسجّل الدخول عبر OIDC أو SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+قبل أن يحصل `externalId` في SCIM على عموده الخاص (`users.scim_external_id`)، كان `PUT` أو `PATCH` من SCIM على مستخدم ربطه تسجيل دخول OIDC أو SAML مسبقًا يكتب معرّف SCIM في هوية تسجيل دخول ذلك المستخدم. لا تستطيع ترحيلات الترقية التمييز بين تلك القيمة وموضوع OIDC أو NameID من SAML حقيقي، لذا تترك هؤلاء المستخدمين كما هم. بالنسبة إليهم، لا يعيد `filter=externalId eq "..."` شيئًا حتى يرسل موفّر الهوية تحديثًا آخر يحمل `externalId`.
+
+إن كنت تفضّل ألا تنتظر موفّر الهوية، فيمكن لسجل التدقيق أن يشهد على المعرّف. يكتب SCIM صف `SCIM_USER_PROVISIONED` مع `externalId` الذي أنشأ به كل مستخدم. بعد أن تصبح على إصدار يحتوي عمود `scim_external_id`، افتح `psql` على قاعدة بيانات SnapOtter (يوضح [دليل استعادة الحساب](./account-recovery.md#older-images-and-fallbacks) كيفية ذلك للإعدادين) وعاين المستخدمين الذين ما زالت هوية تسجيل دخولهم تساوي ذلك المعرّف:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+إذا بدت القائمة صحيحة، فانسخ المعرّف إلى عمود SCIM. شغّله داخل `BEGIN;` وتحقق من الصفوف المعادة قبل `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+التشغيل الثاني لا يطابق شيئًا. تترك الترقية `external_id` كما هو، لأن بعض موفّري الهوية (Okta منهم) يرسلون المعرّف نفسه كموضوع OIDC `sub` و`externalId` في SCIM معًا، ومسحه عندهم سيكسر تسجيل الدخول عبر OIDC. أما المستخدم الذي يكون `external_id` عنده بالفعل هو معرّف SCIM الشارد فيفشل أصلًا في مطابقة الموضوع. ومع تفعيل `OIDC_AUTO_LINK_USERS` (أو `SAML_AUTO_LINK_USERS`)، يعيد تسجيل دخوله التالي ببريد إلكتروني موثَّق ربطه على أي حال.
+
+يبقى بعض المستخدمين خارج المتناول ويلتقطون المعرّف من تحديث موفّر الهوية التالي:
+
+- المستخدمون الذين استبدلت هوية تسجيل دخولهم معرّف SCIM ولم يلحقهم أي كتابة من SCIM بعدها، لأن `external_id` لديهم لم يعد يطابق صف التدقيق
+- المستخدمون الذين كانت مدة الاحتفاظ بسجل تدقيق توفيرهم قد حذفته بالفعل
+- المستخدمون الذين غيّر لهم موفّر الهوية `externalId` بعد إنشائهم (تسجّل صفوف التحديث الحقول التي تغيّرت، لا قيمها)
+- مستخدمان يحملان المعرّف نفسه، وهو ما يتخطاه الاستعلام حتى لا يفشل الفهرس الفريد؛ المعاينة بدون شرطها الأخير تسردهما، وتحديد من يملك المعرّف قرارك أنت

@@ -6,8 +6,11 @@
  * and margin.
  */
 
+import { spawnSync } from "node:child_process";
+import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { hasFitz, pythonBin } from "../../../helpers/python-gate.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -18,6 +21,21 @@ import {
 const PNG = readFixture(fixtures.image.base.png200);
 const JPG = readFixture(fixtures.image.base.jpg100);
 
+function readPdfProducer(pdf: Buffer): { producer: string; creator: string } {
+  if (!pythonBin) throw new Error("pythonBin is required when hasFitz is true");
+  const script = [
+    "import json, sys, fitz",
+    "doc = fitz.open(stream=sys.stdin.buffer.read(), filetype='pdf')",
+    "meta = doc.metadata or {}",
+    "print(json.dumps({'producer': meta.get('producer', ''), 'creator': meta.get('creator', '')}))",
+  ].join("; ");
+  const res = spawnSync(pythonBin, ["-c", script], { input: pdf });
+  if (res.status !== 0) {
+    throw new Error(`fitz metadata read failed: ${res.stderr?.toString("utf8")}`);
+  }
+  return JSON.parse(res.stdout.toString("utf8")) as { producer: string; creator: string };
+}
+
 let testApp: TestApp;
 let app: TestApp["app"];
 let adminToken: string;
@@ -26,11 +44,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("image-to-pdf", () => {
   it("converts a single image to PDF", async () => {
@@ -79,6 +97,13 @@ describe("image-to-pdf", () => {
     const pdfBuffer = Buffer.from(dlRes.rawPayload);
     // PDF files start with %PDF-
     expect(pdfBuffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+    expect(pdfBuffer.length).toBe(json.processedSize);
+    if (hasFitz) {
+      expect(readPdfProducer(pdfBuffer)).toEqual({
+        producer: "SnapOtter",
+        creator: "SnapOtter",
+      });
+    }
   });
 
   it("converts multiple images to multi-page PDF", async () => {
@@ -408,6 +433,21 @@ describe("image-to-pdf", () => {
     expect(json.compression.jpegQuality).toBeGreaterThanOrEqual(10);
     expect(json.compression.jpegQuality).toBeLessThanOrEqual(95);
     expect(json.processedSize).toBeLessThanOrEqual(5_000_000);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const pdfBuffer = Buffer.from(dlRes.rawPayload);
+    expect(pdfBuffer.length).toBe(json.processedSize);
+    if (hasFitz) {
+      expect(readPdfProducer(pdfBuffer)).toEqual({
+        producer: "SnapOtter",
+        creator: "SnapOtter",
+      });
+    }
   });
 
   it("returns targetMet=false when target is impossibly small", async () => {
@@ -1096,6 +1136,70 @@ describe("image-to-pdf", () => {
     expect(json.collated).toBe(false);
     expect(json.downloadUrl).toContain("images.zip");
     expect(json.processedSize).toBeGreaterThan(0);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(dlRes.rawPayload));
+    const entries = zip.getEntries();
+    expect(entries.map((e) => e.entryName).sort()).toEqual(["page1.pdf", "page2.pdf"]);
+    const sumBytes = entries.reduce((sum, e) => sum + e.getData().length, 0);
+    expect(json.processedSize).toBe(sumBytes);
+    if (hasFitz) {
+      for (const entry of entries) {
+        expect(readPdfProducer(entry.getData())).toEqual({
+          producer: "SnapOtter",
+          creator: "SnapOtter",
+        });
+      }
+    }
+  });
+
+  it("deduplicates PDF names when collate=false uploads share a filename stem (#2520)", async () => {
+    const WEBP = readFixture(fixtures.image.base.webp50);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "Photo.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({ collate: false }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(3);
+    expect(json.collated).toBe(false);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(dlRes.rawPayload));
+    const entries = zip.getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual(["photo.pdf", "photo_1.pdf", "Photo_2.pdf"]);
+    const pdfBuffers = entries.map((e) => e.getData());
+    for (let i = 0; i < pdfBuffers.length; i++) {
+      expect(pdfBuffers[i].subarray(0, 5).toString("ascii")).toBe("%PDF-");
+      for (let j = i + 1; j < pdfBuffers.length; j++) {
+        expect(pdfBuffers[i].equals(pdfBuffers[j])).toBe(false);
+      }
+    }
+    const sumBytes = pdfBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    expect(json.processedSize).toBe(sumBytes);
   });
 
   // ── collate=false with single image returns single PDF in ZIP ────
@@ -1149,6 +1253,101 @@ describe("image-to-pdf", () => {
     expect(json.pages).toBe(2);
     expect(json.collated).toBe(false);
     expect(json.compression).toBeDefined();
+    expect(json.compression.targetMet).toBe(true);
+    expect(json.processedSize).toBeLessThanOrEqual(5_000_000);
+  });
+
+  it("returns targetMet=false when collate=false PDFs exceed targetSize (#2519)", async () => {
+    const w = 800;
+    const h = 800;
+    const raw = Buffer.alloc(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 3;
+        raw[idx] = (x * 7 + y * 13) % 256;
+        raw[idx + 1] = (x * 11 + y * 3) % 256;
+        raw[idx + 2] = (x * 5 + y * 17) % 256;
+      }
+    }
+    const sharp = (await import("sharp")).default;
+    const largePng = await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "big1.png", contentType: "image/png", content: largePng },
+      { name: "file", filename: "big2.png", contentType: "image/png", content: largePng },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          collate: false,
+          targetSize: { value: 50, unit: "KB" },
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.collated).toBe(false);
+    expect(json.processedSize).toBeGreaterThan(50_000);
+    expect(json.compression).toEqual({
+      targetRequested: 50_000,
+      targetMet: false,
+      jpegQuality: 10,
+    });
+
+    // Also verify the 10-file uncollated case (at MAX_BATCH_SIZE=10) where
+    // budgeting single-PDF overhead (7,048 B) instead of per-file PDF overhead
+    // (10 * 2548 = 25,480 B) picked a JPEG quality whose 10 single-page PDFs
+    // exceeded 50,000 B (#2519).
+    const mw = 160;
+    const mh = 160;
+    const mraw = Buffer.alloc(mw * mh * 3);
+    for (let y = 0; y < mh; y++) {
+      for (let x = 0; x < mw; x++) {
+        const idx = (y * mw + x) * 3;
+        mraw[idx] = (x * 17 + y * 31) % 256;
+        mraw[idx + 1] = (x * 23 + y * 11) % 256;
+        mraw[idx + 2] = (x * 7 + y * 43) % 256;
+      }
+    }
+    const mediumPng = await sharp(mraw, { raw: { width: mw, height: mh, channels: 3 } })
+      .png()
+      .toBuffer();
+    const tenPayload = createMultipartPayload([
+      ...Array.from({ length: 10 }, (_, i) => ({
+        name: "file",
+        filename: `med-${i}.png`,
+        contentType: "image/png",
+        content: mediumPng,
+      })),
+      {
+        name: "settings",
+        content: JSON.stringify({
+          collate: false,
+          targetSize: { value: 50, unit: "KB" },
+        }),
+      },
+    ]);
+    const tenRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": tenPayload.contentType },
+      body: tenPayload.body,
+    });
+    expect(tenRes.statusCode).toBe(200);
+    const tenJson = JSON.parse(tenRes.body);
+    expect(tenJson.collated).toBe(false);
+    expect(tenJson.processedSize).toBeLessThanOrEqual(50_000);
+    expect(tenJson.compression.targetRequested).toBe(50_000);
+    expect(tenJson.compression.targetMet).toBe(true);
   });
 
   // ── collate=false with all settings ─────────────────────────────
@@ -1235,5 +1434,40 @@ describe("image-to-pdf", () => {
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.pages).toBe(1);
+  });
+
+  // ── Conversion preset route (png-to-pdf) ─────────────────────────
+
+  it("png-to-pdf preset scrubs Producer and Creator metadata (#2501)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/png-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(1);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const pdfBuffer = Buffer.from(dlRes.rawPayload);
+    expect(pdfBuffer.length).toBe(json.processedSize);
+    if (hasFitz) {
+      expect(readPdfProducer(pdfBuffer)).toEqual({
+        producer: "SnapOtter",
+        creator: "SnapOtter",
+      });
+    }
   });
 });

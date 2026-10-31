@@ -13,6 +13,7 @@ import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
+  createUserAndLogin,
   loginAsAdmin,
   type TestApp,
 } from "../../test-server.js";
@@ -29,11 +30,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makePayload(
   settings: Record<string, unknown>,
@@ -116,14 +117,33 @@ describe("Multiple adjustments", () => {
   });
 
   it("applies exposure + temperature + tint", async () => {
-    const res = await postTool("adjust-colors", {
-      exposure: 25,
-      temperature: 40,
-      tint: -20,
-    });
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        exposure: 25,
+        temperature: 40,
+        tint: -20,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([140, 88, 43]);
   });
 
   it("applies hue shift + sharpness + channel adjustments", async () => {
@@ -206,6 +226,16 @@ describe("Effects", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const { data, info } = await sharp(dl.rawPayload).raw().toBuffer({ resolveWithObject: true });
+    expect(info.channels).toBe(4);
+    expect([data[0], data[1], data[2], data[3]]).toEqual([0, 155, 205, 255]);
   });
 });
 
@@ -677,26 +707,183 @@ describe("Output format verification", () => {
 // ── Effect combined with adjustments ───────────────────────────
 describe("Effect combined with adjustments", () => {
   it("applies grayscale effect with brightness and contrast", async () => {
-    const res = await postTool("adjust-colors", {
-      effect: "grayscale",
-      brightness: 15,
-      contrast: 20,
-    });
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 200, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        effect: "grayscale",
+        brightness: 100,
+        contrast: 100,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([229, 229, 229]);
   });
 
   it("applies invert effect with channel adjustments", async () => {
-    const res = await postTool("adjust-colors", {
-      effect: "invert",
-      red: 120,
-      green: 80,
-      blue: 100,
-    });
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        effect: "invert",
+        red: 120,
+        green: 80,
+        blue: 100,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([135, 215, 235]);
+  });
+
+  it("applies grayscale effect after channel multipliers (#3120)", async () => {
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        effect: "grayscale",
+        red: 0,
+        green: 100,
+        blue: 100,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([42, 42, 42]);
+  });
+
+  it("applies saturation and hue before grayscale when no recomb setting is active (#3469)", async () => {
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 200, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        saturation: 100,
+        hue: 120,
+        effect: "grayscale",
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([120, 120, 120]);
+  });
+
+  it("composes temperature/tint, channel multipliers, and sepia in a single request (#2608)", async () => {
+    const gray = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    })
+      .png()
+      .toBuffer();
+
+    const [sepiaOnlyRes, zeroRedSepiaRes, tempTintChannelsRes] = await Promise.all([
+      postTool(
+        "adjust-colors",
+        { red: 100, green: 100, blue: 100, effect: "sepia" },
+        gray,
+        "gray.png",
+        "image/png",
+      ),
+      postTool(
+        "adjust-colors",
+        { red: 0, green: 100, blue: 100, effect: "sepia" },
+        gray,
+        "gray.png",
+        "image/png",
+      ),
+      postTool(
+        "adjust-colors",
+        { temperature: 80, tint: 60, red: 0, green: 150, blue: 100 },
+        gray,
+        "gray.png",
+        "image/png",
+      ),
+    ]);
+
+    expect(sepiaOnlyRes.statusCode).toBe(200);
+    expect(zeroRedSepiaRes.statusCode).toBe(200);
+    expect(tempTintChannelsRes.statusCode).toBe(200);
+
+    const downloadPixel = async (res: { body: string }) => {
+      const { downloadUrl } = JSON.parse(res.body);
+      const dl = await app.inject({
+        method: "GET",
+        url: downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(dl.statusCode).toBe(200);
+      const raw = await sharp(dl.rawPayload).raw().toBuffer();
+      return [raw[0], raw[1], raw[2]];
+    };
+
+    const sepiaPx = await downloadPixel(sepiaOnlyRes);
+    const zeroRedSepiaPx = await downloadPixel(zeroRedSepiaRes);
+    const tempTintChannelsPx = await downloadPixel(tempTintChannelsRes);
+
+    expect(sepiaPx).toEqual([172, 153, 119]);
+    expect(zeroRedSepiaPx).toEqual([122, 109, 85]);
+    // red=0 zeroes red; green=150 * (1 + 0.04 - 0.09 = 0.95) * 128 = 182.4 -> 182;
+    // blue=100 * (1 - 0.12 + 0.06 = 0.94) * 128 = 120.32 -> 120
+    expect(tempTintChannelsPx).toEqual([0, 182, 120]);
   });
 });
 
@@ -764,6 +951,15 @@ describe("Sepia with extreme values", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
     expect(result.processedSize).toBeGreaterThan(0);
+
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([172, 153, 119]);
   });
 });
 
@@ -922,5 +1118,100 @@ describe("Sharpness exact boundaries", () => {
   it("rejects negative sharpness", async () => {
     const res = await postTool("adjust-colors", { sharpness: -1 });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Backwards-compatible legacy alias routes (#2826, #2858) ───
+describe("Legacy alias routes (#2826, #2858)", () => {
+  it.each([
+    ["brightness-contrast", { brightness: 25, contrast: 15 }],
+    ["saturation", { saturation: 40 }],
+    ["color-channels", { red: 130, green: 90, blue: 110 }],
+    ["color-effects", { effect: "grayscale" }],
+  ] as const)(
+    "processes a PNG via /api/v1/tools/image/%s on the image pool",
+    async (aliasId, settings) => {
+      const { body: payload, contentType } = makePayload(settings);
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/v1/tools/image/${aliasId}`,
+        payload,
+        headers: {
+          "content-type": contentType,
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+      expect(result.processedSize).toBeGreaterThan(0);
+    },
+  );
+
+  it("allows an image-category custom role and rejects a video-category custom role on legacy alias routes (#2858)", async () => {
+    const suffix = Date.now().toString(36);
+    const imageRole = `image-alias-${suffix}`;
+    const videoRole = `video-alias-${suffix}`;
+
+    for (const [roleName, allowed] of [
+      [imageRole, ["image"]],
+      [videoRole, ["video"]],
+    ] as const) {
+      const roleRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/roles",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          name: roleName,
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "category", allowed },
+        },
+      });
+      expect(roleRes.statusCode).toBe(201);
+    }
+
+    const { token: imageToken } = await createUserAndLogin(app, `img-user-${suffix}`, imageRole);
+    const { token: videoToken } = await createUserAndLogin(app, `vid-user-${suffix}`, videoRole);
+
+    const { body: payload, contentType } = makePayload({ brightness: 20 });
+    const allowedRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/brightness-contrast",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${imageToken}`,
+      },
+    });
+    expect(allowedRes.statusCode).toBe(200);
+
+    const deniedRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/brightness-contrast",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${videoToken}`,
+      },
+    });
+    expect(deniedRes.statusCode).toBe(403);
+  });
+
+  it("processes a batch of PNGs via POST /api/v1/tools/image/brightness-contrast/batch (#2858)", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ brightness: 15 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/brightness-contrast/batch",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect([200, 202]).toContain(res.statusCode);
   });
 });

@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { changedSettings, writableSettings } from "@/lib/settings-payload";
+import { changedSettings, parseStringArray, writableSettings } from "@/lib/settings-payload";
+
+describe("parseStringArray (#3084)", () => {
+  it("parses a valid JSON array of strings", () => {
+    expect(parseStringArray(JSON.stringify(["resize", "crop"]))).toEqual(["resize", "crop"]);
+    expect(parseStringArray("[]")).toEqual([]);
+  });
+
+  it("returns [] for undefined or empty string", () => {
+    expect(parseStringArray(undefined)).toEqual([]);
+    expect(parseStringArray("")).toEqual([]);
+  });
+
+  it.each([
+    "{corrupt",
+    "{}",
+    "null",
+    "42",
+    '"resize"',
+    "true",
+    "[null]",
+    "[42]",
+    "[{}]",
+    '["resize", 42]',
+  ])("returns [] when stored JSON is %s", (raw) => {
+    expect(parseStringArray(raw)).toEqual([]);
+  });
+});
 
 describe("writableSettings", () => {
   it("strips server-managed read-only keys that the PUT rejects", () => {

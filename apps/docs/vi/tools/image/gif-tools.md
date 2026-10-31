@@ -1,8 +1,8 @@
 ---
 description: "Thay đổi kích thước, tối ưu hóa, đổi tốc độ, đảo ngược, xoay và trích xuất khung hình từ GIF động trong một công cụ duy nhất."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: ff4c20205afa
+i18n_output_hash: 8dd0521ad214
 ---
 
 # Công cụ GIF {#gif-tools}
@@ -34,7 +34,7 @@ Thay đổi kích thước, tối ưu hóa, đổi tốc độ, đảo ngược,
 
 | Tham số | Kiểu | Bắt buộc | Mặc định | Mô tả |
 |-----------|------|----------|---------|-------------|
-| colors | number | Không | 256 | Số màu tối đa trong bảng màu (2 đến 256) |
+| colors | number | Không | 256 | Số màu tối đa trong bảng màu (2, 4, 16 hoặc 256) |
 | dither | number | Không | 1.0 | Cường độ khử răng cưa màu (0 đến 1, trong đó 0 tắt dithering) |
 | effort | number | Không | 7 | Mức nỗ lực tối ưu hóa (1 đến 10, cao hơn = chậm hơn nhưng nhỏ hơn) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Tăng tốc {#speed-up}

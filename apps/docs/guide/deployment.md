@@ -43,6 +43,14 @@ services:
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
+
+      # --- Engines (empty = the image's own binaries, see Configuration) ---
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,6 +140,13 @@ services:
       - DEFAULT_PASSWORD=admin
       - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
       - REDIS_URL=redis://redis:6379
+      # Engines (empty = the image's own binaries, see Configuration)
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -221,8 +236,8 @@ Running at the small end of these tiers (a Pi, an old laptop, a 2 GB VPS)? [Low-
 
 | Tier | Use Case | CPU | RAM | GPU | Storage |
 |------|----------|-----|-----|-----|---------|
-| Minimum | Image, files, and light PDF tools; single user; small batches | 2 cores | 2 GB | None | ~7 GB |
-| Recommended | All five modalities incl. video, PDF, and AI on CPU; batches; a few users | 4 cores | 4 GB | None | ~25 GB |
+| Minimum | Non-AI tools (image, files, light PDF) plus built-in Fast OCR and face detection; single user; small batches | 2 cores | 2 GB | None | ~7 GB |
+| Recommended | All five modalities incl. video, PDF, and standard AI bundles on CPU; batches; a few users | 4 cores | 4 GB (8 GB for HQ inpainting) | None | ~25 GB |
 | Full | Everything at speed incl. GPU AI; large batches; many users | 6-8 cores | 8 GB | NVIDIA 8 GB+ VRAM (12 GB comfortable) | ~35 GB |
 
 **Architecture: 64-bit only** (`linux/amd64` or `linux/arm64`). SnapOtter runs natively on Intel/AMD servers, Apple Silicon Macs, and 64-bit ARM boards including the **Raspberry Pi 4 and 5** (4-8 GB). It does **not** run on 32-bit ARM (`armv7`/`armhf`) — no image is built for it — nor on 512 MB-class boards such as the Pi Zero, which are below the memory floor (see below).
@@ -238,7 +253,7 @@ Running at the small end of these tiers (a Pi, an old laptop, a 2 GB VPS)? [Low-
 
 All 222 non-AI catalog tools - image (resize, crop, convert, compress, adjust, watermark), video (trim, mute, remux), audio (convert, normalize, trim), PDF (merge, split, compress, rotate, protect), file conversions, and dedicated conversion presets - run on modest hardware. Most operations finish in well under a second even on a large file: a 2.7 MB image resizes in ~0.05 s and re-encodes to WebP in ~2 s.
 
-The memory floor is real, from a Docker resource-limit sweep: **512 MB cannot start the stack** (even a single image resize is killed), **1 GB** handles single-file operations but a multi-file batch runs out of memory, and **2 GB / 2 cores** is the smallest configuration that handles batches comfortably.
+The memory floor is real, from a Docker resource-limit sweep: **512 MB cannot start the stack** (even a single image resize is killed), **1 GB** handles single-file operations but a multi-file batch runs out of memory, and **2 GB / 2 cores** is the smallest configuration that handles non-AI batches comfortably. Built-in Fast OCR and the `face-detection` bundle also fit inside 2 GB, whereas the larger AI bundles (Whisper, LaMa/DDColor, rembg, RealESRGAN, photo restoration, and SD1.5 HQ inpainting) need 4 to 8 GB of RAM and are refused up front when free memory is below their per-bundle floor.
 
 ```yaml
 deploy:
@@ -276,20 +291,21 @@ SnapOtter intentionally does not bake these model downloads into the Docker imag
 
 Some tools depend on more than one shared bundle. For example, Passport Photo needs both `background-removal` and `face-detection`; if `background-removal` is already installed, enabling Passport Photo only downloads the missing `face-detection` bundle. The same reuse applies across all AI tools.
 
-Optional AI pack storage estimates:
+Optional AI pack storage and CPU memory floors (SnapOtter checks available memory before dispatching to the Python sidecar and refuses runs below the bundle's free-memory floor immediately):
 
-| Bundle | Disk Size |
-|---|---|
-| Background removal | 4-5 GB |
-| Upscale + Face enhance + Noise removal | 5-6 GB |
-| Face detection | 200-300 MB |
-| Object eraser + Colorize | 1-2 GB |
-| Accurate OCR (`balanced`/`best`) | ~208-234 MiB download / ~409-488 MiB installed |
-| Photo restoration | 4-5 GB |
-| Transcription | ~600 MB |
-| **All bundles** | **~20 GB installed** |
+| Bundle | Disk Size | CPU Memory Floor |
+|---|---|---|
+| Face detection | 200-300 MB | 2 GB host RAM (~0.5 GB free) |
+| Transcription | ~600 MB | 4 GB host RAM (~2 GB free) |
+| Object eraser + Colorize | 1-2 GB | 4 GB host RAM (~2 GB free) |
+| Accurate OCR (`balanced`/`best`) | ~208-234 MiB download / ~409-488 MiB installed | 4 GiB configured effective memory (`fast` runs on 2 GB) |
+| Background removal | 4-5 GB | 4 GB host RAM (~2.5 GB free) |
+| Upscale + Face enhance + Noise removal | 5-6 GB | 4 GB host RAM (~2.5 GB free) |
+| Photo restoration | 4-5 GB | 4 GB host RAM (~3 GB free) |
+| High-Quality Inpainting (`inpaint-hq`) | 5-7 GB | 8 GB host RAM (~6 GB free) |
+| **All bundles** | **~25 GB installed** | **4 GB (8 GB with `inpaint-hq`)** |
 
-Fast OCR is built into the image through Tesseract, adds about 25 MiB, and does not require the optional OCR pack or its 4 GiB memory requirement. Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`). Korean uses `balanced` or `best` and therefore requires the accurate pack. The accurate pack is available in the official Linux amd64 and arm64 containers and runs ONNX Runtime on CPU. NVIDIA hosts use that same CPU OCR runtime, so OCR does not depend on the CUDA version or GPU architecture. The accurate runtime requires at least 4 GiB of effective memory: the configured container cgroup limit, otherwise host memory. SnapOtter rejects systems below that signed compatibility minimum before downloading the pack. Accurate-pack installation is also rejected on bare-metal/prebuilt archives whose libc and Python ABI cannot be guaranteed. On those unsupported hosts, Korean OCR returns an explicit incompatibility error and never silently falls back to Fast.
+Fast OCR is built into the image through Tesseract, adds about 25 MiB, and does not require the optional OCR pack or its 4 GiB memory requirement. Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`) or Arabic (`ar`). Both use `balanced` or `best` and therefore require the accurate pack. The accurate pack is available in the official Linux amd64 and arm64 containers and runs ONNX Runtime on CPU. NVIDIA hosts use that same CPU OCR runtime, so OCR does not depend on the CUDA version or GPU architecture. The accurate runtime requires at least 4 GiB of effective memory: the configured container cgroup limit, otherwise host memory. SnapOtter rejects systems below that signed compatibility minimum before downloading the pack. Accurate-pack installation is also rejected on bare-metal/prebuilt archives whose libc and Python ABI cannot be guaranteed. On those unsupported hosts, Korean and Arabic OCR return an explicit incompatibility error and never silently falls back to Fast.
 
 Replicas that share the same `DATA_DIR` must use the same CPU architecture; pin multi-replica deployments with node affinity. Mixed amd64/arm64 replicas need separate data volumes and independent SnapOtter deployments.
 
@@ -396,7 +412,7 @@ environment:
 
 ### Storage permissions {#storage-permissions}
 
-SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it — instead of booting "healthy" and then failing on the first upload with a cryptic error.
+SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it — instead of booting "healthy" and then failing on the first upload with a cryptic error. The log directory (`LOG_DIR`, `/data/logs` in the image) is checked the same way, in every storage mode, since logs stay local even when files live in S3.
 
 How permissions are handled depends on how the container is launched:
 

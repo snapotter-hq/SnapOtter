@@ -1,11 +1,26 @@
+import type { FeedbackErrorCategory } from "@snapotter/shared";
 import {
   ANALYTICS_EVENTS,
   detectModalityFromMime,
   type LibrarySaveMode,
   type Modality,
+  TOOLS,
 } from "@snapotter/shared";
 import { create } from "zustand";
-import { fetchDecodedPreview, needsServerPreview } from "@/lib/image-preview";
+import { track } from "@/lib/analytics";
+import { BASE_PATH } from "@/lib/app-url";
+import { fetchDecodedPreview, needsServerPreview, revokePreviewUrl } from "@/lib/image-preview";
+
+const TOOL_IDS_BY_ROUTE = new Map<string, string>(TOOLS.map((t) => [t.route, t.id]));
+
+function activeToolIdFromLocation(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const raw = window.location?.pathname ?? "";
+  const path = BASE_PATH && raw.startsWith(`${BASE_PATH}/`) ? raw.slice(BASE_PATH.length) : raw;
+  const normalized =
+    path.length > 1 && path.endsWith("/") ? path.slice(0, -1).toLowerCase() : path.toLowerCase();
+  return TOOL_IDS_BY_ROUTE.get(normalized);
+}
 
 export type PreviewKind = "image" | "video" | "audio" | "document" | "none";
 
@@ -24,6 +39,36 @@ export function previewKindFor(modality: Modality): PreviewKind {
   }
 }
 
+/**
+ * `useToolProcessor` and `usePipelineProcessor` write `"Canceled"` to
+ * `error` and `entry.error` as a cancellation sentinel. Translate that
+ * sentinel at the display boundary while keeping the raw store value intact.
+ */
+export function displayStoredError(
+  error: string | null | undefined,
+  canceledLabel: string,
+): string | null {
+  if (error == null) return null;
+  return error === "Canceled" ? canceledLabel : error;
+}
+
+/**
+ * What the server said about one result beyond the file itself (#1292): compress
+ * scaled the image down to fit (resizedTo), and the target-size verdict from
+ * compress and compress-pdf (targetKb, targetMet). Set per file by single runs
+ * and by batches alike, so a panel or the thumbnail strip can speak for the
+ * file on screen rather than for whichever run happened last.
+ */
+export interface ResultNotes {
+  resizedTo?: { width: number; height: number };
+  targetKb?: number;
+  targetMet?: boolean;
+  /** Image Enhancement's requested Deep Enhance pass didn't run, and why (#1303). */
+  deepEnhanceSkipped?: "failed" | "unavailable" | "animated";
+  /** Chart Maker left rows out because their value wasn't a number (#2060). */
+  chartRows?: { charted: number; skipped: number };
+}
+
 export interface FileEntry {
   /** Stable identity for this entry, unchanged across reordering. */
   id: string;
@@ -38,6 +83,8 @@ export interface FileEntry {
   originalWidth: number | null;
   originalHeight: number | null;
   status: "pending" | "processing" | "completed" | "failed";
+  /** Notes on this entry's result; null when it has none or no result. */
+  resultNotes: ResultNotes | null;
   /**
    * The user took this result: downloaded it, saved it, or it auto-saved.
    *
@@ -50,6 +97,13 @@ export interface FileEntry {
    */
   claimed: boolean;
   error: string | null;
+  /**
+   * The feedback category of `error`, when the code that set it knew the
+   * cause. The message may be translated, so it can't be classified from the
+   * text (#1596). Any patch that sets `error` without a category clears it, so
+   * a re-run can't inherit the last failure's category.
+   */
+  errorCategory?: FeedbackErrorCategory | null;
   serverFileId?: string;
   modality: Modality;
   previewKind: PreviewKind;
@@ -72,6 +126,7 @@ function createEntry(file: File): FileEntry {
     processedPreviewUrl: null,
     processedFilename: null,
     processedSize: null,
+    resultNotes: null,
     originalSize: file.size,
     originalWidth: null,
     originalHeight: null,
@@ -139,12 +194,30 @@ interface FileState {
   batchZipClaimed: boolean;
   processing: boolean;
   error: string | null;
+  /**
+   * The server's machine-readable code for `error` (NO_TEXT_LAYER), when the
+   * failure carried one. `error` is prose and may be translated, so a panel
+   * deciding what to offer next can't read it from the text. Only meaningful
+   * while `error` is set.
+   */
+  errorCode: string | null;
   activeJobId: string | null;
+  /**
+   * Rejects with a CancelRefusedError when the server won't cancel or never
+   * answered (#1815), and with the hook's own error when its teardown breaks
+   * (#1779). Every caller must catch.
+   */
   cancelCurrentJob: (() => Promise<void>) | null;
   /** How library-sourced results are saved (#495): "new" keeps the original. */
   librarySaveMode: LibrarySaveMode;
   /** Library file id of the last run's auto-saved result, for the review UI. */
   lastSavedLibraryFileId: string | null;
+  /**
+   * Bumped whenever the tool route leaves (`stopRuns`), so runs that survive a
+   * panel unmount (mobile sheet close or breakpoint swap) still stop when the
+   * user leaves the tool, even if the next route keeps the files (#1994).
+   */
+  stopCount: number;
 
   // Derived from entries (selected entry fields)
   readonly files: File[];
@@ -168,16 +241,19 @@ interface FileState {
   navigatePrev: () => void;
   /** `claimed` is excluded: a patch touching `processedUrl` always resets it. */
   updateEntry: (index: number, patch: Omit<Partial<FileEntry>, "claimed">) => void;
+  updateEntryById: (id: string, patch: Omit<Partial<FileEntry>, "claimed">) => void;
   setBatchZip: (blob: Blob, filename: string) => void;
+  clearBatchZip: () => void;
   /** Index is required: selectedIndex can change while a job runs. */
   markClaimed: (index: number) => void;
+  markClaimedById: (id: string, expectedProcessedUrl?: string) => void;
   markBatchClaimed: () => void;
   /** Claim the entry the UI is currently showing. Safe only from synchronous
-   *  handlers: across an await the selection can move, so capture the index
-   *  first and use markClaimed instead. */
+   *  handlers: across an await the selection or order can move, so capture the
+   *  entry's id first and use markClaimedById instead. */
   claimSelected: () => void;
   setProcessing: (v: boolean) => void;
-  setError: (e: string | null) => void;
+  setError: (e: string | null, code?: string) => void;
   setActiveJob: (id: string | null, cancelFn: (() => Promise<void>) | null) => void;
   setLibrarySaveMode: (mode: LibrarySaveMode) => void;
   setLastSavedLibraryFileId: (id: string | null) => void;
@@ -185,6 +261,7 @@ interface FileState {
   setProcessedUrl: (url: string | null, previewUrl?: string | null) => void;
   setSizes: (original: number, processed: number) => void;
   undoProcessing: () => void;
+  stopRuns: () => void;
   reset: () => void;
 }
 
@@ -196,10 +273,12 @@ export const useFileStore = create<FileState>((set, get) => ({
   batchZipClaimed: false,
   processing: false,
   error: null,
+  errorCode: null,
   activeJobId: null,
   cancelCurrentJob: null,
   librarySaveMode: "new",
   lastSavedLibraryFileId: null,
+  stopCount: 0,
 
   // Initial derived values (empty state)
   files: [],
@@ -208,15 +287,20 @@ export const useFileStore = create<FileState>((set, get) => ({
   // -- Actions --------------------------------------------------------------
 
   setFiles: (files) => {
-    import("@/lib/analytics").then(({ track }) => {
-      track(ANALYTICS_EVENTS.FILE_ADDED, { file_count: files.length });
+    const toolId = activeToolIdFromLocation();
+    track(ANALYTICS_EVENTS.FILE_ADDED, {
+      ...(toolId ? { tool_id: toolId } : {}),
+      file_count: files.length,
     });
     revokeEntries(get().entries);
     const entries = files.map(createEntry);
     set({
       entries,
       selectedIndex: 0,
+      processing: false,
       error: null,
+      activeJobId: null,
+      cancelCurrentJob: null,
       // The previous run's zip describes files that are no longer loaded.
       batchZipBlob: null,
       batchZipFilename: null,
@@ -224,20 +308,26 @@ export const useFileStore = create<FileState>((set, get) => ({
       // A fresh file set is a fresh edit: the save-mode choice made for a
       // previous file must not carry over (#495 defaults to non-destructive).
       librarySaveMode: "new",
+      lastSavedLibraryFileId: null,
       files: deriveFiles(entries),
       ...deriveSelected(entries, 0),
     });
     // Async: decode HEIC/HEIF files for browser preview
     for (let i = 0; i < entries.length; i++) {
       if (needsServerPreview(entries[i].file)) {
+        const entryId = entries[i].id;
         const file = entries[i].file;
         fetchDecodedPreview(file).then((result) => {
           const state = get();
-          if (state.entries[i]?.file !== file) return;
+          const idx = state.entries.findIndex((e) => e.id === entryId && e.file === file);
+          if (idx === -1) {
+            if (result?.url) revokePreviewUrl(result.url);
+            return;
+          }
           const updated = [...state.entries];
-          const oldBlobUrl = updated[i].blobUrl;
-          updated[i] = {
-            ...updated[i],
+          const oldBlobUrl = updated[idx].blobUrl;
+          updated[idx] = {
+            ...updated[idx],
             previewLoading: false,
             ...(result
               ? {
@@ -255,26 +345,43 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   addFiles: (files) => {
-    import("@/lib/analytics").then(({ track }) => {
-      track(ANALYTICS_EVENTS.FILE_ADDED, { file_count: files.length });
+    const toolId = activeToolIdFromLocation();
+    track(ANALYTICS_EVENTS.FILE_ADDED, {
+      ...(toolId ? { tool_id: toolId } : {}),
+      file_count: files.length,
     });
-    const oldLen = get().entries.length;
     const newEntries = files.map(createEntry);
     const entries = [...get().entries, ...newEntries];
     const idx = get().selectedIndex;
-    set({ entries, files: deriveFiles(entries), ...deriveSelected(entries, idx) });
+    set({
+      entries,
+      // Adding files means the previous batch zip no longer matches the file set (#1806).
+      ...(newEntries.length > 0
+        ? {
+            batchZipBlob: null,
+            batchZipFilename: null,
+            batchZipClaimed: false,
+          }
+        : {}),
+      files: deriveFiles(entries),
+      ...deriveSelected(entries, idx),
+    });
     // Async: decode HEIC/HEIF files for browser preview
     for (let j = 0; j < newEntries.length; j++) {
-      const i = oldLen + j;
       if (needsServerPreview(newEntries[j].file)) {
+        const entryId = newEntries[j].id;
         const file = newEntries[j].file;
         fetchDecodedPreview(file).then((result) => {
           const state = get();
-          if (state.entries[i]?.file !== file) return;
+          const foundIdx = state.entries.findIndex((e) => e.id === entryId && e.file === file);
+          if (foundIdx === -1) {
+            if (result?.url) revokePreviewUrl(result.url);
+            return;
+          }
           const updated = [...state.entries];
-          const oldBlobUrl = updated[i].blobUrl;
-          updated[i] = {
-            ...updated[i],
+          const oldBlobUrl = updated[foundIdx].blobUrl;
+          updated[foundIdx] = {
+            ...updated[foundIdx],
             previewLoading: false,
             ...(result
               ? {
@@ -312,6 +419,10 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({
       entries: newEntries,
       selectedIndex: newIndex,
+      // Removing a file means the previous batch zip no longer matches the file set (#1806).
+      batchZipBlob: null,
+      batchZipFilename: null,
+      batchZipClaimed: false,
       files: deriveFiles(newEntries),
       ...deriveSelected(newEntries, newIndex),
     });
@@ -382,13 +493,23 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (!entries[index]) return;
     // Enforces the claim invariant; see the `claimed` field on FileEntry.
     const claimReset = "processedUrl" in patch ? { claimed: false } : null;
-    entries[index] = { ...entries[index], ...patch, ...claimReset };
+    // Same shape for the error's category; see `errorCategory` on FileEntry.
+    const categoryReset =
+      "error" in patch && !("errorCategory" in patch) ? { errorCategory: null } : null;
+    entries[index] = { ...entries[index], ...patch, ...claimReset, ...categoryReset };
     const idx = get().selectedIndex;
     set({ entries, files: deriveFiles(entries), ...deriveSelected(entries, idx) });
   },
 
+  updateEntryById: (id, patch) => {
+    const index = get().entries.findIndex((e) => e.id === id);
+    if (index !== -1) get().updateEntry(index, patch);
+  },
+
   setBatchZip: (blob, filename) =>
     set({ batchZipBlob: blob, batchZipFilename: filename, batchZipClaimed: false }),
+
+  clearBatchZip: () => set({ batchZipBlob: null, batchZipFilename: null, batchZipClaimed: false }),
 
   markClaimed: (index) => {
     const { entries, selectedIndex } = get();
@@ -396,6 +517,19 @@ export const useFileStore = create<FileState>((set, get) => ({
     const next = [...entries];
     next[index] = { ...next[index], claimed: true };
     set({ entries: next, files: deriveFiles(next), ...deriveSelected(next, selectedIndex) });
+  },
+
+  markClaimedById: (id, expectedProcessedUrl) => {
+    const { entries } = get();
+    const index = entries.findIndex((e) => e.id === id);
+    if (index === -1) return;
+    if (
+      expectedProcessedUrl !== undefined &&
+      entries[index].processedUrl !== expectedProcessedUrl
+    ) {
+      return;
+    }
+    get().markClaimed(index);
   },
 
   markBatchClaimed: () => {
@@ -415,7 +549,12 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   setProcessing: (v) => set({ processing: v }),
 
-  setError: (e) => set(e ? { error: e, processing: false } : { error: null }),
+  setError: (e, code) =>
+    set(
+      e
+        ? { error: e, errorCode: code ?? null, processing: false }
+        : { error: null, errorCode: null },
+    ),
 
   setActiveJob: (id, cancelFn) => set({ activeJobId: id, cancelCurrentJob: cancelFn }),
 
@@ -443,6 +582,8 @@ export const useFileStore = create<FileState>((set, get) => ({
         processedUrl: null,
         processedPreviewUrl: null,
         processedFilename: null,
+        processedSize: null,
+        resultNotes: null,
         status: "pending",
         claimed: false,
       };
@@ -479,9 +620,11 @@ export const useFileStore = create<FileState>((set, get) => ({
       processedPreviewUrl: null,
       processedFilename: null,
       processedSize: null,
+      resultNotes: null,
       status: "pending" as const,
       claimed: false,
       error: null,
+      errorCategory: null,
     }));
     set({
       entries: resetEntries,
@@ -497,6 +640,8 @@ export const useFileStore = create<FileState>((set, get) => ({
       ...deriveSelected(resetEntries, selectedIndex),
     });
   },
+
+  stopRuns: () => set((state) => ({ stopCount: state.stopCount + 1 })),
 
   reset: () => {
     revokeEntries(get().entries);

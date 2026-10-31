@@ -3446,7 +3446,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   ocr: {
     searchTitle: "OCR - Extract Text from Image Online",
     longDescription:
-      "Extract text from images locally with built-in Tesseract or the optional high-accuracy RapidOCR runtime and pinned PP-OCR ONNX models. Choose automatic recognition or an English, German, French, Spanish, Chinese, Japanese, or Korean language hint. The image and extracted text stay on your self-hosted server.",
+      "Extract text from images locally with built-in Tesseract or the optional high-accuracy RapidOCR runtime and pinned PP-OCR ONNX models. Choose automatic recognition or an English, German, French, Spanish, Chinese, Japanese, Korean, or Arabic language hint. The image and extracted text stay on your self-hosted server.",
     useCases: [
       "Digitize text from scanned documents and receipts",
       "Extract data from screenshots and whiteboard photos",
@@ -3457,14 +3457,14 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Built-in Fast tier powered by Tesseract",
       "Optional Balanced and Best tiers powered by RapidOCR and PP-OCRv6 ONNX models",
       "Printed document and scene-text recognition with orientation handling",
-      "Automatic, English, German, French, Spanish, Chinese, Japanese, and Korean language modes",
+      "Automatic, English, German, French, Spanish, Chinese, Japanese, Korean, and Arabic language modes",
       "Portable Linux amd64/arm64 accurate runtime that also works on NVIDIA hosts",
       "Batch OCR across multiple images",
     ],
     faqs: [
       {
         q: "What languages does the OCR support?",
-        a: "SnapOtter exposes automatic recognition plus explicit English, German, French, Spanish, Chinese, Japanese, and Korean modes. Automatic, English, German, French, Spanish, Chinese, and Japanese work with every tier. Korean requires the Balanced or Best tier and the optional accurate runtime; Fast returns an incompatibility error for Korean instead of silently using another language or tier.",
+        a: "SnapOtter exposes automatic recognition plus explicit English, German, French, Spanish, Chinese, Japanese, Korean, and Arabic modes. Automatic, English, German, French, Spanish, Chinese, and Japanese work with every tier. Korean requires the Balanced or Best tier and the optional accurate runtime; Fast returns an incompatibility error for Korean and Arabic instead of silently using another language or tier.",
       },
       {
         q: "Can OCR read handwritten text?",
@@ -4582,7 +4582,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     features: [
       "Built-in Fast Tesseract tier plus optional RapidOCR Balanced and Best tiers",
       "Page-range selection for up to 50 pages per request",
-      "Automatic, English, German, French, Spanish, Chinese, Japanese, and Korean modes",
+      "Automatic, English, German, French, Spanish, Chinese, Japanese, Korean, and Arabic modes",
       "Plain-text output with page boundaries",
       "Portable Linux amd64/arm64 accurate runtime that also works on NVIDIA hosts",
       "Local processing without a third-party OCR API",
@@ -4594,7 +4594,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "Does it support non-English documents?",
-        a: "Yes. Choose automatic recognition or an explicit English, German, French, Spanish, Chinese, Japanese, or Korean hint. Processing happens on your server without an external OCR API.",
+        a: "Yes. Choose automatic recognition or an explicit English, German, French, Spanish, Chinese, Japanese, Korean, or Arabic hint. Processing happens on your server without an external OCR API.",
       },
       {
         q: "Can I process confidential legal or medical PDFs?",
@@ -6986,6 +6986,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       {
         q: "Are bookmarks and links preserved?",
         a: "Yes. Internal links and bookmarks are maintained and adjusted for the new page positions. Your documents are processed entirely on your own server and never leave your network.",
+      },
+    ],
+  },
+  "multi-tool-pdf": {
+    searchTitle: "PDF Page Editor: Organize and Merge Pages",
+    longDescription:
+      "Edit PDF pages visually in one place: reorder, rotate, duplicate, or delete pages, and pull in pages from additional PDFs. SnapOtter assembles the result locally on your server for complete privacy.",
+    useCases: [
+      "Combining the relevant pages of several PDFs into one deliverable",
+      "Rotating misoriented scanned pages while reordering a document",
+      "Deleting confidential or blank pages before sharing a report",
+      "Assembling a custom packet from section PDFs without running merge and organize separately",
+    ],
+    features: [
+      "Drag-and-drop page plan with live thumbnails",
+      "Rotate individual pages clockwise or counterclockwise",
+      "Pull pages from multiple PDFs into one output document",
+      "Duplicate or delete any page before export",
+      "Single-request processing keeps everything on your self-hosted instance",
+    ],
+    faqs: [
+      {
+        q: "Can I take pages from more than one PDF?",
+        a: "Yes. Add other PDFs in the editor, then add any of their pages to the output plan in any position. The final document is assembled in a single step on your own server.",
+      },
+      {
+        q: "Does rotating a page change the page contents?",
+        a: "No. Rotation is recorded as the page's display orientation, exactly like a viewer's rotate command; the page's content stream is untouched.",
+      },
+      {
+        q: "Are bookmarks preserved?",
+        a: "Assembling pages from multiple documents produces a flat page sequence, so document-level outline structures from the sources are not carried into the output.",
       },
     ],
   },

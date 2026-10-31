@@ -19,11 +19,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([
@@ -77,7 +77,7 @@ describe.skipIf(!ffmpegAvailable())("trim-audio (requires ffmpeg)", () => {
     // tiny.mp3 is ~1.0-1.045s depending on the ffprobe build; endS clamps to
     // the duration, leaving well under 0.1s either way.
     const res = await runTool({ startS: 0.98, endS: 9 });
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).details).toMatch(/Trim window/);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/Trim window/);
   });
 });

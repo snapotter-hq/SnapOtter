@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  isVaapiEncoder,
   rateControlArgs,
   setEncoderInventoryForTests,
+  VAAPI_DEVICE,
+  VAAPI_FILTER,
   videoCodecArgs,
+  withVaapiEncodeArgs,
 } from "../../../packages/media-engine/src/encoders.js";
 
 /**
@@ -223,5 +227,164 @@ describe("videoCodecArgs", () => {
         if (accel) expect(args).not.toContain("-crf");
       }
     }
+  });
+});
+
+describe("withVaapiEncodeArgs (#3977)", () => {
+  it("identifies VAAPI encoders only", () => {
+    expect(isVaapiEncoder("h264_vaapi")).toBe(true);
+    expect(isVaapiEncoder("hevc_vaapi")).toBe(true);
+    expect(isVaapiEncoder("h264_nvenc")).toBe(false);
+    expect(isVaapiEncoder("libx264")).toBe(false);
+    expect(isVaapiEncoder("copy")).toBe(false);
+  });
+
+  it("returns non-VAAPI command lines untouched", () => {
+    const sw = ["-i", "in.mp4", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "out.mp4"];
+    const nvenc = [
+      "-i",
+      "in.mp4",
+      "-c:v",
+      "h264_nvenc",
+      "-rc",
+      "vbr",
+      "-cq",
+      "20",
+      "-pix_fmt",
+      "yuv420p",
+      "out.mp4",
+    ];
+    const copy = ["-i", "in.mp4", "-c:v", "copy", "out.mp4"];
+    expect(withVaapiEncodeArgs(sw)).toBe(sw);
+    expect(withVaapiEncodeArgs(nvenc)).toBe(nvenc);
+    expect(withVaapiEncodeArgs(copy)).toBe(copy);
+  });
+
+  it("prepends -vaapi_device, inserts -vf format=nv12,hwupload, and strips -pix_fmt when no filter is present", () => {
+    const input = [
+      "-i",
+      "in.mp4",
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+      "-pix_fmt",
+      "yuv420p",
+      "out.mp4",
+    ];
+    expect(withVaapiEncodeArgs(input)).toEqual([
+      "-vaapi_device",
+      VAAPI_DEVICE,
+      "-i",
+      "in.mp4",
+      "-vf",
+      VAAPI_FILTER,
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+      "out.mp4",
+    ]);
+  });
+
+  it("appends format=nv12,hwupload to an existing -vf chain and is idempotent", () => {
+    const input = [
+      "-i",
+      "in.mp4",
+      "-vf",
+      "scale=-2:720",
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "28",
+      "-pix_fmt",
+      "yuv420p",
+      "out.mp4",
+    ];
+    const once = withVaapiEncodeArgs(input);
+    expect(once).toEqual([
+      "-vaapi_device",
+      VAAPI_DEVICE,
+      "-i",
+      "in.mp4",
+      "-vf",
+      `scale=-2:720,${VAAPI_FILTER}`,
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "28",
+      "out.mp4",
+    ]);
+    expect(withVaapiEncodeArgs(once)).toEqual(once);
+  });
+
+  it("appends ;[v]format=nv12,hwupload[v] to an existing -filter_complex graph and is idempotent", () => {
+    const input = [
+      "-i",
+      "a.mp4",
+      "-i",
+      "b.mp4",
+      "-filter_complex",
+      "[0:v][1:v]concat=n=2:v=1:a=0[v]",
+      "-map",
+      "[v]",
+      "-c:v",
+      "hevc_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+      "-pix_fmt",
+      "yuv420p",
+      "out.mp4",
+    ];
+    const once = withVaapiEncodeArgs(input);
+    expect(once).toEqual([
+      "-vaapi_device",
+      VAAPI_DEVICE,
+      "-i",
+      "a.mp4",
+      "-i",
+      "b.mp4",
+      "-filter_complex",
+      `[0:v][1:v]concat=n=2:v=1:a=0[v];[v]${VAAPI_FILTER}[v]`,
+      "-map",
+      "[v]",
+      "-c:v",
+      "hevc_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+      "out.mp4",
+    ]);
+    expect(withVaapiEncodeArgs(once)).toEqual(once);
+  });
+
+  it("throws when -filter_complex lacks a [v] video output pad instead of emitting a broken graph", () => {
+    const input = [
+      "-i",
+      "a.mp4",
+      "-filter_complex",
+      "[0:v]scale=320:240[outv]",
+      "-map",
+      "[outv]",
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+      "out.mp4",
+    ];
+    expect(() => withVaapiEncodeArgs(input)).toThrow(/\[v\]/);
   });
 });

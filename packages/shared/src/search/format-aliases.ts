@@ -32,24 +32,41 @@ export const MISSPELLINGS: Record<string, string> = {
  * Tokens that can sit on either side of a joined "xtoy" query. Only these
  * split, so "jpgtopng" becomes "jpg to png" while "vectorize" and "photograph"
  * stay whole (#1327). tests/unit/shared/search-aliases.test.ts checks every
- * preset's joined keyword and every x-to-y tool id against this list.
+ * preset's joined keyword, every x-to-y tool id, and every extension in a
+ * tool's acceptedInputs (#1408) against this list.
  */
 const JOINABLE_FORMATS = [
   ...new Set([
     ...Object.keys(FORMAT_ALIASES),
     ...Object.values(FORMAT_ALIASES).flat(),
     // Image and raw formats.
-    ...["avif", "bmp", "eps", "gif", "ico", "jfif", "jxl", "png", "psd", "svg", "tga", "webp"],
-    ...["arw", "cr2", "dng", "nef", "raw"],
+    ...["apng", "avif", "bmp", "eps", "gif", "ico", "jfif", "jxl", "png", "psd", "svg", "svgz"],
+    ...["tga", "webp", "cur", "dds", "dpx", "exr", "fits", "hdr", "jp2", "pbm", "pgm", "ppm"],
+    ...["qoi", "arw", "cr2", "dng", "nef", "raw", "3fr", "cr3", "dcr", "erf", "fff", "gpr"],
+    ...["iiq", "kdc", "mef", "mrw", "nrw", "orf", "pef", "ptx", "raf", "rw2", "rwl", "srw"],
+    ...["x3f"],
     // Audio and video.
     ...["3gp", "aac", "aiff", "avi", "flac", "flv", "m4a", "mkv", "mov", "mp3", "mp4"],
-    ...["ogg", "opus", "wav", "webm", "wma", "wmv"],
+    ...["ogg", "opus", "wav", "webm", "wma", "wmv", "ac3", "amr", "m2ts", "m4v", "mpeg"],
+    ...["mpg", "mts", "ogv", "ts"],
+    // Subtitles.
+    ...["ass", "srt", "vtt"],
     // Documents and data.
-    ...["csv", "epub", "html", "json", "odt", "pdf", "rtf", "text", "txt", "xml", "zip"],
+    ...["csv", "epub", "htm", "html", "json", "odp", "ods", "odt", "pdf", "rtf", "text", "tsv"],
+    ...["txt", "xml", "yaml", "yml", "zip"],
     // Words from the x-to-y tool ids (html-to-image, video-to-gif, ...).
     ...["base64", "frames", "images", "raster", "video"],
+    // Speech-to-text phrasings ("speech2text", "voice2text").
+    ...["speech", "voice"],
   ]),
 ].sort((a, b) => b.length - a.length);
+
+const JOINABLE_FORMAT_SET = new Set(JOINABLE_FORMATS);
+
+/** Whether a token can sit on either side of a joined "xtoy" or "x2y" query. */
+export function isJoinableFormat(token: string): boolean {
+  return JOINABLE_FORMAT_SET.has(token);
+}
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -58,6 +75,10 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\
 const JOINED_FORMAT = `(${JOINABLE_FORMATS.map(escapeRegExp).join("|")})`;
 const JOINED_CONVERSION = new RegExp(
   `(^|[^a-z0-9])${JOINED_FORMAT}to${JOINED_FORMAT}(?![a-z0-9])`,
+  "g",
+);
+const JOINED_CONVERSION_DIGIT = new RegExp(
+  `(^|[^a-z0-9])${JOINED_FORMAT}2${JOINED_FORMAT}(?![a-z0-9])`,
   "g",
 );
 
@@ -94,8 +115,8 @@ const FILLER = new Set([
  */
 export function normalizeSearchQuery(raw: string): string {
   let s = raw.toLowerCase().trim();
-  // Split alpha/digit boundaries so "jpg2png" -> "jpg 2 png", "mp4" stays intact only at word edges.
-  s = s.replace(/([a-z])2([a-z])/g, "$1 to $2");
+  // "jpg2png", "mp42mp3" -> "jpg to png", "mp4 to mp3", only between known formats (#1366).
+  s = s.replace(JOINED_CONVERSION_DIGIT, "$1$2 to $3");
   // "jpgtopng" -> "jpg to png", only between known formats.
   s = s.replace(JOINED_CONVERSION, "$1$2 to $3");
   // Collapse separators to spaces.

@@ -1,6 +1,6 @@
 ---
 description: "Обʼєднайте одне або кілька зображень у документ PDF з опціями розміру сторінки, орієнтації та цільового розміру файлу."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 6e94bdf00179
 ---

@@ -7,9 +7,9 @@ import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 const MODEL_OPTIONS = [
-  { value: "gfpgan", label: "Fast" },
-  { value: "auto", label: "Balanced" },
-  { value: "codeformer", label: "Best" },
+  { value: "gfpgan", labelKey: "fast" },
+  { value: "auto", labelKey: "balanced" },
+  { value: "codeformer", labelKey: "best" },
 ] as const;
 
 export interface EnhanceFacesControlsProps {
@@ -62,7 +62,7 @@ export function EnhanceFacesControls({
           {t.toolSettings["enhance-faces"].quality}
         </p>
         <div className="flex gap-1">
-          {MODEL_OPTIONS.map(({ value, label }) => (
+          {MODEL_OPTIONS.map(({ value, labelKey }) => (
             <button
               key={value}
               type="button"
@@ -73,7 +73,7 @@ export function EnhanceFacesControls({
                   : "bg-muted text-muted-foreground"
               }`}
             >
-              {label}
+              {t.toolSettings["enhance-faces-standalone"][labelKey]}
             </button>
           ))}
         </div>

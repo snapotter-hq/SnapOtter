@@ -31,6 +31,7 @@ export async function deliverWebhook(
   if (authHeader) headers.Authorization = authHeader;
 
   let lastError: string | undefined;
+  let lastStatusCode: number | undefined;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
       const delay = initialDelayMs * 2 ** (attempt - 1);
@@ -50,6 +51,7 @@ export async function deliverWebhook(
         return { success: true, statusCode: response.status, attempts: attempt + 1 };
       }
 
+      lastStatusCode = response.status;
       lastError = `HTTP ${response.status}`;
       // Don't retry 4xx errors (client errors = won't succeed on retry)
       if (response.status >= 400 && response.status < 500) {
@@ -61,9 +63,10 @@ export async function deliverWebhook(
         };
       }
     } catch (err) {
+      lastStatusCode = undefined;
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
 
-  return { success: false, error: lastError, attempts: maxRetries + 1 };
+  return { success: false, statusCode: lastStatusCode, error: lastError, attempts: maxRetries + 1 };
 }

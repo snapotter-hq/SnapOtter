@@ -1,11 +1,80 @@
 """Background removal using rembg with state-of-the-art BiRefNet models."""
+import errno
 import sys
 import json
 import os
 
 
+_OOM_MARKERS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
+    "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
+)
+_HOST_OOM_MARKERS = (
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
+    "bad_alloc",
+    "memoryerror",
+)
+_MODEL_LOAD_ERROR_MARKERS = (
+    "invalidprotobuf",
+    "invalid_protobuf",
+    "protobuf parsing failed",
+    "invalidgraph",
+    "invalid_graph",
+    "no_suchfile",
+    "nosuchfile",
+    "file doesn't exist",
+    "modelproto does not have a graph",
+    "checksum",
+    "hash of downloaded file",
+    "does not match the known hash",
+    "snapotter_allow_model_download",
+)
+
+
 def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
+
+
+def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    return any(s in m for s in _OOM_MARKERS)
+
+
+def _is_host_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    if any(s in m for s in _HOST_OOM_MARKERS):
+        return True
+    return "defaultcpuallocator" in m and _is_oom(err)
+
+
+def _is_model_load_error(err):
+    if isinstance(err, EOFError):
+        return True
+    if isinstance(err, OSError):
+        return err.errno != errno.ENOMEM
+    m = f"{type(err).__name__} {err}".lower()
+    return any(s in m for s in _MODEL_LOAD_ERROR_MARKERS)
 
 
 def _refine_edges(image_bytes, level):
@@ -177,6 +246,14 @@ def main():
 
     model = settings.get("model", "birefnet-general-lite")
     if model not in ALLOWED_MODELS:
+        # JSON so the bridge forwards it to the server log; plain text is dropped.
+        sys.stderr.write(
+            json.dumps(
+                {"warning": f"Unknown model '{model}', falling back to 'birefnet-general-lite'"}
+            )
+            + "\n"
+        )
+        sys.stderr.flush()
         model = "birefnet-general-lite"
 
     # Redirect stdout to stderr so library download/progress output
@@ -206,15 +283,47 @@ def main():
 
         emit_progress(10, "Loading model")
 
+        from session_cache import evict_all, get_session, session_cost
+
         providers, device = onnx_providers()
+        model_path = os.path.join(model_home, f"{model}.onnx")
         try:
-            session = new_session(model, providers=providers)
+            session = get_session(
+                model,
+                providers,
+                lambda: new_session(model, providers=providers),
+                session_cost(model_path, providers),
+            )
         except Exception as e:
-            if "CUDAExecutionProvider" in providers:
-                from gpu import emit_info
-                emit_info(f"GPU session failed ({e}), falling back to CPU")
-                session = new_session(model, providers=["CPUExecutionProvider"])
-                device = "cpu"
+            if (
+                "CUDAExecutionProvider" in providers
+                and not _is_host_oom(e)
+                and not _is_model_load_error(e)
+            ):
+                session = None
+                if _is_oom(e) and evict_all("GPU out of memory loading a session"):
+                    # The cache was holding VRAM that is free now. Keep the GPU
+                    # (and alpha matting, which CPU skips) instead of degrading.
+                    try:
+                        session = get_session(
+                            model,
+                            providers,
+                            lambda: new_session(model, providers=providers),
+                            session_cost(model_path, providers),
+                        )
+                    except Exception as retry_err:
+                        e = retry_err
+                if session is None:
+                    from gpu import emit_info
+                    emit_info(f"GPU session failed ({e}), falling back to CPU")
+                    cpu_providers = ["CPUExecutionProvider"]
+                    session = get_session(
+                        model,
+                        cpu_providers,
+                        lambda: new_session(model, providers=cpu_providers),
+                        session_cost(model_path, cpu_providers),
+                    )
+                    device = "cpu"
             else:
                 raise
 
@@ -241,9 +350,31 @@ def main():
                     alpha_matting_background_threshold=10,
                 )
             except Exception as e:
+                if _is_oom(e):
+                    evict_all("out of memory")
+                    raise
+                detail = str(e).strip() or type(e).__name__
                 if use_alpha_matting:
-                    return remove(input_data, session=session, alpha_matting=False)
-                raise RuntimeError(f"Background removal failed: {e}") from e
+                    sys.stderr.write(
+                        json.dumps(
+                            {
+                                "warning": f"[remove-bg] Alpha matting failed ({detail}); retrying without alpha matting"
+                            }
+                        )
+                        + "\n"
+                    )
+                    sys.stderr.flush()
+                    try:
+                        return remove(input_data, session=session, alpha_matting=False)
+                    except Exception as retry_err:
+                        if _is_oom(retry_err):
+                            evict_all("out of memory")
+                            raise
+                        retry_detail = str(retry_err).strip() or type(retry_err).__name__
+                        raise RuntimeError(
+                            f"Background removal failed: {retry_detail}"
+                        ) from retry_err
+                raise RuntimeError(f"Background removal failed: {detail}") from e
 
         output_data = run_with_heartbeat(_remove, emit_progress, 30, 80, "Analyzing image")
 
@@ -270,15 +401,16 @@ def main():
         result = json.dumps({"success": True, "model": model, "device": device})
 
     except ImportError as e:
-        print(f"[remove-bg] Import failed: {e}", file=sys.stderr, flush=True)
+        detail = str(e).strip() or type(e).__name__
+        print(json.dumps({"warning": f"[remove-bg] Import failed: {detail}"}), file=sys.stderr, flush=True)
         result = json.dumps(
             {
                 "success": False,
-                "error": f"rembg import failed: {e}",
+                "error": f"rembg import failed: {detail}",
             }
         )
     except Exception as e:
-        result = json.dumps({"success": False, "error": str(e)})
+        result = json.dumps({"success": False, "error": str(e).strip() or type(e).__name__})
 
     # Restore original stdout and write only our JSON result
     os.dup2(stdout_fd, 1)

@@ -24,15 +24,35 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// The code under test logs through the API's pino logger (#1500); mock it,
+// since config.js is stubbed without LOG_DIR, and read the calls from it.
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+function loggerCalls(level: "info" | "warn" | "error") {
+  loggerMock[level].mockClear();
+  return loggerMock[level];
+}
+
 // -- Hoisted seam mocks -------------------------------------------------------
 
 const getQueueMock = vi.hoisted(() => vi.fn());
 const runSiemForwardMock = vi.hoisted(() => vi.fn());
 const runAuditArchiveMock = vi.hoisted(() => vi.fn());
+const reconcileStrandedJobsMock = vi.hoisted(() => vi.fn());
 const getMaxAgeMsMock = vi.hoisted(() => vi.fn());
 const deletePrefixMock = vi.hoisted(() => vi.fn());
 const listJobDirsMock = vi.hoisted(() => vi.fn());
-const getSettingNumberMock = vi.hoisted(() => vi.fn());
+const getSettingStrictMock = vi.hoisted(() => vi.fn());
+const parseNumericSettingValueMock = vi.hoisted(() =>
+  vi.fn((_key: string, raw: string | undefined, defaultValue = 0) =>
+    raw === undefined ? defaultValue : Number(raw),
+  ),
+);
 const analyticsEnabledMock = vi.hoisted(() => vi.fn());
 const dbExecuteMock = vi.hoisted(() => vi.fn());
 const dbSelectMock = vi.hoisted(() => vi.fn());
@@ -44,18 +64,15 @@ interface SqlCall {
   values: unknown[];
 }
 const sqlCalls = vi.hoisted(() => [] as SqlCall[]);
-// Captured eq(col, value) argument pairs.
-const eqCalls = vi.hoisted(() => [] as unknown[][]);
 
 // -- Fluent, queued db.select() builder ---------------------------------------
 
-type TableName = "users" | "teams" | "jobs" | "settings";
+type TableName = "users" | "teams" | "jobs";
 
 const selectQueues = vi.hoisted(() => ({
   users: [] as unknown[][],
   teams: [] as unknown[][],
   jobs: [] as unknown[][],
-  settings: [] as unknown[][],
 }));
 
 const schemaMock = vi.hoisted(() => ({
@@ -68,14 +85,12 @@ const schemaMock = vi.hoisted(() => ({
     completedAt: "jobs.completedAt",
     deleteAfter: "jobs.deleteAfter",
   },
-  settings: { key: "settings.key", value: "settings.value" },
 }));
 
 function tableNameOf(table: unknown): TableName {
   if (table === schemaMock.users) return "users";
   if (table === schemaMock.teams) return "teams";
   if (table === schemaMock.jobs) return "jobs";
-  if (table === schemaMock.settings) return "settings";
   throw new Error("Unexpected table passed to db.select().from()");
 }
 
@@ -110,7 +125,6 @@ function resetSelectQueues(): void {
   selectQueues.users = [];
   selectQueues.teams = [];
   selectQueues.jobs = [];
-  selectQueues.settings = [];
 }
 
 /** Flatten a captured sql`` template back into a single comparable string. */
@@ -129,14 +143,15 @@ async function loadSystemJobs(
   vi.resetModules();
   resetSelectQueues();
   sqlCalls.length = 0;
-  eqCalls.length = 0;
   getQueueMock.mockReset();
   runSiemForwardMock.mockReset();
   runAuditArchiveMock.mockReset();
+  reconcileStrandedJobsMock.mockReset();
   getMaxAgeMsMock.mockReset();
   deletePrefixMock.mockReset();
   listJobDirsMock.mockReset();
-  getSettingNumberMock.mockReset();
+  getSettingStrictMock.mockReset();
+  parseNumericSettingValueMock.mockClear();
   analyticsEnabledMock.mockReset();
   dbExecuteMock.mockReset();
   dbSelectMock.mockReset();
@@ -152,13 +167,11 @@ async function loadSystemJobs(
 
   vi.doMock("drizzle-orm", () => ({
     and: vi.fn(() => "and"),
-    eq: vi.fn((...args: unknown[]) => {
-      eqCalls.push(args);
-      return "eq";
-    }),
+    eq: vi.fn(() => "eq"),
     inArray: vi.fn(() => "inArray"),
     isNotNull: vi.fn(() => "isNotNull"),
     lt: vi.fn(() => "lt"),
+    ne: vi.fn(() => "ne"),
     // Capturing tagged-template mock: records the literal strings and the
     // interpolated values so SQL-text and window-arithmetic mutants are visible.
     sql: vi.fn((strings: readonly string[], ...values: unknown[]) => {
@@ -198,12 +211,23 @@ async function loadSystemJobs(
     listJobDirs: listJobDirsMock,
   }));
 
+  const actualSettingsHelpers = await vi.importActual<
+    typeof import("../../../../apps/api/src/lib/settings-helpers.js")
+  >("../../../../apps/api/src/lib/settings-helpers.js");
+  parseNumericSettingValueMock.mockImplementation(actualSettingsHelpers.parseNumericSettingValue);
+
   vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
-    getSettingNumber: getSettingNumberMock,
+    getSettingStrict: getSettingStrictMock,
+    parseNumericSettingValue: parseNumericSettingValueMock,
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/audit-archive.js", () => ({
     runAuditArchive: runAuditArchiveMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/jobs/job-reconciliation.js", () => ({
+    reconcilableJobRows: () => "reconcilableJobRows",
+    reconcileStrandedJobs: reconcileStrandedJobsMock,
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/queues.js", () => ({
@@ -219,6 +243,10 @@ async function loadSystemJobs(
   vi.doMock("@sentry/node", () => ({
     withMonitor: withMonitorMock,
   }));
+
+  // restoreAllMocks() keeps a vi.fn()'s calls, so start each load with none.
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
+  vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
   return import("../../../../apps/api/src/jobs/system-jobs.js");
 }
@@ -279,6 +307,10 @@ describe("scheduleSystemJobs value pinning", () => {
     expect(queue.upsertJobScheduler).toHaveBeenCalledWith(SYSTEM_JOBS.alertEvaluator, {
       every: 60_000,
     });
+    // jobReconciliation: 60_000.
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(SYSTEM_JOBS.jobReconciliation, {
+      every: 60_000,
+    });
   });
 
   it("scales the storageTtl interval with a non-default CLEANUP_INTERVAL_MINUTES", async () => {
@@ -327,7 +359,7 @@ describe("withCronMonitor: enabled path wires Sentry.withMonitor precisely", () 
   it("passes the exact retention monitor config (interval 6 hours, margins)", async () => {
     process.env.SENTRY_CRON_MONITORS = "1";
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+    getSettingStrictMock.mockResolvedValueOnce("0").mockResolvedValueOnce("0");
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
@@ -455,6 +487,134 @@ describe("dispatchSystemJob sessionPurge SQL", () => {
   });
 });
 
+// -- dispatchSystemJob: jobReconciliation (#1726) -----------------------------
+
+describe("dispatchSystemJob jobReconciliation (#1726)", () => {
+  it("runs reconcileStrandedJobs, fails orphaned tool_id-less rows older than 1 hour, and logs the count when positive", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const logSpy = loggerCalls("info");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    reconcileStrandedJobsMock.mockResolvedValue({
+      scanned: 1,
+      recovered: 1,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      outcomes: [
+        { jobId: "j-1", toolId: "resize", previousStatus: "processing", resolution: "recovered" },
+      ],
+    });
+    dbExecuteMock.mockResolvedValue({ rowCount: 2 });
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+
+    expect(reconcileStrandedJobsMock).toHaveBeenCalledTimes(1);
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    const text = allSqlText();
+    expect(text).toContain("UPDATE jobs");
+    expect(text).toContain("status = 'failed'");
+    expect(text).toContain('\'{"message":"Orphaned job reconciled"}\'::jsonb');
+    expect(text).toContain("completed_at = now()");
+    expect(text).toContain("status IN ('processing', 'queued')");
+    expect(text).toContain("(tool_id IS NULL OR tool_id = '')");
+    expect(text).toContain("created_at < now() - interval '1 hour'");
+    expect(text).toContain("AND NOT (");
+    expect(text).toContain("type = 'single'");
+    expect(text).toContain("jobs.settings->>'artifactJobId'");
+    expect(text).toContain("jobs.settings->>'pipelineFlowId'");
+    expect(text).toContain("target.status IN ('processing', 'queued')");
+    expect(text).toContain("AND target.tool_id IS NOT NULL");
+    expect(text).toContain("AND target.tool_id <> ''");
+    expect(text).toContain("jsonb_to_recordset(");
+    expect(text).toContain('active_install("jobId" text, "bundleId" text)');
+    expect(text).toContain('active_install."jobId" = jobs.id');
+    expect(text).toContain("active_install.\"bundleId\" = jobs.settings->>'featureInstall'");
+    expect(sqlCalls.flatMap((c) => c.values)).toContain("[]");
+    expect(logSpy).toHaveBeenCalledWith({ count: 2 }, "Reconciled orphaned job rows");
+    expect(result).toEqual({
+      scanned: 1,
+      recovered: 1,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      orphaned: 2,
+    });
+  });
+
+  it("interpolates active and queued featureInstall jobId/bundleId entries into the orphan UPDATE (#2819)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const { enqueue, resetQueueState, setActive } = await import(
+      "../../../../apps/api/src/lib/feature-install-queue.js"
+    );
+    resetQueueState();
+    try {
+      setActive({ bundleId: "ocr", jobId: "install-active", mutationEpoch: "epoch-1" });
+      enqueue({ bundleId: "face-detection", jobId: "install-queued", mutationEpoch: "epoch-1" });
+      reconcileStrandedJobsMock.mockResolvedValue({
+        scanned: 0,
+        recovered: 0,
+        failed: 0,
+        live: 0,
+        raced: 0,
+        outcomes: [],
+      });
+      dbExecuteMock.mockResolvedValue({ rowCount: 0 });
+
+      await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+
+      const interpolated = sqlCalls.flatMap((c) => c.values);
+      expect(interpolated).toContain(
+        JSON.stringify([
+          { bundleId: "ocr", jobId: "install-active", mutationEpoch: "epoch-1" },
+          { bundleId: "face-detection", jobId: "install-queued", mutationEpoch: "epoch-1" },
+        ]),
+      );
+    } finally {
+      resetQueueState();
+    }
+  });
+
+  it("does NOT log when zero orphaned rows were reconciled and defaults missing rowCount to 0", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const logSpy = loggerCalls("info");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    reconcileStrandedJobsMock.mockResolvedValue({
+      scanned: 0,
+      recovered: 0,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      outcomes: [],
+    });
+    dbExecuteMock.mockResolvedValueOnce({ rowCount: 0 }).mockResolvedValueOnce({});
+
+    const zeroResult = await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+    expect(zeroResult).toEqual({
+      scanned: 0,
+      recovered: 0,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      orphaned: 0,
+    });
+    expect(logSpy).not.toHaveBeenCalled();
+
+    const missingCountResult = await runSystemJob({
+      name: SYSTEM_JOBS.jobReconciliation,
+    } as never);
+    expect(missingCountResult).toEqual({
+      scanned: 0,
+      recovered: 0,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      orphaned: 0,
+    });
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+});
+
 // -- decideExpiry boundary (S3-row branch, line 221) --------------------------
 
 describe("decideExpiry S3-row age boundary", () => {
@@ -490,6 +650,7 @@ describe("storageTtlSweep return arithmetic and empty-set handling", () => {
     // deleteAfterCleaned=2, maxAgeMs>0, but no dirs -> the allDirs.length===0
     // early return intentionally reports removed:0 (NOT removed:2).
     delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
     queueSelect("users", []);
     queueSelect("teams", []);
@@ -505,8 +666,10 @@ describe("storageTtlSweep return arithmetic and empty-set handling", () => {
     // Kills ConditionalExpression `false` on line 285 (fall-through would give
     // removed:2 because deleteAfterCleaned would be added at line 343).
     expect(result).toEqual({ removed: 0, failed: 0 });
+    expect(errSpy).not.toHaveBeenCalled();
     // The two deleteAfter jobs were still cleaned (4 deletePrefix calls).
     expect(deletePrefixMock).toHaveBeenCalledTimes(4);
+    errSpy.mockRestore();
   });
 
   it("returns removed = global-sweep removals + deleteAfterCleaned (sum, not diff)", async () => {
@@ -553,7 +716,7 @@ describe("storageTtlSweep log-guard boundaries", () => {
   it("does NOT log the deleteAfter line when zero jobs were cleaned", async () => {
     // No expired deleteAfter jobs -> deleteAfterCleaned stays 0.
     delete process.env.SENTRY_CRON_MONITORS;
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = loggerCalls("info");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
     queueSelect("users", []);
     queueSelect("teams", []);
@@ -571,7 +734,7 @@ describe("storageTtlSweep log-guard boundaries", () => {
 
   it("does NOT log the removed line when nothing expired in the global sweep", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = loggerCalls("info");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
     queueSelect("users", []);
     queueSelect("teams", []);
@@ -594,7 +757,7 @@ describe("storageTtlSweep log-guard boundaries", () => {
 
   it("does NOT log the error line when every deletion succeeds", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
     queueSelect("users", []);
     queueSelect("teams", []);
@@ -666,8 +829,10 @@ describe("storageTtlSweep legal-hold select gating", () => {
     const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
 
     // Kills the `&&` -> `||` / `size >= 0` mutants (line 308): a truthy guard
-    // would run a 4th select (jobUserMap). Only 3 selects should occur.
-    expect(dbSelectMock).toHaveBeenCalledTimes(3);
+    // would run a 5th select (jobUserMap). Only 4 should occur: held users,
+    // held teams, deleteAfter jobs, and the in-flight owner lookup for the
+    // expired dir (#1412).
+    expect(dbSelectMock).toHaveBeenCalledTimes(4);
     // And the dir is still deleted (no hold in effect).
     expect(result).toEqual({ removed: 1, failed: 0 });
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/stale");
@@ -679,13 +844,17 @@ describe("storageTtlSweep legal-hold select gating", () => {
 describe("retentionSweep SQL pinning", () => {
   it("issues jobs + audit deletes with the exact SQL text and window day counts", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(30).mockResolvedValueOnce(90);
-    queueSelect("settings", []); // tamperResistantAudit unset -> not tamper-resistant
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce(undefined); // tamperResistantAudit unset -> not tamper-resistant
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
     expect(dbExecuteMock).toHaveBeenCalledTimes(2);
+    expect(warnSpy).not.toHaveBeenCalled();
     const text = allSqlText();
     // Kills StringLiteral `` on the heldUsersSubquery + both DELETE templates.
     expect(text).toContain("DELETE FROM jobs");
@@ -695,52 +864,126 @@ describe("retentionSweep SQL pinning", () => {
     // The retention day counts are interpolated (kills a mutant that drops the
     // interpolation value from the template).
     const interpolated = sqlCalls.flatMap((c) => c.values);
-    expect(interpolated).toContain(30);
-    expect(interpolated).toContain(90);
+    expect(interpolated).toContain(60);
+    expect(interpolated).toContain(180);
+    warnSpy.mockRestore();
   });
 
   it("reads the exact settings key when checking tamper-resistant mode", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(30).mockResolvedValueOnce(90);
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
-    // Kills StringLiteral "" on "tamperResistantAudit" (line 373): eq must have
-    // been called with the settings.key column and that literal.
-    expect(eqCalls).toContainEqual(["settings.key", "tamperResistantAudit"]);
+    // Kills StringLiteral "" on "tamperResistantAudit": getSettingStrict must
+    // have been called with that literal on the third read.
+    expect(getSettingStrictMock).toHaveBeenNthCalledWith(3, "tamperResistantAudit");
   });
 
-  it("deletes audit rows when the tamper setting exists but is 'false'", async () => {
-    // Row present, value "false" -> `length>0 && value==="true"` is false ->
-    // NOT tamper-resistant -> audit delete runs.
+  it("deletes audit rows without warning when the tamper setting exists and is 'false'", async () => {
+    // Row present, value "false" -> not tamper-resistant -> audit delete runs.
     delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(30).mockResolvedValueOnce(90);
-    queueSelect("settings", [{ value: "false" }]);
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce("false");
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
-    // Kills the ConditionalExpression `true` on the tamper guard (line 376):
+    // Kills the ConditionalExpression `true` on the tamper guard:
     // a `true` mutant would treat this as tamper-resistant and skip the audit
     // delete, leaving only 1 execute call.
     expect(dbExecuteMock).toHaveBeenCalledTimes(2);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it("passes the env retention days as the getSettingNumber fallback defaults", async () => {
+  it("uses the env retention days when the settings rows are absent", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs({
       JOBS_RETENTION_DAYS: 45,
       AUDIT_RETENTION_DAYS: 120,
     });
-    getSettingNumberMock.mockResolvedValueOnce(45).mockResolvedValueOnce(120);
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
-    // Pins the second argument to each getSettingNumber call (the env fallback).
-    expect(getSettingNumberMock).toHaveBeenNthCalledWith(1, "jobsRetentionDays", 45);
-    expect(getSettingNumberMock).toHaveBeenNthCalledWith(2, "auditRetentionDays", 120);
+    expect(getSettingStrictMock).toHaveBeenNthCalledWith(1, "jobsRetentionDays");
+    expect(getSettingStrictMock).toHaveBeenNthCalledWith(2, "auditRetentionDays");
+    expect(getSettingStrictMock).toHaveBeenNthCalledWith(3, "tamperResistantAudit");
+    expect(parseNumericSettingValueMock).not.toHaveBeenCalled();
+    const interpolated = sqlCalls.flatMap((c) => c.values);
+    expect(interpolated).toContain(45);
+    expect(interpolated).toContain(120);
+  });
+
+  it("omits DELETE FROM jobs when jobsRetentionDays read fails and omits DELETE FROM audit_log when auditRetentionDays read fails (#2718)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    getSettingStrictMock
+      .mockRejectedValueOnce(new Error("db error"))
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce(undefined);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).not.toContain("DELETE FROM jobs");
+    expect(allSqlText()).toContain("DELETE FROM audit_log");
+
+    sqlCalls.length = 0;
+    getSettingStrictMock.mockResolvedValueOnce("60").mockRejectedValueOnce(new Error("db error"));
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).toContain("DELETE FROM jobs");
+    expect(allSqlText()).not.toContain("DELETE FROM audit_log");
+  });
+
+  it("still issues DELETE FROM audit_log when DELETE FROM jobs fails, and omits DELETE FROM audit_log when tamperResistantAudit is corrupt or its read fails (#2736)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce(undefined);
+    dbExecuteMock
+      .mockRejectedValueOnce(new Error("jobs lock timeout"))
+      .mockResolvedValueOnce(undefined);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).toContain("DELETE FROM jobs");
+    expect(allSqlText()).toContain("DELETE FROM audit_log");
+
+    sqlCalls.length = 0;
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce("1");
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).toContain("DELETE FROM jobs");
+    expect(allSqlText()).not.toContain("DELETE FROM audit_log");
+
+    sqlCalls.length = 0;
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockRejectedValueOnce(new Error("tamper read failed"));
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).toContain("DELETE FROM jobs");
+    expect(allSqlText()).not.toContain("DELETE FROM audit_log");
   });
 });

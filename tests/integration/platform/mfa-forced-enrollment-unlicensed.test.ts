@@ -38,7 +38,7 @@ async function setMfaPolicy(value: "optional" | "admins_only" | "required"): Pro
 
 beforeAll(async () => {
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterEach(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
@@ -47,7 +47,7 @@ afterEach(async () => {
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("POST /api/auth/login forced enrollment (unlicensed)", () => {
   it("still returns 403 MFA_ENROLLMENT_REQUIRED for an unenrolled user under a required policy", async () => {

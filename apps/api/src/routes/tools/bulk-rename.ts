@@ -4,8 +4,10 @@ import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getSecurityHeaders } from "../../lib/csp.js";
-import { formatZodErrors } from "../../lib/errors.js";
-import { sanitizeFilename } from "../../lib/filename.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
 
 const settingsSchema = z.object({
   pattern: z.string().min(1).max(1000).default("image-{{index}}"),
@@ -41,10 +43,8 @@ export function registerBulkRename(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (files.length === 0) {
@@ -79,8 +79,11 @@ export function registerBulkRename(app: FastifyInstance) {
       const archive = archiver("zip", { zlib: { level: 5 } });
       archive.pipe(reply.raw);
 
+      const uniqueName = createUniqueNamer();
+
       for (let i = 0; i < files.length; i++) {
         const ext = extname(files[i].filename);
+        const stem = ext ? files[i].filename.slice(0, -ext.length) : files[i].filename;
         const index = settings.startIndex + i;
         const padded = String(index).padStart(
           String(files.length + settings.startIndex).length,
@@ -90,17 +93,26 @@ export function registerBulkRename(app: FastifyInstance) {
           settings.pattern
             .replace(/\{\{index\}\}/g, String(index))
             .replace(/\{\{padded\}\}/g, padded)
-            .replace(/\{\{original\}\}/g, files[i].filename.replace(ext, "")) + ext;
+            .replace(/\{\{original\}\}/g, () => stem) + ext;
 
-        archive.append(files[i].buffer, { name: sanitizeFilename(newName) });
+        archive.append(files[i].buffer, { name: uniqueName(sanitizeFilename(newName)) });
       }
 
       await archive.finalize();
+      await emitInlineRequestAuditIfNeeded(
+        request,
+        200,
+        JSON.stringify({
+          inputFileCount: files.length,
+          originalSize: files.reduce((sum, f) => sum + f.buffer.length, 0),
+        }),
+      );
     } catch (err) {
       if (!reply.raw.headersSent) {
+        request.log?.warn({ err, toolId: "bulk-rename" }, "Bulk rename failed");
         return reply.status(422).send({
           error: "Rename failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
       // The ZIP stream already started; end the connection so clients see a

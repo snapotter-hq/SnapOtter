@@ -2,6 +2,7 @@ import { ArrowLeftRight, Check, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { ASPECT_RATIOS } from "@/components/editor/tools/crop-tool";
 import { useTranslation } from "@/contexts/i18n-context";
+import { runEditorAction } from "@/lib/editor-action";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -14,15 +15,16 @@ export function CropOptions() {
   const cropState = useEditorStore((s) => s.cropState);
   const setCropState = useEditorStore((s) => s.setCropState);
   const applyCrop = useEditorStore((s) => s.applyCrop);
-  const [selectedRatio, setSelectedRatio] = useState("Free");
+  const rebaking = useEditorStore((s) => s.rebaking);
+  const [selectedRatio, setSelectedRatio] = useState("free");
 
   const handleAspectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const label = e.target.value;
-      setSelectedRatio(label);
+      const id = e.target.value;
+      setSelectedRatio(id);
       if (!cropState) return;
 
-      const preset = ASPECT_RATIOS.find((p) => p.label === label);
+      const preset = ASPECT_RATIOS.find((p) => p.id === id);
       if (!preset?.value) {
         setCropState({ ...cropState, aspectRatio: null });
         return;
@@ -35,7 +37,7 @@ export function CropOptions() {
         h = cropState.height;
         w = h * ratio;
       }
-      setCropState({ ...cropState, width: w, height: h, aspectRatio: label });
+      setCropState({ ...cropState, width: w, height: h, aspectRatio: id });
     },
     [cropState, setCropState],
   );
@@ -68,8 +70,9 @@ export function CropOptions() {
   }, [cropState, setCropState]);
 
   const handleApply = useCallback(() => {
-    applyCrop();
-  }, [applyCrop]);
+    if (rebaking) return;
+    runEditorAction(applyCrop(), t.common.somethingWentWrong);
+  }, [applyCrop, rebaking, t]);
 
   const handleCancel = useCallback(() => {
     setCropState(null);
@@ -97,8 +100,8 @@ export function CropOptions() {
           )}
         >
           {ASPECT_RATIOS.map((r) => (
-            <option key={r.label} value={r.label}>
-              {r.label}
+            <option key={r.id} value={r.id}>
+              {r.id === "free" ? t.editor.options.crop.free : r.id}
             </option>
           ))}
         </select>
@@ -151,11 +154,12 @@ export function CropOptions() {
       <button
         type="button"
         onClick={handleApply}
+        disabled={rebaking}
         title={t.editor.options.crop.applyTitle}
         aria-label={t.a11y.applyCrop}
         className={cn(
           "flex h-7 items-center gap-1 rounded bg-primary px-2.5 text-xs text-primary-foreground",
-          "hover:bg-primary/90 transition-colors",
+          "hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
         )}
       >
         <Check className="h-3.5 w-3.5" />

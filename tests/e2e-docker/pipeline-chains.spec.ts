@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { inflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
 
 // ─── Pipeline Chains ───────────────────────────────────────────────
@@ -32,6 +33,55 @@ const JPG_100x100 = fixture("test-100x100.jpg");
 const HEIC_200x150 = fixture("test-200x150.heic");
 const JPG_SAMPLE = formatFixture("sample.jpg");
 const JPG_WITH_EXIF = fixture("test-with-exif.jpg");
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function readFirstPngPixelRgb(png: Buffer): [number, number, number] {
+  if (png.length < 33 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw new Error("Expected a valid PNG buffer");
+  }
+  const idatChunks: Buffer[] = [];
+  let sawIhdr = false;
+  let offset = 8;
+  while (offset + 8 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (dataEnd + 4 > png.length) {
+      throw new Error(`Truncated PNG chunk: ${type}`);
+    }
+    if (type === "IHDR") {
+      if (length < 13) {
+        throw new Error("Truncated PNG IHDR chunk");
+      }
+      const bitDepth = png[dataStart + 8];
+      const colorType = png[dataStart + 9];
+      const interlace = png[dataStart + 12];
+      if (bitDepth !== 8 || (colorType !== 2 && colorType !== 6) || interlace !== 0) {
+        throw new Error(
+          `Unsupported PNG layout for first-pixel RGB read: bitDepth=${bitDepth} colorType=${colorType} interlace=${interlace}`,
+        );
+      }
+      sawIhdr = true;
+    } else if (type === "IDAT") {
+      idatChunks.push(png.subarray(dataStart, dataEnd));
+    } else if (type === "IEND") {
+      break;
+    }
+    offset = dataEnd + 4;
+  }
+  if (!sawIhdr || idatChunks.length === 0) {
+    throw new Error("PNG buffer is missing IHDR or IDAT chunks");
+  }
+  const raw = inflateSync(Buffer.concat(idatChunks));
+  if (raw.length < 4) {
+    throw new Error("Inflated PNG scanline is shorter than 1 RGB pixel");
+  }
+  if (raw[0] > 4) {
+    throw new Error(`Unexpected PNG row 0 filter type: ${raw[0]}`);
+  }
+  return [raw[1], raw[2], raw[3]];
+}
 
 // ─── Resize + Watermark + Optimize Chain ───────────────────────────
 
@@ -78,7 +128,7 @@ test.describe("Crop + Enhance + Convert chain", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "crop", settings: { left: 10, top: 10, width: 200, height: 200 } },
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             { toolId: "convert", settings: { format: "webp" } },
           ],
         }),
@@ -127,7 +177,7 @@ test.describe("Color Adjust + Sharpen + Border chain", () => {
           steps: [
             { toolId: "adjust-colors", settings: { brightness: 10, contrast: 20 } },
             { toolId: "sharpening", settings: { sigma: 1.0 } },
-            { toolId: "border", settings: { size: 10, color: "#333333" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#333333" } },
           ],
         }),
       },
@@ -135,6 +185,11 @@ test.describe("Color Adjust + Sharpen + Border chain", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    expect(readFirstPngPixelRgb(Buffer.from(await dlRes.body()))).toEqual([51, 51, 51]);
   });
 });
 
@@ -180,13 +235,13 @@ test.describe("Enhancement + Replace Color + Convert chain", () => {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "image-enhancement", settings: { preset: "vivid" } },
+            { toolId: "image-enhancement", settings: { mode: "landscape" } },
             {
               toolId: "replace-color",
               settings: {
-                targetColor: "#ffffff",
-                replacementColor: "#f0f0f0",
-                tolerance: 20,
+                sourceColor: "#66fb4a",
+                targetColor: "#f0f0f0",
+                tolerance: 10,
               },
             },
             { toolId: "convert", settings: { format: "avif" } },
@@ -198,6 +253,28 @@ test.describe("Enhancement + Replace Color + Convert chain", () => {
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
     expect(body.downloadUrl).toContain(".avif");
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const avifBuffer = Buffer.from(await dlRes.body());
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "replaced.avif", mimeType: "image/avif", buffer: avifBuffer },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThan(225);
+    expect(g).toBeGreaterThan(225);
+    expect(b).toBeGreaterThan(225);
   });
 });
 
@@ -230,7 +307,7 @@ test.describe("HEIC pipeline chains", () => {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             {
               toolId: "watermark-text",
               settings: {
@@ -262,7 +339,7 @@ test.describe("Grayscale + Sharpen + Text Overlay chain", () => {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "adjust-colors", settings: { grayscale: true } },
+            { toolId: "adjust-colors", settings: { effect: "grayscale" } },
             { toolId: "sharpening", settings: { sigma: 2.0 } },
             {
               toolId: "text-overlay",
@@ -282,6 +359,32 @@ test.describe("Grayscale + Sharpen + Text Overlay chain", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "out.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThan(130);
+    expect(r).toBeLessThan(160);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
   });
 });
 
@@ -296,7 +399,7 @@ test.describe("Social media optimization chain", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 1080, height: 1080, fit: "cover" } },
-            { toolId: "image-enhancement", settings: { preset: "vivid" } },
+            { toolId: "image-enhancement", settings: { mode: "landscape" } },
             {
               toolId: "watermark-text",
               settings: {
@@ -332,7 +435,7 @@ test.describe("Print preparation chain", () => {
             { toolId: "strip-metadata", settings: {} },
             { toolId: "resize", settings: { width: 2480, fit: "contain" } },
             { toolId: "sharpening", settings: { sigma: 1.2 } },
-            { toolId: "border", settings: { size: 40, color: "#ffffff" } },
+            { toolId: "border", settings: { borderWidth: 40, borderColor: "#ffffff" } },
           ],
         }),
       },
@@ -458,7 +561,7 @@ test.describe("Pipeline chain validation", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 100, fit: "contain" } },
-            { toolId: "border", settings: { size: 5, color: "#000000" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#000000" } },
           ],
         }),
       },

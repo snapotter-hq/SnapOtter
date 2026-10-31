@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: fdea551daff9
+i18n_output_hash: 53adc0981a3c
 i18n_hash_version: 2
 ---
 # Pemulihan Akun {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Jika kebijakan masih mewajibkan MFA untuk pengguna itu, mereka akan menghadapi dinding
 pendaftaran berikutnya, jadi jalankan juga `reset-mfa-policy`, login, dan daftar ulang dari Settings.
 
+## Atur ulang kata sandi yang terlupa {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Kosongkan `[password]` dan CLI akan mencetak kata sandi sementara yang dibuat otomatis. Dengan cara apa pun, sesi aktif, kunci API, dan jendela pembatasan gagal login pengguna akan dihapus, serta SnapOtter mewajibkan perubahan kata sandi pada login berikutnya.
+
+## Buat akun admin awal {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Gunakan ini saat tidak ada akun admin yang bisa masuk. `[username]` secara default adalah `DEFAULT_USERNAME` (`admin`), dan mengosongkan `[password]` akan mencetak kata sandi sementara yang harus diubah saat login pertama.
+
+## Buka kunci pengguna yang dibatasi atau dinonaktifkan {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Ini menghapus jendela `LOGIN_THROTTLED` di Redis dan memulihkan peran akun jika pengguna dinonaktifkan.
+
 ## Image lama dan cadangan {#older-images-and-fallbacks}
 
 Pada image yang dibuat sebelum wrapper `snapotter-admin` ada, panggil skrip
@@ -51,7 +75,7 @@ secara langsung:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Sebagai upaya terakhir pada versi apa pun, tetapkan kebijakan di basis data. Pada

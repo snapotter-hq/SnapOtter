@@ -1,8 +1,8 @@
 ---
 description: "Storleksändra, optimera, ändra hastighet, vänd, rotera och extrahera bildrutor från animerade GIF-filer i ett enda verktyg."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: ba0115a2d6d4
+i18n_output_hash: 0264b75460ca
 ---
 
 # GIF-verktyg {#gif-tools}
@@ -34,7 +34,7 @@ Storleksändra, optimera, ändra hastighet, vänd, extrahera bildrutor och roter
 
 | Parameter | Typ | Obligatorisk | Standard | Beskrivning |
 |-----------|------|----------|---------|-------------|
-| colors | number | Nej | 256 | Maximalt antal färger i paletten (2 till 256) |
+| colors | number | Nej | 256 | Maximalt antal färger i paletten (2, 4, 16 eller 256) |
 | dither | number | Nej | 1.0 | Ditheringstyrka (0 till 1, där 0 inaktiverar dithering) |
 | effort | number | Nej | 7 | Optimeringsnivå (1 till 10, högre = långsammare men mindre) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Snabba upp {#speed-up}

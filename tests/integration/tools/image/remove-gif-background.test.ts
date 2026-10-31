@@ -78,12 +78,12 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
   rmSync(testRoot, { recursive: true, force: true });
-}, 15_000);
+});
 
 describe("Remove GIF Background (#496)", () => {
   it("returns 501 naming background-removal when the bundle is not installed", async () => {
@@ -102,6 +102,30 @@ describe("Remove GIF Background (#496)", () => {
     expect(JSON.parse(res.body).code).toBe("NOT_ANIMATED");
   });
 
+  it("rejects a multi-page TIFF with NOT_ANIMATED instead of treating pages as frames (#3047)", async () => {
+    setInstalled(["background-removal"]);
+    const res = await post(
+      readFixture(fixtures.image.multipageTiff),
+      "multipage.tiff",
+      "image/tiff",
+    );
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("NOT_ANIMATED");
+  });
+
+  it("detects animated GIF and APNG buffers across mismatched extensions (#3047)", async () => {
+    setInstalled(["background-removal"]);
+    // 4-frame APNG named .gif still trips the 3-frame cap via magic-byte detection.
+    const apngRes = await post(APNG, "upload.gif", "image/gif");
+    expect(apngRes.statusCode).toBe(400);
+    expect(JSON.parse(apngRes.body).code).toBe("TOO_MANY_FRAMES");
+
+    // 3-frame GIF named .png passes detectAnimation + cap, then trips the backgroundImage check.
+    const gifRes = await post(GIF, "upload.png", "image/png", { backgroundType: "image" });
+    expect(gifRes.statusCode).toBe(400);
+    expect(JSON.parse(gifRes.body).error).toMatch(/background image/i);
+  });
+
   it("rejects an over-cap animation with TOO_MANY_FRAMES", async () => {
     setInstalled(["background-removal"]);
     // Cap is 3; the APNG fixture has 4 frames.
@@ -116,6 +140,88 @@ describe("Remove GIF Background (#496)", () => {
     const res = await post(WEBP, "a.webp", "image/webp", { backgroundType: "image" });
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/background image/i);
+  });
+
+  it("rejects backgroundType 'image' on /batch and /api/v1/pipeline/execute (#3005)", async () => {
+    setInstalled(["background-removal"]);
+    const batchPayload = createMultipartPayload([
+      { name: "file", filename: "a.gif", contentType: "image/gif", content: GIF },
+      { name: "file", filename: "b.gif", contentType: "image/gif", content: GIF },
+      { name: "settings", content: JSON.stringify({ backgroundType: "image" }) },
+    ]);
+    const batchRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-gif-background/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": batchPayload.contentType },
+      body: batchPayload.body,
+    });
+    expect(batchRes.statusCode).toBe(400);
+    expect(JSON.parse(batchRes.body).error).toMatch(/invalid settings/i);
+    expect(batchRes.body).toContain("backgroundType");
+
+    const batchArrayPayload = createMultipartPayload([
+      { name: "file", filename: "a.gif", contentType: "image/gif", content: GIF },
+      { name: "file", filename: "b.gif", contentType: "image/gif", content: GIF },
+      {
+        name: "settings",
+        content: JSON.stringify([{ backgroundType: "transparent" }, { backgroundType: "image" }]),
+      },
+    ]);
+    const batchArrayRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-gif-background/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": batchArrayPayload.contentType,
+      },
+      body: batchArrayPayload.body,
+    });
+    expect(batchArrayRes.statusCode).toBe(400);
+    expect(JSON.parse(batchArrayRes.body).error).toMatch(/invalid settings/i);
+    expect(batchArrayRes.body).toContain("backgroundType");
+
+    for (const url of ["/api/v1/pipeline/execute", "/api/v1/pipeline/batch"]) {
+      const pipelinePayload = createMultipartPayload([
+        { name: "file", filename: "a.gif", contentType: "image/gif", content: GIF },
+        {
+          name: "pipeline",
+          content: JSON.stringify({
+            steps: [{ toolId: "remove-gif-background", settings: { backgroundType: "image" } }],
+          }),
+        },
+      ]);
+      const pipelineRes = await app.inject({
+        method: "POST",
+        url,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": pipelinePayload.contentType,
+        },
+        body: pipelinePayload.body,
+      });
+      expect(pipelineRes.statusCode).toBe(400);
+      expect(JSON.parse(pipelineRes.body).error).toMatch(/invalid settings/i);
+      expect(pipelineRes.body).toContain("backgroundType");
+    }
+  });
+
+  it.each([
+    ["a color that isn't hex", { backgroundType: "color", backgroundColor: "red" }],
+    ["a color background without a color", { backgroundType: "color" }],
+    ["a gradient missing a stop", { backgroundType: "gradient", gradientColor1: "#000000" }],
+  ])("answers 400 for %s (#2282)", async (_label, settings) => {
+    setInstalled(["background-removal"]);
+    const res = await post(GIF, "a.gif", "image/gif", settings);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
+  });
+
+  it("rejects an unknown model name instead of swapping in a default (#1337)", async () => {
+    setInstalled(["background-removal"]);
+    const res = await post(GIF, "a.gif", "image/gif", { model: "birefnet-hr-mating" });
+    expect(res.statusCode).toBe(400);
+    // The reply names the valid models so an API client can fix the typo.
+    expect(res.body).toContain("birefnet-hr-matting");
   });
 
   it("rejects invalid settings JSON", async () => {
@@ -138,4 +244,22 @@ describe("Remove GIF Background (#496)", () => {
   // asserted here: it would enqueue a job the CI worker can't process (no models),
   // producing async noise. It is verified live on a GPU box. These reject-before-
   // enqueue cases fully exercise the route's own logic.
+});
+
+describe("Remove Background model validation (#1337)", () => {
+  it("rejects an unknown model name instead of swapping in a default", async () => {
+    setInstalled(["background-removal"]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "still.png", contentType: "image/png", content: STILL_PNG },
+      { name: "settings", content: JSON.stringify({ model: "birefnet-hr-mating" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("birefnet-hr-matting");
+  });
 });

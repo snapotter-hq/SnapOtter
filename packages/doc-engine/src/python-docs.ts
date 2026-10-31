@@ -1,5 +1,12 @@
 import { runDocsScript } from "@snapotter/ai";
-import { SafeError, type SignPlacement, ToolInputError } from "@snapotter/shared";
+import {
+  isSafeMessageError,
+  SafeError,
+  type SignPlacement,
+  ToolInputError,
+} from "@snapotter/shared";
+
+const MUPDF_DAMAGE_KEYWORDS = "(?:xref|syntax error|format error|repair|corrupt|page tree)";
 
 /**
  * MuPDF's printer reports document damage as prefixed lines on the stream the
@@ -11,8 +18,15 @@ import { SafeError, type SignPlacement, ToolInputError } from "@snapotter/shared
  * The prefix requirement keeps Python tracebacks that merely mention these
  * words classified as bugs.
  */
-const MUPDF_DAMAGE_NOISE =
-  /(?:^|\n)(?:MuPDF error:|error:|warning:).*(?:xref|syntax error|format error|repair|corrupt|page tree)/i;
+const MUPDF_DAMAGE_NOISE = new RegExp(
+  `(?:^|\\n)(?:MuPDF error:|error:|warning:).*${MUPDF_DAMAGE_KEYWORDS}`,
+  "i",
+);
+
+const MUPDF_DAMAGE_ERROR = new RegExp(`(?:^|\\n)code=\\d+:\\s*.*${MUPDF_DAMAGE_KEYWORDS}`, "i");
+
+const DAMAGED_PDF_MESSAGE =
+  "This PDF is damaged (the PDF engine reported broken document structure). Run it through the Repair PDF tool, then try again.";
 
 /**
  * Parse the JSON line the docs dispatcher prints on stdout. Every doc_* script
@@ -22,61 +36,109 @@ const MUPDF_DAMAGE_NOISE =
  * wrap it so the failure carries a safe, authored message and the raw stdout
  * (in the cause) survives for triage instead of a context-free SyntaxError.
  */
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function parseDocsJson<T>(script: string, stdout: string): T {
   const trimmed = stdout.trim();
   try {
-    return JSON.parse(trimmed) as T;
+    const parsed: unknown = JSON.parse(trimmed);
+    if (isJsonObject(parsed)) return parsed as T;
   } catch {
-    // MuPDF's C-level printer writes "error: ..." lines to the same stdout the
-    // JSON contract uses (pdf2docx and the PyMuPDF scripts both drive MuPDF),
-    // ahead of the script's single JSON line. Walk the lines from the end and
-    // take the last one that parses, so library noise cannot turn a completed
-    // conversion into a failure (Sentry NODE-5M).
-    const lines = trimmed.split("\n");
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i].trim();
-      if (!line.startsWith("{")) continue;
-      try {
-        return JSON.parse(line) as T;
-      } catch {
-        // fall through to the earlier lines
-      }
+    // fall through to line-by-line salvage
+  }
+  // MuPDF's C-level printer writes "error: ..." lines to the same stdout the
+  // JSON contract uses (pdf2docx and the PyMuPDF scripts both drive MuPDF),
+  // ahead of the script's single JSON line. Walk the lines from the end and
+  // take the last one that parses, so library noise cannot turn a completed
+  // conversion into a failure (Sentry NODE-5M).
+  const lines = trimmed.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line.startsWith("{")) continue;
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (isJsonObject(parsed)) return parsed as T;
+    } catch {
+      // fall through to the earlier lines
     }
-    if (MUPDF_DAMAGE_NOISE.test(trimmed)) {
-      // Expected-class errors never reach Sentry or the worker's error log, so
-      // keep the raw output on the cause: it is the only artifact left to
-      // check when the classification itself is in question.
-      throw Object.assign(
-        new ToolInputError(
-          "This PDF is damaged (the PDF engine reported broken document structure). Run it through the Repair PDF tool, then try again.",
-        ),
-        { cause: new Error(`${script} stdout (first 200 chars): ${trimmed.slice(0, 200)}`) },
-      );
-    }
-    throw new SafeError("Document tool returned non-JSON output", {
-      kind: "bug",
-      code: script,
+  }
+  if (MUPDF_DAMAGE_NOISE.test(trimmed)) {
+    // Expected-class errors never reach Sentry or the worker's error log, so
+    // keep the raw output on the cause: it is the only artifact left to
+    // check when the classification itself is in question.
+    throw Object.assign(new ToolInputError(DAMAGED_PDF_MESSAGE), {
       cause: new Error(`${script} stdout (first 200 chars): ${trimmed.slice(0, 200)}`),
     });
   }
+  throw new SafeError("Document tool returned non-JSON output", {
+    kind: "bug",
+    code: script,
+    cause: new Error(`${script} stdout (first 200 chars): ${trimmed.slice(0, 200)}`),
+  });
+}
+
+function formatDocsError(error: unknown, stdout: string): string {
+  const trimmed = typeof error === "string" ? error.trim() : "";
+  return trimmed || stdout.slice(0, 200);
+}
+
+function withDamageClassification(err: unknown): never {
+  if (isSafeMessageError(err) && MUPDF_DAMAGE_ERROR.test(err.message)) {
+    throw Object.assign(new ToolInputError(DAMAGED_PDF_MESSAGE), { cause: err });
+  }
+  throw err;
+}
+
+export interface DocsScriptOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+function buildDocsRunOpts(
+  opts?: DocsScriptOptions,
+  defaultTimeoutMs?: number,
+): DocsScriptOptions | undefined {
+  const timeoutMs = opts?.timeoutMs ?? defaultTimeoutMs;
+  const signal = opts?.signal;
+  if (timeoutMs === undefined && signal === undefined) return undefined;
+  return {
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(signal !== undefined ? { signal } : {}),
+  };
 }
 
 /** Page count via the docs-profile Python dispatcher (pikepdf). */
-export async function pdfPageCountPy(absPath: string): Promise<number> {
-  const stdout = await runDocsScript("doc_pagecount", { path: absPath });
+export async function pdfPageCountPy(absPath: string, opts?: DocsScriptOptions): Promise<number> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_pagecount",
+    { path: absPath },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ pages?: number; error?: string }>("doc_pagecount", stdout);
-  if (parsed.error || typeof parsed.pages !== "number") {
-    throw new Error(`doc_pagecount failed: ${parsed.error ?? stdout.slice(0, 200)}`);
+  if ("error" in parsed || typeof parsed.pages !== "number") {
+    throw new Error(`doc_pagecount failed: ${formatDocsError(parsed.error, stdout)}`);
   }
   return parsed.pages;
 }
 
 /** Flatten forms/annotations into page content (PyMuPDF bake). */
-export async function pdfFlattenPy(inPath: string, outPath: string): Promise<void> {
-  const stdout = await runDocsScript("doc_flatten", { path: inPath, out: outPath });
+export async function pdfFlattenPy(
+  inPath: string,
+  outPath: string,
+  opts?: DocsScriptOptions,
+): Promise<void> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_flatten",
+    { path: inPath, out: outPath },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_flatten", stdout);
-  if (parsed.error) {
-    throw new Error(`doc_flatten failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_flatten failed: ${formatDocsError(parsed.error, stdout)}`);
   }
 }
 
@@ -85,11 +147,20 @@ export async function pdfFlattenPy(inPath: string, outPath: string): Promise<voi
  * the conversion engine's self-promotion (LibreOffice, Ghostscript, pdfcpu,
  * WeasyPrint, PDFKit). Encrypted files are copied through untouched.
  */
-export async function pdfScrubProducerPy(inPath: string, outPath: string): Promise<void> {
-  const stdout = await runDocsScript("doc_scrub_meta", { path: inPath, out: outPath });
+export async function pdfScrubProducerPy(
+  inPath: string,
+  outPath: string,
+  opts?: DocsScriptOptions,
+): Promise<void> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_scrub_meta",
+    { path: inPath, out: outPath },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_scrub_meta", stdout);
-  if (parsed.error) {
-    throw new Error(`doc_scrub_meta failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_scrub_meta failed: ${formatDocsError(parsed.error, stdout)}`);
   }
 }
 
@@ -99,20 +170,26 @@ export async function pdfRedactPy(
   outPath: string,
   terms: string[],
   caseSensitive: boolean,
+  opts?: DocsScriptOptions,
 ): Promise<{ found: number }> {
-  const stdout = await runDocsScript("doc_redact", {
-    path: inPath,
-    out: outPath,
-    terms,
-    caseSensitive,
-  });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_redact",
+    {
+      path: inPath,
+      out: outPath,
+      terms,
+      caseSensitive,
+    },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{
     found?: number;
     verified?: boolean;
     error?: string;
   }>("doc_redact", stdout);
-  if (parsed.error) {
-    throw new Error(`doc_redact failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_redact failed: ${formatDocsError(parsed.error, stdout)}`);
   }
   if (typeof parsed.found !== "number") {
     throw new Error(`doc_redact failed: ${stdout.slice(0, 200)}`);
@@ -124,14 +201,20 @@ export async function pdfRedactPy(
 export async function pdfTextPy(
   inPath: string,
   outTxtPath: string,
+  opts?: DocsScriptOptions,
 ): Promise<{ chars: number; hasText: boolean }> {
-  const stdout = await runDocsScript("doc_text", { path: inPath, out: outTxtPath });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_text",
+    { path: inPath, out: outTxtPath },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ chars?: number; hasText?: boolean; error?: string }>(
     "doc_text",
     stdout,
   );
-  if (parsed.error) {
-    throw new Error(`doc_text failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_text failed: ${formatDocsError(parsed.error, stdout)}`);
   }
   if (typeof parsed.chars !== "number") {
     throw new Error(`doc_text failed: ${stdout.slice(0, 200)}`);
@@ -142,27 +225,39 @@ export async function pdfTextPy(
 }
 
 /** PDF to DOCX conversion (pdf2docx). Long-running: 5 min timeout. */
-export async function pdfToWordPy(inPath: string, outPath: string): Promise<void> {
+export async function pdfToWordPy(
+  inPath: string,
+  outPath: string,
+  opts?: DocsScriptOptions,
+): Promise<void> {
   const stdout = await runDocsScript(
     "doc_to_word",
     { path: inPath, out: outPath },
-    { timeoutMs: 300_000 },
-  );
+    buildDocsRunOpts(opts, 300_000),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_to_word", stdout);
-  if (parsed.error) {
-    throw new Error(`doc_to_word failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_to_word failed: ${formatDocsError(parsed.error, stdout)}`);
   }
 }
 
 /** Read PDF document metadata (pikepdf docinfo). */
-export async function pdfMetadataGetPy(inPath: string): Promise<Record<string, string>> {
-  const stdout = await runDocsScript("doc_metadata", { path: inPath, mode: "get" });
+export async function pdfMetadataGetPy(
+  inPath: string,
+  opts?: DocsScriptOptions,
+): Promise<Record<string, string>> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_metadata",
+    { path: inPath, mode: "get" },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ metadata?: Record<string, string>; error?: string }>(
     "doc_metadata",
     stdout,
   );
-  if (parsed.error) {
-    throw new Error(`doc_metadata get failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_metadata get failed: ${formatDocsError(parsed.error, stdout)}`);
   }
   if (!parsed.metadata || typeof parsed.metadata !== "object") {
     throw new Error(`doc_metadata get failed: ${stdout.slice(0, 200)}`);
@@ -175,33 +270,44 @@ export async function pdfMetadataSetPy(
   inPath: string,
   outPath: string,
   metadata: Record<string, string>,
+  opts?: DocsScriptOptions,
 ): Promise<void> {
-  const stdout = await runDocsScript("doc_metadata", {
-    path: inPath,
-    out: outPath,
-    mode: "set",
-    metadata,
-  });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_metadata",
+    {
+      path: inPath,
+      out: outPath,
+      mode: "set",
+      metadata,
+    },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_metadata", stdout);
-  if (parsed.error) {
-    throw new Error(`doc_metadata set failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_metadata set failed: ${formatDocsError(parsed.error, stdout)}`);
   }
 }
 
-/** HTML or Markdown to PDF (WeasyPrint, SSRF-hardened). 2 min timeout. */
+/** HTML or Markdown to PDF (WeasyPrint, SSRF-hardened). 2 min default timeout. */
 export async function htmlToPdfPy(
   inPath: string,
   outPath: string,
   mode: "html" | "markdown",
+  opts?: DocsScriptOptions,
 ): Promise<void> {
   const stdout = await runDocsScript(
     "doc_html_pdf",
     { path: inPath, out: outPath, mode },
-    { timeoutMs: 120_000 },
-  );
+    buildDocsRunOpts(opts, 120_000),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_html_pdf", stdout);
-  if (parsed.error) {
-    throw new Error(`doc_html_pdf failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    const detail = formatDocsError(parsed.error, stdout);
+    if (detail.startsWith("remote resources are disabled")) {
+      throw new ToolInputError(detail);
+    }
+    throw new Error(`doc_html_pdf failed: ${detail}`);
   }
 }
 
@@ -211,20 +317,26 @@ export async function pdfSignPy(
   outPath: string,
   signatures: string[],
   placements: SignPlacement[],
+  opts?: DocsScriptOptions,
 ): Promise<{ placed: number }> {
-  const stdout = await runDocsScript("doc_sign", {
-    input: inPath,
-    output: outPath,
-    signatures,
-    placements,
-  });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_sign",
+    {
+      input: inPath,
+      output: outPath,
+      signatures,
+      placements,
+    },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{
     ok?: boolean;
     placed?: number;
     error?: string;
   }>("doc_sign", stdout);
-  if (parsed.error) {
-    throw new Error(`doc_sign failed: ${parsed.error}`);
+  if ("error" in parsed) {
+    throw new Error(`doc_sign failed: ${formatDocsError(parsed.error, stdout)}`);
   }
   if (typeof parsed.placed !== "number") {
     throw new Error(`doc_sign failed: ${stdout.slice(0, 200)}`);

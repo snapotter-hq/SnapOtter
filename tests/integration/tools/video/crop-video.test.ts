@@ -19,11 +19,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([
@@ -57,9 +57,9 @@ describe.skipIf(!ffmpegAvailable())("crop-video (requires ffmpeg)", () => {
     expect(v?.height).toBe(32);
   }, 60_000);
 
-  it("rejects crop rect exceeding video dimensions with 422", async () => {
+  it("rejects crop rect exceeding video dimensions with 400", async () => {
     const res = await runTool({ width: 9999, height: 9999 });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
     expect(body.details || body.error).toMatch(/exceeds video size/i);
   }, 60_000);

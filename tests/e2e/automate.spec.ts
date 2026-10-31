@@ -1,3 +1,4 @@
+import path from "node:path";
 import { expect, getTestImagePath, test } from "./helpers";
 
 test.describe("Automate Page", () => {
@@ -260,5 +261,210 @@ test.describe("Automate Page", () => {
     // Should show Original and Processed labels inside the slider
     await expect(page.getByText("Original").first()).toBeVisible();
     await expect(page.getByText("Processed").first()).toBeVisible();
+  });
+
+  test("a failed pipeline run shows the failure card", async ({ loggedInPage: page }) => {
+    // #1352: the run's entry has to end at "failed", which is what gates the
+    // result pane's failure card. The side-panel banner alone used to be the
+    // only sign anything went wrong.
+    const message = "Step 1 (compress): target size must be positive";
+    await page.route("**/api/v1/pipeline/execute", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: message }),
+      }),
+    );
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+
+    // The banner renders the message in a <span>; the failure card is the <p>.
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+  });
+
+  test("a 200 the client cannot read shows the failure card", async ({ loggedInPage: page }) => {
+    // #1354: an unparseable body is the one sync outcome that still blames
+    // the server, and it has to fail the entry like any other failure.
+    const message = "Invalid response from server";
+    await page.route("**/api/v1/pipeline/execute", (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<html>not json</html>" }),
+    );
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+  });
+
+  test("a failed batch replaces the previous batch's result with the failure card", async ({
+    loggedInPage: page,
+  }) => {
+    // #1699: a batch never reset its entries, so after a good batch a failed
+    // one left the old result on screen as if this run had produced it.
+    test.setTimeout(90_000);
+    const fixture = (name: string) =>
+      path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
+    await gotoAutomate(page);
+    await addToolStep(page, "Remove Image Metadata", 1);
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /upload from computer/i }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([fixture("test-100x100.jpg"), fixture("qr-code.png")]);
+
+    const processAll = page.getByRole("button", { name: /^Process all/i });
+    await processAll.click();
+    const slider = page.locator("[aria-label='Before/after comparison slider']");
+    await expect(slider).toBeVisible({ timeout: 60_000 });
+
+    const message = "Step 1 (strip-metadata): the server refused this batch";
+    await page.route("**/api/v1/pipeline/batch", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: message }),
+      }),
+    );
+    await processAll.click();
+
+    // The banner renders the message in a <span>; the failure card is the <p>.
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(slider).toHaveCount(0);
+    await expect(processAll).toBeEnabled();
+  });
+
+  // --- Cancel (#1779) ---
+
+  /** Start a run whose upload the server never answers, and return its cancel button. */
+  async function startHeldRun(page: import("@playwright/test").Page) {
+    // Never fulfilled: the run stays mid-upload until the cancel settles it.
+    await page.route("**/api/v1/pipeline/execute", () => {});
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    const cancel = page
+      .getByRole("status")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .filter({ visible: true });
+    await expect(cancel).toBeEnabled({ timeout: 15_000 });
+    return cancel;
+  }
+
+  test("canceling a run the server never saw settles it as canceled", async ({
+    loggedInPage: page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    await page.route("**/api/v1/jobs/*/cancel", (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Job not found" }),
+      }),
+    );
+    const cancel = await startHeldRun(page);
+
+    await cancel.click();
+
+    await expect(page.locator("p", { hasText: "Canceled" }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("a cancel request that never arrives leaves the run going", async ({
+    loggedInPage: page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    let cancelAttempts = 0;
+    await page.route("**/api/v1/jobs/*/cancel", (route) => {
+      cancelAttempts++;
+      return route.abort("failed");
+    });
+    const cancel = await startHeldRun(page);
+
+    await cancel.click();
+
+    // The run is still the server's to settle: the card stays, and the
+    // button comes back for another try, with a line saying why (#1815).
+    await expect.poll(() => cancelAttempts).toBe(1);
+    await expect(cancel).toBeEnabled();
+    await expect(
+      page
+        .getByRole("status")
+        .getByText("Couldn't cancel the run. It's still going, so try again."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeDisabled();
+    expect(pageErrors).toEqual([]);
+  });
+
+  // #1815: a cancel the server refuses used to look like nothing happened.
+  // The route's own refusal is a 200 that says it canceled nothing.
+  for (const [label, status, body, message] of [
+    [
+      "200 canceled:false",
+      200,
+      { canceled: false },
+      "This run can't be canceled now. It's still going.",
+    ],
+    [
+      "403",
+      403,
+      { error: "refused" },
+      "Couldn't cancel: you're signed out or not allowed to stop this run. It's still going.",
+    ],
+    ["500", 500, { error: "refused" }, "Couldn't cancel the run. It's still going, so try again."],
+  ] as const) {
+    test(`a cancel refused with ${label} says so and leaves the run going`, async ({
+      loggedInPage: page,
+    }) => {
+      const pageErrors: string[] = [];
+      page.on("pageerror", (err) => pageErrors.push(err.message));
+      await page.route("**/api/v1/jobs/*/cancel", (route) =>
+        route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }),
+      );
+      const cancel = await startHeldRun(page);
+
+      await cancel.click();
+
+      await expect(page.getByRole("status").getByText(message, { exact: true })).toBeVisible();
+      await expect(cancel).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Process", exact: true })).toBeDisabled();
+      expect(pageErrors).toEqual([]);
+    });
+  }
+
+  test("a 200 with no download URL shows the failure card", async ({ loggedInPage: page }) => {
+    // #1740: an object with nothing to download used to land as a completed
+    // run with no result behind it.
+    const message = "Invalid response from server";
+    await page.route("**/api/v1/pipeline/execute", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
   });
 });

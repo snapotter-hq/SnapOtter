@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import {
   getSettingNumber,
+  getSettingStrict,
   getSettingString,
+  parseNumericSettingValue,
   setSettingIfAbsent,
   upsertSetting,
 } from "../../../apps/api/src/lib/settings-helpers.js";
@@ -94,6 +97,121 @@ describe("getSettingNumber", () => {
     const result = await getSettingNumber(key);
     expect(result).toBe(0);
   });
+
+  it("treats a blank or whitespace-only stored value as unset and returns defaultValue (#1713)", async () => {
+    const key = uniqueKey();
+    keysToClean.push(key);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await upsertSetting(key, "");
+      expect(await getSettingNumber(key, 5)).toBe(5);
+
+      await upsertSetting(key, "   ");
+      expect(await getSettingNumber(key, 5)).toBe(5);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key, value: "" },
+        "invalid numeric setting, using default",
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key, value: "   " },
+        "invalid numeric setting, using default",
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("validates stored values against the setting policy schema and falls back with a warning (#1713)", async () => {
+    keysToClean.push("passwordMinLength");
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      for (const invalid of ["", "0", "129", "Infinity", "3.5", "-4"]) {
+        warnSpy.mockClear();
+        await upsertSetting("passwordMinLength", invalid);
+        expect(await getSettingNumber("passwordMinLength", 8)).toBe(8);
+        expect(warnSpy).toHaveBeenCalledWith(
+          { key: "passwordMinLength", value: invalid },
+          "invalid numeric setting, using default",
+        );
+      }
+
+      warnSpy.mockClear();
+      await upsertSetting("passwordMinLength", "12");
+      expect(await getSettingNumber("passwordMinLength", 8)).toBe(12);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      await cleanupKey("passwordMinLength");
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("returns 0 without warning when a zero-allowed setting stores '0' and defaultValue is non-zero (#1713)", async () => {
+    keysToClean.push("loginThrottleMaxFailures");
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await upsertSetting("loginThrottleMaxFailures", "0");
+      expect(await getSettingNumber("loginThrottleMaxFailures", 5)).toBe(0);
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      await upsertSetting("loginThrottleMaxFailures", "");
+      expect(await getSettingNumber("loginThrottleMaxFailures", 5)).toBe(5);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key: "loginThrottleMaxFailures", value: "" },
+        "invalid numeric setting, using default",
+      );
+    } finally {
+      await cleanupKey("loginThrottleMaxFailures");
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("rejects non-finite values even for keys without a registered policy (#1713)", async () => {
+    const key = uniqueKey();
+    keysToClean.push(key);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await upsertSetting(key, "Infinity");
+      expect(await getSettingNumber(key, 11)).toBe(11);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key, value: "Infinity" },
+        "invalid numeric setting, using default",
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("logs a warning and returns defaultValue when the DB query rejects (#1713)", async () => {
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      const result = await getSettingNumber("maxSessionsPerUser", 3);
+      expect(result).toBe(3);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { err: dbError, key: "maxSessionsPerUser" },
+        "setting read failed, using default",
+      );
+    } finally {
+      selectSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+describe("parseNumericSettingValue", () => {
+  it("returns defaultValue without logging when raw is undefined", () => {
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      expect(parseNumericSettingValue("passwordMinLength", undefined, 8)).toBe(8);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
 
 describe("getSettingString", () => {
@@ -116,6 +234,51 @@ describe("getSettingString", () => {
     const key = uniqueKey();
     const result = await getSettingString(key);
     expect(result).toBe("");
+  });
+
+  it("logs a warning and returns defaultValue when the DB query rejects (#1713)", async () => {
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      const result = await getSettingString("ipAllowlist", "[]");
+      expect(result).toBe("[]");
+      expect(warnSpy).toHaveBeenCalledWith(
+        { err: dbError, key: "ipAllowlist" },
+        "setting read failed, using default",
+      );
+    } finally {
+      selectSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+describe("getSettingStrict", () => {
+  it("returns the stored string when present and undefined when absent", async () => {
+    const key = uniqueKey();
+    keysToClean.push(key);
+
+    expect(await getSettingStrict(key)).toBeUndefined();
+    await upsertSetting(key, "strict-value");
+    expect(await getSettingStrict(key)).toBe("strict-value");
+  });
+
+  it("propagates a DB error without logging a fallback warning", async () => {
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await expect(getSettingStrict("ssoEnforcement")).rejects.toThrow(dbError);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      selectSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });
 

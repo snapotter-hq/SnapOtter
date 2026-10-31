@@ -186,6 +186,36 @@ test.describe("GUI Settings - General Tab", () => {
     await expect(page.getByText("Settings saved.")).toBeVisible({ timeout: 5_000 });
   });
 
+  test("a second save inside three seconds keeps its message for the full time (#1798)", async ({
+    loggedInPage: page,
+  }) => {
+    await openSettings(page);
+    const save = page.getByRole("button", { name: /save settings/i });
+    const saved = page.getByText("Settings saved.");
+    const savePreferences = async () => {
+      const response = page.waitForResponse(
+        (r) => r.url().includes("/v1/preferences") && r.request().method() === "PUT",
+      );
+      await save.click();
+      await response;
+      await expect(saved).toBeVisible();
+    };
+
+    // Save, then save again two seconds later.
+    await savePreferences();
+    const first = Date.now();
+    await page.waitForTimeout(2_000);
+    await savePreferences();
+
+    // The first save's 3 s reset has fired by now. It must not have taken the
+    // second save's message down with it.
+    await page.waitForTimeout(Math.max(0, 3_500 - (Date.now() - first)));
+    expect(await saved.isVisible()).toBe(true);
+
+    // The second save's own reset still clears it.
+    await expect(saved).toBeHidden({ timeout: 4_000 });
+  });
+
   test("setting Fullscreen Grid and saving no longer redirects (route removed)", async ({
     loggedInPage: page,
   }) => {

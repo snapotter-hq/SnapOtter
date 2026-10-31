@@ -1,6 +1,27 @@
+import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
-import { formatHeaders } from "@/lib/api";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+
+interface CaptureResponse {
+  downloadUrl: string;
+  processedSize?: number | null;
+}
+
+function isCaptureResponse(value: unknown): value is CaptureResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.downloadUrl === "string" &&
+    data.downloadUrl.length > 0 &&
+    (data.processedSize === undefined ||
+      data.processedSize === null ||
+      (typeof data.processedSize === "number" &&
+        Number.isFinite(data.processedSize) &&
+        data.processedSize >= 0))
+  );
+}
 
 interface HtmlToImageState {
   mode: "url" | "html";
@@ -26,7 +47,8 @@ interface HtmlToImageState {
   setDevicePreset: (preset: "desktop" | "tablet" | "mobile" | "custom") => void;
   setViewportWidth: (width: number) => void;
   setViewportHeight: (height: number) => void;
-  capture: () => Promise<void>;
+  /** `t` words a failed answer (#1915); the store has no locale of its own. */
+  capture: (t?: TranslationKeys) => Promise<void>;
   reset: () => void;
 }
 
@@ -46,6 +68,9 @@ const DEFAULTS = {
   error: null as string | null,
 };
 
+let captureController: AbortController | null = null;
+let captureRunId = 0;
+
 export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
   ...DEFAULTS,
 
@@ -59,10 +84,22 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
   setViewportWidth: (viewportWidth) => set({ viewportWidth }),
   setViewportHeight: (viewportHeight) => set({ viewportHeight }),
 
-  capture: async () => {
+  capture: async (t = en) => {
     const state = get();
     const hasInput = state.mode === "url" ? state.url : state.htmlContent;
     if (!hasInput || state.capturing) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "html-to-image",
+      is_batch: false,
+      file_count: 1,
+    });
+
+    captureController?.abort();
+    const controller = new AbortController();
+    captureController = controller;
+    const runId = ++captureRunId;
+    const isCurrent = () => runId === captureRunId && !controller.signal.aborted;
 
     set({ capturing: true, error: null, resultUrl: null, resultSize: null });
 
@@ -79,30 +116,52 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
           viewportWidth: state.viewportWidth,
           viewportHeight: state.viewportHeight,
         }),
+        signal: controller.signal,
       });
 
-      const data = resolveServerUrls(await res.json());
-
       if (!res.ok) {
+        // A proxy's error page is not JSON; it still ends on the fallback.
+        const body = await res.json().catch(() => null);
+        if (!isCurrent()) return;
         set({
-          error: data.details || data.error || "Capture failed",
+          error: failedAnswerMessage(t, body, res.status, "Capture failed"),
           capturing: false,
         });
         return;
       }
 
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
+      if (!isCurrent()) return;
+      const data = resolveServerUrls(raw);
+      if (!isCaptureResponse(data)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+
       set({
         resultUrl: data.downloadUrl,
-        resultSize: data.processedSize,
+        resultSize: data.processedSize ?? null,
         capturing: false,
       });
     } catch (err) {
+      if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         error: err instanceof Error ? err.message : "Network error",
         capturing: false,
       });
+    } finally {
+      if (captureController === controller) captureController = null;
+      if (isCurrent()) set({ capturing: false });
     }
   },
 
-  reset: () => set({ ...DEFAULTS }),
+  reset: () => {
+    captureRunId++;
+    const controller = captureController;
+    captureController = null;
+    controller?.abort();
+    set({ ...DEFAULTS });
+  },
 }));

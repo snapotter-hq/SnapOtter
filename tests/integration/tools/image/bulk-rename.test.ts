@@ -39,11 +39,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Bulk Rename", () => {
   it("renames files using the default pattern and returns a ZIP", async () => {
@@ -148,6 +148,35 @@ describe("Bulk Rename", () => {
     const filenames = zipEntryNames(res.rawPayload);
     expect(filenames).toContain("backup-sunset.png");
     expect(filenames).toContain("backup-beach.jpg");
+  });
+
+  it("strips only the trailing extension for {{original}} when stem contains the extension substring (#3034, #3380)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "my.png.photo.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "logo.svg.backup.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "file", filename: "my.png_photo.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "logo.svg_backup.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ pattern: "{{original}}-copy" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toEqual([
+      "logo.svg.backup-copy.svg",
+      "logo.svg_backup-copy.svg",
+      "my.png.photo-copy.png",
+      "my.png_photo-copy.png",
+    ]);
   });
 
   it("respects custom startIndex", async () => {
@@ -515,6 +544,37 @@ describe("Bulk Rename", () => {
     // Both will have the same base name but different extensions
     expect(filenames).toContain("static-name.png");
     expect(filenames).toContain("static-name.jpg");
+  });
+
+  it("deduplicates colliding ZIP entry names when a static pattern or {{original}} produces duplicates (#3024)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: TINY_PNG },
+      { name: "file", filename: "A.PNG", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "static-name" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual([
+      "static-name.png",
+      "static-name_1.png",
+      "static-name_2.PNG",
+    ]);
+    expect(entries[0].getData().equals(PNG)).toBe(true);
+    expect(entries[1].getData().equals(TINY_PNG)).toBe(true);
+    expect(entries[2].getData().equals(PNG)).toBe(true);
   });
 
   // ── All three placeholders together ─────────────────────────────

@@ -14,6 +14,7 @@ export interface OutpaintOptions {
   extendBottom: number;
   extendLeft: number;
   tier?: "fast" | "balanced" | "high";
+  signal?: AbortSignal;
 }
 
 export async function outpaint(
@@ -39,7 +40,7 @@ export async function outpaint(
       String(options.extendLeft),
       options.tier ?? "balanced",
     ],
-    { onProgress },
+    { onProgress, signal: options.signal },
   );
 
   const result = parseStdoutJson(stdout);

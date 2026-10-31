@@ -1,4 +1,18 @@
-import { APP_VERSION, CATEGORIES, SUPPORTED_LOCALES, TOOLS } from "@snapotter/shared";
+import {
+  APP_VERSION,
+  CATEGORIES,
+  CORE_AUDIT_EVENTS,
+  isPasswordRuleEnabled,
+  isValidRoleName,
+  isValidUsername,
+  normalizeRoleName,
+  type Permission,
+  SafeError,
+  SUPPORTED_LOCALES,
+  TEAM_NAME_MAX_LENGTH,
+  TOOLS,
+  type TranslationKeys,
+} from "@snapotter/shared";
 import {
   BarChart3,
   Check,
@@ -32,16 +46,34 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useMobile } from "@/hooks/use-mobile";
-import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@/lib/api";
+import { useTimeouts } from "@/hooks/use-timeouts";
+import { captureHandledError } from "@/lib/analytics";
+import {
+  ApiError,
+  apiDelete,
+  apiErrorMessage,
+  apiGet,
+  apiPost,
+  apiPut,
+  formatHeaders,
+  throwWithMessage,
+} from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
-import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
-import { format, plural } from "@/lib/format";
-import { changedSettings, writableSettings } from "@/lib/settings-payload";
+import { quietImport } from "@/lib/chunk-reload";
+import { canRecordFeedback, shouldShowInstallFeedbackCard } from "@/lib/feedback";
+import { format, formatDate, plural } from "@/lib/format";
+import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
+import { logout } from "@/lib/logout";
+import { passwordErrorMessages } from "@/lib/password-errors";
+import { changedSettings, parseStringArray, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
+import { useConnectionStore } from "@/stores/connection-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { AlertMessages } from "../common/alert-messages";
+import { CopyFeedback } from "../common/copy-feedback";
 import { OtterLogo } from "../common/otter-logo";
 import { AdminInstallFeedbackCard } from "../feedback/admin-install-feedback-card";
 import { FeedbackDialog } from "../feedback/feedback-dialog";
@@ -72,7 +104,9 @@ interface NavItem {
   id: Section;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  requiredPermission?: string;
+  requiredPermission?: Permission;
+  requiredPermissions?: readonly Permission[];
+  requiredAnyPermission?: readonly Permission[];
   authRequired?: boolean;
 }
 
@@ -85,7 +119,7 @@ function useNavItems() {
         id: "system",
         label: t.settings.nav.systemSettings,
         icon: Monitor,
-        requiredPermission: "settings:write",
+        requiredPermissions: ["settings:read", "settings:write"],
       },
       { id: "security", label: t.settings.nav.security, icon: Shield, authRequired: true },
       {
@@ -106,7 +140,7 @@ function useNavItems() {
         id: "roles",
         label: t.settings.nav.roles,
         icon: Shield,
-        requiredPermission: "users:manage",
+        requiredPermission: "audit:read",
         authRequired: true,
       },
       {
@@ -121,7 +155,12 @@ function useNavItems() {
         icon: BarChart3,
         requiredPermission: "audit:read",
       },
-      { id: "api-keys", label: t.settings.nav.apiKeys, icon: Key },
+      {
+        id: "api-keys",
+        label: t.settings.nav.apiKeys,
+        icon: Key,
+        requiredAnyPermission: ["apikeys:own", "apikeys:all"],
+      },
       {
         id: "ai-features",
         label: t.settings.nav.aiFeatures,
@@ -132,7 +171,7 @@ function useNavItems() {
         id: "tools",
         label: t.settings.nav.tools,
         icon: Wrench,
-        requiredPermission: "settings:write",
+        requiredPermissions: ["settings:read", "settings:write"],
       },
       { id: "about", label: t.settings.nav.about, icon: Info },
     ],
@@ -151,11 +190,23 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   useFocusTrap(dialogRef, open && !isMobile);
   useFocusTrap(mobileDialogRef, open && isMobile);
 
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) =>
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    const permitted =
       (!item.requiredPermission || hasPermission(item.requiredPermission)) &&
-      (!item.authRequired || authEnabled),
-  );
+      (!item.requiredPermissions || item.requiredPermissions.every((p) => hasPermission(p))) &&
+      (!item.requiredAnyPermission || item.requiredAnyPermission.some((p) => hasPermission(p)));
+    return permitted && (!item.authRequired || authEnabled);
+  });
+
+  const activeSection: Section = visibleNavItems.some((item) => item.id === section)
+    ? section
+    : "general";
+
+  useEffect(() => {
+    if (activeSection !== section) {
+      setSection(activeSection);
+    }
+  }, [activeSection, section]);
 
   // Close on Escape
   useEffect(() => {
@@ -202,7 +253,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               onClick={() => setSection(item.id)}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-2.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0",
-                section === item.id
+                activeSection === item.id
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground",
               )}
@@ -215,19 +266,19 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
         {/* Mobile content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {section === "general" && <GeneralSection />}
-          {section === "system" && <SystemSection />}
-          {section === "security" && <SecuritySection />}
-          {section === "people" && <PeopleSection />}
-          {section === "teams" && <TeamsSection />}
-          {section === "roles" && <RolesSection />}
-          {section === "audit-log" && <AuditLogSection />}
-          {section === "usage" && <UsageSection />}
-          {section === "api-keys" && <ApiKeysSection />}
-          {section === "ai-features" && <AiFeaturesSection />}
-          {section === "tools" && <ToolsSection />}
+          {activeSection === "general" && <GeneralSection />}
+          {activeSection === "system" && <SystemSection />}
+          {activeSection === "security" && <SecuritySection />}
+          {activeSection === "people" && <PeopleSection />}
+          {activeSection === "teams" && <TeamsSection />}
+          {activeSection === "roles" && <RolesSection />}
+          {activeSection === "audit-log" && <AuditLogSection />}
+          {activeSection === "usage" && <UsageSection />}
+          {activeSection === "api-keys" && <ApiKeysSection />}
+          {activeSection === "ai-features" && <AiFeaturesSection />}
+          {activeSection === "tools" && <ToolsSection />}
 
-          {section === "about" && <AboutSection />}
+          {activeSection === "about" && <AboutSection />}
         </div>
       </div>
     );
@@ -264,7 +315,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               onClick={() => setSection(item.id)}
               className={cn(
                 "flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors",
-                section === item.id
+                activeSection === item.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
@@ -286,19 +337,19 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             <X className="h-4 w-4" />
           </button>
 
-          {section === "general" && <GeneralSection />}
-          {section === "system" && <SystemSection />}
-          {section === "security" && <SecuritySection />}
-          {section === "people" && <PeopleSection />}
-          {section === "teams" && <TeamsSection />}
-          {section === "roles" && <RolesSection />}
-          {section === "audit-log" && <AuditLogSection />}
-          {section === "usage" && <UsageSection />}
-          {section === "api-keys" && <ApiKeysSection />}
-          {section === "ai-features" && <AiFeaturesSection />}
-          {section === "tools" && <ToolsSection />}
+          {activeSection === "general" && <GeneralSection />}
+          {activeSection === "system" && <SystemSection />}
+          {activeSection === "security" && <SecuritySection />}
+          {activeSection === "people" && <PeopleSection />}
+          {activeSection === "teams" && <TeamsSection />}
+          {activeSection === "roles" && <RolesSection />}
+          {activeSection === "audit-log" && <AuditLogSection />}
+          {activeSection === "usage" && <UsageSection />}
+          {activeSection === "api-keys" && <ApiKeysSection />}
+          {activeSection === "ai-features" && <AiFeaturesSection />}
+          {activeSection === "tools" && <ToolsSection />}
 
-          {section === "about" && <AboutSection />}
+          {activeSection === "about" && <AboutSection />}
         </div>
       </div>
     </div>
@@ -354,14 +405,43 @@ interface TeamEntry {
 
 /* ────────────────────── General ────────────────────── */
 
-function GeneralSection() {
+function readStoredUsername(): string {
+  try {
+    return localStorage.getItem("snapotter-username") || "";
+  } catch {
+    return "";
+  }
+}
+
+export function GeneralSection() {
   const { t, locale, setLocale, supportedLocales } = useTranslation();
+  const later = useTimeouts();
   const { authEnabled } = useAuth();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [defaultToolView, setDefaultToolView] = useState("sidebar");
+  const [defaultToolView, setDefaultToolView] = useState<"sidebar" | "fullscreen">("sidebar");
+  const [prefsLoadFailed, setPrefsLoadFailed] = useState(false);
+  const [prefsRetrying, setPrefsRetrying] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [logoutFailed, setLogoutFailed] = useState(false);
+
+  const loadPreferences = useCallback((retrying = false) => {
+    if (retrying) setPrefsRetrying(true);
+    return apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
+      .then((data) => {
+        setDefaultToolView(
+          data.preferences.defaultToolView === "fullscreen" ? "fullscreen" : "sidebar",
+        );
+        setPrefsLoadFailed(false);
+      })
+      .catch(() => {
+        setPrefsLoadFailed(true);
+      })
+      .finally(() => {
+        if (retrying) setPrefsRetrying(false);
+      });
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -370,63 +450,52 @@ function GeneralSection() {
         .catch(() => {
           setUser({
             id: 0,
-            username: localStorage.getItem("snapotter-username") || "",
+            username: readStoredUsername(),
             // Empty, not "unknown": the render site falls back through
             // `user?.role || t.settings.general.roleUnknown`, and a truthy
             // English sentinel would bypass the translated label.
             role: "",
           });
         }),
-      apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
-        .then((data) => {
-          if (typeof data.preferences.defaultToolView === "string") {
-            setDefaultToolView(data.preferences.defaultToolView);
-          }
-        })
-        .catch(() => {}),
+      loadPreferences(),
     ]).finally(() => setLoading(false));
-  }, []);
+  }, [loadPreferences]);
 
   const handleLogout = async () => {
-    try {
-      const res = await fetch(appUrl("/api/auth/logout"), {
-        method: "POST",
-        headers: formatHeaders(),
-      });
-      const data = await res.json().catch(() => ({}));
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      if (data.logoutUrl) {
-        window.location.href = data.logoutUrl;
-      } else {
-        window.location.href = appUrl("/login");
-      }
-    } catch {
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      window.location.href = appUrl("/login");
+    setLogoutFailed(false);
+    const destination = await logout();
+    if (destination === null) {
+      setLogoutFailed(true);
+      return;
     }
+    window.location.href = destination;
   };
 
   const handleSave = useCallback(async () => {
+    if (prefsLoadFailed) return;
     setSaving(true);
     setSaveMsg(null);
+    later.cancel("saveMsg");
     try {
       // The default home view is a per-user preference, not instance config, so
       // it saves to /v1/preferences (writable by any authenticated user) rather
       // than the admin-only /v1/settings.
       await apiPut("/v1/preferences", { defaultToolView });
-      setSaveMsg(t.settings.general.saveSuccess);
+      setSaveMsg({ type: "success", text: t.settings.general.saveSuccess });
       useSettingsStore.setState({
-        defaultToolView: defaultToolView as "sidebar" | "fullscreen",
+        defaultToolView,
       });
-    } catch {
-      setSaveMsg(t.settings.general.saveFailed);
+      later(() => setSaveMsg(null), 3000, "saveMsg");
+    } catch (err) {
+      later.cancel("saveMsg");
+      setSaveMsg({
+        type: "error",
+        text: apiErrorMessage(t, err, {}, t.settings.general.saveFailed),
+      });
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMsg(null), 3000);
     }
-  }, [defaultToolView, t.settings.general.saveSuccess, t.settings.general.saveFailed]);
+  }, [defaultToolView, prefsLoadFailed, t, later]);
 
   const username = user?.username || "admin";
   const role = user?.role || t.settings.general.roleUnknown;
@@ -454,14 +523,21 @@ function GeneralSection() {
           </div>
         </div>
         {authEnabled && (
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            {t.settings.general.logOut}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              {t.settings.general.logOut}
+            </button>
+            {logoutFailed && (
+              <p role="alert" className="text-xs text-destructive">
+                {t.auth.logoutFailed}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -470,15 +546,31 @@ function GeneralSection() {
         label={t.settings.general.defaultToolViewLabel}
         description={t.settings.general.defaultToolViewDescription}
       >
-        <select
-          value={defaultToolView}
-          onChange={(e) => setDefaultToolView(e.target.value)}
-          aria-label={t.settings.general.defaultToolViewLabel}
-          className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
-        >
-          <option value="sidebar">{t.settings.general.sidebarOption}</option>
-          <option value="fullscreen">{t.settings.general.fullscreenGridOption}</option>
-        </select>
+        {prefsLoadFailed ? (
+          prefsRetrying ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : (
+            <LoadFailed
+              inline
+              message={t.settings.general.loadFailed}
+              onRetry={() => void loadPreferences(true)}
+            />
+          )
+        ) : (
+          <select
+            value={defaultToolView}
+            onChange={(e) => {
+              if (e.target.value === "sidebar" || e.target.value === "fullscreen") {
+                setDefaultToolView(e.target.value);
+              }
+            }}
+            aria-label={t.settings.general.defaultToolViewLabel}
+            className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
+          >
+            <option value="sidebar">{t.settings.general.sidebarOption}</option>
+            <option value="fullscreen">{t.settings.general.fullscreenGridOption}</option>
+          </select>
+        )}
       </SettingRow>
 
       <SettingRow
@@ -503,14 +595,16 @@ function GeneralSection() {
         label={t.settings.general.appVersionLabel}
         description={t.settings.general.appVersionDescription}
       >
-        <span className="text-sm font-mono text-muted-foreground">{APP_VERSION}</span>
+        <span data-testid="app-version" className="text-sm font-mono text-muted-foreground">
+          {APP_VERSION}
+        </span>
       </SettingRow>
 
       <div className="flex items-center gap-3 pt-2">
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || prefsLoadFailed}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
@@ -518,12 +612,26 @@ function GeneralSection() {
         </button>
         {saveMsg && (
           <span
+            role={saveMsg.type === "error" ? "alert" : "status"}
             className={cn(
-              "text-sm",
-              saveMsg === t.settings.general.saveFailed ? "text-destructive" : "text-success-ink",
+              "text-sm inline-flex items-center gap-1.5",
+              saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
-            {saveMsg}
+            {saveMsg.text}
+            {saveMsg.type === "error" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveMsg(null);
+                  later.cancel("saveMsg");
+                }}
+                aria-label={t.common.close}
+                className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </span>
         )}
       </div>
@@ -533,8 +641,28 @@ function GeneralSection() {
 
 /* ────────────────────── System ────────────────────── */
 
-function SystemSection() {
+/** What the System tab calls each setting it saves, to name one the server refused. */
+function systemSettingLabel(t: TranslationKeys, key: string): string | undefined {
+  const labels: Partial<Record<string, string>> = {
+    fileUploadLimitMb: t.settings.system.fileUploadLimitLabel,
+    defaultTheme: t.settings.system.defaultThemeLabel,
+    defaultLocale: t.settings.system.languageLabel,
+    loginAttemptLimit: t.settings.system.loginAttemptLimitLabel,
+    tempFileMaxAgeHours: t.settings.fileManagement.maxAge,
+    startupCleanup: t.settings.fileManagement.startupCleanup,
+    analyticsEnabled: t.settings.privacy.analyticsLabel,
+    jobsRetentionDays: t.settings.dataRetention.jobsRetentionDays,
+    auditRetentionDays: t.settings.dataRetention.auditRetentionDays,
+  };
+  return labels[key];
+}
+
+const VALID_DEFAULT_THEMES = new Set<string>(["light", "dark", "system"]);
+const SUPPORTED_LOCALE_CODES = new Set<string>(SUPPORTED_LOCALES.map((l) => l.code));
+
+export function SystemSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const { role, hasPermission } = useAuth();
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
@@ -544,43 +672,67 @@ function SystemSection() {
   const originalSettingsRef = useRef<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [installFeedbackOpen, setInstallFeedbackOpen] = useState(false);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
+  const [installFeedbackError, setInstallFeedbackError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  const loadSettings = useCallback(() => {
+    setLoading(true);
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
         setSettings(data.settings);
         originalSettingsRef.current = data.settings;
+        setLoadFailed(false);
       })
-      .catch(() => {
-        // Fallback defaults if endpoint not ready
-        const fallback = {
-          fileUploadLimitMb: "100",
-          defaultTheme: "system",
-          defaultLocale: "en",
-          loginAttemptLimit: "5",
-        };
-        setSettings(fallback);
-        originalSettingsRef.current = fallback;
-      })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const updateSetting = useCallback((key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const updateInstallFeedbackState = useCallback(async (key: string, value: string) => {
-    await apiPut("/v1/settings", { [key]: value });
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const updateInstallFeedbackState = useCallback(
+    async (key: string, value: string) => {
+      setInstallFeedbackError(null);
+      later.cancel("installFeedbackError");
+      try {
+        await apiPut("/v1/settings", { [key]: value });
+        setSettings((prev) => ({ ...prev, [key]: value }));
+      } catch (error) {
+        const statusCode = error instanceof ApiError ? error.status : undefined;
+        void captureHandledError(
+          new SafeError("Saving install feedback state failed", {
+            kind: "operational",
+            code: key,
+            statusCode,
+            cause: error,
+          }),
+          { error_class: "operational" },
+        );
+        later.cancel("installFeedbackError");
+        setInstallFeedbackError(apiErrorMessage(t, error, {}, t.settings.system.saveFailed));
+      }
+    },
+    [t, later],
+  );
 
-  const handleInstallFeedbackSubmitted = useCallback(() => {
-    void updateInstallFeedbackState("feedback.install.submittedAt", new Date().toISOString());
-  }, [updateInstallFeedbackState]);
+  const handleInstallFeedbackSubmitted = useCallback(
+    (accepted: boolean) => {
+      // A declined answer was not recorded, so keep the card eligible instead
+      // of hiding it as if it had been submitted (#2252).
+      if (!accepted) return;
+      void updateInstallFeedbackState("feedback.install.submittedAt", new Date().toISOString());
+    },
+    [updateInstallFeedbackState],
+  );
 
   const handleInstallFeedbackSnooze = useCallback(() => {
     const snoozedUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
@@ -594,11 +746,13 @@ function SystemSection() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaveMsg(null);
+    later.cancel("saveMsg");
     try {
       const changed = changedSettings(originalSettingsRef.current, settings);
       await apiPut("/v1/settings", writableSettings(changed));
+      originalSettingsRef.current = { ...settings };
       if ("analyticsEnabled" in changed) {
-        const { optIn, optOut } = await import("@/lib/analytics");
+        const { optIn, optOut } = await quietImport(() => import("@/lib/analytics"));
         if (settings.analyticsEnabled === "false") optOut();
         else optIn();
         // Refresh the cached config so this tab converges immediately: optOut()
@@ -606,19 +760,51 @@ function SystemSection() {
         // surfaces visible (and silently drop their submissions) until a refocus.
         useAnalyticsStore.getState().fetchConfig();
       }
-      if (settings.defaultTheme) {
+      if (settings.defaultTheme && VALID_DEFAULT_THEMES.has(settings.defaultTheme)) {
         const theme = settings.defaultTheme as "light" | "dark" | "system";
         useThemeStore.getState().setTheme(theme);
       }
-      originalSettingsRef.current = { ...settings };
-      setSaveMsg(t.settings.system.saveSuccess);
-    } catch {
-      setSaveMsg(t.settings.system.saveFailed);
+      setSaveMsg({ type: "success", text: t.settings.system.saveSuccess });
+      later(() => setSaveMsg(null), 3000, "saveMsg");
+    } catch (err) {
+      later.cancel("saveMsg");
+      // A refused value comes back with the setting's key: name its row and put
+      // the row back where it was, so the tab doesn't keep showing a value the
+      // server never accepted (and doesn't send it again on the next save).
+      const refusedKey =
+        err instanceof ApiError && typeof err.body.setting === "string"
+          ? err.body.setting
+          : undefined;
+      if (refusedKey) {
+        const saved = originalSettingsRef.current[refusedKey];
+        setSettings((prev) => {
+          if (saved === undefined) {
+            const { [refusedKey]: _, ...rest } = prev;
+            return rest;
+          }
+          return { ...prev, [refusedKey]: saved };
+        });
+      }
+      const refused = refusedKey ? systemSettingLabel(t, refusedKey) : undefined;
+      setSaveMsg({
+        type: "error",
+        text: apiErrorMessage(
+          t,
+          err,
+          {
+            FEATURE_NOT_LICENSED: t.errors.featureNotLicensed,
+            ESCALATION_DENIED: t.errors.escalationDenied,
+            ...(refused && {
+              VALIDATION_ERROR: format(t.errors.invalidSetting, { setting: refused }),
+            }),
+          },
+          t.settings.system.saveFailed,
+        ),
+      });
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMsg(null), 3000);
     }
-  }, [settings, t]);
+  }, [settings, t, later]);
 
   if (loading) {
     return (
@@ -628,11 +814,17 @@ function SystemSection() {
     );
   }
 
+  // Invented defaults read as the live configuration: a 90-day audit
+  // retention would show as 0, "keep forever" (#1447).
+  if (loadFailed) {
+    return <LoadFailed message={t.settings.system.loadFailed} onRetry={loadSettings} />;
+  }
+
   const installFeedbackVisible = shouldShowInstallFeedbackCard({
     settings,
     role,
     analyticsConfigLoaded,
-    analyticsEnabled: Boolean(analyticsConfig?.enabled),
+    analyticsEnabled: canRecordFeedback(analyticsConfig),
   });
 
   return (
@@ -646,10 +838,10 @@ function SystemSection() {
         label={t.settings.system.fileUploadLimitLabel}
         description={t.settings.system.fileUploadLimitDescription}
       >
-        <input
-          type="number"
-          value={settings.fileUploadLimitMb || "100"}
-          onChange={(e) => updateSetting("fileUploadLimitMb", e.target.value)}
+        <SettingNumberInput
+          value={settings.fileUploadLimitMb}
+          fallback="100"
+          onChange={(v) => updateSetting("fileUploadLimitMb", v)}
           aria-label={t.settings.system.fileUploadLimitLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={1}
@@ -661,7 +853,11 @@ function SystemSection() {
         description={t.settings.system.defaultThemeDescription}
       >
         <select
-          value={settings.defaultTheme || "system"}
+          value={
+            settings.defaultTheme && VALID_DEFAULT_THEMES.has(settings.defaultTheme)
+              ? settings.defaultTheme
+              : "system"
+          }
           onChange={(e) => updateSetting("defaultTheme", e.target.value)}
           aria-label={t.settings.system.defaultThemeLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
@@ -677,7 +873,11 @@ function SystemSection() {
         description={t.settings.system.languageDescription}
       >
         <select
-          value={settings.defaultLocale || "en"}
+          value={
+            settings.defaultLocale && SUPPORTED_LOCALE_CODES.has(settings.defaultLocale)
+              ? settings.defaultLocale
+              : "en"
+          }
           onChange={(e) => updateSetting("defaultLocale", e.target.value)}
           aria-label={t.settings.system.languageLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
@@ -695,10 +895,10 @@ function SystemSection() {
           label={t.settings.system.loginAttemptLimitLabel}
           description={t.settings.system.loginAttemptLimitDescription}
         >
-          <input
-            type="number"
-            value={settings.loginAttemptLimit || "5"}
-            onChange={(e) => updateSetting("loginAttemptLimit", e.target.value)}
+          <SettingNumberInput
+            value={settings.loginAttemptLimit}
+            fallback="5"
+            onChange={(v) => updateSetting("loginAttemptLimit", v)}
             aria-label={t.settings.system.loginAttemptLimitLabel}
             className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
             min={1}
@@ -716,10 +916,10 @@ function SystemSection() {
         label={t.settings.fileManagement.maxAge}
         description={t.settings.fileManagement.maxAgeDescription}
       >
-        <input
-          type="number"
-          value={settings.tempFileMaxAgeHours || "24"}
-          onChange={(e) => updateSetting("tempFileMaxAgeHours", e.target.value)}
+        <SettingNumberInput
+          value={settings.tempFileMaxAgeHours}
+          fallback="24"
+          onChange={(v) => updateSetting("tempFileMaxAgeHours", v)}
           aria-label={t.settings.fileManagement.maxAge}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={1}
@@ -790,6 +990,25 @@ function SystemSection() {
         onRemindLater={handleInstallFeedbackSnooze}
         onDismissForever={handleInstallFeedbackDismiss}
       />
+      {installFeedbackError && (
+        <span
+          role="alert"
+          className="text-sm inline-flex items-center gap-1.5 text-destructive mt-2"
+        >
+          {installFeedbackError}
+          <button
+            type="button"
+            onClick={() => {
+              setInstallFeedbackError(null);
+              later.cancel("installFeedbackError");
+            }}
+            aria-label={t.common.close}
+            className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </span>
+      )}
 
       <div className="pt-4 border-t border-border">
         <h4 className="text-sm font-semibold text-foreground mb-3">
@@ -804,10 +1023,10 @@ function SystemSection() {
         label={t.settings.dataRetention.jobsRetentionDays}
         description={t.settings.dataRetention.jobsRetentionDaysDesc}
       >
-        <input
-          type="number"
-          value={settings.jobsRetentionDays || "30"}
-          onChange={(e) => updateSetting("jobsRetentionDays", e.target.value)}
+        <SettingNumberInput
+          value={settings.jobsRetentionDays}
+          fallback="30"
+          onChange={(v) => updateSetting("jobsRetentionDays", v)}
           aria-label={t.settings.dataRetention.jobsRetentionDays}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={0}
@@ -818,10 +1037,10 @@ function SystemSection() {
           label={t.settings.dataRetention.auditRetentionDays}
           description={t.settings.dataRetention.auditRetentionDaysDesc}
         >
-          <input
-            type="number"
-            value={settings.auditRetentionDays || "0"}
-            onChange={(e) => updateSetting("auditRetentionDays", e.target.value)}
+          <SettingNumberInput
+            value={settings.auditRetentionDays}
+            fallback="0"
+            onChange={(v) => updateSetting("auditRetentionDays", v)}
             aria-label={t.settings.dataRetention.auditRetentionDays}
             className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
             min={0}
@@ -841,55 +1060,76 @@ function SystemSection() {
         </button>
         {saveMsg && (
           <span
+            role={saveMsg.type === "error" ? "alert" : "status"}
             className={cn(
-              "text-sm",
-              saveMsg === t.settings.system.saveFailed ? "text-destructive" : "text-success-ink",
+              "text-sm inline-flex items-center gap-1.5",
+              saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
-            {saveMsg}
+            {saveMsg.text}
+            {saveMsg.type === "error" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveMsg(null);
+                  later.cancel("saveMsg");
+                }}
+                aria-label={t.common.close}
+                className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </span>
         )}
       </div>
 
-      <div className="pt-4 border-t border-border">
-        <SettingRow
-          label={t.settings.system.supportBundleButton}
-          description={t.settings.system.supportBundleDescription}
-        >
-          <button
-            type="button"
-            disabled={bundleLoading}
-            onClick={async () => {
-              setBundleLoading(true);
-              setBundleError(null);
-              try {
-                const res = await fetch(appUrl("/api/v1/admin/support-bundle"), {
-                  headers: formatHeaders(),
-                });
-                if (!res.ok) throw new Error(`${res.status}`);
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                const cd = res.headers.get("Content-Disposition") || "";
-                const filenameMatch = cd.match(/filename=([^\s;]+)/);
-                a.download = filenameMatch ? filenameMatch[1] : "snapotter-support.zip";
-                a.click();
-                URL.revokeObjectURL(url);
-              } catch {
-                setBundleError(t.settings.system.supportBundleFailed);
-              } finally {
-                setBundleLoading(false);
-              }
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+      {hasPermission("system:health") && (
+        <div className="pt-4 border-t border-border">
+          <SettingRow
+            label={t.settings.system.supportBundleButton}
+            description={t.settings.system.supportBundleDescription}
           >
-            {bundleLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-            {t.settings.system.supportBundleButton}
-          </button>
-        </SettingRow>
-        {bundleError && <p className="text-sm text-destructive mt-2">{bundleError}</p>}
-      </div>
+            <button
+              type="button"
+              disabled={bundleLoading}
+              onClick={async () => {
+                setBundleLoading(true);
+                setBundleError(null);
+                try {
+                  const res = await fetch(appUrl("/api/v1/admin/support-bundle"), {
+                    headers: formatHeaders(),
+                  });
+                  if (!res.ok) await throwWithMessage(res);
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  const cd = res.headers.get("Content-Disposition") || "";
+                  const filenameMatch = cd.match(/filename=([^\s;]+)/);
+                  a.download = filenameMatch ? filenameMatch[1] : "snapotter-support.zip";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch (err) {
+                  if (err instanceof TypeError) {
+                    useConnectionStore.getState().setDisconnected();
+                  }
+                  setBundleError(
+                    apiErrorMessage(t, err, {}, t.settings.system.supportBundleFailed),
+                  );
+                } finally {
+                  setBundleLoading(false);
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {bundleLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {t.settings.system.supportBundleButton}
+            </button>
+          </SettingRow>
+          {bundleError && <p className="text-sm text-destructive mt-2">{bundleError}</p>}
+        </div>
+      )}
 
       <FeedbackDialog
         open={installFeedbackOpen}
@@ -903,9 +1143,9 @@ function SystemSection() {
 
 /* ────────────────────── Security ────────────────────── */
 
-function SecuritySection() {
+export function SecuritySection() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasLocalPassword, loading: authLoading } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -913,48 +1153,47 @@ function SecuritySection() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // `messages` is a list because a password can break several policy rules at
+  // once, and the server names them all (#2090).
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    messages: string[];
+  } | null>(null);
 
   const handleChangePassword = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (newPassword !== confirmPassword) {
-        setMessage({ type: "error", text: t.settings.security.passwordsMismatch });
+        setMessage({ type: "error", messages: [t.settings.security.passwordsMismatch] });
         return;
       }
-      if (newPassword.length < 8) {
-        setMessage({ type: "error", text: t.settings.security.passwordTooShort });
-        return;
-      }
-
       setSubmitting(true);
       setMessage(null);
       try {
         await apiPost("/auth/change-password", { currentPassword, newPassword });
-        setMessage({ type: "success", text: t.settings.security.changeSuccess });
+        setMessage({ type: "success", messages: [t.settings.security.changeSuccess] });
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : t.settings.security.changeFailed;
+        // The server knows the password policy (the length rule included), so
+        // its named rule answers here, in the user's language (#1445).
+        const passwordMessages =
+          err instanceof ApiError ? passwordErrorMessages(t, err.status, err.body) : [];
         setMessage({
           type: "error",
-          text: msg.includes("401") ? t.settings.security.currentPasswordIncorrect : msg,
+          messages:
+            passwordMessages.length > 0
+              ? passwordMessages
+              : // Anything else keeps the reason in the console and gets the
+                // shared mapping for a lost session or a denied request.
+                [apiErrorMessage(t, err, {}, t.settings.security.changeFailed)],
         });
       } finally {
         setSubmitting(false);
       }
     },
-    [
-      currentPassword,
-      newPassword,
-      confirmPassword,
-      t.settings.security.changeFailed,
-      t.settings.security.currentPasswordIncorrect,
-      t.settings.security.changeSuccess,
-      t.settings.security.passwordsMismatch,
-      t.settings.security.passwordTooShort,
-    ],
+    [currentPassword, newPassword, confirmPassword, t],
   );
 
   return (
@@ -964,108 +1203,108 @@ function SecuritySection() {
         <p className="text-sm text-muted-foreground mt-1">{t.settings.security.description}</p>
       </div>
 
-      <form onSubmit={handleChangePassword} className="space-y-4">
-        <h4 className="text-sm font-medium text-foreground">
-          {t.settings.security.changePasswordHeading}
-        </h4>
+      {(authLoading || hasLocalPassword !== false) && (
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <h4 className="text-sm font-medium text-foreground">
+            {t.settings.security.changePasswordHeading}
+          </h4>
 
-        <div className="space-y-3 max-w-sm">
-          <div className="relative">
-            <label htmlFor="current-password" className="sr-only">
-              {t.settings.security.currentPasswordPlaceholder}
-            </label>
-            <input
-              id="current-password"
-              type={showCurrent ? "text" : "password"}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder={t.settings.security.currentPasswordPlaceholder}
-              className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
-              required
-              aria-invalid={message?.type === "error" || undefined}
-              aria-describedby={message ? "password-change-error" : undefined}
-            />
+          <div className="space-y-3 max-w-sm">
+            <div className="relative">
+              <label htmlFor="current-password" className="sr-only">
+                {t.settings.security.currentPasswordPlaceholder}
+              </label>
+              <input
+                id="current-password"
+                type={showCurrent ? "text" : "password"}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder={t.settings.security.currentPasswordPlaceholder}
+                className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
+                required
+                aria-invalid={message?.type === "error" || undefined}
+                aria-describedby={message ? "password-change-error" : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <label htmlFor="new-password" className="sr-only">
+                {t.settings.security.newPasswordPlaceholder}
+              </label>
+              <input
+                id="new-password"
+                type={showNew ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={t.settings.security.newPasswordPlaceholder}
+                className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
+                required
+                aria-invalid={message?.type === "error" || undefined}
+                aria-describedby={message ? "password-change-error" : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew(!showNew)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <label htmlFor="confirm-password" className="sr-only">
+                {t.settings.security.confirmPasswordPlaceholder}
+              </label>
+              <input
+                id="confirm-password"
+                type={showConfirm ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={t.settings.security.confirmPasswordPlaceholder}
+                className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
+                required
+                aria-invalid={message?.type === "error" || undefined}
+                aria-describedby={message ? "password-change-error" : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute end-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            {message && (
+              <AlertMessages
+                id="password-change-error"
+                messages={message.messages}
+                className={cn(
+                  "text-sm",
+                  message.type === "error" ? "text-destructive" : "text-success-ink",
+                )}
+              />
+            )}
+
             <button
-              type="button"
-              onClick={() => setShowCurrent(!showCurrent)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              type="submit"
+              disabled={submitting}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {t.settings.security.changePasswordButton}
             </button>
           </div>
-
-          <div className="relative">
-            <label htmlFor="new-password" className="sr-only">
-              {t.settings.security.newPasswordPlaceholder}
-            </label>
-            <input
-              id="new-password"
-              type={showNew ? "text" : "password"}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder={t.settings.security.newPasswordPlaceholder}
-              className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
-              required
-              aria-invalid={message?.type === "error" || undefined}
-              aria-describedby={message ? "password-change-error" : undefined}
-            />
-            <button
-              type="button"
-              onClick={() => setShowNew(!showNew)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-            >
-              {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-
-          <div className="relative">
-            <label htmlFor="confirm-password" className="sr-only">
-              {t.settings.security.confirmPasswordPlaceholder}
-            </label>
-            <input
-              id="confirm-password"
-              type={showConfirm ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder={t.settings.security.confirmPasswordPlaceholder}
-              className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
-              required
-              aria-invalid={message?.type === "error" || undefined}
-              aria-describedby={message ? "password-change-error" : undefined}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirm(!showConfirm)}
-              className="absolute end-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-              tabIndex={-1}
-            >
-              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-
-          {message && (
-            <p
-              id="password-change-error"
-              role="alert"
-              className={cn(
-                "text-sm",
-                message.type === "error" ? "text-destructive" : "text-success-ink",
-              )}
-            >
-              {message.text}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-            {t.settings.security.changePasswordButton}
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       <div className="border-t border-border pt-4">
         <p className="text-sm text-muted-foreground">{t.settings.security.loginAttemptLimitNote}</p>
@@ -1073,15 +1312,35 @@ function SecuritySection() {
 
       <TwoFactorSettings />
 
-      {hasPermission("settings:write") && hasPermission("security:manage") && (
-        <AdminSecuritySettings />
-      )}
+      {hasPermission("settings:read") &&
+        hasPermission("settings:write") &&
+        hasPermission("security:manage") && <AdminSecuritySettings />}
     </div>
   );
 }
 
+/** What the Security tab calls each setting it saves, to name one the server refused. */
+function securitySettingLabel(t: TranslationKeys, key: string): string | undefined {
+  const labels: Partial<Record<string, string>> = {
+    sessionIdleTimeoutMinutes: t.settings.security.sessionIdleTimeout,
+    maxSessionsPerUser: t.settings.security.maxSessionsPerUser,
+    mfaPolicy: t.settings.security.mfaPolicy,
+    ssoEnforcement: t.settings.security.ssoEnforcement,
+    ssoBreakGlassUsername: t.settings.security.ssoBreakGlassUsername,
+    passwordMinLength: t.settings.security.passwordMinLength,
+    passwordRequireUppercase: t.settings.security.passwordRequireUppercase,
+    passwordRequireLowercase: t.settings.security.passwordRequireLowercase,
+    passwordRequireDigit: t.settings.security.passwordRequireNumber,
+    passwordRequireSpecial: t.settings.security.passwordRequireSpecial,
+  };
+  return labels[key];
+}
+
+const VALID_MFA_POLICIES = new Set<string>(["optional", "admins_only", "required"]);
+
 export function AdminSecuritySettings() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const [settings, setSettings] = useState<Record<string, string>>({});
   // Snapshot of the last server state; a save sends only the fields this tab changed
   // so an unrelated edit here can never echo (and revert) another admin's change,
@@ -1090,16 +1349,23 @@ export function AdminSecuritySettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  const loadSettings = useCallback(() => {
+    setLoading(true);
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
         setSettings(data.settings);
         originalSettingsRef.current = data.settings;
+        setLoadFailed(false);
       })
-      .catch(() => {})
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const updateSetting = useCallback((key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -1108,6 +1374,7 @@ export function AdminSecuritySettings() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaveMsg(null);
+    later.cancel("saveMsg");
     try {
       await apiPut(
         "/v1/settings",
@@ -1115,21 +1382,56 @@ export function AdminSecuritySettings() {
       );
       originalSettingsRef.current = { ...settings };
       setSaveMsg({ type: "success", text: t.settings.security.securitySettingsSaved });
+      later(() => setSaveMsg(null), 3000, "saveMsg");
     } catch (err) {
+      later.cancel("saveMsg");
+      // A refused value comes back with the setting's key: name its row and put
+      // the row back where it was, so the tab doesn't keep showing a value the
+      // server never accepted (and doesn't send it again on the next save).
+      const refusedKey =
+        err instanceof ApiError && typeof err.body.setting === "string"
+          ? err.body.setting
+          : undefined;
+      if (refusedKey) {
+        const saved = originalSettingsRef.current[refusedKey] ?? "";
+        setSettings((prev) => ({ ...prev, [refusedKey]: saved }));
+      }
+      const refused = refusedKey ? securitySettingLabel(t, refusedKey) : undefined;
       setSaveMsg({
         type: "error",
-        text: err instanceof Error ? err.message : t.settings.security.securitySettingsFailed,
+        text: apiErrorMessage(
+          t,
+          err,
+          {
+            FEATURE_NOT_LICENSED: t.errors.featureNotLicensed,
+            ESCALATION_DENIED: t.errors.escalationDenied,
+            DEPENDENCY_VALIDATION_FAILED: t.settings.security.ssoNeedsProvider,
+            ...(refused && {
+              VALIDATION_ERROR: format(t.errors.invalidSetting, { setting: refused }),
+            }),
+          },
+          t.settings.security.securitySettingsFailed,
+        ),
       });
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMsg(null), 3000);
     }
-  }, [settings, t]);
+  }, [settings, t, later]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // A form full of defaults would misstate the live policy (MFA off, no
+  // session limits), so a failed load shows only the failure (#1447).
+  if (loadFailed) {
+    return (
+      <div className="border-t border-border pt-6">
+        <LoadFailed message={t.settings.security.adminSettingsLoadFailed} onRetry={loadSettings} />
       </div>
     );
   }
@@ -1147,10 +1449,10 @@ export function AdminSecuritySettings() {
         label={t.settings.security.sessionIdleTimeout}
         description={t.settings.security.sessionIdleTimeoutDesc}
       >
-        <input
-          type="number"
-          value={settings.sessionIdleTimeoutMinutes || "0"}
-          onChange={(e) => updateSetting("sessionIdleTimeoutMinutes", e.target.value)}
+        <SettingNumberInput
+          value={settings.sessionIdleTimeoutMinutes}
+          fallback="0"
+          onChange={(v) => updateSetting("sessionIdleTimeoutMinutes", v)}
           aria-label={t.settings.security.sessionIdleTimeout}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={0}
@@ -1161,10 +1463,10 @@ export function AdminSecuritySettings() {
         label={t.settings.security.maxSessionsPerUser}
         description={t.settings.security.maxSessionsPerUserDesc}
       >
-        <input
-          type="number"
-          value={settings.maxSessionsPerUser || "0"}
-          onChange={(e) => updateSetting("maxSessionsPerUser", e.target.value)}
+        <SettingNumberInput
+          value={settings.maxSessionsPerUser}
+          fallback="0"
+          onChange={(v) => updateSetting("maxSessionsPerUser", v)}
           aria-label={t.settings.security.maxSessionsPerUser}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={0}
@@ -1176,7 +1478,11 @@ export function AdminSecuritySettings() {
         description={t.settings.security.mfaPolicyDesc}
       >
         <select
-          value={settings.mfaPolicy || "optional"}
+          value={
+            settings.mfaPolicy && VALID_MFA_POLICIES.has(settings.mfaPolicy)
+              ? settings.mfaPolicy
+              : "optional"
+          }
           onChange={(e) => updateSetting("mfaPolicy", e.target.value)}
           aria-label={t.settings.security.mfaPolicy}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
@@ -1239,13 +1545,13 @@ export function AdminSecuritySettings() {
         label={t.settings.security.passwordMinLength}
         description={t.settings.security.passwordMinLengthDesc}
       >
-        <input
-          type="number"
-          value={settings.passwordMinLength || "8"}
-          onChange={(e) => updateSetting("passwordMinLength", e.target.value)}
+        <SettingNumberInput
+          value={settings.passwordMinLength}
+          fallback="8"
+          onChange={(v) => updateSetting("passwordMinLength", v)}
           aria-label={t.settings.security.passwordMinLength}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
-          min={8}
+          min={1}
           max={128}
         />
       </SettingRow>
@@ -1257,23 +1563,70 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireUppercase !== "false"}
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireUppercase",
+            settings.passwordRequireUppercase,
+          )}
           aria-label={t.settings.security.passwordRequireUppercase}
           onClick={() =>
             updateSetting(
               "passwordRequireUppercase",
-              settings.passwordRequireUppercase === "false" ? "true" : "false",
+              isPasswordRuleEnabled("passwordRequireUppercase", settings.passwordRequireUppercase)
+                ? "false"
+                : "true",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireUppercase !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            isPasswordRuleEnabled("passwordRequireUppercase", settings.passwordRequireUppercase)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireUppercase !== "false" ? "translate-x-6" : "translate-x-1",
+              isPasswordRuleEnabled("passwordRequireUppercase", settings.passwordRequireUppercase)
+                ? "translate-x-6"
+                : "translate-x-1",
+            )}
+          />
+        </button>
+      </SettingRow>
+
+      <SettingRow
+        label={t.settings.security.passwordRequireLowercase}
+        description={t.settings.security.passwordRequireLowercaseDesc}
+      >
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireLowercase",
+            settings.passwordRequireLowercase,
+          )}
+          aria-label={t.settings.security.passwordRequireLowercase}
+          onClick={() =>
+            updateSetting(
+              "passwordRequireLowercase",
+              isPasswordRuleEnabled("passwordRequireLowercase", settings.passwordRequireLowercase)
+                ? "false"
+                : "true",
+            )
+          }
+          className={cn(
+            "w-11 h-6 rounded-full transition-colors relative",
+            isPasswordRuleEnabled("passwordRequireLowercase", settings.passwordRequireLowercase)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
+          )}
+        >
+          <span
+            className={cn(
+              "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
+              isPasswordRuleEnabled("passwordRequireLowercase", settings.passwordRequireLowercase)
+                ? "translate-x-6"
+                : "translate-x-1",
             )}
           />
         </button>
@@ -1286,23 +1639,32 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireDigit !== "false"}
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireDigit",
+            settings.passwordRequireDigit,
+          )}
           aria-label={t.settings.security.passwordRequireNumber}
           onClick={() =>
             updateSetting(
               "passwordRequireDigit",
-              settings.passwordRequireDigit === "false" ? "true" : "false",
+              isPasswordRuleEnabled("passwordRequireDigit", settings.passwordRequireDigit)
+                ? "false"
+                : "true",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireDigit !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            isPasswordRuleEnabled("passwordRequireDigit", settings.passwordRequireDigit)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireDigit !== "false" ? "translate-x-6" : "translate-x-1",
+              isPasswordRuleEnabled("passwordRequireDigit", settings.passwordRequireDigit)
+                ? "translate-x-6"
+                : "translate-x-1",
             )}
           />
         </button>
@@ -1315,23 +1677,32 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireSpecial === "true"}
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireSpecial",
+            settings.passwordRequireSpecial,
+          )}
           aria-label={t.settings.security.passwordRequireSpecial}
           onClick={() =>
             updateSetting(
               "passwordRequireSpecial",
-              settings.passwordRequireSpecial === "true" ? "false" : "true",
+              isPasswordRuleEnabled("passwordRequireSpecial", settings.passwordRequireSpecial)
+                ? "false"
+                : "true",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireSpecial === "true" ? "bg-primary" : "bg-muted-foreground/30",
+            isPasswordRuleEnabled("passwordRequireSpecial", settings.passwordRequireSpecial)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireSpecial === "true" ? "translate-x-6" : "translate-x-1",
+              isPasswordRuleEnabled("passwordRequireSpecial", settings.passwordRequireSpecial)
+                ? "translate-x-6"
+                : "translate-x-1",
             )}
           />
         </button>
@@ -1349,12 +1720,26 @@ export function AdminSecuritySettings() {
         </button>
         {saveMsg && (
           <span
+            role={saveMsg.type === "error" ? "alert" : "status"}
             className={cn(
-              "text-sm",
+              "text-sm inline-flex items-center gap-1.5",
               saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
             {saveMsg.text}
+            {saveMsg.type === "error" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveMsg(null);
+                  later.cancel("saveMsg");
+                }}
+                aria-label={t.common.close}
+                className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </span>
         )}
       </div>
@@ -1364,41 +1749,12 @@ export function AdminSecuritySettings() {
 
 /* ────────────────────── People ────────────────────── */
 
-function secureRandom(max: number): number {
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-  return array[0] % max;
-}
-
-function generatePassword(): string {
-  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const lower = "abcdefghijklmnopqrstuvwxyz";
-  const digits = "0123456789";
-  // The server policy can require a special character (passwordRequireSpecial), so
-  // always include one alongside an upper, lower, and digit; otherwise Generate can
-  // produce a password the server rejects. These specials all satisfy its check.
-  const special = "!@#$%^&*()-_=+";
-  const all = upper + lower + digits + special;
-  const required = [
-    upper[secureRandom(upper.length)],
-    lower[secureRandom(lower.length)],
-    digits[secureRandom(digits.length)],
-    special[secureRandom(special.length)],
-  ];
-  const rest = Array.from({ length: 12 }, () => all[secureRandom(all.length)]);
-  const chars = [...required, ...rest];
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = secureRandom(i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-  return chars.join("");
-}
-
-function PeopleSection() {
+export function PeopleSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const isMobile = useMobile();
   const [users, setUsers] = useState<UserEntry[]>([]);
-  const [maxUsers, setMaxUsers] = useState(5);
+  const [maxUsers, setMaxUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1406,28 +1762,53 @@ function PeopleSection() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("user");
   const [newTeam, setNewTeam] = useState("Default");
-  const [addError, setAddError] = useState<string | null>(null);
+  const [addErrors, setAddErrors] = useState<string[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [showGeneratedPw, setShowGeneratedPw] = useState(false);
-  const [pwCopied, setPwCopied] = useState(false);
+  const [pwCopy, setPwCopy] = useState<"copied" | "failed" | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserEntry | null>(null);
   const [editRole, setEditRole] = useState("");
   const [editTeam, setEditTeam] = useState("");
   const [resetPasswordUser, setResetPasswordUser] = useState<UserEntry | null>(null);
   const [resetPassword, setResetPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+  // Drops responses from in-flight reset requests when the form moves (#2066).
+  const resetEpochRef = useRef(0);
+  // Why the server refused the password, shown in the reset form until the next
+  // edit; the banner's three seconds are too easy to miss (#2025).
+  const [resetErrors, setResetErrors] = useState<string[] | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [availableRoles, setAvailableRoles] = useState<RoleEntry[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // The server's minimum password length, so Generate can meet it (#2027). Like
+  // the team and role lists it only feeds a convenience. The key is readable
+  // with security:manage, so an admin without it gets a 403 or a settings map
+  // that leaves it out, and Generate keeps its default length until the server
+  // names the minimum in a refusal.
+  const [policyMinLength, setPolicyMinLength] = useState<unknown>(undefined);
+
+  const loadPolicy = useCallback(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => setPolicyMinLength(data.settings?.passwordMinLength))
+      .catch((err) => {
+        // A 403 FORBIDDEN is the expected answer for an admin without access.
+        if (err instanceof ApiError && err.code === "FORBIDDEN") return;
+        console.warn("Password policy read failed; Generate uses the default length", err);
+      });
+  }, []);
 
   const loadTeams = useCallback(async () => {
     try {
       const data = await apiGet<{ teams: TeamEntry[] }>("/v1/teams");
       setTeams(data.teams);
-    } catch {
+    } catch (err) {
       setTeams([]);
+      if (err instanceof ApiError && err.code === "FORBIDDEN") return;
+      console.warn("Team list read failed; People picker uses Default", err);
     }
   }, []);
 
@@ -1436,20 +1817,40 @@ function PeopleSection() {
       const data = await apiGet<{ users: UserEntry[]; maxUsers: number }>("/auth/users");
       setUsers(data.users);
       setMaxUsers(data.maxUsers);
+      setLoadFailed(false);
     } catch {
       setUsers([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
+  // The team and role lists only feed the pickers, which fall back to Default
+  // and the built-in roles: those endpoints need teams:manage and audit:read,
+  // which a users:manage admin may not have, so their failure isn't the
+  // section's (#1447).
+  const loadRoles = useCallback(async () => {
+    try {
+      const data = await apiGet<{ roles: RoleEntry[] }>("/v1/roles");
+      setAvailableRoles(data.roles);
+    } catch (err) {
+      setAvailableRoles([]);
+      if (err instanceof ApiError && err.code === "FORBIDDEN") return;
+      console.warn("Role list read failed; People picker uses built-in roles", err);
+    }
+  }, []);
+
+  const loadAll = useCallback(() => {
     loadUsers();
     loadTeams();
-    apiGet<{ roles: RoleEntry[] }>("/v1/roles")
-      .then((data) => setAvailableRoles(data.roles))
-      .catch(() => setAvailableRoles([]));
-  }, [loadUsers, loadTeams]);
+    loadRoles();
+    loadPolicy();
+  }, [loadUsers, loadTeams, loadRoles, loadPolicy]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1468,7 +1869,14 @@ function PeopleSection() {
   const handleAddUser = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      setAddError(null);
+      setAddErrors(null);
+      setActionMsg(null);
+      later.cancel("actionMsg");
+      // The server's refusal names no rule, so check here and say which (#1445).
+      if (!isValidUsername(newUsername)) {
+        setAddErrors([t.settings.people.usernameInvalid]);
+        return;
+      }
       setAdding(true);
       try {
         await apiPost("/auth/register", {
@@ -1483,60 +1891,86 @@ function PeopleSection() {
         setNewTeam("Default");
         setShowAddForm(false);
         setShowGeneratedPw(false);
-        setPwCopied(false);
+        setPwCopy(null);
         setActionMsg({ type: "success", text: t.settings.people.createSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadUsers();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : t.settings.people.createFailed;
-        setAddError(
-          msg.includes("403") ? format(t.settings.people.userLimitReached, { max: maxUsers }) : msg,
+        // The refusal names the minimum even when the policy read didn't, so
+        // the next Generate meets it (#2027).
+        if (err instanceof ApiError && typeof err.body.minLength === "number") {
+          setPolicyMinLength(err.body.minLength);
+        }
+        // Every rule the password broke, since the server lists them (#2090).
+        const passwordMessages =
+          err instanceof ApiError ? passwordErrorMessages(t, err.status, err.body) : [];
+        setAddErrors(
+          passwordMessages.length > 0
+            ? passwordMessages
+            : [
+                apiErrorMessage(
+                  t,
+                  err,
+                  {
+                    USER_LIMIT_REACHED: format(t.settings.people.userLimitReached, {
+                      max: maxUsers,
+                    }),
+                    CONFLICT: t.settings.people.usernameTaken,
+                    UNKNOWN_ROLE: t.settings.people.roleNotFound,
+                    UNKNOWN_TEAM: t.settings.people.teamNotFound,
+                    ESCALATION_DENIED: t.errors.escalationDenied,
+                  },
+                  t.settings.people.createFailed,
+                ),
+              ],
         );
       } finally {
         setAdding(false);
-        setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [
-      newUsername,
-      newPassword,
-      newRole,
-      newTeam,
-      maxUsers,
-      loadUsers,
-      t.settings.people.createFailed,
-      t.settings.people.createSuccess,
-      t.settings.people.userLimitReached,
-    ],
+    [newUsername, newPassword, newRole, newTeam, maxUsers, loadUsers, t, later],
   );
 
   const handleDeleteUser = useCallback(
     async (id: string, username: string) => {
       if (!confirm(format(t.settings.people.deleteConfirm, { username }))) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiDelete(`/auth/users/${id}`);
         setActionMsg({
           type: "success",
           text: format(t.settings.people.deleteSuccess, { username }),
         });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadUsers();
-      } catch {
-        setActionMsg({ type: "error", text: t.settings.people.deleteFailed });
+      } catch (err) {
+        later.cancel("actionMsg");
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            t,
+            err,
+            {
+              SELF_DELETE: t.settings.people.cannotDeleteSelf,
+              LAST_ADMIN: t.settings.people.lastAdmin,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.people.deleteFailed,
+          ),
+        });
       }
       setOpenMenuId(null);
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      loadUsers,
-      t.settings.people.deleteSuccess,
-      t.settings.people.deleteFailed,
-      t.settings.people.deleteConfirm,
-    ],
+    [loadUsers, t, later],
   );
 
   const handleUpdateUser = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingUser) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiPut(`/auth/users/${editingUser.id}`, {
           role: editRole,
@@ -1544,45 +1978,99 @@ function PeopleSection() {
         });
         setEditingUser(null);
         setActionMsg({ type: "success", text: t.settings.people.updateSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadUsers();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to update user";
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
-          text: msg.includes("400") ? t.settings.people.cannotRemoveOwnAdmin : msg,
+          text: apiErrorMessage(
+            t,
+            err,
+            {
+              SELF_DEMOTE: t.settings.people.cannotRemoveOwnAdmin,
+              LAST_ADMIN: t.settings.people.lastAdmin,
+              UNKNOWN_ROLE: t.settings.people.roleNotFound,
+              UNKNOWN_TEAM: t.settings.people.teamNotFound,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.people.updateFailed,
+          ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      editingUser,
-      editRole,
-      editTeam,
-      loadUsers,
-      t.settings.people.cannotRemoveOwnAdmin,
-      t.settings.people.updateSuccess,
-    ],
+    [editingUser, editRole, editTeam, loadUsers, t, later],
   );
 
   const handleResetPassword = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!resetPasswordUser) return;
+      if (!resetPasswordUser || resetting) return;
+      const targetUser = resetPasswordUser;
+      const targetPassword = resetPassword;
+      const epoch = ++resetEpochRef.current;
+      setResetting(true);
+      setResetErrors(null);
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
-        await apiPost(`/auth/users/${resetPasswordUser.id}/reset-password`, {
-          newPassword: resetPassword,
+        await apiPost(`/auth/users/${targetUser.id}/reset-password`, {
+          newPassword: targetPassword,
         });
+        if (epoch !== resetEpochRef.current) return;
         setResetPasswordUser(null);
         setResetPassword("");
         setActionMsg({ type: "success", text: t.settings.people.resetSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to reset password";
-        setActionMsg({ type: "error", text: msg });
+        if (epoch !== resetEpochRef.current) return;
+        // A password the policy refuses belongs next to the field. Anything
+        // else (a denied escalation, a rate limit, a server fault) is about the
+        // request, not the value: editing the password can't fix it, so it
+        // keeps the banner.
+        const passwordMessages =
+          err instanceof ApiError && err.code === "VALIDATION_ERROR"
+            ? passwordErrorMessages(t, err.status, err.body)
+            : [];
+        if (passwordMessages.length > 0) {
+          setResetErrors(passwordMessages);
+          // The banner may still hold the last submit's outcome.
+          setActionMsg(null);
+          later.cancel("actionMsg");
+        } else {
+          later.cancel("actionMsg");
+          setActionMsg({
+            type: "error",
+            text: apiErrorMessage(
+              t,
+              err,
+              {
+                ESCALATION_DENIED: t.errors.escalationDenied,
+                OIDC_NO_PASSWORD: t.auth.passwordManagedByProvider,
+              },
+              t.settings.people.resetFailed,
+            ),
+          });
+        }
+      } finally {
+        if (epoch === resetEpochRef.current) {
+          setResetting(false);
+        }
       }
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [resetPasswordUser, resetPassword, t.settings.people.resetSuccess],
+    [resetPasswordUser, resetPassword, resetting, t, later],
   );
+
+  // A picker whose list fell back (built-in roles, Default) may not hold the
+  // user's current role or team, and a select whose value isn't an option
+  // shows the first one: the admin would read the wrong value, and "changing"
+  // to it would save nothing yet report success. Always offer the current one.
+  const editRoleListed =
+    availableRoles.length > 0
+      ? availableRoles.some((r) => r.name === editRole)
+      : ["user", "editor", "admin"].includes(editRole);
+  const editTeamListed =
+    teams.length > 0 ? teams.some((tm) => tm.name === editTeam) : editTeam === "Default";
 
   if (loading) {
     return (
@@ -1600,28 +2088,44 @@ function PeopleSection() {
         <p className="text-sm text-muted-foreground mt-1">{t.settings.people.description}</p>
       </div>
 
-      {/* User count */}
-      <p className="text-sm text-muted-foreground">
-        {maxUsers > 0
-          ? `${users.length} / ${maxUsers} ${plural(maxUsers, format(t.settings.people.userCount, { count: "" }), format(t.settings.people.userCountPlural, { count: "" })).trim()}`
-          : plural(
-              users.length,
-              format(t.settings.people.userCount, { count: users.length }),
-              format(t.settings.people.userCountPlural, { count: users.length }),
-            )}
-      </p>
+      {/* User count: none when the list didn't load, rather than a made-up 0 */}
+      {!loadFailed && (
+        <p className="text-sm text-muted-foreground">
+          {maxUsers > 0
+            ? `${users.length} / ${maxUsers} ${plural(maxUsers, format(t.settings.people.userCount, { count: "" }), format(t.settings.people.userCountPlural, { count: "" })).trim()}`
+            : plural(
+                users.length,
+                format(t.settings.people.userCount, { count: users.length }),
+                format(t.settings.people.userCountPlural, { count: users.length }),
+              )}
+        </p>
+      )}
 
       {/* Action message */}
       {actionMsg && (
         <div
+          role={actionMsg.type === "error" ? "alert" : "status"}
           className={cn(
-            "text-sm px-3 py-2 rounded-lg",
+            "text-sm px-3 py-2 rounded-lg flex items-center justify-between gap-2",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
               : "bg-green-500/10 text-success-ink",
           )}
         >
-          {actionMsg.text}
+          <span>{actionMsg.text}</span>
+          {actionMsg.type === "error" && (
+            <button
+              type="button"
+              onClick={() => {
+                setActionMsg(null);
+                later.cancel("actionMsg");
+              }}
+              aria-label={t.common.close}
+              className="p-0.5 rounded hover:bg-destructive/20 text-destructive shrink-0"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
@@ -1641,7 +2145,7 @@ function PeopleSection() {
           type="button"
           onClick={() => {
             setShowAddForm(!showAddForm);
-            setAddError(null);
+            setAddErrors(null);
           }}
           disabled={atLimit && !showAddForm}
           className={cn(
@@ -1679,9 +2183,14 @@ function PeopleSection() {
                 id="new-user-username"
                 type="text"
                 value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
+                onChange={(e) => {
+                  setNewUsername(e.target.value);
+                  setAddErrors(null);
+                }}
                 placeholder={t.settings.people.usernamePlaceholder}
                 required
+                aria-invalid={Boolean(addErrors) || undefined}
+                aria-describedby={addErrors ? "add-user-error" : undefined}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
               />
             </div>
@@ -1696,40 +2205,51 @@ function PeopleSection() {
                 onChange={(e) => {
                   setNewPassword(e.target.value);
                   setShowGeneratedPw(false);
-                  setPwCopied(false);
+                  setPwCopy(null);
+                  setAddErrors(null);
                 }}
                 placeholder={t.auth.password}
                 required
-                minLength={8}
+                aria-invalid={Boolean(addErrors) || undefined}
+                aria-describedby={addErrors ? "add-user-error" : undefined}
                 className={cn(
                   "flex-1 min-w-0 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground",
                   showGeneratedPw && "font-mono",
                 )}
               />
               {showGeneratedPw && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const ok = await copyToClipboard(newPassword);
-                    if (ok) {
-                      setPwCopied(true);
-                      setTimeout(() => setPwCopied(false), 2000);
+                <>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await copyToClipboard(newPassword);
+                      setPwCopy(ok ? "copied" : "failed");
+                      later(() => setPwCopy(null), 2000, "pwCopy");
+                    }}
+                    className={cn(
+                      "shrink-0 p-2 rounded-lg border border-border transition-colors",
+                      pwCopy === "copied"
+                        ? "text-success-ink bg-green-500/10"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                    title={
+                      pwCopy === "copied"
+                        ? t.settings.people.passwordCopied
+                        : pwCopy === "failed"
+                          ? t.common.copyFailed
+                          : t.settings.people.copyPasswordButton
                     }
-                  }}
-                  className={cn(
-                    "shrink-0 p-2 rounded-lg border border-border transition-colors",
-                    pwCopied
-                      ? "text-success-ink bg-green-500/10"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                  title={
-                    pwCopied
-                      ? t.settings.people.passwordCopied
-                      : t.settings.people.copyPasswordButton
-                  }
-                >
-                  {pwCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </button>
+                  >
+                    {pwCopy === "copied" ? (
+                      <Check className="h-4 w-4" />
+                    ) : pwCopy === "failed" ? (
+                      <X className="h-4 w-4 text-destructive" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
+                  <CopyFeedback status={pwCopy} />
+                </>
               )}
             </div>
             <select
@@ -1779,10 +2299,11 @@ function PeopleSection() {
             <button
               type="button"
               onClick={() => {
-                const pw = generatePassword();
+                const pw = generatePassword(passwordLengthFor(policyMinLength));
                 setNewPassword(pw);
                 setShowGeneratedPw(true);
-                setPwCopied(false);
+                setPwCopy(null);
+                setAddErrors(null);
               }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary-ink hover:bg-primary/20 font-medium transition-colors"
             >
@@ -1795,27 +2316,29 @@ function PeopleSection() {
               onClick={() => {
                 setShowAddForm(false);
                 setShowGeneratedPw(false);
-                setPwCopied(false);
+                setPwCopy(null);
                 // Reset the field values too, so re-opening the form is clean.
                 setNewUsername("");
                 setNewPassword("");
-                setAddError(null);
+                setAddErrors(null);
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
               {t.common.cancel}
             </button>
           </div>
-          {showGeneratedPw && !pwCopied && (
+          {showGeneratedPw && pwCopy !== "copied" && (
             <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
               <Key className="h-3.5 w-3.5 shrink-0" />
               {t.settings.people.copyPasswordWarning}
             </p>
           )}
-          {addError && (
-            <p role="alert" className="text-sm text-destructive">
-              {addError}
-            </p>
+          {addErrors && (
+            <AlertMessages
+              id="add-user-error"
+              messages={addErrors}
+              className="text-sm text-destructive"
+            />
           )}
         </form>
       )}
@@ -1834,6 +2357,7 @@ function PeopleSection() {
               onChange={(e) => setEditRole(e.target.value)}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
             >
+              {!editRoleListed && <option value={editRole}>{editRole}</option>}
               {availableRoles.length > 0 ? (
                 availableRoles.map((r) => (
                   <option key={r.name} value={r.name}>
@@ -1854,6 +2378,7 @@ function PeopleSection() {
               onChange={(e) => setEditTeam(e.target.value)}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-40"
             >
+              {!editTeamListed && <option value={editTeam}>{editTeam}</option>}
               {teams.map((tm) => (
                 <option key={tm.id} value={tm.name}>
                   {tm.name}
@@ -1891,32 +2416,53 @@ function PeopleSection() {
             })}
           </h4>
           <div className="flex flex-wrap gap-3">
+            <label htmlFor="reset-user-password" className="sr-only">
+              {t.settings.people.newPasswordLabel}
+            </label>
             <input
+              id="reset-user-password"
               type="password"
               value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
+              disabled={resetting}
+              onChange={(e) => {
+                setResetPassword(e.target.value);
+                setResetErrors(null);
+              }}
               placeholder={t.settings.people.newPasswordLabel}
               required
-              minLength={8}
-              className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-60"
+              aria-invalid={Boolean(resetErrors) || undefined}
+              aria-describedby={resetErrors ? "reset-password-error" : undefined}
+              className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-60 disabled:opacity-50"
             />
             <button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-light transition-colors"
+              disabled={resetting}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-light transition-colors disabled:opacity-50"
             >
+              {resetting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
               {t.settings.people.resetPasswordButton}
             </button>
             <button
               type="button"
               onClick={() => {
+                resetEpochRef.current += 1;
+                setResetting(false);
                 setResetPasswordUser(null);
                 setResetPassword("");
+                setResetErrors(null);
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
               {t.common.cancel}
             </button>
           </div>
+          {resetErrors && (
+            <AlertMessages
+              id="reset-password-error"
+              messages={resetErrors}
+              className="text-sm text-destructive"
+            />
+          )}
           <p className="text-xs text-muted-foreground">{t.settings.people.resetPasswordWarning}</p>
         </form>
       )}
@@ -1934,7 +2480,15 @@ function PeopleSection() {
         )}
 
         {/* Table rows */}
-        {filteredUsers.length === 0 ? (
+        {loadFailed ? (
+          <LoadFailed
+            message={t.settings.people.loadFailed}
+            onRetry={() => {
+              setLoading(true);
+              loadAll();
+            }}
+          />
+        ) : filteredUsers.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground rounded-b-lg">
             {search ? t.settings.people.noSearchResults : t.settings.people.noUsersFound}
           </div>
@@ -2063,8 +2617,11 @@ function PeopleSection() {
                       <button
                         type="button"
                         onClick={() => {
+                          resetEpochRef.current += 1;
+                          setResetting(false);
                           setResetPasswordUser(u);
                           setResetPassword("");
+                          setResetErrors(null);
                           setOpenMenuId(null);
                         }}
                         className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
@@ -2096,25 +2653,29 @@ function PeopleSection() {
 /* ────────────────────── API Keys ────────────────────── */
 
 export function ApiKeysSection() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const later = useTimeouts();
   const [keys, setKeys] = useState<ApiKeyEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [newKey, setNewKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const [generating, setGenerating] = useState(false);
   const [keyName, setKeyName] = useState("");
   const [showScoping, setShowScoping] = useState(false);
   const [scopedPerms, setScopedPerms] = useState<string[]>([]);
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const { permissions } = useAuth();
 
   const loadKeys = useCallback(async () => {
     try {
       const data = await apiGet<{ apiKeys: ApiKeyEntry[] }>("/v1/api-keys");
       setKeys(data.apiKeys);
+      setLoadFailed(false);
     } catch {
       setKeys([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -2125,38 +2686,61 @@ export function ApiKeysSection() {
   }, [loadKeys]);
 
   const generateKey = useCallback(async () => {
-    setGenerating(true);
     setNewKey(null);
     setError(null);
+    let expiresAtIso: string | undefined;
+    if (expiresAt) {
+      const parsedExpiry = new Date(expiresAt);
+      if (Number.isNaN(parsedExpiry.getTime()) || parsedExpiry.getTime() <= Date.now()) {
+        setError(t.settings.apiKeys.expiresInPast);
+        return;
+      }
+      expiresAtIso = parsedExpiry.toISOString();
+    }
+    setGenerating(true);
     try {
       const payload: Record<string, unknown> = { name: keyName || "default" };
       if (showScoping && scopedPerms.length > 0) {
         payload.permissions = scopedPerms;
       }
-      if (expiresAt) {
-        payload.expiresAt = new Date(expiresAt).toISOString();
+      if (expiresAtIso) {
+        payload.expiresAt = expiresAtIso;
       }
       const data = await apiPost<{ key: string }>("/v1/api-keys", payload);
       setNewKey(data.key);
+      // The last key's Copied or Copy failed is not this key's.
+      setCopyStatus(null);
       setKeyName("");
       setScopedPerms([]);
       setShowScoping(false);
       setExpiresAt("");
       await loadKeys();
-    } catch {
-      setError(t.common.somethingWentWrong);
+    } catch (err) {
+      setError(
+        apiErrorMessage(
+          t,
+          err,
+          {
+            ...(expiresAtIso && {
+              VALIDATION_ERROR: t.settings.apiKeys.expiresInPast,
+            }),
+          },
+          t.common.somethingWentWrong,
+        ),
+      );
     } finally {
       setGenerating(false);
     }
   }, [keyName, showScoping, scopedPerms, expiresAt, loadKeys, t]);
 
-  const copyKey = useCallback(async (key: string) => {
-    const ok = await copyToClipboard(key);
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, []);
+  const copyKey = useCallback(
+    async (key: string) => {
+      const ok = await copyToClipboard(key);
+      setCopyStatus(ok ? "copied" : "failed");
+      later(() => setCopyStatus(null), 2000, "copyStatus");
+    },
+    [later],
+  );
 
   const deleteKey = useCallback(
     async (id: number) => {
@@ -2165,8 +2749,8 @@ export function ApiKeysSection() {
       try {
         await apiDelete(`/v1/api-keys/${id}`);
         await loadKeys();
-      } catch {
-        setError(t.common.somethingWentWrong);
+      } catch (err) {
+        setError(apiErrorMessage(t, err, {}, t.common.somethingWentWrong));
       }
     },
     [loadKeys, t],
@@ -2195,6 +2779,7 @@ export function ApiKeysSection() {
           onChange={(e) => setKeyName(e.target.value)}
           placeholder={t.settings.apiKeys.keyNamePlaceholder}
           aria-label={t.settings.apiKeys.keyNamePlaceholder}
+          maxLength={100}
           className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-48"
         />
         <button
@@ -2262,7 +2847,9 @@ export function ApiKeysSection() {
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
             className="px-2 py-1 rounded border border-border bg-background text-xs text-foreground"
-            min={new Date().toISOString().slice(0, 16)}
+            min={new Date(Date.now() + 60_000 - new Date().getTimezoneOffset() * 60_000)
+              .toISOString()
+              .slice(0, 16)}
           />
         </label>
         {expiresAt && (
@@ -2287,15 +2874,18 @@ export function ApiKeysSection() {
               type="button"
               onClick={() => copyKey(newKey)}
               className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
-              title={t.common.copy}
-              aria-label={t.common.copy}
+              title={copyStatus === "failed" ? t.common.copyFailed : t.common.copy}
+              aria-label={copyStatus === "failed" ? t.common.copyFailed : t.common.copy}
             >
-              {copied ? (
+              {copyStatus === "copied" ? (
                 <Check className="h-4 w-4 text-success-ink" />
+              ) : copyStatus === "failed" ? (
+                <X className="h-4 w-4 text-destructive" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
             </button>
+            <CopyFeedback status={copyStatus} />
           </div>
           <p className="text-xs text-muted-foreground">{t.settings.apiKeys.keyWarning}</p>
         </div>
@@ -2317,7 +2907,7 @@ export function ApiKeysSection() {
                 <p className="text-xs text-muted-foreground font-mono">
                   {k.prefix}... &middot;{" "}
                   {format(t.settings.apiKeys.createdPrefix, {
-                    date: new Date(k.createdAt).toLocaleDateString(),
+                    date: formatDate(k.createdAt, locale),
                   })}
                 </p>
                 {Array.isArray(k.permissions) && k.permissions.length > 0 && (
@@ -2328,7 +2918,7 @@ export function ApiKeysSection() {
                 {k.expiresAt && (
                   <span className="text-xs text-amber-700 dark:text-amber-400">
                     {format(t.settings.apiKeys.expiresPrefix, {
-                      date: new Date(k.expiresAt).toLocaleDateString(),
+                      date: formatDate(k.expiresAt, locale),
                     })}
                   </span>
                 )}
@@ -2347,8 +2937,17 @@ export function ApiKeysSection() {
         </div>
       )}
 
-      {keys.length === 0 && !newKey && (
-        <p className="text-sm text-muted-foreground">{t.settings.apiKeys.emptyState}</p>
+      {loadFailed ? (
+        <LoadFailed
+          message={t.settings.apiKeys.loadFailed}
+          onRetry={() => {
+            setLoading(true);
+            loadKeys();
+          }}
+        />
+      ) : (
+        keys.length === 0 &&
+        !newKey && <p className="text-sm text-muted-foreground">{t.settings.apiKeys.emptyState}</p>
       )}
     </div>
   );
@@ -2356,8 +2955,9 @@ export function ApiKeysSection() {
 
 /* ────────────────────── Teams ────────────────────── */
 
-function TeamsSection() {
+export function TeamsSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const isMobile = useMobile();
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2374,13 +2974,16 @@ function TeamsSection() {
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadTeams = useCallback(async () => {
     try {
       const data = await apiGet<{ teams: TeamEntry[] }>("/v1/teams");
       setTeams(data.teams);
+      setLoadFailed(false);
     } catch {
       setTeams([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -2403,62 +3006,95 @@ function TeamsSection() {
       e.preventDefault();
       if (!newTeamName.trim()) return;
       setCreating(true);
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiPost("/v1/teams", { name: newTeamName.trim() });
         setNewTeamName("");
         setShowCreateForm(false);
         setActionMsg({ type: "success", text: t.settings.teams.createSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to create team";
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
-          text: msg.includes("409") ? t.settings.teams.duplicateName : msg,
+          text: apiErrorMessage(
+            t,
+            err,
+            {
+              CONFLICT: t.settings.teams.duplicateName,
+              // Blank names never leave the form, so length is the only rule left.
+              VALIDATION_ERROR: t.settings.teams.nameTooLong,
+            },
+            t.settings.teams.createFailed,
+          ),
         });
       } finally {
         setCreating(false);
-        setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [newTeamName, loadTeams, t.settings.teams.duplicateName, t.settings.teams.createSuccess],
+    [newTeamName, loadTeams, t, later],
   );
 
   const handleRename = useCallback(
     async (id: string) => {
       if (!editingTeamName.trim()) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiPut(`/v1/teams/${id}`, { name: editingTeamName.trim() });
         setEditingTeamId(null);
         setEditingTeamName("");
         setActionMsg({ type: "success", text: t.settings.teams.renameSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to rename team";
-        setActionMsg({ type: "error", text: msg });
+        later.cancel("actionMsg");
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            t,
+            err,
+            {
+              CONFLICT: t.settings.teams.duplicateName,
+              VALIDATION_ERROR: t.settings.teams.nameTooLong,
+            },
+            t.settings.teams.renameFailed,
+          ),
+        });
       }
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [editingTeamName, loadTeams, t.settings.teams.renameSuccess],
+    [editingTeamName, loadTeams, t, later],
   );
 
   const handleDelete = useCallback(
     async (id: string, name: string) => {
       if (!confirm(format(t.settings.teams.deleteConfirm, { name }))) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiDelete(`/v1/teams/${id}`);
-        setActionMsg({ type: "success", text: `Team "${name}" deleted` });
+        setActionMsg({ type: "success", text: format(t.settings.teams.deleteSuccess, { name }) });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to delete team";
+        later.cancel("actionMsg");
+        // Both refusals (the Default team, a team with members) are 400s with
+        // VALIDATION_ERROR, and this one line covers both.
         setActionMsg({
           type: "error",
-          text: msg.includes("400") ? t.settings.teams.cannotDeleteDefault : msg,
+          text: apiErrorMessage(
+            t,
+            err,
+            { VALIDATION_ERROR: t.settings.teams.cannotDeleteDefault },
+            t.settings.teams.deleteFailed,
+          ),
         });
       }
       setOpenMenuId(null);
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [loadTeams, t.settings.teams.deleteConfirm, t.settings.teams.cannotDeleteDefault],
+    [loadTeams, t, later],
   );
 
   const handleExpandTeam = useCallback(
@@ -2477,6 +3113,8 @@ function TeamsSection() {
   const handleSaveQuota = useCallback(
     async (id: string) => {
       setSavingQuota(true);
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         const body: Record<string, number | null> = {};
         const mbVal = quotaMb.trim() ? Number(quotaMb) : 0;
@@ -2485,17 +3123,20 @@ function TeamsSection() {
         body.retentionHours = retVal > 0 ? retVal : null;
         await apiPut(`/v1/teams/${id}`, body);
         setActionMsg({ type: "success", text: t.settings.teams.quotaSaved });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         setExpandedTeamId(null);
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to save";
-        setActionMsg({ type: "error", text: msg });
+        later.cancel("actionMsg");
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(t, err, {}, t.settings.teams.quotaSaveFailed),
+        });
       } finally {
         setSavingQuota(false);
-        setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [quotaMb, retention, loadTeams, t.settings.teams.quotaSaved],
+    [quotaMb, retention, loadTeams, t, later],
   );
 
   if (loading) {
@@ -2515,14 +3156,28 @@ function TeamsSection() {
 
       {actionMsg && (
         <div
+          role={actionMsg.type === "error" ? "alert" : "status"}
           className={cn(
-            "text-sm px-3 py-2 rounded-lg",
+            "text-sm px-3 py-2 rounded-lg flex items-center justify-between gap-2",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
               : "bg-green-500/10 text-success-ink",
           )}
         >
-          {actionMsg.text}
+          <span>{actionMsg.text}</span>
+          {actionMsg.type === "error" && (
+            <button
+              type="button"
+              onClick={() => {
+                setActionMsg(null);
+                later.cancel("actionMsg");
+              }}
+              aria-label={t.common.close}
+              className="p-0.5 rounded hover:bg-destructive/20 text-destructive shrink-0"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
@@ -2550,6 +3205,7 @@ function TeamsSection() {
               onChange={(e) => setNewTeamName(e.target.value)}
               placeholder={t.settings.teams.teamNamePlaceholder}
               required
+              maxLength={TEAM_NAME_MAX_LENGTH}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground flex-1"
             />
             <button
@@ -2581,7 +3237,15 @@ function TeamsSection() {
           </div>
         )}
 
-        {teams.length === 0 ? (
+        {loadFailed ? (
+          <LoadFailed
+            message={t.settings.teams.loadFailed}
+            onRetry={() => {
+              setLoading(true);
+              loadTeams();
+            }}
+          />
+        ) : teams.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground rounded-b-lg">
             {t.settings.teams.emptyState}
           </div>
@@ -2601,6 +3265,7 @@ function TeamsSection() {
                         type="text"
                         value={editingTeamName}
                         onChange={(e) => setEditingTeamName(e.target.value)}
+                        maxLength={TEAM_NAME_MAX_LENGTH}
                         className="px-2 py-1 rounded border border-border bg-background text-sm text-foreground w-40"
                         ref={(el) => el?.focus()}
                         onKeyDown={(e) => {
@@ -2663,6 +3328,8 @@ function TeamsSection() {
                       setOpenMenuId(openMenuId === tm.id ? null : tm.id);
                     }}
                     className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title={t.common.actions}
+                    aria-label={t.common.actions}
                   >
                     <MoreVertical className="h-4 w-4" />
                   </button>
@@ -2784,25 +3451,28 @@ function TeamsSection() {
 /* ────────────────────── Roles ────────────────────── */
 
 const PERMISSION_GROUPS = [
-  { label: "Tools", permissions: ["tools:use"] },
-  { label: "Files", permissions: ["files:own", "files:all"] },
-  { label: "API Keys", permissions: ["apikeys:own", "apikeys:all"] },
-  { label: "Pipelines", permissions: ["pipelines:own", "pipelines:all"] },
-  { label: "Settings", permissions: ["settings:read", "settings:write"] },
-  { label: "Users", permissions: ["users:manage"] },
-  { label: "Teams", permissions: ["teams:manage"] },
+  { id: "tools", permissions: ["tools:use"] },
+  { id: "files", permissions: ["files:own", "files:all"] },
+  { id: "apiKeys", permissions: ["apikeys:own", "apikeys:all"] },
+  { id: "pipelines", permissions: ["pipelines:own", "pipelines:all"] },
+  { id: "settings", permissions: ["settings:read", "settings:write"] },
+  { id: "users", permissions: ["users:manage"] },
+  { id: "teams", permissions: ["teams:manage"] },
   {
-    label: "System",
+    id: "system",
     permissions: ["features:manage", "system:health", "audit:read"],
   },
   {
-    label: "Enterprise Administration",
+    id: "enterpriseAdmin",
     permissions: ["security:manage", "compliance:manage", "webhooks:manage"],
   },
-];
+] as const;
 
-function RolesSection() {
+export function RolesSection() {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canManageRoles = hasPermission("security:manage");
+  const later = useTimeouts();
   const [roles, setRoles] = useState<RoleEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -2817,12 +3487,16 @@ function RolesSection() {
     null,
   );
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const loadRoles = useCallback(async () => {
     try {
       const data = await apiGet<{ roles: RoleEntry[] }>("/v1/roles");
       setRoles(data.roles);
+      setLoadFailed(false);
     } catch {
       setRoles([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -2836,9 +3510,22 @@ function RolesSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newName.trim()) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
+      // The server's refusals for these name no rule, so check here (#1445).
+      const invalid = !isValidRoleName(newName)
+        ? t.settings.roles.nameInvalid
+        : newPermissions.length === 0
+          ? t.settings.roles.permissionsRequired
+          : null;
+      if (invalid) {
+        later.cancel("actionMsg");
+        setActionMsg({ type: "error", text: invalid });
+        return;
+      }
       try {
         await apiPost("/v1/roles", {
-          name: newName.trim().toLowerCase(),
+          name: normalizeRoleName(newName),
           description: newDescription.trim(),
           permissions: newPermissions,
         });
@@ -2847,73 +3534,103 @@ function RolesSection() {
         setNewPermissions([]);
         setShowCreateForm(false);
         setActionMsg({ type: "success", text: t.settings.roles.createSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadRoles();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to create role";
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
-          text: msg.includes("409") ? t.settings.roles.duplicateRoleError : msg,
+          text: apiErrorMessage(
+            t,
+            err,
+            {
+              CONFLICT: t.settings.roles.duplicateRoleError,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.roles.createFailed,
+          ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      newName,
-      newDescription,
-      newPermissions,
-      loadRoles,
-      t.settings.roles.duplicateRoleError,
-      t.settings.roles.createSuccess,
-    ],
+    [newName, newDescription, newPermissions, loadRoles, t, later],
   );
 
   const handleUpdate = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingRole) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
+      const invalid = !isValidRoleName(editName)
+        ? t.settings.roles.nameInvalid
+        : editPermissions.length === 0
+          ? t.settings.roles.permissionsRequired
+          : null;
+      if (invalid) {
+        later.cancel("actionMsg");
+        setActionMsg({ type: "error", text: invalid });
+        return;
+      }
       try {
         await apiPut(`/v1/roles/${editingRole.id}`, {
-          name: editName.trim().toLowerCase(),
+          name: normalizeRoleName(editName),
           description: editDescription.trim(),
           permissions: editPermissions,
         });
         setEditingRole(null);
         setActionMsg({ type: "success", text: t.settings.roles.updateSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadRoles();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to update role";
-        setActionMsg({ type: "error", text: msg });
+        later.cancel("actionMsg");
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            t,
+            err,
+            {
+              CONFLICT: t.settings.roles.duplicateRoleError,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.roles.updateFailed,
+          ),
+        });
       }
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      editingRole,
-      editName,
-      editDescription,
-      editPermissions,
-      loadRoles,
-      t.settings.roles.updateSuccess,
-    ],
+    [editingRole, editName, editDescription, editPermissions, loadRoles, t, later],
   );
 
   const handleDelete = useCallback(
     async (role: RoleEntry) => {
-      const msg =
+      const question =
         role.userCount > 0
-          ? `Delete role "${role.name}"? ${role.userCount} user${role.userCount !== 1 ? "s" : ""} will need to be reassigned.`
-          : `Delete role "${role.name}"?`;
-      if (!confirm(msg)) return;
+          ? format(t.settings.roles.deleteConfirm, { name: role.name, count: role.userCount })
+          : format(t.settings.roles.deleteConfirmSimple, { name: role.name });
+      if (!confirm(question)) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiDelete(`/v1/roles/${role.id}`);
-        setActionMsg({ type: "success", text: `Role "${role.name}" deleted` });
+        setActionMsg({
+          type: "success",
+          text: format(t.settings.roles.deleteSuccess, { name: role.name }),
+        });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadRoles();
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : "Failed to delete role";
-        setActionMsg({ type: "error", text: errMsg });
+        later.cancel("actionMsg");
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            t,
+            err,
+            { ESCALATION_DENIED: t.errors.escalationDenied },
+            t.settings.roles.deleteFailed,
+          ),
+        });
       }
-      setTimeout(() => setActionMsg(null), 3000);
     },
-    [loadRoles],
+    [loadRoles, t, later],
   );
 
   const togglePermission = (perm: string, list: string[], setter: (v: string[]) => void) => {
@@ -2937,30 +3654,46 @@ function RolesSection() {
 
       {actionMsg && (
         <div
+          role={actionMsg.type === "error" ? "alert" : "status"}
           className={cn(
-            "text-sm px-3 py-2 rounded-lg",
+            "text-sm px-3 py-2 rounded-lg flex items-center justify-between gap-2",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
               : "bg-green-500/10 text-success-ink",
           )}
         >
-          {actionMsg.text}
+          <span>{actionMsg.text}</span>
+          {actionMsg.type === "error" && (
+            <button
+              type="button"
+              onClick={() => {
+                setActionMsg(null);
+                later.cancel("actionMsg");
+              }}
+              aria-label={t.common.close}
+              className="p-0.5 rounded hover:bg-destructive/20 text-destructive shrink-0"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          {t.settings.roles.createButton}
-        </button>
-      </div>
+      {canManageRoles && (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            {t.settings.roles.createButton}
+          </button>
+        </div>
+      )}
 
       {/* Create role form */}
-      {showCreateForm && (
+      {canManageRoles && showCreateForm && (
         <form
           onSubmit={handleCreate}
           className="p-4 rounded-lg border border-border bg-muted/20 space-y-3"
@@ -2980,6 +3713,7 @@ function RolesSection() {
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               placeholder={t.settings.roles.descriptionPlaceholder}
+              maxLength={500}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
             />
           </div>
@@ -2989,8 +3723,10 @@ function RolesSection() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               {PERMISSION_GROUPS.map((group) => (
-                <div key={group.label} className="space-y-1">
-                  <p className="text-xs font-semibold text-foreground">{group.label}</p>
+                <div key={group.id} className="space-y-1">
+                  <p className="text-xs font-semibold text-foreground">
+                    {t.settings.roles.permGroup[group.id]}
+                  </p>
                   {group.permissions.map((perm) => (
                     <label key={perm} className="flex items-center gap-1.5 text-xs cursor-pointer">
                       <input
@@ -3030,7 +3766,7 @@ function RolesSection() {
       )}
 
       {/* Edit role form */}
-      {editingRole && (
+      {canManageRoles && editingRole && (
         <form
           onSubmit={handleUpdate}
           className="p-4 rounded-lg border border-primary/30 bg-primary/5 space-y-3"
@@ -3052,6 +3788,7 @@ function RolesSection() {
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               placeholder={t.settings.roles.descriptionPlaceholder}
+              maxLength={500}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
             />
           </div>
@@ -3061,8 +3798,10 @@ function RolesSection() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               {PERMISSION_GROUPS.map((group) => (
-                <div key={group.label} className="space-y-1">
-                  <p className="text-xs font-semibold text-foreground">{group.label}</p>
+                <div key={group.id} className="space-y-1">
+                  <p className="text-xs font-semibold text-foreground">
+                    {t.settings.roles.permGroup[group.id]}
+                  </p>
                   {group.permissions.map((perm) => (
                     <label key={perm} className="flex items-center gap-1.5 text-xs cursor-pointer">
                       <input
@@ -3098,7 +3837,15 @@ function RolesSection() {
 
       {/* Role cards */}
       <div className="space-y-3">
-        {roles.length === 0 ? (
+        {loadFailed ? (
+          <LoadFailed
+            message={t.settings.roles.loadFailed}
+            onRetry={() => {
+              setLoading(true);
+              loadRoles();
+            }}
+          />
+        ) : roles.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             {t.settings.roles.emptyState}
           </p>
@@ -3127,7 +3874,7 @@ function RolesSection() {
                     )}
                   </span>
                 </div>
-                {!role.isBuiltin && (
+                {!role.isBuiltin && canManageRoles && (
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -3180,33 +3927,6 @@ function RolesSection() {
 
 /* ────────────────────── Audit Log ────────────────────── */
 
-const AUDIT_ACTIONS = [
-  "LOGIN_SUCCESS",
-  "LOGIN_FAILED",
-  "LOGOUT",
-  "PASSWORD_CHANGED",
-  "PASSWORD_RESET",
-  "USER_CREATED",
-  "USER_DELETED",
-  "USER_UPDATED",
-  "FILE_UPLOADED",
-  "FILE_DELETED",
-  "API_KEY_CREATED",
-  "API_KEY_DELETED",
-  "API_KEY_AUTH_FAILED",
-  "ROLE_CREATED",
-  "ROLE_UPDATED",
-  "ROLE_DELETED",
-  "SETTINGS_UPDATED",
-  "OIDC_LOGIN_SUCCESS",
-  "OIDC_USER_CREATED",
-  "OIDC_USER_LINKED",
-  "OIDC_LOGIN_FAILED",
-  "TOOL_EXECUTED",
-  "BATCH_EXECUTED",
-  "PIPELINE_EXECUTED",
-] as const;
-
 interface AuditEntry {
   id: string;
   actorId: string | null;
@@ -3220,20 +3940,26 @@ interface AuditEntry {
   createdAt: string;
 }
 
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+function formatRelativeTime(
+  iso: string,
+  locale: string,
+  auditLogT: TranslationKeys["settings"]["auditLog"],
+): string {
+  const parsed = new Date(iso).getTime();
+  if (Number.isNaN(parsed)) return "---";
+  const diff = Date.now() - parsed;
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return auditLogT.justNow;
+  if (mins < 60) return format(auditLogT.minutesAgo, { mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return format(auditLogT.hoursAgo, { hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  if (days < 7) return format(auditLogT.daysAgo, { days });
+  return formatDate(iso, locale);
 }
 
-function AuditLogSection() {
-  const { t } = useTranslation();
+export function AuditLogSection() {
+  const { t, locale } = useTranslation();
   const isMobile = useMobile();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -3241,9 +3967,12 @@ function AuditLogSection() {
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const limit = 25;
+  const fetchIdRef = useRef(0);
 
   const fetchEntries = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
@@ -3251,13 +3980,19 @@ function AuditLogSection() {
       const data = await apiGet<{ entries: AuditEntry[]; total: number }>(
         `/v1/audit-log?${params}`,
       );
+      if (fetchId !== fetchIdRef.current) return;
       setEntries(data.entries);
       setTotal(data.total);
+      setLoadFailed(false);
     } catch {
+      if (fetchId !== fetchIdRef.current) return;
       setEntries([]);
       setTotal(0);
+      setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [page, actionFilter]);
 
@@ -3282,7 +4017,7 @@ function AuditLogSection() {
           className="text-sm border border-border rounded-lg px-2 py-1.5 bg-background text-foreground"
         >
           <option value="">{t.settings.auditLog.allActionsFilter}</option>
-          {AUDIT_ACTIONS.map((a) => (
+          {CORE_AUDIT_EVENTS.map((a) => (
             <option key={a} value={a}>
               {a.replaceAll("_", " ")}
             </option>
@@ -3294,6 +4029,8 @@ function AuditLogSection() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
+      ) : loadFailed ? (
+        <LoadFailed message={t.settings.auditLog.loadFailed} onRetry={fetchEntries} />
       ) : entries.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">
           {t.settings.auditLog.emptyState}
@@ -3316,7 +4053,7 @@ function AuditLogSection() {
                         {entry.action}
                       </span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(entry.createdAt)}
+                        {formatRelativeTime(entry.createdAt, locale, t.settings.auditLog)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -3371,7 +4108,7 @@ function AuditLogSection() {
                       onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                     >
                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(entry.createdAt)}
+                        {formatRelativeTime(entry.createdAt, locale, t.settings.auditLog)}
                       </td>
                       <td className="px-3 py-2 text-foreground">{entry.actorUsername}</td>
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground tabular-nums whitespace-nowrap">
@@ -3437,7 +4174,7 @@ function AuditLogSection() {
 
 /* ────────────────────── Tools ────────────────────── */
 
-function ToolsSection() {
+export function ToolsSection() {
   const { t } = useTranslation();
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3445,14 +4182,12 @@ function ToolsSection() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [showRestartBanner, setShowRestartBanner] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
-        setDisabledTools(
-          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
-        );
+        setDisabledTools(parseStringArray(data.settings.disabledTools));
         setLoadFailed(false);
       })
       .catch(() => setLoadFailed(true))
@@ -3485,16 +4220,17 @@ function ToolsSection() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    setSaveFailed(false);
+    setSaveError(null);
+    setShowRestartBanner(false);
     try {
       await apiPut("/v1/settings", { disabledTools: JSON.stringify(disabledTools) });
       setShowRestartBanner(true);
-    } catch {
-      setSaveFailed(true);
+    } catch (err) {
+      setSaveError(apiErrorMessage(t, err, {}, t.common.somethingWentWrong));
     } finally {
       setSaving(false);
     }
-  }, [disabledTools]);
+  }, [disabledTools, t]);
 
   if (loading) {
     return (
@@ -3588,9 +4324,9 @@ function ToolsSection() {
         </div>
       )}
 
-      {saveFailed && (
+      {saveError && (
         <div className="px-4 py-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-700 dark:text-red-400">
-          {t.common.somethingWentWrong}
+          {saveError}
         </div>
       )}
 
@@ -3636,7 +4372,9 @@ function AboutSection() {
         <p className="text-sm text-muted-foreground">{t.settings.about.appDescription}</p>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-muted-foreground">{t.settings.about.versionLabel}</span>
-          <span className="font-mono text-foreground">{APP_VERSION}</span>
+          <span data-testid="app-version" className="font-mono text-foreground">
+            {APP_VERSION}
+          </span>
         </div>
       </div>
 
@@ -3682,6 +4420,84 @@ function AboutSection() {
 }
 
 /* ────────────────────── Shared ────────────────────── */
+
+/**
+ * Stands in for a list or form whose data failed to load, so an empty list
+ * only ever means "there are none" (#1447): "No API keys" after a 500 reads
+ * as a fact, and an admin may go and create them again.
+ */
+function LoadFailed({
+  message,
+  onRetry,
+  inline = false,
+}: {
+  message: string;
+  onRetry: () => void;
+  inline?: boolean;
+}) {
+  const { t } = useTranslation();
+  if (inline) {
+    return (
+      <div role="alert" className="flex items-center gap-2">
+        <p className="text-xs text-destructive">{message}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="px-2.5 py-1 rounded-lg border border-border text-xs text-foreground hover:bg-muted transition-colors shrink-0"
+        >
+          {t.common.retry}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div role="alert" className="px-4 py-8 text-center space-y-3">
+      <p className="text-sm text-destructive">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted transition-colors"
+      >
+        {t.common.retry}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Number input for a string-valued setting. The field may be empty while the user
+ * types; if it is left empty, it restores the value it had on focus, so an empty
+ * string (which the API reads as 0) is never saved by accident. See #1186.
+ */
+function SettingNumberInput({
+  value,
+  fallback,
+  onChange,
+  ...props
+}: {
+  value: string | undefined;
+  fallback: string;
+  onChange: (value: string) => void;
+} & Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "type" | "value" | "onChange" | "onFocus" | "onBlur"
+>) {
+  const valueOnFocus = useRef(value ?? fallback);
+  return (
+    <input
+      {...props}
+      type="number"
+      value={value ?? fallback}
+      onFocus={() => {
+        valueOnFocus.current = value ?? fallback;
+      }}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={(e) => {
+        if (e.target.value.trim() === "") onChange(valueOnFocus.current);
+      }}
+    />
+  );
+}
 
 function SettingRow({
   label,

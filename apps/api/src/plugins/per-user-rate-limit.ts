@@ -7,7 +7,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { sharedRedis } from "../jobs/connection.js";
-import { getSettingNumber } from "../lib/settings-helpers.js";
+import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
 import { getAuthUser } from "./auth.js";
 
 const WINDOW_MS = 60_000; // 1-minute sliding window
@@ -20,7 +20,11 @@ export async function registerPerUserRateLimit(app: FastifyInstance): Promise<vo
     // Only rate-limit API routes
     if (!request.url.startsWith("/api/")) return;
 
-    const rateLimitPerUser = await getSettingNumber("rateLimitPerUser", 0);
+    const rateLimitPerUser = parseNumericSettingValue(
+      "rateLimitPerUser",
+      await getSettingStrict("rateLimitPerUser"),
+      0,
+    );
     if (rateLimitPerUser <= 0) return; // 0 = unlimited
 
     const redis = sharedRedis();

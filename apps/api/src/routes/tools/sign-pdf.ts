@@ -4,15 +4,41 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pdfSignPy } from "@snapotter/doc-engine";
 import type { SignPlacement } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { db, schema } from "../../db/index.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../../jobs/enqueue.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
-import { stripInternalPaths } from "../../lib/errors.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../../jobs/types.js";
+import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
+import {
+  markQueueEventsJobFailure,
+  markUpstreamError,
+  reportError,
+} from "../../lib/error-report.js";
+import { friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { getObjectBuffer } from "../../lib/object-storage.js";
+import { createUniqueNamer } from "../../lib/filename.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeS3ReadFault,
+} from "../../lib/object-storage.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -55,10 +81,12 @@ export function registerSignPdf(app: FastifyInstance) {
     let pdfKey: string | null = null;
     let filename = "document.pdf";
     let clientJobId: string | null = null;
+    let clientJobIdRaw: string | null = null;
     let fileId: string | null = null;
     let saveModeRaw: string | null = null;
     let placementsRaw: string | null = null;
     const sigParts: Array<{ index: number; key: string }> = [];
+    const uniqueName = createUniqueNamer();
 
     try {
       for await (const part of request.parts()) {
@@ -69,18 +97,17 @@ export function registerSignPdf(app: FastifyInstance) {
               part.file.resume();
               continue;
             }
-            const upload = await receiveUpload(part, jobId);
+            const upload = await receiveUpload(part, jobId, { uniqueName });
             sigParts.push({ index: Number(m[1]), key: upload.key });
           } else {
-            const upload = await receiveUpload(part, jobId);
+            const upload = await receiveUpload(part, jobId, { uniqueName });
             pdfKey = upload.key;
             filename = upload.filename;
           }
         } else if (part.fieldname === "placements") {
           placementsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          const raw = part.value as string;
-          if (/^[0-9a-f-]{36}$/i.test(raw)) clientJobId = raw;
+          clientJobIdRaw = part.value as string;
         } else if (part.fieldname === "fileId") {
           fileId = part.value as string;
         } else if (part.fieldname === "saveMode") {
@@ -88,85 +115,132 @@ export function registerSignPdf(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
+      await discardUnenqueuedUploads(jobId, request.log);
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
-    // Stamp the client-facing alias before any pre-enqueue work (#892): a
-    // cancel landing between parse and enqueueToolJob needs a durable pointer
-    // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-    if (clientJobId && clientJobId !== jobId) {
-      await insertToolJobAlias({ jobId, clientJobId, userId, pool: "docs" });
-    }
-
-    const saveMode = parseSaveModeField(saveModeRaw);
-    if (saveMode === null) {
-      return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-    }
-
-    if (!pdfKey) return reply.status(400).send({ error: "No PDF file provided" });
-    if (!placementsRaw) return reply.status(400).send({ error: "No placements provided" });
-
-    let parsed: z.infer<typeof settingsSchema>;
+    let enqueued = false;
+    let aliasStamped = false;
     try {
-      parsed = settingsSchema.parse({ placements: JSON.parse(placementsRaw) });
-    } catch (err) {
-      return reply.status(400).send({
-        error: "Invalid placements",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
-    }
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      clientJobId = clientJobIdField ?? null;
 
-    const sigIndexes = new Set(sigParts.map((s) => s.index));
-    for (const p of parsed.placements) {
-      if (!sigIndexes.has(p.sig)) {
-        return reply
-          .status(400)
-          .send({ error: `Missing signature image for placement (sig ${p.sig})` });
+      // Stamp the client-facing alias before any pre-enqueue work (#892): a
+      // cancel landing between parse and enqueueToolJob needs a durable pointer
+      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+      if (clientJobId && clientJobId !== jobId) {
+        aliasStamped =
+          (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "docs" })) !== false;
+      }
+
+      const saveMode = parseSaveModeField(saveModeRaw);
+      if (saveMode === null) {
+        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
+      }
+
+      if (!pdfKey) return reply.status(400).send({ error: "No PDF file provided" });
+      if (!placementsRaw) return reply.status(400).send({ error: "No placements provided" });
+
+      let parsed: z.infer<typeof settingsSchema>;
+      try {
+        parsed = settingsSchema.parse({ placements: JSON.parse(placementsRaw) });
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Invalid placements",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
+      }
+
+      const sigIndexes = new Set(sigParts.map((s) => s.index));
+      for (const p of parsed.placements) {
+        if (!sigIndexes.has(p.sig)) {
+          return reply
+            .status(400)
+            .send({ error: `Missing signature image for placement (sig ${p.sig})` });
+        }
+      }
+
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await getObjectBuffer(pdfKey);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
+      try {
+        // Signing needs a readable PDF; reject encrypted ones up front (the
+        // "unlock first" guidance rides in details) with the same policy the
+        // factory gives other PDF-only tools, instead of failing in the worker.
+        await inputHandlerFor("document").prepare(pdfBuffer, filename, {
+          scratchDir: tmpdir(),
+          rejectPasswordProtected: true,
+        });
+      } catch (err) {
+        // A broken qpdf is the server's fault, not a bad document: keep its 503,
+        // code, and operator hint, and report it (#1403).
+        if (err instanceof InputValidationError && err.statusCode >= 500) {
+          reportEngineUnavailable(err, TOOL_ID, request.log);
+          return reply.status(err.statusCode).send({
+            error: err.message,
+            ...(err.details && { details: err.details }),
+            ...(err.code && { code: err.code }),
+          });
+        }
+        return reply.status(400).send({
+          error: "Invalid PDF",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
+      }
+
+      const orderedSigKeys: string[] = [];
+      for (const s of [...sigParts].sort((a, b) => a.index - b.index)) {
+        let buf: Buffer;
+        try {
+          buf = await getObjectBuffer(s.key);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
+        const v = await validateImageBuffer(buf, `sig${s.index}.png`);
+        if (!v.valid) {
+          return reply.status(400).send({ error: `Invalid signature image: ${v.reason}` });
+        }
+        orderedSigKeys.push(s.key);
+      }
+
+      enqueued = true;
+      const jobData: ToolJobData = {
+        jobId,
+        toolId: TOOL_ID,
+        userId,
+        pool: "docs",
+        inputRefs: [pdfKey, ...orderedSigKeys],
+        filename,
+        settings: { placements: parsed.placements },
+        clientJobId: clientJobId ?? undefined,
+        fileId: fileId ?? undefined,
+        saveMode,
+        kind: "ai-tool",
+      };
+      try {
+        await enqueueToolJob(jobData);
+        clientJobId = jobData.clientJobId ?? null;
+      } catch (err) {
+        if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+        throw err;
+      }
+    } finally {
+      if (!enqueued) {
+        await discardUnenqueuedUploads(jobId, request.log);
+        if (aliasStamped) {
+          await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+        }
       }
     }
-
-    const pdfBuffer = await getObjectBuffer(pdfKey);
-    try {
-      // Signing needs a readable PDF; reject encrypted ones up front (the
-      // "unlock first" guidance rides in details) with the same policy the
-      // factory gives other PDF-only tools, instead of failing in the worker.
-      await inputHandlerFor("document").prepare(pdfBuffer, filename, {
-        scratchDir: tmpdir(),
-        rejectPasswordProtected: true,
-      });
-    } catch (err) {
-      return reply.status(400).send({
-        error: "Invalid PDF",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
-    }
-
-    const orderedSigKeys: string[] = [];
-    for (const s of [...sigParts].sort((a, b) => a.index - b.index)) {
-      const buf = await getObjectBuffer(s.key);
-      const v = await validateImageBuffer(buf, `sig${s.index}.png`);
-      if (!v.valid) {
-        return reply.status(400).send({ error: `Invalid signature image: ${v.reason}` });
-      }
-      orderedSigKeys.push(s.key);
-    }
-
-    await enqueueToolJob({
-      jobId,
-      toolId: TOOL_ID,
-      userId,
-      pool: "docs",
-      inputRefs: [pdfKey, ...orderedSigKeys],
-      filename,
-      settings: { placements: parsed.placements },
-      clientJobId: clientJobId ?? undefined,
-      fileId: fileId ?? undefined,
-      saveMode,
-      kind: "ai-tool",
-    });
 
     try {
       const result = await waitForJob("docs", jobId);
@@ -184,10 +258,69 @@ export function registerSignPdf(app: FastifyInstance) {
       }
       return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     } catch (err) {
+      if (err instanceof Error && err.message === "Canceled") {
+        const wasCanceled = await db
+          .select({ status: schema.jobs.status })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId))
+          .then((rows) => rows[0]?.status === "canceled")
+          .catch((readErr) => {
+            request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
+            void reportError(markUpstreamError(readErr), {
+              source: "http",
+              route: request.routeOptions?.url,
+              method: request.method,
+              jobId,
+            });
+            return false;
+          });
+        if (wasCanceled) {
+          return reply.status(422).send({ error: "Canceled", canceled: true });
+        }
+      }
+      const row = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId))
+        .then((rows) => rows[0] ?? null)
+        .catch((readErr) => {
+          request.log.warn({ err: readErr, jobId }, "failed job row read failed");
+          void reportError(markUpstreamError(readErr), {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            jobId,
+          });
+          return null;
+        });
+      if (row?.status === "canceled") {
+        return reply.status(422).send({ error: "Canceled", canceled: true });
+      }
+      const failure = row?.error ?? null;
+      if (typeof failure?.httpStatus === "number") {
+        if (failure.httpStatus >= 500) {
+          request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");
+        } else {
+          request.log.info({ err, toolId: TOOL_ID }, "sign-pdf rejected input");
+        }
+        const body: Record<string, unknown> = { error: failure.message };
+        if (failure.details !== undefined) body.details = failure.details;
+        if (failure.code) body.code = failure.code;
+        return reply.status(failure.httpStatus).send(body);
+      }
+      if (failure === null) {
+        throw markQueueEventsJobFailure(err);
+      }
       request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");
+      const rawDetail =
+        typeof failure?.message === "string" && failure.message.length > 0
+          ? failure.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
       return reply.status(422).send({
         error: "Processing failed",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        details: friendlyError(rawDetail),
       });
     }
   });
@@ -202,13 +335,23 @@ registerAiJobHandler(TOOL_ID, async (input, data, ctx) => {
     await writeFile(inPath, input);
     const sigPaths: string[] = [];
     for (let i = 1; i < data.inputRefs.length; i++) {
-      const buf = await getObjectBuffer(data.inputRefs[i]);
+      ctx.signal.throwIfAborted();
+      let buf: Buffer;
+      try {
+        buf = await getObjectBuffer(data.inputRefs[i]);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
       const p = join(dir, `sig${i - 1}.png`);
       await writeFile(p, buf);
       sigPaths.push(p);
     }
+    ctx.signal.throwIfAborted();
     ctx.report(20, "stamping");
-    await pdfSignPy(inPath, outPath, sigPaths, placements as SignPlacement[]);
+    await pdfSignPy(inPath, outPath, sigPaths, placements as SignPlacement[], {
+      signal: ctx.signal,
+    });
     ctx.report(90, "saving");
     const buffer = await readFile(outPath);
     const outName = `${data.filename.replace(/\.[^.]+$/, "")}_signed.pdf`;

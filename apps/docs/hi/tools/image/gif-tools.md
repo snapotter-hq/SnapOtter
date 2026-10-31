@@ -1,8 +1,8 @@
 ---
 description: "एक ही टूल में animated GIFs का आकार बदलें, अनुकूलित करें, गति बदलें, उलटें, घुमाएँ और फ़्रेम निकालें।"
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 1e304ec45635
+i18n_output_hash: 604bb6f831bb
 ---
 
 # GIF Tools {#gif-tools}
@@ -34,7 +34,7 @@ animated GIFs का आकार बदलें, अनुकूलित क�
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| colors | number | नहीं | 256 | पैलेट में रंगों की अधिकतम संख्या (2 से 256) |
+| colors | number | नहीं | 256 | पैलेट में रंगों की अधिकतम संख्या (2, 4, 16, या 256) |
 | dither | number | नहीं | 1.0 | Dithering ताकत (0 से 1, जहाँ 0 dithering को अक्षम करता है) |
 | effort | number | नहीं | 7 | अनुकूलन प्रयास स्तर (1 से 10, अधिक = धीमा लेकिन छोटा) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Speed Up {#speed-up}

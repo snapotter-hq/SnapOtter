@@ -1,27 +1,37 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, statfs, unlink, writeFile } from "node:fs/promises";
+import { type FileHandle, mkdir, open, readFile, rename, statfs, unlink } from "node:fs/promises";
 import { basename, extname, isAbsolute, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
-import { CAMERA_RAW_INPUTS, SafeError } from "@snapotter/shared";
+import { CAMERA_RAW_INPUTS, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { env } from "../config.js";
+import { logger } from "./logger.js";
+import { normalizeOperationalWriteError, s3WriteFault } from "./object-storage.js";
 
 const MIN_FREE_BYTES = 100 * 1024 * 1024;
+let statfsFailureLogged = false;
 
 async function assertDiskSpace(dir: string): Promise<void> {
+  let stats: Awaited<ReturnType<typeof statfs>>;
   try {
-    const stats = await statfs(dir);
-    const freeBytes = stats.bfree * stats.bsize;
-    if (freeBytes < MIN_FREE_BYTES) {
-      // ENOSPC here is synthesized from the free-space floor check, not a syscall errno.
-      throw new SafeError("Insufficient disk space", {
-        kind: "operational",
-        code: "ENOSPC",
-        statusCode: 507,
-      });
+    stats = await statfs(dir);
+  } catch (err) {
+    if (!statfsFailureLogged) {
+      statfsFailureLogged = true;
+      logger.warn(
+        { err, dir },
+        "Failed to check free disk space for library storage; skipping floor check",
+      );
     }
-  } catch (e) {
-    if (e instanceof Error && (e as Error & { statusCode?: number }).statusCode === 507) throw e;
+    return;
+  }
+  const freeBytes = stats.bavail * stats.bsize;
+  if (freeBytes < MIN_FREE_BYTES) {
+    throw new SafeError("Insufficient disk space", {
+      kind: "operational",
+      code: "disk-free-floor",
+      statusCode: 503,
+    });
   }
 }
 
@@ -124,57 +134,106 @@ let storageReady = false;
 export async function ensureStorageDir(): Promise<void> {
   if (storageReady) return;
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.checkConnection();
+    try {
+      const s3 = await getS3();
+      await s3.checkConnection();
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     storageReady = true;
     return;
   }
   try {
     await mkdir(env.FILES_STORAGE_PATH, { recursive: true });
   } catch (e) {
-    if (e instanceof Error && (e as NodeJS.ErrnoException).code === "EACCES") {
-      throw new SafeError("Storage directory is not writable", {
-        kind: "operational",
-        code: (e as NodeJS.ErrnoException).code,
-        statusCode: 503,
-      });
-    }
-    throw e;
+    throw storageWriteError(e);
   }
   storageReady = true;
+}
+
+/**
+ * Delete what a failed write left behind. A write that fails partway (the disk
+ * filling after the free-space check, an I/O error) leaves a partial file, and
+ * its name never reaches the caller, so nothing else could ever remove it
+ * (#1472). Only called once the file was created, so a delete that fails here
+ * leaves a real orphan: log it by name, with the write error behind it.
+ */
+async function removePartialWrite(
+  path: string,
+  storedName: string,
+  writeErr: unknown,
+): Promise<void> {
+  try {
+    await unlink(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    // Same as image-error: pino serializes only `err`, so the write error goes in as its message.
+    logger.error(
+      {
+        err,
+        writeErr: writeErr instanceof Error ? writeErr.message : String(writeErr),
+        storedName,
+      },
+      "Could not remove a partly written library file",
+    );
+  }
+}
+
+function storageWriteError(e: unknown): unknown {
+  return normalizeOperationalWriteError(e);
 }
 
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {
   const storedName = generateStoredName(originalName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.putObject(storedName, buffer);
+    try {
+      const s3 = await getS3();
+      await s3.putObject(storedName, buffer);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return storedName;
   }
   await ensureStorageDir();
   await assertDiskSpace(env.FILES_STORAGE_PATH);
+  const path = join(env.FILES_STORAGE_PATH, storedName);
+  // Create, then write. If creating fails (a read-only volume, no permission)
+  // nothing is on disk, and a cleanup would only log an orphan that doesn't
+  // exist. "wx" also means a write never lands on an existing file.
+  let handle: FileHandle;
   try {
-    await writeFile(join(env.FILES_STORAGE_PATH, storedName), buffer);
+    handle = await open(path, "wx");
   } catch (e) {
-    if (e instanceof Error && (e as NodeJS.ErrnoException).code === "EACCES") {
-      throw new SafeError("Storage directory is not writable", {
-        kind: "operational",
-        code: (e as NodeJS.ErrnoException).code,
-        statusCode: 503,
-      });
-    }
-    throw e;
+    throw storageWriteError(e);
+  }
+  let closed = false;
+  try {
+    await handle.writeFile(buffer);
+    closed = true;
+    await handle.close();
+  } catch (e) {
+    // The write error is the one the caller needs; a close failing on top of
+    // it adds nothing.
+    if (!closed) await handle.close().catch(() => {});
+    await removePartialWrite(path, storedName, e);
+    throw storageWriteError(e);
   }
   return storedName;
 }
 
-export async function readStoredFile(storedName: string): Promise<Buffer> {
+export async function readStoredFile(
+  storedName: string,
+  opts?: { signal?: AbortSignal } | AbortSignal,
+): Promise<Buffer> {
   assertSafeStoredName(storedName);
+  const signal = opts instanceof AbortSignal ? opts : opts?.signal;
+  signal?.throwIfAborted();
   if (isS3Enabled()) {
     const s3 = await getS3();
-    return s3.getObject(storedName);
+    signal?.throwIfAborted();
+    return s3.getObject(storedName, signal);
   }
-  return readFile(join(env.FILES_STORAGE_PATH, storedName));
+  return readFile(join(env.FILES_STORAGE_PATH, storedName), signal ? { signal } : undefined);
 }
 
 /**
@@ -188,7 +247,7 @@ export async function readStoredFile(storedName: string): Promise<Buffer> {
  */
 export function isStorageServiceFault(error: unknown): boolean {
   if (!isS3Enabled()) return false;
-  if (error instanceof SafeError) return false;
+  if (isSafeMessageError(error)) return false;
   return !s3Mod || !s3Mod.isMissingObjectError(error);
 }
 
@@ -210,14 +269,30 @@ export async function streamStoredFile(storedName: string): Promise<Readable> {
 export async function deleteStoredFile(storedName: string): Promise<void> {
   assertSafeStoredName(storedName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.deleteObject(storedName);
+    try {
+      const s3 = await getS3();
+      await s3.deleteObject(storedName);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
+  await unlinkStored(join(env.FILES_STORAGE_PATH, storedName));
+}
+
+/**
+ * Remove a stored file or thumbnail. "Already gone" is fine; anything else
+ * reaches the caller. Swallowing every error let a delete that failed on
+ * permissions look like one that worked, and the caller then dropped the DB
+ * row, orphaning the file for good (#1455). A permissions or read-only fault
+ * becomes the same 503 the save path raises.
+ */
+async function unlinkStored(path: string): Promise<void> {
   try {
-    await unlink(join(env.FILES_STORAGE_PATH, storedName));
-  } catch {
-    // File already gone
+    await unlink(path);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException | null)?.code === "ENOENT") return;
+    throw storageWriteError(e);
   }
 }
 
@@ -240,14 +315,7 @@ async function ensureThumbDir(): Promise<void> {
   try {
     await mkdir(join(env.FILES_STORAGE_PATH, THUMB_DIR), { recursive: true });
   } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === "EACCES") {
-      throw new SafeError("Storage directory is not writable", {
-        kind: "operational",
-        code: (err as NodeJS.ErrnoException).code,
-        statusCode: 503,
-      });
-    }
-    throw err;
+    throw storageWriteError(err);
   }
   thumbDirReady = true;
 }
@@ -264,32 +332,57 @@ export async function getCachedThumbnail(storedName: string): Promise<Buffer | n
   }
   try {
     return await readFile(thumbPath(storedName));
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+    throw err;
   }
 }
 
 export async function saveThumbnail(storedName: string, buffer: Buffer): Promise<void> {
   assertSafeStoredName(storedName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.putThumbnail(storedName, buffer);
+    try {
+      const s3 = await getS3();
+      await s3.putThumbnail(storedName, buffer);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
   await ensureThumbDir();
-  await writeFile(thumbPath(storedName), buffer);
+  const finalPath = thumbPath(storedName);
+  const tempPath = `${finalPath}.${randomUUID()}.tmp`;
+  // Write to a sibling temp file and rename into place so getCachedThumbnail
+  // never observes a half-written file (#1633).
+  let handle: FileHandle;
+  try {
+    handle = await open(tempPath, "wx");
+  } catch (e) {
+    throw storageWriteError(e);
+  }
+  let closed = false;
+  try {
+    await handle.writeFile(buffer);
+    closed = true;
+    await handle.close();
+    await rename(tempPath, finalPath);
+  } catch (e) {
+    if (!closed) await handle.close().catch(() => {});
+    await removePartialWrite(tempPath, join(THUMB_DIR, basename(tempPath)), e);
+    throw storageWriteError(e);
+  }
 }
 
 export async function deleteThumbnail(storedName: string): Promise<void> {
   assertSafeStoredName(storedName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.deleteThumbnail(storedName);
+    try {
+      const s3 = await getS3();
+      await s3.deleteThumbnail(storedName);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
-  try {
-    await unlink(thumbPath(storedName));
-  } catch {
-    // Thumbnail may not exist
-  }
+  await unlinkStored(thumbPath(storedName));
 }

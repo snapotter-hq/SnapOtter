@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ffmpegAvailable, probeMedia } from "@snapotter/media-engine";
+import { ffmpegAvailable, probeMedia, resolveFfmpeg } from "@snapotter/media-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -24,11 +25,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function pollJob(jobId: string) {
   const { db, schema } = await import("../../../../apps/api/src/db/index.js");
@@ -42,9 +43,13 @@ async function pollJob(jobId: string) {
   return row;
 }
 
-async function runTool(settings: Record<string, unknown>, content: Buffer = MP4) {
+async function runTool(
+  settings: Record<string, unknown>,
+  content: Buffer = MP4,
+  filename = "tiny.mp4",
+) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content },
+    { name: "file", filename, contentType: "video/mp4", content },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return testApp.app.inject({
@@ -97,4 +102,82 @@ describe.skipIf(!ffmpegAvailable())("compress-video (requires ffmpeg)", () => {
     const row = await pollJob(jobId);
     expect(row?.status).toBe("completed");
   }, 90_000);
+
+  // #2426: a VFR clip whose avg_frame_rate is an odd rational and that has a
+  // 120 s gap between two frames, like a macOS screen recording left on a
+  // static screen. Without a fixed mp4 timescale the gap overflows the 32-bit
+  // stts sample delta and the muxer fails ("Not yet implemented in FFmpeg").
+  it("compresses a VFR recording with a long gap between frames", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "compress-video-vfr-"));
+    try {
+      const srcPath = join(dir, "vfr-gap.mov");
+      const gen = spawnSync(
+        resolveFfmpeg() ?? "ffmpeg",
+        [
+          "-v",
+          "error",
+          "-y",
+          "-f",
+          "lavfi",
+          "-i",
+          "testsrc2=size=320x240:rate=30,trim=end_frame=600",
+          "-f",
+          "lavfi",
+          "-i",
+          "sine=frequency=440:sample_rate=48000:duration=145",
+          "-filter_complex",
+          "[0:v]settb=1/2400,setpts='((N*8 + mod(N*N,7))/240 + gte(N,300)*120.123457)/TB'[v]",
+          "-map",
+          "[v]",
+          "-map",
+          "1:a",
+          "-fps_mode",
+          "passthrough",
+          "-enc_time_base:v",
+          "1/2400",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "ultrafast",
+          "-bf",
+          "0",
+          "-c:a",
+          "aac",
+          "-video_track_timescale",
+          "1000003",
+          "-t",
+          "145",
+          srcPath,
+        ],
+        { timeout: 60_000 },
+      );
+      if (gen.error) {
+        throw new Error(`Failed to spawn ffmpeg for VFR fixture: ${gen.error.message}`);
+      }
+      if (gen.status !== 0) {
+        throw new Error(`Failed to generate VFR fixture: ${gen.stderr?.toString()}`);
+      }
+
+      const res = await runTool({ quality: "strong" }, readFileSync(srcPath), "vfr-gap.mov");
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body);
+      const row = await pollJob(jobId);
+      expect(row?.status).toBe("completed");
+
+      const outName = ((row?.outputRefs ?? []) as string[])[0].split("/").pop() as string;
+      const dl = await testApp.app.inject({
+        method: "GET",
+        url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
+      });
+      expect(dl.statusCode).toBe(200);
+      const outPath = join(dir, outName);
+      writeFileSync(outPath, dl.rawPayload);
+      const info = await probeMedia(outPath);
+      expect(info.streams.some((s) => s.type === "video")).toBe(true);
+      // The gap is kept as a gap, so the output still spans the full clip.
+      expect(info.durationS).toBeGreaterThan(140);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

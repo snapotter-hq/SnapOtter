@@ -220,6 +220,172 @@ test.describe("Erase Object tool", () => {
     await expect(page.getByTestId("erase-object-submit")).toHaveText("Erase All (2)");
   });
 
+  async function paintStroke(page: import("@playwright/test").Page) {
+    const canvas = page.locator("canvas");
+    await canvas.waitFor({ state: "visible", timeout: 5_000 });
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("Canvas not found");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2);
+    await page.mouse.up();
+  }
+
+  // The API answers a successful erase with 202 and lands it over SSE, so a
+  // sync 2xx only comes from something in between. #1734: the body is the only
+  // thing that may blame the server, and a body with nothing to download used
+  // to land as a completed run with no result behind it (#1740).
+  test("a 200 with no download URL fails the run as an invalid response", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+    await page.route("**/api/v1/tools/image/erase-object", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
+    await expect(page.getByTestId("erase-object-download")).toHaveCount(0);
+  });
+
+  test("a 200 with a result lands it", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+    await page.route("**/api/v1/tools/image/erase-object", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          downloadUrl: "/api/v1/download/job-1/test-200x150.png",
+          originalSize: 1000,
+          processedSize: 900,
+        }),
+      }),
+    );
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect(page.getByTestId("erase-object-download")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Invalid response", { exact: true })).toHaveCount(0);
+  });
+
+  /**
+   * Answer the erase with the 202 the API really sends, then complete the run
+   * on the progress stream with `result`. The frame waits for the POST, as
+   * the worker's would.
+   */
+  async function completeOverStream(
+    page: import("@playwright/test").Page,
+    result: Record<string, unknown>,
+  ) {
+    let accepted: () => void = () => {};
+    const postAnswered = new Promise<void>((resolve) => {
+      accepted = resolve;
+    });
+    await page.route("**/api/v1/jobs/*/progress", async (route) => {
+      await postAnswered;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ type: "single", phase: "complete", percent: 100, result })}\n\n`,
+      });
+    });
+    await page.route("**/api/v1/tools/image/erase-object", async (route) => {
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ jobId: "e2e-1830", async: true }),
+      });
+      accepted();
+    });
+  }
+
+  // #1830: the stream twin of the 200 above. A completed frame with nothing to
+  // download used to land as a finished run with no result behind it.
+  test("a completed stream with no download URL fails the run as an invalid response", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+    await completeOverStream(page, { jobId: "e2e-1830", originalSize: 1000, processedSize: 900 });
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
+    await expect(page.getByTestId("erase-object-download")).toHaveCount(0);
+  });
+
+  // #1810: the batch's teardown now runs after its loop whatever happened in
+  // it. A failed file must not stop the next one, and the run must end.
+  test("an Erase All batch moves past a failed file and ends", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /Add more/i }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(fixturePath("image/valid/test-100x100.jpg"));
+    await page.waitForTimeout(500);
+    await page.locator("button").filter({ hasText: "test-100x100.jpg" }).first().click();
+    await page.waitForTimeout(500);
+    await paintStroke(page);
+    await expect(page.getByTestId("erase-object-submit")).toHaveText("Erase All (2)");
+
+    let requests = 0;
+    await page.route("**/api/v1/tools/image/erase-object", (route) => {
+      requests++;
+      return requests === 1
+        ? route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "Object erasing failed" }),
+          })
+        : route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              downloadUrl: "/api/v1/download/job-2/test-100x100.png",
+              originalSize: 1000,
+              processedSize: 900,
+            }),
+          });
+    });
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect.poll(() => requests, { timeout: 15_000 }).toBe(2);
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled({ timeout: 15_000 });
+  });
+
+  test("a completed stream with a result lands it", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+    await completeOverStream(page, {
+      jobId: "e2e-1830",
+      downloadUrl: "/api/v1/download/e2e-1830/test-200x150.png",
+      originalSize: 1000,
+      processedSize: 900,
+    });
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect(page.getByTestId("erase-object-download")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Invalid response", { exact: true })).toHaveCount(0);
+  });
+
   test("High Quality mode is gated on the inpaint-hq pack and blocks submit until installed", async ({
     loggedInPage: page,
   }) => {

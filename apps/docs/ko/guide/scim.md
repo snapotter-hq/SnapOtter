@@ -1,8 +1,8 @@
 ---
 description: "SCIM 2.0 프로비저닝을 설정하여 사용자와 그룹을 아이덴티티 공급자에서 SnapOtter로 동기화합니다. Okta, Azure AD / Entra ID, 사용자 지정 통합을 다룹니다."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 1f563c92cdba
+i18n_output_hash: 3a19d9cfc6ce
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP가 분당 1000개를 초과하는 요청을 보내고 있습니다. 일반�
 ### 사용자가 프로비저닝 해제되었지만 UI에서 제거되지 않음 {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE는 소프트 비활성화입니다. 비활성화된 사용자는 여전히 비활성 상태로 관리자 사용자 목록에 표시됩니다. 이는 데이터를 보존하기 위한 의도된 설계입니다. 해당 사용자의 역할은 `disabled:<original-role>` 로 표시됩니다.
+
+### `externalId` 필터가 OIDC 또는 SAML로 로그인하는 사용자를 찾지 못함 {#recover-scim-ids-in-oidc-or-saml-users}
+
+SCIM의 `externalId`에 자체 컬럼(`users.scim_external_id`)이 생기기 전에는, OIDC 또는 SAML 로그인이 이미 연결한 사용자에게 SCIM `PUT`이나 `PATCH`를 실행하면 SCIM id가 그 사용자의 로그인 신원에 기록되곤 했습니다. 업그레이드 마이그레이션은 그 값을 실제 OIDC subject나 SAML NameID와 구분할 수 없으므로 해당 사용자들은 그대로 둡니다. 이런 사용자는 IdP가 `externalId`를 담은 업데이트를 다시 보내기 전까지 `filter=externalId eq "..."`로 아무 결과도 얻지 못합니다.
+
+IdP를 기다리고 싶지 않다면 감사 로그가 그 id를 증명해 줄 수 있습니다. SCIM은 각 사용자를 생성할 때 사용한 `externalId`와 함께 `SCIM_USER_PROVISIONED` 행을 기록합니다. `scim_external_id` 컬럼이 있는 릴리스로 올라온 뒤 SnapOtter 데이터베이스에 대해 `psql`을 열고(두 구성 모두에 대한 방법은 [계정 복구 가이드](./account-recovery.md#older-images-and-fallbacks)에 나와 있습니다) 로그인 신원이 아직 그 id와 같은 사용자들을 미리 확인하세요:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+목록이 맞아 보인다면 그 id를 SCIM 컬럼에 복사하세요. `BEGIN;` 안에서 실행하고 반환된 행을 확인한 뒤 `COMMIT;` 하세요:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+두 번째 실행에서는 아무것도 일치하지 않습니다. 이 업데이트는 `external_id`를 그대로 둡니다. 일부 IdP(Okta 포함)는 같은 id를 OIDC `sub`와 SCIM `externalId` 양쪽으로 보내므로, 그런 경우 값을 지우면 OIDC 로그인이 깨지기 때문입니다. `external_id`가 실제로 잘못 들어간 SCIM id인 사용자는 이미 subject 일치에서 실패합니다. `OIDC_AUTO_LINK_USERS`(또는 `SAML_AUTO_LINK_USERS`)가 켜져 있으면, 이메일이 검증된 상태에서 다음 로그인 시 어느 쪽이든 다시 연결됩니다.
+
+일부 사용자는 범위 밖에 남아 IdP의 다음 업데이트에서 id를 다시 가져옵니다:
+
+- 로그인 링크가 SCIM id를 대체했고 그 뒤로 SCIM 쓰기가 없었던 사용자. `external_id`가 더 이상 감사 행과 일치하지 않습니다.
+- 프로비저닝 감사 행이 보존 기간 만료로 이미 정리된 사용자.
+- 생성 후 IdP가 `externalId`를 바꾼 사용자(업데이트 행은 어떤 필드가 바뀌었는지 기록할 뿐 값을 기록하지 않습니다).
+- 같은 id를 가진 두 사용자. 쿼리는 고유 인덱스가 중단되지 않도록 이들을 건너뜁니다. 마지막 절을 뺀 미리보기 쿼리가 이들을 나열하며, 어느 쪽이 그 id의 주인인지는 직접 판단하셔야 합니다.

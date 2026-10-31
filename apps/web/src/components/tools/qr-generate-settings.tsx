@@ -1,3 +1,4 @@
+import { ANALYTICS_EVENTS, type TranslationKeys } from "@snapotter/shared";
 import {
   Contact,
   Download,
@@ -14,6 +15,7 @@ import QRCodeStyling from "qr-code-styling";
 import { useCallback, useRef } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
+import { track } from "@/lib/analytics";
 import {
   type ContentType,
   type CornerDotType,
@@ -24,51 +26,53 @@ import {
   useQrStore,
 } from "@/stores/qr-store";
 
+type QrKey = keyof TranslationKeys["toolSettings"]["qr-generate"];
+
 // ── Content type tab definitions ─────────────────────────────────────
 
+// Each content type id doubles as its label key under toolSettings["qr-generate"].
 const CONTENT_TYPES: {
-  id: ContentType;
-  label: string;
+  id: ContentType & QrKey;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { id: "url", label: "URL", icon: Globe },
-  { id: "text", label: "Text", icon: Type },
-  { id: "wifi", label: "WiFi", icon: Wifi },
-  { id: "vcard", label: "vCard", icon: Contact },
-  { id: "email", label: "Email", icon: Mail },
-  { id: "phone", label: "Phone", icon: Phone },
-  { id: "sms", label: "SMS", icon: MessageSquare },
+  { id: "url", icon: Globe },
+  { id: "text", icon: Type },
+  { id: "wifi", icon: Wifi },
+  { id: "vcard", icon: Contact },
+  { id: "email", icon: Mail },
+  { id: "phone", icon: Phone },
+  { id: "sms", icon: MessageSquare },
 ];
 
 // ── Style option definitions ─────────────────────────────────────────
 
-const DOT_TYPES: { value: DotType; label: string }[] = [
-  { value: "square", label: "Square" },
-  { value: "rounded", label: "Rounded" },
-  { value: "dots", label: "Dots" },
-  { value: "classy", label: "Classy" },
-  { value: "classy-rounded", label: "Classy Rnd" },
-  { value: "extra-rounded", label: "Extra Rnd" },
+const DOT_TYPES: { value: DotType; labelKey: QrKey }[] = [
+  { value: "square", labelKey: "styleSquare" },
+  { value: "rounded", labelKey: "styleRounded" },
+  { value: "dots", labelKey: "styleDots" },
+  { value: "classy", labelKey: "styleClassy" },
+  { value: "classy-rounded", labelKey: "styleClassyRounded" },
+  { value: "extra-rounded", labelKey: "styleExtraRounded" },
 ];
 
-const CORNER_SQUARE_TYPES: { value: CornerSquareType; label: string }[] = [
-  { value: "square", label: "Square" },
-  { value: "rounded", label: "Rounded" },
-  { value: "dot", label: "Dot" },
-  { value: "extra-rounded", label: "Extra Rnd" },
+const CORNER_SQUARE_TYPES: { value: CornerSquareType; labelKey: QrKey }[] = [
+  { value: "square", labelKey: "styleSquare" },
+  { value: "rounded", labelKey: "styleRounded" },
+  { value: "dot", labelKey: "styleDot" },
+  { value: "extra-rounded", labelKey: "styleExtraRounded" },
 ];
 
-const CORNER_DOT_TYPES: { value: CornerDotType; label: string }[] = [
-  { value: "square", label: "Square" },
-  { value: "rounded", label: "Rounded" },
-  { value: "dot", label: "Dot" },
+const CORNER_DOT_TYPES: { value: CornerDotType; labelKey: QrKey }[] = [
+  { value: "square", labelKey: "styleSquare" },
+  { value: "rounded", labelKey: "styleRounded" },
+  { value: "dot", labelKey: "styleDot" },
 ];
 
-const DOWNLOAD_FORMATS: { value: DownloadFormat; label: string; desc: string }[] = [
-  { value: "png", label: "PNG", desc: "Best for digital" },
-  { value: "svg", label: "SVG", desc: "Best for print" },
-  { value: "jpeg", label: "JPEG", desc: "Smaller file" },
-  { value: "webp", label: "WebP", desc: "Modern format" },
+const DOWNLOAD_FORMATS: { value: DownloadFormat; label: string; descKey: QrKey }[] = [
+  { value: "png", label: "PNG", descKey: "formatDescPng" },
+  { value: "svg", label: "SVG", descKey: "formatDescSvg" },
+  { value: "jpeg", label: "JPEG", descKey: "formatDescJpeg" },
+  { value: "webp", label: "WebP", descKey: "formatDescWebp" },
 ];
 
 // ── Data entry forms per content type ────────────────────────────────
@@ -179,6 +183,8 @@ function WifiForm() {
 }
 
 function VCardForm() {
+  const { t } = useTranslation();
+  const qt = t.toolSettings["qr-generate"];
   const { vcardData, setVcardData } = useQrStore();
   const field = (label: string, key: keyof typeof vcardData, placeholder: string) => (
     <div key={key}>
@@ -198,14 +204,18 @@ function VCardForm() {
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <div className="flex-1">{field("First Name", "firstName", "John")}</div>
-        <div className="flex-1">{field("Last Name", "lastName", "Doe")}</div>
+        <div className="flex-1">
+          {field(qt.vcardFirstName, "firstName", qt.vcardFirstNamePlaceholder)}
+        </div>
+        <div className="flex-1">
+          {field(qt.vcardLastName, "lastName", qt.vcardLastNamePlaceholder)}
+        </div>
       </div>
-      {field("Phone", "phone", "+1 234 567 890")}
-      {field("Email", "email", "john@example.com")}
-      {field("Organization", "organization", "Company")}
-      {field("Job Title", "title", "Developer")}
-      {field("Website", "url", "https://example.com")}
+      {field(qt.phone, "phone", "+1 234 567 890")}
+      {field(qt.email, "email", "john@example.com")}
+      {field(qt.vcardOrganization, "organization", qt.vcardOrganizationPlaceholder)}
+      {field(qt.vcardJobTitle, "title", qt.vcardJobTitlePlaceholder)}
+      {field(qt.vcardWebsite, "url", qt.httpsExampleCom)}
     </div>
   );
 }
@@ -362,6 +372,12 @@ export function QrGenerateSettings() {
     const data = encodeQrData(store);
     if (!data) return;
 
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "qr-generate",
+      is_batch: false,
+      file_count: 1,
+    });
+
     const qr = new QRCodeStyling({
       width: store.size,
       height: store.size,
@@ -404,6 +420,7 @@ export function QrGenerateSettings() {
       name: "qrcode",
       extension: store.downloadFormat,
     });
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "qr-generate" });
   }, [store]);
 
   const handleLogoUpload = useCallback(
@@ -420,7 +437,7 @@ export function QrGenerateSettings() {
     <div className="space-y-4">
       {/* ── Content type tabs ── */}
       <div className="flex flex-wrap gap-1">
-        {CONTENT_TYPES.map(({ id, label, icon: Icon }) => (
+        {CONTENT_TYPES.map(({ id, icon: Icon }) => (
           <button
             key={id}
             type="button"
@@ -432,7 +449,7 @@ export function QrGenerateSettings() {
             }`}
           >
             <Icon className="h-3 w-3" />
-            {label}
+            {t.toolSettings["qr-generate"][id]}
           </button>
         ))}
       </div>
@@ -448,13 +465,13 @@ export function QrGenerateSettings() {
               {t.toolSettings["qr-generate"].dotPattern}
             </span>
             <div className="grid grid-cols-3 gap-1.5">
-              {DOT_TYPES.map(({ value, label }) => (
+              {DOT_TYPES.map(({ value, labelKey }) => (
                 <PillButton
                   key={value}
                   selected={store.dotType === value}
                   onClick={() => store.setDotType(value)}
                 >
-                  {label}
+                  {t.toolSettings["qr-generate"][labelKey]}
                 </PillButton>
               ))}
             </div>
@@ -464,13 +481,13 @@ export function QrGenerateSettings() {
               {t.toolSettings["qr-generate"].cornerSquare}
             </span>
             <div className="grid grid-cols-2 gap-1.5">
-              {CORNER_SQUARE_TYPES.map(({ value, label }) => (
+              {CORNER_SQUARE_TYPES.map(({ value, labelKey }) => (
                 <PillButton
                   key={value}
                   selected={store.cornerSquareType === value}
                   onClick={() => store.setCornerSquareType(value)}
                 >
-                  {label}
+                  {t.toolSettings["qr-generate"][labelKey]}
                 </PillButton>
               ))}
             </div>
@@ -480,13 +497,13 @@ export function QrGenerateSettings() {
               {t.toolSettings["qr-generate"].cornerDot}
             </span>
             <div className="grid grid-cols-3 gap-1.5">
-              {CORNER_DOT_TYPES.map(({ value, label }) => (
+              {CORNER_DOT_TYPES.map(({ value, labelKey }) => (
                 <PillButton
                   key={value}
                   selected={store.cornerDotType === value}
                   onClick={() => store.setCornerDotType(value)}
                 >
-                  {label}
+                  {t.toolSettings["qr-generate"][labelKey]}
                 </PillButton>
               ))}
             </div>
@@ -780,7 +797,7 @@ export function QrGenerateSettings() {
               {t.toolSettings["qr-generate"].format}
             </span>
             <div className="grid grid-cols-2 gap-1.5">
-              {DOWNLOAD_FORMATS.map(({ value, label, desc }) => (
+              {DOWNLOAD_FORMATS.map(({ value, label, descKey }) => (
                 <button
                   key={value}
                   type="button"
@@ -799,7 +816,7 @@ export function QrGenerateSettings() {
                         : "text-muted-foreground"
                     }`}
                   >
-                    {desc}
+                    {t.toolSettings["qr-generate"][descKey]}
                   </span>
                 </button>
               ))}

@@ -2,8 +2,8 @@ import { ExternalLink, LogOut, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { clearToken } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { logout } from "@/lib/logout";
 import { cn } from "@/lib/utils";
 
 interface AvatarDropdownProps {
@@ -11,10 +11,19 @@ interface AvatarDropdownProps {
   variant?: "light" | "dark";
 }
 
+function readStoredUsername(): string {
+  try {
+    return localStorage.getItem("snapotter-username") || "";
+  } catch {
+    return "";
+  }
+}
+
 export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDropdownProps) {
   const { t } = useTranslation();
   const { authEnabled, loading, username: sessionUsername } = useAuth();
   const [open, setOpen] = useState(false);
+  const [logoutFailed, setLogoutFailed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // The session is the source of truth: OIDC/SAML logins never run the login
@@ -22,8 +31,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
   // localStorage only bridges the gap until the session fetch resolves, and
   // the "admin" terminal fallback (no-auth mode has no session to name) must
   // wait for that fetch; flashing it mid-load is #862's symptom again.
-  const username =
-    sessionUsername || localStorage.getItem("snapotter-username") || (loading ? "" : "admin");
+  const username = sessionUsername || readStoredUsername() || (loading ? "" : "admin");
   const initial = username.charAt(0).toUpperCase();
 
   useEffect(() => {
@@ -36,22 +44,19 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  // A reopened menu shouldn't greet the user with the last attempt's error.
+  useEffect(() => {
+    if (!open) setLogoutFailed(false);
+  }, [open]);
+
   const handleLogout = async () => {
-    try {
-      const res = await fetch(appUrl("/api/auth/logout"), { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      if (data.logoutUrl) {
-        window.location.href = data.logoutUrl;
-      } else {
-        window.location.href = appUrl("/login");
-      }
-    } catch {
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      window.location.href = appUrl("/login");
+    setLogoutFailed(false);
+    const destination = await logout();
+    if (destination === null) {
+      setLogoutFailed(true);
+      return;
     }
+    window.location.href = destination;
   };
 
   return (
@@ -144,10 +149,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
               />
               <button
                 type="button"
-                onClick={() => {
-                  setOpen(false);
-                  handleLogout();
-                }}
+                onClick={handleLogout}
                 className={cn(
                   "w-full text-start px-3 py-2 text-sm flex items-center gap-2 transition-colors",
                   variant === "dark"
@@ -158,6 +160,11 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
                 <LogOut className="h-4 w-4" />
                 {t.auth.logout}
               </button>
+              {logoutFailed && (
+                <p role="alert" className="px-3 pb-2 text-xs text-destructive">
+                  {t.auth.logoutFailed}
+                </p>
+              )}
             </>
           )}
         </div>

@@ -16,11 +16,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("permissions in auth responses", () => {
   it("login response includes permissions array for admin", async () => {
@@ -117,7 +117,7 @@ describe("permission enforcement on routes", () => {
       throw new Error(`User login failed: ${loginRes.body}`);
     }
     userToken = loginBody.token;
-  }, 15_000);
+  });
 
   // -- User cannot access admin-only routes (403) --
 

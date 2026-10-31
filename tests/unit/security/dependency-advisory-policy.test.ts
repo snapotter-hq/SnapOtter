@@ -21,14 +21,14 @@ describe("production dependency advisory policy", () => {
   it("keeps directly reachable server dependencies on patched releases", () => {
     const api = packageJson("apps/api/package.json");
 
-    expect(api.dependencies?.["@fastify/static"]).toBe("^10.1.2");
+    expect(api.dependencies?.["@fastify/static"]).toBe("^10.1.7");
     expect(api.dependencies?.tar).toBe("^7.5.21");
   });
 
   it("uses the patched non-RSC React Router release without the compatibility wrapper", () => {
     const web = packageJson("apps/web/package.json");
 
-    expect(web.dependencies?.["react-router"]).toBe("^8.3.0");
+    expect(web.dependencies?.["react-router"]).toBe("^8.5.0");
     expect(web.dependencies).not.toHaveProperty("react-router-dom");
   });
 
@@ -55,9 +55,9 @@ describe("production dependency advisory policy", () => {
   it("resolves only the patched versions in the frozen lockfile", () => {
     const lockfile = readFileSync(resolve(root, "pnpm-lock.yaml"), "utf8");
 
-    expect(lockfile).toContain("'@fastify/static@10.1.2'");
+    expect(lockfile).toContain("'@fastify/static@10.1.8'");
     expect(lockfile).toContain("brace-expansion@5.0.8");
-    expect(lockfile).toContain("react-router@8.3.0");
+    expect(lockfile).toContain("react-router@8.5.1");
     expect(lockfile).toContain("tar@7.5.22");
     expect(lockfile).not.toContain("'@fastify/static@9.3.0'");
     expect(lockfile).not.toMatch(/\n {2}brace-expansion@5\.0\.7:\n/);
@@ -135,6 +135,13 @@ const ALERT_FLOORS: Record<string, string | Record<string, string>> = {
   qs: "6.16.0",
   // GHSA-fxqj-rqcc-2cmp: incomplete fix of GHSA-6g55-p6wh-862q.
   postcss: "8.5.23",
+  // GHSA-73wf-gq98-2v4g: prototype write via an untrusted stats file, and
+  // GHSA-c83g-rgw3-j3cx: unbounded query cache growth.
+  browserslist: "4.28.7",
+  // GHSA-w27v-7q3p-w38r and GHSA-4vpr-x523-8j87: removeScripts bypasses in SVGO.
+  svgo: "4.1.0",
+  // GHSA-7w5x-hrqm-74c2 (1.7.1) and GHSA-r4xh-jqrq-34v2 (1.9.0): TOML parser DoS.
+  "smol-toml": "1.9.0",
 };
 
 function floorFor(floors: string | Record<string, string>, version: Version): string | undefined {
@@ -175,9 +182,11 @@ describe("Dependabot alert floors (issue #835)", () => {
       ["api fastify", api.dependencies?.fastify, "5.12.2"],
       ["api js-yaml", api.dependencies?.["js-yaml"], "4.3.1"],
       ["override js-yaml", overrides["js-yaml"], "4.3.1"],
+      ["override astro>svgo", overrides["astro>svgo"], "4.1.0"],
       ["override fast-uri", overrides["fast-uri"], "4.1.3"],
       ["override qs", overrides.qs, "6.16.0"],
       ["override postcss", overrides.postcss, "8.5.23"],
+      ["override browserslist", overrides.browserslist, "4.28.7"],
       ["override dompurify", overrides.dompurify, "3.4.13"],
       ["override undici@6", overrides["undici@6"], "6.28.0"],
       ["override undici@7", overrides["undici@7"], "7.29.0"],

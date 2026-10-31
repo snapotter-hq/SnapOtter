@@ -55,6 +55,15 @@ export interface EraserProps {
   maskedFileCount: number;
 }
 
+export interface ComparisonPreview {
+  entryId: string;
+  url: string;
+  originalSize: number;
+  processedSize: number;
+  /** True when fetched after a committed result was already on the entry. */
+  supersedesResult: boolean;
+}
+
 // ── Registry entry ─────────────────────────────────────────────────
 
 export interface ToolRegistryEntry {
@@ -69,6 +78,7 @@ export interface ToolRegistryEntry {
     onPreviewTransform?: (t: PreviewTransform) => void;
     onPreviewFilter?: (filter: string) => void;
     onBgPreview?: (state: BgPreviewState | null) => void;
+    onComparisonPreview?: (preview: ComparisonPreview | null) => void;
     onImageStyle?: (style: React.CSSProperties | null) => void;
     onImageOverlay?: (children: React.ReactNode) => void;
     cropProps?: CropProps;
@@ -680,6 +690,16 @@ const OrganizePdfCanvas = lazy(() =>
     default: m.OrganizePdfCanvas,
   })),
 );
+const MultiToolPdfSettings = lazy(() =>
+  import("@/components/tools/multi-tool-pdf-settings").then((m) => ({
+    default: m.MultiToolPdfSettings,
+  })),
+);
+const MultiToolPdfCanvas = lazy(() =>
+  import("@/components/tools/multi-tool-pdf-canvas").then((m) => ({
+    default: m.MultiToolPdfCanvas,
+  })),
+);
 const ProtectPdfSettings = lazy(() =>
   import("@/components/tools/protect-pdf-settings").then((m) => ({
     default: m.ProtectPdfSettings,
@@ -1144,6 +1164,10 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   [
     "organize-pdf",
     { accept: ".pdf", Settings: OrganizePdfSettings, ResultsPanel: OrganizePdfCanvas },
+  ],
+  [
+    "multi-tool-pdf",
+    { accept: ".pdf", Settings: MultiToolPdfSettings, ResultsPanel: MultiToolPdfCanvas },
   ],
   ["protect-pdf", { accept: ".pdf", Settings: ProtectPdfSettings }],
   ["unlock-pdf", { accept: ".pdf", Settings: UnlockPdfSettings }],

@@ -1,8 +1,9 @@
 ---
 description: "Configura il Single Sign-On SAML 2.0 per SnapOtter. Guide passo passo per Okta, Azure AD / Entra ID, Google Workspace e altri provider di identità SAML."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 0f4f45cf66f7
+i18n_output_hash: 13cf399b021a
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Se vuoi imporre a tutti gli utenti l'accesso tramite SAML (o OIDC) e bloccare il
 2. In **Admin Settings > Security**, attiva **SSO Enforcement**.
 3. Imposta un **break-glass username**: questo è l'unico account locale che può ancora accedere con una password, per l'accesso di emergenza se l'IdP è irraggiungibile.
 
-Quando l'applicazione dell'SSO è attiva, qualsiasi tentativo di login locale (tranne quello dell'utente break-glass) restituisce un errore 403 con il messaggio "Local password login is disabled. Please use SSO."
+Quando l'applicazione dell'SSO è attiva, solo l'utente break-glass può accedere con una password locale. Qualsiasi altro tentativo di login locale viene rifiutato con lo stesso 401 "Invalid credentials" che riceve una password errata, anche se la password è corretta, e conta ai fini del limite di tentativi di login.
 
 ::: tip 
 Configura sempre un break-glass username prima di abilitare l'applicazione dell'SSO. Senza di esso, potresti restare bloccato fuori da SnapOtter se il tuo IdP smette di funzionare.

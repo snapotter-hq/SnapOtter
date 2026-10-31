@@ -1,4 +1,7 @@
+import { HEX_COLOR_PATTERN, normalizeHexColor } from "@snapotter/shared";
 import sharp, { type Sharp } from "sharp";
+
+export { HEX_COLOR_PATTERN, normalizeHexColor };
 
 export type BgOutputFormat = "png" | "webp" | "avif";
 
@@ -9,6 +12,18 @@ export const BG_FORMAT_CONTENT_TYPES: Record<BgOutputFormat, string> = {
   webp: "image/webp",
   avif: "image/avif",
 };
+
+function hexToRgb(color: string): { r: number; g: number; b: number } {
+  const hex = normalizeHexColor(color).slice(1);
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16),
+  };
+}
+
+/** Default shadow strength; matches the slider the tool page starts on. */
+const DEFAULT_SHADOW_OPACITY = 35;
 
 function toOutputFormat(pipeline: Sharp, format: BgOutputFormat): Promise<Buffer> {
   switch (format) {
@@ -122,11 +137,13 @@ export async function createGradientBackground(
   color2: string,
   angle = 180,
 ): Promise<Buffer> {
+  color1 = normalizeHexColor(color1);
+  color2 = normalizeHexColor(color2);
   const rad = (angle * Math.PI) / 180;
   const x1 = 50 - Math.sin(rad) * 50;
-  const y1 = 50 - Math.cos(rad) * 50;
+  const y1 = 50 + Math.cos(rad) * 50;
   const x2 = 50 + Math.sin(rad) * 50;
-  const y2 = 50 + Math.cos(rad) * 50;
+  const y2 = 50 - Math.cos(rad) * 50;
 
   const svg = Buffer.from(
     `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -149,10 +166,7 @@ export async function createGradientBackground(
 export async function compositeOnColor(subjectBuffer: Buffer, hexColor: string): Promise<Buffer> {
   const meta = await sharp(subjectBuffer).metadata();
   if (!meta.width || !meta.height) throw new Error("Cannot read image dimensions");
-  const hex = hexColor.replace("#", "");
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
+  const { r, g, b } = hexToRgb(hexColor);
 
   return sharp({
     create: {
@@ -220,11 +234,22 @@ export async function applyEffects(
 
   // Step 1: Add shadow to the subject (before background compositing)
   let subject = subjectBuffer;
-  if (settings.shadowEnabled && settings.shadowOpacity && settings.shadowOpacity > 0) {
-    subject = await addDropShadow(subject, settings.shadowOpacity);
+  const shadowOpacity = settings.shadowOpacity ?? DEFAULT_SHADOW_OPACITY;
+  if (settings.shadowEnabled && shadowOpacity > 0) {
+    subject = await addDropShadow(subject, shadowOpacity);
   }
 
-  // Step 2: Build the background layer
+  // Step 2: Build the background layer. A background that names a type but not
+  // what it needs fails here rather than coming back transparent (#2075).
+  if (bgType === "image" && !settings.backgroundImageBuffer) {
+    throw new Error("An image background needs a background image");
+  }
+  if (bgType === "color" && !settings.backgroundColor) {
+    throw new Error("A color background needs a color");
+  }
+  if (bgType === "gradient" && !(settings.gradientColor1 && settings.gradientColor2)) {
+    throw new Error("A gradient background needs two colors");
+  }
   let background: Buffer | null = null;
 
   if (bgType === "image" && settings.backgroundImageBuffer) {
@@ -239,7 +264,7 @@ export async function applyEffects(
       const sigma = 1 + (Math.max(0, Math.min(100, intensity)) / 100) * 49;
       background = await sharp(background).blur(sigma).png().toBuffer();
     }
-  } else if (settings.blurEnabled && (bgType === "transparent" || bgType === "blur")) {
+  } else if (bgType === "blur" || (settings.blurEnabled && bgType === "transparent")) {
     // Blur the original background (portrait mode)
     const intensity = settings.blurIntensity ?? 50;
     const sigma = 1 + (Math.max(0, Math.min(100, intensity)) / 100) * 49;
@@ -249,10 +274,7 @@ export async function applyEffects(
       .png()
       .toBuffer();
   } else if (bgType === "color" && settings.backgroundColor) {
-    const hex = settings.backgroundColor.replace("#", "");
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
+    const { r, g, b } = hexToRgb(settings.backgroundColor);
     background = await sharp({
       create: { width, height, channels: 4, background: { r, g, b, alpha: 1 } },
     })

@@ -8,63 +8,20 @@ import { useFileStore } from "@/stores/file-store";
 
 const SIMULATION_TYPES = [
   {
-    group: "Red-Green",
-    types: [
-      {
-        value: "protanopia",
-        label: "Protanopia",
-        description: "No red cones. Reds appear dark. ~1% of males.",
-      },
-      {
-        value: "protanomaly",
-        label: "Protanomaly",
-        description: "Reduced red sensitivity. ~1% of males.",
-      },
-      {
-        value: "deuteranopia",
-        label: "Deuteranopia",
-        description: "No green cones. Reds and greens look similar. ~1% of males.",
-      },
-      {
-        value: "deuteranomaly",
-        label: "Deuteranomaly",
-        description: "Reduced green sensitivity. Most common type. ~5% of males.",
-      },
-    ],
+    group: "redGreen",
+    types: ["protanopia", "protanomaly", "deuteranopia", "deuteranomaly"],
   },
   {
-    group: "Blue-Yellow",
-    types: [
-      {
-        value: "tritanopia",
-        label: "Tritanopia",
-        description: "No blue cones. Blues and greens look similar. Very rare.",
-      },
-      {
-        value: "tritanomaly",
-        label: "Tritanomaly",
-        description: "Reduced blue sensitivity. Very rare.",
-      },
-    ],
+    group: "blueYellow",
+    types: ["tritanopia", "tritanomaly"],
   },
   {
-    group: "Monochromatic",
-    types: [
-      {
-        value: "achromatopsia",
-        label: "Achromatopsia",
-        description: "Complete color blindness. Sees only luminance. Very rare.",
-      },
-      {
-        value: "blueConeMonochromacy",
-        label: "Blue Cone Monochromacy",
-        description: "Only blue cones functional. Very limited color. Very rare.",
-      },
-    ],
+    group: "monochromatic",
+    types: ["achromatopsia", "blueConeMonochromacy"],
   },
-];
+] as const;
 
-const TYPE_MAP = new Map(SIMULATION_TYPES.flatMap((g) => g.types.map((t) => [t.value, t])));
+type SimulationType = (typeof SIMULATION_TYPES)[number]["types"][number];
 
 export function ColorBlindnessSettings() {
   const { t } = useTranslation();
@@ -80,8 +37,9 @@ export function ColorBlindnessSettings() {
     progress,
   } = useToolProcessor("color-blindness");
 
-  const [simulationType, setSimulationType] = useState("deuteranomaly");
-  const selectedInfo = TYPE_MAP.get(simulationType);
+  const [simulationType, setSimulationType] = useState<SimulationType>("deuteranomaly");
+  const typeText = t.toolSettings["color-blindness"].types;
+  const selectedInfo = typeText[simulationType];
 
   const handleProcess = () => {
     const settings = { simulationType };
@@ -103,22 +61,20 @@ export function ColorBlindnessSettings() {
         <select
           id="cb-simulation-type"
           value={simulationType}
-          onChange={(e) => setSimulationType(e.target.value)}
+          onChange={(e) => setSimulationType(e.target.value as SimulationType)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
           {SIMULATION_TYPES.map((group) => (
-            <optgroup key={group.group} label={group.group}>
-              {group.types.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+            <optgroup key={group.group} label={t.toolSettings["color-blindness"][group.group]}>
+              {group.types.map((type) => (
+                <option key={type} value={type}>
+                  {typeText[type].label}
                 </option>
               ))}
             </optgroup>
           ))}
         </select>
-        {selectedInfo && (
-          <p className="mt-1 text-xs text-muted-foreground">{selectedInfo.description}</p>
-        )}
+        <p className="mt-1 text-xs text-muted-foreground">{selectedInfo.description}</p>
       </div>
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}

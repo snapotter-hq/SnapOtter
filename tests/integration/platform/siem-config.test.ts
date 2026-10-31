@@ -3,19 +3,19 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
-let testApp: TestApp;
-let adminToken: string;
-
-beforeAll(async () => {
-  testApp = await buildTestApp();
-  adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
-
-afterAll(async () => {
-  await testApp.cleanup();
-}, 10_000);
-
 describe("SIEM config without enterprise license", () => {
+  let testApp: TestApp;
+  let adminToken: string;
+
+  beforeAll(async () => {
+    testApp = await buildTestApp();
+    adminToken = await loginAsAdmin(testApp.app);
+  });
+
+  afterAll(async () => {
+    await testApp.cleanup();
+  });
+
   it("GET returns 403 without enterprise license", async () => {
     const res = await testApp.app.inject({
       method: "GET",
@@ -41,7 +41,7 @@ describe("SIEM config without enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${adminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         enabled: true,
         flushIntervalSeconds: 30,
       },
@@ -56,7 +56,7 @@ describe("SIEM config without enterprise license", () => {
       method: "PUT",
       url: "/api/v1/enterprise/siem/config",
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         enabled: true,
         flushIntervalSeconds: 30,
       },
@@ -100,12 +100,25 @@ describe("SIEM config with enterprise license", () => {
       payload: { username: "siemregularuser", password: "TestPass1" },
     });
     userToken = JSON.parse(loginRes.body).token;
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await enterpriseApp.cleanup();
     vi.resetModules();
-  }, 10_000);
+  });
+
+  it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
+    const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const queue = getQueue("system");
+    try {
+      await vi.waitFor(async () => expect(await queue.getWorkersCount()).toBe(1), {
+        timeout: 1_000,
+        interval: 25,
+      });
+    } finally {
+      await closeQueues();
+    }
+  });
 
   it("GET returns 200 with default config when none is saved", async () => {
     const res = await enterpriseApp.app.inject({
@@ -135,7 +148,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         authHeader: "Splunk secret-token",
         flushIntervalSeconds: 60,
         enabled: true,
@@ -162,13 +175,42 @@ describe("SIEM config with enterprise license", () => {
     expect(body.error).toContain("Invalid");
   });
 
+  it("PUT rejects loopback, private IP, and non-HTTP(S) webhookUrl (#2555)", async () => {
+    const { readSiemConfig } = await import("../../../apps/api/src/routes/enterprise/siem.js");
+    const before = await readSiemConfig();
+
+    for (const [webhookUrl, expectedDetail] of [
+      ["http://127.0.0.1:8080/siem", "private or reserved IP"],
+      ["http://10.0.0.1/siem", "private or reserved IP"],
+      ["http://[::1]:8080/siem", "private or reserved IP"],
+      ["ftp://example.com/siem", "Only HTTP and HTTPS URLs are supported"],
+    ] as const) {
+      const res = await enterpriseApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/siem/config",
+        headers: { authorization: `Bearer ${entAdminToken}` },
+        payload: {
+          webhookUrl,
+          flushIntervalSeconds: 30,
+          enabled: true,
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe("SIEM webhook URL must resolve to a public HTTP(S) destination");
+      expect(body.details).toContain(expectedDetail);
+    }
+
+    expect(await readSiemConfig()).toEqual(before);
+  });
+
   it("PUT rejects flushIntervalSeconds below 10", async () => {
     const res = await enterpriseApp.app.inject({
       method: "PUT",
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         flushIntervalSeconds: 5,
         enabled: true,
       },
@@ -184,7 +226,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         flushIntervalSeconds: 7200,
         enabled: true,
       },
@@ -200,7 +242,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${userToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         flushIntervalSeconds: 30,
         enabled: true,
       },
@@ -214,7 +256,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.corp.example.com/events",
+        webhookUrl: "https://example.com/siem/corp/events",
         authHeader: "Bearer my-secret-key",
         flushIntervalSeconds: 120,
         enabled: true,
@@ -228,7 +270,7 @@ describe("SIEM config with enterprise license", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
-    expect(body.webhookUrl).toBe("https://siem.corp.example.com/events");
+    expect(body.webhookUrl).toBe("https://example.com/siem/corp/events");
     expect(body.flushIntervalSeconds).toBe(120);
     expect(body.enabled).toBe(true);
   });
@@ -239,7 +281,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         authHeader: "Splunk super-secret-value",
         flushIntervalSeconds: 30,
         enabled: true,
@@ -255,5 +297,183 @@ describe("SIEM config with enterprise license", () => {
     const body = JSON.parse(res.body);
     expect(body.authHeader).toBe("***");
     expect(body.authHeader).not.toContain("super-secret-value");
+  });
+
+  it("PUT preserves stored authHeader when masked *** is echoed back (#2531)", async () => {
+    const { readSiemConfig } = await import("../../../apps/api/src/routes/enterprise/siem.js");
+
+    await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://example.com/siem/input",
+        authHeader: "Splunk super-secret-value",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+
+    const getRes = await enterpriseApp.app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+    });
+    const masked = JSON.parse(getRes.body);
+    expect(masked.authHeader).toBe("***");
+
+    const updateRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        ...masked,
+        webhookUrl: "https://example.com/siem/updated-input",
+        flushIntervalSeconds: 90,
+      },
+    });
+    expect(updateRes.statusCode).toBe(200);
+
+    const saved = await readSiemConfig();
+    expect(saved?.webhookUrl).toBe("https://example.com/siem/updated-input");
+    expect(saved?.flushIntervalSeconds).toBe(90);
+    expect(saved?.authHeader).toBe("Splunk super-secret-value");
+
+    // Sending an empty authHeader clears the stored secret
+    const clearRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        ...masked,
+        webhookUrl: "https://example.com/siem/updated-input",
+        authHeader: "",
+      },
+    });
+    expect(clearRes.statusCode).toBe(200);
+    expect((await readSiemConfig())?.authHeader).toBe("");
+  });
+
+  it("PUT does not store literal *** when no prior siem_config row exists or row is corrupt (#2531)", async () => {
+    const { readSiemConfig } = await import("../../../apps/api/src/routes/enterprise/siem.js");
+    await db.delete(schema.settings).where(eq(schema.settings.key, "siem_config"));
+
+    const res = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://example.com/siem/fresh",
+        authHeader: "***",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const saved = await readSiemConfig();
+    expect(saved?.authHeader).toBe("");
+
+    // Corrupt existing JSON row also falls back to empty string instead of storing ***
+    await db
+      .update(schema.settings)
+      .set({ value: "{corrupt-json" })
+      .where(eq(schema.settings.key, "siem_config"));
+
+    const corruptRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://example.com/siem/recovered",
+        authHeader: "***",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+    expect(corruptRes.statusCode).toBe(200);
+    expect((await readSiemConfig())?.authHeader).toBe("");
+
+    // Non-string authHeader or array JSON in stored row also falls back to empty string
+    await db
+      .update(schema.settings)
+      .set({
+        value: JSON.stringify({ webhookUrl: "https://example.com/siem/x", authHeader: 123 }),
+      })
+      .where(eq(schema.settings.key, "siem_config"));
+
+    const nonStringRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://example.com/siem/non-string",
+        authHeader: "***",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+    expect(nonStringRes.statusCode).toBe(200);
+    expect((await readSiemConfig())?.authHeader).toBe("");
+  });
+
+  it("GET logs a warning and returns default disabled config when siem_config row is corrupt or non-object JSON (#2554)", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const warnSpy = vi.spyOn(logger, "warn");
+
+    try {
+      await db
+        .insert(schema.settings)
+        .values({ key: "siem_config", value: "{corrupt" })
+        .onConflictDoUpdate({
+          target: schema.settings.key,
+          set: { value: "{corrupt", updatedAt: new Date() },
+        });
+
+      const corruptRes = await enterpriseApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/siem/config",
+        headers: { authorization: `Bearer ${entAdminToken}` },
+      });
+      expect(corruptRes.statusCode).toBe(200);
+      expect(JSON.parse(corruptRes.body)).toEqual({
+        webhookUrl: "",
+        authHeader: "",
+        flushIntervalSeconds: 30,
+        enabled: false,
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(SyntaxError), key: "siem_config" }),
+        "siem: failed to parse stored siem_config JSON",
+      );
+
+      for (const nonObject of ["null", "[]", "42"]) {
+        warnSpy.mockClear();
+        await db
+          .update(schema.settings)
+          .set({ value: nonObject, updatedAt: new Date() })
+          .where(eq(schema.settings.key, "siem_config"));
+
+        const nonObjRes = await enterpriseApp.app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/siem/config",
+          headers: { authorization: `Bearer ${entAdminToken}` },
+        });
+        expect(nonObjRes.statusCode).toBe(200);
+        expect(JSON.parse(nonObjRes.body)).toEqual({
+          webhookUrl: "",
+          authHeader: "",
+          flushIntervalSeconds: 30,
+          enabled: false,
+        });
+        expect(warnSpy).toHaveBeenCalledWith(
+          { key: "siem_config" },
+          "siem: stored siem_config is not a JSON object",
+        );
+      }
+    } finally {
+      warnSpy.mockRestore();
+      await db.delete(schema.settings).where(eq(schema.settings.key, "siem_config"));
+    }
   });
 });

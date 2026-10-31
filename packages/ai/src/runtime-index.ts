@@ -31,14 +31,49 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (!isRecord(value)) return value;
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map((key) => [key, sortJson(value[key])]),
-  );
+// Python's sort_keys orders keys by code point, the default .sort() by UTF-16
+// code unit. They split where a key char in U+D800-U+FFFF (a BMP char or a
+// lone surrogate) meets an astral char, whose high surrogate sorts first by
+// code unit but last by code point (#800).
+function compareCodePoints(left: string, right: string): number {
+  const a = Array.from(left, (char) => char.codePointAt(0) ?? 0);
+  const b = Array.from(right, (char) => char.codePointAt(0) ?? 0);
+  const length = Math.min(a.length, b.length);
+  for (let i = 0; i < length; i++) {
+    if (a[i] !== b[i]) return (a[i] ?? 0) - (b[i] ?? 0);
+  }
+  return a.length - b.length;
+}
+
+// Writes the JSON text directly rather than building a sorted object, because
+// JS enumerates integer-like keys ("9", "10") first in numeric order whatever
+// order they were inserted in, while Python sorts them as strings (#1411).
+// Built for plain JSON values (what JSON.parse returns). As with
+// JSON.stringify, undefined and function values drop out of objects and
+// become null in arrays, array holes included; toJSON is never called.
+// Numbers must be safe integers: Python writes floats as 1.0 or 1e-07 and
+// keeps big integers exact, neither of which JS can reproduce after
+// JSON.parse, so the signer refuses them too (#1415). The error names where
+// the number sits, not its value, because JSON.parse has already rounded it.
+// A whole-number float such as 1.0 parses to a safe integer and is caught by
+// the byte comparison instead.
+function stringifySorted(value: unknown, path = ""): string | undefined {
+  if (typeof value === "number" && !Number.isSafeInteger(value)) {
+    throw new TypeError(
+      `canonical runtime JSON only allows safe integers; ${path || "the top-level value"} is not one`,
+    );
+  }
+  if (Array.isArray(value)) {
+    const items = Array.from(value, (item, i) => stringifySorted(item, `${path}[${i}]`) ?? "null");
+    return `[${items.join(",")}]`;
+  }
+  if (!isRecord(value)) return JSON.stringify(value);
+  const members: string[] = [];
+  for (const key of Object.keys(value).sort(compareCodePoints)) {
+    const member = stringifySorted(value[key], path ? `${path}.${key}` : key);
+    if (member !== undefined) members.push(`${JSON.stringify(key)}:${member}`);
+  }
+  return `{${members.join(",")}}`;
 }
 
 /** Canonical representation shared with install_runtime.py and release signing. */
@@ -53,7 +88,8 @@ export function canonicalRuntimeJson(value: unknown): string {
   // release workflow passes on today's all-ASCII metadata (#667). Escaping each
   // UTF-16 code unit renders astral chars as surrogate pairs, exactly as
   // ensure_ascii does. Structural JSON is ASCII, so only string contents change.
-  const json = JSON.stringify(sortJson(value));
+  const json = stringifySorted(value);
+  if (json === undefined) throw new TypeError("canonicalRuntimeJson needs a JSON value");
   let ascii = "";
   for (let i = 0; i < json.length; i++) {
     const code = json.charCodeAt(i);

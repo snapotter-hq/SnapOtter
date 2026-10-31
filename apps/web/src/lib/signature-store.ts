@@ -9,10 +9,26 @@ export interface SavedSignature {
 export const MAX_SIGNATURES = 10;
 const KEY = "snapotter.signatures.v1";
 
+function isSavedSignature(value: unknown): value is SavedSignature {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === "string" &&
+    typeof record.dataUrl === "string" &&
+    typeof record.createdAt === "number" &&
+    Number.isFinite(record.createdAt)
+  );
+}
+
 function read(): SavedSignature[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as SavedSignature[]) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every(isSavedSignature)) {
+      return [];
+    }
+    return parsed;
   } catch {
     return [];
   }

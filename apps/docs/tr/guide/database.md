@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter için PostgreSQL veritabanı şeması, tablolar, migration'lar ve yedekleme prosedürleri."
-i18n_source_hash: a68264552836
+i18n_source_hash: 331b11cd21d1
 i18n_provenance: machine
 i18n_output_hash: 635a49df1d8b
 i18n_hash_version: 2

@@ -14,11 +14,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("PUT /api/v1/settings mfaPolicy (no mfa license)", () => {
   it("rejects admins_only when mfa is not licensed", async () => {

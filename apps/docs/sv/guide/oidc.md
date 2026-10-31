@@ -1,6 +1,6 @@
 ---
 description: "Konfigurera Single Sign-On med OpenID Connect. Steg-för-steg-guider för Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta och andra OIDC-leverantörer."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: b3ed5df413a2
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 Sätt inte `NODE_TLS_REJECT_UNAUTHORIZED=0`. Detta inaktiverar all TLS-verifiering och är en säkerhetsrisk.
 :::
+
+## Utfärdare över okrypterad http {#plain-http-issuers}
+
+SnapOtter accepterar en utfärdar-URL med `http://` bara när `EXTERNAL_URL` också är okrypterad http, vilket passar en lokal testmiljö eller en testmiljö i ett LAN. Discovery, utbytet av inloggningskoden och tokens går då okrypterat över nätverket, så SnapOtter loggar en varning vid start som anger utfärdarens värd. Med en `https://`-`EXTERNAL_URL` nekas en http-utfärdare vid inloggning, och startvarningen säger det. I båda fallen är lösningen att leverera din identitetsleverantör över https.
 
 ## Felsökning {#troubleshooting}
 

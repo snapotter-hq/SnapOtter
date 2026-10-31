@@ -1,8 +1,15 @@
 import { expect, putPreferences, test } from "./helpers";
 
-// Mutates the shared per-user `pinnedTools` preference on the server, so it
-// pins and then unpins within the single test to leave state clean.
+// Mutates the shared admin's `pinnedTools` preference on the server, so it runs
+// in chromium-serial (SERIAL_SPECS in playwright.config.ts), never alongside
+// the screenshot specs (#1706). The test unpins at the end; afterEach clears
+// the pins too, so a failure between pin and unpin can't leave a Pinned
+// section for later specs in the same run.
 test.describe("Pin tools", () => {
+  test.afterEach(async ({ page }) => {
+    expect((await putPreferences(page, { pinnedTools: [] })).status, "clear pinnedTools").toBe(200);
+  });
+
   test("pin a tool, persist across reload, then unpin", async ({ loggedInPage: page }) => {
     // Start from a known-empty pin state. CI retries once, and a prior attempt
     // that failed after pinning but before unpinning leaves a server-side pin,

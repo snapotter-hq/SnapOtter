@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: a4289adc1b56
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 427a7fff20af
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | 인증 | 현재 세션 검증 |
 | `POST` | `/api/auth/change-password` | 인증 | 본인 비밀번호 변경(다른 모든 세션 + API 키 무효화) |
 | `GET` | `/api/auth/users` | 관리자 | 전체 사용자 목록 조회 |
-| `POST` | `/api/auth/register` | 관리자 | 새 사용자 생성 |
-| `PUT` | `/api/auth/users/:id` | 관리자 | 사용자 역할 또는 팀 업데이트 |
-| `POST` | `/api/auth/users/:id/reset-password` | 관리자 | 사용자 비밀번호 재설정 |
-| `DELETE` | `/api/auth/users/:id` | 관리자 | 사용자 삭제 |
+| `POST` | `/api/auth/register` | 관리자(`users:manage`; 제안된 역할 권한) | 새 사용자 생성 |
+| `PUT` | `/api/auth/users/:id` | 관리자(`users:manage`; 대상 권한) | 사용자 역할 또는 팀 업데이트 |
+| `POST` | `/api/auth/users/:id/reset-password` | 관리자(`users:manage`; 대상 권한) | 사용자 비밀번호 재설정 |
+| `DELETE` | `/api/auth/users/:id` | 관리자(`users:manage`; 대상 권한) | 사용자 삭제 |
 | `GET` | `/api/v1/config/auth` | 공개 | 인증 활성화 여부 확인(`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | 인증 | TOTP MFA 등록 시작. 엔터프라이즈 `mfa` 기능 필요 |
 | `POST` | `/api/auth/mfa/verify` | 인증 | TOTP 코드로 MFA 등록 확인 |
 | `POST` | `/api/auth/mfa/complete` | 공개 | 대기 중인 MFA 로그인 챌린지 완료 |
 | `POST` | `/api/auth/mfa/disable` | 인증 | 현재 사용자의 MFA 비활성화 |
-| `POST` | `/api/auth/users/:id/mfa/reset` | 관리자(`users:manage`) | 사용자의 MFA 재설정 |
+| `POST` | `/api/auth/users/:id/mfa/reset` | 관리자(`users:manage`; 대상 권한) | 사용자의 MFA 재설정 |
 | `GET` | `/api/auth/oidc/login` | 공개 | OIDC 활성화 시 OIDC 로그인 시작 |
 | `GET` | `/api/auth/oidc/callback` | 공개 | OIDC 인가 콜백 |
 | `GET` | `/api/auth/saml/metadata` | 공개 | SAML 활성화 시 SAML SP 메타데이터 XML |
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | 도구 ID | 이름 | AI 모델 | 주요 설정 |
 |---------|------|---------|-------------|
-| `remove-background` | 배경 제거 | rembg(BiRefNet / U2-Net) | `model`, `backgroundType`(transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | 배경 제거 | rembg(BiRefNet / U2-Net) | 1단계: `model`, `edgeRefine`(0-3), `decontaminate`. 2단계(`/api/v1/tools/image/remove-background/effects`), `/batch` 및 파이프라인: `backgroundType`(transparent/color/gradient/blur, `/effects`에서는 image 추가), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat`(png/webp/avif) |
 | `upscale` | 이미지 업스케일 | RealESRGAN | `scale`(2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | 오브젝트 지우개 | LaMa(ONNX) | 마스크는 두 번째 파일 파트로 전송(필드명 `mask`), `format`, `quality` |
 | `ocr` | OCR / 텍스트 추출 | Tesseract(빠름); RapidOCR + PP-OCR ONNX(균형 잡힌/최고) | `quality`(빠름/균형/최고), `language`, `enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG를 래스터로 | `format`(png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | 이미지를 SVG로 | `colorMode`(bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode`(none/polygon/spline) |
-| `gif-tools` | GIF 도구 | `action`(resize/optimize/reverse/speed/extract-frames/rotate/add-text), 액션별 매개변수 |
+| `gif-tools` | GIF 도구 | `mode`(resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors`(2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode`(single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat`(png/webp), `angle`(90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP 변환기 | `quality`(1-100), `lossless`(bool), `resizePercent`(10-100) |
 
 ### 비디오 도구 {#video-tools}
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | 관리자(`teams:manage`) | 팀 목록 |
 | `POST` | `/api/v1/teams` | 관리자(`teams:manage`) | 팀 생성 |
-| `PUT` | `/api/v1/teams/:id` | 관리자(`teams:manage`) | 팀 이름 변경 |
+| `PUT` | `/api/v1/teams/:id` | 관리자(`teams:manage`) | 팀 업데이트(최소 하나의 필드 필요) |
 | `DELETE` | `/api/v1/teams/:id` | 관리자(`teams:manage`) | 팀 삭제(기본 팀 또는 멤버가 있는 팀은 삭제 불가) |
 
 ## 설정 {#settings}
@@ -559,6 +559,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ## 역할 {#roles}
 
 세분화된 권한을 가진 커스텀 역할 관리.
+
+역할 생성과 변경에는 권한 포함 제약이 적용됩니다. 제안된 역할이나 현재 역할은 행위자보다 높은 계층이거나, 행위자의 유효 권한을 초과하거나, 행위자의 도구 범위를 넓힐 수 없습니다. API 키 범위도 이 검사에 반영됩니다. 커스텀 역할을 삭제하려면 구성원에게 적용되는 기본 제공 `user` 폴백 역할을 할당할 권한도 필요합니다.
 
 | 메서드 | 경로 | 접근 권한 | 설명 |
 |--------|------|--------|-------------|
@@ -651,8 +653,8 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | 관리자(`security:manage`) | 자기 잠금 방지와 함께 CIDR 허용 목록 업데이트 |
 | `GET` | `/api/v1/enterprise/legal-hold` | 관리자(`compliance:manage`) | 사용자 및 팀 법적 보존 목록 |
 | `PUT` | `/api/v1/enterprise/legal-hold` | 관리자(`compliance:manage`) | 사용자 또는 팀에 법적 보존 적용 또는 해제 |
-| `POST` | `/api/v1/enterprise/scim/token` | 관리자(`users:manage`) | SCIM 베어러 토큰 생성, 한 번만 반환됨 |
-| `DELETE` | `/api/v1/enterprise/scim/token` | 관리자(`users:manage`) | 현재 SCIM 베어러 토큰 취소 |
+| `POST` | `/api/v1/enterprise/scim/token` | 전체 권한의 기본 제공 관리자 | SCIM 베어러 토큰 생성, 한 번만 반환됨 |
+| `DELETE` | `/api/v1/enterprise/scim/token` | 전체 권한의 기본 제공 관리자 | 현재 SCIM 베어러 토큰 취소 |
 | `GET` | `/api/v1/enterprise/siem/config` | 관리자(`webhooks:manage`) | SIEM 포워딩 구성 읽기 |
 | `PUT` | `/api/v1/enterprise/siem/config` | 관리자(`webhooks:manage`) | SIEM 포워딩 구성 업데이트 |
 | `GET` | `/api/v1/enterprise/webhooks` | 관리자(`webhooks:manage`) | 웹훅 대상 목록 |
@@ -662,15 +664,15 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | 관리자(`webhooks:manage`) | 테스트 웹훅 페이로드 전송 |
 | `POST` | `/api/v1/enterprise/users/:id/export` | 관리자(`compliance:manage`) | GDPR 사용자 내보내기 작업 시작 |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | 관리자(`compliance:manage`) | GDPR 내보내기 상태 및 다운로드 URL 읽기 |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | 관리자(`compliance:manage`) | 확인 후 사용자 데이터 영구 삭제 |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | 관리자(`compliance:manage`) | 확인 후 팀 데이터 영구 삭제 |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | 관리자(`compliance:manage`; 대상 권한) | 확인 후 사용자 데이터 영구 삭제 |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | 관리자(`compliance:manage`; 전체 구성원 권한) | 확인 후 팀 데이터 영구 삭제 |
 | `GET` | `/api/v1/admin/version` | 관리자(`system:health`) | 앱, 빌드, Node, 스키마 버전 메타데이터 읽기 |
 | `GET` | `/api/v1/admin/migrations/pending` | 관리자(`system:health`) | 패키징된 마이그레이션과 적용된 마이그레이션 비교 |
 | `GET` | `/api/v1/admin/upgrade-check` | 관리자(`system:health`) | 업그레이드 준비 상태 검사 실행 |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM 디스커버리 엔드포인트는 공개입니다. 사용자 및 그룹 엔드포인트는 위에서 생성한 SCIM 베어러 토큰이 필요합니다.
+SCIM 디스커버리 엔드포인트는 공개입니다. 사용자 및 그룹 엔드포인트는 위에서 생성한 SCIM 베어러 토큰이 필요합니다. 버전이 없는 레거시 토큰은 유효하지 않으며 전체 권한의 기본 제공 관리자가 `so_scim_v2_...` 토큰으로 재발급해야 합니다.
 
 | 메서드 | 경로 | 접근 권한 | 설명 |
 |--------|------|--------|-------------|

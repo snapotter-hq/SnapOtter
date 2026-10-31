@@ -1,6 +1,6 @@
 ---
 description: "सभी modalities में समर्थित file formats - 55+ image input formats, video, audio, PDF, और file formats।"
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: ce09fe20d2b2
 ---

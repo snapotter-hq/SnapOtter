@@ -8,8 +8,11 @@
  * it back with barcode-read, guaranteeing a clean, machine-readable input.
  */
 
+import { chmodSync, mkdirSync, statSync } from "node:fs";
+import path from "node:path";
 import sharp from "sharp";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { initZXingReader } from "../../../../apps/api/src/routes/tools/barcode-read.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -49,11 +52,11 @@ beforeAll(async () => {
     url: genResult.downloadUrl,
   });
   qrCodePng = dlRes.rawPayload;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Barcode Read", () => {
   it("detects and decodes a QR code from a generated image", async () => {
@@ -1105,4 +1108,171 @@ describe("Barcode Read", () => {
     expect(result.annotatedUrl).toBeDefined();
     expect(result.annotatedUrl).not.toBeNull();
   });
+});
+
+// ── Decoder that fails to start (#1402) ──────────────────────────
+
+describe("Barcode Read when the decoder fails to start", () => {
+  async function readQr() {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "qr.png", contentType: "image/png", content: qrCodePng },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/barcode-read",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // Leave the decoder working for anything that runs after this block.
+    initZXingReader();
+  });
+
+  it("answers 503, not 422, and the next request decodes normally", async () => {
+    // The real binary, failing to instantiate once (as under memory
+    // pressure). zxing caches that rejection, so before #1402 every later
+    // request failed too, reported as a bad image (422).
+    const realInstantiate = WebAssembly.instantiate;
+    vi.spyOn(WebAssembly, "instantiate").mockImplementationOnce(() =>
+      Promise.reject(new RangeError("could not allocate memory")),
+    );
+    // Force a fresh instantiation: the one the spy fails.
+    initZXingReader();
+    expect(WebAssembly.instantiate).not.toBe(realInstantiate);
+
+    const failed = await readQr();
+    expect(failed.statusCode).toBe(503);
+    expect(JSON.parse(failed.body).code).toBe("ENGINE_UNAVAILABLE");
+
+    const next = await readQr();
+    expect(next.statusCode).toBe(200);
+    expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
+  });
+});
+
+// ── Server-side failures are not the image's fault (#1425) ───────
+
+describe("Barcode Read server-side failures", () => {
+  // The route's own zxing-wasm instance (the module the route imports).
+  const zxing = () =>
+    import(
+      new URL(
+        "../../../../apps/api/node_modules/zxing-wasm/dist/es/reader/index.js",
+        import.meta.url,
+      ).href
+    );
+
+  /**
+   * Leave the decoder's heap with a single free hole of `bytes`: reserve it,
+   * fill everything else, then free the reserve. For the 400x400 QR these
+   * tests read, zxing throws "Failed to allocate" below 0.16 MB (its one-byte
+   * grayscale copy of the image), returns a std::bad_alloc result from there
+   * to about 0.6 MB, and decodes above that.
+   */
+  async function squeezeDecoderHeap(bytes: number) {
+    const { getZXingModule } = await zxing();
+    await readQr(); // make sure the decoder is instantiated
+    const heap = await getZXingModule();
+    const reserve = heap._malloc(bytes);
+    expect(reserve).not.toBe(0);
+    for (const size of [256e6, 64e6, 16e6, 4e6, 1e6, 256e3, 64e3, 16e3, 4e3, 1e3]) {
+      while (heap._malloc(size)) {}
+    }
+    heap._free(reserve);
+  }
+
+  async function readQr() {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "qr.png", contentType: "image/png", content: qrCodePng },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/barcode-read",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+  }
+
+  afterEach(() => {
+    // A fresh decoder instance, and with it a fresh heap.
+    initZXingReader();
+  });
+
+  it("answers 503 when the decoder can't fit the image, then recovers", async () => {
+    // Before #1425: 422 "Barcode reading failed", blaming the upload.
+    await squeezeDecoderHeap(50_000);
+
+    const failed = await readQr();
+    expect(failed.statusCode).toBe(503);
+    expect(JSON.parse(failed.body).code).toBe("ENGINE_UNAVAILABLE");
+
+    const next = await readQr();
+    expect(next.statusCode).toBe(200);
+    expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
+  });
+
+  it("answers 503, not an empty 200, when the decoder runs out of memory mid-read", async () => {
+    // Before #1425 zxing's std::bad_alloc result was filtered out as an
+    // invalid read, and the route said the image had no barcodes.
+    await squeezeDecoderHeap(400_000);
+
+    const failed = await readQr();
+    expect(failed.statusCode).toBe(503);
+    expect(JSON.parse(failed.body).code).toBe("ENGINE_UNAVAILABLE");
+
+    const next = await readQr();
+    expect(next.statusCode).toBe(200);
+    expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
+  });
+
+  it("answers 503 when Node can't allocate the decoder's copy of the image", async () => {
+    // Before handing the image to wasm, zxing copies it into a one-byte
+    // grayscale Uint8Array in JS. Under memory pressure V8 throws
+    // "Array buffer allocation failed" there; before #1469 that was a 422.
+    // Fail exactly that allocation (400x400 = 160000 bytes) and nothing else.
+    const RealUint8Array = globalThis.Uint8Array;
+    globalThis.Uint8Array = new Proxy(RealUint8Array, {
+      construct(target, args, newTarget) {
+        if (args[0] === 400 * 400) throw new RangeError("Array buffer allocation failed");
+        return Reflect.construct(target, args, newTarget);
+      },
+    });
+    let res: Awaited<ReturnType<typeof readQr>>;
+    try {
+      res = await readQr();
+    } finally {
+      globalThis.Uint8Array = RealUint8Array;
+    }
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+
+    const next = await readQr();
+    expect(next.statusCode).toBe(200);
+    expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
+  });
+
+  // chmod means nothing to root, and S3 storage never touches WORKSPACE_PATH.
+  it.skipIf(process.getuid?.() === 0 || process.env.STORAGE_MODE === "s3")(
+    "answers 503, not 422, when the result can't be stored",
+    async () => {
+      // The annotated result goes under WORKSPACE_PATH/outputs; make it read-only.
+      const outputs = path.join(process.env.WORKSPACE_PATH as string, "outputs");
+      mkdirSync(outputs, { recursive: true });
+      const mode = statSync(outputs).mode & 0o777;
+      chmodSync(outputs, 0o500);
+      try {
+        // The error now propagates instead of being caught as a 422. putObject
+        // names a read-only volume as a 503 "storage not writable" (#2120). The
+        // test app keeps Fastify's default handler (#1243); in production
+        // apps/api/src/plugins/error-handler.ts masks it and reports it.
+        const res = await readQr();
+        expect(res.statusCode).toBe(503);
+      } finally {
+        chmodSync(outputs, mode);
+      }
+    },
+  );
 });

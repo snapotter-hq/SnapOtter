@@ -117,7 +117,9 @@ export function BlurFacesSettings() {
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
-      {warning && <p className="text-xs text-amber-700 dark:text-amber-400">{warning}</p>}
+      {downloadUrl && warning && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">{warning}</p>
+      )}
 
       {/* Size info */}
       {originalSize != null && processedSize != null && (

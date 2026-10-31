@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { ne, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { type db, schema } from "../db/index.js";
 
@@ -21,7 +21,10 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export async function userLimitReached(tx: Tx): Promise<boolean> {
   if (env.MAX_USERS <= 0) return false;
   await tx.execute(sql`SELECT pg_advisory_xact_lock(${USER_LIMIT_LOCK_KEY})`);
-  const [row] = await tx.select({ count: sql<number>`COUNT(*)::int` }).from(schema.users);
+  const [row] = await tx
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(schema.users)
+    .where(ne(schema.users.id, "anonymous"));
   // COUNT(*) always yields one row; if that ever stops being true, fail
   // closed instead of admitting everyone with a phantom count of 0.
   if (!row) throw new Error("user count query returned no rows");

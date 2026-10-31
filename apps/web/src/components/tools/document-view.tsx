@@ -2,6 +2,7 @@ import { FileText } from "lucide-react";
 import * as pdfjs from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { useFileStore } from "@/stores/file-store";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -51,7 +52,7 @@ export function DocumentView({ inputOnly = false }: { inputOnly?: boolean } = {}
     (async () => {
       try {
         const source = file ? { data: new Uint8Array(await file.arrayBuffer()) } : { url };
-        doc = await pdfjs.getDocument(source).promise;
+        doc = await pdfjs.getDocument({ ...source, ...pdfDocumentOptions() }).promise;
         if (cancelled) return;
         setPageCount(doc.numPages);
         const pdfPage = await doc.getPage(Math.min(page, doc.numPages));

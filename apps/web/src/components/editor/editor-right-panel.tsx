@@ -11,9 +11,9 @@ import { LayersPanel } from "./panels/layers-panel";
 import { NavigatorPanel } from "./panels/navigator-panel";
 
 const TABS = [
-  { id: "layers" as const, label: "Layers" },
-  { id: "adjustments" as const, label: "Adjustments" },
-  { id: "history" as const, label: "History" },
+  { id: "layers" as const },
+  { id: "adjustments" as const },
+  { id: "history" as const },
 ];
 
 // The panel is user-resizable so it never has to consume a fixed, excessive
@@ -35,15 +35,28 @@ export function EditorRightPanel() {
   const togglePanel = useEditorStore((s) => s.toggleRightPanel);
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabLabels: Record<(typeof TABS)[number]["id"], string> = {
+    layers: t.editor.panels.tabs.layers,
+    adjustments: t.editor.panels.tabs.adjustments,
+    history: t.editor.panels.tabs.history,
+  };
 
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_PANEL_WIDTH;
-    const stored = Number(window.localStorage.getItem(PANEL_WIDTH_STORAGE_KEY));
-    return stored > 0 ? clampPanelWidth(stored) : DEFAULT_PANEL_WIDTH;
+    try {
+      const stored = Number(window.localStorage.getItem(PANEL_WIDTH_STORAGE_KEY));
+      return stored > 0 ? clampPanelWidth(stored) : DEFAULT_PANEL_WIDTH;
+    } catch {
+      return DEFAULT_PANEL_WIDTH;
+    }
   });
 
   useEffect(() => {
-    window.localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(width));
+    try {
+      window.localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(width));
+    } catch {
+      // Storage blocked or full
+    }
   }, [width]);
 
   const handleResizeStart = useCallback(
@@ -148,7 +161,7 @@ export function EditorRightPanel() {
               )}
               data-testid={`tab-${tab.id}`}
             >
-              {tab.label}
+              {tabLabels[tab.id]}
             </button>
           ))}
         </div>

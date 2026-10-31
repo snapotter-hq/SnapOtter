@@ -5,10 +5,73 @@
  * bulk delete, save-result versioning, search, and pagination.
  */
 
-import { chmod, unlink } from "node:fs/promises";
+import { chmod, stat, unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { gzipSync } from "node:zlib";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+const hooks = vi.hoisted(() => ({
+  reportError: vi.fn(),
+  svgUnexpectedError: false,
+  afterSaveFile: null as ((storedName: string) => Promise<void>) | null,
+  streamStoredFileError: null as Error | null,
+  readStoredFileError: null as Error | null,
+}));
+
+vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/file-storage.js")>();
+  return {
+    ...actual,
+    saveFile: async (...args: Parameters<typeof actual.saveFile>) => {
+      const storedName = await actual.saveFile(...args);
+      if (hooks.afterSaveFile) {
+        await hooks.afterSaveFile(storedName);
+      }
+      return storedName;
+    },
+    streamStoredFile: async (...args: Parameters<typeof actual.streamStoredFile>) => {
+      if (hooks.streamStoredFileError) {
+        const err = hooks.streamStoredFileError;
+        hooks.streamStoredFileError = null;
+        throw err;
+      }
+      return actual.streamStoredFile(...args);
+    },
+    readStoredFile: async (...args: Parameters<typeof actual.readStoredFile>) => {
+      if (hooks.readStoredFileError) {
+        const err = hooks.readStoredFileError;
+        hooks.readStoredFileError = null;
+        throw err;
+      }
+      return actual.readStoredFile(...args);
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: (...args: Parameters<typeof actual.reportError>) => {
+      hooks.reportError(...args);
+      return actual.reportError(...args);
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  return {
+    ...actual,
+    sanitizeSvg: (buffer: Buffer) => {
+      if (hooks.svgUnexpectedError) throw new Error("simulated sanitizer crash");
+      return actual.sanitizeSvg(buffer);
+    },
+  };
+});
+
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { getStoredFilePath } from "../../../apps/api/src/lib/file-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -21,12 +84,19 @@ import {
 
 const PNG = readFixture(fixtures.image.base.png200);
 const JPG = readFixture(fixtures.image.base.jpg100);
-const _WEBP = readFixture(fixtures.image.base.webp50);
+const WEBP = readFixture(fixtures.image.base.webp50);
 const TINY_PNG = readFixture(fixtures.image.edge.px1);
 // BMP is a CLI_DECODED_FORMATS member (see file-validation.ts): validateImageBuffer()
 // intentionally returns {valid: true, width: 0, height: 0} for it without decoding,
 // since real decoding happens lazily elsewhere. Used to cover the 0x0-vs-null bug.
 const BMP = readFixture(fixtures.image.formats("bmp"));
+const SVGZ_BOMB = gzipSync(
+  Buffer.concat([
+    Buffer.from('<svg xmlns="http://www.w3.org/2000/svg">'),
+    Buffer.alloc(51 * 1024 * 1024, 0x20),
+    Buffer.from("</svg>"),
+  ]),
+);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -36,11 +106,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ── Upload ───────────────────────────────────────────────────────
 describe("File upload", () => {
@@ -131,6 +201,33 @@ describe("File upload", () => {
     expect(result.files).toHaveLength(1);
     expect(result.files[0].width).toBeNull();
     expect(result.files[0].height).toBeNull();
+  });
+
+  it("rejects an .svgz upload that decompresses past the 50 MiB cap with 400 and no Sentry report (#2429, #2582)", async () => {
+    hooks.reportError.mockClear();
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "upload-bomb.svgz",
+        contentType: "image/svg+xml",
+        content: SVGZ_BOMB,
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/52428800|larger than/i);
+    expect(hooks.reportError).not.toHaveBeenCalled();
   });
 });
 
@@ -362,6 +459,78 @@ describe("File download", () => {
       await chmod(blobPath, 0o644);
     }
   });
+
+  it("keeps 404 for a poisoned stored_name (INVALID_STORED_NAME SafeError) on download (#2851)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "poisoned-dl.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const fileId = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const [row] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, fileId));
+    await unlink(getStoredFilePath(row.storedName));
+    await db
+      .update(schema.userFiles)
+      .set({ storedName: "../escape.png" })
+      .where(eq(schema.userFiles.id, fileId));
+
+    hooks.reportError.mockClear();
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${fileId}/download`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "File not found in storage" });
+    expect(hooks.reportError).not.toHaveBeenCalled();
+  });
+
+  it("returns 500, not 404 or 422, when streamStoredFile or readStoredFile rejects with a non-syscall local error (#2851)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "nosyscall-fault.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const fileId = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const tooLarge = Object.assign(new RangeError("File size is greater than 2 GiB"), {
+      code: "ERR_FS_FILE_TOO_LARGE",
+    });
+    hooks.streamStoredFileError = tooLarge;
+    const dlRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${fileId}/download`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(500);
+    expect(JSON.parse(dlRes.body).error).not.toMatch(/not found/i);
+
+    const unexpectedBug = new TypeError("unexpected readStoredFile failure");
+    hooks.readStoredFileError = unexpectedBug;
+    const thumbRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${fileId}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(thumbRes.statusCode).toBe(500);
+    expect(JSON.parse(thumbRes.body).error).not.toMatch(/could not generate thumbnail/i);
+  });
 });
 
 // ── Thumbnail ────────────────────────────────────────────────────
@@ -396,6 +565,66 @@ describe("Thumbnail generation", () => {
     expect(meta.width).toBeLessThanOrEqual(300);
   });
 
+  it("preserves Content-Type on cached PDF and video thumbnails (#2824)", async () => {
+    const pdf = readFixture(fixtures.document.pdf3);
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "cached-thumb.pdf", contentType: "application/pdf", content: pdf },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const pdfFileId = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+    const [pdfRow] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, pdfFileId));
+
+    const { saveThumbnail } = await import("../../../apps/api/src/lib/file-storage.js");
+    await saveThumbnail(pdfRow.storedName, TINY_PNG);
+
+    const cachedPdfRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${pdfFileId}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(cachedPdfRes.statusCode).toBe(200);
+    expect(cachedPdfRes.headers["content-type"]).toBe("image/png");
+    expect(Buffer.compare(cachedPdfRes.rawPayload, TINY_PNG)).toBe(0);
+
+    const mp4 = readFixture(fixtures.video.tiny("mp4"));
+    const { body: vidBody, contentType: vidCt } = createMultipartPayload([
+      { name: "file", filename: "cached-thumb.mp4", contentType: "video/mp4", content: mp4 },
+    ]);
+    const vidUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": vidCt, authorization: `Bearer ${adminToken}` },
+      body: vidBody,
+    });
+    expect(vidUploadRes.statusCode).toBe(201);
+    const vidFileId = (JSON.parse(vidUploadRes.body).files[0] as { id: string }).id;
+    const [vidRow] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, vidFileId));
+
+    await saveThumbnail(vidRow.storedName, WEBP);
+
+    const cachedVidRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${vidFileId}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(cachedVidRes.statusCode).toBe(200);
+    expect(cachedVidRes.headers["content-type"]).toBe("image/webp");
+    expect(Buffer.compare(cachedVidRes.rawPayload, WEBP)).toBe(0);
+  });
+
   it("returns 404 for non-existent file thumbnail", async () => {
     const res = await app.inject({
       method: "GET",
@@ -404,6 +633,177 @@ describe("Thumbnail generation", () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "returns 500, not 422, when the backing blob is unreadable (#2808)",
+    async () => {
+      const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+        { name: "file", filename: "locked-thumb.png", contentType: "image/png", content: PNG },
+      ]);
+
+      const uploadRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/upload",
+        headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+        body: uploadBody,
+      });
+
+      const fileId = JSON.parse(uploadRes.body).files[0].id;
+
+      const [row] = await db
+        .select({ storedName: schema.userFiles.storedName })
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.id, fileId));
+      const blobPath = getStoredFilePath(row.storedName);
+      await chmod(blobPath, 0o000);
+
+      try {
+        const res = await app.inject({
+          method: "GET",
+          url: `/api/v1/files/${fileId}/thumbnail`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+
+        expect(res.statusCode).toBe(500);
+      } finally {
+        await chmod(blobPath, 0o644);
+      }
+    },
+  );
+
+  it.skipIf(isRoot)(
+    "returns 500, not a regenerated 200 cache miss, when the cached thumbnail is unreadable (#2836)",
+    async () => {
+      const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "locked-cached-thumb.png",
+          contentType: "image/png",
+          content: PNG,
+        },
+      ]);
+
+      const uploadRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/upload",
+        headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+        body: uploadBody,
+      });
+
+      const fileId = JSON.parse(uploadRes.body).files[0].id;
+
+      const [row] = await db
+        .select({ storedName: schema.userFiles.storedName })
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.id, fileId));
+      const { saveThumbnail } = await import("../../../apps/api/src/lib/file-storage.js");
+      await saveThumbnail(row.storedName, TINY_PNG);
+      const cachedThumbPath = join(
+        dirname(getStoredFilePath(row.storedName)),
+        ".thumbs",
+        `${row.storedName}.thumb.jpg`,
+      );
+      await chmod(cachedThumbPath, 0o000);
+
+      try {
+        const res = await app.inject({
+          method: "GET",
+          url: `/api/v1/files/${fileId}/thumbnail`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+
+        expect(res.statusCode).toBe(500);
+      } finally {
+        await chmod(cachedThumbPath, 0o644);
+      }
+    },
+  );
+
+  it("returns 500, not 422, when videoPosterPreview or pdfFirstPagePreview fails with an operational scratch fault (#2870)", async () => {
+    const previewMod = await import("../../../apps/api/src/modality/preview.js");
+
+    const pdf = readFixture(fixtures.document.pdf3);
+    const { body: pdfBody, contentType: pdfCt } = createMultipartPayload([
+      { name: "file", filename: "fault-thumb.pdf", contentType: "application/pdf", content: pdf },
+    ]);
+    const pdfUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": pdfCt, authorization: `Bearer ${adminToken}` },
+      body: pdfBody,
+    });
+    expect(pdfUploadRes.statusCode).toBe(201);
+    const pdfFileId = (JSON.parse(pdfUploadRes.body).files[0] as { id: string }).id;
+
+    const mp4 = readFixture(fixtures.video.tiny("mp4"));
+    const { body: vidBody, contentType: vidCt } = createMultipartPayload([
+      { name: "file", filename: "fault-thumb.mp4", contentType: "video/mp4", content: mp4 },
+    ]);
+    const vidUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": vidCt, authorization: `Bearer ${adminToken}` },
+      body: vidBody,
+    });
+    expect(vidUploadRes.statusCode).toBe(201);
+    const vidFileId = (JSON.parse(vidUploadRes.body).files[0] as { id: string }).id;
+
+    const enospc = Object.assign(new Error("ENOSPC: no space left on device, mkdir"), {
+      code: "ENOSPC",
+      syscall: "mkdir",
+    });
+    const pdfSpy = vi.spyOn(previewMod, "pdfFirstPagePreview").mockRejectedValueOnce(enospc);
+    const vidSpy = vi.spyOn(previewMod, "videoPosterPreview").mockRejectedValueOnce(enospc);
+    try {
+      const pdfRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${pdfFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(pdfRes.statusCode).toBe(500);
+
+      const vidRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${vidFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(vidRes.statusCode).toBe(500);
+
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      pdfSpy.mockRejectedValueOnce(
+        new DecoderOutOfMemoryError(
+          "The PDF preview engine ran out of memory rendering this PDF, or was killed.",
+        ),
+      );
+      vidSpy.mockRejectedValueOnce(
+        new DecoderOutOfMemoryError(
+          "The video preview engine ran out of memory decoding this video, or was killed.",
+        ),
+      );
+
+      const pdfOomRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${pdfFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(pdfOomRes.statusCode).toBe(503);
+      expect(JSON.parse(pdfOomRes.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+
+      const vidOomRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${vidFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(vidOomRes.statusCode).toBe(503);
+      expect(JSON.parse(vidOomRes.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    } finally {
+      pdfSpy.mockRestore();
+      vidSpy.mockRestore();
+    }
   });
 });
 
@@ -490,6 +890,92 @@ describe("Bulk delete", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.deleted).toBe(0);
+  });
+
+  it("deletes an orphaned version chain whose parent row was already deleted (#2927)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "orphan-root.png", contentType: "image/png", content: PNG },
+    ]);
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const v1Id = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const { body: v2Body, contentType: v2Ct } = createMultipartPayload([
+      { name: "file", filename: "v2.png", contentType: "image/png", content: PNG },
+      { name: "parentId", content: v1Id },
+      { name: "toolId", content: "resize" },
+    ]);
+    const v2Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v2Ct, authorization: `Bearer ${adminToken}` },
+      body: v2Body,
+    });
+    expect(v2Res.statusCode).toBe(201);
+    const v2 = JSON.parse(v2Res.body).file as { id: string; size: number };
+
+    const { body: v3Body, contentType: v3Ct } = createMultipartPayload([
+      { name: "file", filename: "v3.png", contentType: "image/png", content: TINY_PNG },
+      { name: "parentId", content: v2.id },
+      { name: "toolId", content: "compress" },
+    ]);
+    const v3Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v3Ct, authorization: `Bearer ${adminToken}` },
+      body: v3Body,
+    });
+    expect(v3Res.statusCode).toBe(201);
+    const v3 = JSON.parse(v3Res.body).file as { id: string; size: number };
+
+    // Remove the root parent row directly so v2 -> v3 is an orphaned sub-chain
+    // whose top-most surviving row (v2) has a non-null parent_id pointing at a
+    // deleted row.
+    const [v1Row] = await db
+      .select({ userId: schema.userFiles.userId, storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v1Id));
+    await unlink(getStoredFilePath(v1Row.storedName));
+    await db.delete(schema.userFiles).where(eq(schema.userFiles.id, v1Id));
+
+    const [userBefore] = await db
+      .select({ storageUsed: schema.users.storageUsed })
+      .from(schema.users)
+      .where(eq(schema.users.id, v1Row.userId ?? ""));
+
+    const delRes = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/files",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${adminToken}`,
+      },
+      payload: { ids: [v3.id] },
+    });
+    expect(delRes.statusCode).toBe(200);
+    expect(JSON.parse(delRes.body)).toEqual({ deleted: 2 });
+
+    const remaining = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v2.id));
+    expect(remaining).toEqual([]);
+    const remainingLeaf = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v3.id));
+    expect(remainingLeaf).toEqual([]);
+
+    const [userAfter] = await db
+      .select({ storageUsed: schema.users.storageUsed })
+      .from(schema.users)
+      .where(eq(schema.users.id, v1Row.userId ?? ""));
+    expect(userAfter.storageUsed).toBe(Math.max(0, userBefore.storageUsed - v2.size - v3.size));
   });
 });
 
@@ -685,5 +1171,463 @@ describe("Save result", () => {
     expect(detail.versions.length).toBe(3);
     expect(detail.versions[0].version).toBe(1);
     expect(detail.versions[2].version).toBe(3);
+  });
+
+  // Regression test for #2582: gunzipSync(..., { maxOutputLength: 50 MiB }) throws
+  // RangeError (ERR_BUFFER_TOO_LARGE) when an .svgz result decompresses past the cap.
+  // save-result must answer 400 without reporting to Sentry or creating a version row,
+  // matching /api/v1/files/upload (#2429).
+  it("rejects an .svgz result that decompresses past the 50 MiB cap with 400 and no Sentry report (#2582)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "parent-for-svgz-bomb.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    hooks.reportError.mockClear();
+
+    const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+      { name: "file", filename: "result.svgz", contentType: "image/svg+xml", content: SVGZ_BOMB },
+      { name: "parentId", content: parentId },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+      body: saveBody,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/52428800|larger than/i);
+    expect(hooks.reportError).not.toHaveBeenCalled();
+
+    const detailRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${parentId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(detailRes.statusCode).toBe(200);
+    expect(JSON.parse(detailRes.body).versions).toHaveLength(1);
+  });
+
+  it("rejects corrupt, truncated, and over-element-cap SVG/SVGZ results with 400 and no Sentry report", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "parent-for-svg-errors.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    const validSvgz = gzipSync(
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+    );
+    // 1. Z_DATA_ERROR: valid gzip stream with a corrupted CRC32 trailer byte
+    const corruptSvgz = Buffer.from(validSvgz);
+    corruptSvgz[corruptSvgz.length - 8] ^= 0xff;
+    // 2. Z_BUF_ERROR: valid gzip stream truncated mid-stream
+    const truncatedSvgz = validSvgz.subarray(0, validSvgz.length - 6);
+    // 3. statusCode === 400: SVG over the 5000-element cap
+    const overElementCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg">${"<rect/>".repeat(5001)}</svg>`,
+    );
+
+    for (const [filename, content, expectedError] of [
+      ["corrupt.svgz", corruptSvgz, /incorrect data check/i],
+      ["truncated.svgz", truncatedSvgz, /unexpected end of file/i],
+      ["too-many-elements.svg", overElementCapSvg, /element count/i],
+    ] as const) {
+      hooks.reportError.mockClear();
+      const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+        { name: "file", filename, contentType: "image/svg+xml", content },
+        { name: "parentId", content: parentId },
+        { name: "toolId", content: "compress" },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/save-result",
+        headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+        body: saveBody,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toMatch(expectedError);
+      expect(hooks.reportError).not.toHaveBeenCalled();
+    }
+
+    const detailRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${parentId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(detailRes.statusCode).toBe(200);
+    expect(JSON.parse(detailRes.body).versions).toHaveLength(1);
+  });
+
+  it("answers 500 and calls reportError when sanitizeSvg throws an unexpected error on save-result", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "parent-for-svg-500.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    hooks.reportError.mockClear();
+    hooks.svgUnexpectedError = true;
+    try {
+      const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "result.svg",
+          contentType: "image/svg+xml",
+          content: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+        },
+        { name: "parentId", content: parentId },
+        { name: "toolId", content: "compress" },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/save-result",
+        headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+        body: saveBody,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(hooks.reportError).toHaveBeenCalledTimes(1);
+      expect(hooks.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "simulated sanitizer crash" }),
+        expect.objectContaining({
+          source: "http",
+          route: "/api/v1/files/save-result",
+          method: "POST",
+          statusCode: 500,
+        }),
+      );
+    } finally {
+      hooks.svgUnexpectedError = false;
+    }
+  });
+
+  it("decompresses valid .svgz to .svg and keeps non-SVG .svgz as opaque on save-result", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "vector-parent.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    const validSvgz = gzipSync(
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect/></svg>'),
+    );
+    const { body: v2Body, contentType: v2Ct } = createMultipartPayload([
+      { name: "file", filename: "result.svgz", contentType: "image/svg+xml", content: validSvgz },
+      { name: "parentId", content: parentId },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const v2Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v2Ct, authorization: `Bearer ${adminToken}` },
+      body: v2Body,
+    });
+    expect(v2Res.statusCode).toBe(201);
+    const v2 = JSON.parse(v2Res.body).file;
+    expect(v2.originalName).toBe("vector-parent.svg");
+
+    const opaqueSvgz = gzipSync(Buffer.from("plain text inside gzip, not an SVG"));
+    const { body: v3Body, contentType: v3Ct } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "opaque.svgz",
+        contentType: "application/octet-stream",
+        content: opaqueSvgz,
+      },
+      { name: "parentId", content: v2.id },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const v3Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v3Ct, authorization: `Bearer ${adminToken}` },
+      body: v3Body,
+    });
+    expect(v3Res.statusCode).toBe(201);
+    const v3 = JSON.parse(v3Res.body).file;
+    expect(v3.originalName).toBe("vector-parent.svgz");
+
+    // Saving an extensionless result against the .svgz parent falls back to the
+    // parent's .svgz extension, decompressing and rewriting to .svg (#3529).
+    const { body: v4Body, contentType: v4Ct } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "result",
+        contentType: "application/octet-stream",
+        content: validSvgz,
+      },
+      { name: "parentId", content: v3.id },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const v4Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v4Ct, authorization: `Bearer ${adminToken}` },
+      body: v4Body,
+    });
+    expect(v4Res.statusCode).toBe(201);
+    const v4 = JSON.parse(v4Res.body).file;
+    expect(v4.originalName).toBe("vector-parent.svg");
+    expect(v4.mimeType).toBe("image/svg+xml");
+
+    // Dotfile parent stems stay intact on extensionless and extensioned results (#3529).
+    const { body: dotUploadBody, contentType: dotUploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: ".gitignore",
+        contentType: "text/plain",
+        content: Buffer.from("dist/\n"),
+      },
+    ]);
+    const dotUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": dotUploadCt, authorization: `Bearer ${adminToken}` },
+      body: dotUploadBody,
+    });
+    expect(dotUploadRes.statusCode).toBe(201);
+    const dotParentId = JSON.parse(dotUploadRes.body).files[0].id as string;
+
+    const { body: dotExtlessBody, contentType: dotExtlessCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "result",
+        contentType: "text/plain",
+        content: Buffer.from("dist/\nnode_modules/\n"),
+      },
+      { name: "parentId", content: dotParentId },
+      { name: "toolId", content: "convert" },
+    ]);
+    const dotExtlessRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": dotExtlessCt, authorization: `Bearer ${adminToken}` },
+      body: dotExtlessBody,
+    });
+    expect(dotExtlessRes.statusCode).toBe(201);
+    expect(JSON.parse(dotExtlessRes.body).file.originalName).toBe(".gitignore");
+
+    const { body: dotExtBody, contentType: dotExtCt } = createMultipartPayload([
+      { name: "file", filename: "result.png", contentType: "image/png", content: TINY_PNG },
+      { name: "parentId", content: dotParentId },
+      { name: "toolId", content: "convert" },
+    ]);
+    const dotExtRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": dotExtCt, authorization: `Bearer ${adminToken}` },
+      body: dotExtBody,
+    });
+    expect(dotExtRes.statusCode).toBe(201);
+    expect(JSON.parse(dotExtRes.body).file.originalName).toBe(".gitignore.png");
+  });
+
+  it("discards the staged blob and returns 404 when the parent file is deleted while save-result is staging (#2939)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "race-parent.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const v1Id = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const [v1Row] = await db
+      .select({ userId: schema.userFiles.userId })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v1Id));
+    const ownerId = v1Row.userId ?? "";
+
+    let stagedStoredName: string | null = null;
+    hooks.afterSaveFile = async (storedName) => {
+      stagedStoredName = storedName;
+      const delRes = await app.inject({
+        method: "DELETE",
+        url: "/api/v1/files",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: { ids: [v1Id] },
+      });
+      expect(delRes.statusCode).toBe(200);
+      expect(JSON.parse(delRes.body)).toEqual({ deleted: 1 });
+    };
+
+    try {
+      const [userBeforeSave] = await db
+        .select({ storageUsed: schema.users.storageUsed })
+        .from(schema.users)
+        .where(eq(schema.users.id, ownerId));
+
+      const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+        { name: "file", filename: "race-v2.png", contentType: "image/png", content: TINY_PNG },
+        { name: "parentId", content: v1Id },
+        { name: "toolId", content: "resize" },
+      ]);
+      const saveRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/save-result",
+        headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+        body: saveBody,
+      });
+
+      expect(saveRes.statusCode).toBe(404);
+      expect(JSON.parse(saveRes.body)).toEqual({ error: "Parent file not found" });
+      expect(stagedStoredName).toBeTruthy();
+      await expect(stat(getStoredFilePath(stagedStoredName ?? ""))).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+
+      const orphanChildren = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.parentId, v1Id));
+      expect(orphanChildren).toEqual([]);
+
+      const [userAfterSave] = await db
+        .select({ storageUsed: schema.users.storageUsed })
+        .from(schema.users)
+        .where(eq(schema.users.id, ownerId));
+      // v1 was deleted inside afterSaveFile, so userAfterSave.storageUsed must equal
+      // userBeforeSave.storageUsed minus v1's size (no charge from the aborted v2).
+      expect(userAfterSave.storageUsed).toBe(userBeforeSave.storageUsed - PNG.length);
+    } finally {
+      hooks.afterSaveFile = null;
+    }
+  });
+
+  it("returns the surviving version chain from GET /api/v1/files/:id when the root parent row is missing (#2939)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "detail-orphan-root.png", contentType: "image/png", content: PNG },
+    ]);
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const v1Id = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const { body: v2Body, contentType: v2Ct } = createMultipartPayload([
+      { name: "file", filename: "v2.png", contentType: "image/png", content: PNG },
+      { name: "parentId", content: v1Id },
+      { name: "toolId", content: "resize" },
+    ]);
+    const v2Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v2Ct, authorization: `Bearer ${adminToken}` },
+      body: v2Body,
+    });
+    expect(v2Res.statusCode).toBe(201);
+    const v2 = JSON.parse(v2Res.body).file as { id: string };
+
+    const { body: v3Body, contentType: v3Ct } = createMultipartPayload([
+      { name: "file", filename: "v3.png", contentType: "image/png", content: TINY_PNG },
+      { name: "parentId", content: v2.id },
+      { name: "toolId", content: "compress" },
+    ]);
+    const v3Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v3Ct, authorization: `Bearer ${adminToken}` },
+      body: v3Body,
+    });
+    expect(v3Res.statusCode).toBe(201);
+    const v3 = JSON.parse(v3Res.body).file as { id: string };
+
+    const [v1Row] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v1Id));
+    await unlink(getStoredFilePath(v1Row.storedName));
+    await db.delete(schema.userFiles).where(eq(schema.userFiles.id, v1Id));
+
+    for (const targetId of [v2.id, v3.id]) {
+      const detailRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${targetId}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(detailRes.statusCode).toBe(200);
+      const detail = JSON.parse(detailRes.body) as {
+        file: { id: string };
+        versions: { id: string; version: number; parentId: string | null }[];
+      };
+      expect(detail.file.id).toBe(targetId);
+      expect(detail.versions.map((v) => ({ id: v.id, version: v.version }))).toEqual([
+        { id: v2.id, version: 2 },
+        { id: v3.id, version: 3 },
+      ]);
+    }
   });
 });

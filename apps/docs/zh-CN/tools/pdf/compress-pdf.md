@@ -1,6 +1,6 @@
 ---
 description: "通过压缩嵌入的图像来缩减 PDF 文件大小。"
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: c96018e728d8
 ---

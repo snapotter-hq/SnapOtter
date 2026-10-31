@@ -248,24 +248,102 @@ describe("runFfmpeg: resolution and stderr capture", () => {
 });
 
 describe("runFfmpeg: non-zero exit", () => {
-  it("rejects with 'ffmpeg exited <code>: <tail>' including the last 2000 chars", async () => {
+  it("rejects with 'ffmpeg exited <code>: <tail>' including the full stderr tail (up to ring max)", async () => {
     const child = makeChild();
     mockSpawnReturns(child);
     const runFfmpeg = await loadRunFfmpeg();
     const p = runFfmpeg(["out.mp4"]);
     child.stderr.emit("data", Buffer.from("Unknown encoder 'libbogus'"));
     child.proc.emit("close", 3, null);
-    await expect(p).rejects.toThrow("ffmpeg exited 3: Unknown encoder 'libbogus'");
+    let caught: unknown;
+    try {
+      await p;
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as Error).message).toBe("ffmpeg exited 3: Unknown encoder 'libbogus'");
+    expect(caught).not.toHaveProperty("signal");
+    expect((caught as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("uses the signal name when exit code is null", async () => {
+  it.each(["SIGSEGV", "SIGKILL"] as const)(
+    "tags a signal kill (%s, exit code null) as an errno-coded spawn failure (#3829)",
+    async (signal) => {
+      const child = makeChild();
+      mockSpawnReturns(child);
+      const runFfmpeg = await loadRunFfmpeg();
+      const p = runFfmpeg(["out.mp4"]);
+      child.stderr.emit("data", Buffer.from("killed\n"));
+      child.proc.emit("close", null, signal);
+      await expect(p).rejects.toMatchObject({
+        message: `ffmpeg exited ${signal}: killed`,
+        code: "ENOMEM",
+        syscall: "spawn",
+        path: "/fake/ffmpeg",
+        signal,
+      });
+    },
+  );
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
     const child = makeChild();
     mockSpawnReturns(child);
     const runFfmpeg = await loadRunFfmpeg();
     const p = runFfmpeg(["out.mp4"]);
-    child.stderr.emit("data", Buffer.from("killed"));
-    child.proc.emit("close", null, "SIGSEGV");
-    await expect(p).rejects.toThrow("ffmpeg exited SIGSEGV: killed");
+    child.stderr.emit("data", Buffer.from("  \n"));
+    child.proc.emit("close", null, "SIGTERM");
+    await expect(p).rejects.toMatchObject({
+      message: "spawn /fake/ffmpeg ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/fake/ffmpeg",
+      signal: "SIGTERM",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3829)", async () => {
+    const runFfmpeg = await loadRunFfmpeg();
+
+    const child126 = makeChild();
+    vi.mocked(spawn).mockReturnValueOnce(child126.proc);
+    const p126 = runFfmpeg(["out.mp4"]);
+    child126.stderr.emit("data", Buffer.from("sh: exec format error\n"));
+    child126.proc.emit("close", 126, null);
+    await expect(p126).rejects.toMatchObject({
+      message: "ffmpeg exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/fake/ffmpeg",
+    });
+
+    const child127 = makeChild();
+    vi.mocked(spawn).mockReturnValueOnce(child127.proc);
+    const p127 = runFfmpeg(["out.mp4"]);
+    child127.stderr.emit("data", Buffer.from("sh: ffmpeg: not found\n"));
+    child127.proc.emit("close", 127, null);
+    await expect(p127).rejects.toMatchObject({
+      message: "ffmpeg exited 127: sh: ffmpeg: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/fake/ffmpeg",
+    });
+  });
+
+  it("does not mark a signal kill or 126/127 exit as a tool input error (#3829)", async () => {
+    const child = makeChild();
+    mockSpawnReturns(child);
+    const runFfmpeg = await loadRunFfmpeg();
+    const p = runFfmpeg(["out.mp4"]);
+    child.stderr.emit("data", Buffer.from("moov atom not found"));
+    child.proc.emit("close", null, "SIGKILL");
+    const caught = await p.catch((e: unknown) => e);
+    expect(isToolInputError(caught)).toBe(false);
+    expect(caught).toMatchObject({
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/fake/ffmpeg",
+      signal: "SIGKILL",
+    });
   });
 
   it("marks the rejection as a tool input error when stderr matches an input pattern", async () => {
@@ -300,7 +378,7 @@ describe("runFfmpeg: non-zero exit", () => {
     expect(isToolInputError(caught)).toBe(false);
   });
 
-  it("truncates the reject message tail to the last 2000 chars", async () => {
+  it("does not truncate the reject message tail", async () => {
     const child = makeChild();
     mockSpawnReturns(child);
     const runFfmpeg = await loadRunFfmpeg();
@@ -315,7 +393,7 @@ describe("runFfmpeg: non-zero exit", () => {
     }
     const msg = (caught as Error).message;
     const prefix = "ffmpeg exited 1: ";
-    expect(msg.slice(prefix.length).length).toBe(2000);
+    expect(msg.slice(prefix.length).length).toBe(5000);
   });
 });
 
@@ -432,6 +510,20 @@ describe("runFfmpeg: missing binary", () => {
       "ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)",
     );
     expect(vi.mocked(spawn)).not.toHaveBeenCalled();
+    vi.doUnmock("../src/binaries.js");
+  });
+
+  // A failed spawn is how the route tells a broken install from a bad file (#1576).
+  it("rejects with a spawn-shaped ENOENT so callers read it as an engine fault", async () => {
+    vi.doMock("../src/binaries.js", () => ({
+      resolveFfmpeg: () => null,
+      resolveFfprobe: () => null,
+    }));
+    const { runFfmpeg } = await import("../src/ffmpeg.js");
+    await expect(runFfmpeg(["out.mp4"])).rejects.toMatchObject({
+      code: "ENOENT",
+      syscall: "spawn",
+    });
     vi.doUnmock("../src/binaries.js");
   });
 });

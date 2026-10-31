@@ -174,23 +174,43 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
  * Tells the user when a target size could only be met by shrinking the image
  * (#1272). The server sets resizedTo only on that path.
  */
-export function CompressResizeNote({
-  resultPayload,
-}: {
-  resultPayload: Record<string, unknown> | null | undefined;
-}) {
+/**
+ * Says when compress had to scale an image down to fit its target (#1272),
+ * from the selected file's own result. After a batch it also sums up how many
+ * files were scaled down, since a batch otherwise settles every file as done
+ * whatever happened to it (#1292).
+ */
+export function CompressResizeNote() {
   const { t } = useTranslation();
-  const resizedTo = resultPayload?.resizedTo as { width: number; height: number } | undefined;
-  const targetKb = resultPayload?.targetKb as number | undefined;
-  if (!resizedTo || targetKb == null) return null;
+  const { entries, currentEntry } = useFileStore();
+  const done = entries.filter((entry) => entry.status === "completed");
+  const resized = done.filter((entry) => entry.resultNotes?.resizedTo);
+  const notes = currentEntry?.status === "completed" ? currentEntry.resultNotes : null;
+  const summaryKb = resized[0]?.resultNotes?.targetKb;
+  const showSummary = entries.length > 1 && resized.length > 0 && summaryKb != null;
+  const showFileLine = notes?.resizedTo != null && notes.targetKb != null;
+  if (!showSummary && !showFileLine) return null;
   return (
-    <p className="text-xs text-foreground" data-testid="compress-resized-note">
-      {format(t.toolSettings.compress.resizedToFit, {
-        width: resizedTo.width,
-        height: resizedTo.height,
-        size: targetKb,
-      })}
-    </p>
+    <>
+      {showSummary && (
+        <p className="text-xs font-medium text-foreground" data-testid="compress-resized-summary">
+          {format(t.toolSettings.compress.batchResized, {
+            count: resized.length,
+            total: entries.length,
+            size: summaryKb,
+          })}
+        </p>
+      )}
+      {showFileLine && notes?.resizedTo && (
+        <p className="text-xs text-foreground" data-testid="compress-resized-note">
+          {format(t.toolSettings.compress.resizedToFit, {
+            width: notes.resizedTo.width,
+            height: notes.resizedTo.height,
+            size: notes.targetKb ?? "",
+          })}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -206,7 +226,6 @@ export function CompressSettings() {
     originalSize,
     processedSize,
     progress,
-    resultPayload,
   } = useToolProcessor("compress");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
@@ -250,9 +269,11 @@ export function CompressSettings() {
                 originalSize > 0 ? ((1 - processedSize / originalSize) * 100).toFixed(1) : "0",
             })}
           </p>
-          <CompressResizeNote resultPayload={resultPayload} />
         </div>
       )}
+
+      {/* Scaled-down notes: the selected file, and a batch summary (#1292) */}
+      <CompressResizeNote />
 
       {/* Process */}
       {processing ? (

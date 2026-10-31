@@ -1,7 +1,10 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -33,26 +36,84 @@ interface ImageInfoData {
   }>;
 }
 
+function isHistogramEntry(value: unknown): value is ImageInfoData["histogram"][number] {
+  if (!value || typeof value !== "object") return false;
+  const ch = value as Record<string, unknown>;
+  return (
+    typeof ch.channel === "string" &&
+    ch.channel.length > 0 &&
+    typeof ch.min === "number" &&
+    Number.isFinite(ch.min) &&
+    typeof ch.max === "number" &&
+    Number.isFinite(ch.max) &&
+    typeof ch.mean === "number" &&
+    Number.isFinite(ch.mean)
+  );
+}
+
+function isImageInfoData(value: unknown): value is ImageInfoData {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.format === "string" &&
+    data.format.length > 0 &&
+    typeof data.width === "number" &&
+    Number.isFinite(data.width) &&
+    data.width >= 0 &&
+    typeof data.height === "number" &&
+    Number.isFinite(data.height) &&
+    data.height >= 0 &&
+    typeof data.fileSize === "number" &&
+    Number.isFinite(data.fileSize) &&
+    data.fileSize >= 0 &&
+    typeof data.channels === "number" &&
+    Number.isFinite(data.channels) &&
+    data.channels >= 0 &&
+    typeof data.colorSpace === "string" &&
+    data.colorSpace.length > 0 &&
+    (data.density === undefined ||
+      data.density === null ||
+      (typeof data.density === "number" && Number.isFinite(data.density))) &&
+    typeof data.pages === "number" &&
+    Number.isFinite(data.pages) &&
+    data.pages >= 0 &&
+    Array.isArray(data.histogram) &&
+    data.histogram.every(isHistogramEntry)
+  );
+}
+
 export function InfoSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
   const selectedIndex = useFileStore((s) => s.selectedIndex);
   const [info, setInfo] = useState<ImageInfoData | null>(null);
-  const cacheRef = useRef<Map<number, ImageInfoData>>(new Map());
+  const cacheRef = useRef<Map<string, ImageInfoData>>(new Map());
   const autoFetchRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchInfo = useCallback(
     async (index: number) => {
-      const file = useFileStore.getState().entries[index]?.file;
-      if (!file) return;
+      const entry = useFileStore.getState().entries[index];
+      if (!entry) return;
+      const { id: entryId, file } = entry;
 
-      const cached = cacheRef.current.get(index);
+      const cached = cacheRef.current.get(entryId);
       if (cached) {
+        if (abortRef.current) {
+          abortRef.current.abort();
+          abortRef.current = null;
+          setProcessing(false);
+        }
         setError(null);
         setInfo(cached);
         return;
       }
+
+      track(ANALYTICS_EVENTS.TOOL_STARTED, {
+        tool_id: "info",
+        is_batch: false,
+        file_count: 1,
+      });
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -60,6 +121,7 @@ export function InfoSettings() {
 
       setProcessing(true);
       setError(null);
+      setInfo(null);
 
       try {
         const formData = new FormData();
@@ -74,41 +136,69 @@ export function InfoSettings() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Failed: ${res.status}`);
+          throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
         }
 
-        const data: ImageInfoData = await res.json();
-        cacheRef.current.set(index, data);
-        setInfo(data);
+        const data = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
+        const state = useFileStore.getState();
+        if (!autoFetchRef.current || !state.entries.some((e) => e.id === entryId)) return;
+        if (!isImageInfoData(data)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
+        cacheRef.current.set(entryId, data);
+        if (!controller.signal.aborted && state.entries[state.selectedIndex]?.id === entryId) {
+          setInfo(data);
+        }
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : t.toolSettings.info.failedToRead);
+        if (
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
+          return;
+        }
+        const state = useFileStore.getState();
+        if (state.entries[state.selectedIndex]?.id === entryId) {
+          setError(err instanceof Error ? err.message : t.toolSettings.info.failedToRead);
+        }
       } finally {
-        if (!controller.signal.aborted) {
-          setProcessing(false);
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          if (!controller.signal.aborted) {
+            setProcessing(false);
+          }
         }
       }
     },
     [setProcessing, setError, t],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: files.length is the reset trigger
+  // biome-ignore lint/correctness/useExhaustiveDependencies: files is the reset trigger
   useEffect(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+      setProcessing(false);
+    }
     cacheRef.current.clear();
     autoFetchRef.current = false;
+    setError(null);
     setInfo(null);
-  }, [files.length]);
+  }, [files]);
 
   useEffect(() => {
     if (!autoFetchRef.current || files.length === 0) return;
     fetchInfo(selectedIndex);
   }, [selectedIndex, fetchInfo, files.length]);
 
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  // A fetch the unmount aborts is not "superseded by a newer one", so the finally
+  // above leaves `processing` set; end the run here (#2304).
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleProcess = () => {
     if (files.length === 0) return;

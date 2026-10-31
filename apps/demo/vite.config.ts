@@ -3,9 +3,10 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { codeSplitting } from "../web/vite.chunks";
+import { pdfjsAssets } from "../web/vite.pdfjs-assets";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), pdfjsAssets()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "../web/src"),

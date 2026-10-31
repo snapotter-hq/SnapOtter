@@ -11,8 +11,10 @@ vi.stubGlobal("URL", {
 });
 
 const imagePreviewMock = vi.hoisted(() => ({
-  needsServerPreview: vi.fn(() => false),
-  fetchDecodedPreview: vi.fn(() => Promise.resolve(null)),
+  needsServerPreview: vi.fn<(_file: File) => boolean>(() => false),
+  fetchDecodedPreview: vi.fn<
+    (_file: File) => Promise<{ url: string; originalWidth: number; originalHeight: number } | null>
+  >(() => Promise.resolve(null)),
 }));
 
 vi.mock("@/lib/image-preview", () => imagePreviewMock);
@@ -109,5 +111,90 @@ describe("useFileStore reordering", () => {
     useFileStore.getState().reverseFiles();
 
     expect(useFileStore.getState().entries).toBe(before);
+  });
+
+  it("updateEntryById and markClaimedById follow the entry across reorderFiles and reverseFiles", () => {
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png"), makeFile("c.png")]);
+    const idA = useFileStore.getState().entries[0].id;
+
+    useFileStore.getState().reorderFiles(0, 2); // [b, c, a]
+    useFileStore.getState().updateEntryById(idA, {
+      processedUrl: "blob:result-a",
+      processedFilename: "a-out.png",
+      status: "completed",
+    });
+    useFileStore.getState().markClaimedById(idA);
+
+    const afterReorder = useFileStore.getState().entries;
+    expect(afterReorder[2]).toMatchObject({
+      id: idA,
+      processedUrl: "blob:result-a",
+      processedFilename: "a-out.png",
+      status: "completed",
+      claimed: true,
+    });
+    expect(afterReorder[0].processedUrl).toBeNull();
+    expect(afterReorder[0].claimed).toBe(false);
+
+    useFileStore.getState().reverseFiles(); // [a, c, b]
+    useFileStore.getState().updateEntryById(idA, { processedUrl: "blob:rerun-a" });
+
+    const afterReverse = useFileStore.getState().entries;
+    expect(afterReverse[0]).toMatchObject({
+      id: idA,
+      processedUrl: "blob:rerun-a",
+      claimed: false,
+    });
+    expect(afterReverse[2].processedUrl).toBeNull();
+  });
+
+  it("applies decoded HEIC previews to the moved entry after a reorder in setFiles and addFiles", async () => {
+    imagePreviewMock.needsServerPreview.mockImplementation((file: File) =>
+      file.name.endsWith(".heic"),
+    );
+    let resolveA:
+      | ((v: { url: string; originalWidth: number; originalHeight: number }) => void)
+      | undefined;
+    let resolveC:
+      | ((v: { url: string; originalWidth: number; originalHeight: number }) => void)
+      | undefined;
+    imagePreviewMock.fetchDecodedPreview.mockImplementation((file: File) => {
+      if (file.name === "a.heic") {
+        return new Promise((resolve) => {
+          resolveA = resolve;
+        });
+      }
+      return new Promise((resolve) => {
+        resolveC = resolve;
+      });
+    });
+
+    useFileStore
+      .getState()
+      .setFiles([makeFile("a.heic", 100, "image/heic"), makeFile("b.png", 100, "image/png")]);
+    useFileStore.getState().reorderFiles(0, 1); // [b.png, a.heic]
+
+    resolveA?.({ url: "blob:decoded-a", originalWidth: 800, originalHeight: 600 });
+    await vi.waitFor(() => {
+      expect(useFileStore.getState().entries[1].previewLoading).toBe(false);
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      blobUrl: "blob:decoded-a",
+      originalWidth: 800,
+      originalHeight: 600,
+    });
+
+    useFileStore.getState().addFiles([makeFile("c.heic", 100, "image/heic")]); // [b.png, a.heic, c.heic]
+    useFileStore.getState().reverseFiles(); // [c.heic, a.heic, b.png]
+
+    resolveC?.({ url: "blob:decoded-c", originalWidth: 1024, originalHeight: 768 });
+    await vi.waitFor(() => {
+      expect(useFileStore.getState().entries[0].previewLoading).toBe(false);
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      blobUrl: "blob:decoded-c",
+      originalWidth: 1024,
+      originalHeight: 768,
+    });
   });
 });

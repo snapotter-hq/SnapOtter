@@ -1,16 +1,98 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { extname } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { readBarcodes } from "zxing-wasm/reader";
+import { prepareZXingModule, readBarcodes } from "zxing-wasm/reader";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { reportError } from "../../lib/error-report.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+  noteDecoderFallback,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+
+/**
+ * Hand zxing-wasm the packaged binary. Also how the route resets a failed
+ * decoder (#1402): zxing compares overrides value by value and keeps its
+ * cached instance, even a failed one, while they match. Each call reads a
+ * fresh Buffer, which is what makes it a reset; caching the Buffer here would
+ * silently stop that.
+ */
+export function initZXingReader(): void {
+  const require = createRequire(import.meta.url);
+  let wasmBinary: Buffer;
+  try {
+    wasmBinary = readFileSync(require.resolve("zxing-wasm/reader/zxing_reader.wasm"));
+  } catch (err) {
+    throw new Error(
+      "barcode-read: could not load the bundled zxing_reader.wasm; reinstall dependencies",
+      { cause: err },
+    );
+  }
+  prepareZXingModule({ overrides: { wasmBinary } });
+}
+
+// Hand zxing-wasm the packaged binary so it never fetches it from jsdelivr (#1385).
+initZXingReader();
+
+/** zxing ran out of heap mid-read, which it reports as a result (#1425). */
+class DecoderOutOfMemory extends Error {
+  override name = "DecoderOutOfMemory";
+}
+
+/**
+ * zxing catches any C++ exception during a read and returns it as a single
+ * `{ isValid: false, error: e.what() }` in place of the whole list, so partial
+ * results never come back beside it. The route never asks for invalid reads
+ * (`returnErrors`), so a non-empty `error` can only be such an exception.
+ * Filtering it out as an invalid read answered "no barcodes found" (#1425).
+ * Returns the error to throw for such a result, or null for a normal read.
+ */
+export function failedRead(results: readonly { isValid: boolean; error: string }[]): Error | null {
+  const failed = results.find((r) => !r.isValid && r.error !== "");
+  if (!failed) return null;
+  if (/bad_alloc|bad_array_new_length/.test(failed.error)) {
+    return new DecoderOutOfMemory(failed.error);
+  }
+  return new Error(`Barcode decoder raised: ${failed.error}`);
+}
+
+/**
+ * The decoder failing on this server's side rather than on the image:
+ * - a WebAssembly RuntimeError: it couldn't instantiate (the glue wraps every
+ *   instantiate error this way) or it trapped mid-read, after which the
+ *   instance can't be trusted (#1402);
+ * - no room in its heap for the image, which zxing throws as a plain Error;
+ * - no room mid-read (DecoderOutOfMemory, from failedRead) (#1425);
+ * - no room in Node for zxing's grayscale copy of the image, made in JS
+ *   before the wasm call: V8's "Array buffer allocation failed" (#1469).
+ *
+ * sharp running out of memory earlier in the route isn't here because it
+ * can't be: libvips crashes the process (a segfault under `ulimit -v`, an
+ * OOM kill under a cgroup limit) rather than throwing.
+ */
+function isDecoderFault(err: unknown): boolean {
+  return (
+    err instanceof WebAssembly.RuntimeError ||
+    err instanceof DecoderOutOfMemory ||
+    (err instanceof Error && /^Failed to allocate \d+ bytes in WASM memory/.test(err.message)) ||
+    (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed"))
+  );
+}
 
 const settingsSchema = z.object({
   tryHarder: z.boolean().default(true),
@@ -102,10 +184,8 @@ export function registerBarcodeRead(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (!fileBuffer || fileBuffer.length === 0) {
@@ -135,45 +215,86 @@ export function registerBarcodeRead(app: FastifyInstance) {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
-      try {
-        const tryHarder = settings.tryHarder;
-
-        if (validation.format === "heif") {
+      if (validation.format === "heif") {
+        try {
+          fileBuffer = await decodeHeic(fileBuffer);
+        } catch (rawErr) {
+          // A server fault (no decoder, no memory for its output, or a
+          // tmpdir write failure) is not a bad file. decodeHeic reports
+          // running out of memory as decoder unavailable (#1577), which the
+          // outer catch hands to the global handler as a 503 (#1533, #2800).
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || isDecoderFault(err)) {
+            throw err;
+          }
+          return reply.status(422).send({
+            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+          });
+        }
+      }
+      let fallbackFormat: string | undefined;
+      if (needsCliDecode(validation.format)) {
+        try {
+          const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
           try {
-            fileBuffer = await decodeHeic(fileBuffer);
-          } catch (err) {
+            const meta = await sharp(fileBuffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(fileBuffer).resize(1).raw().toBuffer();
+            }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+              throw decodeErr;
+            }
+            request.log?.warn({ err: decodeErr, toolId: "barcode-read" }, "Decode failed");
             return reply.status(422).send({
-              error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-              details: err instanceof Error ? err.message : String(err),
+              error: `Failed to decode ${validation.format.toUpperCase()} file`,
+              details: stripInternalPaths(
+                decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+              ),
             });
           }
         }
-        if (needsCliDecode(validation.format)) {
-          try {
-            const fileExt = filename.split(".").pop()?.toLowerCase();
-            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-          } catch {
-            try {
-              await sharp(fileBuffer).metadata();
-            } catch (err) {
-              return reply.status(422).send({
-                error: `Failed to decode ${validation.format.toUpperCase()} file`,
-                details: err instanceof Error ? err.message : String(err),
-              });
-            }
-          }
-        }
-        if (validation.format === "svg") {
-          try {
-            fileBuffer = decompressSvgz(fileBuffer);
-            fileBuffer = sanitizeSvg(fileBuffer);
-          } catch (err) {
+      }
+
+      const isSvg = validation.format === "svg" || fallbackFormat === "svg";
+      if (isSvg) {
+        try {
+          fileBuffer = decompressSvgz(fileBuffer);
+          fileBuffer = sanitizeSvg(fileBuffer);
+        } catch (err) {
+          if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
             });
           }
+          throw asDecoderOutOfMemory(err);
         }
-        fileBuffer = await autoOrient(fileBuffer);
+      }
+
+      let storing = false;
+      let imageSize: { width: number; height: number } | undefined;
+      try {
+        const tryHarder = settings.tryHarder;
+
+        if (!isSvg) {
+          fileBuffer = await autoOrient(fileBuffer);
+        }
 
         // Convert to raw RGBA pixel data
         const image = sharp(fileBuffer);
@@ -187,6 +308,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
           });
         }
 
+        imageSize = { width, height };
         const rawData = await image.ensureAlpha().raw().toBuffer();
 
         // --- Detect barcodes via zxing-wasm ---
@@ -200,6 +322,8 @@ export function registerBarcodeRead(app: FastifyInstance) {
           tryHarder,
           maxNumberOfSymbols: 255,
         });
+        const readError = failedRead(results);
+        if (readError) throw readError;
 
         const validResults = results.filter((r) => r.isValid);
 
@@ -232,10 +356,10 @@ export function registerBarcodeRead(app: FastifyInstance) {
         }
 
         // --- Generate annotated image ---
+        // Nothing past here depends on the upload being readable: a failure is
+        // storage or memory on this server, for the global error handler.
+        storing = true;
         const jobId = randomUUID();
-
-        // Save original input
-        await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
 
         // Build SVG overlay with bounding boxes
         const overlaySvg = buildOverlaySvg(width, height, barcodes);
@@ -258,11 +382,41 @@ export function registerBarcodeRead(app: FastifyInstance) {
           annotatedUrl: downloadUrl,
           previewUrl: downloadUrl,
         });
-      } catch (err) {
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || storing) throw err;
+        // The decoder itself failing is a server fault, not a bad image
+        // (isDecoderFault). zxing-wasm caches a failed instantiation for good,
+        // so hand it the binary again: new overrides drop the cached instance
+        // and the next request starts a fresh one with a fresh heap (#1402).
+        if (isDecoderFault(err)) {
+          // Node failing to allocate zxing's grayscale copy happens before the
+          // wasm call, so the decoder is fine; reloading it would only add
+          // work while memory is short (#1469).
+          const reload = !(err instanceof RangeError);
+          // The size tells memory pressure (retry works) from an image too
+          // big for this server (it never will). It's set once the image is
+          // decoded, so without it the failure came earlier, in orienting or
+          // reading the image, not zxing. A HEIC decode that runs out of
+          // memory doesn't get here: it's rethrown above as decoder
+          // unavailable (#1577).
+          const stage = imageSize ? "barcode decoder" : "image decode";
+          request.log.error(
+            { err, toolId: "barcode-read", stage, imageSize, reload },
+            `Barcode read failed in the ${stage}`,
+          );
+          void reportError(err, { source: "http", toolId: "barcode-read", statusCode: 503 });
+          if (reload) initZXingReader();
+          return reply.status(503).send({
+            error: "Barcode reading failed on this server.",
+            details: "The server ran out of resources reading this image. Try again.",
+            code: "ENGINE_UNAVAILABLE",
+          });
+        }
         request.log.error({ err, toolId: "barcode-read" }, "Barcode read failed");
         return reply.status(422).send({
           error: "Barcode reading failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

@@ -21,11 +21,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(filename: string, content: Buffer, settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([

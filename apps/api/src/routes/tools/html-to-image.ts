@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { captureHtml, capturePage, isBrowserAvailable } from "../../lib/browser-service.js";
@@ -64,7 +65,9 @@ export function registerHtmlToImage(app: FastifyInstance) {
         } catch (err) {
           return reply.status(400).send({
             error: "URL is not allowed",
-            details: err instanceof Error ? err.message : "URL validation failed",
+            details: stripInternalPaths(
+              err instanceof Error ? err.message : "URL validation failed",
+            ),
           });
         }
       }
@@ -105,9 +108,11 @@ export function registerHtmlToImage(app: FastifyInstance) {
           processedSize: buffer.length,
         });
       } catch (err) {
+        if (hasServerErrorStatus(err)) throw err;
         const message = err instanceof Error ? err.message : "Unknown error";
 
         if (message.includes("Timeout") || message.includes("timeout")) {
+          request.log?.warn({ err, toolId: "html-to-image" }, "Screenshot capture timed out");
           return reply.status(504).send({
             error: "Page took too long to load",
             details: stripInternalPaths(message),
@@ -118,12 +123,17 @@ export function registerHtmlToImage(app: FastifyInstance) {
           message.includes("permanently disabled") ||
           message.includes("temporarily unavailable")
         ) {
+          request.log?.error(
+            { err, toolId: "html-to-image" },
+            "Screenshot browser service unavailable",
+          );
           return reply.status(503).send({
             error: "Screenshot service is temporarily unavailable",
             code: "BROWSER_CRASHED",
           });
         }
 
+        request.log?.warn({ err, toolId: "html-to-image" }, "Screenshot capture failed");
         return reply.status(422).send({
           error: "Screenshot capture failed",
           details: stripInternalPaths(message),

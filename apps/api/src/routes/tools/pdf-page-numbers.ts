@@ -36,6 +36,7 @@ export function registerPdfPageNumbers(app: FastifyInstance) {
           rotation: 0,
         },
         outPath,
+        { signal: ctx.signal },
       );
       ctx.report(90, "Done");
 

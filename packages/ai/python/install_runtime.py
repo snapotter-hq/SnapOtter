@@ -268,26 +268,46 @@ def _map_cgroup_membership(
     return candidate
 
 
+def _quoted(value: str) -> str:
+    # Same shape as quoted() in packages/ai/src/runtime-resources.ts.
+    return json.dumps(value[:64], ensure_ascii=False)
+
+
+def _read_reason(error: BaseException) -> str:
+    # The CLI prints only str(error), so the chained cause never reaches the
+    # API: the reason has to be in the message itself.
+    if isinstance(error, OSError) and error.strerror:
+        return error.strerror
+    return str(error)
+
+
 def _process_cgroup_memory_limits() -> list[int] | None:
+    # Every refusal names the file and what was wrong with it, worded like
+    # packages/ai/src/runtime-resources.ts so the API and the installer read
+    # the same (#1673).
     try:
         membership_raw = Path("/proc/self/cgroup").read_text(encoding="ascii")
     except (OSError, UnicodeError) as error:
         if sys.platform.startswith("linux"):
             raise PreflightError(
-                "unable to read the process cgroup memory capacity"
+                "unable to read the process cgroup memory capacity from "
+                f"/proc/self/cgroup: {_read_reason(error)}"
             ) from error
         return None
 
     memberships: list[tuple[str, str]] = []
     membership_lines = membership_raw.splitlines()
     if sys.platform.startswith("linux") and not membership_lines:
-        raise PreflightError("unable to read the process cgroup memory capacity")
+        raise PreflightError(
+            "unable to resolve the process cgroup memory capacity: /proc/self/cgroup is empty"
+        )
     for line in membership_lines:
         fields = line.split(":", 2)
         if len(fields) != 3 or not fields[2].startswith("/"):
             if sys.platform.startswith("linux"):
                 raise PreflightError(
-                    "unable to read the process cgroup memory capacity"
+                    "unable to resolve the process cgroup memory capacity: "
+                    f"unrecognised /proc/self/cgroup line {_quoted(line)}"
                 )
             continue
         hierarchy, controllers_raw, membership = fields
@@ -303,7 +323,8 @@ def _process_cgroup_memory_limits() -> list[int] | None:
         mountinfo_raw = Path("/proc/self/mountinfo").read_text(encoding="ascii")
     except (OSError, UnicodeError) as error:
         raise PreflightError(
-            "unable to resolve the process cgroup memory capacity"
+            "unable to read the process cgroup memory capacity from "
+            f"/proc/self/mountinfo: {_read_reason(error)}"
         ) from error
 
     mounts: list[tuple[str, str, str, set[str]]] = []
@@ -350,28 +371,60 @@ def _process_cgroup_memory_limits() -> list[int] | None:
             )
             selected_root_length = len(mount_root)
     if selected is None:
-        raise PreflightError("unable to resolve the process cgroup memory capacity")
+        # Nothing matched, so the first membership is as uncovered as the rest.
+        kind, membership = memberships[0]
+        mount_kind = "cgroup2" if kind == "cgroup2" else "cgroup v1"
+        raise PreflightError(
+            "unable to resolve the process cgroup memory capacity: "
+            f"no {mount_kind} memory mount in /proc/self/mountinfo covers "
+            f"{_quoted(membership)}"
+        )
 
     mount_point, current, filename = selected
     limits: list[int] = []
-    unreadable = False
     while True:
+        limit_path = posixpath.join(current, filename)
         try:
-            raw = Path(current, filename).read_text(encoding="ascii").strip()
+            raw = Path(limit_path).read_text(encoding="ascii").strip()
+        except FileNotFoundError as error:
+            # A v2 level has no memory.max when the memory controller isn't
+            # enabled there (always so at the root). That means no limit at
+            # this level, provided the level itself is readable. Matches
+            # packages/ai/src/runtime-resources.ts.
+            if filename != "memory.max":
+                raise PreflightError(
+                    "unable to read the process cgroup memory capacity from "
+                    f"{limit_path}: {_read_reason(error)}"
+                ) from error
+            controllers_path = posixpath.join(current, "cgroup.controllers")
+            try:
+                Path(controllers_path).read_text(encoding="ascii")
+            except (OSError, ValueError) as controllers_error:
+                raise PreflightError(
+                    "unable to read the process cgroup memory capacity from "
+                    f"{controllers_path} (memory.max is absent): "
+                    f"{_read_reason(controllers_error)}"
+                ) from controllers_error
+        except (OSError, ValueError) as error:
+            # ValueError also covers an embedded NUL from a decoded mountinfo
+            # path, not only a UnicodeError.
+            raise PreflightError(
+                "unable to read the process cgroup memory capacity from "
+                f"{limit_path}: {_read_reason(error)}"
+            ) from error
+        else:
             if raw != "max" and not raw.isdecimal():
-                raise ValueError("malformed cgroup memory capacity")
-            if raw != "max" and raw.isdecimal() and int(raw) > 0:
+                raise PreflightError(
+                    f"malformed cgroup memory capacity in {limit_path}: {_quoted(raw)}"
+                )
+            if raw != "max" and int(raw) > 0:
                 limits.append(int(raw))
-        except (OSError, UnicodeError, ValueError):
-            unreadable = True
         if current == mount_point:
             break
         parent = posixpath.dirname(current)
         if parent == current or not parent.startswith(mount_point):
             break
         current = parent
-    if unreadable:
-        raise PreflightError("unable to read the process cgroup memory capacity")
     return limits
 
 

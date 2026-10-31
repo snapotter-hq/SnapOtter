@@ -34,11 +34,11 @@ describe("batch survival and progress replay across client disconnects (#750)", 
     await testApp.app.listen({ port: 0, host: "127.0.0.1" });
     const addr = testApp.app.server.address() as AddressInfo;
     baseUrl = `http://127.0.0.1:${addr.port}`;
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   /** Collect SSE frames for a job until the predicate matches or time runs out. */
   function waitForFrame(

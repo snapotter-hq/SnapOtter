@@ -79,11 +79,11 @@ describe("catalog integrity launch gate", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   it("TOOLS catalog is non-empty", () => {
     expect(TOOLS.length).toBeGreaterThan(0);

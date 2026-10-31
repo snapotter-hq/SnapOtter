@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter में योगदान कैसे करें। बग रिपोर्ट, फ़ीचर अनुरोध, पुल रिक्वेस्ट और CLA आवश्यकताएँ।"
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: 2e30393617bf
 i18n_hash_version: 2

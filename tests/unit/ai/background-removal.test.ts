@@ -338,6 +338,17 @@ describe("removeBackground", () => {
         const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
         expect(options.timeout).toBe(600000);
       });
+
+      it("queries isGpuAvailable('onnx') so Torch-only GPU does not use the 30s/MP GPU timeout for CPU ONNX inference (issue #2576)", async () => {
+        mock24MpImage();
+        vi.mocked(isGpuAvailable).mockImplementation((framework?: string) => framework !== "onnx");
+
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
+
+        expect(isGpuAvailable).toHaveBeenCalledWith("onnx");
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(24 * 180_000);
+      });
     });
   });
 
@@ -503,6 +514,19 @@ describe("removeBackground", () => {
       expect(fallbackOpts.model).toBe("u2net");
     });
 
+    it("retries with u2net when a localized [Errno 12] OOM message is returned (#3460)", async () => {
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("[Errno 12] Nicht genügend Hauptspeicher verfügbar"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+      const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
+      const fallbackOpts = JSON.parse(fallbackArgs[2]);
+      expect(fallbackOpts.model).toBe("u2net");
+    });
+
     it("fires progress callback on fallback retry", async () => {
       const onProgress = vi.fn();
       vi.mocked(runPythonWithProgress)
@@ -620,6 +644,72 @@ describe("removeBackground", () => {
       expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
       const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
       expect(JSON.parse(fallbackArgs[2]).model).toBe("u2net");
+    });
+
+    it("does not retry on OOM when oomFallbackModel is false, and omits oomFallbackModel from Python args (#3059)", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValueOnce(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+          model: "birefnet-hr-matting",
+          oomFallbackModel: false,
+        }),
+      ).rejects.toThrow("out of memory");
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+      const primaryArgs = vi.mocked(runPythonWithProgress).mock.calls[0][1];
+      expect(JSON.parse(primaryArgs[2])).toEqual({ model: "birefnet-hr-matting" });
+    });
+
+    it("retries with a custom oomFallbackModel when specified (#3059)", async () => {
+      const onProgress = vi.fn();
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(
+        FAKE_INPUT,
+        FAKE_OUTPUT_DIR,
+        {
+          model: "birefnet-hr-matting",
+          oomFallbackModel: "birefnet-general",
+          edgeRefine: 2,
+          decontaminate: true,
+        },
+        onProgress,
+      );
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+      const primaryArgs = vi.mocked(runPythonWithProgress).mock.calls[0][1];
+      const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
+      expect(JSON.parse(primaryArgs[2])).toEqual({
+        model: "birefnet-hr-matting",
+        edgeRefine: 2,
+        decontaminate: true,
+      });
+      expect(JSON.parse(fallbackArgs[2])).toEqual({
+        model: "birefnet-general",
+        edgeRefine: 2,
+        decontaminate: true,
+      });
+      expect(onProgress).toHaveBeenCalledWith(5, "Retrying with lighter model (birefnet-general)");
+    });
+
+    it("does not retry on OOM when model already matches custom oomFallbackModel (#3059)", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValueOnce(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+          model: "birefnet-general",
+          oomFallbackModel: "birefnet-general",
+        }),
+      ).rejects.toThrow("out of memory");
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
     });
   });
 

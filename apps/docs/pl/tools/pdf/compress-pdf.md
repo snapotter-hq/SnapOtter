@@ -1,6 +1,6 @@
 ---
 description: "Zmniejsz rozmiar pliku PDF przez kompresję osadzonych obrazów."
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: 4ad39b458a2f
 ---

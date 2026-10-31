@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { isAbsolute } from "node:path";
 import type { ZodIssue } from "zod";
 
 export function formatZodErrors(issues: ZodIssue[]): string {
@@ -8,13 +10,36 @@ export function formatZodErrors(issues: ZodIssue[]): string {
 
 /**
  * Strip internal filesystem paths from error messages to avoid
- * leaking server directory structure to API consumers.
+ * leaking server directory structure to API consumers. That includes
+ * anything under the host's temp dir, which on macOS or a job runner sits
+ * outside the hard-coded roots below; decoder errors carry temp paths (#1430).
  */
 export function stripInternalPaths(message: string): string {
-  return message.replace(
+  const temp = tempRootPattern();
+  const withoutTemp = temp ? message.replace(temp, "[internal]") : message;
+  return withoutTemp.replace(
     /\/(?:tmp|data|app|opt|home|workspace)\b[^\s'")}]*|[A-Za-z]:\\[^\s'")}]*/g,
     "[internal]",
   );
+}
+
+/** A whole path segment boundary after the root, then the rest of the path. */
+const TEMP_TAIL = String.raw`(?=[/\\\s'")}\x60]|$)[^\s'")}\x60]*`;
+
+/**
+ * The host's temp dir as a pattern, only when it's specific enough to strip
+ * safely: absolute and at least two segments deep. A relative or shallow
+ * TMPDIR (".", "/var") would otherwise eat ordinary text in every 4xx the
+ * global handler sends. A one-segment /tmp is already a hard-coded root.
+ */
+function tempRootPattern(): RegExp | undefined {
+  const root = tmpdir().replace(/[/\\]+$/, "");
+  if (!isAbsolute(root) || root.split(/[/\\]+/).filter(Boolean).length < 2) return undefined;
+  return new RegExp(escapeRegExp(root) + TEMP_TAIL, "g");
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // Matching control characters is the entire point of these patterns (we strip

@@ -5,16 +5,16 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
 
-const PRESETS: { label: string; shadow: string; highlight: string }[] = [
-  { label: "Classic", shadow: "#1e3a8a", highlight: "#fbbf24" },
-  { label: "Noir", shadow: "#000000", highlight: "#ffffff" },
-  { label: "Sepia", shadow: "#2d1b00", highlight: "#ffe8c2" },
-  { label: "Midnight", shadow: "#0f2027", highlight: "#78ffd6" },
-  { label: "Sunset", shadow: "#3a1c71", highlight: "#ffaf7b" },
-  { label: "Cyber", shadow: "#0f0c29", highlight: "#f857a6" },
-  { label: "Ocean", shadow: "#000428", highlight: "#43cea2" },
-  { label: "Forest", shadow: "#022c12", highlight: "#9be15d" },
-];
+const PRESETS = [
+  { id: "classic", shadow: "#1e3a8a", highlight: "#fbbf24" },
+  { id: "noir", shadow: "#000000", highlight: "#ffffff" },
+  { id: "sepia", shadow: "#2d1b00", highlight: "#ffe8c2" },
+  { id: "midnight", shadow: "#0f2027", highlight: "#78ffd6" },
+  { id: "sunset", shadow: "#3a1c71", highlight: "#ffaf7b" },
+  { id: "cyber", shadow: "#0f0c29", highlight: "#f857a6" },
+  { id: "ocean", shadow: "#000428", highlight: "#43cea2" },
+  { id: "forest", shadow: "#022c12", highlight: "#9be15d" },
+] as const;
 
 interface DuotoneSettingsProps {
   onImageStyle?: (style: React.CSSProperties | null) => void;
@@ -98,7 +98,7 @@ export function DuotoneSettings({ onImageStyle, onImageOverlay }: DuotoneSetting
         <div className="grid grid-cols-4 gap-1.5">
           {PRESETS.map((p) => (
             <button
-              key={p.label}
+              key={p.id}
               type="button"
               onClick={() => {
                 setShadow(p.shadow);
@@ -115,7 +115,7 @@ export function DuotoneSettings({ onImageStyle, onImageOverlay }: DuotoneSetting
                 <div className="flex-1" style={{ background: p.highlight }} />
               </div>
               <span className="text-[10px] text-muted-foreground leading-tight truncate w-full text-center">
-                {p.label}
+                {t.toolSettings.duotone.presetNames[p.id]}
               </span>
             </button>
           ))}

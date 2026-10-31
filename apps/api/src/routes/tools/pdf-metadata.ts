@@ -36,8 +36,8 @@ export function registerPdfMetadata(app: FastifyInstance) {
       if (settings.subject !== undefined) meta.Subject = settings.subject;
       if (settings.keywords !== undefined) meta.Keywords = settings.keywords;
 
-      await pdfMetadataSetPy(inPath, outPath, meta);
-      const metadata = await pdfMetadataGetPy(outPath);
+      await pdfMetadataSetPy(inPath, outPath, meta, { signal: ctx.signal });
+      const metadata = await pdfMetadataGetPy(outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

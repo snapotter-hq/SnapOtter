@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { formatHeaders } from "@/lib/api";
+import { useTranslation } from "@/contexts/i18n-context";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -14,6 +15,16 @@ export interface UrlImportEntry {
   downloadUrl?: string;
   previewUrl?: string | null;
   error?: string;
+}
+
+export type AddReadyFilesResult = File[] & {
+  failedCount: number;
+  fulfilledIndices: number[];
+};
+
+export interface UseUrlImportOptions {
+  fileFilter?: (file: File) => boolean;
+  unsupportedMessage?: string;
 }
 
 interface FetchUrlResult {
@@ -35,12 +46,29 @@ interface FetchUrlsResponse {
 
 // ── Hook ───────────────────────────────────────────────────────
 
-export function useUrlImport() {
+export function useUrlImport(options?: UseUrlImportOptions) {
   const [entries, setEntries] = useState<UrlImportEntry[]>([]);
   const [importing, setImporting] = useState(false);
+  const entriesRef = useRef<UrlImportEntry[]>(entries);
+  entriesRef.current = entries;
+  const fileFilterRef = useRef(options?.fileFilter);
+  fileFilterRef.current = options?.fileFilter;
+  const unsupportedMessageRef = useRef(options?.unsupportedMessage);
+  unsupportedMessageRef.current = options?.unsupportedMessage;
   const abortRef = useRef<AbortController | null>(null);
+  const singleAbortRef = useRef<AbortController | null>(null);
+  const downloadAbortRef = useRef<AbortController | null>(null);
+  const retryAbortRef = useRef<Map<string, AbortController>>(new Map());
+  const { t } = useTranslation();
 
   // -- helpers --
+
+  const abortRetries = useCallback(() => {
+    for (const controller of retryAbortRef.current.values()) {
+      controller.abort();
+    }
+    retryAbortRef.current.clear();
+  }, []);
 
   const fetchUrls = useCallback(
     async (urls: string[], signal?: AbortSignal): Promise<FetchUrlsResponse> => {
@@ -53,12 +81,12 @@ export function useUrlImport() {
         signal,
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as Record<string, string>).error || `Fetch failed: ${res.status}`);
+        const body = await res.json().catch(() => null);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Fetch failed: ${res.status}`));
       }
       return resolveServerUrls(await res.json());
     },
-    [],
+    [t],
   );
 
   const resultToEntry = useCallback((result: FetchUrlResult): UrlImportEntry => {
@@ -84,11 +112,14 @@ export function useUrlImport() {
   const downloadAsFile = useCallback(
     async (downloadUrl: string, filename: string, signal?: AbortSignal): Promise<File> => {
       const res = await fetch(downloadUrl, { headers: formatHeaders(), signal });
-      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Download failed: ${res.status}`));
+      }
       const blob = await res.blob();
       return new File([blob], filename, { type: blob.type });
     },
-    [],
+    [t],
   );
 
   // -- public API --
@@ -98,6 +129,9 @@ export function useUrlImport() {
       if (urls.length === 0) return;
 
       abortRef.current?.abort();
+      downloadAbortRef.current?.abort();
+      downloadAbortRef.current = null;
+      abortRetries();
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -126,80 +160,184 @@ export function useUrlImport() {
         }
       }
     },
-    [fetchUrls, resultToEntry],
+    [fetchUrls, resultToEntry, abortRetries],
   );
 
   const importSingleUrl = useCallback(
     async (url: string): Promise<File | null> => {
+      singleAbortRef.current?.abort();
       const controller = new AbortController();
-      abortRef.current = controller;
+      singleAbortRef.current = controller;
       try {
         const { results } = await fetchUrls([url], controller.signal);
+        if (controller.signal.aborted) return null;
         const result = results[0];
-        if (!result?.success || !result.downloadUrl || !result.filename) return null;
-        return await downloadAsFile(result.downloadUrl, result.filename, controller.signal);
-      } catch {
-        return null;
+        if (!result?.success || !result.downloadUrl || !result.filename) {
+          throw new Error(result?.error ? result.error : t.dropzone.urlFetchFailed);
+        }
+        const file = await downloadAsFile(result.downloadUrl, result.filename, controller.signal);
+        if (controller.signal.aborted) return null;
+        return file;
+      } catch (err) {
+        if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+          return null;
+        }
+        throw err;
+      } finally {
+        if (singleAbortRef.current === controller) {
+          singleAbortRef.current = null;
+        }
       }
     },
-    [fetchUrls, downloadAsFile],
+    [fetchUrls, downloadAsFile, t.dropzone.urlFetchFailed],
   );
 
-  const addReadyFiles = useCallback(async (): Promise<File[]> => {
-    const ready = entries.filter(
-      (e): e is UrlImportEntry & { downloadUrl: string; filename: string } =>
-        e.status === "ready" && !!e.downloadUrl && !!e.filename,
-    );
+  const addReadyFiles = useCallback(async (): Promise<AddReadyFilesResult> => {
+    downloadAbortRef.current?.abort();
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
+
+    const readyWithIndex: Array<{
+      index: number;
+      entry: UrlImportEntry & { downloadUrl: string; filename: string };
+    }> = [];
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      if (e.status === "ready" && e.downloadUrl && e.filename) {
+        readyWithIndex.push({
+          index: i,
+          entry: e as UrlImportEntry & { downloadUrl: string; filename: string },
+        });
+      }
+    }
 
     const settled = await Promise.allSettled(
-      ready.map((e) => downloadAsFile(e.downloadUrl, e.filename)),
+      readyWithIndex.map(({ entry }) =>
+        downloadAsFile(entry.downloadUrl, entry.filename, controller.signal),
+      ),
     );
 
-    return settled
-      .filter((r): r is PromiseFulfilledResult<File> => r.status === "fulfilled")
-      .map((r) => r.value);
-  }, [entries, downloadAsFile]);
+    if (controller.signal.aborted) {
+      return Object.assign([] as File[], { failedCount: 0, fulfilledIndices: [] as number[] });
+    }
+
+    const files: File[] = [];
+    const fulfilledIndices: number[] = [];
+    const failedByIndex = new Map<number, string>();
+    const checkFile = fileFilterRef.current;
+    const unsupportedError = unsupportedMessageRef.current || t.dropzone.unsupportedFileType;
+
+    for (let i = 0; i < settled.length; i++) {
+      const outcome = settled[i];
+      const { index } = readyWithIndex[i];
+      if (outcome.status === "fulfilled") {
+        if (checkFile && !checkFile(outcome.value)) {
+          failedByIndex.set(index, unsupportedError);
+        } else {
+          files.push(outcome.value);
+          fulfilledIndices.push(index);
+        }
+      } else {
+        const reason = outcome.reason;
+        const message = reason instanceof Error ? reason.message : String(reason);
+        failedByIndex.set(index, message);
+      }
+    }
+
+    if (failedByIndex.size > 0) {
+      setEntries((prev) =>
+        prev.map((entry, idx) => {
+          const error = failedByIndex.get(idx);
+          return error !== undefined ? { ...entry, status: "failed" as const, error } : entry;
+        }),
+      );
+    }
+
+    return Object.assign(files, {
+      failedCount: failedByIndex.size,
+      fulfilledIndices,
+    });
+  }, [entries, downloadAsFile, t.dropzone.unsupportedFileType]);
+
+  const removeEntries = useCallback((indices: ReadonlySet<number> | readonly number[]) => {
+    const toRemove = indices instanceof Set ? indices : new Set(indices);
+    if (toRemove.size === 0) return;
+    setEntries((prev) => prev.filter((_, idx) => !toRemove.has(idx)));
+  }, []);
 
   const retryUrl = useCallback(
     async (index: number) => {
-      let url: string | undefined;
-      setEntries((prev) => {
-        url = prev[index]?.url;
-        if (!url) return prev;
-        return prev.map((e, i) =>
-          i === index ? { ...e, status: "fetching" as const, error: undefined } : e,
-        );
-      });
-      if (!url) return;
+      const targetUrl = entriesRef.current[index]?.url;
+      if (!targetUrl) return;
+
+      retryAbortRef.current.get(targetUrl)?.abort();
+      const controller = new AbortController();
+      retryAbortRef.current.set(targetUrl, controller);
+
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.url === targetUrl ? { ...e, status: "fetching" as const, error: undefined } : e,
+        ),
+      );
 
       try {
-        const { results } = await fetchUrls([url]);
+        const { results } = await fetchUrls([targetUrl], controller.signal);
+        if (controller.signal.aborted) return;
         const result = results[0];
-        if (!result) return;
+        if (!result) {
+          setEntries((prev) =>
+            prev.map((e) =>
+              e.url === targetUrl
+                ? { ...e, status: "failed" as const, error: t.urlImport.failedStatus }
+                : e,
+            ),
+          );
+          return;
+        }
 
-        setEntries((prev) => prev.map((e, i) => (i === index ? resultToEntry(result) : e)));
+        setEntries((prev) => prev.map((e) => (e.url === targetUrl ? resultToEntry(result) : e)));
       } catch (err) {
+        if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
         setEntries((prev) =>
-          prev.map((e, i) =>
-            i === index ? { ...e, status: "failed" as const, error: (err as Error).message } : e,
+          prev.map((e) =>
+            e.url === targetUrl ? { ...e, status: "failed" as const, error: message } : e,
           ),
         );
+      } finally {
+        if (retryAbortRef.current.get(targetUrl) === controller) {
+          retryAbortRef.current.delete(targetUrl);
+        }
       }
     },
-    [fetchUrls, resultToEntry],
+    [fetchUrls, resultToEntry, t.urlImport.failedStatus],
   );
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    singleAbortRef.current?.abort();
+    singleAbortRef.current = null;
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
+    abortRetries();
     setEntries([]);
     setImporting(false);
-  }, []);
+  }, [abortRetries]);
 
   const reset = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    singleAbortRef.current?.abort();
+    singleAbortRef.current = null;
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
+    abortRetries();
     setEntries([]);
     setImporting(false);
-  }, []);
+  }, [abortRetries]);
 
   // -- derived counts --
 
@@ -212,6 +350,7 @@ export function useUrlImport() {
     importUrls,
     importSingleUrl,
     addReadyFiles,
+    removeEntries,
     retryUrl,
     cancel,
     reset,

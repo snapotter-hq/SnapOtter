@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter için SAML 2.0 Çoklu Oturum Açma kurulumu yapın. Okta, Azure AD / Entra ID, Google Workspace ve diğer SAML kimlik sağlayıcıları için adım adım kılavuzlar."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 2d0731a89c15
+i18n_output_hash: 22dc6011c05b
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Tüm kullanıcıların SAML (veya OIDC) aracılığıyla oturum açmasını zoru
 2. **Admin Settings > Security** bölümünde, **SSO Enforcement** öğesini açın.
 3. Bir **acil durum kullanıcı adı** ayarlayın: bu, IdP erişilemez olduğunda acil durum erişimi için hâlâ parolayla oturum açabilen tek yerel hesaptır.
 
-SSO zorunlu kılma etkin olduğunda, herhangi bir yerel oturum açma denemesi (acil durum kullanıcısı hariç) "Local password login is disabled. Please use SSO." mesajıyla bir 403 hatası döndürür.
+SSO zorunlu kılma etkin olduğunda yalnızca break-glass kullanıcısı yerel parolayla oturum açabilir. Diğer tüm yerel oturum açma denemeleri, parola doğru olsa bile yanlış parolanın aldığı aynı 401 "Invalid credentials" yanıtıyla reddedilir ve oturum açma sınırına sayılır.
 
 ::: tip 
 SSO zorunlu kılmayı etkinleştirmeden önce her zaman bir acil durum kullanıcı adı yapılandırın. Bu olmadan, IdP'niz çökerse SnapOtter'a erişiminiz engellenebilir.

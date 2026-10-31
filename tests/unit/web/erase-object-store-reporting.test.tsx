@@ -1,0 +1,3494 @@
+// @vitest-environment jsdom
+import "@testing-library/jest-dom/vitest";
+import { en } from "@snapotter/shared";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+
+import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
+import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
+import { captureHandledError } from "@/lib/analytics";
+import { trackAbandonedJob } from "@/lib/cancel-abandoned-job";
+import { useFileStore } from "@/stores/file-store";
+
+/**
+ * Erase Object hand-rolls its requests, single file and batch alike, so
+ * nothing in useToolProcessor answers for them. These pin how each sync 2xx
+ * answer tells a body that isn't a result (the server's fault) apart from a
+ * throw while landing a good one (ours), the split #1354 made for the tool,
+ * pipeline and Sign PDF handlers (#1734).
+ */
+
+const DOWNLOAD_URL = "/api/v1/download/job-1/photo.png";
+const GOOD_BODY = { downloadUrl: DOWNLOAD_URL, originalSize: 1000, processedSize: 900 };
+
+class FakeEventSource {
+  static OPEN = 1;
+  static instances: FakeEventSource[] = [];
+
+  readyState = FakeEventSource.OPEN;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+
+  constructor(readonly url: string) {
+    FakeEventSource.instances.push(this);
+  }
+
+  close() {
+    this.readyState = 2;
+  }
+}
+
+class FakeXhr {
+  static instances: FakeXhr[] = [];
+
+  timeout = 0;
+  status = 0;
+  responseText = "";
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
+  upload: {
+    onprogress: ((event: ProgressEvent) => void) | null;
+    onload: unknown;
+  } = { onprogress: null, onload: null };
+  /** A browser sends no upload events to a handler attached after send(). */
+  uploadHandlerAtSend = false;
+  url = "";
+  aborted = false;
+
+  constructor() {
+    FakeXhr.instances.push(this);
+  }
+
+  abort() {
+    this.aborted = true;
+  }
+
+  open(_method: string, url: string) {
+    this.url = url;
+  }
+
+  setRequestHeader(_key: string, _value: string) {}
+
+  body: FormData | null = null;
+
+  send(body: FormData) {
+    this.body = body;
+    this.uploadHandlerAtSend = this.upload.onprogress !== null;
+  }
+
+  /** The browser finished sending the body; the server hasn't answered yet. */
+  uploadFinished() {
+    act(() => {
+      (this.upload.onload as (() => void) | null)?.();
+    });
+  }
+
+  /** Report upload bytes moving, as the browser does while the body is sent. */
+  uploadProgress(loaded: number, total: number) {
+    act(() => {
+      this.upload.onprogress?.(
+        new ProgressEvent("progress", { loaded, total, lengthComputable: true }),
+      );
+    });
+  }
+
+  respond(status: number, body: unknown) {
+    this.respondRaw(status, JSON.stringify(body));
+  }
+
+  respondRaw(status: number, text: string) {
+    act(() => {
+      this.status = status;
+      this.responseText = text;
+      this.onload?.();
+    });
+  }
+}
+
+function image(name: string): File {
+  return new File(["png"], name, { type: "image/png" });
+}
+
+function entry(index = 0) {
+  return useFileStore.getState().entries[index];
+}
+
+function fakeEraser(): EraserCanvasRef {
+  const mask = () => new Blob(["mask"], { type: "image/png" });
+  return {
+    exportMask: async () => mask(),
+    exportAllMasks: async () =>
+      new Map(useFileStore.getState().entries.map((e) => [e.blobUrl, mask()] as const)),
+    getMaskCenter: () => null,
+    clear: vi.fn(),
+    clearAll: vi.fn(),
+    undo: vi.fn(),
+  };
+}
+
+function renderPanel(maskedFileCount = 1) {
+  return render(
+    <EraseObjectSettings
+      eraserRef={{ current: fakeEraser() }}
+      hasStrokes
+      brushSize={30}
+      onBrushSizeChange={vi.fn()}
+      mode="brush"
+      onModeChange={vi.fn()}
+      maskedFileCount={maskedFileCount}
+    />,
+  );
+}
+
+/** Click submit and wait for the request the handler fires after its export. */
+async function submit(count = 1): Promise<FakeXhr> {
+  fireEvent.click(screen.getByTestId("erase-object-submit"));
+  await waitFor(() => expect(FakeXhr.instances).toHaveLength(count));
+  return FakeXhr.instances[count - 1];
+}
+
+const realUpdateEntry = useFileStore.getState().updateEntry;
+
+/**
+ * The next updateEntry throws, as a broken store write would; later ones work.
+ * Call it once the request is out: from there the first entry write is the one
+ * landing the result. The rethrow test below leans on the same order.
+ */
+function breakNextEntryWrite() {
+  vi.spyOn(useFileStore.getState(), "updateEntry")
+    .mockImplementationOnce(() => {
+      throw new Error("boom");
+    })
+    .mockImplementation(realUpdateEntry);
+}
+
+function expectReported(message: string, statusCode: number | undefined) {
+  expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+  const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+  expect(error.message).toBe(message);
+  expect(error.cause).toBeUndefined();
+  expect((error as { statusCode?: number }).statusCode).toBe(statusCode);
+  expect(tags).toEqual({ error_class: "operational", tool_id: "erase-object" });
+}
+
+let blobCount = 0;
+
+beforeEach(() => {
+  // Batch runs map masks back to entries by blob URL, so each needs its own.
+  blobCount = 0;
+  URL.createObjectURL = vi.fn(() => `blob:mock-${++blobCount}`);
+  URL.revokeObjectURL = vi.fn();
+  FakeXhr.instances = [];
+  FakeEventSource.instances = [];
+  vi.stubGlobal("XMLHttpRequest", FakeXhr);
+  vi.stubGlobal("EventSource", FakeEventSource);
+  // A run that fails on our side posts a cancel (#1960); nothing here talks to a server.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+  );
+  vi.mocked(captureHandledError).mockClear();
+  useFileStore.getState().reset();
+  useFileStore.getState().setFiles([image("photo.png")]);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  useFileStore.setState({ updateEntry: realUpdateEntry });
+  useFileStore.getState().reset();
+});
+
+describe("erase-object single file: its own failures apart from a bad response", () => {
+  it("lands a good result", async () => {
+    renderPanel();
+
+    (await submit()).respond(200, GOOD_BODY);
+
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry().status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("claims an auto-saved result and links it on overwrite", async () => {
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+    useFileStore.getState().updateEntry(0, { serverFileId: "file-1" });
+    renderPanel();
+
+    (await submit()).respond(200, { ...GOOD_BODY, savedFileId: "file-2" });
+
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBe("file-2");
+    expect(entry().serverFileId).toBe("file-2");
+    expect(entry().claimed).toBe(true);
+  });
+
+  it("lands the single-file result and auto-save claim on the erased entry after a reorder (#1114)", async () => {
+    useFileStore.getState().setFiles([image("first.png"), image("second.png")]);
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+    useFileStore.getState().updateEntry(0, { serverFileId: "file-1" });
+    renderPanel();
+
+    const xhr = await submit();
+    act(() => useFileStore.getState().reorderFiles(0, 1));
+    xhr.respond(200, { ...GOOD_BODY, savedFileId: "file-2" });
+
+    expect(entry(1).file.name).toBe("first.png");
+    expect(entry(1).status).toBe("completed");
+    expect(entry(1).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(1).serverFileId).toBe("file-2");
+    expect(entry(1).claimed).toBe(true);
+    expect(entry(0).file.name).toBe("second.png");
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(entry(0).claimed).toBe(false);
+  });
+
+  it("ends the run with the tracking message when landing the result throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    breakNextEntryWrite();
+
+    expect(() => xhr.respond(200, GOOD_BODY)).toThrow("boom");
+    // act() skips its flush when the callback throws; let the render land.
+    await act(async () => {});
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(screen.queryByText(en.errors.invalidResponse)).not.toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+    // Our bug, not a malformed answer: the rethrow reaches Sentry instead.
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("rethrows the root cause when ending the run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    // A store listener that breaks on every write: landing the result throws
+    // the root cause, then each of the teardown's store writes throws again.
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      if (writes === 1) throw new Error("root cause");
+      throw new Error(writes === 2 ? "teardown broke" : "later teardown broke");
+    });
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+    try {
+      expect(() => xhr.respond(200, GOOD_BODY)).toThrow("root cause");
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a result handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      // zustand sets the state before its listeners run, so each write landed
+      // even though a listener threw.
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      // The UI teardown still ran after setError threw: the elapsed counter
+      // stops instead of ticking for as long as the page is open.
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      // Both teardown writes threw; the run reports once, with the first
+      // (#1882). The root cause is rethrown, so it isn't reported here.
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a result handling error failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run after a result handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it.each([
+    ["a JSON null body", null, "Tool result body is not a JSON object"],
+    ["a JSON string body", "ok", "Tool result body is not a JSON object"],
+    ["an empty object", {}, "Tool result has no download URL"],
+  ])("says the response was invalid, and reports it, for %s", async (_label, body, message) => {
+    renderPanel();
+
+    (await submit()).respond(200, body);
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expect(entry().status).not.toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+    expectReported(message, 200);
+  });
+
+  it("reports a malformed body even when showing the error throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unsubscribe = useFileStore.subscribe(() => {
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => xhr.respond(200, {})).toThrow("store broke");
+      const calls = vi.mocked(captureHandledError).mock.calls;
+      // The malformed answer is reported first, before any store write. Every
+      // write throws here, so the teardown's failure is reported too (#2134).
+      expect(calls).toHaveLength(2);
+      expect(calls[0][0].message).toBe("Tool result has no download URL");
+      expect((calls[0][0] as { statusCode?: number }).statusCode).toBe(200);
+      expect(calls[0][1]).toEqual({ error_class: "operational", tool_id: "erase-object" });
+      expect(calls[1][0].message).toBe("Ending an Erase Object run with an error failed");
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reports a body that does not parse without its text", async () => {
+    renderPanel();
+
+    (await submit()).respondRaw(200, "<html>secret-token</html>");
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+    expectReported("Tool result body is not a JSON object", 200);
+  });
+});
+
+describe("erase-object batch: its own failures apart from a bad response", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  it("lands a good result on each entry", async () => {
+    renderPanel(2);
+
+    (await submit(1)).respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).status).toBe("completed");
+  });
+
+  it("fails the entry with the tracking message when landing its result throws", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    breakNextEntryWrite();
+
+    expect(() => first.respond(200, GOOD_BODY)).toThrow("boom");
+    // act() skips its flush when the callback throws; reset it before going on.
+    await act(async () => {});
+    // The batch moves on to the next file once the first one settles.
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+    expect(entry(1).status).toBe("completed");
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("rethrows the root cause and reports the teardown failure when ending a streamed batch file throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(202, { jobId: "job-1", async: true });
+      breakNextEntryWrite();
+      vi.spyOn(first, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+        }),
+      ).toThrow("boom");
+      await act(async () => {});
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "abort broke" }),
+      );
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+      expect(entry(1).status).toBe("completed");
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run after a stream handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "abort broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("fails the entry as an invalid response, and reports it, for a body with no result", async () => {
+    renderPanel(2);
+
+    (await submit(1)).respond(200, {});
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe(en.errors.invalidResponse);
+    expect(entry(0).errorCategory).toBe("processing_error");
+    expect(entry(0).processedUrl).toBeNull();
+    expectReported("Tool result has no download URL", 200);
+  });
+});
+
+// Ending the run with an error message is two store writes, the message and the
+// UI teardown. Each is guarded on its own, so one that throws cannot leave the run
+// stuck at processing, and the first throw still reaches Sentry's global handler
+// (#2134).
+describe("erase-object single file: a store write that throws while the run ends with an error", () => {
+  const endings = [
+    ["a failed answer", (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" })],
+    ["a malformed answer", (xhr: FakeXhr) => xhr.respond(200, {})],
+    ["a network error", (xhr: FakeXhr) => act(() => xhr.onerror?.())],
+    ["a timeout", (xhr: FakeXhr) => act(() => xhr.ontimeout?.())],
+  ] as const;
+
+  it.each(endings)(
+    "still ends the run after %s when showing the error throws",
+    async (_label, end) => {
+      renderPanel();
+      const xhr = await submit();
+      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+      let threw = false;
+      const unsubscribe = useFileStore.subscribe((state, previous) => {
+        if (threw || state.error === previous.error) return;
+        threw = true;
+        // Only what runs after this write counts as ending the run.
+        clearIntervalSpy.mockClear();
+        throw new Error("store broke");
+      });
+
+      try {
+        expect(() => end(xhr)).toThrow("store broke");
+        // The UI teardown still ran: the elapsed counter stops.
+        expect(clearIntervalSpy).toHaveBeenCalled();
+        expect(useFileStore.getState().processing).toBe(false);
+      } finally {
+        clearIntervalSpy.mockRestore();
+        unsubscribe();
+      }
+    },
+  );
+
+  it("rethrows the first failure and reports the second when both writes throw", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "message write broke" : "teardown write broke");
+    });
+
+    try {
+      expect(() => act(() => xhr.onerror?.())).toThrow("message write broke");
+
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run with an error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown write broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("still ends the run after a stall when showing the message throws", async () => {
+    const stalls = captureStallTimers();
+    renderPanel();
+    await submit();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      clearIntervalSpy.mockClear();
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("store broke");
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      stalls.restore();
+    }
+  });
+
+  it("rethrows the message write's failure, and reports the teardown's once, after a stall (#1961)", async () => {
+    const stalls = captureStallTimers();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    await submit();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      throw new Error(state.error !== previous.error ? "message write broke" : "teardown broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("message write broke");
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      expect(useFileStore.getState().processing).toBe(false);
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run with an error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      consoleError.mockRestore();
+      stalls.restore();
+    }
+  });
+
+  it("rethrows the message write's failure, not the teardown's, after a failed frame", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    await submit();
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      // The message write lands first; every later write breaks too.
+      throw new Error(state.error !== previous.error ? "message write broke" : "teardown broke");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+        }),
+      ).toThrow("message write broke");
+      // Once: the stream must not call onFailed again and report a second time.
+      expect(
+        vi
+          .mocked(captureHandledError)
+          .mock.calls.filter(
+            ([e]) => e.message === "Ending an Erase Object run with an error failed",
+          ),
+      ).toHaveLength(1);
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reports nothing extra when only the first write throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => act(() => xhr.onerror?.())).toThrow("store broke");
+      // The throw itself reaches Sentry's global handler; a report would double it.
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+});
+
+describe("erase-object single file: every other way the request ends", () => {
+  it("fails the file with the server's error text", async () => {
+    renderPanel();
+
+    (await submit()).respond(422, { error: "Object erasing failed" });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe("Object erasing failed");
+    expect(screen.getByText("Object erasing failed")).toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("fails the file as upload_error on 413", async () => {
+    renderPanel();
+
+    (await submit()).respond(413, { error: "Payload too large" });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().errorCategory).toBe("upload_error");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("fails the file as upload_error on network error", async () => {
+    renderPanel();
+
+    const xhr = await submit();
+    act(() => xhr.onerror?.(new Event("error")));
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.network);
+    expect(entry().errorCategory).toBe("upload_error");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("fails the file as timeout on request timeout", async () => {
+    renderPanel();
+
+    const xhr = await submit();
+    act(() => xhr.ontimeout?.(new Event("timeout")));
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.toolSettings["erase-object"].timeoutOverloaded);
+    expect(entry().errorCategory).toBe("timeout");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("keeps the server's text and ends the run when showing it throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    // The first error write breaks its listener; the write itself still lands.
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      // Only what runs after this write counts as ending the run.
+      clearIntervalSpy.mockClear();
+      throw new Error("store broke");
+    });
+
+    try {
+      // The throw is ours, not the server's: it surfaces instead of being read
+      // as an unparseable body (#2109).
+      expect(() => xhr.respond(422, { error: "Object erasing failed" })).toThrow("store broke");
+      expect(useFileStore.getState().error).toBe("Object erasing failed");
+      // The UI teardown still ran: the elapsed counter stops.
+      expect(clearIntervalSpy).toHaveBeenCalled();
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+    }
+  });
+
+  it("falls back to the details when there is no error text", async () => {
+    renderPanel();
+
+    (await submit()).respond(422, { details: "Not enough memory" });
+
+    expect(screen.getByText("Not enough memory")).toBeInTheDocument();
+  });
+
+  it("names the status when a failed request's body does not parse", async () => {
+    renderPanel();
+
+    (await submit()).respondRaw(502, "<html>Bad Gateway</html>");
+
+    expect(screen.getByText(en.errors.processingFailedWithStatus)).toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("says so on a network error", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    act(() => xhr.onerror?.());
+
+    expect(screen.getByText(en.errors.network)).toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("says so when the request times out", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    act(() => xhr.ontimeout?.());
+
+    expect(screen.getByText(en.toolSettings["erase-object"].timeoutOverloaded)).toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("lands an async result through the progress stream", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    xhr.respond(202, { jobId: "job-1", async: true });
+    expect(useFileStore.getState().processing).toBe(true);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("ignores a malformed sync 200 after the result landed on the stream (#2931)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+
+    xhr.respondRaw(200, "<html>not json</html>");
+
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "a late 504 answer",
+      (xhr: FakeXhr) => xhr.respondRaw(504, "<html>504 Gateway Time-out</html>"),
+    ],
+    ["a late network error", (xhr: FakeXhr) => act(() => xhr.onerror?.())],
+    ["a late timeout", (xhr: FakeXhr) => act(() => xhr.ontimeout?.())],
+  ])("ignores %s after the result landed on the stream (#2931)", async (_label, fireLate) => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+
+    fireLate(xhr);
+
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("keeps a claim and leaves a retry running when a stream-completed run's XHR answers late (#2931)", async () => {
+    useFileStore.getState().setFiles([image("photo.png"), image("second.png")]);
+    renderPanel(1);
+    const first = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+    act(() => useFileStore.getState().markClaimed(0));
+    expect(entry(0).claimed).toBe(true);
+
+    // Select the second file and start a second run before the first request's late 200 arrives.
+    act(() => useFileStore.getState().setSelectedIndex(1));
+    const second = await submit(2);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent("0%");
+    expect(screen.getByRole("status").querySelector(".animate-spin")).toBeNull();
+
+    first.respond(200, {
+      downloadUrl: "/api/v1/download/job-stale/stale.png",
+      originalSize: 1000,
+      processedSize: 900,
+      savedFileId: "file-stale",
+    });
+
+    expect(entry(0).claimed).toBe(true);
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    // Late upload callbacks from the first request must not reset progress phase/percent.
+    first.uploadProgress(50, 100);
+    first.uploadFinished();
+    expect(screen.getByRole("status")).toHaveTextContent("0%");
+    expect(screen.getByRole("status").querySelector(".animate-spin")).toBeNull();
+
+    second.respond(200, {
+      downloadUrl: "/api/v1/download/job-2/photo.png",
+      originalSize: 1000,
+      processedSize: 850,
+    });
+    expect(entry(1).processedUrl).toBe("/api/v1/download/job-2/photo.png");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("ignores a queued malformed or failed SSE frame after a sync 200 settled the run (#2932)", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      xhr.respond(200, GOOD_BODY);
+
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "failed", error: "late error" }),
+        });
+      });
+      stalls.fireLatest();
+
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(useFileStore.getState().error).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it.each([
+    ["a malformed 200", (xhr: FakeXhr) => xhr.respond(200, {}), en.errors.invalidResponse, 1],
+    [
+      "a failed 422",
+      (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" }),
+      "Object erasing failed",
+      0,
+    ],
+  ])(
+    "ignores a queued SSE complete, failed, or stall after %s settled the run (#2932)",
+    async (_label, respondSync, expectedError, expectedReports) => {
+      const stalls = captureStallTimers();
+      try {
+        renderPanel();
+        const xhr = await submit();
+        respondSync(xhr);
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "failed", error: "late stream error" }),
+          });
+        });
+        stalls.fireLatest();
+
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+        expect(screen.queryByText("late stream error")).not.toBeInTheDocument();
+        expect(entry().status).not.toBe("completed");
+        expect(entry().processedUrl).toBeNull();
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+      } finally {
+        stalls.restore();
+      }
+    },
+  );
+});
+
+/** Answer the request with a 202, then send one frame on the progress stream. */
+function goAsyncThenSend(xhr: FakeXhr, frame: unknown, stream = 0) {
+  xhr.respond(202, { jobId: "job-1", async: true });
+  act(() => {
+    FakeEventSource.instances[stream].onmessage?.({ data: JSON.stringify(frame) });
+  });
+}
+
+// A completed frame's result is the worker's buildLegacyResultPayload, which
+// always carries a downloadUrl, so one without it is the server's bug: the
+// stream twin of a sync 200 {} (#1740), closed for the shared hooks in #1794.
+const NOTHING_TO_DOWNLOAD = [
+  ["an empty result", { result: {} }, "Tool result has no download URL"],
+  ["an empty download URL", { result: { downloadUrl: "" } }, "Tool result has no download URL"],
+  ["a null result", { result: null }, "Tool result body is not a JSON object"],
+  ["no result at all", {}, "Tool result body is not a JSON object"],
+] as const;
+
+describe("erase-object single file: a completed frame with nothing to download (#1830)", () => {
+  it.each(NOTHING_TO_DOWNLOAD)(
+    "fails the run, and reports it once, for %s",
+    async (_label, extra, message) => {
+      renderPanel();
+
+      goAsyncThenSend(await submit(), { type: "single", phase: "complete", ...extra });
+
+      expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+      expect(entry().status).not.toBe("completed");
+      expect(entry().processedUrl).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      // A progress frame has no HTTP status to tag.
+      expectReported(message, undefined);
+    },
+  );
+
+  it("keeps the invalid-response error, reported once, when showing it throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    const unsubscribe = useFileStore.subscribe(() => {
+      throw new Error("store broke");
+    });
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+    try {
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        }),
+      ).toThrow("store broke");
+      // zustand sets the state before its listeners run. The server's fault
+      // stays the error: it is not relabelled as our own tracking failure.
+      expect(useFileStore.getState().error).toBe(en.errors.invalidResponse);
+      // The server's fault is reported once, before any store write. Every write
+      // throws here, so the teardown's failure is reported too (#2134).
+      const messages = vi.mocked(captureHandledError).mock.calls.map(([e]) => e.message);
+      expect(messages.filter((m) => m === "Tool result has no download URL")).toHaveLength(1);
+      expect(
+        messages.filter((m) => m === "Ending an Erase Object run with an error failed"),
+      ).toHaveLength(1);
+      expect(messages).toHaveLength(2);
+      // The stream already let go of the run, so the teardown must still run
+      // or it sits at processing for good.
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(clearIntervalSpy).toHaveBeenCalled();
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("still reads a throw while landing a good frame as ours", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    breakNextEntryWrite();
+
+    expect(() =>
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("keeps the completed result without jobTrackingFailed or a cancel when ending a completed streamed run throws (#3018)", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ canceled: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderPanel();
+    const xhr = await submit();
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (previous.processing && !state.processing) {
+        throw new Error("boom");
+      }
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+        }),
+      ).toThrow("boom");
+      await act(async () => {});
+
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(screen.getByTestId("erase-object-download")).toHaveAttribute("href", DOWNLOAD_URL);
+      expect(useFileStore.getState().error).toBeNull();
+      expect(screen.queryByText(en.errors.jobTrackingFailed)).not.toBeInTheDocument();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      xhr.respond(202, { jobId: "job-1", async: true });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("rethrows the root cause and reports the teardown failure once when ending a streamed run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      if (writes === 1) throw new Error("root cause");
+      throw new Error(writes === 2 ? "teardown broke" : "later teardown broke");
+    });
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+        }),
+      ).toThrow("root cause");
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run after a stream handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reports once when both the streamed frame and a queued 200 are malformed (#2931)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    xhr.respondRaw(200, "<html>not json</html>");
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expectReported("Tool result has no download URL", undefined);
+  });
+});
+
+describe("erase-object batch: a completed frame with nothing to download (#1830)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  it.each(NOTHING_TO_DOWNLOAD)(
+    "fails the file, and reports it once, for %s",
+    async (_label, extra, message) => {
+      renderPanel(2);
+
+      goAsyncThenSend(await submit(1), { type: "single", phase: "complete", ...extra });
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.errors.invalidResponse);
+      expect(entry(0).processedUrl).toBeNull();
+      expect(entry(1).status).toBe("completed");
+      expectReported(message, undefined);
+    },
+  );
+
+  it("lands a good frame on the file", async () => {
+    renderPanel(2);
+
+    goAsyncThenSend(await submit(1), { type: "single", phase: "complete", result: GOOD_BODY });
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("completed");
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late malformed 200 or late valid 200 after a batch file completed on the stream (#2931)", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+    act(() => useFileStore.getState().markClaimed(0));
+    expect(entry(0).claimed).toBe(true);
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    // First file's XHR answers late with a malformed 200, then a valid 200 with a different URL,
+    // plus a 504, network error, and timeout.
+    first.respondRaw(200, "<html>not json</html>");
+    first.respond(200, {
+      downloadUrl: "/api/v1/download/job-stale/stale.png",
+      originalSize: 1000,
+      processedSize: 900,
+    });
+    first.respondRaw(504, "<html>504 Gateway Time-out</html>");
+    act(() => first.onerror?.());
+    act(() => first.ontimeout?.());
+
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("completed");
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(0).claimed).toBe(true);
+    expect(entry(1).status).toBe("completed");
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("reports once when both a batch file's streamed frame and a queued 200 are malformed (#2931)", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    first.respondRaw(200, "<html>not json</html>");
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe(en.errors.invalidResponse);
+    expect(entry(1).status).toBe("completed");
+    expectReported("Tool result has no download URL", undefined);
+  });
+
+  it("ignores a queued malformed or failed SSE frame or stall after a batch file's sync 200 settled it (#2932)", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(200, GOOD_BODY);
+      act(() => useFileStore.getState().markClaimed(0));
+
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "failed", error: "late error" }),
+        });
+      });
+      act(() => stalls.all()[0]?.fire());
+
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("completed");
+      expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+      expect(entry(0).claimed).toBe(true);
+      expect(entry(1).status).toBe("completed");
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it.each([
+    ["a malformed 200", (xhr: FakeXhr) => xhr.respond(200, {}), en.errors.invalidResponse, 1],
+    [
+      "a failed 422",
+      (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" }),
+      "Object erasing failed",
+      0,
+    ],
+  ])(
+    "ignores a queued SSE complete, failed, or stall after a batch file's sync response was %s (#2932)",
+    async (_label, respondSync, expectedError, expectedReports) => {
+      const stalls = captureStallTimers();
+      try {
+        renderPanel(2);
+        const first = await submit(1);
+        respondSync(first);
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "failed", error: "late stream error" }),
+          });
+        });
+        act(() => stalls.all()[0]?.fire());
+
+        await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+        FakeXhr.instances[1].respond(200, GOOD_BODY);
+        await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+        expect(entry(0).status).toBe("failed");
+        expect(entry(0).error).toBe(expectedError);
+        expect(entry(0).processedUrl).toBeNull();
+        expect(entry(1).status).toBe("completed");
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+      } finally {
+        stalls.restore();
+      }
+    },
+  );
+
+  it("lands each batch file's result on its own entry when reordered mid-batch (#1114)", async () => {
+    renderPanel(2);
+
+    const first = await submit(1);
+    // Reorder [one.png, two.png] -> [two.png, one.png] while one.png is in flight.
+    act(() => useFileStore.getState().reorderFiles(0, 1));
+    first.respond(200, { ...GOOD_BODY, downloadUrl: "/api/v1/download/job-1/one.png" });
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(422, { error: "Second failed" });
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(1).file.name).toBe("one.png");
+    expect(entry(1).status).toBe("completed");
+    expect(entry(1).processedUrl).toBe("/api/v1/download/job-1/one.png");
+    expect(entry(0).file.name).toBe("two.png");
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Second failed");
+  });
+});
+
+describe("erase-object batch: every other way a file's request ends", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  async function runFirstThenFinish(answerFirst: (xhr: FakeXhr) => void) {
+    renderPanel(2);
+    answerFirst(await submit(1));
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+  }
+
+  it("fails the file with the server's error text", async () => {
+    await runFirstThenFinish((xhr) => xhr.respond(422, { error: "Object erasing failed" }));
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(1).status).toBe("completed");
+  });
+
+  it("names the status when a failed request's body does not parse", async () => {
+    await runFirstThenFinish((xhr) => xhr.respondRaw(502, "<html>Bad Gateway</html>"));
+
+    expect(entry(0).error).toBe(en.errors.processingFailedWithStatus);
+  });
+
+  it("fails the file on a network error", async () => {
+    await runFirstThenFinish((xhr) => act(() => xhr.onerror?.()));
+
+    expect(entry(0).error).toBe(en.errors.network);
+  });
+
+  it("fails the file as a timeout when the request times out", async () => {
+    await runFirstThenFinish((xhr) => act(() => xhr.ontimeout?.()));
+
+    expect(entry(0).error).toBe(en.errors.requestTimedOut);
+    expect(entry(0).errorCategory).toBe("timeout");
+  });
+});
+
+/**
+ * A batch leaves its click handler as a rejection when a store write keeps
+ * throwing. Takes that over from vitest until `restore`, so a test can assert
+ * on it instead of failing the run (the same takeover as the Collage tests in
+ * own-parse-tools-result-reporting). Call `restore` in a finally that starts
+ * right after this, or vitest's listener stays gone.
+ */
+function takeOverUnhandledRejections() {
+  const saved = process.listeners("unhandledRejection");
+  const rejections: unknown[] = [];
+  const onRejection = (reason: unknown) => {
+    rejections.push(reason);
+  };
+  process.removeAllListeners("unhandledRejection");
+  process.on("unhandledRejection", onRejection);
+  return {
+    rejections,
+    restore() {
+      process.off("unhandledRejection", onRejection);
+      for (const listener of saved) process.on("unhandledRejection", listener);
+    },
+  };
+}
+
+/**
+ * Watches the batch's elapsed counter: the one 1000 ms interval the panel
+ * starts. Testing Library's waitFor starts and clears its own intervals, so
+ * only a clear of this handle proves the counter stopped.
+ */
+function watchElapsedInterval() {
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  const handles: ReturnType<typeof setInterval>[] = [];
+  const setSpy = vi.spyOn(globalThis, "setInterval").mockImplementation(((
+    handler: () => void,
+    ms?: number,
+  ) => {
+    const handle = realSetInterval(handler, ms);
+    if (ms === 1000) handles.push(handle);
+    return handle;
+  }) as typeof setInterval);
+  const clearSpy = vi.spyOn(globalThis, "clearInterval");
+  return {
+    handles,
+    clearSpy,
+    realClearInterval,
+    expectCleared() {
+      expect(handles).toHaveLength(1);
+      expect(clearSpy).toHaveBeenCalledWith(handles[0]);
+    },
+    restore() {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+      for (const handle of handles) realClearInterval(handle);
+    },
+  };
+}
+
+describe("erase-object batch: a store that keeps throwing (#1810)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  it("ends the batch when failing a file's entry throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    const elapsed = watchElapsedInterval();
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // Every entry write from here on throws before it lands: landing the
+      // result, failing the entry in handleProcessAll's catch, and the
+      // teardown's attempt to settle the file it left at "processing".
+      const thrown: Error[] = [];
+      vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation((_index, patch) => {
+        const err = new Error(`write ${patch.status}`);
+        thrown.push(err);
+        throw err;
+      });
+
+      expect(() => first.respond(200, GOOD_BODY)).toThrow("write completed");
+      await act(async () => {});
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(thrown.map((err) => err.message)).toEqual([
+        "write completed",
+        "write failed",
+        "write failed",
+      ]);
+      // The catch's failed write is the root cause, and it surfaces.
+      expect(unhandled.rejections[0]).toBe(thrown[1]);
+      expect(useFileStore.getState().processing).toBe(false);
+      elapsed.expectCleared();
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      // A store that can't record a failure gets no more files sent to it.
+      expect(FakeXhr.instances).toHaveLength(1);
+      // The settle behind it threw too and would be lost to the rethrow, so
+      // it is reported, once. The store never took a write, so the file is
+      // still at "processing": nothing could have moved it.
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Ending an Erase Object batch after a store error failed");
+      expect(error.cause).toBe(thrown[2]);
+      expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+      expect(entry(0).status).toBe("processing");
+    } finally {
+      elapsed.restore();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("rethrows the root cause and reports the teardown's first throw once", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    const elapsed = watchElapsedInterval();
+    let unsubscribe = () => {};
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // A store listener that breaks on every write, named for the write it
+      // saw. zustand sets the state before its listeners run, so each write
+      // lands and then throws.
+      unsubscribe = useFileStore.subscribe((state, prev) => {
+        const was = prev.entries[0]?.status;
+        const now = state.entries[0]?.status;
+        if (was !== now) throw new Error(`entry ${now}`);
+        if (prev.processing && !state.processing) throw new Error("processing cleared");
+        if (prev.error !== state.error) throw new Error("error shown");
+        throw new Error("other write");
+      });
+
+      expect(() => first.respond(200, GOOD_BODY)).toThrow("entry completed");
+      await act(async () => {});
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      // Failing the entry in the catch is the root cause; the teardown's
+      // throws came after it and must not replace it.
+      expect(unhandled.rejections[0]).toMatchObject({ message: "entry failed" });
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      elapsed.expectCleared();
+      expect(FakeXhr.instances).toHaveLength(1);
+      for (const message of ["processing cleared", "error shown"]) {
+        expect(consoleError).toHaveBeenCalledWith(
+          "Ending an Erase Object batch failed",
+          expect.objectContaining({ message }),
+        );
+      }
+      // Two teardown writes threw; the first one is the one reported.
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Ending an Erase Object batch after a store error failed");
+      expect(error.cause).toMatchObject({ message: "processing cleared" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      unsubscribe();
+      elapsed.restore();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("runs the rest of the teardown when stopping the counter throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    const elapsed = watchElapsedInterval();
+    const clearBroke = new Error("clear broke");
+    elapsed.clearSpy.mockImplementation((handle) => {
+      if (handle !== undefined && handle === elapsed.handles[0]) throw clearBroke;
+      elapsed.realClearInterval(handle);
+    });
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // A 422 lands nothing, so the next entry write is the catch's failed
+      // write. It throws before it lands; every write after it works.
+      vi.spyOn(useFileStore.getState(), "updateEntry")
+        .mockImplementationOnce(() => {
+          throw new Error("fail write broke");
+        })
+        .mockImplementation(realUpdateEntry);
+
+      first.respond(422, { error: "Object erasing failed" });
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "fail write broke" });
+      // Every step after the throwing one still ran: the run ended, the
+      // error shows, and the file the batch left behind was settled.
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(captureHandledError).mock.calls[0][0].cause).toBe(clearBroke);
+    } finally {
+      elapsed.restore();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("rethrows a teardown throw, unreported, when every file went through", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
+    try {
+      renderPanel(2);
+      (await submit(1)).respond(200, GOOD_BODY);
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      // Only ending the run breaks: the write that clears processing throws.
+      unsubscribe = useFileStore.subscribe((state, prev) => {
+        if (prev.processing && !state.processing) throw new Error("teardown broke");
+      });
+
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "teardown broke" });
+      expect(entry(0).status).toBe("completed");
+      expect(entry(1).status).toBe("completed");
+      expect(useFileStore.getState().processing).toBe(false);
+      // A batch that went through shows no error.
+      expect(useFileStore.getState().error).toBeNull();
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      // Sentry's global handler gets the rethrow, so no second report.
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("ends the batch when marking the next file as processing throws", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    const elapsed = watchElapsedInterval();
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // The first file lands; the next entry write, marking file two as
+      // processing, throws before it lands.
+      vi.spyOn(useFileStore.getState(), "updateEntry")
+        .mockImplementationOnce(realUpdateEntry)
+        .mockImplementationOnce(() => {
+          throw new Error("marking broke");
+        })
+        .mockImplementation(realUpdateEntry);
+
+      first.respond(200, GOOD_BODY);
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "marking broke" });
+      expect(entry(0).status).toBe("completed");
+      expect(entry(1).status).not.toBe("processing");
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      elapsed.expectCleared();
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      elapsed.restore();
+      unhandled.restore();
+    }
+  });
+
+  it("settles a file marked processing that the stopped batch never sent", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // Marking file two as processing lands, then its listener throws.
+      unsubscribe = useFileStore.subscribe((state, prev) => {
+        if (prev.entries[1]?.status !== "processing" && state.entries[1]?.status === "processing") {
+          throw new Error("marking listener broke");
+        }
+      });
+
+      first.respond(200, GOOD_BODY);
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "marking listener broke" });
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(entry(0).status).toBe("completed");
+      expect(entry(1).status).toBe("failed");
+      expect(entry(1).error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("ends the batch when starting it throws", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
+    try {
+      renderPanel(2);
+      // setProcessing(true) lands, then a listener throws: nothing may be left
+      // at processing with no request ever sent.
+      unsubscribe = useFileStore.subscribe((state, prev) => {
+        if (!prev.processing && state.processing) throw new Error("start broke");
+      });
+
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "start broke" });
+      expect(FakeXhr.instances).toHaveLength(0);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(entry(0).status).not.toBe("processing");
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+    }
+  });
+});
+
+const STALL_MS = 5 * 60_000;
+
+/**
+ * Captures the progress stream's stall timers (the one five-minute timeout the
+ * panel arms) so a test can fire the stall without faking every timer, which
+ * would stall Testing Library's own waitFor too.
+ */
+function captureStallTimers() {
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  const stalls: { fire: () => void; cleared: boolean }[] = [];
+  const byHandle = new Map<unknown, (typeof stalls)[number]>();
+  const setSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    handler: () => void,
+    ms?: number,
+  ) => {
+    if (ms !== STALL_MS) return realSetTimeout(handler, ms);
+    const handle = realSetTimeout(() => {}, 0);
+    const stall = { fire: handler, cleared: false };
+    stalls.push(stall);
+    byHandle.set(handle, stall);
+    return handle;
+  }) as typeof setTimeout);
+  const clearSpy = vi.spyOn(globalThis, "clearTimeout").mockImplementation(((
+    handle?: Parameters<typeof clearTimeout>[0],
+  ) => {
+    const stall = byHandle.get(handle);
+    if (stall) stall.cleared = true;
+    realClearTimeout(handle);
+  }) as typeof clearTimeout);
+  return {
+    /** Fire the most recently armed stall, as five quiet minutes would. */
+    fireLatest() {
+      const stall = stalls.at(-1);
+      if (!stall) throw new Error("no stall timer armed");
+      act(() => stall.fire());
+    },
+    /** Every stall armed so far, in order, with whether it was cleared. */
+    all() {
+      return stalls;
+    },
+    restore() {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    },
+  };
+}
+
+const FAILED_FRAME = { type: "single", phase: "failed", error: "Object erasing failed" };
+
+describe("erase-object batch: a file the progress stream gave up on (#1893)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  /** File one is still uploading when its stream gives up; the batch moves on. */
+  async function giveUpOnFirstThenAnswerItLate(giveUp: () => void) {
+    renderPanel(2);
+    const first = await submit(1);
+    giveUp();
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+    // The abandoned request answers after the batch is over.
+    first.respond(200, GOOD_BODY);
+    return first;
+  }
+
+  it("aborts the request and keeps the file failed after a failed frame", async () => {
+    const first = await giveUpOnFirstThenAnswerItLate(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      }),
+    );
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(first.aborted).toBe(true);
+    expect(entry(1).status).toBe("completed");
+    expect(FakeXhr.instances[1].aborted).toBe(false);
+  });
+
+  it("aborts the request and keeps the file failed after a stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      const first = await giveUpOnFirstThenAnswerItLate(() => stalls.fireLatest());
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.toolSettings["erase-object"].stallBatch);
+      expect(entry(0).errorCategory).toBe("timeout");
+      expect(entry(0).processedUrl).toBeNull();
+      expect(first.aborted).toBe(true);
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("keeps the file failed and continues the batch after a stall even when aborting throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      vi.spyOn(first, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.toolSettings["erase-object"].stallBatch);
+      expect(entry(0).errorCategory).toBe("timeout");
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not abort a request that answered first", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(first.aborted).toBe(false);
+    expect(entry(0).status).toBe("completed");
+  });
+});
+
+describe("erase-object single file: a run the progress stream gave up on (#1893)", () => {
+  it("aborts the request and keeps the failure after a failed frame", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    xhr.respond(200, GOOD_BODY);
+
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(entry().status).not.toBe("completed");
+    expect(entry().processedUrl).toBeNull();
+    expect(xhr.aborted).toBe(true);
+  });
+
+  it("aborts the request and keeps the stall message after a stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+      expect(useFileStore.getState().processing).toBe(false);
+
+      xhr.respond(200, GOOD_BODY);
+
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      expect(entry().status).not.toBe("completed");
+      expect(entry().processedUrl).toBeNull();
+      expect(xhr.aborted).toBe(true);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("still ends the run after a stall when aborting the request throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      vi.spyOn(xhr, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("rethrows the abort failure and reports the store failure when both aborting and showing the stall message throw", async () => {
+    const stalls = captureStallTimers();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    vi.spyOn(xhr, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run with an error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "store broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+      stalls.restore();
+    }
+  });
+
+  it("ignores a late network error on the abandoned request", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    act(() => xhr.onerror?.());
+
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
+  });
+
+  it("ignores a late timeout on the abandoned request", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    act(() => xhr.ontimeout?.());
+
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
+  });
+
+  it("ignores a late error answer on the abandoned request", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+
+      xhr.respond(422, { error: "Object erasing failed" });
+
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
+  });
+});
+
+/**
+ * #1959: the stall timer is armed before the upload starts, and only the
+ * progress stream used to reset it. A big image still uploading while the
+ * stream was quiet got called stalled, and since #1893 the stall also aborts
+ * the request, cutting off an upload that was still moving.
+ */
+describe("erase-object counts upload progress as a sign of life (#1959)", () => {
+  it("single file: pushes the stall back while upload bytes are moving", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      expect(xhr.uploadHandlerAtSend).toBe(true);
+      const armedBeforeUpload = stalls.all().at(-1);
+      expect(armedBeforeUpload?.cleared).toBe(false);
+
+      xhr.uploadProgress(1, 4);
+
+      expect(armedBeforeUpload?.cleared).toBe(true);
+      expect(stalls.all().at(-1)?.cleared).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      expect(useFileStore.getState().processing).toBe(true);
+
+      xhr.respond(200, GOOD_BODY);
+      expect(entry().status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("single file: still stalls after five quiet minutes once the upload stops", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      xhr.uploadProgress(4, 4);
+
+      stalls.fireLatest();
+
+      expect(xhr.aborted).toBe(true);
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("single file: upload progress after the run ended arms no new stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      });
+      const armed = stalls.all().length;
+
+      xhr.uploadProgress(4, 4);
+
+      expect(stalls.all()).toHaveLength(armed);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: pushes the stall back while upload bytes are moving", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const xhr = await submit();
+      expect(xhr.uploadHandlerAtSend).toBe(true);
+      const armedBeforeUpload = stalls.all().at(-1);
+      expect(armedBeforeUpload?.cleared).toBe(false);
+
+      xhr.uploadProgress(1, 4);
+
+      expect(armedBeforeUpload?.cleared).toBe(true);
+      expect(stalls.all().at(-1)?.cleared).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      expect(entry(0).status).toBe("processing");
+    } finally {
+      stalls.restore();
+    }
+  });
+});
+
+/**
+ * #1960: when the client gives up on a run (handling a frame broke, or the
+ * five-minute stall fired), the job still runs on the server and can still
+ * save. Both paths cancel the server job once it has been accepted.
+ */
+describe("erase-object cancels a job the client gave up on (#1960)", () => {
+  const cancelUrl = (xhr: FakeXhr) =>
+    `/api/v1/jobs/${xhr.body?.get("clientJobId") as string}/cancel`;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => new Response(JSON.stringify({ canceled: true })));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  /** The 202 is answered and the stream's complete frame then breaks landing. */
+  async function breakLandingStreamResult(xhr: FakeXhr) {
+    xhr.respond(202, { jobId: "job-1", async: true });
+    breakNextEntryWrite();
+    expect(() =>
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+  }
+
+  it("single file: posts a cancel when handling the stream breaks", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(cancelUrl(xhr));
+    expect(init.method).toBe("POST");
+  });
+
+  it("batch: posts a cancel for the file whose handling broke", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+    const first = await submit(1);
+
+    await breakLandingStreamResult(first);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+  });
+
+  it("does not cancel a job the server itself reported as failed", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not cancel a failed frame's job when showing its error or aborting throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    vi.spyOn(xhr, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      }),
+    ).toThrow("abort broke");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("batch: does not cancel a failed frame's job when aborting throws", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+    const first = await submit(1);
+    first.respond(202, { jobId: "job-1", async: true });
+    vi.spyOn(first, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      }),
+    ).toThrow("abort broke");
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(1).status).toBe("completed");
+  });
+
+  it("single file: posts a cancel when the progress stream stalls after 202", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      xhr.respond(202, { jobId: "job-1", async: true });
+
+      stalls.fireLatest();
+
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      expect(en.toolSettings["erase-object"].stall).toBe(
+        "Processing timed out with no progress. Try again.",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe(cancelUrl(xhr));
+      expect(init.method).toBe("POST");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("single file: posts a cancel on stall even when aborting the request throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      xhr.respond(202, { jobId: "job-1", async: true });
+      vi.spyOn(xhr, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: posts a cancel for the file whose progress stream stalled after 202", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(202, { jobId: "job-1", async: true });
+
+      stalls.fireLatest();
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.toolSettings["erase-object"].stallBatch);
+      expect(en.toolSettings["erase-object"].stallBatch).toBe("Processing timed out. Try again.");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: posts a cancel on stall even when aborting the request throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(202, { jobId: "job-1", async: true });
+      vi.spyOn(first, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+      expect(entry(0).status).toBe("failed");
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not send a cancel when the stall fires while the file is still uploading, unless a 202 slips past the abort", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+
+      expect(xhr.aborted).toBe(true);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+
+      // A 202 response already queued behind the abort still triggers a cancel,
+      // while a non-202 response does not.
+      xhr.respond(202, { jobId: "job-1", async: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not send a cancel when a non-202 response slips past a pre-202 stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+
+      xhr.respond(200, GOOD_BODY);
+      xhr.respond(422, { error: "Object erasing failed" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("cancels once when a stall follows a progress frame and the 202 arrives later", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 30 }),
+        });
+      });
+
+      stalls.fireLatest();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+
+      xhr.respond(202, { jobId: "job-1", async: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: cancels once when a stall follows a progress frame and the 202 arrives later", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const first = await submit(1);
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 30 }),
+        });
+      });
+
+      stalls.fireLatest();
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      first.respond(202, { jobId: "job-1", async: true });
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("single file: posts a cancel on stall after 202 even when showing the stall message throws", async () => {
+    const stalls = captureStallTimers();
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("store broke");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      unsubscribe();
+      stalls.restore();
+    }
+  });
+
+  it("trackAbandonedJob sends at most one cancel across cancelOnStall and keepRequestOnStop", () => {
+    const stalledFirst = trackAbandonedJob("job-stall-first", "erase-object");
+    stalledFirst.onAccepted();
+    stalledFirst.cancelOnStall();
+    stalledFirst.cancelOnStall();
+    expect(stalledFirst.keepRequestOnStop()).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const stoppedFirst = trackAbandonedJob("job-stop-first", "erase-object");
+    stoppedFirst.onAccepted();
+    expect(stoppedFirst.keepRequestOnStop()).toBe(false);
+    stoppedFirst.cancelOnStall();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the failure alone, and reports it, when the cancel never reaches the server", async () => {
+    // Not the browser's own offline rejection: the scrubber ignores that one.
+    fetchMock.mockRejectedValue(new Error("proxy reset the connection"));
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1));
+
+    expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+      "A cancel request never reached the server",
+    );
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("treats a job that already finished (canceled: false) as expected, not as a fault", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ canceled: false })));
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+  });
+
+  it("reports a cancel that finds no job, since nothing else would trace it", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 404 }));
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1));
+
+    expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+      "Cancel for an abandoned Erase Object job found no job",
+    );
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+  });
+
+  it("does not report a cancel the server acknowledged", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+});
+
+describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png"), image("three.png")]);
+  });
+
+  /** What the tool page does on the way out: a fresh store for the next tool. */
+  function moveToAnotherTool() {
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-tool.png")]);
+    });
+  }
+
+  it("an abort that throws still settles the stopped file's promise (#2137)", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+    act(() => {
+      first.respond(202, { jobId: "queued", async: true });
+    });
+
+    const originalAbort = first.abort;
+    first.abort = () => {
+      originalAbort.call(first);
+      throw new Error("fake abort error");
+    };
+
+    act(() => {
+      useFileStore.getState().setFiles([image("library.png")]);
+    });
+
+    await act(async () => {});
+
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("leaving for another tool stops the file in flight and sends no more", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+
+    unmount();
+    moveToAnotherTool();
+
+    expect(first.aborted).toBe(true);
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    // Answered anyway: it lands nowhere, and no second file goes out.
+    first.respond(200, GOOD_BODY);
+    await act(async () => {});
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBeNull();
+  });
+
+  it("cancels the job the server already queued for the file it drops (#2093)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.respond(202, { jobId: "queued", async: true });
+
+    unmount();
+    moveToAnotherTool();
+
+    const clientJobId = first.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts a file still uploading and sends no cancel (#2093)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(first.aborted).toBe(true);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  // The browser has sent the whole body and the server hasn't answered: it may be
+  // reading or decoding it, and will enqueue. Aborting would leave that job running with nothing to cancel
+  // it by, so the request stays open and the cancel goes out on the 202 (#2136).
+  it("keeps the request after the upload finished and cancels when the 202 arrives (#2136)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.uploadFinished();
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(first.aborted).toBe(false);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+
+    first.respond(202, { jobId: "queued", async: true });
+    const clientJobId = first.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    // The stopped batch stays stopped: nothing else goes out, nothing lands.
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(entry(0).processedUrl).toBeNull();
+  });
+
+  // Firefox fires upload.onload only once the answer starts, so the last upload
+  // progress event is all the batch has to go on.
+  it("treats the final upload progress event as the upload being done (#2136)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.uploadProgress(100, 100);
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(first.aborted).toBe(false);
+    first.respond(202, { jobId: "queued", async: true });
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+  });
+
+  it("aborts when the upload progress shows the body is only partly sent (#2136)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.uploadProgress(40, 100);
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(first.aborted).toBe(true);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("sends no cancel when the answer to a stopped, uploaded file is not a 202 (#2136)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.uploadFinished();
+
+    unmount();
+    moveToAnotherTool();
+    first.respond(200, GOOD_BODY);
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("stops at the file in flight when the files go after one has finished", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+
+    moveToAnotherTool();
+    second.respond(200, GOOD_BODY);
+    await act(async () => {});
+
+    expect(second.aborted).toBe(true);
+    expect(FakeEventSource.instances[1].readyState).toBe(2);
+    expect(FakeXhr.instances).toHaveLength(2);
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+  });
+
+  it("ends the run when library files replace the batch's without a reset", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    // Erase Object, then the file library, then a library file opened in a
+    // tool: the store is replaced, never reset.
+    unmount();
+    act(() => useFileStore.getState().setFiles([image("from-library.png")]));
+    await act(async () => {});
+
+    expect(first.aborted).toBe(true);
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it("keeps going when only the panel unmounts, as the mobile settings sheet does", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+
+    unmount();
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(first.aborted).toBe(false);
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).status).toBe("completed");
+    expect(entry(2).status).toBe("completed");
+  });
+
+  it("keeps going when more files are added mid-batch", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+
+    act(() => useFileStore.getState().addFiles([image("four.png")]));
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(first.aborted).toBe(false);
+    expect(entry(2).status).toBe("completed");
+    expect(entry(3).status).toBe("pending");
+  });
+
+  it("reports a throw while stopping instead of breaking the reset that caused it", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+    vi.spyOn(first, "abort").mockImplementation(() => {
+      throw new Error("abort blew up");
+    });
+
+    expect(() => moveToAnotherTool()).not.toThrow();
+    await act(async () => {});
+
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe("Stopping an Erase Object batch whose files left failed");
+    expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+  });
+
+  it("sends nothing more when the files go just as a file finishes", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+
+    // Same tick: the loop only learns of it before the next file.
+    act(() => {
+      first.status = 200;
+      first.responseText = JSON.stringify(GOOD_BODY);
+      first.onload?.();
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-tool.png")]);
+    });
+    await act(async () => {});
+
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it("sends no cancel when the files go in the same tick a 202 batch file completes (#2239)", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+    first.respond(202, { jobId: "queued", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-tool.png")]);
+    });
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("stops the batch, preserves completed entries, resets the processing entry, and cancels a 202 job when stopRuns fires without resetting the store (#1994)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+    second.respond(202, { jobId: "queued", async: true });
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).status).toBe("processing");
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+
+    expect(FakeEventSource.instances[1].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).status).toBe("pending");
+    expect(entry(2).status).toBe("pending");
+    const clientJobId = second.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    await act(async () => {});
+    expect(FakeXhr.instances).toHaveLength(2);
+  });
+
+  it("still clears processing, resets the processing entry, and reports the first error when abort throws during stopRuns (#1994)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    const abortBoom = new Error("abort blew up on route leave");
+    vi.spyOn(first, "abort").mockImplementation(() => {
+      throw abortBoom;
+    });
+
+    unmount();
+    expect(() =>
+      act(() => {
+        useFileStore.getState().stopRuns();
+      }),
+    ).not.toThrow();
+    await act(async () => {});
+
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe("Stopping an Erase Object batch whose files left failed");
+    expect(error.cause).toBe(abortBoom);
+    expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+  });
+
+  it("sends nothing when stopRuns fires while batch masks are still exporting (#1994)", async () => {
+    let finishExport: (masks: Map<string, Blob>) => void = () => {};
+    const eraser = fakeEraser();
+    eraser.exportAllMasks = () =>
+      new Promise<Map<string, Blob>>((resolve) => {
+        finishExport = resolve;
+      });
+    render(
+      <EraseObjectSettings
+        eraserRef={{ current: eraser }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={2}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+    await act(async () => {
+      const mask = new Blob(["mask"], { type: "image/png" });
+      finishExport(new Map(useFileStore.getState().entries.map((e) => [e.blobUrl, mask] as const)));
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it("does not clobber a new run's processing flag when the stopped batch's microtask drains (#1994)", async () => {
+    const { unmount } = renderPanel(3);
+    await submit(1);
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+      useFileStore.getState().setProcessing(true);
+    });
+    await act(async () => {});
+
+    expect(useFileStore.getState().processing).toBe(true);
+  });
+
+  it("skips a queued entry removed via removeFile mid-batch and finishes the remaining entries (#3465)", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+    expect(first.aborted).toBe(false);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(FakeXhr.instances).toHaveLength(2);
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).file.name).toBe("three.png");
+    expect(entry(1).status).toBe("completed");
+  });
+
+  it("aborts only the in-flight entry when removed via removeFile and continues to the remaining entries (#3465)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png"), image("three.png")]);
+    renderPanel(3);
+    const first = await submit(1);
+    const abortBoom = new Error("abort blew up on partial removeFile");
+    vi.spyOn(first, "abort").mockImplementationOnce(() => {
+      throw abortBoom;
+    });
+
+    expect(() =>
+      act(() => {
+        useFileStore.getState().removeFile(0);
+      }),
+    ).not.toThrow();
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [reportedErr, reportedTags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(reportedErr.message).toBe("Stopping an Erase Object batch whose files left failed");
+    expect(reportedErr.cause).toBe(abortBoom);
+    expect(reportedTags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+    second.respond(202, { jobId: "queued-2", async: true });
+    const closeBoom = new Error("stream close blew up on partial removeFile");
+    vi.spyOn(FakeEventSource.instances[1], "close").mockImplementationOnce(() => {
+      throw closeBoom;
+    });
+
+    expect(() =>
+      act(() => {
+        useFileStore.getState().removeFile(0);
+      }),
+    ).not.toThrow();
+    const secondJobId = second.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${secondJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(captureHandledError).mock.calls[1][0].cause).toBe(closeBoom);
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(FakeXhr.instances).toHaveLength(3);
+    expect(entry(0).file.name).toBe("three.png");
+    expect(entry(0).status).toBe("completed");
+  });
+
+  it("aborts the last remaining in-flight entry when removed via removeFile after an earlier entry completed, clears processing, and preserves the completed entry (#3465)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(second.aborted).toBe(true);
+    expect(FakeEventSource.instances[1].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).file.name).toBe("one.png");
+    expect(entry(0).status).toBe("completed");
+  });
+});
+
+describe("erase-object single file: leaving the page mid-run (#1975)", () => {
+  /** What the tool page does on the way out: a fresh store for the next tool. */
+  function moveToAnotherTool() {
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-tool.png")]);
+    });
+  }
+
+  it("leaving for another tool aborts the request and drops its answer", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+
+    unmount();
+    moveToAnotherTool();
+
+    expect(xhr.aborted).toBe(true);
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    xhr.respond(200, GOOD_BODY);
+    await act(async () => {});
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("leaving drops an error answer too, so the next tool shows no error", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+
+    unmount();
+    moveToAnotherTool();
+    xhr.respond(422, { error: "Object erasing failed" });
+    await act(async () => {});
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it("closes the progress stream of a 202 run when the files go", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    moveToAnotherTool();
+
+    // A closed EventSource delivers no more frames, so nothing can land.
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(xhr.aborted).toBe(true);
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBeNull();
+  });
+
+  it("cancels the queued job of a 202 run when the files go (#2093)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    moveToAnotherTool();
+
+    const clientJobId = xhr.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts a file still uploading and sends no cancel (#2093)", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(xhr.aborted).toBe(true);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("keeps the request after the upload finished and cancels when the 202 arrives (#2136)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.uploadFinished();
+
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(xhr.aborted).toBe(false);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    // The run is over for the user: processing is false and nothing is pending.
+    expect(useFileStore.getState().processing).toBe(false);
+
+    xhr.respond(202, { jobId: "job-1", async: true });
+    const clientJobId = xhr.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats the final upload progress event as the upload being done (#2136)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.uploadProgress(100, 100);
+
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(xhr.aborted).toBe(false);
+    xhr.respond(202, { jobId: "job-1", async: true });
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+  });
+
+  it("sends no cancel when the answer to a stopped, uploaded file is not a 202 (#2136)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.uploadFinished();
+
+    moveToAnotherTool();
+    xhr.respond(200, GOOD_BODY);
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(entry(0).processedUrl).toBeNull();
+  });
+
+  it("replacing the files from the library ends the run and clears processing", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    act(() => {
+      useFileStore.getState().setFiles([image("from-library.png")]);
+    });
+
+    expect(xhr.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    xhr.respond(200, GOOD_BODY);
+    expect(entry(0).processedUrl).toBeNull();
+  });
+
+  it("a bare unmount (the mobile settings sheet closing) leaves the request running", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+
+    unmount();
+
+    expect(xhr.aborted).toBe(false);
+    xhr.respond(200, GOOD_BODY);
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+  });
+
+  // #2304: the panel unmounting (a remount when the window crosses the breakpoint)
+  // used to close the stream of a 202 run, which then never heard its terminal
+  // frame, so `processing` stayed set for good. The batch has always been left to
+  // finish in the background; the single-file run now is too.
+  it("a bare unmount leaves a 202 run to finish in the background (#2304)", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    unmount();
+
+    expect(FakeEventSource.instances[0].readyState).not.toBe(2);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(0).status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("does not touch the request of a run that already finished", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    xhr.respond(200, GOOD_BODY);
+
+    unmount();
+    moveToAnotherTool();
+
+    expect(xhr.aborted).toBe(false);
+  });
+
+  it("sends nothing when the files are replaced while the mask is still exporting", async () => {
+    let finishExport: (blob: Blob) => void = () => {};
+    const eraser = fakeEraser();
+    eraser.exportMask = () =>
+      new Promise<Blob | null>((resolve) => {
+        finishExport = resolve;
+      });
+    render(
+      <EraseObjectSettings
+        eraserRef={{ current: eraser }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={1}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+    moveToAnotherTool();
+    await act(async () => {
+      finishExport(new Blob(["mask"], { type: "image/png" }));
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it.each([
+    ["a network error", (xhr: FakeXhr) => xhr.onerror?.()],
+    ["a request timeout", (xhr: FakeXhr) => xhr.ontimeout?.()],
+  ])("ends the watch on %s even when showing the error throws", async (_label, end) => {
+    // The panel reads setError off the store when it renders, so the break goes
+    // in first. Only a message throws: the run's own setError(null) must work.
+    const realSetError = useFileStore.getState().setError;
+    vi.spyOn(useFileStore.getState(), "setError").mockImplementation((message) => {
+      if (message !== null) throw new Error("boom");
+      realSetError(message);
+    });
+    try {
+      renderPanel();
+      const xhr = await submit();
+
+      expect(() => act(() => end(xhr))).toThrow("boom");
+      await act(async () => {});
+      moveToAnotherTool();
+
+      // The run was over before the files left: nothing is left to abort.
+      expect(xhr.aborted).toBe(false);
+    } finally {
+      useFileStore.setState({ setError: realSetError });
+    }
+  });
+
+  it("reports a stop that throws without breaking the update that replaced the files", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    unmount();
+    vi.spyOn(xhr, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() => moveToAnotherTool()).not.toThrow();
+    await act(async () => {});
+
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe("Stopping an Erase Object run whose file left failed");
+    expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+  });
+
+  it("stops a 202 single-file run, closes its stream, and cancels the job when stopRuns fires without resetting the store (#1994)", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).processedUrl).toBeNull();
+    const clientJobId = xhr.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+  });
+
+  it("sends nothing when stopRuns fires while the single-file mask is still exporting (#1994)", async () => {
+    let finishExport: (blob: Blob) => void = () => {};
+    const eraser = fakeEraser();
+    eraser.exportMask = () =>
+      new Promise<Blob | null>((resolve) => {
+        finishExport = resolve;
+      });
+    render(
+      <EraseObjectSettings
+        eraserRef={{ current: eraser }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={1}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+    await act(async () => {
+      finishExport(new Blob(["mask"], { type: "image/png" }));
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
+  });
+});
+
+describe("erase-object re-runs clear stale processed fields (#3281)", () => {
+  it("single file: clears processedUrl, processedPreviewUrl, processedFilename, and processedSize on kickoff and keeps them null when the re-run fails", async () => {
+    renderPanel();
+
+    const first = await submit(1);
+    first.respond(200, {
+      downloadUrl: DOWNLOAD_URL,
+      previewUrl: "/api/v1/preview/job-1/photo.png",
+      originalSize: 2048,
+      processedSize: 1024,
+    });
+    act(() => {
+      useFileStore.getState().updateEntry(0, { processedFilename: "photo-erased.png" });
+    });
+
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry().processedPreviewUrl).toBe("/api/v1/preview/job-1/photo.png");
+    expect(entry().processedFilename).toBe("photo-erased.png");
+    expect(entry().processedSize).toBe(1024);
+    expect(useFileStore.getState().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().processedPreviewUrl).toBe("/api/v1/preview/job-1/photo.png");
+    expect(useFileStore.getState().processedSize).toBe(1024);
+    expect(screen.getByTestId("erase-object-download")).toBeInTheDocument();
+    expect(screen.getByText("Processed: 1.0 KB")).toBeInTheDocument();
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    const second = await submit(2);
+
+    // Server URLs are not passed to URL.revokeObjectURL on re-run kickoff.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    // While the second run is in flight, the first run's processed fields and UI are cleared.
+    expect(entry().status).toBe("pending");
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().processedUrl).toBeNull();
+    expect(useFileStore.getState().processedPreviewUrl).toBeNull();
+    expect(useFileStore.getState().processedSize).toBeNull();
+    expect(screen.queryByTestId("erase-object-download")).not.toBeInTheDocument();
+    expect(screen.queryByText("Processed: 1.0 KB")).not.toBeInTheDocument();
+
+    second.respond(422, { error: "Second erase failed" });
+
+    // After the second run fails, the stale processed fields stay null.
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().processedUrl).toBeNull();
+    expect(useFileStore.getState().processedPreviewUrl).toBeNull();
+    expect(useFileStore.getState().processedSize).toBeNull();
+    expect(screen.getByText("Second erase failed")).toBeInTheDocument();
+    expect(screen.queryByTestId("erase-object-download")).not.toBeInTheDocument();
+    expect(screen.queryByText("Processed: 1.0 KB")).not.toBeInTheDocument();
+  });
+
+  it("single file: clears entry error and errorCategory from a prior batch failure on kickoff and does not arm processing if kickoff reset throws", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    const elapsed = watchElapsedInterval();
+    try {
+      renderPanel();
+      act(() => {
+        useFileStore.getState().updateEntry(0, {
+          status: "failed",
+          error: "Prior batch failure",
+          errorCategory: "timeout",
+        });
+      });
+
+      breakNextEntryWrite();
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+
+      expect(unhandled.rejections[0]).toMatchObject({ message: "boom" });
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(elapsed.handles).toHaveLength(0);
+      expect(FakeXhr.instances).toHaveLength(0);
+
+      // Next run succeeds in clearing the prior failure at kickoff.
+      const xhr = await submit(1);
+      expect(entry().status).toBe("pending");
+      expect(entry().error).toBeNull();
+      expect(entry().errorCategory).toBeNull();
+      xhr.respond(200, GOOD_BODY);
+      expect(entry().status).toBe("completed");
+    } finally {
+      elapsed.restore();
+      unhandled.restore();
+    }
+  });
+
+  it("single file: clears processed fields when sync 200 or SSE applyResult throws after updating the entry", async () => {
+    renderPanel();
+    const syncXhr = await submit(1);
+    vi.spyOn(useFileStore.getState(), "markClaimedById").mockImplementationOnce(() => {
+      throw new Error("claim broke");
+    });
+
+    expect(() =>
+      syncXhr.respond(200, {
+        ...GOOD_BODY,
+        previewUrl: "/api/v1/preview/job-1/photo.png",
+        savedFileId: "file-2",
+      }),
+    ).toThrow("claim broke");
+    await act(async () => {});
+
+    expect(entry().status).toBe("failed");
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+
+    const streamXhr = await submit(2);
+    streamXhr.respond(202, { jobId: "job-2", async: true });
+    vi.spyOn(useFileStore.getState(), "markClaimedById").mockImplementationOnce(() => {
+      throw new Error("stream claim broke");
+    });
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[1].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: {
+              ...GOOD_BODY,
+              previewUrl: "/api/v1/preview/job-2/photo.png",
+              savedFileId: "file-3",
+            },
+          }),
+        });
+      }),
+    ).toThrow("stream claim broke");
+    await act(async () => {});
+
+    expect(entry().status).toBe("failed");
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+  });
+
+  it("batch: clears processedUrl, processedPreviewUrl, processedFilename, and processedSize on kickoff, catch, and batchError teardown", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+
+    // Seed entry 0 and entry 1 with completed results from a previous run.
+    act(() => {
+      for (const idx of [0, 1]) {
+        useFileStore.getState().updateEntry(idx, {
+          processedUrl: `/api/v1/download/job-${idx}/out.png`,
+          processedPreviewUrl: `/api/v1/preview/job-${idx}/out.png`,
+          processedFilename: `out-${idx}.png`,
+          originalSize: 2048,
+          processedSize: 1024,
+          status: "completed",
+        });
+      }
+    });
+
+    const first = await submit(1);
+
+    // While entry 0 is processing, its stale processed fields are cleared.
+    expect(entry(0).status).toBe("processing");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(entry(0).processedPreviewUrl).toBeNull();
+    expect(entry(0).processedFilename).toBeNull();
+    expect(entry(0).processedSize).toBeNull();
+    expect(useFileStore.getState().processedUrl).toBeNull();
+    expect(useFileStore.getState().processedPreviewUrl).toBeNull();
+    expect(useFileStore.getState().processedSize).toBeNull();
+
+    // Repopulate processed fields mid-flight to verify the catch block also clears them on failure.
+    act(() => {
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "/api/v1/download/stale/out.png",
+        processedPreviewUrl: "/api/v1/preview/stale/out.png",
+        processedFilename: "stale.png",
+        processedSize: 999,
+      });
+    });
+
+    first.respond(422, { error: "Batch file 1 failed" });
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Batch file 1 failed");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(entry(0).processedPreviewUrl).toBeNull();
+    expect(entry(0).processedFilename).toBeNull();
+    expect(entry(0).processedSize).toBeNull();
+
+    // Entry 1's stale processed fields are also cleared as soon as its turn starts.
+    expect(entry(1).status).toBe("processing");
+    expect(entry(1).processedUrl).toBeNull();
+    expect(entry(1).processedPreviewUrl).toBeNull();
+    expect(entry(1).processedFilename).toBeNull();
+    expect(entry(1).processedSize).toBeNull();
+
+    // Repopulate entry 1's processed fields while it is processing, then make the catch block's
+    // updateEntry throw so batchError teardown settles entry 1 and clears its processed fields.
+    act(() => {
+      useFileStore.getState().updateEntry(1, {
+        processedUrl: "blob:stale-batch-error",
+        processedPreviewUrl: "blob:stale-batch-preview",
+        processedFilename: "stale-2.png",
+        processedSize: 888,
+      });
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    const unhandled = takeOverUnhandledRejections();
+    try {
+      breakNextEntryWrite();
+      FakeXhr.instances[1].respond(422, { error: "Batch file 2 failed" });
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:stale-batch-error");
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:stale-batch-preview");
+      expect(entry(1).status).toBe("failed");
+      expect(entry(1).error).toBe(en.errors.jobTrackingFailed);
+      expect(entry(1).processedUrl).toBeNull();
+      expect(entry(1).processedPreviewUrl).toBeNull();
+      expect(entry(1).processedFilename).toBeNull();
+      expect(entry(1).processedSize).toBeNull();
+    } finally {
+      unhandled.restore();
+    }
+  });
+
+  it("revokes blob: processedUrl and processedPreviewUrl on single-file and batch re-runs", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const { unmount } = renderPanel(1);
+
+    act(() => {
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "blob:single-out",
+        processedPreviewUrl: "blob:single-preview",
+        processedSize: 512,
+        status: "completed",
+      });
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    const singleXhr = await submit(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:single-out");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:single-preview");
+    singleXhr.respond(200, GOOD_BODY);
+    unmount();
+
+    renderPanel(2);
+    act(() => {
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "blob:batch-out",
+        processedPreviewUrl: "blob:batch-preview",
+        processedSize: 512,
+        status: "completed",
+      });
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    const batchFirst = await submit(2);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:batch-out");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:batch-preview");
+    batchFirst.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+  });
+});

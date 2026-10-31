@@ -3,9 +3,16 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
-import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
+import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
-import { missingBundleForScript } from "./feature-gate.js";
+import {
+  type GpuFramework,
+  type GpuFrameworks,
+  missingBundleForScript,
+  type SidecarMemoryOptions,
+  sidecarMemoryRefusal,
+} from "./feature-gate.js";
+import { aiLog, describeUnexpectedExit } from "./log.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -53,6 +60,9 @@ export function buildMinimalEnv(): Record<string, string> {
     "U2NET_HOME",
     "PROCESSING_TIMEOUT_S",
     "DISPATCHER_MAX_REQUESTS",
+    "DISPATCHER_MAX_CONSECUTIVE_FAILURES",
+    "AI_SESSION_CACHE_BYTES",
+    "AI_SESSION_IDLE_TIMEOUT",
     "PYTHON_VENV_PATH",
     "SNAPOTTER_GPU",
     "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -81,9 +91,18 @@ export function buildMinimalEnv(): Record<string, string> {
   return env;
 }
 
-/** Try venv first, then system python. */
-function getPythonPath(): string {
-  const venvPath = process.env.PYTHON_VENV_PATH || resolve(__dirname, "../../../.venv");
+/** Venv the AI sidecar runs from. Bundle installs write into it. */
+function aiVenvPath(): string {
+  return process.env.PYTHON_VENV_PATH || resolve(__dirname, "../../../.venv");
+}
+
+/** Venv bundle installs write into; mirrors the install route's default. */
+function installVenvPath(): string {
+  return process.env.PYTHON_VENV_PATH || "/opt/venv";
+}
+
+/** Try the given venv first, then system python. */
+function getPythonPath(venvPath: string = aiVenvPath()): string {
   const path = process.platform === "win32" ? win32 : posix;
   const venvPython = path.join(
     venvPath,
@@ -93,10 +112,37 @@ function getPythonPath(): string {
 }
 
 /**
+ * Document tasks need only base packages (WeasyPrint, PyMuPDF, pikepdf), so
+ * they can run from a venv that installs never rewrite, such as the image's
+ * baked /opt/venv. Only a venv that is not the install target can skip the
+ * venv lock; otherwise a document job would dlopen libraries mid-install.
+ */
+function docsDispatcherOptions(): { venvPath?: string; takesVenvLock: boolean } {
+  const docsVenv = process.env.DOCS_PYTHON_VENV_PATH;
+  if (!docsVenv) return { takesVenvLock: true };
+  const sharesInstallVenv = resolve(docsVenv) === resolve(installVenvPath());
+  return { venvPath: docsVenv, takesVenvLock: sharesInstallVenv };
+}
+
+/**
  * Extract a user-friendly error from a Python process error.
  */
 const OOM_EXIT_TEXT =
-  /out of memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc/i;
+  /out of memory|not enough memory|can't allocate memory|cannot allocate memory|\[errno 12\]|unable to allocate|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i;
+
+const FS_EXIT_MAP: Array<[RegExp, string]> = [
+  [/\[errno 28\]|no space left on device/i, "ENOSPC"],
+  [/\[errno 13\]|permission denied/i, "EACCES"],
+  [/\[errno 30\]|read-only file system/i, "EROFS"],
+  [/\[errno 24\]|too many open files/i, "EMFILE"],
+];
+
+function checkFsError(message: string): string | undefined {
+  for (const [regex, code] of FS_EXIT_MAP) {
+    if (regex.test(message)) return code;
+  }
+  return undefined;
+}
 
 /**
  * Build the error to reject a non-zero Python exit with. The extracted reason is
@@ -127,9 +173,10 @@ function pythonExitError(
     });
   }
   const message = extracted || `Python script exited with code ${code}`;
+  const fsCode = checkFsError(message);
   const err = new SafeError(message, {
-    kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
-    code: `exit-${code ?? "unknown"}`,
+    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
+    code: fsCode || `exit-${code ?? "unknown"}`,
   });
   if (info) {
     Object.assign(err, { pythonType: info.type, pythonFrames: info.frames });
@@ -149,10 +196,89 @@ function pythonExitError(
  */
 export function toSidecarError(reason: unknown, fallback: string): Error {
   if (isSafeMessageError(reason)) return reason;
-  const message = reason instanceof Error ? reason.message : String(reason ?? "");
+  const message = (reason instanceof Error ? reason.message : String(reason ?? "")).trim();
+  const fsCode = checkFsError(message);
   return new SafeError(message || fallback, {
-    kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
+    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
+    code: fsCode,
   });
+}
+
+function parsePythonJsonCandidates(output: string): Array<Record<string, unknown>> {
+  const trimmed = output.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return [parsed as Record<string, unknown>];
+    }
+    return [];
+  } catch {
+    // Fall back to scanning individual lines in reverse when diagnostic output
+    // precedes a JSON error line.
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  const lines = trimmed.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]?.trim();
+    if (!line?.startsWith("{")) continue;
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        results.push(parsed as Record<string, unknown>);
+      }
+    } catch {
+      // Not a standalone JSON object line.
+    }
+  }
+  return results;
+}
+
+function extractStructuredErrorMessage(output: string): string | null {
+  for (const parsed of parsePythonJsonCandidates(output)) {
+    if (typeof parsed.error === "string" && parsed.error.trim()) {
+      return parsed.error;
+    }
+    const errorInfo = parsed.errorInfo as { type?: unknown } | undefined;
+    if (typeof errorInfo?.type === "string" && errorInfo.type.trim()) {
+      return errorInfo.type.trim();
+    }
+  }
+  return null;
+}
+
+function isJsonObjectString(text: string): boolean {
+  if (!text.startsWith("{")) return false;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return !!parsed && typeof parsed === "object" && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
+function extractTracebackErrorLine(output: string): string | null {
+  const lines = output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  let lastTracebackIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i]?.startsWith("Traceback")) {
+      lastTracebackIdx = i;
+      break;
+    }
+  }
+  if (lastTracebackIdx === -1) return null;
+  for (let i = lines.length - 1; i > lastTracebackIdx; i--) {
+    const line = lines[i];
+    if (!line || line.startsWith("Traceback")) continue;
+    if (/^\[[a-zA-Z0-9_.-]+\]\s/.test(line) || isJsonObjectString(line)) continue;
+    return line;
+  }
+  return null;
 }
 
 function extractPythonError(error: unknown): string {
@@ -162,29 +288,28 @@ function extractPythonError(error: unknown): string {
       stdout?: string;
       message?: string;
     };
-    for (const output of [pErr.stdout, pErr.stderr]) {
-      if (output) {
-        try {
-          const parsed = JSON.parse(output.trim());
-          if (parsed.error) return parsed.error;
-        } catch {
-          const trimmed = output.trim();
-          if (trimmed && !trimmed.startsWith("Traceback")) {
-            return trimmed;
-          }
-          // Extract the last meaningful line from a Python Traceback
-          if (trimmed) {
-            const lines = trimmed
-              .split("\n")
-              .map((l) => l.trim())
-              .filter(Boolean);
-            const lastLine = lines[lines.length - 1];
-            if (lastLine && lastLine !== "Traceback (most recent call last):") {
-              return lastLine;
-            }
-          }
-        }
-      }
+    const outputs = [pErr.stdout, pErr.stderr];
+    for (const output of outputs) {
+      if (!output) continue;
+      const structured = extractStructuredErrorMessage(output);
+      if (structured) return structured;
+    }
+    for (const output of outputs) {
+      if (!output) continue;
+      const tbLine = extractTracebackErrorLine(output);
+      if (tbLine) return tbLine;
+    }
+    for (const output of [pErr.stderr, pErr.stdout]) {
+      const trimmed = output?.trim();
+      if (!trimmed || isJsonObjectString(trimmed)) continue;
+      const rawLines = trimmed.split("\n");
+      if (rawLines.some((l) => l.trim().startsWith("Traceback"))) continue;
+      const nonJsonLines = rawLines.filter((l) => {
+        const t = l.trim();
+        return Boolean(t) && !isJsonObjectString(t);
+      });
+      const candidate = nonJsonLines.join("\n").trim();
+      if (candidate) return candidate;
     }
     if (pErr.message) return pErr.message;
     // Return empty string for {stdout, stderr} objects with no useful content
@@ -206,8 +331,7 @@ export function extractPythonErrorInfo(error: unknown): PythonErrorInfo | null {
   const pErr = error as { stdout?: string; stderr?: string };
   for (const output of [pErr.stdout, pErr.stderr]) {
     if (!output) continue;
-    try {
-      const parsed = JSON.parse(output.trim()) as { errorInfo?: unknown };
+    for (const parsed of parsePythonJsonCandidates(output)) {
       const info = parsed.errorInfo as PythonErrorInfo | undefined;
       if (info && Array.isArray(info.frames)) {
         return {
@@ -223,8 +347,6 @@ export function extractPythonErrorInfo(error: unknown): PythonErrorInfo | null {
             .slice(0, 20),
         };
       }
-    } catch {
-      // not JSON; nothing structured to read
     }
   }
   return null;
@@ -236,6 +358,28 @@ export interface PythonRunOptions {
   onProgress?: ProgressCallback;
   signal?: AbortSignal;
   timeout?: number;
+  toolId?: string;
+  memoryOptions?: SidecarMemoryOptions;
+}
+
+function parseGpuFrameworks(raw: unknown): GpuFrameworks | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const obj = raw as Record<string, unknown>;
+  const out: GpuFrameworks = {};
+  if (typeof obj.torch === "boolean") out.torch = obj.torch;
+  if (typeof obj.onnx === "boolean") out.onnx = obj.onnx;
+  if (typeof obj.ctranslate2 === "boolean") out.ctranslate2 = obj.ctranslate2;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+export function isNvidiaDevicePresent(
+  deviceExists: (path: string) => boolean = existsSync,
+): boolean {
+  const gpuEnv = process.env.SNAPOTTER_GPU?.trim().toLowerCase();
+  if (gpuEnv === "0" || gpuEnv === "false" || gpuEnv === "no") return false;
+  const visible = process.env.CUDA_VISIBLE_DEVICES?.trim();
+  if (visible === "" || visible === "-1" || visible?.toLowerCase() === "none") return false;
+  return deviceExists("/dev/nvidiactl") || deviceExists("/dev/nvidia0");
 }
 
 function pythonAbortError(): Error {
@@ -245,6 +389,15 @@ function pythonAbortError(): Error {
   });
   error.name = "AbortError";
   return error;
+}
+
+function isTimeoutAbortReason(reason: unknown): boolean {
+  if (reason === "timeout") return true;
+  return (
+    typeof reason === "object" &&
+    reason !== null &&
+    (reason as { name?: unknown }).name === "TimeoutError"
+  );
 }
 
 // ── PythonDispatcher class ─────────────────────────────────────────
@@ -262,6 +415,59 @@ interface PendingRequest {
 const CRASH_WINDOW_MS = 60_000;
 const MAX_CONSECUTIVE_CRASHES = 5;
 const BASE_BACKOFF_MS = 1_000;
+// Enough to hold a Python traceback's tail without keeping a whole log per child.
+const EXIT_STDERR_TAIL_LINES = 20;
+const DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES = 3;
+
+const CUDA_POISON_RE =
+  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|ort_runtime_exception|onnxruntimeerror|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
+
+const PRE_EXEC_GATE_ERRORS = new Set([
+  "invalid_script_name",
+  "script_not_allowed",
+  "feature_not_installed",
+]);
+
+function resolveMaxConsecutiveScriptFailures(): number {
+  const configured = process.env.DISPATCHER_MAX_CONSECUTIVE_FAILURES?.trim();
+  if (configured !== undefined && configured !== "") {
+    const parsed = Number(configured);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return Math.floor(parsed);
+    }
+  }
+  return DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES;
+}
+
+function classifyDispatcherResponseFailure(
+  exitCode: unknown,
+  stdout: string,
+  stderr: string,
+  extracted: string,
+  infoType?: string,
+): { status: "succeeded" | "failed" | "ignored"; cudaPoison: boolean } {
+  for (const parsed of parsePythonJsonCandidates(stdout)) {
+    const errVal = typeof parsed.error === "string" ? parsed.error.trim() : "";
+    if (errVal === "canceled" || PRE_EXEC_GATE_ERRORS.has(errVal)) {
+      return { status: "ignored", cudaPoison: false };
+    }
+    const failed =
+      exitCode !== 0 || parsed.success === false || (errVal.length > 0 && parsed.success !== true);
+    if (!failed) return { status: "succeeded", cudaPoison: false };
+    const combined = `${infoType ?? ""}\n${extracted}\n${errVal}\n${stdout}\n${stderr}`;
+    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+  }
+  if (exitCode !== 0) {
+    if (extracted === "canceled" || PRE_EXEC_GATE_ERRORS.has(extracted)) {
+      return { status: "ignored", cudaPoison: false };
+    }
+    const combined = `${infoType ?? ""}\n${extracted}\n${stdout}\n${stderr}`;
+    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+  }
+  return { status: "succeeded", cudaPoison: false };
+}
+
+export type DispatcherRecycleReason = "cuda_error" | "consecutive_failures" | "max_requests";
 
 export interface DispatcherStatus {
   running: boolean;
@@ -270,6 +476,8 @@ export interface DispatcherStatus {
   gpu: boolean;
   pid: number | null;
   consecutiveCrashes: number;
+  consecutiveScriptFailures: number;
+  lastRecycleReason: DispatcherRecycleReason | null;
 }
 
 /**
@@ -283,10 +491,15 @@ export class PythonDispatcher {
   private childReady = false;
   private childFailed = false;
   private gpuAvail = false;
+  private gpuFrameworks: GpuFrameworks | undefined = undefined;
+  private gpuProbed = false;
   private pending = new Map<string, PendingRequest>();
   private crashes = 0;
   private lastCrashTs = 0;
   private backoffEnd = 0;
+  private consecutiveScriptFailures = 0;
+  private childScriptFailures = 0;
+  private lastRecycleReason: DispatcherRecycleReason | null = null;
   /**
    * Monotonic child counter. Each spawned child and every request written to
    * it carry the generation current at spawn time, so a stale child's late
@@ -302,9 +515,23 @@ export class PythonDispatcher {
    * NOT add to this set, so a genuinely hung script still counts as a crash.
    */
   private stoppedChildren = new WeakSet<ChildProcess>();
+  /** Venv root to run from; undefined resolves the AI venv at spawn time. */
+  private venvPath: string | undefined;
+  /** False for a venv no install writes to, so requests skip the venv lock. */
+  private takesVenvLock: boolean;
 
-  constructor(opts: { profile: "ai" | "docs" }) {
+  /**
+   * Children whose death is already in the crash counter. A dead child can
+   * report itself twice (a broken stdin pipe, then a non-zero "close"); both
+   * handlers record the crash, and only the first may count so
+   * MAX_CONSECUTIVE_CRASHES means five dead children (#4162).
+   */
+  private countedCrashes = new WeakSet<ChildProcess>();
+
+  constructor(opts: { profile: "ai" | "docs"; venvPath?: string; takesVenvLock?: boolean }) {
     this.profile = opts.profile;
+    this.venvPath = opts.venvPath;
+    this.takesVenvLock = opts.takesVenvLock ?? true;
   }
 
   private buildEnv(): Record<string, string> {
@@ -313,7 +540,11 @@ export class PythonDispatcher {
     return env;
   }
 
-  private recordCrash(): void {
+  /**
+   * @param exit what the dead child reported (see describeUnexpectedExit), so
+   * the log says why it died, not only how many times.
+   */
+  private recordCrash(exit?: string): void {
     const now = Date.now();
     if (now - this.lastCrashTs > CRASH_WINDOW_MS) {
       this.crashes = 1;
@@ -321,10 +552,11 @@ export class PythonDispatcher {
       this.crashes++;
     }
     this.lastCrashTs = now;
+    const detail = exit ? ` (${exit})` : "";
 
     if (this.crashes >= MAX_CONSECUTIVE_CRASHES) {
-      console.error(
-        `[bridge] Dispatcher crashed ${this.crashes} times in ${CRASH_WINDOW_MS / 1000}s, disabling permanently`,
+      aiLog.error(
+        `[bridge] Dispatcher crashed ${this.crashes} times in ${CRASH_WINDOW_MS / 1000}s, disabling permanently${detail}`,
       );
       this.childFailed = true;
       return;
@@ -332,9 +564,15 @@ export class PythonDispatcher {
 
     const delay = BASE_BACKOFF_MS * 2 ** (this.crashes - 1);
     this.backoffEnd = now + delay;
-    console.warn(
-      `[bridge] Dispatcher crash #${this.crashes}, backing off ${delay}ms before restart`,
+    aiLog.warn(
+      `[bridge] Dispatcher crash #${this.crashes}, backing off ${delay}ms before restart${detail}`,
     );
+  }
+
+  private recordChildCrash(proc: ChildProcess, exit?: string): void {
+    if (this.countedCrashes.has(proc)) return;
+    this.countedCrashes.add(proc);
+    this.recordCrash(exit);
   }
 
   /**
@@ -352,22 +590,83 @@ export class PythonDispatcher {
     }
   }
 
+  /**
+   * Cleanly retire the current dispatcher child without counting it as a crash
+   * against MAX_CONSECUTIVE_CRASHES. Used when a script failure indicates a
+   * poisoned CUDA/ORT context or reaches the consecutive script failure limit.
+   */
+  private recycleChild(
+    proc: ChildProcess,
+    generation: number,
+    reason: DispatcherRecycleReason,
+  ): void {
+    this.lastRecycleReason = reason;
+    this.childScriptFailures = 0;
+    this.stoppedChildren.add(proc);
+    aiLog.warn(`[bridge] Recycling Python dispatcher (${reason})`);
+    if (this.child === proc) {
+      this.child = null;
+      this.childReady = false;
+    }
+    this.rejectPendingForGeneration(
+      generation,
+      new SafeError("Python dispatcher exited unexpectedly", {
+        kind: "operational",
+        code: "dispatcher-exit",
+      }),
+    );
+    proc.stdin?.end();
+    if (!proc.killed) {
+      proc.kill("SIGTERM");
+    }
+  }
+
+  private recordScriptOutcome(
+    proc: ChildProcess,
+    generation: number,
+    outcome: { status: "succeeded" | "failed" | "ignored"; cudaPoison: boolean },
+  ): void {
+    if (outcome.status === "ignored") {
+      return;
+    }
+    if (outcome.status === "succeeded") {
+      this.consecutiveScriptFailures = 0;
+      this.childScriptFailures = 0;
+      return;
+    }
+    this.consecutiveScriptFailures++;
+    this.childScriptFailures++;
+    if (outcome.cudaPoison) {
+      this.recycleChild(proc, generation, "cuda_error");
+      return;
+    }
+    const maxFailures = resolveMaxConsecutiveScriptFailures();
+    if (maxFailures > 0 && this.childScriptFailures >= maxFailures) {
+      this.recycleChild(proc, generation, "consecutive_failures");
+    }
+  }
+
   private startChild(): ChildProcess | null {
     if (this.childFailed) return null;
     this.generation++;
     const gen = this.generation;
+    this.childReady = false;
+    this.childScriptFailures = 0;
 
     try {
-      const proc = spawn(getPythonPath(), [resolve(PYTHON_DIR, "dispatcher.py")], {
-        stdio: ["pipe", "pipe", "pipe"],
-        env: this.buildEnv(),
-      });
+      // Under the root context: the child outlives whichever job started
+      // it, and its pipe events inherit the context it was spawned in, so
+      // every line it logs would carry that one job's trace id (#1500).
+      // Each request's own trace context goes to Python with the request.
+      const proc = context.with(ROOT_CONTEXT, () =>
+        spawn(getPythonPath(this.venvPath), [resolve(PYTHON_DIR, "dispatcher.py")], {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: this.buildEnv(),
+        }),
+      );
 
       proc.stdin?.on("error", (err: NodeJS.ErrnoException) => {
         if (err.code === "EPIPE" || err.code === "ERR_STREAM_DESTROYED") {
-          console.error(
-            `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
-          );
           this.rejectPendingForGeneration(
             gen,
             new SafeError("Python dispatcher stdin closed unexpectedly", {
@@ -377,11 +676,17 @@ export class PythonDispatcher {
           );
           // An intentional shutdown() ends stdin then SIGTERMs the child,
           // which can surface here as an EPIPE/ERR_STREAM_DESTROYED. That is
-          // not a crash: counting it would let repeated legitimate restarts
-          // (shutdownDispatcher() runs after every AI bundle install) trip
-          // the crash limit and permanently disable the dispatcher. Guard
-          // mirrors the "close" handler below.
-          if (!this.stoppedChildren.has(proc)) this.recordCrash();
+          // not a crash: counting or logging it would let repeated legitimate
+          // restarts (shutdownDispatcher() runs after every AI bundle install)
+          // emit spurious errors and trip the crash limit to permanently
+          // disable the dispatcher. Guard mirrors the "close" handler below.
+          if (!this.stoppedChildren.has(proc)) {
+            aiLog.error(
+              `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
+              err,
+            );
+            this.recordChildCrash(proc);
+          }
           if (this.child === proc) {
             this.child = null;
             this.childReady = false;
@@ -391,6 +696,72 @@ export class PythonDispatcher {
 
       let stderrBuf = "";
       let stdoutBuf = "";
+      // Kept per child, not per request: a crash with nothing pending still
+      // needs the traceback that explains it.
+      const stderrTail: string[] = [];
+
+      const handleStderrLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (trimmed.startsWith("{")) {
+          try {
+            const parsed = JSON.parse(trimmed);
+
+            // Readiness signal. Ignore it from a superseded child so a stale
+            // process can't mark a not-yet-ready replacement as ready.
+            if (parsed?.ready === true) {
+              if (this.child === proc) {
+                this.childReady = true;
+                this.gpuAvail = parsed.gpu === true;
+                this.gpuFrameworks = parseGpuFrameworks(parsed.gpuFrameworks);
+                this.gpuProbed = true;
+                this.crashes = 0;
+                aiLog.info(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
+              }
+              return;
+            }
+
+            // Progress event - route to the currently active request
+            if (typeof parsed?.progress === "number" && typeof parsed?.stage === "string") {
+              // Progress goes to this child's pending requests (only one
+              // should be active at a time since Python processes synchronously)
+              for (const req of this.pending.values()) {
+                if (req.generation === gen) req.onProgress?.(parsed.progress, parsed.stage);
+              }
+              return;
+            }
+
+            // Diagnostic notices are forwarded so they reach docker logs
+            // instead of being silently dropped for matching neither shape.
+            if (typeof parsed?.info === "string") {
+              aiLog.info(`[python] ${parsed.info}`);
+              return;
+            }
+            if (typeof parsed?.warning === "string") {
+              aiLog.warn(`[python] ${parsed.warning}`);
+              return;
+            }
+          } catch {
+            // Malformed JSON object - collect as regular stderr.
+          }
+        } else if (trimmed.startsWith("[")) {
+          if (trimmed.includes("[dispatcher] Reached max requests")) {
+            this.lastRecycleReason = "max_requests";
+          } else if (trimmed.includes("[dispatcher] CUDA/ORT runtime failure detected")) {
+            this.lastRecycleReason = "cuda_error";
+          } else if (trimmed.includes("[dispatcher] Reached consecutive script failure limit")) {
+            this.lastRecycleReason = "consecutive_failures";
+          }
+          // Forward diagnostic messages to Node.js logger and collect as regular stderr.
+          aiLog.info(`[python] ${trimmed}`);
+        }
+        stderrTail.push(trimmed);
+        if (stderrTail.length > EXIT_STDERR_TAIL_LINES) stderrTail.shift();
+        for (const req of this.pending.values()) {
+          if (req.generation === gen) req.stderrLines.push(trimmed);
+        }
+      };
 
       proc.stderr?.on("data", (chunk: Buffer) => {
         stderrBuf += chunk.toString();
@@ -398,53 +769,7 @@ export class PythonDispatcher {
         stderrBuf = lines.pop() ?? "";
 
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          try {
-            const parsed = JSON.parse(trimmed);
-
-            // Readiness signal. Ignore it from a superseded child so a stale
-            // process can't mark a not-yet-ready replacement as ready.
-            if (parsed.ready === true) {
-              if (this.child === proc) {
-                this.childReady = true;
-                this.gpuAvail = parsed.gpu === true;
-                this.crashes = 0;
-                console.log(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
-              }
-              continue;
-            }
-
-            // Progress event - route to the currently active request
-            if (typeof parsed.progress === "number" && typeof parsed.stage === "string") {
-              // Progress goes to this child's pending requests (only one
-              // should be active at a time since Python processes synchronously)
-              for (const req of this.pending.values()) {
-                if (req.generation === gen) req.onProgress?.(parsed.progress, parsed.stage);
-              }
-              continue;
-            }
-
-            // Diagnostic notices are forwarded so they reach docker logs
-            // instead of being silently dropped for matching neither shape.
-            if (typeof parsed.info === "string") {
-              console.log(`[python] ${parsed.info}`);
-              continue;
-            }
-            if (typeof parsed.warning === "string") {
-              console.warn(`[python] ${parsed.warning}`);
-            }
-          } catch {
-            // Not JSON - forward diagnostic messages to Node.js logger,
-            // collect the rest as error output for pending requests.
-            if (trimmed.startsWith("[")) {
-              console.log(`[python] ${trimmed}`);
-            }
-            for (const req of this.pending.values()) {
-              if (req.generation === gen) req.stderrLines.push(trimmed);
-            }
-          }
+          handleStderrLine(line);
         }
       });
 
@@ -463,16 +788,25 @@ export class PythonDispatcher {
             const req = this.pending.get(reqId);
             if (req) {
               this.pending.delete(reqId);
+              const stdoutStr = typeof response.stdout === "string" ? response.stdout : "";
+              const stderrStr = req.stderrLines.join("\n");
+              const raw = { stdout: stdoutStr, stderr: stderrStr };
+              const extracted = response.exitCode !== 0 ? extractPythonError(raw) : "";
+              const info = response.exitCode !== 0 ? extractPythonErrorInfo(raw) : null;
+              const outcome = classifyDispatcherResponseFailure(
+                response.exitCode,
+                stdoutStr,
+                stderrStr,
+                extracted,
+                info?.type,
+              );
+              this.recordScriptOutcome(proc, gen, outcome);
               if (response.exitCode !== 0) {
-                const raw = { stdout: response.stdout, stderr: req.stderrLines.join("\n") };
-                const extracted = extractPythonError(raw);
-                req.reject(
-                  pythonExitError(response.exitCode, null, extracted, extractPythonErrorInfo(raw)),
-                );
+                req.reject(pythonExitError(response.exitCode, null, extracted, info));
               } else {
                 req.resolve({
-                  stdout: response.stdout || "",
-                  stderr: req.stderrLines.join("\n"),
+                  stdout: stdoutStr,
+                  stderr: stderrStr,
                 });
               }
             }
@@ -483,12 +817,14 @@ export class PythonDispatcher {
       });
 
       proc.on("error", (err: NodeJS.ErrnoException) => {
-        console.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`);
         if (err.code === "ENOENT") {
+          aiLog.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`, err);
           this.childFailed = true;
         } else if (!this.stoppedChildren.has(proc)) {
-          // Skip crash accounting when we initiated the teardown (shutdown()
-          // marks the child stopped before killing it); mirrors "close".
+          // Skip error logging and crash accounting when we initiated the
+          // teardown (shutdown() marks the child stopped before killing it);
+          // mirrors "close".
+          aiLog.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`, err);
           this.recordCrash();
         }
         this.rejectPendingForGeneration(
@@ -504,7 +840,11 @@ export class PythonDispatcher {
         }
       });
 
-      proc.on("close", (code) => {
+      proc.on("close", (code, signal) => {
+        if (this.child === proc) {
+          this.child = null;
+          this.childReady = false;
+        }
         this.rejectPendingForGeneration(
           gen,
           new SafeError("Python dispatcher exited unexpectedly", {
@@ -512,12 +852,12 @@ export class PythonDispatcher {
             code: "dispatcher-exit",
           }),
         );
-        if (code !== 0 && !this.stoppedChildren.has(proc)) {
-          this.recordCrash();
+        if (stderrBuf.trim()) {
+          handleStderrLine(stderrBuf);
+          stderrBuf = "";
         }
-        if (this.child === proc) {
-          this.child = null;
-          this.childReady = false;
+        if (code !== 0 && !this.stoppedChildren.has(proc)) {
+          this.recordChildCrash(proc, describeUnexpectedExit(code, signal, stderrTail));
         }
       });
 
@@ -578,8 +918,12 @@ export class PythonDispatcher {
           this.pending.delete(id);
           // Kill the stuck dispatcher so it restarts on the next request instead of
           // blocking all subsequent operations behind the timed-out script.
-          if (this.child && !this.child.killed) {
-            this.child.kill("SIGTERM");
+          if (this.child === proc) {
+            this.child = null;
+            this.childReady = false;
+          }
+          if (!proc.killed) {
+            proc.kill("SIGTERM");
           }
           wrappedReject(
             new SafeError("Python script timed out", {
@@ -604,8 +948,14 @@ export class PythonDispatcher {
         this.pending.delete(id);
         // The dispatcher executes synchronously and has no request-level cancel
         // protocol, so stopping the process is the only way to stop Python work.
-        // Treat this as intentional teardown, not a dispatcher crash.
-        this.stoppedChildren.add(proc);
+        // Treat user cancellation as intentional teardown, not a dispatcher
+        // crash; a deadline abort ("timeout" / TimeoutError) leaves proc out of
+        // stoppedChildren so a hung script still counts as a crash on close.
+        // Guard on !proc.killed so a sibling request canceled after a timeout
+        // already signaled proc cannot retroactively mask the timeout crash.
+        if (!proc.killed && !isTimeoutAbortReason(options.signal?.reason)) {
+          this.stoppedChildren.add(proc);
+        }
         if (this.child === proc) {
           this.child = null;
           this.childReady = false;
@@ -723,28 +1073,47 @@ export class PythonDispatcher {
         activeTimer = timer;
 
         proc.stdout.on("data", (chunk: Buffer) => {
+          if (attempt !== activeAttempt) return;
           stdout += chunk.toString();
         });
 
+        const handleStderrLine = (line: string) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+
+          if (trimmed.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (typeof parsed?.progress === "number" && typeof parsed?.stage === "string") {
+                if (!timedOut) options.onProgress?.(parsed.progress, parsed.stage);
+                return;
+              }
+              if (typeof parsed?.info === "string") {
+                aiLog.info(`[python] ${parsed.info}`);
+                return;
+              }
+              if (typeof parsed?.warning === "string") {
+                aiLog.warn(`[python] ${parsed.warning}`);
+                return;
+              }
+            } catch {
+              // Malformed JSON object - collect as regular stderr.
+            }
+          } else if (trimmed.startsWith("[")) {
+            // Forward diagnostic messages to Node.js logger and collect as regular stderr.
+            aiLog.info(`[python] ${trimmed}`);
+          }
+          stderrLines.push(trimmed);
+        };
+
         proc.stderr.on("data", (chunk: Buffer) => {
+          if (attempt !== activeAttempt) return;
           stderrBuffer += chunk.toString();
           const lines = stderrBuffer.split("\n");
           stderrBuffer = lines.pop() ?? "";
 
           for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-
-            try {
-              const parsed = JSON.parse(trimmed);
-              if (typeof parsed.progress === "number" && typeof parsed.stage === "string") {
-                options.onProgress?.(parsed.progress, parsed.stage);
-                continue;
-              }
-            } catch {
-              // Not JSON - collect as regular stderr
-            }
-            stderrLines.push(trimmed);
+            handleStderrLine(line);
           }
         });
 
@@ -768,7 +1137,7 @@ export class PythonDispatcher {
           if (attempt !== activeAttempt) return;
 
           if (stderrBuffer.trim()) {
-            stderrLines.push(stderrBuffer.trim());
+            handleStderrLine(stderrBuffer);
           }
 
           if (timedOut) {
@@ -797,16 +1166,22 @@ export class PythonDispatcher {
         onAbort();
         return;
       }
-      trySpawn(getPythonPath(), false);
+      trySpawn(getPythonPath(this.venvPath), false);
     });
   }
 
   // ── Public API ──────────────────────────────────────────────────
 
   /**
-   * Whether the Python dispatcher detected a CUDA GPU at startup.
+   * Whether the Python dispatcher detected a CUDA GPU at startup, optionally
+   * scoped to a specific inference framework (`torch`, `onnx`, `ctranslate2`).
+   * Falls back to `this.gpuAvail` when `framework` is omitted or when
+   * `this.gpuFrameworks` was not populated.
    */
-  isGpuAvailable(): boolean {
+  isGpuAvailable(framework?: GpuFramework): boolean {
+    if (framework !== undefined) {
+      return this.gpuFrameworks?.[framework] ?? this.gpuAvail;
+    }
     return this.gpuAvail;
   }
 
@@ -818,6 +1193,8 @@ export class PythonDispatcher {
       gpu: this.gpuAvail,
       pid: this.child?.pid ?? null,
       consecutiveCrashes: this.crashes,
+      consecutiveScriptFailures: this.consecutiveScriptFailures,
+      lastRecycleReason: this.lastRecycleReason,
     };
   }
 
@@ -825,12 +1202,27 @@ export class PythonDispatcher {
    * Shut down the persistent dispatcher process.
    */
   shutdown(): void {
+    // Clear per-framework probe state so a shutdown after installing or
+    // resetting AI bundles re-probes on the next spawn instead of refusing
+    // newly installed GPU frameworks against pre-install state.
+    this.gpuProbed = false;
+    this.gpuFrameworks = undefined;
+    this.childScriptFailures = 0;
     if (this.child && !this.child.killed) {
-      this.stoppedChildren.add(this.child);
-      this.child.stdin?.end();
-      this.child.kill("SIGTERM");
+      const proc = this.child;
+      const gen = this.generation;
+      this.stoppedChildren.add(proc);
       this.child = null;
       this.childReady = false;
+      this.rejectPendingForGeneration(
+        gen,
+        new SafeError("Python dispatcher exited unexpectedly", {
+          kind: "operational",
+          code: "dispatcher-exit",
+        }),
+      );
+      proc.stdin?.end();
+      proc.kill("SIGTERM");
     }
   }
 
@@ -894,6 +1286,34 @@ export class PythonDispatcher {
       : null;
 
     const doRun = (): Promise<{ stdout: string; stderr: string }> => {
+      if (this.profile === "ai") {
+        const gpuAvailable =
+          options.memoryOptions?.gpuAvailable ??
+          (this.gpuProbed
+            ? this.gpuAvail
+            : isNvidiaDevicePresent(options.memoryOptions?.deviceExists));
+        const gpuFrameworks =
+          options.memoryOptions?.gpuFrameworks ??
+          (options.memoryOptions?.gpuAvailable === undefined && this.gpuProbed
+            ? this.gpuFrameworks
+            : undefined);
+        const toolId = options.toolId ?? options.memoryOptions?.toolId;
+        const refusal = sidecarMemoryRefusal(scriptName, {
+          ...options.memoryOptions,
+          ...(toolId !== undefined ? { toolId } : {}),
+          gpuAvailable,
+          ...(gpuFrameworks !== undefined ? { gpuFrameworks } : {}),
+        });
+        if (refusal) {
+          return Promise.reject(
+            new SafeError(refusal, {
+              kind: "operational",
+              code: "insufficient-memory",
+            }),
+          );
+        }
+      }
+
       // Try persistent dispatcher first
       const dispatcherPromise = this.dispatcherRun(scriptName, args, options);
       if (dispatcherPromise) {
@@ -902,7 +1322,7 @@ export class PythonDispatcher {
             err.message === "Python dispatcher exited unexpectedly" ||
             err.message === "Python dispatcher stdin closed unexpectedly"
           ) {
-            console.warn(
+            aiLog.warn(
               `[bridge] Dispatcher crashed during ${scriptName}, retrying with per-request process`,
             );
             return this.runPerRequest(scriptName, args, options).then((result) => ({
@@ -942,6 +1362,7 @@ export class PythonDispatcher {
     // segfaults the sidecar. In the common case the lock is free, so acquire it
     // synchronously and run inline (no microtask deferral, preserving the prior
     // call timing); only when an install holds it do we await.
+    if (!this.takesVenvLock) return runWithSpan();
     const release = tryAcquireVenvRead();
     if (release) return runWithSpan().finally(release);
     return acquireVenvRead().then((r) => runWithSpan().finally(r));
@@ -958,10 +1379,11 @@ function getAiDispatcher(): PythonDispatcher {
 }
 
 /**
- * Whether the Python dispatcher detected a CUDA GPU at startup.
+ * Whether the Python dispatcher detected a CUDA GPU at startup, optionally
+ * scoped to a specific inference framework (`torch`, `onnx`, `ctranslate2`).
  */
-export function isGpuAvailable(): boolean {
-  return getAiDispatcher().isGpuAvailable();
+export function isGpuAvailable(framework?: GpuFramework): boolean {
+  return getAiDispatcher().isGpuAvailable(framework);
 }
 
 export function getDispatcherStatus(): DispatcherStatus {
@@ -1015,23 +1437,27 @@ let docsDispatcher: PythonDispatcher | null = null;
 
 /** Lazy docs-profile dispatcher instance (same protocol, no new IPC). */
 export function getDocsDispatcher(): PythonDispatcher {
-  if (!docsDispatcher) docsDispatcher = new PythonDispatcher({ profile: "docs" });
+  if (!docsDispatcher)
+    docsDispatcher = new PythonDispatcher({ profile: "docs", ...docsDispatcherOptions() });
   return docsDispatcher;
 }
 
 export async function runDocsScript(
   script: string,
   args: Record<string, unknown>,
-  opts?: { timeoutMs?: number },
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<string> {
   // Ensure .py extension: the dispatcher protocol strips it for the
   // in-process path, while the per-request fallback needs it for the
   // file path on disk.
   const scriptFile = script.endsWith(".py") ? script : `${script}.py`;
+  const runOpts: PythonRunOptions = {};
+  if (opts?.timeoutMs !== undefined) runOpts.timeout = opts.timeoutMs;
+  if (opts?.signal !== undefined) runOpts.signal = opts.signal;
   const result = await getDocsDispatcher().run(
     scriptFile,
     [JSON.stringify(args)],
-    opts?.timeoutMs ? { timeout: opts.timeoutMs } : undefined,
+    Object.keys(runOpts).length > 0 ? runOpts : undefined,
   );
   return result.stdout;
 }

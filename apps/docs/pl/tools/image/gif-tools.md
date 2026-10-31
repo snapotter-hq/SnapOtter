@@ -1,8 +1,8 @@
 ---
 description: "Zmieniaj rozmiar, optymalizuj, zmieniaj prędkość, odwracaj, obracaj i wyodrębniaj klatki z animowanych plików GIF w jednym narzędziu."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 90168d0b887b
+i18n_output_hash: 0fbeed2c21f2
 ---
 
 # Narzędzia GIF {#gif-tools}
@@ -34,7 +34,7 @@ Zmieniaj rozmiar, optymalizuj, zmieniaj prędkość, odwracaj, wyodrębniaj klat
 
 | Parametr | Typ | Wymagany | Domyślnie | Opis |
 |-----------|------|----------|---------|-------------|
-| colors | number | Nie | 256 | Maksymalna liczba kolorów w palecie (2 do 256) |
+| colors | number | Nie | 256 | Maksymalna liczba kolorów w palecie (2, 4, 16 lub 256) |
 | dither | number | Nie | 1.0 | Siła ditheringu (0 do 1, gdzie 0 wyłącza dithering) |
 | effort | number | Nie | 7 | Poziom wysiłku optymalizacji (1 do 10, wyższy = wolniej, ale mniejszy) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Przyspieszenie {#speed-up}

@@ -1,26 +1,31 @@
 import type { SharpFormat } from "@snapotter/image-engine";
 import sharp from "sharp";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 
 export interface OutputFormat {
   format: SharpFormat;
   extension: string;
   contentType: string;
   /**
-   * Undefined for PNG unless explicitly overridden: Sharp reads `quality` on
-   * PNG as "quantise down to a palette", which dithers the image and often
-   * inflates the file (issue #710). `toFormat(format, { quality: undefined })`
-   * behaves exactly like passing no quality at all, so routes can spread this
-   * without caring about the format.
+   * Always undefined for PNG: Sharp reads `quality` on PNG as "quantise down to
+   * a palette", which dithers the image and often inflates the file (issues
+   * #710, #2205). `toFormat(format, { quality: undefined })` behaves exactly
+   * like passing no quality at all, so routes can spread this without caring
+   * about the format.
    */
   quality?: number;
   /**
    * The whole option bag for `toFormat()`, so a route never has to know which
    * encoder it is about to drive: `.toFormat(f.format, f.encoderOptions)`.
    *
-   * It carries `quality` plus, for GIF, `reuse: false`. Sharp's GIF writer
-   * defaults to reusing the palette libvips read the input with, so a tool that
-   * introduces a colour the source never held cannot express it: a green border
-   * on a GIF came back as 76,105,113, with a 200 and no warning (issue #1190).
+   * It carries `quality` plus, for GIF, `reuse: false`, and for TIFF,
+   * `compression: "lzw"`. Sharp's GIF writer defaults to reusing the palette
+   * libvips read the input with, so a tool that introduces a colour the source
+   * never held cannot express it: a green border on a GIF came back as
+   * 76,105,113, with a 200 and no warning (issue #1190). Sharp's TIFF writer
+   * defaults to `compression: "jpeg"`, and JPEG-compressed TIFFs cannot store
+   * an alpha channel, so libvips drops band 3 on save and flattens transparent
+   * pixels to black (issue #2586).
    *
    * A fresh palette is not free, and the cost falls on the tools that needed it
    * least. Reuse hands an unchanged photographic animation back byte for byte,
@@ -40,6 +45,7 @@ export interface OutputFormat {
 export interface EncoderOptions {
   quality?: number;
   reuse?: false;
+  compression?: "lzw";
 }
 
 const FORMAT_MAP: Record<string, { format: SharpFormat; extension: string; contentType: string }> =
@@ -74,7 +80,9 @@ export async function resolveOutputFormat(
   try {
     const meta = await sharp(inputBuffer).metadata();
     detected = meta.format;
-  } catch {
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
     // format detection failed
   }
 
@@ -85,9 +93,9 @@ export async function resolveOutputFormat(
 
   const mapped = detected ? FORMAT_MAP[detected] : undefined;
   const config = mapped ?? PNG_FALLBACK;
-  // PNG stays lossless unless the caller explicitly asked for a quality;
-  // every other encoder wants the default hint.
-  const quality = qualityOverride ?? (config.format === "png" ? undefined : DEFAULT_QUALITY);
+  // PNG has no lossy quality; Sharp reads `quality` on PNG as palette
+  // quantisation (#710, #2205), so ignore qualityOverride for PNG too.
+  const quality = config.format === "png" ? undefined : (qualityOverride ?? DEFAULT_QUALITY);
 
   return outputFormatFor(config.format, quality);
 }
@@ -103,10 +111,16 @@ export async function resolveOutputFormat(
  */
 export function outputFormatFor(format: SharpFormat, quality?: number): OutputFormat {
   const config = FORMAT_MAP[format] ?? PNG_FALLBACK;
+  const effectiveQuality = config.format === "png" ? undefined : quality;
   return {
     ...config,
     format,
-    quality,
-    encoderOptions: format === "gif" ? { quality, reuse: false } : { quality },
+    quality: effectiveQuality,
+    encoderOptions:
+      format === "gif"
+        ? { quality: effectiveQuality, reuse: false }
+        : format === "tiff"
+          ? { quality: effectiveQuality, compression: "lzw" }
+          : { quality: effectiveQuality },
   };
 }

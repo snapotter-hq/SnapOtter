@@ -33,9 +33,24 @@ export function getActiveBundleId(): string | null {
   return activeInstall?.bundleId ?? null;
 }
 
+/** The job id of the bundle currently installing (holding the file lock), or null. */
+export function getActiveInstallJobId(): string | null {
+  return activeInstall?.jobId ?? null;
+}
+
 /** Bundle ids waiting in the queue, in FIFO order (excludes the active one). */
 export function getQueuedBundleIds(): string[] {
   return queue.map((entry) => entry.bundleId);
+}
+
+/** Job ids waiting in the queue, in FIFO order (excludes the active one). */
+export function getQueuedInstallJobIds(): string[] {
+  return queue.map((entry) => entry.jobId);
+}
+
+/** Snapshot of the active and queued install entries, in execution order. */
+export function getActiveAndQueuedInstalls(): QueuedInstall[] {
+  return activeInstall ? [activeInstall, ...queue] : [...queue];
 }
 
 /** True when the bundle is currently installing or already waiting in the queue. */

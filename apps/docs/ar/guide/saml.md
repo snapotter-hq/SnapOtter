@@ -1,8 +1,9 @@
 ---
 description: "أعدّ الدخول الموحّد عبر SAML 2.0 لـ SnapOtter. أدلة تفصيلية خطوة بخطوة لـ Okta وAzure AD / Entra ID وGoogle Workspace ومزودي هوية SAML الآخرين."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: fd0b07fe2fe4
+i18n_output_hash: 4c5666a1d0d9
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ services:
 2. في **Admin Settings > Security**، فعّل مفتاح **SSO Enforcement**.
 3. اضبط **اسم مستخدم break-glass**: هذا هو الحساب المحلي الوحيد الذي لا يزال بإمكانه تسجيل الدخول بكلمة مرور، للوصول الطارئ إذا تعذّر الوصول إلى مزوّد الهوية.
 
-عندما يكون فرض SSO نشطًا، فإن أي محاولة تسجيل دخول محلي (باستثناء مستخدم break-glass) تُرجع خطأ 403 مع الرسالة "Local password login is disabled. Please use SSO."
+عندما يكون فرض SSO نشطًا، يمكن لمستخدم break-glass وحده تسجيل الدخول بكلمة مرور محلية. يُرفض أي طلب تسجيل دخول محلي آخر بالخطأ نفسه 401 "Invalid credentials" الذي تحصل عليه كلمة المرور الخاطئة، حتى لو كانت كلمة المرور صحيحة، ويُحتسب ضمن حد محاولات تسجيل الدخول.
 
 ::: tip 
 اضبط دائمًا اسم مستخدم break-glass قبل تفعيل فرض SSO. من دونه، قد تُحظَر من الوصول إلى SnapOtter إذا تعطّل مزوّد الهوية الخاص بك.

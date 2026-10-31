@@ -1,6 +1,8 @@
+import type { Route } from "@playwright/test";
 import {
   expect,
   getE2eRunRoot,
+  getTestImagePath,
   openSettings,
   test,
   uploadTestImage,
@@ -982,6 +984,233 @@ test.describe("Server Error Handling", () => {
 
     await page.unroute("**/api/v1/tools/image/resize");
   });
+
+  test("a 200 whose body is not a result fails the run", async ({ loggedInPage: page }) => {
+    // #1354: only the parse may blame the server, and a JSON value that isn't
+    // an object is a bad response too. It used to land as a "completed" entry
+    // with no result behind it.
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify("ok") }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    await expect(
+      page.getByText("Invalid response from server").filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Resize" })).toBeEnabled();
+
+    await page.unroute("**/api/v1/tools/image/resize");
+  });
+
+  test("a 200 with no download URL fails the run", async ({ loggedInPage: page }) => {
+    // #1740: an object with nothing to download used to land as a completed
+    // run with no result behind it.
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    await expect(
+      page.getByText("Invalid response from server").filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Resize" })).toBeEnabled();
+
+    await page.unroute("**/api/v1/tools/image/resize");
+  });
+
+  // #1795: Stitch, Collage and Barcode Read read their own sync answer. An
+  // object with nothing in it used to land as a finished run with no download
+  // (Stitch, Collage) or take the panel down (Barcode Read).
+  test("stitch fails a 200 with no download URL", async ({ loggedInPage: page }) => {
+    await page.goto("/image/stitch");
+    await page.route("**/api/v1/tools/image/stitch", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("stitch-submit").click();
+
+    // The settings panel shows the same copy under its submit button; assert on
+    // the preview card so the locator stays unambiguous (#4097).
+    await expect(
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("Invalid response", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("stitch-submit")).toBeEnabled();
+    await expect(page.getByTestId("stitch-download")).toHaveCount(0);
+  });
+
+  test("collage fails a 200 with no download URL", async ({ loggedInPage: page }) => {
+    await page.goto("/image/collage");
+    await page.route("**/api/v1/tools/image/collage", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload images for collage" }).click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("collage-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("collage-submit")).toBeEnabled();
+    await expect(page.getByTestId("collage-download")).toHaveCount(0);
+  });
+
+  // #1857: a download URL with no job id or sizes used to land as a finished
+  // run, with the size readout gone and nothing reported.
+  test("stitch fails a 200 with a download URL but no job id or sizes", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/stitch");
+    await page.route("**/api/v1/tools/image/stitch", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ downloadUrl: "/api/v1/download/x/stitch.png" }),
+      }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("stitch-submit").click();
+
+    await expect(
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("Invalid response", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("stitch-submit")).toBeEnabled();
+    await expect(page.getByTestId("stitch-download")).toHaveCount(0);
+  });
+
+  test("collage fails a 200 with a download URL but no job id or sizes", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/collage");
+    await page.route("**/api/v1/tools/image/collage", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ downloadUrl: "/api/v1/download/x/collage.png" }),
+      }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload images for collage" }).click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("collage-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("collage-submit")).toBeEnabled();
+    await expect(page.getByTestId("collage-download")).toHaveCount(0);
+  });
+
+  test("barcode read fails a 200 with no barcode list", async ({ loggedInPage: page }) => {
+    await page.goto("/image/barcode-read");
+    await page.route("**/api/v1/tools/image/barcode-read", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    await uploadTestImage(page);
+
+    await page.getByTestId("barcode-read-submit").click();
+
+    await expect(page.getByText(/: Invalid response$/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("barcode-read-submit")).toBeEnabled();
+  });
+
+  // #1858: panels that post for themselves read a failed answer as
+  // `body.error || fallback`, so an object-valued error showed as
+  // "[object Object]" and a details-only answer lost its reason.
+  test("stitch shows the failure copy, not [object Object], for an object error", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/stitch");
+    await page.route("**/api/v1/tools/image/stitch", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { reason: "x" } }),
+      }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("stitch-submit").click();
+
+    await expect(
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("We couldn't complete that request. Please try again.", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("[object Object]")).toHaveCount(0);
+    await expect(page.getByTestId("stitch-submit")).toBeEnabled();
+  });
+
+  test("color palette shows its status line, not [object Object], for an object error", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/color-palette");
+    await page.route("**/api/v1/tools/image/color-palette", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { reason: "x" } }),
+      }),
+    );
+    await uploadTestImage(page);
+
+    await page.getByTestId("color-palette-submit").click();
+
+    await expect(page.getByText("Failed: 422", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("[object Object]")).toHaveCount(0);
+  });
+
+  test("compare shows the reason of a details-only failure", async ({ loggedInPage: page }) => {
+    await page.goto("/image/compare");
+    await page.route("**/api/v1/tools/image/compare", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ details: "Not enough memory" }),
+      }),
+    );
+    await uploadTestImage(page);
+    await page.locator("#compare-second-image").setInputFiles(getTestImagePath());
+
+    await page.getByTestId("compare-submit").click();
+
+    await expect(
+      page
+        .locator("section[aria-label='Preview area']")
+        .getByText("Not enough memory", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1454,6 +1683,172 @@ test.describe("Processing State Cleanup", () => {
     await expect(resizeBtn).toBeEnabled({ timeout: 5_000 });
 
     await page.unroute("**/api/v1/tools/image/resize");
+  });
+
+  test("a failed async run ends with its failure card and disarms cancel", async ({
+    loggedInPage: page,
+  }) => {
+    // #1698: every failure exit tears the run down before it fails the
+    // entry. Both have to land: the entry at "failed" gates the failure card,
+    // and the teardown takes down the progress card's armed cancel button.
+    const message = "Resize could not finish this image";
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+
+    // The progress stream opens before the POST. Hold it until the 202 has
+    // armed the cancel button, then deliver the job's failed frame.
+    let releaseFrame: () => void = () => {};
+    const frameReleased = new Promise<void>((resolve) => {
+      releaseFrame = resolve;
+    });
+    await page.route("**/api/v1/jobs/*/progress", async (route) => {
+      await frameReleased;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ type: "single", phase: "failed", percent: 0, error: message })}\n\n`,
+      });
+    });
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ jobId: "e2e-1698", async: true }),
+      }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    const cancel = page.getByRole("button", { name: "Cancel" });
+    await expect(cancel).toBeVisible({ timeout: 15_000 });
+    releaseFrame();
+
+    // The settings form shows the error too; the failure card is the one in
+    // the preview area, and it only renders once the entry is "failed".
+    await expect(page.getByLabel("Preview area").getByText(message)).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(cancel).toHaveCount(0);
+
+    await page.unroute("**/api/v1/tools/image/resize");
+    await page.unroute("**/api/v1/jobs/*/progress");
+  });
+
+  test("an async run that completes with nothing to download fails instead of finishing", async ({
+    loggedInPage: page,
+  }) => {
+    // #1794: a completed frame whose result has no download URL used to land
+    // as a finished run with no file behind it. It now fails the run the same
+    // way a sync 2xx with no download URL does (#1740).
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+
+    let releaseFrame: () => void = () => {};
+    const frameReleased = new Promise<void>((resolve) => {
+      releaseFrame = resolve;
+    });
+    await page.route("**/api/v1/jobs/*/progress", async (route) => {
+      await frameReleased;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          result: { jobId: "e2e-1794", originalSize: 64, processedSize: 32 },
+        })}\n\n`,
+      });
+    });
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ jobId: "e2e-1794", async: true }),
+      }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    const cancel = page.getByRole("button", { name: "Cancel" });
+    await expect(cancel).toBeVisible({ timeout: 15_000 });
+    releaseFrame();
+
+    await expect(
+      page.getByLabel("Preview area").getByText("Invalid response from server"),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(cancel).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /download/i })).toHaveCount(0);
+
+    await page.unroute("**/api/v1/tools/image/resize");
+    await page.unroute("**/api/v1/jobs/*/progress");
+  });
+
+  test("a canceled batch the server never saw ends with its failure card and disarms cancel", async ({
+    loggedInPage: page,
+  }) => {
+    // #1778: a failed batch tears the run down before it fails the entries.
+    // Both have to land: the entries at "failed" gate the failure card, and
+    // the teardown takes down the progress card's armed cancel button. The
+    // cancel 404 is one of the exits that ends a batch only through failRun.
+    // A real browser's store doesn't throw, so this guards the reordered exit
+    // end to end; the throwing-write regression itself is pinned in
+    // tests/unit/web/use-tool-processor-batch-recovery.test.ts.
+    await page.goto("/image/resize");
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.locator("[class*='border-dashed']").first().click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([
+      `${process.cwd()}/tests/fixtures/image/valid/test-100x100.jpg`,
+      `${process.cwd()}/tests/fixtures/image/valid/test-200x150.png`,
+    ]);
+    await expect(page.getByText("Files (2)")).toBeVisible();
+
+    // The batch POST and its progress stream never answer, and the server
+    // has no job to cancel: the degraded state the cancel 404 settles.
+    let releaseHeld: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      releaseHeld = resolve;
+    });
+    const hold = async (route: Route) => {
+      await held;
+      await route.abort().catch(() => {});
+    };
+    await page.route("**/api/v1/tools/image/resize/batch", hold);
+    await page.route("**/api/v1/jobs/*/progress", hold);
+    await page.route("**/api/v1/jobs/*/cancel", (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Job not found" }),
+      }),
+    );
+
+    try {
+      await page.locator("input[placeholder='Auto']").first().fill("50");
+      await page.getByRole("button", { name: /resize.*2 files/i }).click();
+
+      const cancel = page.getByRole("button", { name: "Cancel", exact: true });
+      await expect(cancel).toBeVisible({ timeout: 15_000 });
+      await cancel.click();
+
+      // The failure card renders in the preview area only once the entry is
+      // "failed"; the cancel button goes with the run's teardown.
+      await expect(page.getByLabel("Preview area").getByText("Canceled")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+      await expect(cancel).toHaveCount(0);
+    } finally {
+      releaseHeld();
+      await page.unroute("**/api/v1/tools/image/resize/batch");
+      await page.unroute("**/api/v1/jobs/*/progress");
+      await page.unroute("**/api/v1/jobs/*/cancel");
+    }
   });
 
   test("successful processing followed by clear resets fully", async ({ loggedInPage: page }) => {

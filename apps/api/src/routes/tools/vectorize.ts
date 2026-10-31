@@ -1,13 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { vectorize as vtrace } from "@neplex/vectorizer";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import potrace from "potrace";
 import sharp from "sharp";
 import { z } from "zod";
-import { formatZodErrors } from "../../lib/errors.js";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { putObject } from "../../lib/object-storage.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -55,16 +60,25 @@ async function vectorizeBuffer(
 ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
   let buf = inputBuffer;
 
-  if (settings.invert) {
-    // PNG: negating a GIF through its own palette traced inverted magenta as
-    // 76,105,113 instead of green (#1190).
-    buf = await sharp(buf).negate({ alpha: false }).png().toBuffer();
+  let pngBuffer: Buffer;
+  try {
+    if (settings.invert) {
+      // PNG: negating a GIF through its own palette traced inverted magenta as
+      // 76,105,113 instead of green (#1190).
+      buf = await sharp(buf).negate({ alpha: false }).png().toBuffer();
+    }
+
+    pngBuffer =
+      settings.colorMode === "color"
+        ? await sharp(buf).png().toBuffer()
+        : await sharp(buf).grayscale().png().toBuffer();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
   }
 
   let svg: string;
 
   if (settings.colorMode === "color") {
-    const pngBuffer = await sharp(buf).png().toBuffer();
     svg = await vtrace(pngBuffer, {
       colorMode: 0,
       colorPrecision: settings.colorPrecision,
@@ -79,7 +93,6 @@ async function vectorizeBuffer(
       pathPrecision: 5,
     });
   } else {
-    const pngBuffer = await sharp(buf).grayscale().png().toBuffer();
     svg = await traceImage(pngBuffer, {
       threshold: settings.threshold,
       turdSize: settings.filterSpeckle,
@@ -118,10 +131,8 @@ export function registerVectorize(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -160,13 +171,16 @@ export function registerVectorize(app: FastifyInstance) {
         originalSize: fileBuffer.length,
         processedSize: result.buffer.length,
       });
-    } catch (err) {
-      if (err instanceof InputValidationError) {
-        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+    } catch (rawErr) {
+      if (rawErr instanceof InputValidationError) {
+        return sendInputValidationError(reply, rawErr, "vectorize", request.log);
       }
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "vectorize" }, "Vectorization failed");
       return reply.status(422).send({
         error: "Vectorization failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });
@@ -174,10 +188,14 @@ export function registerVectorize(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "vectorize",
     settingsSchema: settingsSchema as z.ZodType<unknown, z.ZodTypeDef, unknown>,
-    process: vectorizeBuffer as (
-      inputBuffer: Buffer,
-      settings: unknown,
-      filename: string,
-    ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>,
+    process: withImageEncodeContext<unknown>(
+      "Image vectorization failed",
+      (s) => (s as z.infer<typeof settingsSchema>)?.colorMode ?? "bw",
+      vectorizeBuffer as (
+        inputBuffer: Buffer,
+        settings: unknown,
+        filename: string,
+      ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>,
+    ),
   });
 }

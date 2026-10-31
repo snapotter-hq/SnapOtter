@@ -30,11 +30,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Upload a PNG into the library, return its file id. */
 async function uploadLibraryFile(filename: string): Promise<string> {
@@ -201,6 +201,27 @@ describe("Library saveMode: default (save as new file)", () => {
     expect(detail.file.version).toBe(1);
     expect(detail.file.parentId).toBeNull();
     expect(detail.file.toolChain).toEqual(["resize", "compress"]);
+  });
+
+  it("normalizes application/postscript to image/x-eps when auto-saving an EPS conversion (#3223)", async () => {
+    const originalId = await uploadLibraryFile("lsmeps.png");
+
+    const run = await runResize({
+      filename: "lsmeps.png",
+      fileId: originalId,
+      saveMode: "new",
+      toolPath: "/api/v1/tools/image/convert",
+      settings: { format: "eps" },
+    });
+    expect(run.statusCode).toBe(200);
+    expect(run.savedFileId).toBeDefined();
+
+    const detail = await getFileDetail(String(run.savedFileId));
+    expect(detail.file.mimeType).toBe("image/x-eps");
+    expect(detail.file.originalName).toBe("lsmeps.eps");
+    expect(detail.file.width).toBeNull();
+    expect(detail.file.height).toBeNull();
+    expect(detail.file.toolChain).toEqual(["convert"]);
   });
 });
 

@@ -2,7 +2,7 @@
  * Test server helper -- builds a real Fastify app with an isolated Postgres
  * database for integration tests.
  *
- * Environment variables (DATABASE_URL, WORKSPACE_PATH) are set per-fork in
+ * Environment variables (DATABASE_URL, WORKSPACE_PATH, FILES_STORAGE_PATH) are set per-fork in
  * tests/setup/per-fork-env.ts BEFORE this module is loaded, ensuring
  * apps/api/src/config.ts picks them up.
  *
@@ -20,6 +20,7 @@ mkdirSync(process.env.WORKSPACE_PATH!, { recursive: true });
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import { getDispatcherStatus, isGpuAvailable } from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 // ---------------------------------------------------------------------------
@@ -58,6 +59,7 @@ import { analyticsRoutes } from "../../apps/api/src/routes/analytics.js";
 import { apiKeyRoutes } from "../../apps/api/src/routes/api-keys.js";
 import { auditLogRoutes } from "../../apps/api/src/routes/audit-log.js";
 import { registerBatchRoutes } from "../../apps/api/src/routes/batch.js";
+import { configRoutes } from "../../apps/api/src/routes/config.js";
 import { docsRoutes } from "../../apps/api/src/routes/docs.js";
 import { registerEnterpriseRoutes } from "../../apps/api/src/routes/enterprise/index.js";
 import { feedbackRoutes } from "../../apps/api/src/routes/feedback.js";
@@ -79,32 +81,53 @@ import { userFileRoutes } from "../../apps/api/src/routes/user-files.js";
 // ensures the __drizzle_migrations journal is consistent in each fork).
 await runMigrations();
 
-// ── Job spine lifecycle (once per fork) ────────────────────────────
+// ── Job spine lifecycle (once per module graph) ────────────────────
 // Workers idle when unused; starting them for every integration file is cheap.
+// Track live TestApp instances so cleanup() stops the spine when the last app
+// in this module graph closes, before a later describe block calls
+// vi.resetModules() and boots a second module graph on the same Redis queues.
 let spineStarted = false;
+let activeApps = 0;
 
 async function ensureSpine(): Promise<void> {
   if (spineStarted) return;
   spineStarted = true;
-  await startCancelListener();
-  startWorkers();
-  // Position every pool's QueueEvents consumer at the stream tail *before* the
-  // first job is enqueued. Without this, the first sync-wait per fork lazily
-  // creates a consumer that can miss a fast job's completion event and block
-  // for the full SYNC_WAIT_MS window -- the root cause of the csv-json 30s
-  // timeout flake. Awaited here so it is deterministic for the first request.
-  await warmQueueEvents();
+  try {
+    await startCancelListener();
+    startWorkers();
+    // Position every pool's QueueEvents consumer at the stream tail *before* the
+    // first job is enqueued. Without this, the first sync-wait per fork lazily
+    // creates a consumer that can miss a fast job's completion event and block
+    // for the full SYNC_WAIT_MS window (the root cause of the csv-json 30s
+    // timeout flake). Awaited here so it is deterministic for the first request.
+    await warmQueueEvents();
+  } catch (err) {
+    await stopSpine().catch(() => {});
+    throw err;
+  }
+}
+
+async function stopSpine(): Promise<void> {
+  if (!spineStarted) return;
+  spineStarted = false;
+  const results = await Promise.allSettled([
+    closeWorkers(),
+    stopCancelListener(),
+    closeQueueEvents(),
+  ]);
+  const rejected = results.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+  if (rejected) {
+    throw rejected.reason;
+  }
 }
 
 // Module-scope afterAll: vitest registers this into any importing file's
 // suite, so every fork cleans up workers and cancel listener on exit.
 afterAll(async () => {
-  if (spineStarted) {
-    await closeWorkers();
-    await stopCancelListener();
-    await closeQueueEvents();
-  }
-}, 10_000);
+  await stopSpine();
+});
 
 // ---------------------------------------------------------------------------
 // 3. Public API
@@ -299,24 +322,12 @@ export async function buildTestApp(): Promise<TestApp> {
       storage: { mode: env.STORAGE_MODE, available: "N/A" },
       database: dbOk ? "ok" : "error",
       queue: { active: 0, pending: 0 },
-      ai: {},
+      ai: { gpu: isGpuAvailable(), dispatcher: getDispatcherStatus() },
     };
   });
 
-  // Public config endpoint
-  app.get("/api/v1/config/auth", async () => {
-    const config: Record<string, unknown> = { authEnabled: env.AUTH_ENABLED };
-    if (env.OIDC_ENABLED) {
-      config.oidcEnabled = true;
-      config.oidcProviderName = env.OIDC_PROVIDER_NAME || null;
-      config.oidcLoginUrl = "/api/auth/oidc/login";
-    }
-    config.samlEnabled = false;
-    config.samlProviderName = "";
-    config.samlLoginUrl = "";
-    config.ssoEnforced = false;
-    return config;
-  });
+  // Public config endpoints (the real routes, so /config/auth is tested as shipped)
+  await configRoutes(app);
 
   // Readiness probe (no auth)
   app.get("/api/v1/readyz", async (_request, reply) => {
@@ -346,8 +357,19 @@ export async function buildTestApp(): Promise<TestApp> {
   // Ensure Fastify is ready (all plugins loaded)
   await app.ready();
 
+  activeApps += 1;
+  let cleanedUp = false;
   const cleanup = async () => {
-    await app.close();
+    if (cleanedUp) return;
+    cleanedUp = true;
+    try {
+      await app.close();
+    } finally {
+      activeApps = Math.max(0, activeApps - 1);
+      if (activeApps === 0) {
+        await stopSpine();
+      }
+    }
     // The pg pool is a module-level singleton shared across the fork.
     // Do NOT call closeDb() here; let the fork process exit naturally.
     // Closing prematurely would break tests that run DB queries after

@@ -2,10 +2,16 @@
 
 import type Konva from "konva";
 import { useCallback } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
-import { captureDocumentCanvas } from "../stage-capture";
+import {
+  captureDocumentContext,
+  readDocumentPixels,
+  reportCaptureFailure,
+  strokeToDataUrl,
+} from "../stage-capture";
 
 function colorDistance(
   r1: number,
@@ -136,6 +142,7 @@ function floodFill(
 }
 
 export function useFillTool(stageRef: React.RefObject<Konva.Stage | null>) {
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
   const handleMouseDown = useCallback(
     (_e: Konva.KonvaEventObject<MouseEvent>) => {
       const {
@@ -162,19 +169,30 @@ export function useFillTool(stageRef: React.RefObject<Konva.Stage | null>) {
       if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) return;
 
       // Capture the document pixels at document resolution (ignoring zoom/pan).
-      const stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
+      const capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      if (!capture.ok) {
+        reportCaptureFailure(capture.reason, captureMessages);
+        return;
+      }
+      const { ctx } = capture;
 
-      const ctx = stageCanvas.getContext("2d");
-      if (!ctx) return;
-
-      const imageData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+      const read = readDocumentPixels(ctx, canvasSize.width, canvasSize.height);
+      if (!read.ok) {
+        reportCaptureFailure(read.reason, captureMessages);
+        return;
+      }
+      const imageData = read.imageData;
       const [fillR, fillG, fillB] = hexToRgb(foregroundColor);
 
       floodFill(imageData, x, y, fillR, fillG, fillB, fillTolerance, fillContiguous);
 
       // Put the modified data back and create an image object
       ctx.putImageData(imageData, 0, 0);
-      const dataUrl = stageCanvas.toDataURL();
+      const dataUrl = strokeToDataUrl(ctx.canvas);
+      if (!dataUrl) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       const obj: CanvasObject = {
         id: generateId(),
@@ -193,7 +211,7 @@ export function useFillTool(stageRef: React.RefObject<Konva.Stage | null>) {
 
       useEditorStore.getState().addObject(obj);
     },
-    [stageRef],
+    [stageRef, captureMessages],
   );
 
   const handleMouseMove = useCallback((_e: Konva.KonvaEventObject<MouseEvent>) => {

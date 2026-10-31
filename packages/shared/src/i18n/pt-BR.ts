@@ -30,6 +30,7 @@ export const ptBR: TranslationKeys = {
     clear: "Limpar",
     copy: "Copiar",
     copied: "Copiado!",
+    copyFailed: "Falha ao copiar",
     noResults: "Nenhum resultado encontrado",
     showLess: "Mostrar menos",
     showMore: "Mostrar mais {count}",
@@ -1103,6 +1104,11 @@ export const ptBR: TranslationKeys = {
       name: "Organizar PDF",
       description: "Reordene as páginas com uma ordem explícita",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Reordene, gire, remova páginas e traga páginas de outros PDFs em um único editor",
+    },
     "protect-pdf": {
       name: "Proteger PDF",
       description: "Adicione proteção por senha (criptografia AES-256)",
@@ -1240,7 +1246,13 @@ export const ptBR: TranslationKeys = {
       name: "Construtor de Pipeline",
       description: "Encadeie várias ferramentas em um fluxo de trabalho",
     },
-    processing: { canceled: "Processamento cancelado" },
+    processing: {
+      canceled: "Processamento cancelado",
+      cancelUnavailable: "Este processamento não pode ser cancelado agora. Ele continua.",
+      cancelNotAllowed:
+        "Não foi possível cancelar: você saiu da conta ou não tem permissão para parar este processamento. Ele continua.",
+      cancelFailed: "Não foi possível cancelar o processamento. Ele continua, tente novamente.",
+    },
     mediaPlayer: {
       unsupported: "Seu navegador não suporta este formato de mídia.",
     },
@@ -1266,7 +1278,6 @@ export const ptBR: TranslationKeys = {
       paintOverObjectsToErase: "Pinte sobre os objetos para apagar",
     },
     "crop-canvas": {
-      original: "Original:",
       cropPreview: "Visualização do corte",
       cropRegionSize: "Região de corte: {width} x {height}",
       originalSize: "Original: {width} x {height}",
@@ -1300,7 +1311,6 @@ export const ptBR: TranslationKeys = {
       infoBar: "{width} x {height}px . grade {cols}x{rows} . {count} blocos",
     },
     "remove-bg": {
-      original: "Original:",
       transparent: "Transparente",
       color: "Colorido",
       gradient: "Degradado",
@@ -1327,7 +1337,6 @@ export const ptBR: TranslationKeys = {
       theExtractedTextWillAppear: "O texto extraído aparecerá aqui depois que você executar o OCR.",
     },
     "image-enhancement": {
-      original: "Original:",
       removesNoiseAndArtifactsUsing: "Remove ruído e artefatos usando AI",
       analyzingImage: "Analisando imagem...",
       imageLooksGoodFineTune: "A imagem parece boa. Ajuste com o controle de intensidade.",
@@ -1339,8 +1348,6 @@ export const ptBR: TranslationKeys = {
       enhancedSizeKb: "Melhorado: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Todos",
-      group: "Grupo",
       dimensions: "Dimensões",
       format: "Formato",
       scanned: "Escaneadas:",
@@ -1375,7 +1382,6 @@ export const ptBR: TranslationKeys = {
       pageSize: "Tamanho da página",
     },
     color: {
-      original: "Original:",
       light: "Luz",
       brightness: "Brilho",
       contrast: "Contraste",
@@ -1413,6 +1419,7 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Comprimir ({count} arquivos)",
       submitTarget: "Comprimir para {size} KB",
       resizedToFit: "Redimensionada para {width} × {height} para caber em {size} KB",
+      batchResized: "{count} de {total} imagens foram reduzidas para caber em {size} KB.",
       progressLabel: "Comprimindo",
       original: "Original: {size} KB",
       processed: "Processado: {size} KB",
@@ -1444,6 +1451,8 @@ export const ptBR: TranslationKeys = {
       submit: "Redimensionar",
       submitBatch: "Redimensionar ({count} arquivos)",
       progressLabel: "Redimensionando",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
+      maxPercentageExceeded: "Use uma escala de 1 a {max}%.",
     },
     crop: {
       width: "Largura",
@@ -1467,6 +1476,7 @@ export const ptBR: TranslationKeys = {
       submit: "Cortar",
       submitBatch: "Cortar ({count} arquivos)",
       progressLabel: "Cortando",
+      free: "Livre",
     },
     rotate: {
       rotate90CounterClockwise: "Girar 90° anti-horário",
@@ -1486,7 +1496,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Aplicando",
     },
     convert: {
-      original: "Original:",
       originalSizeKb: "Original: {size} KB",
       processedSizeKb: "Processado: {size} KB",
       targetFormat: "Formato de destino",
@@ -1516,7 +1525,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Otimizando",
     },
     "strip-metadata": {
-      original: "Original:",
       iccProfile: "Tem ICC",
       originalSize: "Original: {size} KB",
       processedSize: "Processado: {size} KB",
@@ -1540,9 +1548,9 @@ export const ptBR: TranslationKeys = {
       metadataRemoved: "Metadados removidos: {size} KB",
       submit: "Remover metadados",
       progressLabel: "Removendo metadados",
+      inspectFailed: "Falha ao inspecionar os metadados",
     },
     "edit-metadata": {
-      original: "Original:",
       imageDescription: "Descrição da imagem",
       photographerCreatorName: "Nome do fotógrafo / criador",
       imageTitle: "Título da imagem",
@@ -1603,6 +1611,7 @@ export const ptBR: TranslationKeys = {
       datesShifted: "datas ajustadas",
       submit: "Aplicar metadados",
       progressLabel: "Gravando metadados",
+      inspectFailed: "Falha ao inspecionar o arquivo",
     },
     "bulk-rename": {
       pattern: "Padrão",
@@ -1613,6 +1622,7 @@ export const ptBR: TranslationKeys = {
       renaming: "Renomeando...",
       submit: "Renomear {count} arquivos",
       zipDownloaded: "ZIP baixado com sucesso",
+      renameFailed: "Falha ao renomear",
     },
     "image-to-pdf": {
       preview: "Visualização",
@@ -1642,10 +1652,13 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Criando PDF",
       uploadingImages: "Enviando imagens...",
       processingPages: "Processando {count} páginas...",
+      parseResponseFailed: "Falha ao interpretar a resposta do servidor",
+      creationFailedWithStatus:
+        "Não foi possível criar o PDF. Verifique suas imagens e tente novamente.",
+      networkErrorCreation: "Erro de rede durante a criação do PDF",
+      requestTimedOut: "A requisição expirou, o servidor pode estar sobrecarregado",
     },
     "pdf-to-image": {
-      converting2: "Convertendo",
-      page: "página",
       custom: "Personalizado",
       uploadAPdfToGet: "Envie um PDF para começar",
       generatingPagePreviews: "Gerando visualizações das páginas...",
@@ -1702,6 +1715,12 @@ export const ptBR: TranslationKeys = {
       submitPlural: "Gerar Favicons ({count} imagens)",
       downloadZip: "Baixar ZIP dos Favicons",
       progressLabel: "Gerando Favicons",
+      generationFailed: "Não foi possível gerar o favicon. Tente outra imagem.",
+      networkError: "Erro de rede durante a geração do favicon",
+      timeout: "A requisição expirou, o servidor pode estar sobrecarregado",
+      uploadingImages: "Enviando imagens...",
+      processingImagesOne: "Processando {count} imagem...",
+      processingImagesOther: "Processando {count} imagens...",
     },
     "adjust-colors": {
       light: "Luz",
@@ -1733,7 +1752,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Ajustando cores",
     },
     sharpening: {
-      original: "Original:",
       originalSize: "Original: {size} KB",
       processedSize: "Processado: {size} KB",
       method: "Método",
@@ -1760,9 +1778,17 @@ export const ptBR: TranslationKeys = {
       submit: "Aumentar nitidez",
       submitBatch: "Aumentar nitidez ({count} arquivos)",
       progressLabel: "Aumentando nitidez",
+      presetNames: {
+        light: "Leve",
+        medium: "Médio",
+        strong: "Forte",
+        portrait: "Retrato",
+        landscape: "Paisagem",
+        detail: "Detalhe",
+        print: "Impressão",
+      },
     },
     "replace-color": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       sourceColor: "Cor de origem (a substituir)",
@@ -1776,7 +1802,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Substituindo cor",
     },
     "color-blindness": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       simulationType: "Tipo de simulação",
@@ -1786,6 +1811,41 @@ export const ptBR: TranslationKeys = {
       submit: "Simular",
       submitBatch: "Simular ({count} arquivos)",
       progressLabel: "Simulando daltonismo",
+      types: {
+        protanopia: {
+          label: "Protanopia",
+          description: "Sem cones vermelhos. Os vermelhos parecem escuros. ~1% dos homens.",
+        },
+        protanomaly: {
+          label: "Protanomalia",
+          description: "Sensibilidade reduzida ao vermelho. ~1% dos homens.",
+        },
+        deuteranopia: {
+          label: "Deuteranopia",
+          description: "Sem cones verdes. Vermelhos e verdes parecem semelhantes. ~1% dos homens.",
+        },
+        deuteranomaly: {
+          label: "Deuteranomalia",
+          description: "Sensibilidade reduzida ao verde. O tipo mais comum. ~5% dos homens.",
+        },
+        tritanopia: {
+          label: "Tritanopia",
+          description: "Sem cones azuis. Azuis e verdes parecem semelhantes. Muito rara.",
+        },
+        tritanomaly: {
+          label: "Tritanomalia",
+          description: "Sensibilidade reduzida ao azul. Muito rara.",
+        },
+        achromatopsia: {
+          label: "Acromatopsia",
+          description: "Daltonismo total. Enxerga apenas a luminância. Muito rara.",
+        },
+        blueConeMonochromacy: {
+          label: "Monocromacia de cones azuis",
+          description:
+            "Apenas os cones azuis funcionam. Percepção de cor muito limitada. Muito rara.",
+        },
+      },
     },
     "remove-background": {
       subject: "Assunto",
@@ -1823,6 +1883,28 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Remover fundo ({count} arquivos)",
       progressLabel: "Removendo fundo",
       cpuNote: "Usa um modelo de IA. Sem GPU, uma imagem grande pode demorar um pouco.",
+      colorPresets: {
+        white: "Branco",
+        black: "Preto",
+        red: "Vermelho",
+        green: "Verde",
+        blue: "Azul",
+      },
+      gradientPresets: {
+        purple: "Roxo",
+        pink: "Rosa",
+        blue: "Azul",
+        green: "Verde",
+        sunset: "Pôr do sol",
+        lavender: "Lavanda",
+      },
+      effectsProcessingFailed: "Falha no processamento dos efeitos",
+      effectsExpired:
+        "A remoção de fundo anterior expirou, então está sendo executada de novo. Aplique os efeitos quando terminar.",
+      refineChanged:
+        "O assunto, a qualidade, a suavização de bordas e a descontaminação de cor são aplicados quando o fundo é removido. Execute novamente para usar as novas configurações.",
+      backgroundImageRequired: "Escolha uma imagem de fundo para continuar.",
+      invalidHexColor: "Use uma cor hexadecimal como #FF5500 ou #F50.",
     },
     "remove-gif-background": {
       quality: "Qualidade",
@@ -1861,7 +1943,6 @@ export const ptBR: TranslationKeys = {
       download: "Baixar",
     },
     upscale: {
-      original: "Original:",
       off: "Desligado",
       originalKb: "Original: {size} KB",
       upscaledKb: "Ampliado: {size} KB",
@@ -1878,9 +1959,11 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Ampliando {count} imagens",
       cpuNote:
         "A ampliação com IA exige muito processamento. Sem GPU, uma imagem grande pode levar vários minutos.",
+      qualityFast: "Rápido",
+      qualityBalanced: "Equilibrado",
+      qualityBest: "Melhor",
     },
     "erase-object": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       qualityFast: "Rápido",
@@ -1896,11 +1979,17 @@ export const ptBR: TranslationKeys = {
       clear: "Limpar",
       outputFormat: "Formato de saída",
       quality: "Qualidade",
-      paintHint: "Pinte sobre os objetos que deseja remover. Use Ctrl+Z para desfazer.",
-      lassoHint: "Desenhe um laço ao redor do objeto que deseja remover. Use Ctrl+Z para desfazer.",
+      paintHint: "Pinte sobre os objetos que deseja remover. Use {shortcut} para desfazer.",
+      lassoHint:
+        "Desenhe um laço ao redor do objeto que deseja remover. Use {shortcut} para desfazer.",
       submit: "Apagar objeto",
       submitBatch: "Apagar todos ({count})",
       progressLabel: "Apagando objeto",
+      stall: "O processamento expirou sem progresso. Tente novamente.",
+      stallBatch: "O processamento expirou. Tente novamente.",
+      timeoutOverloaded:
+        "A requisição expirou, o servidor pode estar sobrecarregado. Tente novamente.",
+      erasingProgress: "Apagando {current}/{total}",
     },
     ocr: {
       copied: "Copiado",
@@ -1910,6 +1999,8 @@ export const ptBR: TranslationKeys = {
         "Melhora o contraste local antes do reconhecimento. Rápido aplica diretamente; Equilibrado e Melhor só mantêm a variante quando a pontuação calibrada melhora o resultado.",
       fastKoreanUnsupported:
         "O OCR rápido não oferece suporte a coreano. Instale o pacote de OCR preciso e escolha Equilibrado ou Melhor.",
+      fastArabicUnsupported:
+        "O OCR rápido não oferece suporte a árabe. Instale o pacote de OCR preciso e escolha Equilibrado ou Melhor.",
       language: "Idioma",
       autoDetect: "Detecção automática",
       extractedText: "Texto extraído",
@@ -1918,6 +2009,9 @@ export const ptBR: TranslationKeys = {
       submit: "Extrair texto",
       submitBatch: "Extrair texto ({count} arquivos)",
       progressLabel: "Extraindo texto",
+      filesFailed: "{failed} de {total} arquivos falharam",
+      noTextDetectedInline: "(nenhum texto detectado)",
+      fileErrorInline: "(erro: {message})",
     },
     "ocr-pdf": {
       quality: "Qualidade",
@@ -1931,7 +2025,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Extraindo texto do PDF",
     },
     "blur-faces": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       blurRadius: "Raio de desfoque",
@@ -1944,7 +2037,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Desfocando rostos",
     },
     "enhance-faces": {
-      original: "Original:",
       subtle: "Sutil",
       maximum: "Máximo",
       fewerFaces: "Menos rostos",
@@ -2005,6 +2097,9 @@ export const ptBR: TranslationKeys = {
       submitSubject: "Corte inteligente",
       submitFace: "Corte por rosto",
       submitTrim: "Cortar bordas",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
+      cropAreaExceeded:
+        "Este recorte ultrapassa o limite de {max} pixels. Reduza a largura, a altura ou o preenchimento.",
     },
     imageEnhancement: {
       enhancementMode: "Modo de melhoria",
@@ -2040,6 +2135,14 @@ export const ptBR: TranslationKeys = {
         "A melhoria profunda requer o pacote de Ampliação e melhoria, que não está instalado, então você recebeu a melhoria padrão.",
       deepEnhanceSkippedAnimated:
         "A melhoria profunda não funciona em imagens animadas, então cada quadro recebeu a melhoria padrão.",
+      batchDeepEnhanceSkipped:
+        "A melhoria profunda não foi executada em {count} de {total} imagens, então elas receberam a melhoria padrão.",
+      batchDeepEnhanceSkippedFailed:
+        "A melhoria profunda falhou em {count} de {total} imagens, então elas receberam a melhoria padrão.",
+      batchDeepEnhanceSkippedUnavailable:
+        "A melhoria profunda não foi executada em {count} de {total} imagens porque o pacote de Ampliação e melhoria não está instalado.",
+      batchDeepEnhanceSkippedAnimated:
+        "A melhoria profunda pulou {count} de {total} imagens porque elas são animadas.",
     },
     "noise-removal": {
       off: "Desligado",
@@ -2071,7 +2174,6 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Removendo ruído de {count} imagens",
     },
     "red-eye-removal": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       fixedKb: "Corrigido: {size} KB",
       sensitivity: "Sensibilidade",
@@ -2088,7 +2190,6 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Corrigindo olhos vermelhos em {count} imagens",
     },
     "restore-photo": {
-      original: "Original:",
       subtle: "Sutil",
       strong: "Forte",
       originalKb: "Original: {size} KB",
@@ -2125,6 +2226,9 @@ export const ptBR: TranslationKeys = {
       submit: "Redimensionar",
       submitBatch: "Redimensionar ({count} arquivos)",
       progressLabel: "Redimensionamento inteligente",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
+      areaExceeded:
+        "O redimensionamento com reconhecimento de conteúdo é limitado a {max} pixels no total. Reduza a largura ou a altura.",
     },
     "ai-canvas-expand": {
       quality: "Qualidade",
@@ -2146,7 +2250,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Estendendo canvas",
     },
     colorize: {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       colorizedKb: "Colorizado: {size} KB",
       aiModel: "Modelo AI",
@@ -2292,6 +2395,12 @@ export const ptBR: TranslationKeys = {
       dragToAdjust: "Arraste para ajustar",
       scrollToZoom: "Role para dar zoom",
       photoGenerated: "Foto gerada. Baixe pelo painel esquerdo.",
+      analysisFailedWithStatus: "Não foi possível analisar esta foto. Tente uma foto mais nítida.",
+      faceAnalysisFailed: "Falha na análise facial",
+      generationFailedWithStatus: "Não foi possível gerar a foto de passaporte. Tente novamente.",
+      photoGenerationFailed: "Falha ao gerar a foto",
+      analysisExpired:
+        "A análise expirou, então a foto está sendo analisada de novo. Gere quando terminar.",
     },
     "transcribe-audio": {
       language: "Idioma",
@@ -2349,7 +2458,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Desfocando fundo",
     },
     "watermark-text": {
-      original: "Original:",
       applyWatermark: "Aplicar marca d'água",
       tiledRepeating: "Lado a lado (repetição)",
       originalKb: "Original: {size} KB",
@@ -2372,7 +2480,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Adicionando marca d'água",
     },
     "watermark-image": {
-      original: "Original:",
       center: "Centro",
       topLeft: "Superior esquerdo",
       topRight: "Superior direito",
@@ -2391,7 +2498,6 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Aplicar marca d'água ({count} arquivos)",
     },
     "text-overlay": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       text: "Texto",
@@ -2411,7 +2517,6 @@ export const ptBR: TranslationKeys = {
       defaultText: "Seu Texto Aqui",
     },
     compose: {
-      original: "Original:",
       screen: "Tela",
       processing: "Processando...",
       overlayImage: "Imagem de sobreposição",
@@ -2466,9 +2571,6 @@ export const ptBR: TranslationKeys = {
       backToGallery: "Voltar para a galeria",
     },
     info: {
-      min: "mín:",
-      max: "máx:",
-      mean: "média:",
       minValue: "mín:{value}",
       maxValue: "máx:{value}",
       meanValue: "média:{value}",
@@ -2505,6 +2607,7 @@ export const ptBR: TranslationKeys = {
       similarity: "Similaridade: {percent}%",
       submit: "Comparar",
       downloadDiff: "Baixar diferença",
+      comparisonFailed: "Falha na comparação",
     },
     "find-duplicates": {
       sensitivity: "Sensibilidade",
@@ -2534,6 +2637,10 @@ export const ptBR: TranslationKeys = {
       threshold: "Limiar",
       submit: "Buscar duplicatas",
       scanning: "Escaneando...",
+      parseResultsFailed: "Falha ao interpretar os resultados da verificação",
+      networkErrorUpload:
+        "Erro de rede durante o envio. Tente com menos arquivos ou verifique sua conexão.",
+      requestTimedOut: "A requisição expirou. Tente com menos arquivos.",
     },
     "color-palette": {
       colors: "Cores",
@@ -2604,6 +2711,26 @@ export const ptBR: TranslationKeys = {
       downloadFormat: "Formato de download",
       submit: "Gerar código QR",
       download: "Baixar código QR",
+      styleSquare: "Quadrado",
+      styleRounded: "Arredondado",
+      styleDots: "Pontos",
+      styleClassy: "Elegante",
+      styleClassyRounded: "Elegante arred.",
+      styleExtraRounded: "Extra arred.",
+      styleDot: "Ponto",
+      formatDescPng: "Ideal para digital",
+      formatDescSvg: "Ideal para impressão",
+      formatDescJpeg: "Arquivo menor",
+      formatDescWebp: "Formato moderno",
+      vcardFirstName: "Nome",
+      vcardFirstNamePlaceholder: "João",
+      vcardLastName: "Sobrenome",
+      vcardLastNamePlaceholder: "Silva",
+      vcardOrganization: "Organização",
+      vcardOrganizationPlaceholder: "Empresa",
+      vcardJobTitle: "Cargo",
+      vcardJobTitlePlaceholder: "Desenvolvedor",
+      vcardWebsite: "Site",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2653,6 +2780,9 @@ export const ptBR: TranslationKeys = {
       noBarcodesFound: "Nenhum código de barras encontrado",
       barcodesFound: "{count} código de barras encontrado",
       barcodesFoundPlural: "{count} códigos de barras encontrados",
+      scanningFile: "Lendo {name}...",
+      scanningFailedWithStatus: "Não foi possível ler os códigos desta imagem. Tente outra imagem.",
+      filesFailed: "{count} de {total} arquivos falharam",
     },
     collage: {
       sideBySide: "Lado a lado",
@@ -2673,9 +2803,6 @@ export const ptBR: TranslationKeys = {
       mosaic: "Mosaico",
       uploadingImages: "Enviando imagens...",
       processingCollage: "Processando collage...",
-      loaded: "carregadas",
-      images: "imagens",
-      collage: "Collage:",
       snapotter: "SnapOtter",
       background: "Fundo",
       format: "Formato",
@@ -2711,6 +2838,12 @@ export const ptBR: TranslationKeys = {
       quality: "Qualidade",
       submit: "Criar collage",
       downloadCollage: "Baixar collage",
+      ratioFree: "Livre",
+      bgWhite: "Branco",
+      bgBlack: "Preto",
+      bgNone: "Nenhum",
+      bgCustom: "Personalizado",
+      collageFailed: "Falha ao criar a collage",
     },
     stitch: {
       format: "Formato",
@@ -2740,6 +2873,7 @@ export const ptBR: TranslationKeys = {
       outputFormat: "Formato de saída",
       quality: "Qualidade",
       submit: "Juntar imagens",
+      stitchFailed: "Falha ao unir",
     },
     split: {
       splitMode: "Modo de divisão",
@@ -2768,6 +2902,21 @@ export const ptBR: TranslationKeys = {
       submit: "Dividir imagem",
       downloadAll: "Baixar tudo (ZIP)",
       tileWarningSmall: "Os blocos ficarão muito pequenos ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Metade horizontal",
+        verticalHalf: "Metade vertical",
+        quarters: "Quadrantes",
+        horizontalStrip: "Faixa horizontal",
+        verticalStrip: "Faixa vertical",
+        grid9: "Grade de 9 blocos",
+        portrait6: "Retrato de 6 blocos",
+        landscape6: "Paisagem de 6 blocos",
+        grid16: "Grade de 16 blocos",
+      },
+      keepOriginal: "Manter original",
+      auto: "Automático",
+      splitFailed: "Falha ao dividir",
+      failedToSplit: "Falha ao dividir {name}: {detail}",
     },
     border: {
       blur: "Desfoque",
@@ -2793,6 +2942,16 @@ export const ptBR: TranslationKeys = {
       submit: "Adicionar borda",
       submitBatch: "Adicionar borda ({count} arquivos)",
       progressLabel: "Adicionando borda",
+      presetNames: {
+        cleanWhite: "Branco limpo",
+        galleryBlack: "Preto galeria",
+        shadow: "Sombra",
+        rounded: "Arredondado",
+        polaroid: "Polaroid",
+        vintage: "Vintage",
+        minimal: "Minimalista",
+        cinematic: "Cinematográfico",
+      },
     },
     beautify: {
       background: "Fundo",
@@ -2809,7 +2968,6 @@ export const ptBR: TranslationKeys = {
       text: "Texto",
       position: "Posição",
       newTab: "Nova aba",
-      frame: "Moldura",
       quickPresets: "Predefinições rápidas",
       linear: "Linear",
       radial: "Radial",
@@ -2837,6 +2995,33 @@ export const ptBR: TranslationKeys = {
       submit: "Embelezar",
       submitBatch: "Embelezar ({count} arquivos)",
       progressLabel: "Embelezando captura de tela",
+      presetPurpleHaze: "Névoa roxa",
+      presetFlamingo: "Flamingo",
+      presetOcean: "Oceano",
+      presetMidnight: "Meia-noite",
+      presetMint: "Menta",
+      presetSunset: "Pôr do sol",
+      presetCleanWhite: "Branco limpo",
+      presetNoBackground: "Sem fundo",
+      bgGradient: "Degradado",
+      bgSolid: "Sólido",
+      bgImage: "Imagem",
+      none: "Nenhum",
+      frameBrowser: "Navegador",
+      shadowSubtle: "Sutil",
+      shadowMedium: "Médio",
+      shadowDramatic: "Dramático",
+      shadowCustom: "Personalizado",
+      socialOriginal: "Original",
+      socialIgSquare: "IG quadrado",
+      socialIgStory: "IG Stories",
+      positionTopLeft: "Superior esquerdo",
+      positionTopRight: "Superior direito",
+      positionCenter: "Centro",
+      positionBottomLeft: "Inferior esquerdo",
+      positionBottomRight: "Inferior direito",
+      processingFailed: "Falha no processamento",
+      processingFailedStatus: "Não foi possível processar esta imagem. Tente novamente.",
     },
     "circle-crop": {
       border: "Borda",
@@ -2875,6 +3060,16 @@ export const ptBR: TranslationKeys = {
       submit: "Aplicar duotone",
       submitBatch: "Aplicar duotone ({count} arquivos)",
       progressLabel: "Aplicando duotone",
+      presetNames: {
+        classic: "Clássico",
+        noir: "Noir",
+        sepia: "Sépia",
+        midnight: "Meia-noite",
+        sunset: "Pôr do sol",
+        cyber: "Cyber",
+        ocean: "Oceano",
+        forest: "Floresta",
+      },
     },
     "image-pad": {
       background: "Fundo",
@@ -2887,6 +3082,7 @@ export const ptBR: TranslationKeys = {
       submit: "Preencher imagem",
       submitBatch: "Preencher imagem ({count} arquivos)",
       progressLabel: "Preenchendo imagem",
+      custom: "Personalizado",
     },
     pixelate: {
       blockSize: "Tamanho do bloco",
@@ -2989,7 +3185,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Convertendo SVG",
     },
     vectorize: {
-      original: "Original:",
       detail: "Detalhe",
       smoothing: "Suavização",
       blackWhite: "Preto e branco",
@@ -3026,7 +3221,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Vetorizando",
     },
     "gif-tools": {
-      original: "Original:",
       widthPx: "Largura (px)",
       auto: "Automático",
       heightPx: "Altura (px)",
@@ -3083,6 +3277,7 @@ export const ptBR: TranslationKeys = {
       submit: "Processar GIF",
       submitBatch: "Processar ({count} arquivos)",
       progressLabel: "Processando GIF",
+      maxDimensionExceeded: "Use um tamanho de 1 a {max} px.",
     },
     "image-to-base64": {
       converting: "Convertendo...",
@@ -3117,6 +3312,7 @@ export const ptBR: TranslationKeys = {
       includeText: "Incluir texto",
       submit: "Gerar código de barras",
       download: "Baixar código de barras",
+      generateFailed: "Falha ao gerar o código de barras",
     },
     "chart-maker": {
       optionalChartTitle: "Título do gráfico (opcional)",
@@ -3127,6 +3323,11 @@ export const ptBR: TranslationKeys = {
       submit: "Criar gráfico",
       submitBatch: "Criar gráfico ({count} arquivos)",
       progressLabel: "Criando gráfico",
+      kindBar: "Barras",
+      kindLine: "Linhas",
+      kindPie: "Pizza",
+      rowsSkipped:
+        "Linhas no gráfico: {charted}. Ignoradas porque a coluna de valores não tinha um número: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modelo",
@@ -3517,12 +3718,12 @@ export const ptBR: TranslationKeys = {
       submit: "Comprimir",
       submitBatch: "Comprimir ({count} arquivos)",
       submitTarget: "Comprimir para {size}",
+      batchMissed: "{count} de {total} arquivos não ficaram abaixo de {target}.",
       progressLabel: "Comprimindo",
       bestEffortHint:
         "Máximo possível. PDFs baseados em imagens chegam perto; PDFs somente com texto podem não reduzir para este tamanho.",
       targetReached: "Alvo de {target} atingido (resultado: {size}).",
-      targetMissed:
-        "Não foi possível atingir {target}. O menor tamanho possível foi {size} porque este PDF é composto principalmente de texto ou vetores, que a compressão de imagem não consegue reduzir.",
+      targetMissed: "Não foi possível atingir {target}. O menor tamanho possível foi {size}.",
     },
     "rotate-pdf": {
       angle: "Ângulo de rotação",
@@ -3591,6 +3792,31 @@ export const ptBR: TranslationKeys = {
       pageLabel: "Página {n}",
       orderTooLong:
         "Muitas movimentações separadas para enviar. Redefina e tente com menos alterações.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Máximo de {docs} PDFs e {pages} páginas de saída.",
+      addDocument: "Adicionar PDF",
+      addAll: "Adicionar todas as páginas",
+      allPages: "Todas no plano",
+      addPage: "Adicionar página {n}",
+      dragHint:
+        "Arraste para reordenar, girar ou remover páginas. Adicione PDFs para puxar as páginas deles.",
+      reset: "Redefinir plano",
+      emptyPlan: "Nenhuma página no plano ainda. Adicione páginas dos documentos acima.",
+      docFailed: "Não foi possível ler um documento.",
+      skippedNotPdf: "{count} arquivo(s) ignorado(s): só é possível adicionar PDFs.",
+      skippedOverLimit:
+        "{count} PDF(s) não adicionado(s): o editor comporta no máximo {docs} PDFs.",
+      pageLabel: "Posição {n}",
+      planSummary: "{pages} página(s) de {docs} documento(s) serão montadas.",
+      submit: "Criar PDF ({pages} páginas)",
+      progressLabel: "Montando",
+      rotateLeft: "Girar à esquerda",
+      rotateRight: "Girar à direita",
+      removePage: "Remover página",
+      removeDoc: "Remover PDF",
+      zoomIn: "Ampliar",
+      zoomOut: "Reduzir",
     },
     "protect-pdf": {
       userPassword: "Senha do usuário",
@@ -3711,6 +3937,9 @@ export const ptBR: TranslationKeys = {
         save: "Salvar e posicionar",
         uploadHint: "Solte um PNG / JPG ou clique para escolher. PNG transparente funciona melhor.",
       },
+      exportFailed: "Não foi possível ler as assinaturas posicionadas. Tente novamente.",
+      stall: "O processamento expirou. Tente novamente.",
+      timeout: "A requisição expirou. Tente novamente.",
     },
     "redact-pdf": {
       terms: "Termos para censurar",
@@ -3724,6 +3953,9 @@ export const ptBR: TranslationKeys = {
       submit: "Extrair Texto",
       submitBatch: "Extrair Texto ({count} arquivos)",
       progressLabel: "Extraindo",
+      scannedHint:
+        "Este PDF é digitalizado, então não há texto para extrair. O OCR consegue lê-lo, mas leva mais tempo e exige o pacote de IA de OCR instalado.",
+      runOcr: "Executar OCR neste PDF",
     },
     "pdf-to-word": {
       hint: "Ideal para PDFs com texto; páginas digitalizadas precisam de OCR",
@@ -3880,6 +4112,9 @@ export const ptBR: TranslationKeys = {
     importFromFiles: "Importar de Arquivos",
     saveToFiles: "Salvar em Arquivos",
     savedToFiles: "Salvo em Arquivos",
+    resultExpired: "Este resultado expirou. Execute a ferramenta novamente.",
+    libraryFull:
+      "Seu armazenamento de arquivos está cheio. Exclua alguns arquivos e tente novamente.",
     librarySaveTitle: "Este arquivo vem dos seus Arquivos",
     librarySaveAsNew: "Salvar o resultado como um novo arquivo",
     librarySaveAsNewHint: "Mantém o original nos seus Arquivos",
@@ -4100,7 +4335,7 @@ export const ptBR: TranslationKeys = {
       dropDescription: "Arraste uma imagem aqui para começar",
       openImageButton: "Abrir imagem",
       newDocumentButton: "Novo documento",
-      pasteHint: "Ou cole da área de transferência (Ctrl+V)",
+      pasteHint: "Ou cole da área de transferência ({shortcut})",
     },
     mobile: {
       heading: "Recomendado para desktop",
@@ -4153,6 +4388,7 @@ export const ptBR: TranslationKeys = {
         ratioLabel: "Proporção:",
         applyTitle: "Aplicar recorte (Enter)",
         cancelTitle: "Cancelar recorte (Esc)",
+        free: "Livre",
       },
       dodgeBurn: {
         dodge: "Subexposição",
@@ -4169,6 +4405,9 @@ export const ptBR: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Amostra:",
         toggleDropdown: "Alternar lista suspensa",
+        samplePoint: "Ponto (1x1)",
+        sampleAverage3: "Média 3x3",
+        sampleAverage5: "Média 5x5",
       },
       fill: {
         tolerance: "Tolerância",
@@ -4265,6 +4504,68 @@ export const ptBR: TranslationKeys = {
         grain: "Granulação",
         resetAll: "Redefinir tudo",
         apply: "Aplicar",
+        autoButtons: {
+          autoTone: "Tom automático",
+          autoContrast: "Contraste automático",
+          autoColor: "Cor automática",
+          autoEnhance: "Melhoria automática",
+        },
+        sliders: {
+          brightness: "Brilho",
+          contrast: "Contraste",
+          hue: "Matiz",
+          saturation: "Saturação",
+          luminance: "Luminância",
+          exposure: "Exposição",
+          vibrance: "Vibração",
+          warmth: "Calor",
+        },
+        filters: {
+          grayscale: "Escala de cinza",
+          sepia: "Sépia",
+          invert: "Inverter",
+          solarize: "Solarizar",
+          blur: "Desfoque",
+          sharpen: "Nitidez",
+          noise: "Ruído",
+          pixelate: "Pixelizar",
+          emboss: "Relevo",
+          posterize: "Posterizar",
+          threshold: "Limiar",
+          kaleidoscope: "Caleidoscópio",
+          motionBlur: "Desfoque de movimento",
+          radialBlur: "Desfoque radial",
+          surfaceBlur: "Desfoque de superfície",
+        },
+        params: {
+          radius: "Raio",
+          amount: "Quantidade",
+          size: "Tamanho",
+          strength: "Intensidade",
+          levels: "Níveis",
+          level: "Nível",
+          power: "Potência",
+          angle: "Ângulo",
+          distance: "Distância",
+          centerX: "Centro X",
+          centerY: "Centro Y",
+          threshold: "Limiar",
+          midpoint: "Ponto médio",
+          roundness: "Arredondamento",
+          feather: "Difusão",
+          roughness: "Aspereza",
+        },
+        curvePresets: {
+          linear: "Linear",
+          darken: "Escurecer",
+          lighten: "Clarear",
+          increaseContrast: "Aumentar contraste",
+          decreaseContrast: "Diminuir contraste",
+          mediumContrast: "Contraste médio",
+          strongContrast: "Contraste forte",
+          crossProcess: "Processo cruzado",
+          negative: "Negativo",
+        },
       },
       color: {
         channelAriaLabel: "Canal de cor {channel}",
@@ -4280,12 +4581,64 @@ export const ptBR: TranslationKeys = {
         median: "Mediana",
       },
       history: {
-        undoTitle: "Desfazer (Ctrl+Z)",
-        redoTitle: "Refazer (Ctrl+Shift+Z)",
+        undoTitle: "Desfazer ({shortcut})",
+        redoTitle: "Refazer ({shortcut})",
         empty: "Nenhum histórico ainda",
+        unknown: "Desconhecido",
+        actions: {
+          initialState: "Estado inicial",
+          loadImage: "Abrir imagem",
+          loadProject: "Abrir projeto",
+          restoreAutosave: "Restaurar salvamento automático",
+          resizeCanvas: "Redimensionar canvas",
+          resizeImage: "Redimensionar imagem",
+          rotateCanvas: "Girar canvas {degrees}",
+          flipHorizontal: "Espelhar horizontal",
+          flipVertical: "Espelhar vertical",
+          trimCanvas: "Aparar canvas",
+          addObject: "Adicionar {type}",
+          layerEffect: "Efeito de camada",
+          delete: "Excluir",
+          bringToFront: "Trazer para frente",
+          bringForward: "Trazer para a frente",
+          sendBackward: "Enviar para trás",
+          sendToBack: "Enviar para o fundo",
+          addLayer: "Adicionar camada",
+          deleteLayer: "Excluir camada",
+          duplicateLayer: "Duplicar camada",
+          reorderLayers: "Reordenar camadas",
+          mergeDown: "Mesclar para baixo",
+          flattenAll: "Achatar tudo",
+          adjust: "Ajustar {name}",
+          resetAdjustments: "Redefinir ajustes",
+          levels: "Níveis",
+          curves: "Curvas",
+          resetLevels: "Redefinir níveis",
+          resetCurves: "Redefinir curvas",
+          resetAll: "Redefinir tudo",
+          toggleFilter: "Alternar filtro {name}",
+          setFilterParam: "Definir {param} de {filter}",
+          crop: "Cortar",
+          cut: "Recortar",
+          paste: "Colar",
+          pasteInPlace: "Colar no lugar",
+          nudge: "Deslocar levemente",
+          brushStroke: "Pincelada",
+          eraserStroke: "Traço da borracha",
+        },
+        objectTypes: {
+          line: "linha",
+          rect: "retângulo",
+          ellipse: "elipse",
+          text: "texto",
+          image: "imagem",
+          arrow: "seta",
+          polygon: "polígono",
+          star: "estrela",
+        },
       },
       layers: {
-        newLayerTitle: "Nova camada (Ctrl+Shift+N)",
+        newLayerTitle: "Nova camada ({shortcut})",
         blend: "Mesclagem",
         opacity: "Opacidade",
         hideLayer: "Ocultar camada",
@@ -4313,9 +4666,34 @@ export const ptBR: TranslationKeys = {
           positionCenter: "Centro",
           positionOutside: "Externa",
         },
+        blendModes: {
+          normal: "Normal",
+          multiply: "Multiplicar",
+          screen: "Tela",
+          overlay: "Sobrepor",
+          darken: "Escurecer",
+          lighten: "Clarear",
+          colorDodge: "Subexposição de cores",
+          colorBurn: "Superexposição de cores",
+          hardLight: "Luz direta",
+          softLight: "Luz indireta",
+          difference: "Diferença",
+          exclusion: "Exclusão",
+          hue: "Matiz",
+          saturation: "Saturação",
+          color: "Cor",
+          luminosity: "Luminosidade",
+        },
+        duplicate: "Duplicar",
+        flattenAll: "Achatar tudo",
       },
       navigator: {
         noImageLoaded: "Nenhuma imagem carregada",
+      },
+      tabs: {
+        layers: "Camadas",
+        adjustments: "Ajustes",
+        history: "Histórico",
       },
     },
     ui: {
@@ -4331,6 +4709,7 @@ export const ptBR: TranslationKeys = {
         anchorLabel: "Âncora:",
         anchorAriaLabel: "Âncora {position}",
         backgroundLabel: "Fundo:",
+        transparent: "Transparente",
         anchors: {
           topLeft: "superior esquerdo",
           topCenter: "superior central",
@@ -4348,6 +4727,14 @@ export const ptBR: TranslationKeys = {
         original: "Original: {width} x {height} px",
         note: "Redimensiona todos os objetos proporcionalmente às novas dimensões.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Esta imagem é grande demais para o navegador editar com esta ferramenta. Tente um tamanho de canvas menor.",
+        crossOriginBlocked:
+          "O editor não consegue ler os pixels de uma imagem carregada de outro site. Baixe a imagem e abra o arquivo.",
+        sourceImageFailed:
+          "Não foi possível carregar a imagem. Se ela estiver hospedada em outro site, esse site precisa permitir o acesso entre origens.",
+      },
       exportDialog: {
         heading: "Exportar imagem",
         previewAlt: "Visualização da exportação",
@@ -4361,13 +4748,19 @@ export const ptBR: TranslationKeys = {
         exportButton: "Exportar",
         copied: "Copiado",
         copyFailed: "Falha ao copiar",
+        exportFailed: "Falha na exportação. Tente novamente ou escolha outro formato.",
+        tooLarge:
+          "Esta exportação é grande demais para o navegador gerar. Tente dimensões menores.",
         saveProject: "Salvar projeto",
         loadProject: "Abrir projeto",
+        invalidProject: "Este arquivo não é um projeto do SnapOtter válido.",
       },
       autosaveRecovery: {
         message: "Trabalho não salvo recuperado de {time}.",
         restore: "Restaurar",
         discard: "Descartar",
+        saveFailed:
+          "Não foi possível salvar seu trabalho neste navegador. Exporte ou use Salvar projeto para manter uma cópia.",
       },
       fillDialog: {
         heading: "Preencher",
@@ -4393,6 +4786,7 @@ export const ptBR: TranslationKeys = {
           black: "Preto",
           transparent: "Transparente",
         },
+        presetCustom: "Personalizado",
       },
       colorSwatch: {
         ariaLabel: "Cor {color}",
@@ -4402,6 +4796,25 @@ export const ptBR: TranslationKeys = {
         noneSelected: "{label}: Nenhum",
         setNone: "Sem {label}",
       },
+      contextMenu: {
+        duplicate: "Duplicar",
+        selectAll: "Selecionar tudo",
+      },
+    },
+    toolbar: {
+      move: "Mover",
+      marquee: "Letreiro",
+      crop: "Cortar",
+      eyedropper: "Conta-gotas",
+      brush: "Pincel",
+      pencil: "Lápis",
+      cloneStamp: "Carimbo",
+      eraser: "Borracha",
+      paintBucket: "Balde de tinta",
+      gradient: "Degradado",
+      text: "Texto",
+      hand: "Mão",
+      zoom: "Zoom",
     },
   },
   settings: {
@@ -4434,6 +4847,7 @@ export const ptBR: TranslationKeys = {
       saveButton: "Salvar configurações",
       saveSuccess: "Configurações salvas.",
       saveFailed: "Falha ao salvar as configurações.",
+      loadFailed: "Não foi possível carregar suas preferências.",
       roleUnknown: "desconhecida",
     },
     system: {
@@ -4460,6 +4874,7 @@ export const ptBR: TranslationKeys = {
       saveButton: "Salvar configurações",
       saveSuccess: "Configurações salvas.",
       saveFailed: "Falha ao salvar as configurações.",
+      loadFailed: "Não foi possível carregar as configurações do sistema.",
       limitsAndResources: "Limites e recursos",
       maxFileSize: "Tamanho máximo de arquivo",
       maxBatchSize: "Tamanho máximo de lote",
@@ -4497,10 +4912,10 @@ export const ptBR: TranslationKeys = {
       newPasswordPlaceholder: "Nova senha",
       confirmPasswordPlaceholder: "Confirmar nova senha",
       passwordsMismatch: "As senhas não coincidem",
-      passwordTooShort: "A senha deve ter pelo menos 4 caracteres",
       changeSuccess: "Senha alterada com sucesso",
       changeFailed: "Falha ao alterar a senha",
       currentPasswordIncorrect: "A senha atual está incorreta",
+      passwordChangedElsewhere: "Sua senha foi alterada em outro lugar. Entre novamente.",
       changePasswordButton: "Alterar senha",
       loginAttemptLimitNote:
         "Os limites de tentativas de login podem ser configurados nas Configurações do sistema.",
@@ -4551,6 +4966,8 @@ export const ptBR: TranslationKeys = {
       passwordMinLengthDesc: "Número mínimo de caracteres exigido para senhas.",
       passwordRequireUppercase: "Exigir maiúscula",
       passwordRequireUppercaseDesc: "Exigir pelo menos uma letra maiúscula.",
+      passwordRequireLowercase: "Exigir minúscula",
+      passwordRequireLowercaseDesc: "Exigir pelo menos uma letra minúscula.",
       passwordRequireNumber: "Exigir número",
       passwordRequireNumberDesc: "Exigir pelo menos um número.",
       passwordRequireSpecial: "Exigir caractere especial",
@@ -4558,6 +4975,12 @@ export const ptBR: TranslationKeys = {
       passwordPolicyHeading: "Política de senhas",
       securitySettingsSaved: "Configurações de segurança salvas",
       securitySettingsFailed: "Falha ao salvar configurações de segurança",
+      adminSettingsLoadFailed: "Não foi possível carregar as configurações de segurança.",
+      twoFactorStateChanged:
+        "A autenticação de dois fatores foi alterada em outra janela. Recarregue e tente novamente.",
+      twoFactorUnreadable:
+        "O servidor não consegue ler suas configurações de autenticação de dois fatores. Fale com um administrador.",
+      ssoNeedsProvider: "Para a imposição de SSO, configure primeiro um provedor OIDC ou SAML.",
     },
     people: {
       heading: "Pessoas",
@@ -4590,7 +5013,7 @@ export const ptBR: TranslationKeys = {
       updateFailed: "Falha ao atualizar o usuário",
       cannotRemoveOwnAdmin: "Não é possível remover sua própria função de administrador",
       resetPasswordHeading: "Redefinir senha de {username}",
-      newPasswordLabel: "Nova senha (min. 8 caracteres)",
+      newPasswordLabel: "Nova senha",
       resetPasswordButton: "Redefinir senha",
       resetPasswordWarning: "Isso invalidará todas as sessões e chaves API deste usuário.",
       resetSuccess: "Senha redefinida com sucesso",
@@ -4600,6 +5023,7 @@ export const ptBR: TranslationKeys = {
       tableHeaderTeam: "Equipe",
       noSearchResults: "Nenhum membro corresponde a sua busca.",
       noUsersFound: "Nenhum usuário encontrado.",
+      loadFailed: "Não foi possível carregar os usuários.",
       authBadgeLocalOidc: "Local + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Editar função / equipe",
@@ -4611,6 +5035,13 @@ export const ptBR: TranslationKeys = {
       copyPasswordWarning: "Copie esta senha agora. Você não poderá vê-la após criar o usuário.",
       memberCount: "{count} membro",
       memberCountPlural: "{count} membros",
+      usernameTaken: "Esse nome de usuário já está em uso",
+      lastAdmin: "Sempre deve haver pelo menos um administrador",
+      cannotDeleteSelf: "Não é possível excluir sua própria conta",
+      usernameInvalid:
+        "O nome de usuário deve ter de 3 a 50 caracteres e usar apenas a-z, A-Z, 0-9, pontos, hifens e sublinhados",
+      roleNotFound: "Essa função não existe mais",
+      teamNotFound: "Essa equipe não existe mais",
     },
     teams: {
       heading: "Equipes",
@@ -4632,6 +5063,7 @@ export const ptBR: TranslationKeys = {
       tableHeaderTeamName: "Nome da equipe",
       tableHeaderMembers: "Membros",
       emptyState: "Nenhuma equipe encontrada.",
+      loadFailed: "Não foi possível carregar as equipes.",
       renameSaveButton: "Salvar",
       renameCancelButton: "Cancelar",
       renameAction: "Renomear",
@@ -4647,6 +5079,7 @@ export const ptBR: TranslationKeys = {
       teamRetentionHoursDesc:
         "Retenção de arquivos processados desta equipe. Deixe vazio para usar o padrão global.",
       quotaSaved: "Configurações da equipe salvas",
+      quotaSaveFailed: "Falha ao salvar as configurações da equipe",
     },
     roles: {
       heading: "Funções",
@@ -4672,6 +5105,7 @@ export const ptBR: TranslationKeys = {
       deleteSuccess: 'Função "{name}" excluída',
       deleteFailed: "Falha ao excluir a função",
       emptyState: "Nenhuma função encontrada.",
+      loadFailed: "Não foi possível carregar as funções.",
       builtInBadge: "Predefinida",
       userCountBadge: "{count} usuário(s)",
       editRoleTitle: "Editar função",
@@ -4685,12 +5119,17 @@ export const ptBR: TranslationKeys = {
         users: "Usuários",
         teams: "Equipes",
         system: "Sistema",
+        enterpriseAdmin: "Administração empresarial",
       },
+      nameInvalid:
+        "O nome da função deve ter de 2 a 30 caracteres e usar apenas a-z, 0-9, hifens e sublinhados",
+      permissionsRequired: "Escolha pelo menos uma permissão",
     },
     auditLog: {
       heading: "Registro de auditoria",
       allActionsFilter: "Todas as ações",
       emptyState: "Nenhuma entrada no registro de auditoria.",
+      loadFailed: "Não foi possível carregar o registro de auditoria.",
       tableHeaderTime: "Hora",
       tableHeaderUser: "Usuário",
       tableHeaderAction: "Ação",
@@ -4733,6 +5172,7 @@ export const ptBR: TranslationKeys = {
       teamColumn: "Equipe",
       storageColumn: "Armazenamento",
       usersColumn: "Usuários",
+      loadFailed: "Falha ao carregar os dados de uso.",
     },
     apiKeys: {
       heading: "Chaves API",
@@ -4742,6 +5182,7 @@ export const ptBR: TranslationKeys = {
       removeScopingLabel: "Remover restrição de permissões",
       restrictPermissionsLabel: "Restringir permissões (opcional)",
       expiresLabel: "Expira:",
+      expiresInPast: "A data de expiração deve estar no futuro.",
       clearButton: "Limpar",
       copyTitle: "Copiar",
       keyWarning: "Guarde esta chave em local seguro. Ela não será exibida novamente.",
@@ -4752,6 +5193,7 @@ export const ptBR: TranslationKeys = {
       deleteKeyTitle: "Excluir chave",
       deleteConfirm: "Excluir esta chave API? As integrações que a utilizam deixarão de funcionar.",
       emptyState: "Nenhuma chave API ainda. Gere uma para começar.",
+      loadFailed: "Não foi possível carregar as chaves API.",
     },
     tools: {
       heading: "Ferramentas",
@@ -4796,6 +5238,8 @@ export const ptBR: TranslationKeys = {
       description: "Gerencie pacotes de modelos de IA para processamento avançado de arquivos.",
       installAll: "Instalar tudo",
       diskUsage: "Uso do disco: {size}",
+      statusStale:
+        "Não foi possível atualizar o status dos pacotes. A lista abaixo pode estar desatualizada.",
       sizeOnDisk: "{size} em disco",
       installed: "Instalado",
       notInstalled: "Não instalado",
@@ -4826,6 +5270,9 @@ export const ptBR: TranslationKeys = {
       resetFailed: "Falha ao redefinir: {error}",
       resetVenvKept:
         "O ambiente Python compartilhado foi mantido: esta instalação não tem uma base incluída para reconstruí-lo. Os modelos, o cache de download e os registros de instalação foram apagados. Recrie esse ambiente você mesmo se o problema for um pacote desatualizado nele.",
+      importBusy:
+        "Outra instalação ou importação já está em andamento. Tente novamente quando terminar.",
+      importNoSpace: "O servidor não tem espaço em disco suficiente para este pacote.",
     },
     about: {
       heading: "Sobre",
@@ -4845,6 +5292,9 @@ export const ptBR: TranslationKeys = {
   auth: {
     login: "Entrar",
     logout: "Sair",
+    logoutFailed: "Não foi possível sair. Tente novamente.",
+    idpLogoutFailed:
+      "Você saiu do SnapOtter, mas sua sessão no provedor de SSO ainda pode estar aberta. Saia de lá também.",
     username: "Nome de usuário",
     password: "Senha",
     loginButton: "Entrar",
@@ -4875,11 +5325,23 @@ export const ptBR: TranslationKeys = {
     verify: "Verificar",
     verifying: "Verificando...",
     mfaInvalidCode: "Código inválido. Tente novamente.",
+    mfaAttemptsExhausted: "Muitos códigos inválidos. Faça login novamente.",
+    mfaEnrollmentAttemptsExhausted:
+      "Muitos códigos inválidos. Faça login novamente para obter um novo QR code e novos códigos de recuperação; os exibidos antes não vão funcionar.",
+    mfaExpired: "Sua sessão de verificação expirou. Faça login novamente.",
+    mfaEnrollmentExpired:
+      "Sua sessão de configuração expirou. Faça login novamente para obter um novo QR code e novos códigos de recuperação; os exibidos antes não vão funcionar.",
+    mfaNotConfigured: "A autenticação de dois fatores não está configurada. Faça login novamente.",
+    mfaAlreadyEnabled: "A autenticação de dois fatores já está ativada. Faça login novamente.",
+    mfaUnreadable:
+      "O servidor não consegue ler seus dados de autenticação de dois fatores. Entre em contato com um administrador.",
     mfaEnrollmentHeading: "Configure a autenticação de dois fatores para continuar",
     mfaEnrollmentRequired:
       "Sua organização exige autenticação multifator. Configure o MFA nas configurações da sua conta.",
     mfaPolicyUnavailable:
       "Não foi possível verificar a política de MFA. Tente novamente em instantes.",
+    accountDisabled: "Esta conta está desativada. Entre em contato com um administrador.",
+    ipNotAllowed: "Seu endereço IP não é permitido. Entre em contato com um administrador.",
     loginThrottled: "Muitas tentativas de login. Tente novamente em {minutes} minuto.",
     loginThrottledPlural: "Muitas tentativas de login. Tente novamente em {minutes} minutos.",
     loginThrottledUnknownWait: "Muitas tentativas de login. Aguarde antes de tentar novamente.",
@@ -4923,14 +5385,13 @@ export const ptBR: TranslationKeys = {
   },
   changePassword: {
     title: "Altere sua senha",
-    description:
-      "Você precisa definir uma nova senha antes de continuar. Sua senha deve ter pelo menos 8 caracteres com maiúsculas, minúsculas e um número.",
+    description: "Você precisa definir uma nova senha antes de continuar.",
     usernameLabel: "Nome de usuário",
     currentPasswordLabel: "Senha atual",
     currentPasswordPlaceholder: "Digite a senha atual",
     newPasswordLabel: "Nova senha",
     generateButton: "Gerar senha forte",
-    newPasswordPlaceholder: "Pelo menos 8 caracteres",
+    newPasswordPlaceholder: "Digite a nova senha",
     confirmPasswordLabel: "Confirmar nova senha",
     confirmPasswordPlaceholder: "Repita a nova senha",
     passwordsMismatch: "As senhas não coincidem",
@@ -4940,6 +5401,7 @@ export const ptBR: TranslationKeys = {
     changeButton: "Alterar senha",
     sidebarTitle: "Quase lá",
     sidebarDescription: "Defina uma senha forte para proteger sua conta e você estará pronto.",
+    sessionEnded: "Sua sessão terminou. Entre novamente para alterar sua senha.",
   },
   automate: {
     title: "Automatizar",
@@ -4949,6 +5411,15 @@ export const ptBR: TranslationKeys = {
     noSteps: "O arquivo Pipeline não tem passos",
     importFailed: "Falha na importação",
     couldNotRead: "Não foi possível ler o arquivo Pipeline",
+    importListRefreshFailed:
+      "Pipeline importado, mas a lista salva não foi atualizada. Recarregue a página para vê-lo.",
+    saveFailed: "Falha ao salvar o Pipeline",
+    deleteFailed: "Falha ao excluir o Pipeline",
+    loadFailed: "Não foi possível carregar os Pipelines salvos.",
+    saveListRefreshFailed:
+      "Pipeline salvo, mas a lista salva não foi atualizada. Recarregue a página para vê-lo.",
+    deleteListRefreshFailed:
+      "Pipeline excluído, mas a lista salva não foi atualizada. Recarregue a página para ver a alteração.",
     fileCount: "{count} arquivo",
     fileCountPlural: "{count} arquivos",
     importFromLibrary: "Importar da biblioteca",
@@ -5034,6 +5505,7 @@ export const ptBR: TranslationKeys = {
     fileCount: "{count} arquivos",
     fileCountSingular: "{count} arquivo",
     noFilesFound: "Nenhum arquivo encontrado",
+    loadFailed: "Não foi possível carregar seus arquivos.",
     selectFilePrompt: "Selecione um arquivo para ver os detalhes",
     openFile: "Abrir arquivo",
     selectFile: "Selecionar arquivo",
@@ -5052,6 +5524,7 @@ export const ptBR: TranslationKeys = {
     download: "Baixar",
     details: {
       previewFailedRetry: "Falha ao gerar a pré-visualização. Tente novamente.",
+      loadFailed: "Não foi possível carregar este arquivo.",
     },
   },
   dropzone: {
@@ -5071,6 +5544,8 @@ export const ptBR: TranslationKeys = {
     filesSelected: "{count} arquivos selecionados",
     dropToAdd: "Solte para adicionar arquivos",
     dropToReplace: "Solte para substituir arquivo",
+    ignoredWhileRunning:
+      "Há uma execução em andamento. Aguarde o término antes de adicionar arquivos.",
     reorderHint: "Arraste as miniaturas para reordenar, ou inverta a ordem, antes de executar.",
   },
   reviewPanel: {
@@ -5102,6 +5577,8 @@ export const ptBR: TranslationKeys = {
     lessThanMinute: "Menos de um minuto restante",
     oneMinuteLeft: "~1 minuto restante",
     minutesLeft: "~{mins} minutos restantes",
+    minutesLeftFew: "~{mins} minutos restantes",
+    minutesLeftTwo: "~{mins} minutos restantes",
     progressMessages: [
       "Quase lá... provavelmente...",
       "Coisas boas levam tempo...",
@@ -5178,6 +5655,59 @@ export const ptBR: TranslationKeys = {
     networkError: "Erro de rede. Verifique sua conexão.",
     invalidCredentials: "Nome de usuário ou senha inválidos",
     connectionError: "Erro de conexão",
+    fileTooLarge:
+      "Este arquivo é grande demais para ser enviado. Tente um arquivo menor ou peça ao administrador do servidor para aumentar o limite de envio.",
+    featureNotInstalledForTool:
+      '{tool} requer o recurso "{feature}". Ative-o em Configurações → Recursos de AI.',
+    featureNotInstalled:
+      'O recurso "{feature}" não está instalado. Ative-o em Configurações → Recursos de AI.',
+    featureIncompatible: 'O recurso "{feature}" não pode ser executado no hardware deste servidor.',
+    passwordTooShort: "A senha deve ter pelo menos {minLength} caracteres.",
+    passwordNeedsUppercase: "A senha deve conter uma letra maiúscula.",
+    passwordNeedsLowercase: "A senha deve conter uma letra minúscula.",
+    passwordNeedsDigit: "A senha deve conter um número.",
+    passwordNeedsSpecial: "A senha deve conter um caractere especial.",
+    passwordNoControlCharacters: "A senha não pode conter caracteres de controle.",
+    passwordTooLong: "A senha deve ter no máximo {maxLength} caracteres.",
+    passwordTooLongAdminReset:
+      "A senha é muito longa (máx. {maxLength} caracteres). Um administrador deve redefini-la.",
+    passwordNoInvalidCharacters: "A senha não pode conter caracteres inválidos.",
+    tooManyRequests: "Muitas tentativas. Aguarde um minuto e tente novamente.",
+    escalationDenied: "Isso exige mais acesso do que sua função tem.",
+    featureNotLicensed: "Isso requer uma licença empresarial.",
+    sessionEnded: "Sua sessão terminou. Entre novamente.",
+    forbidden: "Você não tem permissão para fazer isso.",
+    invalidSetting: "Valor inválido para {setting}.",
+    network: "Erro de rede",
+    invalidResponse: "Resposta inválida",
+    staleVersionReload: "O app foi atualizado. Recarregue a página e tente novamente.",
+    failedWithStatus: "Não foi possível concluir essa solicitação. Tente novamente.",
+    processingFailedWithStatus:
+      "Não foi possível processar este arquivo. Verifique se ele não está corrompido e tente novamente.",
+    processingFailedNoDetail: "Falha no processamento",
+    canceled: "Processamento cancelado",
+    jobTrackingFailed: "Algo deu errado ao acompanhar esta tarefa. Tente novamente.",
+    requestTimedOut: "A requisição expirou",
+    runInterrupted: "O processamento foi interrompido. Execute novamente.",
+    requestFailedWithStatus: "Não foi possível concluir essa solicitação. Tente novamente.",
+    invalidServerResponse: "Resposta inválida do servidor",
+    batchFailed: "Falha no processamento em lote",
+    batchFailedWithStatus:
+      "Não foi possível concluir o processamento em lote. Tente executá-lo novamente.",
+    allFilesFailed: "Falha ao processar todos os arquivos",
+    filesFailedSuffix_one: " (1 arquivo falhou)",
+    filesFailedSuffix_other: " ({count} arquivos falharam)",
+    uploadTimeout:
+      "O tempo limite do upload esgotou. Verifique sua conexão ou tente usar um arquivo menor.",
+    processingInterrupted:
+      "O processamento foi interrompido. Tente novamente quando se reconectar.",
+    processingInterruptedUnconfirmed:
+      "O processamento foi interrompido e o servidor nunca confirmou o trabalho. Tente novamente quando se reconectar.",
+    resultNoLongerAvailable:
+      "O resultado concluído não está mais disponível. Execute o trabalho novamente.",
+    batchDownloadFailed: "Não foi possível baixar o lote concluído. Atualize e tente novamente.",
+    fileNotFoundInBatch: "Arquivo não encontrado nos resultados do lote",
+    noFilesSelected: "Nenhum arquivo selecionado",
   },
   sidebar: {
     sponsor: "Apoie-nos",
@@ -5213,6 +5743,7 @@ export const ptBR: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Apoie o SnapOtter no GitHub Sponsors",
     skipToContent: "Pular para o conteúdo principal",
     openSidebar: "Abrir barra lateral",
@@ -5235,6 +5766,8 @@ export const ptBR: TranslationKeys = {
     imageControls: "Controles de visualização",
     zoomControls: "Controles de zoom",
     dragToReorder: "Arraste para reordenar",
+    resultResizedToFit: "Reduzida para caber no tamanho desejado",
+    resultMissedTarget: "Não atingiu o tamanho desejado",
     reverseOrder: "Inverter ordem",
     whiteBackground: "Fundo branco",
     blackBackground: "Fundo preto",
@@ -5317,11 +5850,47 @@ export const ptBR: TranslationKeys = {
       description: "Repare, colorize e amplie uma foto antiga ou danificada com IA.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Remoção de fundo",
+      description: "Remova o fundo de imagens com IA",
+    },
+    "face-detection": {
+      name: "Detecção de rostos",
+      description: "Detecte e desfoque rostos, corrija olhos vermelhos, corte inteligente",
+    },
+    "object-eraser-colorize": {
+      name: "Apagador de objetos e colorização",
+      description: "Apague objetos de fotos e colorize imagens em preto e branco",
+    },
+    "inpaint-hq": {
+      name: "Inpainting de alta qualidade",
+      description:
+        "Remoção de objetos baseada em difusão para objetos grandes, texturas detalhadas e fundos estruturados",
+    },
+    "upscale-enhance": {
+      name: "Ampliação e melhoria",
+      description: "Ampliação com IA, melhoria de rostos e remoção de ruído",
+    },
+    "photo-restoration": {
+      name: "Restauração de fotos",
+      description: "Restaure fotos antigas ou danificadas",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Extraia texto de imagens e PDFs",
+    },
+    transcription: {
+      name: "Transcrição",
+      description: "Fala para texto em áudio e vídeo (legendas)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importando...",
       importCount: "Importar ({count})",
       import: "Importar",
+      importFailed: "Não foi possível importar {failed} de {total} arquivos.",
     },
     metadataGrid: {
       noData: "Sem dados",
@@ -5334,6 +5903,19 @@ export const ptBR: TranslationKeys = {
     waveform: {
       play: "Reproduzir",
       pause: "Pausar",
+    },
+    languageNames: {
+      en: "Inglês",
+      de: "Alemão",
+      fr: "Francês",
+      es: "Espanhol",
+      zh: "Chinês",
+      ja: "Japonês",
+      ko: "Coreano",
+      ar: "Árabe",
+      id: "Indonésio",
+      th: "Tailandês",
+      vi: "Vietnamita",
     },
   },
   privacyPolicy: {

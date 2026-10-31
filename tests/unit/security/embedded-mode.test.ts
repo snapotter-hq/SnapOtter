@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -306,5 +306,249 @@ describe("embedded-lib.sh readiness gates", () => {
     bin.write(probe, `printf '%s' "$*" > "${args}"; echo PONG`);
     expect(bin.run(gate).status).toBe(0);
     expect(readFileSync(args, "utf8")).toBe(argv);
+  });
+});
+
+describe("embedded-lib.sh mark_snapotter_ready", () => {
+  let bin: ReturnType<typeof probeBin>;
+  beforeEach(() => {
+    bin = probeBin();
+  });
+  afterEach(() => {
+    rmSync(bin.dir, { recursive: true, force: true });
+  });
+
+  it("writes the readiness marker as soon as the local health endpoint responds", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const args = join(bin.dir, "curl.argv");
+    bin.write("curl", `printf '%s' "$*" > "${args}"; printf '{"status":"healthy"}'`);
+
+    const r = bin.run(`mark_snapotter_ready "${process.pid}"`, {
+      SNAPOTTER_READY_FILE: marker,
+    });
+
+    expect(r.status).toBe(0);
+    expect(existsSync(marker)).toBe(true);
+    expect(readFileSync(args, "utf8")).toBe(
+      "--noproxy * -sf --max-time 2 http://127.0.0.1:1349/api/v1/health",
+    );
+  });
+
+  it("honors a custom PORT and keeps polling while the API is still booting", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const calls = join(bin.dir, "curl.calls");
+    const args = join(bin.dir, "curl.argv");
+    bin.write(
+      "curl",
+      `printf '%s' "$*" > "${args}"\nif [ -f "${calls}" ]; then printf '{"status":"healthy"}'; exit 0; fi\n: > "${calls}"\nexit 7`,
+    );
+
+    const r = bin.run(`mark_snapotter_ready "${process.pid}"`, {
+      PORT: "4321",
+      SNAPOTTER_READY_FILE: marker,
+    });
+
+    expect(r.status).toBe(0);
+    expect(existsSync(marker)).toBe(true);
+    expect(bin.sleepCalls()).toBe(1);
+    expect(readFileSync(args, "utf8")).toBe(
+      "--noproxy * -sf --max-time 2 http://127.0.0.1:4321/api/v1/health",
+    );
+  });
+
+  it("keeps waiting when the endpoint responds 200 without a healthy status payload", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const calls = join(bin.dir, "curl.calls");
+    bin.write(
+      "curl",
+      `if [ -f "${calls}" ]; then printf '{"status":"healthy"}'; exit 0; fi\n: > "${calls}"\nprintf '{"status":"starting"}'`,
+    );
+
+    const r = bin.run(`mark_snapotter_ready "${process.pid}"`, {
+      SNAPOTTER_READY_FILE: marker,
+    });
+
+    expect(r.status).toBe(0);
+    expect(existsSync(marker)).toBe(true);
+    expect(bin.sleepCalls()).toBe(1);
+  });
+
+  it("exits without creating the marker when the API process dies before becoming healthy", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const pidFile = join(bin.dir, "api.pid");
+    bin.write("curl", `kill "$(cat "${pidFile}")" 2>/dev/null || true; exit 7`);
+
+    const r = bin.run(
+      `/bin/sleep 30 &\npid=$!\nprintf '%s' "$pid" > "${pidFile}"\nmark_snapotter_ready "$pid"`,
+      {
+        SNAPOTTER_READY_FILE: marker,
+      },
+    );
+
+    expect(r.status).toBe(1);
+    expect(existsSync(marker)).toBe(false);
+    expect(bin.sleepCalls()).toBe(1);
+  });
+
+  it("warns and returns non-zero when the readiness marker path cannot be written", () => {
+    const marker = join(bin.dir, "missing-dir", "snapotter-ready");
+    bin.write("curl", `printf '{"status":"healthy"}'`);
+
+    const r = bin.run(`mark_snapotter_ready "${process.pid}"`, {
+      SNAPOTTER_READY_FILE: marker,
+    });
+
+    expect(r.status).toBe(1);
+    expect(existsSync(marker)).toBe(false);
+    expect(r.stderr).toContain("WARNING: mark_snapotter_ready could not write");
+  });
+
+  it("returns immediately without probing when the marker already exists", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const called = join(bin.dir, "curl.called");
+    writeFileSync(marker, "");
+    bin.write("curl", `: > "${called}"; printf '{"status":"healthy"}'`);
+
+    const r = bin.run(`mark_snapotter_ready "${process.pid}"`, {
+      SNAPOTTER_READY_FILE: marker,
+    });
+
+    expect(r.status).toBe(0);
+    expect(existsSync(called)).toBe(false);
+  });
+
+  it("refuses to poll when given an empty PID", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    bin.write("curl", `printf '{"status":"healthy"}'`);
+
+    const r = bin.run('mark_snapotter_ready ""', {
+      SNAPOTTER_READY_FILE: marker,
+    });
+
+    expect(r.status).toBe(1);
+    expect(existsSync(marker)).toBe(false);
+  });
+});
+
+describe("embedded-lib.sh snapotter_finish", () => {
+  let bin: ReturnType<typeof probeBin>;
+  beforeEach(() => {
+    bin = probeBin();
+  });
+  afterEach(() => {
+    rmSync(bin.dir, { recursive: true, force: true });
+  });
+
+  it("halts the container with the API exit code when the first start fails before becoming ready (#2267)", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const exitfile = join(bin.dir, "exitcode");
+    const halted = join(bin.dir, "halted");
+    const haltBin = join(bin.dir, "halt");
+    bin.write("halt", `: > "${halted}"`);
+
+    const r = bin.run("snapotter_finish 1 0", {
+      SNAPOTTER_READY_FILE: marker,
+      S6_EXITCODE_FILE: exitfile,
+      S6_HALT_BIN: haltBin,
+    });
+
+    // 125 tells s6-supervise not to respawn the service while s6-linux-init
+    // tears the supervision tree down.
+    expect(r.status).toBe(125);
+    expect(readFileSync(exitfile, "utf8")).toBe("1\n");
+    expect(existsSync(halted)).toBe(true);
+  });
+
+  it("propagates other non-zero startup exit codes (1..255) to the container exitcode file", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const exitfile = join(bin.dir, "exitcode");
+    const halted = join(bin.dir, "halted");
+    const haltBin = join(bin.dir, "halt");
+    bin.write("halt", `: > "${halted}"`);
+
+    const r = bin.run("snapotter_finish 9 0", {
+      SNAPOTTER_READY_FILE: marker,
+      S6_EXITCODE_FILE: exitfile,
+      S6_HALT_BIN: haltBin,
+    });
+
+    expect(r.status).toBe(125);
+    expect(readFileSync(exitfile, "utf8")).toBe("9\n");
+    expect(existsSync(halted)).toBe(true);
+  });
+
+  it("logs a fatal diagnostic and avoids permanently downing the service when halt fails", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const exitfile = join(bin.dir, "exitcode");
+    const haltBin = join(bin.dir, "halt");
+    bin.write("halt", "exit 1");
+
+    const r = bin.run("snapotter_finish 1 0", {
+      SNAPOTTER_READY_FILE: marker,
+      S6_EXITCODE_FILE: exitfile,
+      S6_HALT_BIN: haltBin,
+    });
+
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("FATAL: snapotter_finish failed to halt container");
+  });
+
+  it("logs a fatal diagnostic when the container exitcode file cannot be written", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const exitfile = join(bin.dir, "missing-dir", "exitcode");
+    const halted = join(bin.dir, "halted");
+    const haltBin = join(bin.dir, "halt");
+    bin.write("halt", `: > "${halted}"`);
+
+    const r = bin.run("snapotter_finish 1 0", {
+      SNAPOTTER_READY_FILE: marker,
+      S6_EXITCODE_FILE: exitfile,
+      S6_HALT_BIN: haltBin,
+    });
+
+    expect(r.status).toBe(125);
+    expect(r.stderr).toContain("FATAL: snapotter_finish could not write exit code 1");
+    expect(existsSync(halted)).toBe(true);
+  });
+
+  it("leaves crashes after a successful boot to normal s6 restart supervision", () => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const exitfile = join(bin.dir, "exitcode");
+    const halted = join(bin.dir, "halted");
+    const haltBin = join(bin.dir, "halt");
+    writeFileSync(marker, "");
+    bin.write("halt", `: > "${halted}"`);
+
+    const r = bin.run("snapotter_finish 1 0", {
+      SNAPOTTER_READY_FILE: marker,
+      S6_EXITCODE_FILE: exitfile,
+      S6_HALT_BIN: haltBin,
+    });
+
+    expect(r.status).toBe(0);
+    expect(existsSync(exitfile)).toBe(false);
+    expect(existsSync(halted)).toBe(false);
+  });
+
+  it.each([
+    ["a clean exit (0)", "0 0"],
+    ["a signal termination (256)", "256 15"],
+    ["a non-numeric exit code", "invalid 0"],
+  ])("does not halt on %s even before the readiness marker exists", (_label, args) => {
+    const marker = join(bin.dir, "snapotter-ready");
+    const exitfile = join(bin.dir, "exitcode");
+    const halted = join(bin.dir, "halted");
+    const haltBin = join(bin.dir, "halt");
+    bin.write("halt", `: > "${halted}"`);
+
+    const r = bin.run(`snapotter_finish ${args}`, {
+      SNAPOTTER_READY_FILE: marker,
+      S6_EXITCODE_FILE: exitfile,
+      S6_HALT_BIN: haltBin,
+    });
+
+    expect(r.status).toBe(0);
+    expect(existsSync(exitfile)).toBe(false);
+    expect(existsSync(halted)).toBe(false);
   });
 });

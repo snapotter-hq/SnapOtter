@@ -1,138 +1,300 @@
 /**
- * Unit tests for user file routes helper functions and serialization logic.
+ * Unit tests for user file routes helper functions and route handler logic.
  *
- * Tests the formatToMime, extToMime, and serializeFile helpers that are
- * used throughout the user-files route handlers.
+ * Tests the extToMime, unverifiedMime, measuredDimensions, serializeFile, and
+ * deleteFilesSchema helpers and the GET /api/v1/files, DELETE /api/v1/files,
+ * and POST /api/v1/files/save-result handlers from user-files.ts.
  */
-import { describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
+import { gzipSync } from "node:zlib";
+import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
+import sharp from "sharp";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
 
+const mocks = vi.hoisted(() => ({
+  likeSpy: vi.fn(),
+  limitSpy: vi.fn(),
+  offsetSpy: vi.fn(),
+  executeSpy: vi.fn<(_q: unknown) => Promise<{ rows: unknown[] }>>(() =>
+    Promise.resolve({ rows: [] }),
+  ),
+  deleteWhereSpy: vi.fn(() => Promise.resolve()),
+  parentRows: [] as unknown[],
+  txParentRows: null as unknown[] | null,
+  txParentWhereSpy: vi.fn(),
+  txParentForSpy: vi.fn(),
+  deleteParentDuringSave: false,
+  insertedValues: undefined as Record<string, unknown> | undefined,
+  deleteStoredFile: vi.fn<(_name: string) => Promise<void>>(() => Promise.resolve()),
+  getCachedThumbnail: vi.fn<() => Promise<Buffer | null>>(() => Promise.resolve(null)),
+  isStorageServiceFault: vi.fn<(_e: unknown) => boolean>(() => false),
+  saveFile: vi.fn<(_buf: Buffer, _name: string) => Promise<string>>(() =>
+    Promise.resolve("stored-result.png"),
+  ),
+  saveThumbnail: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+  readStoredFile: vi.fn<() => Promise<Buffer>>(() => Promise.resolve(Buffer.alloc(0))),
+  streamStoredFile: vi.fn<() => Promise<Readable>>(() =>
+    Promise.resolve(Readable.from([Buffer.from("bytes")])),
+  ),
+  videoPosterPreview: vi.fn<() => Promise<Buffer | null>>(() =>
+    Promise.resolve(Buffer.from("webp-poster")),
+  ),
+  pdfFirstPagePreview: vi.fn<() => Promise<Buffer | null>>(() =>
+    Promise.resolve(Buffer.from("png-page")),
+  ),
+  quotaRefusal: vi.fn(() => Promise.resolve(null)),
+  requireFileAccess: vi.fn(() =>
+    Promise.resolve({ id: "user-1", username: "alice", role: "admin" }),
+  ),
+  hasEffectivePermission: vi.fn(() => Promise.resolve(true)),
+  auditFn: vi.fn(() => Promise.resolve()),
+  validateImageBuffer: vi.fn<
+    (
+      _buf: Buffer,
+      _filename?: string,
+    ) => Promise<{
+      valid: true;
+      format: string;
+      width: number;
+      height: number;
+      nameOnly?: true;
+    }>
+  >(() => Promise.resolve({ valid: true as const, format: "png", width: 800, height: 600 })),
+}));
+
+vi.mock("drizzle-orm", () => ({
+  and: (...conds: unknown[]) => ({ op: "and", conds }),
+  desc: (col: unknown) => ({ op: "desc", col }),
+  eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+  inArray: (col: unknown, vals: unknown) => ({ op: "inArray", col, vals }),
+  like: (col: unknown, pattern: string) => {
+    mocks.likeSpy(col, pattern);
+    return { op: "like", col, pattern };
+  },
+  sql: Object.assign((strings: TemplateStringsArray) => strings.join("?"), {
+    join: () => "sql-join",
+  }),
+}));
+
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
-    select: () => ({
+    select: (fields?: unknown) => ({
       from: () => ({
-        where: () => ({ get: () => null, all: () => [] }),
-        all: () => [],
+        where: () => {
+          if (fields && typeof fields === "object" && "count" in fields) {
+            return Promise.resolve([{ count: 0 }]);
+          }
+          const orderChain = {
+            orderBy: () => ({
+              limit: (n: number) => {
+                mocks.limitSpy(n);
+                return {
+                  offset: (o: number) => {
+                    mocks.offsetSpy(o);
+                    return Promise.resolve([]);
+                  },
+                };
+              },
+            }),
+            // Thenable so `await db.select().from().where()` resolves to parentRows
+            // biome-ignore lint/suspicious/noThenProperty: mock Drizzle query builder promise chain
+            then: (resolve: (v: unknown) => unknown) =>
+              Promise.resolve(mocks.parentRows).then(resolve),
+          };
+          return orderChain;
+        },
       }),
     }),
-    insert: () => ({ values: () => ({ run: vi.fn() }) }),
-    delete: () => ({ where: () => ({ run: vi.fn() }) }),
+    execute: (q: unknown) => mocks.executeSpy(q),
+    delete: () => ({
+      where: mocks.deleteWhereSpy,
+    }),
+    update: () => ({
+      set: () => ({
+        where: () => Promise.resolve(),
+      }),
+    }),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        select: () => ({
+          from: () => ({
+            where: (cond: unknown) => {
+              mocks.txParentWhereSpy(cond);
+              return {
+                limit: () => ({
+                  for: async (mode: unknown) => {
+                    mocks.txParentForSpy(mode);
+                    return mocks.txParentRows ?? mocks.parentRows;
+                  },
+                }),
+              };
+            },
+          }),
+        }),
+        insert: () => ({
+          values: (vals: Record<string, unknown> | Array<Record<string, unknown>>) => {
+            mocks.insertedValues = Array.isArray(vals) ? vals[0] : vals;
+            const rows = (Array.isArray(vals) ? vals : [vals]).map((v) => ({
+              ...v,
+              createdAt: new Date("2025-06-01T12:00:00Z"),
+            }));
+            return {
+              returning: () => Promise.resolve(rows),
+            };
+          },
+        }),
+        update: () => ({
+          set: () => ({
+            where: () => Promise.resolve(),
+          }),
+        }),
+      };
+      return fn(tx);
+    },
   },
   pool: {},
   closeDb: async () => {},
   schema: {
-    userFiles: { id: {}, userId: {}, parentId: {}, createdAt: {}, originalName: {} },
+    userFiles: {
+      id: "id",
+      userId: "user_id",
+      parentId: "parent_id",
+      createdAt: "created_at",
+      originalName: "original_name",
+    },
+    users: { id: "id", storageUsed: "storage_used" },
   },
 }));
 
-// ── Reproduce helper functions from user-files.ts ──────────────────────
+vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
+  deleteStoredFile: mocks.deleteStoredFile,
+  getCachedThumbnail: mocks.getCachedThumbnail,
+  isStorageServiceFault: mocks.isStorageServiceFault,
+  readStoredFile: mocks.readStoredFile,
+  saveFile: mocks.saveFile,
+  saveThumbnail: mocks.saveThumbnail,
+  streamStoredFile: mocks.streamStoredFile,
+}));
 
-function formatToMime(format: string): string {
-  const map: Record<string, string> = {
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    avif: "image/avif",
-  };
-  return map[format] ?? "application/octet-stream";
-}
-
-function extToMime(ext: string): string {
-  const clean = ext.toLowerCase().replace(/^\./, "");
-  const map: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    tif: "image/tiff",
-    avif: "image/avif",
-  };
-  return map[clean] ?? "application/octet-stream";
-}
-
-interface UserFileRow {
-  id: string;
-  originalName: string;
-  mimeType: string;
-  size: number;
-  width: number | null;
-  height: number | null;
-  version: number;
-  parentId: string | null;
-  toolChain: string | null;
-  createdAt: Date;
-}
-
-function serializeFile(row: UserFileRow) {
+vi.mock("../../../apps/api/src/modality/preview.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/modality/preview.js")>();
   return {
-    id: row.id,
-    originalName: row.originalName,
-    mimeType: row.mimeType,
-    size: row.size,
-    width: row.width,
-    height: row.height,
-    version: row.version,
-    parentId: row.parentId,
-    toolChain: row.toolChain ? JSON.parse(row.toolChain) : [],
-    createdAt: row.createdAt.toISOString(),
+    ...actual,
+    videoPosterPreview: mocks.videoPosterPreview,
+    pdfFirstPagePreview: mocks.pdfFirstPagePreview,
   };
-}
+});
 
-// Reproduce the bulk delete validation logic
-function validateDeleteBody(body: unknown): { success: boolean; ids?: string[] } {
-  if (typeof body !== "object" || body === null) return { success: false };
-  const obj = body as Record<string, unknown>;
-  if (!Array.isArray(obj.ids)) return { success: false };
-  if (obj.ids.length === 0) return { success: false };
-  if (!obj.ids.every((id: unknown) => typeof id === "string")) return { success: false };
-  return { success: true, ids: obj.ids as string[] };
-}
+vi.mock("../../../apps/api/src/lib/quota.js", () => ({
+  quotaRefusal: mocks.quotaRefusal,
+}));
+
+vi.mock("../../../apps/api/src/permissions.js", () => ({
+  hasEffectivePermission: mocks.hasEffectivePermission,
+  requireFileAccess: mocks.requireFileAccess,
+}));
+
+vi.mock("../../../apps/api/src/lib/library-cleanup.js", () => ({
+  deleteLibraryFileStorage: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("../../../apps/api/src/lib/audit.js", () => ({
+  auditFromRequest: () => mocks.auditFn,
+}));
+
+vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/file-validation.js")>();
+  return {
+    ...actual,
+    validateImageBuffer: mocks.validateImageBuffer,
+  };
+});
+
+import type { schema } from "../../../apps/api/src/db/index.js";
+import {
+  deleteFilesSchema,
+  extToMime,
+  measuredDimensions,
+  serializeFile,
+  thumbnailContentType,
+  unverifiedMime,
+  userFileRoutes,
+} from "../../../apps/api/src/routes/user-files.js";
+
+type UserFileRow = typeof schema.userFiles.$inferSelect;
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
 describe("user files route logic", () => {
-  describe("formatToMime", () => {
-    it("maps jpeg to image/jpeg", () => {
-      expect(formatToMime("jpeg")).toBe("image/jpeg");
+  describe("unverifiedMime", () => {
+    it("downgrades unverified image/* claims to application/octet-stream", () => {
+      expect(unverifiedMime("image/png")).toBe("application/octet-stream");
+      expect(unverifiedMime("image/jpeg")).toBe("application/octet-stream");
+      expect(unverifiedMime("image/svg+xml")).toBe("application/octet-stream");
     });
 
-    it("maps png to image/png", () => {
-      expect(formatToMime("png")).toBe("image/png");
+    it("preserves non-image MIME types", () => {
+      expect(unverifiedMime("application/pdf")).toBe("application/pdf");
+      expect(unverifiedMime("video/mp4")).toBe("video/mp4");
+      expect(unverifiedMime("audio/mpeg")).toBe("audio/mpeg");
+      expect(unverifiedMime("text/plain")).toBe("text/plain");
+      expect(unverifiedMime("application/octet-stream")).toBe("application/octet-stream");
+    });
+  });
+
+  describe("thumbnailContentType (#2824)", () => {
+    it("returns image/webp for video/* MIME types", () => {
+      expect(thumbnailContentType("video/mp4")).toBe("image/webp");
+      expect(thumbnailContentType("video/webm")).toBe("image/webp");
+      expect(thumbnailContentType("video/quicktime")).toBe("image/webp");
     });
 
-    it("maps webp to image/webp", () => {
-      expect(formatToMime("webp")).toBe("image/webp");
+    it("returns image/png for application/pdf", () => {
+      expect(thumbnailContentType("application/pdf")).toBe("image/png");
     });
 
-    it("maps gif to image/gif", () => {
-      expect(formatToMime("gif")).toBe("image/gif");
+    it("returns image/jpeg for image/* and other MIME types", () => {
+      expect(thumbnailContentType("image/png")).toBe("image/jpeg");
+      expect(thumbnailContentType("image/jpeg")).toBe("image/jpeg");
+      expect(thumbnailContentType("image/webp")).toBe("image/jpeg");
+      expect(thumbnailContentType("application/octet-stream")).toBe("image/jpeg");
+    });
+  });
+
+  describe("measuredDimensions", () => {
+    it("returns null dimensions when validation is null", () => {
+      expect(measuredDimensions(null)).toEqual({ width: null, height: null });
     });
 
-    it("maps bmp to image/bmp", () => {
-      expect(formatToMime("bmp")).toBe("image/bmp");
+    it("returns null dimensions when validation reports 0x0 (CLI-decoded formats)", () => {
+      expect(measuredDimensions({ valid: true, format: "heif", width: 0, height: 0 })).toEqual({
+        width: null,
+        height: null,
+      });
     });
 
-    it("maps tiff to image/tiff", () => {
-      expect(formatToMime("tiff")).toBe("image/tiff");
+    it("returns positive width and height when measured", () => {
+      expect(measuredDimensions({ valid: true, format: "png", width: 1920, height: 1080 })).toEqual(
+        {
+          width: 1920,
+          height: 1080,
+        },
+      );
     });
 
-    it("maps avif to image/avif", () => {
-      expect(formatToMime("avif")).toBe("image/avif");
-    });
-
-    it("returns application/octet-stream for unknown format", () => {
-      expect(formatToMime("raw")).toBe("application/octet-stream");
-    });
-
-    it("returns application/octet-stream for empty string", () => {
-      expect(formatToMime("")).toBe("application/octet-stream");
+    it("evaluates width and height independently when one axis is zero", () => {
+      expect(measuredDimensions({ valid: true, format: "png", width: 100, height: 0 })).toEqual({
+        width: 100,
+        height: null,
+      });
+      expect(measuredDimensions({ valid: true, format: "png", width: 0, height: 100 })).toEqual({
+        width: null,
+        height: 100,
+      });
     });
   });
 
@@ -157,6 +319,10 @@ describe("user files route logic", () => {
       expect(extToMime(".gif")).toBe("image/gif");
     });
 
+    it("maps .bmp to image/bmp", () => {
+      expect(extToMime(".bmp")).toBe("image/bmp");
+    });
+
     it("maps .tif to image/tiff", () => {
       expect(extToMime(".tif")).toBe("image/tiff");
     });
@@ -169,12 +335,86 @@ describe("user files route logic", () => {
       expect(extToMime(".avif")).toBe("image/avif");
     });
 
+    it("maps video extensions (.mp4, .webm, .mov, .mkv, .avi, .m4v, .ogv, .ts, ...)", () => {
+      expect(extToMime(".mp4")).toBe("video/mp4");
+      expect(extToMime(".m4v")).toBe("video/mp4");
+      expect(extToMime(".webm")).toBe("video/webm");
+      expect(extToMime(".mov")).toBe("video/quicktime");
+      expect(extToMime(".mkv")).toBe("video/x-matroska");
+      expect(extToMime(".avi")).toBe("video/x-msvideo");
+      expect(extToMime(".3gp")).toBe("video/3gpp");
+      expect(extToMime(".flv")).toBe("video/x-flv");
+      expect(extToMime(".wmv")).toBe("video/x-ms-wmv");
+      expect(extToMime(".mpg")).toBe("video/mpeg");
+      expect(extToMime(".mpeg")).toBe("video/mpeg");
+      expect(extToMime(".ts")).toBe("video/mp2t");
+      expect(extToMime(".mts")).toBe("video/mp2t");
+      expect(extToMime(".m2ts")).toBe("video/mp2t");
+      expect(extToMime(".ogv")).toBe("video/ogg");
+    });
+
+    it("maps audio extensions (.mp3, .wav, .flac, .ogg, .aac, .m4a, .opus, .aiff, .wma, ...)", () => {
+      expect(extToMime(".mp3")).toBe("audio/mpeg");
+      expect(extToMime(".wav")).toBe("audio/wav");
+      expect(extToMime(".flac")).toBe("audio/flac");
+      expect(extToMime(".ogg")).toBe("audio/ogg");
+      expect(extToMime(".aac")).toBe("audio/aac");
+      expect(extToMime(".m4a")).toBe("audio/mp4");
+      expect(extToMime(".opus")).toBe("audio/opus");
+      expect(extToMime(".wma")).toBe("audio/x-ms-wma");
+      expect(extToMime(".aiff")).toBe("audio/aiff");
+      expect(extToMime(".amr")).toBe("audio/amr");
+      expect(extToMime(".ac3")).toBe("audio/ac3");
+    });
+
+    it("maps document, text, data, archive, and subtitle extensions (#3215)", () => {
+      expect(extToMime(".pdf")).toBe("application/pdf");
+      expect(extToMime(".epub")).toBe("application/epub+zip");
+      expect(extToMime(".docx")).toBe(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      );
+      expect(extToMime(".odt")).toBe("application/vnd.oasis.opendocument.text");
+      expect(extToMime(".rtf")).toBe("application/rtf");
+      expect(extToMime(".pptx")).toBe(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      );
+      expect(extToMime(".odp")).toBe("application/vnd.oasis.opendocument.presentation");
+      expect(extToMime(".xlsx")).toBe(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      expect(extToMime(".ods")).toBe("application/vnd.oasis.opendocument.spreadsheet");
+      expect(extToMime(".html")).toBe("text/html");
+      expect(extToMime(".htm")).toBe("text/html");
+      expect(extToMime(".md")).toBe("text/markdown");
+      expect(extToMime(".markdown")).toBe("text/markdown");
+      expect(extToMime(".txt")).toBe("text/plain");
+      expect(extToMime(".csv")).toBe("text/csv");
+      expect(extToMime(".tsv")).toBe("text/tab-separated-values");
+      expect(extToMime(".json")).toBe("application/json");
+      expect(extToMime(".xml")).toBe("application/xml");
+      expect(extToMime(".yaml")).toBe("application/yaml");
+      expect(extToMime(".yml")).toBe("application/yaml");
+      expect(extToMime(".zip")).toBe("application/zip");
+      expect(extToMime(".srt")).toBe("application/x-subrip");
+      expect(extToMime(".vtt")).toBe("text/vtt");
+    });
+
+    it.each(Object.entries(IMAGE_EXT_TO_MIME))(
+      "maps IMAGE_EXT_TO_MIME entry .%s to %s (#3215)",
+      (ext, mime) => {
+        expect(extToMime(`.${ext}`)).toBe(mime);
+        expect(extToMime(ext)).toBe(mime);
+      },
+    );
+
     it("handles uppercase extensions", () => {
       expect(extToMime(".JPG")).toBe("image/jpeg");
+      expect(extToMime(".MP4")).toBe("video/mp4");
     });
 
     it("handles extension without leading dot", () => {
       expect(extToMime("png")).toBe("image/png");
+      expect(extToMime("pdf")).toBe("application/pdf");
     });
 
     it("returns application/octet-stream for unknown extension", () => {
@@ -183,10 +423,12 @@ describe("user files route logic", () => {
   });
 
   describe("serializeFile", () => {
-    it("serializes a complete file row", () => {
+    it("serializes a complete file row and omits internal storage columns", () => {
       const row: UserFileRow = {
         id: "file-1",
+        userId: "user-1",
         originalName: "photo.jpg",
+        storedName: "stored-file-1.jpg",
         mimeType: "image/jpeg",
         size: 12345,
         width: 800,
@@ -198,29 +440,35 @@ describe("user files route logic", () => {
       };
 
       const result = serializeFile(row);
-      expect(result.id).toBe("file-1");
-      expect(result.originalName).toBe("photo.jpg");
-      expect(result.mimeType).toBe("image/jpeg");
-      expect(result.size).toBe(12345);
-      expect(result.width).toBe(800);
-      expect(result.height).toBe(600);
-      expect(result.version).toBe(1);
-      expect(result.parentId).toBeNull();
-      expect(result.toolChain).toEqual([]);
-      expect(result.createdAt).toBe("2025-06-01T12:00:00.000Z");
+      expect(result).toEqual({
+        id: "file-1",
+        originalName: "photo.jpg",
+        mimeType: "image/jpeg",
+        size: 12345,
+        width: 800,
+        height: 600,
+        version: 1,
+        parentId: null,
+        toolChain: [],
+        createdAt: "2025-06-01T12:00:00.000Z",
+      });
+      expect(result).not.toHaveProperty("userId");
+      expect(result).not.toHaveProperty("storedName");
     });
 
-    it("parses toolChain JSON when present", () => {
+    it("preserves toolChain string array from jsonb column when present", () => {
       const row: UserFileRow = {
         id: "file-2",
+        userId: "user-1",
         originalName: "edited.png",
+        storedName: "stored-file-2.png",
         mimeType: "image/png",
         size: 54321,
         width: 1920,
         height: 1080,
         version: 3,
         parentId: "file-1",
-        toolChain: JSON.stringify(["resize", "compress", "convert"]),
+        toolChain: ["resize", "compress", "convert"],
         createdAt: new Date("2025-06-15T08:30:00Z"),
       };
 
@@ -233,7 +481,9 @@ describe("user files route logic", () => {
     it("returns empty array for null toolChain", () => {
       const row: UserFileRow = {
         id: "file-3",
+        userId: "user-1",
         originalName: "upload.gif",
+        storedName: "stored-file-3.gif",
         mimeType: "image/gif",
         size: 999,
         width: null,
@@ -251,7 +501,9 @@ describe("user files route logic", () => {
     it("preserves null width and height", () => {
       const row: UserFileRow = {
         id: "file-4",
+        userId: null,
         originalName: "unknown.bin",
+        storedName: "stored-file-4.bin",
         mimeType: "application/octet-stream",
         size: 100,
         width: null,
@@ -270,126 +522,2848 @@ describe("user files route logic", () => {
 
   describe("delete schema validation", () => {
     it("accepts valid ids array", () => {
-      const result = validateDeleteBody({ ids: ["id-1", "id-2"] });
+      const result = deleteFilesSchema.safeParse({ ids: ["id-1", "id-2"] });
       expect(result.success).toBe(true);
     });
 
     it("rejects empty ids array", () => {
-      const result = validateDeleteBody({ ids: [] });
+      const result = deleteFilesSchema.safeParse({ ids: [] });
       expect(result.success).toBe(false);
     });
 
     it("rejects missing ids field", () => {
-      const result = validateDeleteBody({});
+      const result = deleteFilesSchema.safeParse({});
       expect(result.success).toBe(false);
     });
 
     it("rejects non-array ids", () => {
-      const result = validateDeleteBody({ ids: "single-id" });
+      const result = deleteFilesSchema.safeParse({ ids: "single-id" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects non-string elements in ids array", () => {
+      const result = deleteFilesSchema.safeParse({ ids: [123] });
       expect(result.success).toBe(false);
     });
 
     it("accepts single id", () => {
-      const result = validateDeleteBody({ ids: ["only-one"] });
+      const result = deleteFilesSchema.safeParse({ ids: ["only-one"] });
       expect(result.success).toBe(true);
     });
   });
 
-  describe("pagination parsing", () => {
-    it("defaults to limit 50 and offset 0", () => {
-      const limit = parseInt("" || "50", 10) || 50;
-      const offset = parseInt("" || "0", 10) || 0;
-      expect(limit).toBe(50);
-      expect(offset).toBe(0);
+  describe("route handler behavior", () => {
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let listHandler: RouteHandler;
+    let detailHandler: RouteHandler;
+    let deleteHandler: RouteHandler;
+    let uploadHandler: RouteHandler;
+    let saveResultHandler: RouteHandler;
+    let downloadHandler: RouteHandler;
+    let thumbnailHandler: RouteHandler;
+
+    beforeAll(async () => {
+      const fakeApp = {
+        get: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/files") listHandler = handler;
+          if (path === "/api/v1/files/:id") detailHandler = handler;
+          if (path === "/api/v1/files/:id/download") downloadHandler = handler;
+          if (path === "/api/v1/files/:id/thumbnail") thumbnailHandler = handler;
+        }),
+        post: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/files/upload") uploadHandler = handler;
+          if (path === "/api/v1/files/save-result") saveResultHandler = handler;
+        }),
+        delete: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/files") deleteHandler = handler;
+        }),
+        log: { info: vi.fn() },
+      };
+      await userFileRoutes(fakeApp as never);
     });
 
-    it("parses custom limit and offset", () => {
-      const limit = parseInt("25", 10) || 50;
-      const offset = parseInt("10", 10) || 0;
-      expect(limit).toBe(25);
-      expect(offset).toBe(10);
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mocks.parentRows = [];
+      mocks.txParentRows = null;
+      mocks.deleteParentDuringSave = false;
+      mocks.insertedValues = undefined;
+      mocks.requireFileAccess.mockResolvedValue({
+        id: "user-1",
+        username: "alice",
+        role: "admin",
+      });
+      mocks.hasEffectivePermission.mockResolvedValue(true);
+      mocks.quotaRefusal.mockResolvedValue(null);
+      mocks.deleteStoredFile.mockResolvedValue();
+      mocks.getCachedThumbnail.mockResolvedValue(null);
+      mocks.isStorageServiceFault.mockReturnValue(false);
+      mocks.saveFile.mockImplementation(async () => {
+        if (mocks.deleteParentDuringSave) {
+          mocks.txParentRows = [];
+        }
+        return "stored-result.png";
+      });
+      mocks.saveThumbnail.mockResolvedValue();
+      mocks.streamStoredFile.mockImplementation(async () => Readable.from([Buffer.from("bytes")]));
+      mocks.videoPosterPreview.mockResolvedValue(Buffer.from("webp-poster"));
+      mocks.pdfFirstPagePreview.mockResolvedValue(Buffer.from("png-page"));
+      mocks.validateImageBuffer.mockResolvedValue({
+        valid: true,
+        format: "png",
+        width: 800,
+        height: 600,
+      });
     });
 
-    it("falls back to defaults for non-numeric values", () => {
-      const limit = parseInt("abc", 10) || 50;
-      const offset = parseInt("xyz", 10) || 0;
-      expect(limit).toBe(50);
-      expect(offset).toBe(0);
-    });
-  });
+    function makeReply() {
+      const reply = {
+        statusCode: 200,
+        headers: {} as Record<string, string>,
+        payload: undefined as unknown,
+        status: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        header: vi.fn((name: string, value: string) => {
+          reply.headers[name.toLowerCase()] = value;
+          return reply;
+        }),
+        send: vi.fn((body: unknown) => {
+          reply.payload = body;
+          return reply;
+        }),
+      };
+      return reply;
+    }
 
-  describe("search escaping", () => {
-    it("escapes SQL LIKE wildcards", () => {
-      const search = "test%name_file\\special";
-      const escaped = search.replace(/[%_\\]/g, "\\$&");
-      expect(escaped).toBe("test\\%name\\_file\\\\special");
+    function makeSaveResultRequest(opts: {
+      filename: string;
+      parentId: string;
+      toolId?: string | null;
+      buffer?: Buffer;
+    }) {
+      const content = opts.buffer ?? Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+      return {
+        log: { warn: vi.fn(), error: vi.fn() },
+        parts: async function* () {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: opts.filename,
+            file: Readable.from([content]),
+          };
+          yield {
+            type: "field" as const,
+            fieldname: "parentId",
+            value: opts.parentId,
+          };
+          if (opts.toolId) {
+            yield {
+              type: "field" as const,
+              fieldname: "toolId",
+              value: opts.toolId,
+            };
+          }
+        },
+      };
+    }
+
+    describe("GET /api/v1/files pagination and search escaping", () => {
+      it("defaults to limit 50 and offset 0", async () => {
+        const reply = makeReply();
+        await listHandler({ query: {} }, reply);
+        expect(mocks.limitSpy).toHaveBeenCalledWith(50);
+        expect(mocks.offsetSpy).toHaveBeenCalledWith(0);
+        expect(reply.payload).toMatchObject({ limit: 50, offset: 0 });
+      });
+
+      it("parses custom limit and offset", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { limit: "25", offset: "10" } }, reply);
+        expect(mocks.limitSpy).toHaveBeenCalledWith(25);
+        expect(mocks.offsetSpy).toHaveBeenCalledWith(10);
+        expect(reply.payload).toMatchObject({ limit: 25, offset: 10 });
+      });
+
+      it("falls back to defaults for non-numeric or zero limit and offset", async () => {
+        const reply1 = makeReply();
+        await listHandler({ query: { limit: "abc", offset: "xyz" } }, reply1);
+        expect(mocks.limitSpy).toHaveBeenCalledWith(50);
+        expect(mocks.offsetSpy).toHaveBeenCalledWith(0);
+        expect(reply1.payload).toMatchObject({ limit: 50, offset: 0 });
+
+        const reply2 = makeReply();
+        await listHandler({ query: { limit: "0", offset: "0" } }, reply2);
+        expect(mocks.limitSpy).toHaveBeenLastCalledWith(50);
+        expect(mocks.offsetSpy).toHaveBeenLastCalledWith(0);
+      });
+
+      it("trims search and escapes SQL LIKE wildcards", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { search: "  test%name_file\\special  " } }, reply);
+        expect(mocks.likeSpy).toHaveBeenCalledWith(
+          "original_name",
+          "%test\\%name\\_file\\\\special%",
+        );
+      });
+
+      it("skips LIKE filter when search is whitespace-only", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { search: "   " } }, reply);
+        expect(mocks.likeSpy).not.toHaveBeenCalled();
+      });
+
+      it("passes unescaped normal search string wrapped in % wildcards", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { search: "normal-search" } }, reply);
+        expect(mocks.likeSpy).toHaveBeenCalledWith("original_name", "%normal-search%");
+      });
     });
 
-    it("does not modify strings without special characters", () => {
-      const search = "normal-search";
-      const escaped = search.replace(/[%_\\]/g, "\\$&");
-      expect(escaped).toBe("normal-search");
+    describe("DELETE /api/v1/files validation", () => {
+      it("returns 400 when ids is empty or missing", async () => {
+        const reply1 = makeReply();
+        await deleteHandler({ body: { ids: [] } }, reply1);
+        expect(reply1.statusCode).toBe(400);
+        expect(reply1.payload).toEqual({ error: "ids must be a non-empty array of strings" });
+
+        const reply2 = makeReply();
+        await deleteHandler({ body: {} }, reply2);
+        expect(reply2.statusCode).toBe(400);
+      });
+
+      it("seeds the delete CTE from ancestors whose parent row is NULL or missing (#2927)", async () => {
+        mocks.parentRows = [{ id: "orphan-v2", userId: "user-1" }];
+        mocks.executeSpy.mockResolvedValueOnce({
+          rows: [{ id: "orphan-v2", stored_name: "stored-v2.png", size: 256, user_id: "user-1" }],
+        });
+
+        const reply = makeReply();
+        await deleteHandler({ body: { ids: ["orphan-v2"] } }, reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.payload).toEqual({ deleted: 1 });
+        expect(mocks.auditFn).toHaveBeenCalledWith("FILE_DELETED", {
+          userId: "user-1",
+          username: "alice",
+          count: 1,
+          ids: ["orphan-v2"],
+        });
+        expect(mocks.executeSpy).toHaveBeenCalledTimes(1);
+        const queryText = String(mocks.executeSpy.mock.calls[0]?.[0] ?? "");
+        expect(queryText).toMatch(
+          /NOT EXISTS\s*\(\s*SELECT 1 FROM user_files p WHERE p\.id = a\.parent_id\s*\)/i,
+        );
+      });
+
+      it("audits FILE_DELETED with userId and username when no requested ids match (#3981)", async () => {
+        mocks.parentRows = [];
+        const reply = makeReply();
+        await deleteHandler({ body: { ids: ["missing-id"] } }, reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.payload).toEqual({ deleted: 0 });
+        expect(mocks.auditFn).toHaveBeenCalledWith("FILE_DELETED", {
+          userId: "user-1",
+          username: "alice",
+          count: 0,
+          ids: ["missing-id"],
+        });
+      });
     });
 
-    it("trims search string", () => {
-      const search = "  hello  ";
-      const trimmed = search.trim();
-      expect(trimmed).toBe("hello");
-    });
-  });
+    describe("GET /api/v1/files/:id version chain query (#2939)", () => {
+      it("seeds the version chain CTE from the top surviving ancestor when the root parent row is missing (#2939)", async () => {
+        const orphanRow: UserFileRow = {
+          id: "orphan-v2",
+          userId: "user-1",
+          originalName: "photo.png",
+          storedName: "stored-v2.png",
+          mimeType: "image/png",
+          size: 512,
+          width: 200,
+          height: 150,
+          version: 2,
+          parentId: "deleted-v1",
+          toolChain: ["resize"],
+          createdAt: new Date("2025-06-01T12:00:00Z"),
+        };
+        mocks.parentRows = [orphanRow];
+        mocks.executeSpy.mockResolvedValueOnce({
+          rows: [
+            {
+              id: "orphan-v2",
+              original_name: "photo.png",
+              mime_type: "image/png",
+              size: 512,
+              width: 200,
+              height: 150,
+              version: 2,
+              parent_id: "deleted-v1",
+              tool_chain: ["resize"],
+              created_at: new Date("2025-06-01T12:00:00Z"),
+            },
+          ],
+        });
 
-  describe("version chain logic", () => {
-    it("computes next version from parent", () => {
-      const parentVersion = 2;
-      const nextVersion = parentVersion + 1;
-      expect(nextVersion).toBe(3);
+        const reply = makeReply();
+        await detailHandler({ params: { id: "orphan-v2" } }, reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.payload).toMatchObject({
+          file: { id: "orphan-v2", version: 2, parentId: "deleted-v1" },
+          versions: [
+            {
+              id: "orphan-v2",
+              originalName: "photo.png",
+              mimeType: "image/png",
+              size: 512,
+              width: 200,
+              height: 150,
+              version: 2,
+              parentId: "deleted-v1",
+              toolChain: ["resize"],
+              createdAt: "2025-06-01T12:00:00.000Z",
+            },
+          ],
+        });
+        expect(mocks.executeSpy).toHaveBeenCalledTimes(1);
+        const queryText = String(mocks.executeSpy.mock.calls[0]?.[0] ?? "");
+        expect(queryText).toMatch(
+          /WHERE\s+a\.parent_id\s+IS\s+NULL\s+OR\s+NOT\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+user_files\s+p\s+WHERE\s+p\.id\s*=\s*a\.parent_id\s*\)/i,
+        );
+      });
     });
 
-    it("builds tool chain by appending toolId", () => {
-      const existingChain = ["resize", "compress"];
-      const toolId = "convert";
-      const newChain = [...existingChain, toolId];
-      expect(newChain).toEqual(["resize", "compress", "convert"]);
+    describe("POST /api/v1/files/save-result version chain and filename preservation", () => {
+      function makeParent(overrides: Partial<UserFileRow> = {}): UserFileRow {
+        return {
+          id: "parent-1",
+          userId: "user-1",
+          originalName: "vacation-photo.jpg",
+          storedName: "stored-parent.jpg",
+          mimeType: "image/jpeg",
+          size: 1000,
+          width: 800,
+          height: 600,
+          version: 2,
+          parentId: null,
+          toolChain: ["resize", "compress"],
+          createdAt: new Date("2025-06-01T12:00:00Z"),
+          ...overrides,
+        };
+      }
+
+      it("increments parent version and appends toolId to existing toolChain", async () => {
+        mocks.parentRows = [makeParent({ version: 2, toolChain: ["resize", "compress"] })];
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          reply,
+        );
+        expect(reply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          version: 3,
+          parentId: "parent-1",
+          toolChain: ["resize", "compress", "convert"],
+          originalName: "vacation-photo.png",
+        });
+      });
+
+      it("starts from an empty chain when parent toolChain is null", async () => {
+        mocks.parentRows = [makeParent({ version: 1, toolChain: null })];
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          reply,
+        );
+        expect(reply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          version: 2,
+          toolChain: ["resize"],
+        });
+      });
+
+      it("preserves existing toolChain when no toolId is provided", async () => {
+        mocks.parentRows = [makeParent({ version: 1, toolChain: ["resize"] })];
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: null,
+          }),
+          reply,
+        );
+        expect(reply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          version: 2,
+          toolChain: ["resize"],
+        });
+      });
+
+      it("preserves parent base name across multiple dots or extensionless names", async () => {
+        mocks.parentRows = [makeParent({ originalName: "my.great.photo.jpg" })];
+        const reply1 = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result.webp",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          reply1,
+        );
+        expect(mocks.insertedValues?.originalName).toBe("my.great.photo.webp");
+
+        mocks.parentRows = [makeParent({ originalName: "no-extension" })];
+        const reply2 = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          reply2,
+        );
+        expect(mocks.insertedValues?.originalName).toBe("no-extension.png");
+
+        mocks.parentRows = [makeParent({ originalName: "vacation-photo.jpg" })];
+        const reply3 = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          reply3,
+        );
+        expect(mocks.insertedValues?.originalName).toBe("vacation-photo.jpg");
+      });
+
+      it.each([
+        ["result.mkv", "video/x-matroska"],
+        ["result.avi", "video/x-msvideo"],
+        ["result.m4a", "audio/mp4"],
+        ["result.opus", "audio/opus"],
+        ["result.epub", "application/epub+zip"],
+        ["result.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        ["result.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+        [
+          "result.pptx",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ],
+        ["result.odt", "application/vnd.oasis.opendocument.text"],
+        ["result.ods", "application/vnd.oasis.opendocument.spreadsheet"],
+        ["result.odp", "application/vnd.oasis.opendocument.presentation"],
+        ["result.rtf", "application/rtf"],
+        ["result.html", "text/html"],
+        ["result.md", "text/markdown"],
+        ["result.yaml", "application/yaml"],
+        ["result.srt", "application/x-subrip"],
+        ["result.vtt", "text/vtt"],
+        ["result.MKV", "video/x-matroska"],
+        ["result", "video/x-matroska"],
+      ])(
+        "stores the output MIME type for non-image save-result %s -> %s (#3215)",
+        async (filename, expectedMime) => {
+          mocks.parentRows = [
+            makeParent({ originalName: "source.mkv", mimeType: "video/x-matroska" }),
+          ];
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: false,
+            reason: "Not a valid image",
+          } as never);
+          const reply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename,
+              parentId: "parent-1",
+              toolId: "video-convert",
+              buffer: Buffer.from("non-image-output-bytes"),
+            }),
+            reply,
+          );
+          expect(reply.statusCode).toBe(201);
+          expect(mocks.insertedValues?.mimeType).toBe(expectedMime);
+        },
+      );
+
+      it.each(["result.qoi", "result.cr3"])(
+        "downgrades unverified IMAGE_EXT_TO_MIME image/* claims on save-result (%s) to application/octet-stream (#3215)",
+        async (filename) => {
+          mocks.parentRows = [makeParent({ originalName: "source.png", mimeType: "image/png" })];
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: false,
+            reason: "Not a valid image",
+          } as never);
+          const reply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename,
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: Buffer.from("not-an-image"),
+            }),
+            reply,
+          );
+          expect(reply.statusCode).toBe(201);
+          expect(mocks.insertedValues?.mimeType).toBe("application/octet-stream");
+        },
+      );
+
+      it("discards the staged blob and returns 404 when the parent file is deleted before the transaction commits (#2939)", async () => {
+        mocks.parentRows = [makeParent()];
+        mocks.deleteParentDuringSave = true;
+
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          reply,
+        );
+
+        expect(reply.statusCode).toBe(404);
+        expect(reply.payload).toEqual({ error: "Parent file not found" });
+        expect(mocks.txParentWhereSpy).toHaveBeenCalledWith({
+          op: "eq",
+          col: "id",
+          val: "parent-1",
+        });
+        expect(mocks.txParentForSpy).toHaveBeenCalledWith("no key update");
+        expect(mocks.insertedValues).toBeUndefined();
+        expect(mocks.deleteStoredFile).toHaveBeenCalledWith("stored-result.png");
+
+        const discardErr = new Error("simulated discard failure");
+        mocks.deleteStoredFile.mockRejectedValueOnce(discardErr);
+        const req2 = makeSaveResultRequest({
+          filename: "output.png",
+          parentId: "parent-1",
+          toolId: "resize",
+        });
+        const reply2 = makeReply();
+        await saveResultHandler(req2, reply2);
+        expect(reply2.statusCode).toBe(404);
+        expect(reply2.payload).toEqual({ error: "Parent file not found" });
+        expect(req2.log.error).toHaveBeenCalledWith(
+          { err: discardErr, storedName: "stored-result.png" },
+          "Failed to discard a staged upload",
+        );
+      });
+
+      it("treats a .svgz dotfile on POST /api/v1/files/upload as an extensionless file rather than an SVGZ archive (#3259)", async () => {
+        const corruptGzipDotfile = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const uploadLog = { warn: vi.fn(), error: vi.fn() };
+        const uploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: uploadLog,
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: ".svgz",
+                mimetype: "application/octet-stream",
+                file: Readable.from([corruptGzipDotfile]),
+              };
+            },
+          },
+          uploadReply,
+        );
+        expect(uploadReply.statusCode).toBe(201);
+        expect(uploadLog.warn).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".svgz",
+          mimeType: "application/octet-stream",
+          size: corruptGzipDotfile.length,
+        });
+        expect(mocks.auditFn).toHaveBeenCalledWith("FILE_UPLOADED", {
+          userId: "user-1",
+          username: "alice",
+          count: 1,
+          files: [".svgz"],
+        });
+      });
+
+      it("sanitizes POST /api/v1/files/upload filenames before .svgz detection and passes safeName with !nameOnly to validateImageBuffer (#3531)", async () => {
+        const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+          typeof import("../../../apps/api/src/lib/file-validation.js")
+        >("../../../apps/api/src/lib/file-validation.js");
+        mocks.validateImageBuffer.mockImplementation(realValidateImageBuffer as never);
+
+        const rawSvgWithScript = Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8"><script>alert(1)</script><rect width="12" height="8"/></svg>',
+        );
+        const compressedSvg = gzipSync(rawSvgWithScript);
+        const nonSvgGzip = gzipSync(Buffer.from("not-an-svg"));
+        const savedCalls: Array<[Buffer, string]> = [];
+        mocks.saveFile.mockImplementation(async (buf: Buffer, name: string) => {
+          savedCalls.push([buf, name]);
+          return `stored-${name}`;
+        });
+
+        const uploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "diagram.svgz.php",
+                mimetype: "image/svg+xml",
+                file: Readable.from([compressedSvg]),
+              };
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "diagram.png.svgz",
+                mimetype: "image/svg+xml",
+                file: Readable.from([compressedSvg]),
+              };
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "archive.svgz.php",
+                mimetype: "image/svg+xml",
+                file: Readable.from([nonSvgGzip]),
+              };
+            },
+          },
+          uploadReply,
+        );
+
+        expect(uploadReply.statusCode).toBe(201);
+        const createdFiles = (uploadReply.payload as { files: Array<Record<string, unknown>> })
+          .files;
+        expect(createdFiles).toHaveLength(3);
+
+        // 1. "diagram.svgz.php" -> safeName "diagram.svgz" -> decompressed + sanitized -> "diagram.svg"
+        expect(savedCalls[0]?.[1]).toBe("diagram.svg");
+        expect(savedCalls[0]?.[0].toString("utf-8")).toContain("<svg");
+        expect(savedCalls[0]?.[0].toString("utf-8")).not.toContain("<script");
+        expect(mocks.validateImageBuffer).toHaveBeenNthCalledWith(
+          1,
+          savedCalls[0]?.[0],
+          "diagram.svg",
+        );
+        expect(createdFiles[0]).toMatchObject({
+          originalName: "diagram.svg",
+          mimeType: "image/svg+xml",
+          width: 12,
+          height: 8,
+        });
+
+        // 2. "diagram.png.svgz" -> safeName "diagram.png" -> not treated as .svgz, stored as raw bytes with unverifiedMime
+        expect(savedCalls[1]?.[1]).toBe("diagram.png");
+        expect(savedCalls[1]?.[0].equals(compressedSvg)).toBe(true);
+        expect(mocks.validateImageBuffer).toHaveBeenNthCalledWith(2, compressedSvg, "diagram.png");
+        expect(createdFiles[1]).toMatchObject({
+          originalName: "diagram.png",
+          mimeType: "application/octet-stream",
+          size: compressedSvg.length,
+          width: null,
+          height: null,
+        });
+
+        // 3. "archive.svgz.php" -> safeName "archive.svgz" -> non-SVG gzip falls through as opaque .svgz with nameOnly: true
+        expect(savedCalls[2]?.[1]).toBe("archive.svgz");
+        expect(savedCalls[2]?.[0].equals(nonSvgGzip)).toBe(true);
+        expect(mocks.validateImageBuffer).toHaveBeenNthCalledWith(3, nonSvgGzip, "archive.svgz");
+        expect(createdFiles[2]).toMatchObject({
+          originalName: "archive.svgz",
+          mimeType: "application/octet-stream",
+          size: nonSvgGzip.length,
+          width: null,
+          height: null,
+        });
+
+        // 4. Direct check that !validation.nameOnly gates isValidImage (including measuredDimensions) on upload and save-result
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "png",
+          width: 320,
+          height: 240,
+          nameOnly: true,
+        });
+        const nameOnlyUploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "unverified.tga",
+                mimetype: "image/x-tga",
+                file: Readable.from([Buffer.from("not-a-tga")]),
+              };
+            },
+          },
+          nameOnlyUploadReply,
+        );
+        expect(nameOnlyUploadReply.statusCode).toBe(201);
+        const [nameOnlyFile] = (
+          nameOnlyUploadReply.payload as { files: Array<Record<string, unknown>> }
+        ).files;
+        expect(nameOnlyFile).toMatchObject({
+          originalName: "unverified.tga",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
+        });
+
+        mocks.parentRows = [
+          makeParent({ originalName: "unverified.tga", mimeType: "image/x-tga" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "png",
+          width: 320,
+          height: 240,
+          nameOnly: true,
+        });
+        const nameOnlySaveReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result.tga",
+            parentId: "parent-1",
+            toolId: "resize",
+            buffer: Buffer.from("not-a-tga"),
+          }),
+          nameOnlySaveReply,
+        );
+        expect(nameOnlySaveReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "unverified.tga",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
+        });
+      });
+
+      it("treats a .svgz dotfile on POST /api/v1/files/save-result as an extensionless file rather than an SVGZ archive (#3259)", async () => {
+        const corruptGzipDotfile = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.parentRows = [makeParent({ originalName: "notes.txt", mimeType: "text/plain" })];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const saveReq = makeSaveResultRequest({
+          filename: ".svgz",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: corruptGzipDotfile,
+        });
+        const saveReply = makeReply();
+        await saveResultHandler(saveReq, saveReply);
+        expect(saveReply.statusCode).toBe(201);
+        expect(saveReq.log.warn).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "notes.txt",
+          mimeType: "text/plain",
+          size: corruptGzipDotfile.length,
+        });
+      });
+
+      it("preserves dotfile parent stems when saving extensionless or extensioned results (#3529)", async () => {
+        mocks.parentRows = [
+          makeParent({ originalName: ".gitignore", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const extlessReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "convert",
+            buffer: Buffer.from("node_modules/\n"),
+          }),
+          extlessReply,
+        );
+        expect(extlessReply.statusCode).toBe(201);
+        expect(mocks.saveFile).toHaveBeenLastCalledWith(expect.any(Buffer), ".gitignore");
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".gitignore",
+          mimeType: "application/octet-stream",
+        });
+
+        mocks.parentRows = [
+          makeParent({ originalName: ".gitignore", mimeType: "application/octet-stream" }),
+        ];
+        const withExtReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          withExtReply,
+        );
+        expect(withExtReply.statusCode).toBe(201);
+        expect(mocks.saveFile).toHaveBeenLastCalledWith(expect.any(Buffer), ".gitignore.png");
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".gitignore.png",
+          mimeType: "image/png",
+        });
+
+        const corruptGzipDotfile = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.parentRows = [
+          makeParent({ originalName: ".svgz", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const dotfileSvgzReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: corruptGzipDotfile,
+        });
+        const dotfileSvgzReply = makeReply();
+        await saveResultHandler(dotfileSvgzReq, dotfileSvgzReply);
+        expect(dotfileSvgzReply.statusCode).toBe(201);
+        expect(dotfileSvgzReq.log.warn).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".svgz",
+          mimeType: "application/octet-stream",
+          size: corruptGzipDotfile.length,
+        });
+
+        mocks.parentRows = [makeParent({ originalName: ".hidden.jpg", mimeType: "image/jpeg" })];
+        const dotfileWithExtReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          dotfileWithExtReply,
+        );
+        expect(dotfileWithExtReply.statusCode).toBe(201);
+        expect(mocks.insertedValues?.originalName).toBe(".hidden.png");
+
+        mocks.parentRows = [makeParent({ originalName: ".hidden.jpg", mimeType: "image/jpeg" })];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "jpeg",
+          width: 800,
+          height: 600,
+        });
+        const dotfileExtlessFallbackReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          dotfileExtlessFallbackReply,
+        );
+        expect(dotfileExtlessFallbackReply.statusCode).toBe(201);
+        expect(mocks.insertedValues?.originalName).toBe(".hidden.jpg");
+      });
+
+      it("decompresses and sanitizes an extensionless result when the parent originalName ends in .svgz (#3529)", async () => {
+        const rawSvgWithScript =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>';
+        const compressedSvg = gzipSync(Buffer.from(rawSvgWithScript));
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "svg",
+          width: 10,
+          height: 10,
+        });
+        const saveReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "compress",
+          buffer: compressedSvg,
+        });
+        const saveReply = makeReply();
+        await saveResultHandler(saveReq, saveReply);
+
+        expect(saveReply.statusCode).toBe(201);
+        const [savedBuffer, savedName] = mocks.saveFile.mock.lastCall as unknown as [
+          Buffer,
+          string,
+        ];
+        expect(savedName).toBe("diagram.svg");
+        expect(savedBuffer.toString("utf-8")).toContain("<svg");
+        expect(savedBuffer.toString("utf-8")).not.toContain("<script");
+        expect(mocks.validateImageBuffer).toHaveBeenLastCalledWith(savedBuffer, "diagram.svg");
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.svg",
+          mimeType: "image/svg+xml",
+          size: savedBuffer.length,
+        });
+
+        // Uppercase .SVGZ parent extension with extensionless filename decompresses to .svg
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.SVGZ", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "svg",
+          width: 10,
+          height: 10,
+        });
+        const upperReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "compress",
+            buffer: compressedSvg,
+          }),
+          upperReply,
+        );
+        expect(upperReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.svg",
+          mimeType: "image/svg+xml",
+        });
+
+        // Explicit non-.svgz result filename ("output.png") against .svgz parent skips decompressSvgz
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        const pngAgainstSvgzReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          pngAgainstSvgzReply,
+        );
+        expect(pngAgainstSvgzReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.png",
+          mimeType: "image/png",
+        });
+
+        // Non-SVG gzip with extensionless filename against .svgz parent stays opaque .svgz
+        const opaqueGzip = gzipSync(Buffer.from("not an svg payload"));
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const opaqueReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "compress",
+          buffer: opaqueGzip,
+        });
+        const opaqueReply = makeReply();
+        await saveResultHandler(opaqueReq, opaqueReply);
+        expect(opaqueReply.statusCode).toBe(201);
+        expect(opaqueReq.log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ filename: "result" }),
+          "Result .svgz file does not contain SVG, storing as opaque file",
+        );
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.svgz",
+          mimeType: "application/octet-stream",
+          size: opaqueGzip.length,
+        });
+
+        // Corrupt gzip with extensionless filename against .svgz parent rejects with 400
+        mocks.saveFile.mockClear();
+        mocks.insertedValues = undefined;
+        const corruptSvgz = Buffer.from(compressedSvg);
+        corruptSvgz[corruptSvgz.length - 8] ^= 0xff;
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        const corruptReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "compress",
+          buffer: corruptSvgz,
+        });
+        const corruptReply = makeReply();
+        await saveResultHandler(corruptReq, corruptReply);
+        expect(corruptReply.statusCode).toBe(400);
+        expect(mocks.saveFile).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toBeUndefined();
+      });
+
+      it("passes resolved resultName to validateImageBuffer and checks parent access before SVGZ decompression (#3529)", async () => {
+        const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+          typeof import("../../../apps/api/src/lib/file-validation.js")
+        >("../../../apps/api/src/lib/file-validation.js");
+        const tgaBuffer = readFixture(fixtures.image.formats("tga"));
+        mocks.parentRows = [makeParent({ originalName: "texture.tga", mimeType: "image/x-tga" })];
+        mocks.validateImageBuffer.mockImplementationOnce(realValidateImageBuffer as never);
+
+        const tgaReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "resize",
+            buffer: tgaBuffer,
+          }),
+          tgaReply,
+        );
+        expect(tgaReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "texture.tga",
+          mimeType: "image/x-tga",
+        });
+
+        // Missing or unauthorized parent returns 404 before decompressSvgz or validateImageBuffer
+        const corruptGzip = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.validateImageBuffer.mockClear();
+        mocks.saveFile.mockClear();
+        mocks.insertedValues = undefined;
+        mocks.parentRows = [];
+        const missingReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "corrupt.svgz",
+            parentId: "missing-parent",
+            toolId: "compress",
+            buffer: corruptGzip,
+          }),
+          missingReply,
+        );
+        expect(missingReply.statusCode).toBe(404);
+        expect(mocks.validateImageBuffer).not.toHaveBeenCalled();
+        expect(mocks.saveFile).not.toHaveBeenCalled();
+
+        mocks.parentRows = [makeParent({ userId: "other-user" })];
+        mocks.hasEffectivePermission.mockResolvedValueOnce(false);
+        const unauthReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "corrupt.svgz",
+            parentId: "parent-1",
+            toolId: "compress",
+            buffer: corruptGzip,
+          }),
+          unauthReply,
+        );
+        expect(unauthReply.statusCode).toBe(404);
+        expect(mocks.validateImageBuffer).not.toHaveBeenCalled();
+        expect(mocks.saveFile).not.toHaveBeenCalled();
+      });
+
+      it("logs unexpected validateImageBuffer rejections as a warning and rethrows 5xx / DecoderOutOfMemoryError on upload and save-result (#3593)", async () => {
+        const { DecoderOutOfMemoryError } = await import(
+          "../../../apps/api/src/lib/format-decoders.js"
+        );
+
+        // 1. POST /api/v1/files/upload: unexpected non-5xx rejection logs a warning and falls back to unverifiedMime
+        const unexpectedUploadErr = new TypeError("unexpected validator fault on upload");
+        mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedUploadErr);
+        const uploadLog = { warn: vi.fn(), error: vi.fn() };
+        const uploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: uploadLog,
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "photo.png",
+                mimetype: "image/png",
+                file: Readable.from([Buffer.from("png-bytes")]),
+              };
+            },
+          },
+          uploadReply,
+        );
+        expect(uploadReply.statusCode).toBe(201);
+        expect(uploadLog.warn).toHaveBeenCalledWith(
+          { err: unexpectedUploadErr, filename: "photo.png" },
+          "Image validation threw unexpectedly",
+        );
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "photo.png",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
+        });
+
+        // 2. POST /api/v1/files/upload: DecoderOutOfMemoryError rethrows and discards earlier staged blobs
+        mocks.saveFile.mockClear();
+        mocks.deleteStoredFile.mockClear();
+        mocks.insertedValues = undefined;
+        const uploadOomErr = new DecoderOutOfMemoryError("The image decoder ran out of memory.");
+        mocks.validateImageBuffer
+          .mockResolvedValueOnce({
+            valid: true as const,
+            format: "png",
+            width: 100,
+            height: 100,
+          })
+          .mockRejectedValueOnce(uploadOomErr);
+        mocks.saveFile.mockResolvedValueOnce("staged-first.png");
+        const oomUploadLog = { warn: vi.fn(), error: vi.fn() };
+        await expect(
+          uploadHandler(
+            {
+              log: oomUploadLog,
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "first.png",
+                  mimetype: "image/png",
+                  file: Readable.from([Buffer.from("first-png")]),
+                };
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "second.png",
+                  mimetype: "image/png",
+                  file: Readable.from([Buffer.from("second-png")]),
+                };
+              },
+            },
+            makeReply(),
+          ),
+        ).rejects.toBe(uploadOomErr);
+        expect(mocks.saveFile).toHaveBeenCalledTimes(1);
+        expect(mocks.deleteStoredFile).toHaveBeenCalledWith("staged-first.png");
+        expect(mocks.insertedValues).toBeUndefined();
+        expect(oomUploadLog.warn).not.toHaveBeenCalled();
+
+        // 3. POST /api/v1/files/save-result: unexpected non-5xx rejection logs a warning and falls back to unverifiedMime
+        mocks.parentRows = [makeParent({ originalName: "photo.jpg", mimeType: "image/jpeg" })];
+        const unexpectedSaveErr = new TypeError("unexpected validator fault on save-result");
+        mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedSaveErr);
+        const saveReq = makeSaveResultRequest({
+          filename: "result.png",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: Buffer.from("png-bytes"),
+        });
+        const saveReply = makeReply();
+        await saveResultHandler(saveReq, saveReply);
+        expect(saveReply.statusCode).toBe(201);
+        expect(saveReq.log.warn).toHaveBeenCalledWith(
+          { err: unexpectedSaveErr, filename: "photo.png" },
+          "Image validation threw unexpectedly",
+        );
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "photo.png",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
+        });
+
+        // 4. POST /api/v1/files/save-result: DecoderOutOfMemoryError rethrows before saveFile or DB insert
+        mocks.saveFile.mockClear();
+        mocks.insertedValues = undefined;
+        mocks.parentRows = [makeParent({ originalName: "photo.jpg", mimeType: "image/jpeg" })];
+        const saveOomErr = new DecoderOutOfMemoryError("The image decoder ran out of memory.");
+        mocks.validateImageBuffer.mockRejectedValueOnce(saveOomErr);
+        const oomSaveReq = makeSaveResultRequest({
+          filename: "result.png",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: Buffer.from("png-bytes"),
+        });
+        await expect(saveResultHandler(oomSaveReq, makeReply())).rejects.toBe(saveOomErr);
+        expect(mocks.saveFile).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toBeUndefined();
+        expect(oomSaveReq.log.warn).not.toHaveBeenCalled();
+
+        // 5. Plain 5xx error (not an instance of DecoderOutOfMemoryError) also rethrows on both upload and save-result
+        const plain500Err = Object.assign(new Error("validator 500 fault"), { statusCode: 500 });
+        mocks.validateImageBuffer
+          .mockRejectedValueOnce(plain500Err)
+          .mockRejectedValueOnce(plain500Err);
+        await expect(
+          uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "photo.png",
+                  mimetype: "image/png",
+                  file: Readable.from([Buffer.from("png-bytes")]),
+                };
+              },
+            },
+            makeReply(),
+          ),
+        ).rejects.toBe(plain500Err);
+        await expect(
+          saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.png",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: Buffer.from("png-bytes"),
+            }),
+            makeReply(),
+          ),
+        ).rejects.toBe(plain500Err);
+      });
     });
 
-    it("starts with empty chain for first tool", () => {
-      const existingChain: string[] = [];
-      const toolId = "resize";
-      const newChain = [...existingChain, toolId];
-      expect(newChain).toEqual(["resize"]);
+    describe("GET /api/v1/files/:id/thumbnail cache write failure logging (#1633)", () => {
+      function makeFileRow(overrides: Partial<UserFileRow> = {}): UserFileRow {
+        return {
+          id: "file-thumb-1",
+          userId: "user-1",
+          originalName: "photo.png",
+          storedName: "stored-thumb.png",
+          mimeType: "image/png",
+          size: 512,
+          width: 10,
+          height: 10,
+          version: 1,
+          parentId: null,
+          toolChain: null,
+          createdAt: new Date("2025-06-01T12:00:00Z"),
+          ...overrides,
+        };
+      }
+
+      it("still sends the generated thumbnail and logs a warning when saveThumbnail rejects", async () => {
+        const tinyPng = await sharp({
+          create: { width: 4, height: 4, channels: 3, background: { r: 20, g: 40, b: 60 } },
+        })
+          .png()
+          .toBuffer();
+
+        const cases = [
+          {
+            label: "image",
+            row: makeFileRow({
+              id: "file-img",
+              storedName: "stored-img.png",
+              mimeType: "image/png",
+            }),
+            raw: tinyPng,
+            expectedType: "image/jpeg",
+          },
+          {
+            label: "video",
+            row: makeFileRow({
+              id: "file-vid",
+              storedName: "stored-vid.mp4",
+              mimeType: "video/mp4",
+            }),
+            raw: Buffer.from("video-bytes"),
+            expectedType: "image/webp",
+          },
+          {
+            label: "pdf",
+            row: makeFileRow({
+              id: "file-pdf",
+              storedName: "stored-pdf.pdf",
+              mimeType: "application/pdf",
+            }),
+            raw: Buffer.from("pdf-bytes"),
+            expectedType: "image/png",
+          },
+        ];
+
+        for (const c of cases) {
+          mocks.parentRows = [c.row];
+          mocks.readStoredFile.mockResolvedValueOnce(c.raw);
+          const diskFull = Object.assign(new Error("ENOSPC: no space left on device"), {
+            code: "ENOSPC",
+          });
+          mocks.saveThumbnail.mockRejectedValueOnce(diskFull);
+
+          const warn = vi.fn();
+          const reply = makeReply();
+          await thumbnailHandler(
+            { params: { id: c.row.id }, log: { warn, error: vi.fn() } },
+            reply,
+          );
+          await new Promise((resolve) => setImmediate(resolve));
+
+          expect(reply.statusCode, c.label).toBe(200);
+          expect(reply.headers["content-type"], c.label).toBe(c.expectedType);
+          expect(Buffer.isBuffer(reply.payload), c.label).toBe(true);
+          expect(mocks.saveThumbnail, c.label).toHaveBeenCalledWith(
+            c.row.storedName,
+            reply.payload,
+          );
+          expect(warn, c.label).toHaveBeenCalledWith(
+            expect.objectContaining({
+              err: diskFull,
+              fileId: c.row.id,
+              storedName: c.row.storedName,
+            }),
+            expect.any(String),
+          );
+        }
+      });
+
+      it("does not read the source file or regenerate the thumbnail when getCachedThumbnail rejects (#976, #2808)", async () => {
+        const row = makeFileRow({
+          id: "file-s3-denied",
+          storedName: "stored-s3-denied.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        mocks.isStorageServiceFault.mockReturnValue(true);
+        const denied = Object.assign(new Error("AccessDenied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        });
+        mocks.getCachedThumbnail.mockRejectedValueOnce(denied);
+
+        const reply = makeReply();
+        await expect(
+          thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            reply,
+          ),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          cause: denied,
+        });
+        expect(mocks.readStoredFile).not.toHaveBeenCalled();
+        expect(mocks.saveThumbnail).not.toHaveBeenCalled();
+
+        mocks.isStorageServiceFault.mockReturnValue(false);
+        const invalidName = Object.assign(new Error("Invalid stored file name"), {
+          statusCode: 400,
+          code: "INVALID_STORED_NAME",
+        });
+        mocks.getCachedThumbnail.mockRejectedValueOnce(invalidName);
+        await expect(
+          thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ),
+        ).rejects.toBe(invalidName);
+        expect(mocks.readStoredFile).not.toHaveBeenCalled();
+
+        for (const code of ["EACCES", "EISDIR", "EIO"] as const) {
+          const localErr = Object.assign(new Error(`${code}: local thumbnail read fault`), {
+            code,
+            syscall: "open",
+          });
+          mocks.getCachedThumbnail.mockRejectedValueOnce(localErr);
+          await expect(
+            thumbnailHandler(
+              { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toBe(localErr);
+          expect(mocks.readStoredFile).not.toHaveBeenCalled();
+          expect(mocks.saveThumbnail).not.toHaveBeenCalled();
+        }
+      });
+
+      it("normalizes S3 read faults from getCachedThumbnail and readStoredFile into a 503 storage-unavailable SafeError (#2808)", async () => {
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        const row = makeFileRow({
+          id: "file-s3-thumb",
+          storedName: "stored-s3-thumb.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        mocks.isStorageServiceFault.mockReturnValue(true);
+
+        const s3Faults = [
+          Object.assign(new Error("Access Denied"), {
+            name: "AccessDenied",
+            $metadata: { httpStatusCode: 403 },
+          }),
+          Object.assign(new Error("Please reduce your request rate."), {
+            name: "SlowDown",
+            $metadata: { httpStatusCode: 503 },
+          }),
+          Object.assign(new Error("read ECONNRESET"), {
+            name: "TimeoutError",
+            code: "ECONNRESET",
+            syscall: "read",
+            $metadata: { attempts: 3 },
+          }),
+          Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+            code: "ECONNREFUSED",
+            syscall: "connect",
+          }),
+          Object.assign(new Error("Premature close"), {
+            code: "ERR_STREAM_PREMATURE_CLOSE",
+          }),
+        ];
+
+        for (const fault of s3Faults) {
+          mocks.readStoredFile.mockClear();
+          mocks.getCachedThumbnail.mockRejectedValueOnce(fault);
+          const cacheErr = await thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(cacheErr).toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            cause: fault,
+          });
+          expect(classifyError(cacheErr, "http")).toBe("operational");
+          expect(mocks.readStoredFile).not.toHaveBeenCalled();
+
+          mocks.readStoredFile.mockRejectedValueOnce(fault);
+          const readErr = await thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(readErr).toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            cause: fault,
+          });
+          expect(classifyError(readErr, "http")).toBe("operational");
+        }
+
+        const unexpectedBug = new TypeError("unexpected S3 client defect");
+        mocks.readStoredFile.mockRejectedValueOnce(unexpectedBug);
+        const bugErr = await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+          makeReply(),
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(bugErr).toBe(unexpectedBug);
+        expect(classifyError(bugErr, "http")).toBe("bug");
+      });
+
+      it("rethrows a local EACCES fault from readStoredFile instead of swallowing it as 422 (#2808)", async () => {
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        const row = makeFileRow({
+          id: "file-local-eacces",
+          storedName: "stored-local-eacces.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        const eacces = Object.assign(new Error("EACCES: permission denied, open"), {
+          code: "EACCES",
+          syscall: "open",
+        });
+        mocks.readStoredFile.mockRejectedValueOnce(eacces);
+
+        const reply = makeReply();
+        const err = await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+          reply,
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(err).toBe(eacces);
+        expect(classifyError(err, "http")).toBe("operational");
+        expect(reply.send).not.toHaveBeenCalled();
+      });
+
+      it("rethrows non-syscall local faults (ERR_FS_FILE_TOO_LARGE, AbortError, TypeError) from readStoredFile instead of swallowing them as 422 (#2851)", async () => {
+        const { SafeError } = await import("@snapotter/shared");
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        const row = makeFileRow({
+          id: "file-local-nosyscall",
+          storedName: "stored-local-nosyscall.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        mocks.isStorageServiceFault.mockReturnValue(false);
+
+        const nonMissingLocalErrors: Array<{
+          err: Error;
+          expectedKind: "bug" | "operational" | "expected";
+        }> = [
+          {
+            err: Object.assign(new RangeError("File size is greater than 2 GiB"), {
+              code: "ERR_FS_FILE_TOO_LARGE",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("The operation was aborted"), {
+              name: "AbortError",
+              code: "ABORT_ERR",
+            }),
+            expectedKind: "expected",
+          },
+          {
+            err: new TypeError("unexpected failure"),
+            expectedKind: "bug",
+          },
+          {
+            err: new SafeError("The server's storage is full.", {
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
+            err: Object.assign(new Error("The server's storage is full."), {
+              isSafeMessage: true as const,
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
+            err: Object.assign(new Error("ENAMETOOLONG: name too long, open"), {
+              code: "ENAMETOOLONG",
+              syscall: "open",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("non-SafeError invalid stored name"), {
+              code: "INVALID_STORED_NAME",
+            }),
+            expectedKind: "bug",
+          },
+        ];
+
+        for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
+          mocks.readStoredFile.mockRejectedValueOnce(localFault);
+          const warn = vi.fn();
+          const reply = makeReply();
+          const caught = await thumbnailHandler(
+            { params: { id: row.id }, log: { warn, error: vi.fn() } },
+            reply,
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(caught).toBe(localFault);
+          expect(classifyError(caught, "http")).toBe(expectedKind);
+          expect(warn).not.toHaveBeenCalled();
+          expect(reply.send).not.toHaveBeenCalled();
+        }
+      });
+
+      it("logs a warning and returns 422 when readStoredFile rejects with a missing blob (ENOENT or NoSuchKey)", async () => {
+        const { SafeError } = await import("@snapotter/shared");
+        const row = makeFileRow({
+          id: "file-missing-blob",
+          storedName: "stored-missing-blob.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        const enoent = Object.assign(new Error("ENOENT: no such file or directory, open"), {
+          code: "ENOENT",
+          syscall: "open",
+        });
+        mocks.readStoredFile.mockRejectedValueOnce(enoent);
+
+        const warn1 = vi.fn();
+        const reply1 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn1, error: vi.fn() } },
+          reply1,
+        );
+        expect(reply1.statusCode).toBe(422);
+        expect(reply1.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn1).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+
+        const noSuchKey = Object.assign(new Error("NoSuchKey"), {
+          name: "NoSuchKey",
+          $metadata: { httpStatusCode: 404 },
+        });
+        mocks.isStorageServiceFault.mockReturnValue(false);
+        mocks.readStoredFile.mockRejectedValueOnce(noSuchKey);
+
+        const warn2 = vi.fn();
+        const reply2 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn2, error: vi.fn() } },
+          reply2,
+        );
+        expect(reply2.statusCode).toBe(422);
+        expect(reply2.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn2).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+
+        const invalidStoredName = new SafeError("Invalid stored file name", {
+          kind: "operational",
+          code: "INVALID_STORED_NAME",
+          statusCode: 400,
+        });
+        mocks.readStoredFile.mockRejectedValueOnce(invalidStoredName);
+
+        const warn3 = vi.fn();
+        const reply3 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn3, error: vi.fn() } },
+          reply3,
+        );
+        expect(reply3.statusCode).toBe(422);
+        expect(reply3.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn3).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+
+        const crossRealmInvalidStoredName = Object.assign(new Error("Invalid stored file name"), {
+          isSafeMessage: true as const,
+          kind: "operational",
+          code: "INVALID_STORED_NAME",
+          statusCode: 400,
+        });
+        expect(crossRealmInvalidStoredName).not.toBeInstanceOf(SafeError);
+        mocks.readStoredFile.mockRejectedValueOnce(crossRealmInvalidStoredName);
+
+        const warn4 = vi.fn();
+        const reply4 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn4, error: vi.fn() } },
+          reply4,
+        );
+        expect(reply4.statusCode).toBe(422);
+        expect(reply4.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn4).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+      });
+
+      it("preserves Content-Type on cached thumbnail hits for video, PDF, and image files (#2824)", async () => {
+        const cases = [
+          {
+            label: "image",
+            row: makeFileRow({
+              id: "file-cached-img",
+              storedName: "stored-cached-img.png",
+              mimeType: "image/png",
+            }),
+            cached: Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+            expectedType: "image/jpeg",
+          },
+          {
+            label: "video",
+            row: makeFileRow({
+              id: "file-cached-vid",
+              storedName: "stored-cached-vid.mp4",
+              mimeType: "video/mp4",
+            }),
+            cached: Buffer.from("RIFF\x10\x00\x00\x00WEBPVP8 "),
+            expectedType: "image/webp",
+          },
+          {
+            label: "pdf",
+            row: makeFileRow({
+              id: "file-cached-pdf",
+              storedName: "stored-cached-pdf.pdf",
+              mimeType: "application/pdf",
+            }),
+            cached: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            expectedType: "image/png",
+          },
+        ];
+
+        for (const c of cases) {
+          mocks.parentRows = [c.row];
+          mocks.getCachedThumbnail.mockResolvedValueOnce(c.cached);
+          mocks.readStoredFile.mockClear();
+
+          const reply = makeReply();
+          await thumbnailHandler(
+            { params: { id: c.row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            reply,
+          );
+
+          expect(reply.statusCode, c.label).toBe(200);
+          expect(reply.headers["content-type"], c.label).toBe(c.expectedType);
+          expect(reply.headers["cache-control"], c.label).toBe("public, max-age=86400, immutable");
+          expect(reply.payload, c.label).toBe(c.cached);
+          expect(mocks.readStoredFile, c.label).not.toHaveBeenCalled();
+        }
+      });
+
+      it("rethrows operational scratch/spawn faults and TypeError from thumbnail generation instead of swallowing them as 422 (#2870)", async () => {
+        const videoRow = makeFileRow({
+          id: "file-vid-fault",
+          storedName: "stored-vid-fault.mp4",
+          mimeType: "video/mp4",
+        });
+        const pdfRow = makeFileRow({
+          id: "file-pdf-fault",
+          storedName: "stored-pdf-fault.pdf",
+          mimeType: "application/pdf",
+        });
+        const imgRow = makeFileRow({
+          id: "file-img-fault",
+          storedName: "stored-img-fault.png",
+          mimeType: "image/png",
+        });
+
+        for (const code of ["ENOSPC", "EACCES", "EMFILE", "ENOMEM"] as const) {
+          const fault = Object.assign(new Error(`${code}: preview scratch fault`), {
+            code,
+            syscall: "mkdir",
+          });
+
+          mocks.parentRows = [videoRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("video-bytes"));
+          mocks.videoPosterPreview.mockRejectedValueOnce(fault);
+          await expect(
+            thumbnailHandler(
+              { params: { id: videoRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toBe(fault);
+
+          mocks.parentRows = [pdfRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("pdf-bytes"));
+          mocks.pdfFirstPagePreview.mockRejectedValueOnce(fault);
+          await expect(
+            thumbnailHandler(
+              { params: { id: pdfRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toBe(fault);
+        }
+
+        const typeErr = new TypeError("unexpected thumbnail bug");
+        mocks.parentRows = [imgRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("img-bytes"));
+        mocks.validateImageBuffer.mockRejectedValueOnce(typeErr);
+        await expect(
+          thumbnailHandler(
+            { params: { id: imgRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ),
+        ).rejects.toBe(typeErr);
+
+        const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+        const tiffHeadedDng = await sharp({
+          create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+        })
+          .tiff()
+          .toBuffer();
+        const dngRow = makeFileRow({
+          id: "file-dng-fault",
+          originalName: "photo.dng",
+          storedName: "stored-dng-fault.dng",
+          mimeType: "image/x-adobe-dng",
+        });
+        mocks.parentRows = [dngRow];
+        mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true as const,
+          format: "raw",
+          width: 8,
+          height: 8,
+        });
+        const heicConverter = await import("../../../apps/api/src/lib/heic-converter.js");
+        const cliScratchFault = Object.assign(new Error("ENOSPC: no space left on device"), {
+          code: "ENOSPC",
+          syscall: "open",
+        });
+        const decodeSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(cliScratchFault);
+        const heicSpy = vi.spyOn(heicConverter, "decodeHeic");
+        try {
+          const warn = vi.fn();
+          await expect(
+            thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn, error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-full",
+            statusCode: 503,
+            cause: cliScratchFault,
+          });
+          expect(warn).not.toHaveBeenCalled();
+
+          const heicRow = makeFileRow({
+            id: "file-heic-fault",
+            originalName: "photo.heic",
+            storedName: "stored-heic-fault.heic",
+            mimeType: "image/heic",
+          });
+          for (const [errno, expectedCode] of [
+            ["ENOSPC", "storage-full"],
+            ["EDQUOT", "storage-full"],
+            ["EACCES", "storage-not-writable"],
+            ["EPERM", "storage-not-writable"],
+            ["EROFS", "storage-not-writable"],
+          ] as const) {
+            const writeFault = Object.assign(new Error(`${errno}: temp write failed`), {
+              code: errno,
+              syscall: "open",
+            });
+            mocks.parentRows = [heicRow];
+            mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("heic-bytes"));
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "heif",
+              width: 8,
+              height: 8,
+            });
+            heicSpy.mockRejectedValueOnce(writeFault);
+            await expect(
+              thumbnailHandler(
+                { params: { id: heicRow.id }, log: { warn, error: vi.fn() } },
+                makeReply(),
+              ),
+            ).rejects.toMatchObject({
+              isSafeMessage: true,
+              kind: "operational",
+              code: expectedCode,
+              statusCode: 503,
+              cause: writeFault,
+            });
+
+            mocks.parentRows = [dngRow];
+            mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "raw",
+              width: 8,
+              height: 8,
+            });
+            decodeSpy.mockRejectedValueOnce(writeFault);
+            await expect(
+              thumbnailHandler(
+                { params: { id: dngRow.id }, log: { warn, error: vi.fn() } },
+                makeReply(),
+              ),
+            ).rejects.toMatchObject({
+              isSafeMessage: true,
+              kind: "operational",
+              code: expectedCode,
+              statusCode: 503,
+              cause: writeFault,
+            });
+          }
+          expect(warn).not.toHaveBeenCalled();
+
+          // When the CLI decoder is missing (DecoderUnavailableError), TIFF-headed
+          // DNGs still fall back to Sharp's native reader and return a 200 thumbnail.
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No LibRaw found."),
+          );
+          const dngReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: dngRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            dngReply,
+          );
+          expect(dngReply.statusCode).toBe(200);
+          expect(dngReply.headers["content-type"]).toBe("image/jpeg");
+
+          // #2801: when the CLI decoder is missing on a TIFF-headed RAW (CR2) whose
+          // header Sharp reads but whose pixels Sharp cannot decode, thumbnail returns 503 ENGINE_UNAVAILABLE.
+          const cr2Buffer = readFixture(fixtures.image.formats("cr2"));
+          const cr2Row = makeFileRow({
+            id: "11111111-1111-4111-8111-111111111195",
+            originalName: "photo.cr2",
+            storedName: "photo.cr2",
+            mimeType: "image/x-canon-cr2",
+          });
+          mocks.parentRows = [cr2Row];
+          mocks.readStoredFile.mockResolvedValueOnce(cr2Buffer);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 1536,
+            height: 1024,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No LibRaw found."),
+          );
+          const cr2Reply = makeReply();
+          await thumbnailHandler(
+            { params: { id: cr2Row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            cr2Reply,
+          );
+          expect(cr2Reply.statusCode).toBe(503);
+          expect(cr2Reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          mocks.parentRows = [dngRow];
+
+          // DecoderOutOfMemoryError bypasses the Sharp fallback and answers 503 ENGINE_UNAVAILABLE.
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderOutOfMemoryError("Decoder out of memory."),
+          );
+          const oomReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: dngRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            oomReply,
+          );
+          expect(oomReply.statusCode).toBe(503);
+          expect(oomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+
+          // #3353: SIGKILL / DecoderOutOfMemoryError during video or PDF thumbnail rendering
+          // answers 503 ENGINE_UNAVAILABLE instead of 422.
+          const vidOom = new formatDecoders.DecoderOutOfMemoryError(
+            "The video preview engine ran out of memory decoding this video, or was killed.",
+            Object.assign(new Error("ffmpeg exited SIGKILL: "), { signal: "SIGKILL" }),
+          );
+          mocks.parentRows = [videoRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("video-bytes"));
+          mocks.videoPosterPreview.mockRejectedValueOnce(vidOom);
+          const vidOomReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: videoRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            vidOomReply,
+          );
+          expect(vidOomReply.statusCode).toBe(503);
+          expect(vidOomReply.payload).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+            error: expect.stringContaining("video preview engine ran out of memory"),
+          });
+
+          const pdfOom = new formatDecoders.DecoderOutOfMemoryError(
+            "The PDF preview engine ran out of memory rendering this PDF, or was killed.",
+            Object.assign(new Error("gs exited SIGKILL: "), { signal: "SIGKILL" }),
+          );
+          mocks.parentRows = [pdfRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("pdf-bytes"));
+          mocks.pdfFirstPagePreview.mockRejectedValueOnce(pdfOom);
+          const pdfOomReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: pdfRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            pdfOomReply,
+          );
+          expect(pdfOomReply.statusCode).toBe(503);
+          expect(pdfOomReply.payload).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+            error: expect.stringContaining("PDF preview engine ran out of memory"),
+          });
+
+          const rawSigkill = Object.assign(new Error("gs exited SIGKILL: "), {
+            signal: "SIGKILL",
+          });
+          mocks.parentRows = [pdfRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("pdf-bytes"));
+          mocks.pdfFirstPagePreview.mockRejectedValueOnce(rawSigkill);
+          const rawSigkillReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: pdfRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            rawSigkillReply,
+          );
+          expect(rawSigkillReply.statusCode).toBe(503);
+          expect(rawSigkillReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        } finally {
+          decodeSpy.mockRestore();
+          heicSpy.mockRestore();
+        }
+      });
+
+      it("surfaces DecoderOutOfMemoryError when GET /api/v1/files/:id/thumbnail hits OOM in decodeHeic, decodeToSharpCompat, or the DNG Sharp fallback probe (#3631)", async () => {
+        const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+        const heicConverter = await import("../../../apps/api/src/lib/heic-converter.js");
+        const objectStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        const tiffHeadedDng = await sharp({
+          create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+        })
+          .tiff()
+          .toBuffer();
+        const dngRow = makeFileRow({
+          id: "file-dng-oom-3631",
+          originalName: "photo.dng",
+          storedName: "stored-dng-oom-3631.dng",
+          mimeType: "image/x-adobe-dng",
+        });
+        const heicRow = makeFileRow({
+          id: "file-heic-oom-3631",
+          originalName: "photo.heic",
+          storedName: "stored-heic-oom-3631.heic",
+          mimeType: "image/heic",
+        });
+
+        let fakeNow = Date.now() + 60 * 60_000;
+        const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+        const decodeSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat");
+        const heicSpy = vi.spyOn(heicConverter, "decodeHeic");
+        const normalizeSpy = vi.spyOn(objectStorage, "normalizeOperationalWriteError");
+        try {
+          // 1. DNG Sharp fallback probe rejecting with V8 RangeError("Array buffer allocation failed") at sharp.prototype.raw surfaces DecoderOutOfMemoryError over DecoderUnavailableError
+          mocks.parentRows = [dngRow];
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+          );
+          const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+            this: sharp.Sharp,
+          ) {
+            return {
+              toBuffer: async () => {
+                throw new RangeError("Array buffer allocation failed");
+              },
+            } as unknown as sharp.Sharp;
+          });
+          try {
+            const warnProbeRawOom = vi.fn();
+            const probeRawOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnProbeRawOom, error: vi.fn() } },
+              probeRawOomReply,
+            );
+            expect(probeRawOomReply.statusCode).toBe(503);
+            expect(probeRawOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnProbeRawOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          } finally {
+            rawSpy.mockRestore();
+          }
+
+          // 2. DNG Sharp fallback probe rejecting with V8 RangeError("Array buffer allocation failed") at sharp.prototype.metadata also surfaces DecoderOutOfMemoryError over DecoderUnavailableError
+          fakeNow += 11 * 60_000;
+          mocks.parentRows = [dngRow];
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+          );
+          const metaSpy = vi
+            .spyOn(sharp.prototype, "metadata")
+            .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+          try {
+            const warnProbeMetaOom = vi.fn();
+            const probeMetaOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnProbeMetaOom, error: vi.fn() } },
+              probeMetaOomReply,
+            );
+            expect(probeMetaOomReply.statusCode).toBe(503);
+            expect(probeMetaOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnProbeMetaOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          } finally {
+            metaSpy.mockRestore();
+          }
+
+          // 3. Non-OOM RangeError in the DNG Sharp fallback probe still surfaces DecoderUnavailableError when the CLI decoder was missing
+          fakeNow += 11 * 60_000;
+          mocks.parentRows = [dngRow];
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+          );
+          const nonOomRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+            this: sharp.Sharp,
+          ) {
+            return {
+              toBuffer: async () => {
+                throw new RangeError("Invalid raw parameter");
+              },
+            } as unknown as sharp.Sharp;
+          });
+          try {
+            const warnProbeNonOom = vi.fn();
+            const probeNonOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnProbeNonOom, error: vi.fn() } },
+              probeNonOomReply,
+            );
+            expect(probeNonOomReply.statusCode).toBe(503);
+            expect(probeNonOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnProbeNonOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderUnavailableError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          } finally {
+            nonOomRawSpy.mockRestore();
+          }
+
+          // 4. Raw OOM errors from decodeToSharpCompat (including stderr OOMs that would otherwise fall through to the Sharp DNG probe) and decodeHeic surface 503 DecoderOutOfMemoryError
+          for (const makeRawOom of [
+            () => new RangeError("Array buffer allocation failed"),
+            () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+            () =>
+              Object.assign(new Error("decoder stderr OOM"), {
+                stderr: "libgomp: Thread creation failed: Resource temporarily unavailable",
+              }),
+          ]) {
+            fakeNow += 11 * 60_000;
+            mocks.parentRows = [dngRow];
+            mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "raw",
+              width: 8,
+              height: 8,
+            });
+            decodeSpy.mockRejectedValueOnce(makeRawOom());
+            normalizeSpy.mockClear();
+            const warnDngOom = vi.fn();
+            const dngOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnDngOom, error: vi.fn() } },
+              dngOomReply,
+            );
+            expect(normalizeSpy).toHaveBeenCalledWith(
+              expect.any(formatDecoders.DecoderOutOfMemoryError),
+            );
+            expect(dngOomReply.statusCode).toBe(503);
+            expect(dngOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnDngOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+
+            fakeNow += 11 * 60_000;
+            mocks.parentRows = [heicRow];
+            mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("heic-bytes"));
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "heif",
+              width: 8,
+              height: 8,
+            });
+            heicSpy.mockRejectedValueOnce(makeRawOom());
+            normalizeSpy.mockClear();
+            const warnHeicOom = vi.fn();
+            const heicOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: heicRow.id }, log: { warn: warnHeicOom, error: vi.fn() } },
+              heicOomReply,
+            );
+            expect(normalizeSpy).toHaveBeenCalledWith(
+              expect.any(formatDecoders.DecoderOutOfMemoryError),
+            );
+            expect(heicOomReply.statusCode).toBe(503);
+            expect(heicOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnHeicOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          }
+        } finally {
+          normalizeSpy.mockRestore();
+          decodeSpy.mockRestore();
+          heicSpy.mockRestore();
+          nowSpy.mockRestore();
+        }
+      });
+
+      it("logs a warning and returns 422 when video, PDF, or image thumbnail generation fails (#2870)", async () => {
+        const videoRow = makeFileRow({
+          id: "file-vid-corrupt",
+          storedName: "stored-vid-corrupt.mp4",
+          mimeType: "video/mp4",
+        });
+        mocks.parentRows = [videoRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("corrupt-video"));
+        mocks.videoPosterPreview.mockResolvedValueOnce(null);
+        const vidWarn = vi.fn();
+        const vidReply = makeReply();
+        await thumbnailHandler(
+          { params: { id: videoRow.id }, log: { warn: vidWarn, error: vi.fn() } },
+          vidReply,
+        );
+        expect(vidReply.statusCode).toBe(422);
+        expect(vidReply.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(vidWarn).toHaveBeenCalledWith(
+          { fileId: videoRow.id, storedName: videoRow.storedName },
+          "Thumbnail generation failed",
+        );
+
+        const pdfRow = makeFileRow({
+          id: "file-pdf-corrupt",
+          storedName: "stored-pdf-corrupt.pdf",
+          mimeType: "application/pdf",
+        });
+        mocks.parentRows = [pdfRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("corrupt-pdf"));
+        mocks.pdfFirstPagePreview.mockResolvedValueOnce(null);
+        const pdfWarn = vi.fn();
+        const pdfReply = makeReply();
+        await thumbnailHandler(
+          { params: { id: pdfRow.id }, log: { warn: pdfWarn, error: vi.fn() } },
+          pdfReply,
+        );
+        expect(pdfReply.statusCode).toBe(422);
+        expect(pdfReply.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(pdfWarn).toHaveBeenCalledWith(
+          { fileId: pdfRow.id, storedName: pdfRow.storedName },
+          "Thumbnail generation failed",
+        );
+
+        const imgRow = makeFileRow({
+          id: "file-img-corrupt",
+          storedName: "stored-img-corrupt.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [imgRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("not-a-valid-png-stream"));
+
+        const warn = vi.fn();
+        const reply = makeReply();
+        await thumbnailHandler({ params: { id: imgRow.id }, log: { warn, error: vi.fn() } }, reply);
+
+        expect(reply.statusCode).toBe(422);
+        expect(reply.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            err: expect.any(Error),
+            fileId: imgRow.id,
+            storedName: imgRow.storedName,
+          }),
+          "Thumbnail generation failed",
+        );
+      });
+
+      it("sanitizes .svg, .svgz, and disguised SVGs (.apng, .tga, .dng) on thumbnail generation, upload, and save-result (#3846)", async () => {
+        const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+        const svgSanitize = await import("../../../apps/api/src/lib/svg-sanitize.js");
+        const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+          typeof import("../../../apps/api/src/lib/file-validation.js")
+        >("../../../apps/api/src/lib/file-validation.js");
+
+        const dirtySvg = Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="20"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="30" height="20" fill="red"/></svg>',
+          "utf-8",
+        );
+        const dirtySvgz = gzipSync(dirtySvg);
+        const commentPaddedDirtySvg = Buffer.from(
+          `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="20" fill="red"/></svg>`,
+          "utf-8",
+        );
+        const commentPaddedOverCapSvg = Buffer.from(
+          `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20">${"<rect/>".repeat(5001)}</svg>`,
+          "utf-8",
+        );
+
+        mocks.validateImageBuffer.mockImplementation(realValidateImageBuffer as never);
+        const decodeSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValue(new Error("CLI decode failed"));
+
+        try {
+          // 1. GET /api/v1/files/:id/thumbnail on .svg, .svgz, .apng, .tga, .dng
+          for (const [originalName, payload] of [
+            ["icon.svg", dirtySvg],
+            ["icon.svgz", dirtySvgz],
+            ["padded.apng", commentPaddedDirtySvg],
+            ["padded.tga", commentPaddedDirtySvg],
+            ["padded.dng", commentPaddedDirtySvg],
+          ] as const) {
+            const row = makeFileRow({
+              id: `thumb-${originalName}`,
+              originalName,
+              storedName: `stored-${originalName}`,
+              mimeType: "image/svg+xml",
+            });
+            mocks.parentRows = [row];
+            mocks.readStoredFile.mockResolvedValueOnce(payload);
+
+            let sanitized = false;
+            let resized1x1 = false;
+            const origResize = sharp.prototype.resize;
+            const resizeSpy = vi.spyOn(sharp.prototype, "resize").mockImplementation(function (
+              this: sharp.Sharp,
+              ...args: Parameters<typeof origResize>
+            ) {
+              if (args[0] === 1) resized1x1 = true;
+              return origResize.apply(this, args);
+            });
+            const realSanitize = svgSanitize.sanitizeSvg;
+            const sanitizeSpy = vi
+              .spyOn(svgSanitize, "sanitizeSvg")
+              .mockImplementation((buf: Buffer) => {
+                if (buf.toString("utf-8").includes("169.254.169.254")) sanitized = true;
+                return realSanitize(buf);
+              });
+
+            try {
+              const reply = makeReply();
+              await thumbnailHandler(
+                { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+                reply,
+              );
+              expect(reply.statusCode, originalName).toBe(200);
+              expect(sanitized, originalName).toBe(true);
+              expect(resized1x1, originalName).toBe(false);
+            } finally {
+              resizeSpy.mockRestore();
+              sanitizeSpy.mockRestore();
+            }
+          }
+
+          // 2. POST /api/v1/files/upload with comment-padded .apng SVG
+          const savedUploads: Buffer[] = [];
+          mocks.saveFile.mockImplementation(async (buf: Buffer, name: string) => {
+            savedUploads.push(buf);
+            return `stored-${name}`;
+          });
+          const uploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedDirtySvg]),
+                };
+              },
+            },
+            uploadReply,
+          );
+          expect(uploadReply.statusCode).toBe(201);
+          expect(savedUploads).toHaveLength(1);
+          expect(savedUploads[0]?.toString("utf-8")).toContain("<svg");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("<script");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("169.254.169.254");
+
+          // Over-cap .apng SVG on upload returns 400 and discards earlier staged files
+          const overUploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded-over.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedOverCapSvg]),
+                };
+              },
+            },
+            overUploadReply,
+          );
+          expect(overUploadReply.statusCode).toBe(400);
+          expect(overUploadReply.payload).toEqual({
+            error: "SVG exceeds maximum element count of 5000",
+          });
+
+          // Unexpected sanitizer fault on .apng upload returns 500
+          const unexpectedSanitizeSpy = vi
+            .spyOn(svgSanitize, "sanitizeSvg")
+            .mockImplementationOnce(() => {
+              throw new TypeError("unexpected upload apng svg fault");
+            });
+          const faultUploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedDirtySvg]),
+                };
+              },
+            },
+            faultUploadReply,
+          );
+          expect(faultUploadReply.statusCode).toBe(500);
+          expect(faultUploadReply.payload).toEqual({ error: "Internal server error" });
+          unexpectedSanitizeSpy.mockRestore();
+
+          // Post-sanitize size growth exceeding quota returns 413 STORAGE_QUOTA_EXCEEDED
+          const growingSanitizeSpy = vi
+            .spyOn(svgSanitize, "sanitizeSvg")
+            .mockImplementationOnce((buf: Buffer) => Buffer.concat([buf, Buffer.from("   ")]));
+          mocks.quotaRefusal
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce("Storage quota full" as never);
+          const quotaUploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedDirtySvg]),
+                };
+              },
+            },
+            quotaUploadReply,
+          );
+          expect(quotaUploadReply.statusCode).toBe(413);
+          expect(quotaUploadReply.payload).toEqual({
+            error: "Storage quota full",
+            code: "STORAGE_QUOTA_EXCEEDED",
+          });
+          growingSanitizeSpy.mockRestore();
+
+          // 3. POST /api/v1/files/save-result with comment-padded .apng SVG
+          savedUploads.length = 0;
+          mocks.parentRows = [
+            makeFileRow({ id: "parent-1", originalName: "anim.apng", mimeType: "image/apng" }),
+          ];
+          const saveReply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.apng",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: commentPaddedDirtySvg,
+            }),
+            saveReply,
+          );
+          expect(saveReply.statusCode).toBe(201);
+          expect(savedUploads).toHaveLength(1);
+          expect(savedUploads[0]?.toString("utf-8")).toContain("<svg");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("<script");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("169.254.169.254");
+
+          // Over-cap .apng SVG on save-result returns 400
+          const overSaveReply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.apng",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: commentPaddedOverCapSvg,
+            }),
+            overSaveReply,
+          );
+          expect(overSaveReply.statusCode).toBe(400);
+          expect(overSaveReply.payload).toEqual({
+            error: "SVG exceeds maximum element count of 5000",
+          });
+
+          // Unexpected sanitizer fault on .apng save-result returns 500
+          const saveFaultSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementationOnce(() => {
+            throw new TypeError("unexpected save-result apng svg fault");
+          });
+          const faultSaveReply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.apng",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: commentPaddedDirtySvg,
+            }),
+            faultSaveReply,
+          );
+          expect(faultSaveReply.statusCode).toBe(500);
+          expect(faultSaveReply.payload).toEqual({ error: "Internal server error" });
+          saveFaultSpy.mockRestore();
+
+          // 4. V8 RangeError in decompressSvgz or sanitizeSvg on upload and save-result rethrows DecoderOutOfMemoryError (#3910)
+          const oom = () => new RangeError("Array buffer allocation failed");
+          for (const [label, fnName, filename, payload] of [
+            ["decompressSvgz on .svgz", "decompressSvgz", "icon.svgz", dirtySvgz],
+            ["sanitizeSvg on .svg", "sanitizeSvg", "icon.svg", dirtySvg],
+            [
+              "decompressSvgz on disguised .apng SVG",
+              "decompressSvgz",
+              "padded.apng",
+              commentPaddedDirtySvg,
+            ],
+            [
+              "sanitizeSvg on disguised .apng SVG",
+              "sanitizeSvg",
+              "padded.apng",
+              commentPaddedDirtySvg,
+            ],
+          ] as const) {
+            mocks.saveFile.mockClear();
+            mocks.deleteStoredFile.mockClear();
+            mocks.insertedValues = undefined;
+            const oomUploadSpy = vi.spyOn(svgSanitize, fnName).mockImplementationOnce(() => {
+              throw oom();
+            });
+            try {
+              const oomUploadLog = { warn: vi.fn(), error: vi.fn() };
+              const rejectedUpload = await uploadHandler(
+                {
+                  log: oomUploadLog,
+                  parts: async function* () {
+                    yield {
+                      type: "file" as const,
+                      fieldname: "file",
+                      filename: "first.png",
+                      mimetype: "image/png",
+                      file: Readable.from([readFixture(fixtures.image.base.png200)]),
+                    };
+                    yield {
+                      type: "file" as const,
+                      fieldname: "file",
+                      filename,
+                      mimetype: "application/octet-stream",
+                      file: Readable.from([payload]),
+                    };
+                  },
+                },
+                makeReply(),
+              ).catch((err: unknown) => err);
+              expect(rejectedUpload, `upload ${label}`).toBeInstanceOf(
+                formatDecoders.DecoderOutOfMemoryError,
+              );
+              expect(rejectedUpload, `upload ${label}`).toMatchObject({
+                statusCode: 503,
+                code: "ENGINE_UNAVAILABLE",
+                kind: "operational",
+                cause: expect.any(RangeError),
+              });
+              expect(mocks.saveFile, `upload ${label}`).toHaveBeenCalledTimes(1);
+              expect(mocks.deleteStoredFile, `upload ${label}`).toHaveBeenCalledWith(
+                "stored-first.png",
+              );
+              expect(mocks.insertedValues, `upload ${label}`).toBeUndefined();
+              expect(oomUploadLog.error, `upload ${label}`).not.toHaveBeenCalled();
+            } finally {
+              oomUploadSpy.mockRestore();
+            }
+
+            mocks.saveFile.mockClear();
+            mocks.insertedValues = undefined;
+            mocks.parentRows = [
+              makeFileRow({ id: "parent-1", originalName: filename, mimeType: "image/svg+xml" }),
+            ];
+            const oomSaveSpy = vi.spyOn(svgSanitize, fnName).mockImplementationOnce(() => {
+              throw oom();
+            });
+            try {
+              const saveOomReq = makeSaveResultRequest({
+                filename,
+                parentId: "parent-1",
+                toolId: "convert",
+                buffer: payload,
+              });
+              const rejectedSave = await saveResultHandler(saveOomReq, makeReply()).catch(
+                (err: unknown) => err,
+              );
+              expect(rejectedSave, `save-result ${label}`).toBeInstanceOf(
+                formatDecoders.DecoderOutOfMemoryError,
+              );
+              expect(rejectedSave, `save-result ${label}`).toMatchObject({
+                statusCode: 503,
+                code: "ENGINE_UNAVAILABLE",
+                kind: "operational",
+                cause: expect.any(RangeError),
+              });
+              expect(mocks.saveFile, `save-result ${label}`).not.toHaveBeenCalled();
+              expect(mocks.insertedValues, `save-result ${label}`).toBeUndefined();
+              expect(saveOomReq.log.error, `save-result ${label}`).not.toHaveBeenCalled();
+            } finally {
+              oomSaveSpy.mockRestore();
+            }
+          }
+        } finally {
+          decodeSpy.mockRestore();
+          mocks.saveFile.mockImplementation(() => Promise.resolve("stored-result.png"));
+          mocks.validateImageBuffer.mockImplementation(() =>
+            Promise.resolve({ valid: true as const, format: "png", width: 800, height: 600 }),
+          );
+        }
+      });
     });
 
-    it("preserves chain when no toolId provided", () => {
-      const existingChain = ["resize"];
-      const toolId: string | null = null;
-      const newChain = toolId ? [...existingChain, toolId] : existingChain;
-      expect(newChain).toEqual(["resize"]);
-    });
-  });
+    describe("GET /api/v1/files/:id/download S3 fault classification (#2808)", () => {
+      it("normalizes S3 streamStoredFile faults into a 503 storage-unavailable SafeError classified as operational", async () => {
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        mocks.parentRows = [
+          {
+            id: "file-dl-1",
+            userId: "user-1",
+            originalName: "photo.png",
+            storedName: "stored-dl.png",
+            mimeType: "image/png",
+            size: 128,
+            width: 10,
+            height: 10,
+            version: 1,
+            parentId: null,
+            toolChain: null,
+            createdAt: new Date("2025-06-01T12:00:00Z"),
+          },
+        ];
+        mocks.isStorageServiceFault.mockReturnValue(true);
 
-  describe("filename preservation for results", () => {
-    it("preserves parent base name with new extension", () => {
-      const parentName = "vacation-photo.jpg";
-      const ext = ".png";
-      const baseName = parentName.replace(/\.[^.]+$/, "");
-      const resultName = `${baseName}${ext}`;
-      expect(resultName).toBe("vacation-photo.png");
-    });
+        const s3Faults = [
+          Object.assign(new Error("Access Denied"), {
+            name: "AccessDenied",
+            $metadata: { httpStatusCode: 403 },
+          }),
+          Object.assign(new Error("Please reduce your request rate."), {
+            name: "SlowDown",
+            $metadata: { httpStatusCode: 503 },
+          }),
+          Object.assign(new Error("read ECONNRESET"), {
+            name: "TimeoutError",
+            code: "ECONNRESET",
+            syscall: "read",
+            $metadata: { attempts: 3 },
+          }),
+          Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+            code: "ECONNREFUSED",
+            syscall: "connect",
+          }),
+        ];
 
-    it("handles parent name with multiple dots", () => {
-      const parentName = "my.great.photo.jpg";
-      const ext = ".webp";
-      const baseName = parentName.replace(/\.[^.]+$/, "");
-      const resultName = `${baseName}${ext}`;
-      expect(resultName).toBe("my.great.photo.webp");
-    });
+        for (const fault of s3Faults) {
+          mocks.streamStoredFile.mockRejectedValueOnce(fault);
+          const reply = makeReply();
+          const err = await downloadHandler(
+            { params: { id: "file-dl-1" }, log: { warn: vi.fn(), error: vi.fn() } },
+            reply,
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(err).toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            cause: fault,
+          });
+          expect(classifyError(err, "http")).toBe("operational");
+          expect(reply.send).not.toHaveBeenCalled();
+        }
 
-    it("handles parent name without extension", () => {
-      const parentName = "no-extension";
-      const ext = ".png";
-      const baseName = parentName.replace(/\.[^.]+$/, "");
-      const resultName = `${baseName}${ext}`;
-      expect(resultName).toBe("no-extension.png");
+        const unexpectedBug = new TypeError("unexpected S3 client defect");
+        mocks.streamStoredFile.mockRejectedValueOnce(unexpectedBug);
+        const bugErr = await downloadHandler(
+          { params: { id: "file-dl-1" }, log: { warn: vi.fn(), error: vi.fn() } },
+          makeReply(),
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(bugErr).toBe(unexpectedBug);
+        expect(classifyError(bugErr, "http")).toBe("bug");
+      });
+
+      it("rethrows non-syscall local faults from streamStoredFile while keeping 404 for ENOENT, S3 404, and INVALID_STORED_NAME (#2851)", async () => {
+        const { SafeError } = await import("@snapotter/shared");
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        mocks.parentRows = [
+          {
+            id: "file-dl-local",
+            userId: "user-1",
+            originalName: "photo.png",
+            storedName: "stored-dl-local.png",
+            mimeType: "image/png",
+            size: 128,
+            width: 10,
+            height: 10,
+            version: 1,
+            parentId: null,
+            toolChain: null,
+            createdAt: new Date("2025-06-01T12:00:00Z"),
+          },
+        ];
+        mocks.isStorageServiceFault.mockReturnValue(false);
+
+        const nonMissingLocalErrors: Array<{
+          err: Error;
+          expectedKind: "bug" | "operational" | "expected";
+        }> = [
+          {
+            err: Object.assign(new RangeError("File size is greater than 2 GiB"), {
+              code: "ERR_FS_FILE_TOO_LARGE",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("The operation was aborted"), {
+              name: "AbortError",
+              code: "ABORT_ERR",
+            }),
+            expectedKind: "expected",
+          },
+          {
+            err: new TypeError("unexpected failure"),
+            expectedKind: "bug",
+          },
+          {
+            err: new SafeError("The server's storage is full.", {
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
+            err: Object.assign(new Error("The server's storage is full."), {
+              isSafeMessage: true as const,
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
+            err: Object.assign(new Error("ENAMETOOLONG: name too long, open"), {
+              code: "ENAMETOOLONG",
+              syscall: "open",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("non-SafeError invalid stored name"), {
+              code: "INVALID_STORED_NAME",
+            }),
+            expectedKind: "bug",
+          },
+        ];
+
+        for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
+          mocks.streamStoredFile.mockRejectedValueOnce(localFault);
+          const warn = vi.fn();
+          const reply = makeReply();
+          const caught = await downloadHandler(
+            { params: { id: "file-dl-local" }, log: { warn, error: vi.fn() } },
+            reply,
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(caught).toBe(localFault);
+          expect(classifyError(caught, "http")).toBe(expectedKind);
+          expect(warn).not.toHaveBeenCalled();
+          expect(reply.send).not.toHaveBeenCalled();
+        }
+
+        const missingErrors = [
+          Object.assign(new Error("ENOENT: no such file or directory, open"), {
+            code: "ENOENT",
+            syscall: "open",
+          }),
+          Object.assign(new Error("NoSuchKey"), {
+            name: "NoSuchKey",
+            $metadata: { httpStatusCode: 404 },
+          }),
+          new SafeError("Invalid stored file name", {
+            kind: "operational",
+            code: "INVALID_STORED_NAME",
+            statusCode: 400,
+          }),
+          Object.assign(new Error("Invalid stored file name"), {
+            isSafeMessage: true as const,
+            kind: "operational",
+            code: "INVALID_STORED_NAME",
+            statusCode: 400,
+          }),
+        ];
+
+        for (const miss of missingErrors) {
+          mocks.streamStoredFile.mockRejectedValueOnce(miss);
+          const warn = vi.fn();
+          const reply = makeReply();
+          await downloadHandler(
+            { params: { id: "file-dl-local" }, log: { warn, error: vi.fn() } },
+            reply,
+          );
+          expect(reply.statusCode).toBe(404);
+          expect(reply.payload).toEqual({ error: "File not found in storage" });
+          expect(warn).toHaveBeenCalledWith(
+            { fileId: "file-dl-local", storedName: "stored-dl-local.png" },
+            "library download: stored blob missing",
+          );
+        }
+      });
     });
   });
 });

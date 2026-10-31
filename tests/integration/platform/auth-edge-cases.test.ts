@@ -4,9 +4,11 @@
  */
 
 import { asc, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { authAttempts } from "../../../apps/api/src/lib/metrics.js";
+import { normalizePassword } from "../../../apps/api/src/lib/password-form.js";
+import { hashPassword } from "../../../apps/api/src/plugins/auth.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -27,6 +29,33 @@ async function clearSetting(key: string): Promise<void> {
   await db.delete(schema.settings).where(eq(schema.settings.key, key));
 }
 
+// Faults only the settings-table select for `targetKey`, leaving earlier
+// settings reads (login throttle, MFA policy) and full-row selects intact.
+function breakSettingRead(targetKey: string) {
+  const originalSelect = db.select.bind(db);
+  return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+    const selection = args[0] as Record<string, unknown> | undefined;
+    // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+    const builder = (originalSelect as any)(...args);
+    if (selection && "value" in selection) {
+      const origFrom = builder.from.bind(builder);
+      builder.from = (...fromArgs: unknown[]) => {
+        const query = origFrom(...fromArgs);
+        const origWhere = query.where.bind(query);
+        query.where = (...whereArgs: unknown[]) => {
+          const filtered = origWhere(...whereArgs);
+          if (filtered.toSQL().params.includes(targetKey)) {
+            throw new Error(`simulated settings store failure for ${targetKey}`);
+          }
+          return filtered;
+        };
+        return query;
+      };
+    }
+    return builder;
+  });
+}
+
 beforeAll(async () => {
   testApp = await buildTestApp();
   // The timing-oracle test below fires 10 wrong-password attempts at "admin";
@@ -36,12 +65,12 @@ beforeAll(async () => {
   // login-throttle.test.ts.
   await setSetting("loginThrottleMaxFailures", "100000");
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await clearSetting("loginThrottleMaxFailures");
   await testApp.cleanup();
-}, 10_000);
+});
 
 // Helper: register a user, clear mustChangePassword, return { username, password }
 async function createUser(
@@ -82,6 +111,37 @@ async function loginAs(username: string, password: string): Promise<string> {
 // LOGIN FAILURES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Login failures", () => {
+  it("rejects password over 1024 characters with VALIDATION_ERROR and logs audit row (#2309)", async () => {
+    const start = Date.now();
+    const username = uid();
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: "A".repeat(1025) },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body).toMatchObject({
+      code: "VALIDATION_ERROR",
+      rule: "maxLength",
+      maxLength: 1024,
+    });
+
+    const rows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "LOGIN_FAILED"))
+      .orderBy(asc(schema.auditLog.createdAt));
+
+    const auditRow = rows.find((r) => (r.details as any)?.username === username);
+
+    expect(auditRow).toBeDefined();
+    expect(auditRow.action).toBe("LOGIN_FAILED");
+    const details = auditRow.details as any;
+    expect(details?.reason).toBe("password_too_long");
+  });
+
   it("empty body returns 400", async () => {
     const res = await testApp.app.inject({
       method: "POST",
@@ -434,32 +494,200 @@ describe("Register validation", () => {
     expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
   });
 
-  it("non-existent team name returns 400", async () => {
-    const res = await testApp.app.inject({
+  it("unknown, deleted, or blank team returns 400 UNKNOWN_TEAM and does not create the user (#2646)", async () => {
+    const teamName = `deleted-team-${Date.now()}`;
+    const createTeamRes = await testApp.app.inject({
       method: "POST",
-      url: "/api/auth/register",
+      url: "/api/v1/teams",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: {
-        username: uid(),
-        password: "ValidPass1",
-        team: `ghost_team_${Date.now()}`,
-      },
+      payload: { name: teamName },
     });
-    expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    expect(createTeamRes.statusCode).toBe(201);
+    const teamId = JSON.parse(createTeamRes.body).id as string;
+
+    const deleteTeamRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteTeamRes.statusCode).toBe(200);
+
+    for (const badTeam of [`ghost_team_${Date.now()}`, teamName, teamId, "", "   "]) {
+      const username = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          username,
+          password: "ValidPass1",
+          team: badTeam,
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, username));
+      expect(rows).toHaveLength(0);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a team is deleted
+    // during scrypt hashing after passing the initial pre-check.
+    const raceTeam = `tx-reg-team-${Date.now()}`;
+    const raceTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceTeam },
+    });
+    expect(raceTeamRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.teams).where(eq(schema.teams.name, raceTeam));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const raceUsername = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: raceUsername, password: "ValidPass1", team: raceTeam },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+      const rows = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, raceUsername));
+      expect(rows).toHaveLength(0);
+    } finally {
+      txSpy.mockRestore();
+    }
+
+    // If the team is renamed during scrypt hashing, the 201 response reflects
+    // the new name read from the FOR SHARE row inside the transaction.
+    const oldTeamName = `tx-rename-old-${Date.now()}`;
+    const newTeamName = `tx-rename-new-${Date.now()}`;
+    const renameTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: oldTeamName },
+    });
+    expect(renameTeamRes.statusCode).toBe(201);
+
+    const renameSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db
+          .update(schema.teams)
+          .set({ name: newTeamName })
+          .where(eq(schema.teams.name, oldTeamName));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const renamedUsername = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: renamedUsername, password: "ValidPass1", team: oldTeamName },
+      });
+      expect(res.statusCode).toBe(201);
+      expect(JSON.parse(res.body).team).toBe(newTeamName);
+    } finally {
+      renameSpy.mockRestore();
+    }
   });
 
-  it("unknown role defaults to user", async () => {
-    const username = uid();
-    const res = await testApp.app.inject({
+  it("unknown or deleted role returns 400 UNKNOWN_ROLE and does not create the user (#1582)", async () => {
+    const roleName = `deleted-role-${Date.now()}`;
+    const createRoleRes = await testApp.app.inject({
       method: "POST",
-      url: "/api/auth/register",
+      url: "/api/v1/roles",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { username, password: "ValidPass1", role: "bogus" },
+      payload: { name: roleName, permissions: ["tools:use"] },
     });
-    expect(res.statusCode).toBe(201);
-    const body = JSON.parse(res.body);
-    expect(body.role).toBe("user");
+    expect(createRoleRes.statusCode).toBe(201);
+    const roleId = JSON.parse(createRoleRes.body).id as string;
+
+    const deleteRoleRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/roles/${roleId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteRoleRes.statusCode).toBe(200);
+
+    for (const badRole of ["bogus", roleName, ""]) {
+      const username = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username, password: "ValidPass1", role: badRole },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, username));
+      expect(rows).toHaveLength(0);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a custom role is deleted
+    // during scrypt hashing after passing the initial pre-check.
+    const raceRole = `tx-reg-${Date.now()}`;
+    const raceRoleRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceRole, permissions: ["tools:use"] },
+    });
+    expect(raceRoleRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.roles).where(eq(schema.roles.name, raceRole));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const raceUsername = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: raceUsername, password: "ValidPass1", role: raceRole },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+      const rows = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, raceUsername));
+      expect(rows).toHaveLength(0);
+    } finally {
+      txSpy.mockRestore();
+    }
   });
 
   it("duplicate username returns 409", async () => {
@@ -795,6 +1023,418 @@ describe("Concurrent session limit", () => {
       await clearSetting("maxSessionsPerUser");
     }
   });
+
+  it("serializes concurrent logins for the same user and preserves the newly minted session on createdAt ties (#3025)", async () => {
+    const { username, password, id } = await createUser();
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      // 1. Concurrent logins with an older existing session t0: without per-user
+      // serialization in evictExcessUserSessions, both transactions see only [t0, self],
+      // both evict t0, and 2 sessions survive past maxSessionsPerUser = 1.
+      const t0 = await loginAs(username, password);
+      await db
+        .update(schema.sessions)
+        .set({ createdAt: new Date(Date.now() - 60_000) })
+        .where(eq(schema.sessions.id, t0));
+
+      let insertedCount = 0;
+      let releaseBothInserts!: () => void;
+      const bothInserted = new Promise<void>((resolve) => {
+        releaseBothInserts = resolve;
+      });
+
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const syncedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "insert") {
+                const origInsert = Reflect.get(target, prop, receiver) as (table: unknown) => {
+                  values: (vals: Record<string, unknown>) => Promise<unknown>;
+                };
+                return (table: unknown) => {
+                  const builder = origInsert.call(target, table);
+                  if (table !== schema.sessions) return builder;
+                  const origValues = builder.values.bind(builder);
+                  builder.values = async (vals: Record<string, unknown>) => {
+                    try {
+                      const res = await origValues(vals);
+                      insertedCount += 1;
+                      if (insertedCount >= 2) {
+                        releaseBothInserts();
+                      }
+                      await bothInserted;
+                      return res;
+                    } catch (err) {
+                      releaseBothInserts();
+                      throw err;
+                    }
+                  };
+                  return builder;
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(syncedTx);
+        }, config)) as unknown as typeof db.transaction);
+
+      let t1: string;
+      let t2: string;
+      try {
+        [t1, t2] = await Promise.all([loginAs(username, password), loginAs(username, password)]);
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      const remainingAfterConcurrent = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      const concurrentIds = remainingAfterConcurrent.map((r) => r.id);
+
+      expect(concurrentIds).toHaveLength(1);
+      expect(concurrentIds[0]).not.toBe(t0);
+      expect([t1, t2]).toContain(concurrentIds[0]);
+
+      // 2. Same-millisecond createdAt tie: updating the prior surviving session after
+      // inserting t3 places the prior session's tuple after t3 on the heap page, so
+      // ORDER BY created_at ASC returns the newly inserted session t3 first on the tie.
+      const priorSurvivor = concurrentIds[0];
+      const tiedCreatedAt = new Date();
+
+      const tieSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const tiedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "insert") {
+                const origInsert = Reflect.get(target, prop, receiver) as (table: unknown) => {
+                  values: (vals: Record<string, unknown>) => Promise<unknown>;
+                };
+                return (table: unknown) => {
+                  const builder = origInsert.call(target, table);
+                  if (table !== schema.sessions) return builder;
+                  const origValues = builder.values.bind(builder);
+                  builder.values = async (vals: Record<string, unknown>) => {
+                    const res = await origValues({ ...vals, createdAt: tiedCreatedAt });
+                    await (
+                      tx as unknown as {
+                        update: typeof db.update;
+                      }
+                    )
+                      .update(schema.sessions)
+                      .set({ createdAt: tiedCreatedAt })
+                      .where(eq(schema.sessions.id, priorSurvivor));
+                    return res;
+                  };
+                  return builder;
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(tiedTx);
+        }, config)) as unknown as typeof db.transaction);
+
+      let t3: string;
+      try {
+        t3 = await loginAs(username, password);
+      } finally {
+        tieSpy.mockRestore();
+      }
+
+      const remainingAfterTie = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remainingAfterTie.map((r) => r.id)).toEqual([t3]);
+
+      const survivingRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/auth/session",
+        headers: { authorization: `Bearer ${t3}` },
+      });
+      expect(survivingRes.statusCode).toBe(200);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
+  it("fails closed with 500 and creates no session when reading maxSessionsPerUser fails (#2517)", async () => {
+    const { username, password, id } = await createUser();
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      const t1 = await loginAs(username, password);
+      const selectSpy = breakSettingRead("maxSessionsPerUser");
+      try {
+        const res = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(res.statusCode).toBe(500);
+        expect(JSON.parse(res.body).token).toBeUndefined();
+        expect(String(res.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      } finally {
+        selectSpy.mockRestore();
+      }
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remaining.map((r) => r.id)).toEqual([t1]);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
+  it("rolls back the new session when FIFO eviction fails inside the login transaction (#2517)", async () => {
+    const { username, password, id } = await createUser();
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      const t1 = await loginAs(username, password);
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const failingTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "delete") {
+                return () => {
+                  throw new Error("simulated FIFO eviction delete failure");
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(failingTx);
+        }, config)) as unknown as typeof db.transaction);
+      try {
+        const res = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(res.statusCode).toBe(500);
+        expect(JSON.parse(res.body).token).toBeUndefined();
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remaining.map((r) => r.id)).toEqual([t1]);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
+  it("rolls back the new session and prior session eviction when schema.teams select fails during login (#3118)", async () => {
+    const { username, password, id } = await createUser();
+
+    function faultTeamsSelectOnce() {
+      const state = { faulted: false };
+      // biome-ignore lint/suspicious/noExplicitAny: wrap Drizzle select builder on both db and tx
+      const wrapSelect = (origSelect: (...args: any[]) => any) => {
+        return (...args: unknown[]) => {
+          const builder = origSelect(...args);
+          const origFrom = builder.from.bind(builder);
+          builder.from = (table: unknown, ...fromArgs: unknown[]) => {
+            if (!state.faulted && table === schema.teams) {
+              state.faulted = true;
+              throw new Error("simulated transient teams lookup failure");
+            }
+            return origFrom(table, ...fromArgs);
+          };
+          return builder;
+        };
+      };
+
+      const origDbSelect = db.select.bind(db);
+      const selectSpy = vi.spyOn(db, "select").mockImplementation(wrapSelect(origDbSelect));
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          // biome-ignore lint/suspicious/noExplicitAny: proxy tx.select to fault schema.teams inside transaction
+          const origTxSelect = (tx as any).select.bind(tx);
+          const wrappedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "select") {
+                return wrapSelect(origTxSelect);
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(wrappedTx);
+        }, config)) as unknown as typeof db.transaction);
+
+      return {
+        state,
+        restore: () => {
+          txSpy.mockRestore();
+          selectSpy.mockRestore();
+        },
+      };
+    }
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      const t1 = await loginAs(username, password);
+      const passwordSuccessCount = async (): Promise<number> => {
+        const metric = await authAttempts.get();
+        const row = metric.values.find(
+          (v) => v.labels.method === "password" && v.labels.result === "success",
+        );
+        return row?.value ?? 0;
+      };
+      const successBefore = await passwordSuccessCount();
+      const loginSuccessBefore = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "LOGIN_SUCCESS"));
+      const userAuditBefore = loginSuccessBefore.filter((row) => row.actorId === id);
+
+      const teamsFault = faultTeamsSelectOnce();
+      try {
+        const res = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(res.statusCode).toBe(500);
+        expect(teamsFault.state.faulted).toBe(true);
+        expect(JSON.parse(res.body).token).toBeUndefined();
+        expect(String(res.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      } finally {
+        teamsFault.restore();
+      }
+
+      expect(await passwordSuccessCount()).toBe(successBefore);
+
+      const remainingAfterFault = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remainingAfterFault.map((r) => r.id)).toEqual([t1]);
+
+      const loginSuccessAfterFault = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "LOGIN_SUCCESS"));
+      expect(loginSuccessAfterFault.filter((row) => row.actorId === id)).toHaveLength(
+        userAuditBefore.length,
+      );
+
+      // Prior session t1 remains valid after the rolled-back login attempt.
+      const priorSessionRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/auth/session",
+        headers: { authorization: `Bearer ${t1}` },
+      });
+      expect(priorSessionRes.statusCode).toBe(200);
+
+      // Retrying login after the transient fault clears succeeds and evicts t1.
+      const retryRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password },
+      });
+      expect(retryRes.statusCode).toBe(200);
+      const retryBody = JSON.parse(retryRes.body);
+      expect(typeof retryBody.token).toBe("string");
+      expect(retryBody.user.teamName).toBe("Default");
+      expect(retryBody.user.permissions).toContain("tools:use");
+      expect(String(retryRes.headers["set-cookie"])).toContain(
+        `snapotter-session=${retryBody.token}`,
+      );
+
+      const remainingAfterRetry = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remainingAfterRetry.map((r) => r.id)).toEqual([retryBody.token]);
+
+      // If the user's team changes between the initial select and db.transaction,
+      // login resolves teamName from lockedUser.team inside the transaction.
+      const newTeamName = `login-tx-team-${Date.now()}`;
+      const createTeamRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/teams",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { name: newTeamName },
+      });
+      expect(createTeamRes.statusCode).toBe(201);
+      const newTeamId = JSON.parse(createTeamRes.body).id as string;
+
+      const origTx = db.transaction.bind(db);
+      const teamRaceSpy = vi
+        .spyOn(db, "transaction")
+        // biome-ignore lint/suspicious/noExplicitAny: wrap db.transaction to simulate concurrent team move
+        .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+          await db.update(schema.users).set({ team: newTeamId }).where(eq(schema.users.id, id));
+          return origTx(fn, ...rest);
+        });
+      try {
+        const teamRaceRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(teamRaceRes.statusCode).toBe(200);
+        expect(JSON.parse(teamRaceRes.body).user.teamName).toBe(newTeamName);
+      } finally {
+        teamRaceSpy.mockRestore();
+      }
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
+  it("treats blank or out-of-range maxSessionsPerUser as disabled (0) rather than failing login (#2517)", async () => {
+    const { username, password, id } = await createUser();
+
+    try {
+      for (const bad of ["", "-1", "Infinity"]) {
+        await setSetting("maxSessionsPerUser", bad);
+        const token = await loginAs(username, password);
+        expect(token).toBeDefined();
+      }
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remaining).toHaveLength(3);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -825,6 +1465,74 @@ describe("Session idle timeout", () => {
 
       const [row] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
       expect(row).toBeUndefined();
+    } finally {
+      await clearSetting("sessionIdleTimeoutMinutes");
+    }
+  });
+
+  it("fails closed with 500 instead of authenticating an idle-expired session when reading sessionIdleTimeoutMinutes fails (#2517)", async () => {
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
+
+    await db
+      .update(schema.sessions)
+      .set({ lastActivity: new Date(Date.now() - 5 * 60 * 1000) })
+      .where(eq(schema.sessions.id, token));
+
+    await setSetting("sessionIdleTimeoutMinutes", "1");
+    try {
+      const selectSpy = breakSettingRead("sessionIdleTimeoutMinutes");
+      try {
+        const res = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/api-keys",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(res.statusCode).toBe(500);
+
+        const sessionRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/auth/session",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(sessionRes.statusCode).toBe(500);
+        expect(JSON.parse(sessionRes.body).user).toBeUndefined();
+      } finally {
+        selectSpy.mockRestore();
+      }
+
+      // Once the DB recovers, the stale session is still rejected as IDLE_TIMEOUT.
+      const afterRecovery = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/api-keys",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(afterRecovery.statusCode).toBe(401);
+      expect(JSON.parse(afterRecovery.body).code).toBe("IDLE_TIMEOUT");
+    } finally {
+      await clearSetting("sessionIdleTimeoutMinutes");
+    }
+  });
+
+  it("treats blank or out-of-range sessionIdleTimeoutMinutes as disabled (0) (#2517)", async () => {
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
+
+    await db
+      .update(schema.sessions)
+      .set({ lastActivity: new Date(Date.now() - 5 * 60 * 1000) })
+      .where(eq(schema.sessions.id, token));
+
+    try {
+      for (const bad of ["", "-1", "Infinity"]) {
+        await setSetting("sessionIdleTimeoutMinutes", bad);
+        const res = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/api-keys",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(res.statusCode).toBe(200);
+      }
     } finally {
       await clearSetting("sessionIdleTimeoutMinutes");
     }
@@ -946,21 +1654,83 @@ describe("Team resolution by id", () => {
     expect(row.team).toBe(defaultTeam.id);
   });
 
-  it("update with an unknown team returns 400 and does not touch the row", async () => {
-    const { id } = await createUser();
+  it("update with an unknown, deleted, or blank team returns 400 UNKNOWN_TEAM and does not touch the row (#2646)", async () => {
+    const { id } = await createUser({ role: "user" });
     const [before] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
-    const res = await testApp.app.inject({
-      method: "PUT",
-      url: `/api/auth/users/${id}`,
+    const teamName = `deleted-upd-team-${Date.now()}`;
+    const createTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { team: `ghost_team_${Date.now()}` },
+      payload: { name: teamName },
     });
-    expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    expect(createTeamRes.statusCode).toBe(201);
+    const teamId = JSON.parse(createTeamRes.body).id as string;
 
-    const [after] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-    expect(after.team).toBe(before.team);
+    const deleteTeamRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteTeamRes.statusCode).toBe(200);
+
+    for (const badTeam of [`ghost_team_${Date.now()}`, teamName, teamId, "", "   "]) {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: "editor", team: badTeam },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+
+      const [after] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+      expect(after.role).toBe(before.role);
+      expect(after.team).toBe(before.team);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a team is deleted
+    // between the pre-check and the transaction.
+    const raceTeam = `tx-upd-team-${Date.now()}`;
+    const raceTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceTeam },
+    });
+    expect(raceTeamRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.teams).where(eq(schema.teams.name, raceTeam));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: "editor", team: raceTeam },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+
+      const [after] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+      expect(after.role).toBe(before.role);
+      expect(after.team).toBe(before.team);
+    } finally {
+      txSpy.mockRestore();
+    }
   });
 });
 
@@ -968,22 +1738,99 @@ describe("Team resolution by id", () => {
 // ADMIN USER-MANAGEMENT GUARDS (update / delete / reset authority + shape)
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Admin user-management guards", () => {
-  it("update with an unknown role is a no-op (200, role unchanged)", async () => {
-    const { id } = await createUser({ role: "user" });
+  it("update with an unknown or deleted role returns 400 UNKNOWN_ROLE and leaves the user unchanged (#1582)", async () => {
+    const { id } = await createUser({ role: "editor" });
 
-    const res = await testApp.app.inject({
-      method: "PUT",
-      url: `/api/auth/users/${id}`,
+    const roleName = `deleted-upd-${Date.now()}`;
+    const createRoleRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { role: "totally-bogus-role" },
+      payload: { name: roleName, permissions: ["tools:use"] },
     });
-    expect(res.statusCode).toBe(200);
+    expect(createRoleRes.statusCode).toBe(201);
+    const roleId = JSON.parse(createRoleRes.body).id as string;
 
-    const [row] = await db
-      .select({ role: schema.users.role })
+    const deleteRoleRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/roles/${roleId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteRoleRes.statusCode).toBe(200);
+
+    const [before] = await db
+      .select({ role: schema.users.role, team: schema.users.team })
       .from(schema.users)
       .where(eq(schema.users.id, id));
-    expect(row.role).toBe("user");
+
+    const otherTeamName = `keep-team-${Date.now()}`;
+    const createTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: otherTeamName },
+    });
+    expect(createTeamRes.statusCode).toBe(201);
+
+    for (const badRole of ["totally-bogus-role", roleName, ""]) {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: badRole, team: otherTeamName },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+
+      const [row] = await db
+        .select({ role: schema.users.role, team: schema.users.team })
+        .from(schema.users)
+        .where(eq(schema.users.id, id));
+      expect(row).toEqual(before);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a custom role is deleted
+    // between the pre-check and the transaction.
+    const raceRole = `tx-upd-${Date.now()}`;
+    const raceRoleRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceRole, permissions: ["tools:use"] },
+    });
+    expect(raceRoleRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.roles).where(eq(schema.roles.name, raceRole));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: raceRole, team: otherTeamName },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+      const [row] = await db
+        .select({ role: schema.users.role, team: schema.users.team })
+        .from(schema.users)
+        .where(eq(schema.users.id, id));
+      expect(row).toEqual(before);
+    } finally {
+      txSpy.mockRestore();
+    }
   });
 
   it("update against an unknown user id returns 404", async () => {
@@ -1116,7 +1963,13 @@ describe("Admin user-management guards", () => {
       payload: { newPassword: "weak" },
     });
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      rule: "minLength",
+      rules: ["minLength", "uppercase", "digit"],
+      minLength: 8,
+      error: expect.stringMatching(/^Password must/),
+    });
   });
 
   it("reset-password on a passwordless (OIDC/SSO) user returns 400 OIDC_NO_PASSWORD", async () => {
@@ -1162,6 +2015,539 @@ describe("Admin user-management guards", () => {
     });
     expect(res.statusCode).toBe(401);
     expect(JSON.parse(res.body).code).toBe("INVALID_PASSWORD");
+  });
+
+  // The client can't read the password policy (a user who must change their
+  // password can't reach /v1/settings), so a weak password names the rule it
+  // broke and the client words it in the UI language (#1446). `error` stays
+  // the English sentence: the Settings dialog still shows it as-is.
+  async function loggedInUser() {
+    const { username, password } = await createUser();
+    return { username, password, token: await loginAs(username, password) };
+  }
+
+  function sendChangePassword(user: { password: string; token: string }, newPassword: string) {
+    return testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/change-password",
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { currentPassword: user.password, newPassword },
+    });
+  }
+
+  it.each([
+    ["Short1A", { rule: "minLength", minLength: 8 }],
+    ["alllower1", { rule: "uppercase" }],
+    ["ALLUPPER1", { rule: "lowercase" }],
+    ["NoDigitsHere", { rule: "digit" }],
+  ])("change-password to %s names the broken rule", async (newPassword, expected) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: expect.stringMatching(/^Password must/),
+      ...expected,
+    });
+  });
+
+  // A password that breaks several rules names all of them, so the user can fix
+  // them in one go instead of one retry per rule (#1569). `rule` stays the first.
+  it("change-password lists every broken rule, first one in `rule`", async () => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, "abc");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        code: "VALIDATION_ERROR",
+        rule: "minLength",
+        minLength: 8,
+        rules: ["minLength", "uppercase", "digit", "special"],
+      });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  it("change-password sends a one-element rules list when a single rule is broken", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "alllower1");
+
+    const body = JSON.parse(res.body);
+    expect(body).toMatchObject({ rule: "uppercase", rules: ["uppercase"] });
+    // The length is only echoed when the length rule is among the broken ones.
+    expect(body).not.toHaveProperty("minLength");
+  });
+
+  it("change-password names all five rules, in a fixed order, for a password that meets none", async () => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      // A single Thai letter: no case, not a digit, not a symbol, and too short.
+      const res = await sendChangePassword(user, "\u0e01");
+
+      expect(JSON.parse(res.body)).toMatchObject({
+        rule: "minLength",
+        rules: ["minLength", "uppercase", "lowercase", "digit", "special"],
+      });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  it("change-password names the special-character rule when the policy requires one", async () => {
+    // The user first: createUser's own password has no special character.
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, "NoSpecial9");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", rule: "special" });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  // The strength rules count an uppercase or lowercase letter, a digit, or a character
+  // that isn't a letter, mark or number, in any script (#1568).
+  it.each([
+    ["a Cyrillic password with both cases", "Пароль-пароль1"],
+    ["an Eastern Arabic digit", "Пароль\u0661\u0662\u0663"],
+  ])("change-password accepts %s under the default rules", async (_label, newPassword) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it.each([
+    ["a space", "Abc defg1"],
+    ["a euro sign", "Abcdefg1\u20ac"],
+    ["a pound sign", "Abcdefg1\u00a3"],
+    ["a tilde", "Abcdefg1~"],
+    ["a backtick", "Abcdefg1`"],
+    ["ASCII punctuation", "Abcdefg1!"],
+  ])("change-password counts %s as a special character", async (_label, newPassword) => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode).toBe(200);
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  // A control character can be set but never typed back: login refuses NUL before
+  // the user lookup, and browsers strip LF and CR from password inputs (#2055).
+  it.each([
+    ["NUL", "Abcdefg1\u0000"],
+    ["a tab", "Abcdefg1\t"],
+    ["a trailing newline", "Abcdefg1\n"],
+    ["a carriage return", "Abcdefg1\r"],
+    ["DEL", "Abcdefg1\u007f"],
+    ["a C1 control", "Abcdefg1\u0085"],
+  ])("change-password refuses %s and names the rule", async (_label, newPassword) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must not contain control characters",
+      rule: "controlCharacter",
+    });
+  });
+
+  it("change-password names the maximum length for a password over 1024 characters (#2037)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), `Aa1${"a".repeat(1022)}`);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must be at most 1024 characters",
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: 1024,
+    });
+  });
+
+  it("change-password allows 1024 code points that exceed 1024 code units, handling NFC/NFD variations (#2310)", async () => {
+    // 500 '𐐀's + 'Aa1' + 521 'a's = 1024 code points, 1524 code units.
+    const newPassword = `Aa1${"𐐀".repeat(500)}${"a".repeat(521)}`;
+    const user = await loggedInUser();
+
+    const res = await sendChangePassword(user, newPassword);
+    expect(res.statusCode).toBe(200);
+
+    // Should also allow login with the new password
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: user.username, password: newPassword },
+    });
+    expect(loginRes.statusCode).toBe(200);
+  });
+
+  it("change-password prevents 1025 code points that exceed 1024 code points but are under 4096 code units (#2310)", async () => {
+    const newPassword = `Aa1${"𐐀".repeat(501)}${"a".repeat(521)}`;
+    const user = await loggedInUser();
+    const res = await sendChangePassword(user, newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must be at most 1024 characters",
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: 1024,
+    });
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: user.username, password: newPassword },
+    });
+
+    expect(loginRes.statusCode).toBe(400);
+    expect(loginRes.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must be at most 1024 characters",
+      rule: "maxLength",
+      maxLength: 1024,
+    });
+
+    // Check audit log
+    const logs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "LOGIN_FAILED"));
+    const matchingLog = logs.find((l) => {
+      const details = l.details as any;
+      return details.username === user.username && details.reason === "password_too_long";
+    });
+    expect(matchingLog).toBeDefined();
+  });
+
+  it("change-password answers an over-long current password as incorrect, not a schema failure (#2037)", async () => {
+    const user = await loggedInUser();
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/change-password",
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { currentPassword: "a".repeat(1025), newPassword: "ValidPass2" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body)).toMatchObject({ code: "INVALID_PASSWORD" });
+  });
+
+  it("register names the maximum length too, and accepts a password of exactly 1024", async () => {
+    const tooLong = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: `max_${Date.now()}`, password: `Aa1${"a".repeat(1022)}` },
+    });
+    expect(tooLong.statusCode).toBe(400);
+    expect(JSON.parse(tooLong.body)).toMatchObject({ rule: "maxLength", maxLength: 1024 });
+
+    const exactName = `max_ok_${Date.now()}`;
+    const exactPassword = `Aa1${"a".repeat(1021)}`;
+    const exact = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: exactName, password: exactPassword },
+    });
+    expect(exact.statusCode, exact.body).toBe(201);
+
+    // What the policy accepts the login schema must accept too.
+    const signIn = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: exactName, password: exactPassword },
+    });
+    expect(signIn.statusCode, signIn.body).toBe(200);
+  });
+
+  it("register refuses a control character in the password", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: `ctl_${Date.now()}`, password: "Abcdefg1\u0000" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "controlCharacter",
+      rules: ["controlCharacter"],
+    });
+  });
+
+  // A lone UTF-16 surrogate can't be encoded: Node's UTF-8 turns each one into
+  // U+FFFD before scrypt sees it, so "\uD800" x8 and "\uFFFD" x8 hashed alike and
+  // every string of lone surrogates of that length logged in (#2170). Only an API
+  // client can send one; a browser form can't produce it.
+  it.each([
+    ["a lone high surrogate", "Abcdefg1\uD800"],
+    ["a lone low surrogate", "Abcdefg1\uDC00"],
+    ["a high surrogate followed by a letter", "Abcdefg1\uD800x"],
+    ["reversed surrogates (low before high)", "Abcdefg1\uDC00\uD800"],
+  ])("change-password refuses %s and names the rule (#2170)", async (_label, newPassword) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    });
+  });
+
+  it("register refuses a lone surrogate in the password (#2170)", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: `sur_${Date.now()}`, password: "Abcdefg1\uD800" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    });
+  });
+
+  // Setting one is refused, but signing in is not touched: an account whose password
+  // was set with a lone surrogate before the fix must still reach its owner. At login
+  // the surrogate compares as U+FFFD (Node's UTF-8 replaces it), which is why setting
+  // one is refused at all. A later hardening of login with the same check would lock
+  // these accounts out, so this pins the asymmetry.
+  it("an account already holding a lone-surrogate password can still sign in (#2170)", async () => {
+    const { username, id } = await createUser();
+    const stored = "Abcdefg1\uD800";
+    await db
+      .update(schema.users)
+      .set({ passwordHash: await hashPassword(normalizePassword(stored)) })
+      .where(eq(schema.users.id, id));
+
+    const token = await loginAs(username, stored);
+    expect(token).toEqual(expect.any(String));
+    // The weakness the refusal exists for: the same hash opens with U+FFFD.
+    expect(await loginAs(username, "Abcdefg1\uFFFD")).toEqual(expect.any(String));
+    // And the signed-in owner can rotate away from that legacy password.
+    const rotate = await sendChangePassword({ password: stored, token }, "CleanPass1");
+    expect(rotate.statusCode, rotate.body).toBe(200);
+  });
+
+  it("still accepts a surrogate pair, which is a real character (#2170)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "Abcdefg1\u{1F600}");
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
+  it("lets a user sign in with the non-Latin password they just set", async () => {
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
+    const newPassword = "Пароль-пароль1";
+    const change = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/change-password",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { currentPassword: password, newPassword },
+    });
+    expect(change.statusCode).toBe(200);
+
+    await expect(loginAs(username, newPassword)).resolves.toEqual(expect.any(String));
+  });
+
+  it.each([
+    ["only uppercase Cyrillic letters", "ПАРОЛЬ123", "lowercase"],
+    ["only lowercase Cyrillic letters", "пароль123", "uppercase"],
+    ["no digit in any script", "Парольпароль", "digit"],
+  ])("change-password still rejects %s", async (_label, newPassword, rule) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", rule });
+  });
+
+  it.each([
+    ["letters and digits of any script", "Пароль\u0661\u0662\u0663д"],
+    ["combining marks that belong to a letter", "Abcdefg1e\u0301"],
+    ["a zero-width space", "Abcdefg1\u200b"],
+  ])("does not count %s as special", async (_label, newPassword) => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ rule: "special" });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  // The Security tab shows a default-on rule as on for any stored value except
+  // "false", so enforcement has to agree: a row such as "TRUE" or "1" (a hand
+  // edit, or one written before settings were validated in #618) can't show a
+  // switch that's on while enforcing nothing (#2026).
+  it.each([
+    ["passwordRequireUppercase", "TRUE", "alllower1", "uppercase"],
+    ["passwordRequireDigit", "FALSE", "NoDigitsHere", "digit"],
+    ["passwordRequireLowercase", "1", "ALLUPPER1", "lowercase"],
+    ["passwordRequireDigit", "yes", "NoDigitsHere", "digit"],
+    ["passwordRequireUppercase", "", "alllower1", "uppercase"],
+  ])("enforces %s when its stored value is %j", async (key, stored, newPassword, rule) => {
+    const user = await loggedInUser();
+    await setSetting(key, stored);
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", rule });
+    } finally {
+      await clearSetting(key);
+    }
+  });
+
+  it.each([
+    ["passwordRequireUppercase", "false", "alllower1"],
+    ["passwordRequireLowercase", "false", "ALLUPPER1"],
+    ["passwordRequireDigit", "false", "NoDigitsHere"],
+  ])("does not enforce %s when its stored value is %j", async (key, stored, newPassword) => {
+    const user = await loggedInUser();
+    await setSetting(key, stored);
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode, res.body).toBe(200);
+    } finally {
+      await clearSetting(key);
+    }
+  });
+
+  it("leaves the special-character rule off unless its stored value is exactly true", async () => {
+    // The Security tab shows this one as on only for "true", and it defaults off.
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "1");
+    try {
+      const res = await sendChangePassword(user, "NoSpecial9");
+
+      expect(res.statusCode, res.body).toBe(200);
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  it("change-password echoes the configured minimum length, not the default", async () => {
+    const user = await loggedInUser();
+    await setSetting("passwordMinLength", "12");
+    try {
+      const res = await sendChangePassword(user, "Elevenchar1");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 12 });
+    } finally {
+      await clearSetting("passwordMinLength");
+    }
+  });
+
+  it("change-password falls back to 8 when stored passwordMinLength is blank or out of range (#1713)", async () => {
+    const user = await loggedInUser();
+    try {
+      for (const bad of ["", "0", "Infinity", "200"]) {
+        await setSetting("passwordMinLength", bad);
+        const res = await sendChangePassword(user, "Aa1");
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 8 });
+      }
+      await setSetting("passwordMinLength", "Infinity");
+      const okRes = await sendChangePassword(user, "Abcdef12");
+      expect(okRes.statusCode, okRes.body).toBe(200);
+    } finally {
+      await clearSetting("passwordMinLength");
+    }
+  });
+
+  // The minimum counts characters, not UTF-16 code units: an astral character is
+  // one character but two units, so counting units let four of them meet a
+  // minimum of 8 (#2057). Mathematical bold letters and digits satisfy the
+  // uppercase, lowercase and digit rules since #1568.
+  it("change-password counts a character outside the BMP once toward the minimum (#2057)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "𝐀𝐚𝟏𝐛");
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "minLength",
+      rules: ["minLength"],
+      minLength: 8,
+    });
+  });
+
+  it("change-password accepts a password of exactly the minimum in characters, astral or not (#2057)", async () => {
+    // Eight characters, sixteen UTF-16 code units, and one of each required class.
+    const res = await sendChangePassword(await loggedInUser(), "𝐀𝐚𝟏𝐛𝐜𝐝𝐞𝐟");
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
+  it("change-password counts the same for a password of plain characters at the minimum (#2057)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "Abcdef12");
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
+  it("an admin can switch every password rule off and register a one-character password with no letters (#1028)", async () => {
+    const policy = {
+      passwordMinLength: "1",
+      passwordRequireUppercase: "false",
+      passwordRequireLowercase: "false",
+      passwordRequireDigit: "false",
+      passwordRequireSpecial: "false",
+    };
+    try {
+      const saved = await testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: policy,
+      });
+      expect(saved.statusCode, saved.body).toBe(200);
+
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: uid(), password: "!" },
+      });
+      expect(res.statusCode, res.body).toBe(201);
+    } finally {
+      for (const key of Object.keys(policy)) await clearSetting(key);
+    }
+  });
+
+  it("register names the broken password rule too", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: uid(), password: "Short1A" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      rule: "minLength",
+      rules: ["minLength"],
+      minLength: 8,
+      error: expect.stringMatching(/^Password must/),
+    });
   });
 });
 
@@ -1226,6 +2612,18 @@ describe("SSO enforcement without license", () => {
       // is false and the enforcement branch is skipped -- login proceeds.
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res.body).token).toBeTruthy();
+    } finally {
+      await clearSetting("ssoEnforcement");
+    }
+  });
+
+  it("does not tell the login page enforcement is on when the feature is unlicensed (#2128)", async () => {
+    await setSetting("ssoEnforcement", "true");
+    try {
+      const res = await testApp.app.inject({ method: "GET", url: "/api/v1/config/auth" });
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).ssoEnforced).toBe(false);
     } finally {
       await clearSetting("ssoEnforcement");
     }

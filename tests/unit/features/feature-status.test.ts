@@ -8,7 +8,9 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -17,7 +19,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 const ocrRuntime = vi.hoisted(() => ({
   getCapability: vi.fn(),
@@ -28,16 +30,37 @@ const ocrRuntime = vi.hoisted(() => ({
 const fsFaults = vi.hoisted(() => ({
   denyOwnerOnlyMutationPath: null as string | null,
   denyRecursiveRemovePath: null as string | null,
+  denyReaddirPath: null as string | null,
+  denyUnlinkPath: null as string | null,
+  onRenameDestMatch: null as {
+    match: string;
+    callback: (src: string, dest: string) => void;
+  } | null,
   existsSequencePath: null as string | null,
   existsSequence: [] as boolean[],
   forceNonDocker: false,
   // Override existsSync for the two image-only reseed inputs. null = real fs.
   bakedBaseVenv: null as boolean | null,
   reseedScript: null as boolean | null,
+  closeSyncErrorOnNextOpenPathMatch: null as {
+    match: string;
+    code: string;
+    targetFd: number | null;
+    closeCalls: number;
+  } | null,
+  fstatSyncErrorOnTargetFd: null as {
+    match: string;
+    code: string;
+    targetFd: number | null;
+    fstatCalls: number;
+    closeCalls: number;
+  } | null,
+  fsyncSyncErrorCode: null as string | null,
 }));
 
 const childProcessFaults = vi.hoisted(() => ({
   nextKernelLockFailure: null as string | null,
+  nextPipInstallTimeout: false,
   reseedOutcomes: [] as Array<"fail" | "success">,
   reseedCalls: [] as Array<{ stdio: unknown }>,
 }));
@@ -71,6 +94,26 @@ vi.mock("node:child_process", async (importOriginal) => {
           status: 1,
           stderr: Buffer.from(detail),
           stdout: Buffer.alloc(0),
+        };
+      }
+      if (
+        childProcessFaults.nextPipInstallTimeout &&
+        Array.isArray(args[1]) &&
+        args[1].includes("pip") &&
+        args[1].includes("install")
+      ) {
+        childProcessFaults.nextPipInstallTimeout = false;
+        const timeoutErr = Object.assign(new Error("spawnSync pip ETIMEDOUT"), {
+          code: "ETIMEDOUT",
+        });
+        return {
+          error: timeoutErr,
+          output: [null, "", ""],
+          pid: 43,
+          signal: "SIGTERM",
+          status: null,
+          stderr: "",
+          stdout: "",
         };
       }
       return actual.spawnSync(...args);
@@ -116,6 +159,78 @@ vi.mock("node:fs", async (importOriginal) => {
       if (args[0] === fsFaults.denyRecursiveRemovePath) throw permissionError();
       return actual.rmSync(...args);
     },
+    renameSync: (...args: Parameters<typeof actual.renameSync>) => {
+      if (
+        fsFaults.onRenameDestMatch &&
+        String(args[1]).includes(fsFaults.onRenameDestMatch.match)
+      ) {
+        fsFaults.onRenameDestMatch.callback(String(args[0]), String(args[1]));
+      }
+      return actual.renameSync(...args);
+    },
+    unlinkSync: (...args: Parameters<typeof actual.unlinkSync>) => {
+      if (args[0] === fsFaults.denyUnlinkPath) throw permissionError();
+      return actual.unlinkSync(...args);
+    },
+    readdirSync: ((...args: Parameters<typeof actual.readdirSync>) => {
+      if (args[0] === fsFaults.denyReaddirPath) throw permissionError();
+      return actual.readdirSync(...args);
+    }) as typeof actual.readdirSync,
+    openSync: (...args: Parameters<typeof actual.openSync>) => {
+      const fd = actual.openSync(...args);
+      if (
+        fsFaults.closeSyncErrorOnNextOpenPathMatch &&
+        fsFaults.closeSyncErrorOnNextOpenPathMatch.targetFd === null &&
+        String(args[0]).includes(fsFaults.closeSyncErrorOnNextOpenPathMatch.match)
+      ) {
+        fsFaults.closeSyncErrorOnNextOpenPathMatch.targetFd = fd;
+      }
+      if (
+        fsFaults.fstatSyncErrorOnTargetFd &&
+        fsFaults.fstatSyncErrorOnTargetFd.targetFd === null &&
+        String(args[0]).includes(fsFaults.fstatSyncErrorOnTargetFd.match)
+      ) {
+        fsFaults.fstatSyncErrorOnTargetFd.targetFd = fd;
+      }
+      return fd;
+    },
+    fstatSync: ((...args: Parameters<typeof actual.fstatSync>) => {
+      const fault = fsFaults.fstatSyncErrorOnTargetFd;
+      if (fault && args[0] === fault.targetFd) {
+        fault.fstatCalls += 1;
+        throw Object.assign(new Error(`${fault.code}: fstatSync failed`), {
+          code: fault.code,
+        });
+      }
+      return actual.fstatSync(...args);
+    }) as typeof actual.fstatSync,
+    fsyncSync: (...args: Parameters<typeof actual.fsyncSync>) => {
+      if (fsFaults.fsyncSyncErrorCode !== null) {
+        const code = fsFaults.fsyncSyncErrorCode;
+        fsFaults.fsyncSyncErrorCode = null;
+        throw Object.assign(new Error(`${code}: fsyncSync failed`), { code });
+      }
+      return actual.fsyncSync(...args);
+    },
+    closeSync: (...args: Parameters<typeof actual.closeSync>) => {
+      if (
+        fsFaults.fstatSyncErrorOnTargetFd &&
+        args[0] === fsFaults.fstatSyncErrorOnTargetFd.targetFd
+      ) {
+        fsFaults.fstatSyncErrorOnTargetFd.closeCalls += 1;
+      }
+      const fault = fsFaults.closeSyncErrorOnNextOpenPathMatch;
+      if (fault && args[0] === fault.targetFd) {
+        fault.closeCalls += 1;
+        if (fault.closeCalls === 1) {
+          actual.closeSync(...args);
+        }
+        throw Object.assign(new Error(`${fault.code}: closeSync failed`), {
+          code: fault.code,
+        });
+      }
+      return actual.closeSync(...args);
+    },
   };
 });
 
@@ -133,17 +248,25 @@ let installedPath: string;
 let lockPath: string;
 let kernelLockPath: string;
 let mutationEpochPath: string;
+let logger: typeof import("../../../apps/api/src/lib/logger.js").logger;
 
 beforeEach(async () => {
   vi.resetModules();
   fsFaults.denyOwnerOnlyMutationPath = null;
   fsFaults.denyRecursiveRemovePath = null;
+  fsFaults.denyReaddirPath = null;
+  fsFaults.denyUnlinkPath = null;
+  fsFaults.onRenameDestMatch = null;
   fsFaults.existsSequencePath = null;
   fsFaults.existsSequence.length = 0;
   fsFaults.forceNonDocker = false;
   fsFaults.bakedBaseVenv = null;
   fsFaults.reseedScript = null;
+  fsFaults.closeSyncErrorOnNextOpenPathMatch = null;
+  fsFaults.fstatSyncErrorOnTargetFd = null;
+  fsFaults.fsyncSyncErrorCode = null;
   childProcessFaults.nextKernelLockFailure = null;
+  childProcessFaults.nextPipInstallTimeout = false;
   childProcessFaults.reseedOutcomes.length = 0;
   childProcessFaults.reseedCalls.length = 0;
   ocrRuntime.getCapability.mockReset();
@@ -173,6 +296,7 @@ beforeEach(async () => {
   process.env.FEATURE_MANIFEST_PATH = join(tempDir, "feature-manifest.json");
 
   mod = await import("../../../apps/api/src/lib/feature-status.js");
+  logger = (await import("../../../apps/api/src/lib/logger.js")).logger;
 });
 
 afterEach(() => {
@@ -448,6 +572,181 @@ describe("Install lock", () => {
     expect((thrown as Error).message).toMatch(/PUID|ownership/i);
   });
 
+  it("preserves SafeError from openKernelInstallLockFile when closeSync throws in catch (#3929)", () => {
+    writeFileSync(kernelLockPath, "", { mode: 0o666 });
+    chmodSync(kernelLockPath, 0o666);
+    fsFaults.denyOwnerOnlyMutationPath = kernelLockPath;
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+
+    let thrown: unknown;
+    try {
+      mod.acquireInstallLock("ocr");
+    } catch (error) {
+      thrown = error;
+    }
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    expect(thrown).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "install-lock-perms",
+    });
+  });
+
+  it("closes kernelFd once when acquireKernelInstallLock or claimInstallMarker returns false and closeSync throws (#3929)", () => {
+    const externalFd = openSync(kernelLockPath, constants.O_RDWR | constants.O_CREAT, 0o660);
+    acquireKernelFlock(externalFd);
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(() => mod.acquireInstallLock("ocr")).toThrow(/EIO: closeSync failed/);
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      closeSync(externalFd);
+    }
+
+    const oldHolderFd = openSync(
+      lockPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o660,
+    );
+    writeFileSync(
+      oldHolderFd,
+      JSON.stringify({ bundleId: "ocr", startedAt: new Date().toISOString() }),
+    );
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(() => mod.acquireInstallLock("face-detection")).toThrow(/EIO: closeSync failed/);
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      closeSync(oldHolderFd);
+      unlinkSync(lockPath);
+    }
+  });
+
+  it("ignores closeSync errors on existing.fd in claimInstallMarker when a fresh legacy marker is held (#3929)", () => {
+    const oldHolderFd = openSync(
+      lockPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o660,
+    );
+    writeFileSync(
+      oldHolderFd,
+      JSON.stringify({ bundleId: "ocr", startedAt: new Date().toISOString() }),
+    );
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(mod.acquireInstallLock("face-detection")).toBe(false);
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      closeSync(oldHolderFd);
+      unlinkSync(lockPath);
+    }
+  });
+
+  it("closes marker fd and preserves primary error when fstatSync or fsyncSync fails in createInstallMarker (#3929)", () => {
+    fsFaults.fstatSyncErrorOnTargetFd = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      fstatCalls: 0,
+      closeCalls: 0,
+    };
+    expect(() => mod.acquireInstallLock("ocr")).toThrow(/EIO: fstatSync failed/);
+    expect(fsFaults.fstatSyncErrorOnTargetFd.closeCalls).toBe(1);
+    fsFaults.fstatSyncErrorOnTargetFd = null;
+    if (existsSync(lockPath)) unlinkSync(lockPath);
+
+    fsFaults.fsyncSyncErrorCode = "ENOSPC";
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(() => mod.acquireInstallLock("ocr")).toThrow(/ENOSPC: fsyncSync failed/);
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("preserves marker validation error in openInstallMarker when closeSync throws in catch (#3929)", () => {
+    writeFileSync(
+      lockPath,
+      JSON.stringify({ bundleId: "ocr", startedAt: new Date().toISOString() }),
+    );
+    const hardlinkPath = join(aiDir, "install.lock.hardlink");
+    // Open a hardlinked install.lock so openInstallMarker rejects nlink !== 1
+    // during claimInstallMarker's fallback path.
+    spawnSync("/bin/ln", [lockPath, hardlinkPath]);
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(() => mod.acquireInstallLock("face-detection")).toThrow(
+        /AI install marker path is not a private regular file/,
+      );
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      if (existsSync(hardlinkPath)) unlinkSync(hardlinkPath);
+      if (existsSync(lockPath)) unlinkSync(lockPath);
+    }
+  });
+
+  it("returns observed status in getInstallingBundle when closeSync throws on kernelFd or marker.fd (#3929)", () => {
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bundleId: "ocr",
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(mod.getInstallingBundle()).toEqual({
+      bundleId: "ocr",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(mod.getInstallingBundle()).toEqual({
+      bundleId: "ocr",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+  });
+
   it("heartbeats an owned lease so a long install cannot be stolen", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.now());
@@ -718,7 +1017,7 @@ describe("resetAiEnvironment", () => {
     const venvPython = join(aiDir, "venv", "bin", "python3");
     mkdirSync(join(aiDir, "venv", "bin"), { recursive: true });
     writeFileSync(venvPython, "#!/bin/sh\n");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     expect(mod.resetAiEnvironment()).toEqual({ venvReseeded: false });
     expect(childProcessFaults.reseedCalls).toHaveLength(0);
@@ -732,7 +1031,7 @@ describe("resetAiEnvironment", () => {
     mkdirSync(join(aiDir, "venv", "bin"), { recursive: true });
     writeFileSync(venvPython, "#!/bin/sh\n");
     writeFileSync(join(modelsDir, "some-model.onnx"), "fake weights");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     const result = mod.resetAiEnvironment();
 
@@ -819,6 +1118,46 @@ describe("AI mutation epoch", () => {
     expect(next).toMatch(/^[0-9a-f-]{36}$/i);
     expect(mod.getAiMutationEpoch()).toBe(next);
     expect(readFileSync(mutationEpochPath, "utf-8").trim()).toBe(next);
+  });
+
+  it("closes the staging descriptor once and removes the temp file when closeSync throws in advanceAiMutationEpoch (#3869)", () => {
+    expect(mod.acquireInstallLock("__uninstall__")).toBe(true);
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: ".install-mutation.",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+
+    expect(() => mod.advanceAiMutationEpoch()).toThrow("EIO: closeSync failed");
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    expect(existsSync(mutationEpochPath)).toBe(false);
+    expect(readdirSync(aiDir).filter((name) => name.startsWith(".install-mutation."))).toEqual([]);
+  });
+
+  it("ignores closeSync errors in getAiMutationEpoch and preserves primary validation errors (#3929)", () => {
+    expect(mod.acquireInstallLock("__uninstall__")).toBe(true);
+    const next = mod.advanceAiMutationEpoch();
+    mod.releaseInstallLock();
+
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install-mutation.epoch",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(mod.getAiMutationEpoch()).toBe(next);
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+
+    writeFileSync(mutationEpochPath, "   \n");
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install-mutation.epoch",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(() => mod.getAiMutationEpoch()).toThrow("AI mutation epoch is empty");
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
   });
 });
 
@@ -1186,8 +1525,8 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
 
   it("polls for a missing AI data directory without logging", async () => {
     vi.useFakeTimers();
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
     try {
       rmSync(aiDir, { recursive: true, force: true });
       const recovered = vi.fn();
@@ -1218,7 +1557,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "transcription", startedAt: new Date().toISOString() }),
     );
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     expect(mod.recoverInterruptedInstalls()).toBe(false);
     expect(existsSync(marker)).toBe(true);
@@ -1239,7 +1578,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
         marker,
         JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
       );
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = vi.spyOn(logger, "error").mockImplementation(() => {});
       const recovered = vi.fn();
 
       mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
@@ -1265,7 +1604,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "ocr", startedAt: "2026-01-01T00:00:00.000Z" }),
     );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     expect(() => mod.recoverInterruptedInstalls()).not.toThrow();
 
@@ -1289,8 +1628,8 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
     );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     expect(mod.recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(marker)).toBe(false);
@@ -1315,8 +1654,8 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       marker,
       JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
     );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     expect(mod.recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(marker)).toBe(false);
@@ -1341,7 +1680,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
         marker,
         JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
       );
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const recovered = vi.fn(() => true);
 
       mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
@@ -1447,6 +1786,46 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     fsFaults.denyRecursiveRemovePath = null;
     expect(mod.recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(offlineUpload)).toBe(false);
+  });
+
+  it("logs the entry and errno when orphaned import staging can't be removed (#1565)", () => {
+    const offlineUpload = join(aiDir, ".offline-import-v2-logged-failure");
+    mkdirSync(offlineUpload, { recursive: true });
+    fsFaults.denyRecursiveRemovePath = offlineUpload;
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      expect(mod.recoverInterruptedInstalls()).toBe(false);
+      const logged = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+      expect(logged).toContain(".offline-import-v2-logged-failure");
+      expect(logged).toContain("EPERM");
+      expect(existsSync(offlineUpload)).toBe(true);
+
+      // Startup recovery retries every few seconds; the same stuck entry and
+      // errno must not be warned about again on each attempt.
+      const warnsForEntry = () =>
+        warn.mock.calls.filter((call) =>
+          call.map(String).join(" ").includes(".offline-import-v2-logged-failure"),
+        ).length;
+      expect(mod.recoverInterruptedInstalls()).toBe(false);
+      expect(warnsForEntry()).toBe(1);
+    } finally {
+      warn.mockRestore();
+      fsFaults.denyRecursiveRemovePath = null;
+    }
+  });
+
+  it("logs the errno when the AI directory can't be listed for import staging (#1565)", () => {
+    fsFaults.denyReaddirPath = aiDir;
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      expect(mod.recoverInterruptedInstalls()).toBe(false);
+      const logged = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+      expect(logged).toContain("interrupted import staging");
+      expect(logged).toContain("EPERM");
+    } finally {
+      warn.mockRestore();
+      fsFaults.denyReaddirPath = null;
+    }
   });
 
   it("does NOT delete non-staging directories", () => {
@@ -1732,10 +2111,17 @@ describe("Composite state - getFeatureStates", () => {
     expect(ocr?.error).toMatch(/4 GiB.*3 GiB.*Fast OCR remains available/i);
   });
 
-  it("keeps Fast available when the container memory controller cannot be inspected", () => {
+  it("keeps Fast available when the container memory controller cannot be inspected", async () => {
+    const unreadable = new Error(
+      "unable to read the process cgroup memory capacity from /sys/fs/cgroup/memory.max",
+      { cause: new Error("EACCES: permission denied") },
+    );
     ocrRuntime.getEffectiveMemory.mockImplementation(() => {
-      throw new Error("unable to read the process cgroup memory capacity");
+      throw unreadable;
     });
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    onTestFinished(() => warn.mockRestore());
 
     const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
 
@@ -1748,7 +2134,78 @@ describe("Composite state - getFeatureStates", () => {
       availableQualities: ["fast"],
     });
     expect(ocr?.error).toMatch(/cannot safely determine.*memory.*Fast OCR remains available/i);
+
+    // The UI message is fixed; the cause goes to the log, once, not per poll (#1501).
+    mod.getFeatureStates();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      { err: unreadable },
+      "[ocr-runtime] Accurate OCR can't be offered: this container's memory limit couldn't be read",
+    );
+
+    // A different cause logs right away, even with the same message.
+    ocrRuntime.getEffectiveMemory.mockImplementation(() => {
+      throw new Error(unreadable.message, { cause: new Error("EIO: i/o error") });
+    });
+    mod.getFeatureStates();
+    expect(warn).toHaveBeenCalledTimes(2);
+
+    // A read that works in between clears it, so the next failure logs again.
+    ocrRuntime.getEffectiveMemory.mockReturnValue(8 * 1024 ** 3);
+    mod.getFeatureStates();
+    ocrRuntime.getEffectiveMemory.mockImplementation(() => {
+      throw unreadable;
+    });
+    mod.getFeatureStates();
+    expect(warn).toHaveBeenCalledTimes(3);
   });
+
+  it.each([
+    [
+      "the runtime check already reported it",
+      {
+        available: false,
+        status: "incompatible",
+        reason: "memory-capacity-unknown",
+        qualities: [],
+        providers: [],
+      },
+    ],
+    [
+      "Accurate OCR is installed and working",
+      {
+        available: true,
+        status: "ready",
+        qualities: ["balanced", "best"],
+        providers: ["CPUExecutionProvider"],
+        descriptor: {
+          generation: "ocr-3.0.0-cpu",
+          artifact: {
+            version: "3.0.0",
+            // A target, so feature status does run its own memory read here.
+            target: process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312",
+          },
+        },
+      },
+    ],
+  ])(
+    "leaves the memory failure to the runtime check when %s (#1501)",
+    async (_label, capability) => {
+      // Only a missing runtime makes the preflight decide what the UI shows, so
+      // only then is its read worth a line; otherwise it's a duplicate or noise.
+      ocrRuntime.getCapability.mockReturnValue(capability);
+      ocrRuntime.getEffectiveMemory.mockImplementation(() => {
+        throw new Error("unable to read the process cgroup memory capacity from /proc/self/cgroup");
+      });
+      const { logger } = await import("../../../apps/api/src/lib/logger.js");
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      onTestFinished(() => warn.mockRestore());
+
+      mod.getFeatureStates();
+
+      expect(warn).not.toHaveBeenCalled();
+    },
+  );
 
   it("lock held for bundle returns installing", () => {
     mod.acquireInstallLock("ocr");
@@ -2018,8 +2475,9 @@ describe("ensureAiDirs", () => {
     writeTestManifest({});
     vi.resetModules();
     mod = await import("../../../apps/api/src/lib/feature-status.js");
+    logger = (await import("../../../apps/api/src/lib/logger.js")).logger;
 
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     expect(() => mod.ensureAiDirs()).not.toThrow();
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Cannot create AI directories"));
     errorSpy.mockRestore();
@@ -2039,4 +2497,815 @@ describe("ensureAiDirs", () => {
       expect(existsSync(join(tempDir, "fresh-data"))).toBe(false);
     },
   );
+});
+
+describe("importBundleArchive fixups and smoke verification (#1237)", () => {
+  function setupFakeVenv(
+    options: {
+      pipBehavior?: "ok" | "fail-stderr" | "fail-stdout" | "fail-empty";
+      failImport?: string;
+    } = {},
+  ): { venvPath: string; sitePackagesDir: string } {
+    const venvPath = join(aiDir, "venv");
+    const rawSitePackagesDir = join(venvPath, "lib", "python3.12", "site-packages");
+    mkdirSync(rawSitePackagesDir, { recursive: true });
+    mkdirSync(join(venvPath, "bin"), { recursive: true });
+    const sitePackagesDir = realpathSync(rawSitePackagesDir);
+
+    const pipMode = options.pipBehavior ?? "ok";
+    const failMod = options.failImport ?? "";
+    const script = [
+      "#!/bin/sh",
+      'case "$*" in',
+      "  *sysconfig*)",
+      `    echo ${JSON.stringify(sitePackagesDir)}`,
+      "    exit 0",
+      "    ;;",
+      "  *-m\\ pip\\ install*)",
+      pipMode === "ok"
+        ? `    mkdir -p ${JSON.stringify(join(sitePackagesDir, "nccl_fixup"))}; printf '# installed by pip\\n' > ${JSON.stringify(join(sitePackagesDir, "nccl_fixup", "__init__.py"))}; exit 0`
+        : pipMode === "fail-stderr"
+          ? "    echo 'ERROR: fake_nccl-1.0.0-cp312-linux_x86_64.whl is not a supported wheel on this platform.' >&2; exit 1"
+          : pipMode === "fail-stdout"
+            ? "    echo 'ERROR: No matching distribution found for fake_nccl'; exit 1"
+            : "    exit 2",
+      "    ;;",
+      "  *-m\\ pip\\ uninstall*)",
+      `    rm -rf ${JSON.stringify(join(sitePackagesDir, "nccl_fixup"))}`,
+      "    exit 0",
+      "    ;;",
+      "  *import*)",
+      failMod
+        ? `    case "$*" in *"import ${failMod}"*) echo "ImportError: libnccl.so.2: cannot open shared object file for ${failMod}" >&2; exit 1 ;; esac`
+        : "    :",
+      '    for arg in "$@"; do',
+      '      case "$arg" in',
+      "        import\\ *)",
+      "          mod=$(printf '%s' \"$arg\" | sed 's/^import //')",
+      `          if [ ! -d "${sitePackagesDir}/$mod" ] && [ ! -f "${sitePackagesDir}/$mod.py" ]; then`,
+      "            echo \"ModuleNotFoundError: No module named '$mod'\" >&2",
+      "            exit 1",
+      "          fi",
+      "          ;;",
+      "      esac",
+      "    done",
+      "    exit 0",
+      "    ;;",
+      "esac",
+      "exit 0",
+      "",
+    ].join("\n");
+
+    const binPy = join(venvPath, "bin", "python3");
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+    return { venvPath, sitePackagesDir };
+  }
+
+  async function createTestArchive(options: {
+    bundleId?: string;
+    version?: string;
+    models?: Record<string, string>;
+    sitePackages?: Record<string, string>;
+    fixups?: Record<string, string>;
+  }): Promise<string> {
+    const { createRequire } = await import("node:module");
+    const apiRequire = createRequire(join(process.cwd(), "apps/api/package.json"));
+    const tar = apiRequire("tar") as {
+      create: (
+        opts: { gzip: boolean; file: string; cwd: string },
+        files: string[],
+      ) => Promise<void>;
+    };
+
+    const buildDir = mkdtempSync(join(tempDir, "bundle-src-"));
+    const bundleId = options.bundleId ?? "face-detection";
+    const version = options.version ?? "2.0.0-test";
+    const modelEntries = options.models ?? { "mediapipe/face.tflite": "model-weights" };
+
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId,
+        version,
+        models: Object.keys(modelEntries),
+      }),
+    );
+
+    for (const [rel, content] of Object.entries(modelEntries)) {
+      const full = join(buildDir, "models", rel);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, content);
+    }
+
+    if (options.sitePackages) {
+      for (const [rel, content] of Object.entries(options.sitePackages)) {
+        const full = join(buildDir, "site-packages", rel);
+        mkdirSync(join(full, ".."), { recursive: true });
+        writeFileSync(full, content);
+      }
+    }
+
+    if (options.fixups) {
+      for (const [rel, content] of Object.entries(options.fixups)) {
+        const full = join(buildDir, "fixups", rel);
+        mkdirSync(join(full, ".."), { recursive: true });
+        writeFileSync(full, content);
+      }
+    }
+
+    const tarPath = join(
+      tempDir,
+      `archive-${Date.now()}-${Math.random().toString(16).slice(2)}.tar.gz`,
+    );
+    await tar.create({ gzip: true, file: tarPath, cwd: buildDir }, ["."]);
+    return tarPath;
+  }
+
+  it("fails with ImportValidationError and leaves no models or site-packages behind when a fixup wheel fails to install", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "fail-stderr" });
+    mkdirSync(join(sitePackagesDir, "mediapipe"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "mediapipe", "__init__.py"), "# existing v1");
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# new v2",
+        "extra_pkg/__init__.py": "# extra",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "bad-wheel",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/fake_nccl.*not a supported wheel/i);
+
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "extra_pkg"))).toBe(false);
+    expect(readFileSync(join(sitePackagesDir, "mediapipe", "__init__.py"), "utf-8")).toBe(
+      "# existing v1",
+    );
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+  });
+
+  it("fails with ImportValidationError naming the module and stderr and rolls back when a smokeImports module fails", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+    mkdirSync(join(sitePackagesDir, "existing_pkg"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "existing_pkg", "__init__.py"), "# keep me");
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# broken c-ext",
+        "existing_pkg/__init__.py": "# overwritten by bundle",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/mediapipe/);
+    expect((err as Error).message).toMatch(/libnccl\.so\.2/);
+
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "mediapipe"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "nccl_fixup"))).toBe(false);
+    expect(readFileSync(join(sitePackagesDir, "existing_pkg", "__init__.py"), "utf-8")).toBe(
+      "# keep me",
+    );
+  });
+
+  it("ignores AppleDouble dotfile wheels in fixups/ and succeeds when fixups and smokeImports pass", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe", "nccl_fixup"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# ok",
+      },
+      fixups: {
+        "._fake_nccl-1.0.0-cp312-linux_x86_64.whl": "appledouble-junk",
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "valid-wheel",
+      },
+    });
+
+    // If the ._fake_nccl dotfile were passed to pip, pkgName would be "._fake_nccl"
+    // or if no real wheel ran, nccl_fixup would be missing and smokeImports would fail.
+    const result = await mod.importBundleArchive(createReadStream(tarPath));
+    expect(result.bundleId).toBe("face-detection");
+    expect(mod.isFeatureInstalled("face-detection")).toBe(true);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "mediapipe", "__init__.py"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "nccl_fixup", "__init__.py"))).toBe(true);
+  });
+
+  it("honors SNAPOTTER_SKIP_INSTALL_SMOKE=1 for offline bundle imports", async () => {
+    const { createReadStream } = await import("node:fs");
+    setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# skipped smoke check",
+      },
+    });
+
+    await expect(mod.importBundleArchive(createReadStream(tarPath))).rejects.toThrow(
+      mod.ImportValidationError,
+    );
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+
+    process.env.SNAPOTTER_SKIP_INSTALL_SMOKE = "1";
+    try {
+      const result = await mod.importBundleArchive(createReadStream(tarPath));
+      expect(result.bundleId).toBe("face-detection");
+      expect(mod.isFeatureInstalled("face-detection")).toBe(true);
+    } finally {
+      delete process.env.SNAPOTTER_SKIP_INSTALL_SMOKE;
+    }
+  });
+
+  it("fails before moving models or spawning pip when a fixups-only archive targets a venv with no interpreter", async () => {
+    const { createReadStream } = await import("node:fs");
+    mkdirSync(join(aiDir, "venv"), { recursive: true });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/could not be queried/i);
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+  });
+
+  it("reports a timeout and rolls back site-packages when a fixup wheel pip install times out", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    childProcessFaults.nextPipInstallTimeout = true;
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# staged",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/Timed out while installing fixup wheel.*fake_nccl/i);
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "mediapipe"))).toBe(false);
+  });
+
+  it("surfaces pip stdout or exit status when fixup wheel install fails without stderr", async () => {
+    const { createReadStream } = await import("node:fs");
+    setupFakeVenv({ pipBehavior: "fail-stdout" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarStdout = await createTestArchive({
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(tarStdout))).rejects.toThrow(
+      /No matching distribution found for fake_nccl/,
+    );
+
+    setupFakeVenv({ pipBehavior: "fail-empty" });
+    const tarEmpty = await createTestArchive({
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(tarEmpty))).rejects.toThrow(
+      /pip exited with status 2/,
+    );
+  });
+
+  it("rejects malformed fixup wheel filenames and invalid smokeImport module names", async () => {
+    const { createReadStream } = await import("node:fs");
+    setupFakeVenv({ pipBehavior: "ok" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const badWheelTar = await createTestArchive({
+      fixups: { "-flag_injection-1.0.0.whl": "wheel-bytes" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(badWheelTar))).rejects.toThrow(
+      /Invalid fixup wheel filename/i,
+    );
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe; import os"],
+          },
+        },
+      }),
+    );
+
+    const badSmokeTar = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# ok" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(badSmokeTar))).rejects.toThrow(
+      /invalid smokeImport module name/i,
+    );
+  });
+
+  it("preserves a pre-existing fixup distribution on rollback and falls back to FEATURE_BUNDLES.smokeImports when manifest omits smokeImports", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+
+    // Pre-seed fake_nccl-1.0.0.dist-info and nccl_fixup so it looks already installed
+    mkdirSync(join(sitePackagesDir, "fake_nccl-1.0.0.dist-info"), { recursive: true });
+    mkdirSync(join(sitePackagesDir, "nccl_fixup"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "nccl_fixup", "__init__.py"), "# pre-existing nccl");
+    mkdirSync(join(sitePackagesDir, "existing_parent"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "existing_parent", "keep.py"), "# keep");
+
+    // Manifest entry omits smokeImports; importBundleArchive must fall back to
+    // FEATURE_BUNDLES["face-detection"].smokeImports (["mediapipe"]).
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# broken",
+        "existing_parent/new_child/deep/mod.py": "# nested new",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/mediapipe/);
+
+    // Pre-existing fake_nccl distribution was NOT uninstalled by rollback
+    expect(existsSync(join(sitePackagesDir, "nccl_fixup", "__init__.py"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "fake_nccl-1.0.0.dist-info"))).toBe(true);
+    // Nested newly created directories were pruned, while existing_parent survived
+    expect(existsSync(join(sitePackagesDir, "existing_parent", "new_child"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "existing_parent", "keep.py"))).toBe(true);
+  });
+
+  it("surfaces ENOSPC from fixup wheel install with code ENOSPC for 507 classification", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath } = setupFakeVenv({ pipBehavior: "ok" });
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      "printf '# installed by pip\\n'",
+      "echo 'ERROR: Could not install packages due to an OSError: [Errno 28] No space left on device' >&2; exit 1 #",
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as NodeJS.ErrnoException).code).toBe("ENOSPC");
+    expect((err as Error).message).toMatch(/No space left on device/i);
+  });
+
+  it("logs and appends rollback warnings when pip uninstall fails during rollback", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath } = setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      /(\*-m\\ pip\\ uninstall\*[\s\S]*?)exit 0/,
+      "$1echo 'ERROR: uninstall lock failure' >&2; exit 1",
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# fail" },
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/rollback warnings:.*uninstall lock failure/i);
+    expect(errorSpy).toHaveBeenCalled();
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(true);
+  });
+
+  it("rejects archives where fixups, site-packages, or models is a regular file with ImportValidationError", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { createRequire } = await import("node:module");
+    const apiRequire = createRequire(join(process.cwd(), "apps/api/package.json"));
+    const tar = apiRequire("tar") as {
+      create: (
+        opts: { gzip: boolean; file: string; cwd: string },
+        files: string[],
+      ) => Promise<void>;
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const buildDir = mkdtempSync(join(tempDir, "bundle-file-fixups-"));
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({ bundleId: "face-detection", version: "1.0.0", models: [] }),
+    );
+    writeFileSync(join(buildDir, "fixups"), "not-a-directory");
+    const tarPath = join(tempDir, `file-fixups-${Date.now()}.tar.gz`);
+    await tar.create({ gzip: true, file: tarPath, cwd: buildDir }, ["."]);
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/Archive entry "fixups" must be a directory/i);
+  });
+
+  it("brackets site-packages move and fixups pip install with venv.writing and clears it after import (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath, sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    const markerPath = join(aiDir, "venv.writing");
+    const markerDuringPipPath = join(tempDir, "marker-during-pip.json");
+
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      "  *-m\\ pip\\ install*)\n",
+      `  *-m\\ pip\\ install*)\n    if [ -f ${JSON.stringify(markerPath)} ]; then cp ${JSON.stringify(markerPath)} ${JSON.stringify(markerDuringPipPath)}; fi\n`,
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    const markersSeenDuringMove: Array<{ bundleId: string; startedAt: string }> = [];
+    fsFaults.onRenameDestMatch = {
+      match: sitePackagesDir,
+      callback: () => {
+        if (existsSync(markerPath)) {
+          markersSeenDuringMove.push(JSON.parse(readFileSync(markerPath, "utf-8")));
+        }
+      },
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe", "nccl_fixup"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# ok",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "valid-wheel",
+      },
+    });
+
+    const result = await mod.importBundleArchive(createReadStream(tarPath));
+    expect(result.bundleId).toBe("face-detection");
+    expect(markersSeenDuringMove.length).toBeGreaterThan(0);
+    expect(markersSeenDuringMove[0]).toMatchObject({
+      bundleId: "face-detection",
+      startedAt: expect.any(String),
+    });
+    expect(existsSync(markerDuringPipPath)).toBe(true);
+    expect(JSON.parse(readFileSync(markerDuringPipPath, "utf-8"))).toMatchObject({
+      bundleId: "face-detection",
+      startedAt: expect.any(String),
+    });
+    expect(existsSync(markerPath)).toBe(false);
+  });
+
+  it("clears venv.writing when moving site-packages throws partway through and rollback succeeds (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    const markerPath = join(aiDir, "venv.writing");
+
+    let moveCount = 0;
+    let markerSeenBeforeThrow = false;
+    fsFaults.onRenameDestMatch = {
+      match: sitePackagesDir,
+      callback: () => {
+        moveCount += 1;
+        if (moveCount === 2) {
+          markerSeenBeforeThrow = existsSync(markerPath);
+          throw Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
+        }
+      },
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "first_pkg/__init__.py": "# 1",
+        "second_pkg/__init__.py": "# 2",
+      },
+    });
+
+    await expect(mod.importBundleArchive(createReadStream(tarPath))).rejects.toThrow(/ENOSPC/);
+    expect(markerSeenBeforeThrow).toBe(true);
+    expect(existsSync(markerPath)).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "first_pkg"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "second_pkg"))).toBe(false);
+  });
+
+  it("brackets venv rollback with venv.writing, clears it when rollback succeeds, and retains it when venv rollback fails (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath, sitePackagesDir } = setupFakeVenv({
+      pipBehavior: "ok",
+      failImport: "mediapipe",
+    });
+    const markerPath = join(aiDir, "venv.writing");
+    const markerDuringUninstallPath = join(tempDir, "marker-during-uninstall.json");
+
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      "  *-m\\ pip\\ uninstall*)\n",
+      `  *-m\\ pip\\ uninstall*)\n    if [ -f ${JSON.stringify(markerPath)} ]; then cp ${JSON.stringify(markerPath)} ${JSON.stringify(markerDuringUninstallPath)}; fi\n`,
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# fail" },
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+
+    await expect(mod.importBundleArchive(createReadStream(tarPath))).rejects.toThrow(
+      mod.ImportValidationError,
+    );
+    expect(existsSync(markerDuringUninstallPath)).toBe(true);
+    expect(JSON.parse(readFileSync(markerDuringUninstallPath, "utf-8"))).toMatchObject({
+      bundleId: "face-detection",
+    });
+    expect(existsSync(markerPath)).toBe(false);
+
+    // Now simulate a failed venv rollback (e.g. rmSync on the placed site-packages
+    // file fails with EPERM): venv.writing must stay on disk so next boot reseeds.
+    fsFaults.denyRecursiveRemovePath = join(sitePackagesDir, "mediapipe", "__init__.py");
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
+
+    const tarPath2 = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# fail" },
+    });
+    const err2 = await mod.importBundleArchive(createReadStream(tarPath2)).catch((e: unknown) => e);
+    expect(err2).toBeInstanceOf(mod.ImportValidationError);
+    expect((err2 as Error).message).toMatch(/rollback warnings/i);
+    expect(existsSync(markerPath)).toBe(true);
+
+    // And recoverInterruptedInstalls() on next boot heals the torn venv.
+    fsFaults.denyRecursiveRemovePath = null;
+    markOfficialImage();
+    childProcessFaults.reseedOutcomes.push("success");
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+    expect(childProcessFaults.reseedCalls).toHaveLength(1);
+    expect(existsSync(markerPath)).toBe(false);
+  });
+
+  it("retains venv.writing when a partial site-packages move fails its own rollback or when venv.writing cannot be unlinked (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    const markerPath = join(aiDir, "venv.writing");
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
+
+    // 1. Partial move throws on the 2nd file AND rollback fails to remove the 1st file
+    let moveCount = 0;
+    fsFaults.onRenameDestMatch = {
+      match: sitePackagesDir,
+      callback: () => {
+        moveCount += 1;
+        if (moveCount === 2) {
+          fsFaults.denyRecursiveRemovePath = join(sitePackagesDir, "first_pkg", "__init__.py");
+          throw Object.assign(new Error("ENOSPC mid-move"), { code: "ENOSPC" });
+        }
+      },
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPartial = await createTestArchive({
+      sitePackages: {
+        "first_pkg/__init__.py": "# 1",
+        "second_pkg/__init__.py": "# 2",
+      },
+    });
+
+    const err1 = await mod
+      .importBundleArchive(createReadStream(tarPartial))
+      .catch((e: unknown) => e);
+    expect((err1 as Error).message).toMatch(/ENOSPC mid-move.*rollback warnings/i);
+    expect(existsSync(markerPath)).toBe(true);
+
+    // Clean up and test 2: unlinkSync on venv.writing fails with EPERM after move
+    fsFaults.onRenameDestMatch = null;
+    fsFaults.denyRecursiveRemovePath = null;
+    unlinkSync(markerPath);
+    rmSync(join(sitePackagesDir, "first_pkg"), { recursive: true, force: true });
+
+    fsFaults.denyUnlinkPath = markerPath;
+    const tarUnlinkFail = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# ok" },
+    });
+
+    const err2 = await mod
+      .importBundleArchive(createReadStream(tarUnlinkFail))
+      .catch((e: unknown) => e);
+    expect((err2 as Error).message).toMatch(/could not clear venv\.writing/i);
+    expect(existsSync(join(sitePackagesDir, "mediapipe"))).toBe(false);
+    expect(existsSync(markerPath)).toBe(true);
+    fsFaults.denyUnlinkPath = null;
+  });
 });

@@ -30,6 +30,7 @@ export const vi: TranslationKeys = {
     clear: "Xóa",
     copy: "Sao chép",
     copied: "Đã sao chép!",
+    copyFailed: "Sao chép thất bại",
     noResults: "Không tìm thấy kết quả",
     showLess: "Thu gọn",
     showMore: "Hiển thị thêm {count}",
@@ -1103,6 +1104,11 @@ export const vi: TranslationKeys = {
       name: "Sắp xếp PDF",
       description: "Sắp xếp lại thứ tự trang theo trình tự chỉ định",
     },
+    "multi-tool-pdf": {
+      name: "PDF Đa công cụ",
+      description:
+        "Sắp xếp lại, xoay, xóa trang và lấy trang từ các PDF khác trong cùng một trình chỉnh sửa",
+    },
     "protect-pdf": {
       name: "Bảo vệ PDF",
       description: "Thêm bảo vệ bằng mật khẩu (mã hóa AES-256)",
@@ -1239,7 +1245,13 @@ export const vi: TranslationKeys = {
       name: "Trình xây dựng Pipeline",
       description: "Kết nối nhiều công cụ thành một quy trình làm việc",
     },
-    processing: { canceled: "Đã hủy xử lý" },
+    processing: {
+      canceled: "Đã hủy xử lý",
+      cancelUnavailable: "Không thể hủy quá trình này lúc này. Quá trình vẫn đang chạy.",
+      cancelNotAllowed:
+        "Không thể hủy: bạn đã đăng xuất hoặc không có quyền dừng quá trình này. Quá trình vẫn đang chạy.",
+      cancelFailed: "Không thể hủy quá trình xử lý. Quá trình vẫn đang chạy, hãy thử lại.",
+    },
     mediaPlayer: {
       unsupported: "Trình duyệt của bạn không hỗ trợ định dạng media này.",
     },
@@ -1265,7 +1277,6 @@ export const vi: TranslationKeys = {
       paintOverObjectsToErase: "Tô lên đối tượng cần xóa",
     },
     "crop-canvas": {
-      original: "Gốc:",
       cropPreview: "Xem trước vùng cắt",
       cropRegionSize: "Vùng cắt: {width} x {height}",
       originalSize: "Gốc: {width} x {height}",
@@ -1296,7 +1307,6 @@ export const vi: TranslationKeys = {
       infoBar: "{width} x {height}px . lưới {cols}x{rows} . {count} ô",
     },
     "remove-bg": {
-      original: "Gốc:",
       transparent: "Trong suốt",
       color: "Màu",
       gradient: "Chuyển sắc",
@@ -1323,7 +1333,6 @@ export const vi: TranslationKeys = {
       theExtractedTextWillAppear: "Văn bản trích xuất sẽ hiển thị tại đây sau khi bạn chạy OCR.",
     },
     "image-enhancement": {
-      original: "Gốc:",
       removesNoiseAndArtifactsUsing: "Khử nhiễu và hiện tượng lỗi bằng AI",
       analyzingImage: "Đang phân tích hình ảnh...",
       imageLooksGoodFineTune: "Hình ảnh trông tốt. Tinh chỉnh bằng thanh trượt cường độ.",
@@ -1335,8 +1344,6 @@ export const vi: TranslationKeys = {
       enhancedSizeKb: "Đã nâng cao: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Tất cả",
-      group: "Nhóm",
       dimensions: "Kích thước",
       format: "Định dạng",
       scanned: "Đã quét:",
@@ -1370,7 +1377,6 @@ export const vi: TranslationKeys = {
       pageSize: "Khổ giấy",
     },
     color: {
-      original: "Gốc:",
       light: "Ánh sáng",
       brightness: "Độ sáng",
       contrast: "Độ tương phản",
@@ -1408,6 +1414,7 @@ export const vi: TranslationKeys = {
       submitBatch: "Nén ({count} tệp)",
       submitTarget: "Nén xuống {size} KB",
       resizedToFit: "Đã thu nhỏ xuống {width} × {height} để vừa trong {size} KB",
+      batchResized: "Đã thu nhỏ {count}/{total} ảnh để vừa trong {size} KB.",
       progressLabel: "Đang nén",
       original: "Gốc: {size} KB",
       processed: "Đã xử lý: {size} KB",
@@ -1439,6 +1446,8 @@ export const vi: TranslationKeys = {
       submit: "Thay đổi kích thước",
       submitBatch: "Thay đổi kích thước ({count} tệp)",
       progressLabel: "Đang thay đổi kích thước",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
+      maxPercentageExceeded: "Dùng tỉ lệ từ 1 đến {max}%.",
     },
     crop: {
       width: "Chiều rộng",
@@ -1462,6 +1471,7 @@ export const vi: TranslationKeys = {
       submit: "Cắt",
       submitBatch: "Cắt ({count} tệp)",
       progressLabel: "Đang cắt",
+      free: "Tự do",
     },
     rotate: {
       rotate90CounterClockwise: "Xoay 90° ngược chiều kim đồng hồ",
@@ -1481,7 +1491,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang áp dụng",
     },
     convert: {
-      original: "Gốc:",
       originalSizeKb: "Gốc: {size} KB",
       processedSizeKb: "Đã xử lý: {size} KB",
       targetFormat: "Định dạng đích",
@@ -1511,7 +1520,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang tối ưu",
     },
     "strip-metadata": {
-      original: "Gốc:",
       iccProfile: "Có ICC",
       originalSize: "Gốc: {size} KB",
       processedSize: "Đã xử lý: {size} KB",
@@ -1535,9 +1543,9 @@ export const vi: TranslationKeys = {
       metadataRemoved: "Đã xóa siêu dữ liệu: {size} KB",
       submit: "Xóa siêu dữ liệu",
       progressLabel: "Đang xóa siêu dữ liệu",
+      inspectFailed: "Không thể kiểm tra siêu dữ liệu",
     },
     "edit-metadata": {
-      original: "Gốc:",
       imageDescription: "Mô tả hình ảnh",
       photographerCreatorName: "Tên nhiếp ảnh gia / người tạo",
       imageTitle: "Tiêu đề hình ảnh",
@@ -1597,6 +1605,7 @@ export const vi: TranslationKeys = {
       datesShifted: "đã dịch chuyển ngày",
       submit: "Áp dụng siêu dữ liệu",
       progressLabel: "Đang ghi siêu dữ liệu",
+      inspectFailed: "Không thể kiểm tra tệp",
     },
     "bulk-rename": {
       pattern: "Mẫu",
@@ -1607,6 +1616,7 @@ export const vi: TranslationKeys = {
       renaming: "Đang đổi tên...",
       submit: "Đổi tên {count} tệp",
       zipDownloaded: "Đã tải xuống tệp ZIP thành công",
+      renameFailed: "Đổi tên thất bại",
     },
     "image-to-pdf": {
       preview: "Xem trước",
@@ -1636,10 +1646,12 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang tạo PDF",
       uploadingImages: "Đang tải lên hình ảnh...",
       processingPages: "Đang xử lý {count} trang...",
+      parseResponseFailed: "Không thể phân tích phản hồi của máy chủ",
+      creationFailedWithStatus: "Không thể tạo PDF. Hãy kiểm tra lại hình ảnh rồi thử lại.",
+      networkErrorCreation: "Lỗi mạng khi tạo PDF",
+      requestTimedOut: "Yêu cầu đã hết thời gian, máy chủ có thể đang quá tải",
     },
     "pdf-to-image": {
-      converting2: "Đang chuyển đổi",
-      page: "trang",
       custom: "Tùy chỉnh",
       uploadAPdfToGet: "Tải lên PDF để bắt đầu",
       generatingPagePreviews: "Đang tạo bản xem trước trang...",
@@ -1696,6 +1708,12 @@ export const vi: TranslationKeys = {
       submitPlural: "Tạo Favicon ({count} ảnh)",
       downloadZip: "Tải xuống Favicon ZIP",
       progressLabel: "Đang tạo Favicon",
+      generationFailed: "Không thể tạo Favicon. Hãy thử một hình ảnh khác.",
+      networkError: "Lỗi mạng khi tạo Favicon",
+      timeout: "Yêu cầu đã hết thời gian, máy chủ có thể đang quá tải",
+      uploadingImages: "Đang tải lên hình ảnh...",
+      processingImagesOne: "Đang xử lý {count} hình ảnh...",
+      processingImagesOther: "Đang xử lý {count} hình ảnh...",
     },
     "adjust-colors": {
       light: "Ánh sáng",
@@ -1727,7 +1745,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang điều chỉnh màu sắc",
     },
     sharpening: {
-      original: "Gốc:",
       originalSize: "Gốc: {size} KB",
       processedSize: "Đã xử lý: {size} KB",
       method: "Phương pháp",
@@ -1754,9 +1771,17 @@ export const vi: TranslationKeys = {
       submit: "Làm nét",
       submitBatch: "Làm nét ({count} tệp)",
       progressLabel: "Đang làm nét",
+      presetNames: {
+        light: "Nhẹ",
+        medium: "Vừa",
+        strong: "Mạnh",
+        portrait: "Chân dung",
+        landscape: "Phong cảnh",
+        detail: "Chi tiết",
+        print: "In ấn",
+      },
     },
     "replace-color": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       sourceColor: "Màu nguồn (cần thay thế)",
@@ -1770,7 +1795,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang thay thế màu",
     },
     "color-blindness": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       simulationType: "Loại mô phỏng",
@@ -1780,6 +1804,43 @@ export const vi: TranslationKeys = {
       submit: "Mô phỏng",
       submitBatch: "Mô phỏng ({count} tệp)",
       progressLabel: "Đang mô phỏng mù màu",
+      types: {
+        protanopia: {
+          label: "Mù màu đỏ",
+          description: "Không có tế bào nón đỏ. Màu đỏ trông tối. Khoảng 1% nam giới.",
+        },
+        protanomaly: {
+          label: "Yếu màu đỏ",
+          description: "Giảm nhạy cảm với màu đỏ. Khoảng 1% nam giới.",
+        },
+        deuteranopia: {
+          label: "Mù màu xanh lá",
+          description:
+            "Không có tế bào nón xanh lá. Đỏ và xanh lá trông giống nhau. Khoảng 1% nam giới.",
+        },
+        deuteranomaly: {
+          label: "Yếu màu xanh lá",
+          description: "Giảm nhạy cảm với màu xanh lá. Loại phổ biến nhất. Khoảng 5% nam giới.",
+        },
+        tritanopia: {
+          label: "Mù màu xanh dương",
+          description:
+            "Không có tế bào nón xanh dương. Xanh dương và xanh lá trông giống nhau. Rất hiếm.",
+        },
+        tritanomaly: {
+          label: "Yếu màu xanh dương",
+          description: "Giảm nhạy cảm với màu xanh dương. Rất hiếm.",
+        },
+        achromatopsia: {
+          label: "Mù màu hoàn toàn",
+          description: "Mù màu hoàn toàn. Chỉ cảm nhận được độ sáng. Rất hiếm.",
+        },
+        blueConeMonochromacy: {
+          label: "Đơn sắc nón xanh dương",
+          description:
+            "Chỉ tế bào nón xanh dương hoạt động. Khả năng phân biệt màu rất hạn chế. Rất hiếm.",
+        },
+      },
     },
     "remove-background": {
       subject: "Chủ thể",
@@ -1817,6 +1878,28 @@ export const vi: TranslationKeys = {
       submitBatch: "Xóa nền ({count} tệp)",
       progressLabel: "Đang xóa nền",
       cpuNote: "Sử dụng mô hình AI. Không có GPU, ảnh lớn có thể mất một lúc.",
+      colorPresets: {
+        white: "Trắng",
+        black: "Đen",
+        red: "Đỏ",
+        green: "Xanh lá",
+        blue: "Xanh dương",
+      },
+      gradientPresets: {
+        purple: "Tím",
+        pink: "Hồng",
+        blue: "Xanh dương",
+        green: "Xanh lá",
+        sunset: "Hoàng hôn",
+        lavender: "Oải hương",
+      },
+      effectsProcessingFailed: "Xử lý hiệu ứng thất bại",
+      effectsExpired:
+        "Lần xóa nền trước đã hết hạn nên đang được chạy lại. Hãy áp dụng hiệu ứng khi xong.",
+      refineChanged:
+        "Chủ thể, chất lượng, làm mịn viền và khử nhiễm màu được áp dụng khi xóa nền. Hãy chạy lại để dùng các cài đặt mới.",
+      backgroundImageRequired: "Hãy chọn ảnh nền để tiếp tục.",
+      invalidHexColor: "Hãy dùng mã màu hex như #FF5500 hoặc #F50.",
     },
     "remove-gif-background": {
       quality: "Chất lượng",
@@ -1855,7 +1938,6 @@ export const vi: TranslationKeys = {
       download: "Tải xuống",
     },
     upscale: {
-      original: "Gốc:",
       off: "Tắt",
       originalKb: "Gốc: {size} KB",
       upscaledKb: "Đã phóng to: {size} KB",
@@ -1872,9 +1954,11 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang phóng to {count} ảnh",
       cpuNote:
         "Nâng cấp bằng AI tiêu tốn nhiều tài nguyên tính toán. Không có GPU, ảnh lớn có thể mất vài phút.",
+      qualityFast: "Nhanh",
+      qualityBalanced: "Cân bằng",
+      qualityBest: "Tốt nhất",
     },
     "erase-object": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       qualityFast: "Nhanh",
@@ -1889,11 +1973,15 @@ export const vi: TranslationKeys = {
       clear: "Xóa",
       outputFormat: "Định dạng đầu ra",
       quality: "Chất lượng",
-      paintHint: "Tô lên các đối tượng bạn muốn xóa. Nhấn Ctrl+Z để hoàn tác.",
-      lassoHint: "Vẽ một vòng quanh đối tượng bạn muốn xóa. Nhấn Ctrl+Z để hoàn tác.",
+      paintHint: "Tô lên các đối tượng bạn muốn xóa. Nhấn {shortcut} để hoàn tác.",
+      lassoHint: "Vẽ một vòng quanh đối tượng bạn muốn xóa. Nhấn {shortcut} để hoàn tác.",
       submit: "Xóa đối tượng",
       submitBatch: "Xóa tất cả ({count})",
       progressLabel: "Đang xóa đối tượng",
+      stall: "Xử lý đã hết thời gian mà không có tiến triển. Vui lòng thử lại.",
+      stallBatch: "Xử lý đã hết thời gian. Vui lòng thử lại.",
+      timeoutOverloaded: "Yêu cầu đã hết thời gian, máy chủ có thể đang quá tải. Vui lòng thử lại.",
+      erasingProgress: "Đang xóa {current}/{total}",
     },
     ocr: {
       copied: "Đã sao chép",
@@ -1903,6 +1991,8 @@ export const vi: TranslationKeys = {
         "Cải thiện độ tương phản cục bộ trước khi nhận dạng. Nhanh áp dụng trực tiếp; Cân bằng và Tốt nhất chỉ giữ biến thể khi điểm đã hiệu chỉnh cải thiện kết quả.",
       fastKoreanUnsupported:
         "OCR Nhanh không hỗ trợ tiếng Hàn. Hãy cài đặt gói OCR Chính xác rồi chọn Cân bằng hoặc Tốt nhất.",
+      fastArabicUnsupported:
+        "OCR Nhanh không hỗ trợ tiếng Ả Rập. Hãy cài đặt gói OCR Chính xác rồi chọn Cân bằng hoặc Tốt nhất.",
       language: "Ngôn ngữ",
       autoDetect: "Tự động nhận diện",
       extractedText: "Văn bản trích xuất",
@@ -1911,6 +2001,9 @@ export const vi: TranslationKeys = {
       submit: "Trích xuất văn bản",
       submitBatch: "Trích xuất văn bản ({count} tệp)",
       progressLabel: "Đang trích xuất văn bản",
+      filesFailed: "{failed}/{total} tệp thất bại",
+      noTextDetectedInline: "(không phát hiện văn bản)",
+      fileErrorInline: "(lỗi: {message})",
     },
     "ocr-pdf": {
       quality: "Chất lượng",
@@ -1924,7 +2017,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang trích xuất văn bản từ PDF",
     },
     "blur-faces": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       blurRadius: "Bán kính làm mờ",
@@ -1937,7 +2029,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang làm mờ khuôn mặt",
     },
     "enhance-faces": {
-      original: "Gốc:",
       subtle: "Nhẹ nhàng",
       maximum: "Tối đa",
       fewerFaces: "Ít khuôn mặt hơn",
@@ -1998,6 +2089,9 @@ export const vi: TranslationKeys = {
       submitSubject: "Cắt thông minh",
       submitFace: "Cắt khuôn mặt",
       submitTrim: "Cắt viền",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
+      cropAreaExceeded:
+        "Vùng cắt này vượt giới hạn {max} pixel. Giảm chiều rộng, chiều cao hoặc khoảng đệm.",
     },
     imageEnhancement: {
       enhancementMode: "Chế độ nâng cao",
@@ -2033,6 +2127,14 @@ export const vi: TranslationKeys = {
         "Nâng cao sâu cần gói Phóng to & Nâng cao, nhưng gói này chưa được cài đặt, nên bạn nhận được bản nâng cao tiêu chuẩn.",
       deepEnhanceSkippedAnimated:
         "Nâng cao sâu không hoạt động với ảnh động, nên mọi khung hình đều nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkipped:
+        "Nâng cao sâu không chạy trên {count} trong {total} ảnh, nên các ảnh đó nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkippedFailed:
+        "Nâng cao sâu thất bại trên {count} trong {total} ảnh, nên các ảnh đó nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Nâng cao sâu không chạy trên {count} trong {total} ảnh vì gói Phóng to & Nâng cao chưa được cài đặt.",
+      batchDeepEnhanceSkippedAnimated:
+        "Nâng cao sâu đã bỏ qua {count} trong {total} ảnh vì chúng là ảnh động.",
     },
     "noise-removal": {
       off: "Tắt",
@@ -2064,7 +2166,6 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang khử nhiễu {count} ảnh",
     },
     "red-eye-removal": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       fixedKb: "Đã sửa: {size} KB",
       sensitivity: "Độ nhạy",
@@ -2081,7 +2182,6 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang sửa mắt đỏ {count} ảnh",
     },
     "restore-photo": {
-      original: "Gốc:",
       subtle: "Nhẹ nhàng",
       strong: "Mạnh",
       originalKb: "Gốc: {size} KB",
@@ -2118,6 +2218,9 @@ export const vi: TranslationKeys = {
       submit: "Thay đổi kích thước",
       submitBatch: "Thay đổi kích thước ({count} tệp)",
       progressLabel: "Đang thay đổi kích thước thông minh",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
+      areaExceeded:
+        "Thay đổi kích thước nhận biết nội dung được giới hạn ở tổng {max} pixel. Giảm chiều rộng hoặc chiều cao.",
     },
     "ai-canvas-expand": {
       quality: "Chất lượng",
@@ -2139,7 +2242,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang mở rộng khung vẽ",
     },
     colorize: {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       colorizedKb: "Đã tô màu: {size} KB",
       aiModel: "Mô hình AI",
@@ -2283,6 +2385,12 @@ export const vi: TranslationKeys = {
       dragToAdjust: "Kéo để điều chỉnh",
       scrollToZoom: "Cuộn để thu phóng",
       photoGenerated: "Ảnh đã được tạo. Tải xuống từ bảng bên trái.",
+      analysisFailedWithStatus: "Không thể phân tích ảnh này. Hãy thử một bức ảnh rõ nét hơn.",
+      faceAnalysisFailed: "Phân tích khuôn mặt thất bại",
+      generationFailedWithStatus: "Không thể tạo ảnh hộ chiếu. Vui lòng thử lại.",
+      photoGenerationFailed: "Tạo ảnh thất bại",
+      analysisExpired:
+        "Phân tích đã hết hạn nên ảnh đang được phân tích lại. Hãy tạo ảnh khi xong.",
     },
     "transcribe-audio": {
       language: "Ngôn ngữ",
@@ -2340,7 +2448,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang làm mờ nền",
     },
     "watermark-text": {
-      original: "Gốc:",
       applyWatermark: "Áp dụng hình mờ",
       tiledRepeating: "Lát gạch (lặp lại)",
       originalKb: "Gốc: {size} KB",
@@ -2363,7 +2470,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang thêm hình mờ",
     },
     "watermark-image": {
-      original: "Gốc:",
       center: "Giữa",
       topLeft: "Trên trái",
       topRight: "Trên phải",
@@ -2382,7 +2488,6 @@ export const vi: TranslationKeys = {
       submitBatch: "Áp dụng hình mờ ({count} tệp)",
     },
     "text-overlay": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       text: "Văn bản",
@@ -2402,7 +2507,6 @@ export const vi: TranslationKeys = {
       defaultText: "Nhập văn bản tại đây",
     },
     compose: {
-      original: "Gốc:",
       screen: "Màn hình",
       processing: "Đang xử lý...",
       overlayImage: "Ảnh lớp phủ",
@@ -2457,9 +2561,6 @@ export const vi: TranslationKeys = {
       backToGallery: "Quay lại bộ sưu tập",
     },
     info: {
-      min: "nhỏ nhất:",
-      max: "lớn nhất:",
-      mean: "trung bình:",
       minValue: "nhỏ nhất:{value}",
       maxValue: "lớn nhất:{value}",
       meanValue: "trung bình:{value}",
@@ -2496,6 +2597,7 @@ export const vi: TranslationKeys = {
       similarity: "Độ giống nhau: {percent}%",
       submit: "So sánh",
       downloadDiff: "Tải xuống ảnh khác biệt",
+      comparisonFailed: "So sánh thất bại",
     },
     "find-duplicates": {
       sensitivity: "Độ nhạy",
@@ -2525,6 +2627,9 @@ export const vi: TranslationKeys = {
       threshold: "Ngưỡng",
       submit: "Quét tìm ảnh trùng",
       scanning: "Đang quét...",
+      parseResultsFailed: "Không thể phân tích kết quả quét",
+      networkErrorUpload: "Lỗi mạng khi tải lên. Hãy thử với ít tệp hơn hoặc kiểm tra kết nối.",
+      requestTimedOut: "Yêu cầu đã hết thời gian. Hãy thử với ít tệp hơn.",
     },
     "color-palette": {
       colors: "Màu sắc",
@@ -2595,6 +2700,26 @@ export const vi: TranslationKeys = {
       downloadFormat: "Định dạng tải xuống",
       submit: "Tạo mã QR",
       download: "Tải xuống mã QR",
+      styleSquare: "Vuông",
+      styleRounded: "Bo tròn",
+      styleDots: "Chấm",
+      styleClassy: "Thanh lịch",
+      styleClassyRounded: "Thanh lịch bo",
+      styleExtraRounded: "Bo tròn nhiều",
+      styleDot: "Chấm",
+      formatDescPng: "Tốt nhất cho kỹ thuật số",
+      formatDescSvg: "Tốt nhất để in",
+      formatDescJpeg: "Tệp nhỏ hơn",
+      formatDescWebp: "Định dạng hiện đại",
+      vcardFirstName: "Tên",
+      vcardFirstNamePlaceholder: "An",
+      vcardLastName: "Họ",
+      vcardLastNamePlaceholder: "Nguyễn",
+      vcardOrganization: "Tổ chức",
+      vcardOrganizationPlaceholder: "Công ty",
+      vcardJobTitle: "Chức danh",
+      vcardJobTitlePlaceholder: "Lập trình viên",
+      vcardWebsite: "Trang web",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2644,6 +2769,9 @@ export const vi: TranslationKeys = {
       noBarcodesFound: "Không tìm thấy mã vạch",
       barcodesFound: "Tìm thấy {count} mã vạch",
       barcodesFoundPlural: "Tìm thấy {count} mã vạch",
+      scanningFile: "Đang quét {name}...",
+      scanningFailedWithStatus: "Không thể quét hình ảnh này. Hãy thử một hình ảnh khác.",
+      filesFailed: "{count}/{total} tệp thất bại",
     },
     collage: {
       sideBySide: "Cạnh nhau",
@@ -2664,9 +2792,6 @@ export const vi: TranslationKeys = {
       mosaic: "Khảm",
       uploadingImages: "Đang tải lên hình ảnh...",
       processingCollage: "Đang xử lý ảnh ghép...",
-      loaded: "đã tải",
-      images: "hình ảnh",
-      collage: "Ảnh ghép:",
       snapotter: "SnapOtter",
       background: "Nền",
       format: "Định dạng",
@@ -2702,6 +2827,12 @@ export const vi: TranslationKeys = {
       quality: "Chất lượng",
       submit: "Tạo ảnh ghép",
       downloadCollage: "Tải xuống ảnh ghép",
+      ratioFree: "Tự do",
+      bgWhite: "Trắng",
+      bgBlack: "Đen",
+      bgNone: "Không",
+      bgCustom: "Tùy chỉnh",
+      collageFailed: "Không thể tạo ảnh ghép",
     },
     stitch: {
       format: "Định dạng",
@@ -2731,6 +2862,7 @@ export const vi: TranslationKeys = {
       outputFormat: "Định dạng đầu ra",
       quality: "Chất lượng",
       submit: "Ghép nối ảnh",
+      stitchFailed: "Ghép nối thất bại",
     },
     split: {
       splitMode: "Chế độ tách",
@@ -2759,6 +2891,21 @@ export const vi: TranslationKeys = {
       submit: "Tách ảnh",
       downloadAll: "Tải tất cả (ZIP)",
       tileWarningSmall: "Các ô sẽ rất nhỏ ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Chia đôi ngang",
+        verticalHalf: "Chia đôi dọc",
+        quarters: "Chia bốn",
+        horizontalStrip: "Dải ngang",
+        verticalStrip: "Dải dọc",
+        grid9: "Lưới 9 ô",
+        portrait6: "6 ô dọc",
+        landscape6: "6 ô ngang",
+        grid16: "Lưới 16 ô",
+      },
+      keepOriginal: "Giữ nguyên gốc",
+      auto: "Tự động",
+      splitFailed: "Tách thất bại",
+      failedToSplit: "Không thể tách {name}: {detail}",
     },
     border: {
       blur: "Làm mờ",
@@ -2784,6 +2931,16 @@ export const vi: TranslationKeys = {
       submit: "Thêm viền",
       submitBatch: "Thêm viền ({count} tệp)",
       progressLabel: "Đang thêm viền",
+      presetNames: {
+        cleanWhite: "Trắng tinh",
+        galleryBlack: "Đen phòng tranh",
+        shadow: "Bóng đổ",
+        rounded: "Bo tròn",
+        polaroid: "Polaroid",
+        vintage: "Hoài cổ",
+        minimal: "Tối giản",
+        cinematic: "Điện ảnh",
+      },
     },
     beautify: {
       background: "Nền",
@@ -2800,7 +2957,6 @@ export const vi: TranslationKeys = {
       text: "Văn bản",
       position: "Vị trí",
       newTab: "Tab mới",
-      frame: "Khung",
       quickPresets: "Mẫu nhanh",
       linear: "Tuyến tính",
       radial: "Tỏa tròn",
@@ -2828,6 +2984,33 @@ export const vi: TranslationKeys = {
       submit: "Làm đẹp",
       submitBatch: "Làm đẹp ({count} tệp)",
       progressLabel: "Đang làm đẹp ảnh chụp màn hình",
+      presetPurpleHaze: "Tím mờ ảo",
+      presetFlamingo: "Hồng hạc",
+      presetOcean: "Đại dương",
+      presetMidnight: "Nửa đêm",
+      presetMint: "Bạc hà",
+      presetSunset: "Hoàng hôn",
+      presetCleanWhite: "Trắng tinh",
+      presetNoBackground: "Không nền",
+      bgGradient: "Chuyển sắc",
+      bgSolid: "Màu đơn",
+      bgImage: "Hình ảnh",
+      none: "Không",
+      frameBrowser: "Trình duyệt",
+      shadowSubtle: "Nhẹ nhàng",
+      shadowMedium: "Vừa",
+      shadowDramatic: "Kịch tính",
+      shadowCustom: "Tùy chỉnh",
+      socialOriginal: "Gốc",
+      socialIgSquare: "IG vuông",
+      socialIgStory: "IG Story",
+      positionTopLeft: "Trên trái",
+      positionTopRight: "Trên phải",
+      positionCenter: "Giữa",
+      positionBottomLeft: "Dưới trái",
+      positionBottomRight: "Dưới phải",
+      processingFailed: "Xử lý thất bại",
+      processingFailedStatus: "Không thể xử lý hình ảnh này. Vui lòng thử lại.",
     },
     "circle-crop": {
       border: "Viền",
@@ -2866,6 +3049,16 @@ export const vi: TranslationKeys = {
       submit: "Áp dụng Duotone",
       submitBatch: "Áp dụng Duotone ({count} tệp)",
       progressLabel: "Đang áp dụng duotone",
+      presetNames: {
+        classic: "Cổ điển",
+        noir: "Noir",
+        sepia: "Nâu đỏ",
+        midnight: "Nửa đêm",
+        sunset: "Hoàng hôn",
+        cyber: "Cyber",
+        ocean: "Đại dương",
+        forest: "Rừng xanh",
+      },
     },
     "image-pad": {
       background: "Nền",
@@ -2878,6 +3071,7 @@ export const vi: TranslationKeys = {
       submit: "Đệm ảnh",
       submitBatch: "Đệm ảnh ({count} tệp)",
       progressLabel: "Đang đệm ảnh",
+      custom: "Tùy chỉnh",
     },
     pixelate: {
       blockSize: "Kích thước ô",
@@ -2979,7 +3173,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang chuyển đổi SVG",
     },
     vectorize: {
-      original: "Gốc:",
       detail: "Chi tiết",
       smoothing: "Làm mịn",
       blackWhite: "Đen trắng",
@@ -3016,7 +3209,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang véc-tơ hóa",
     },
     "gif-tools": {
-      original: "Gốc:",
       widthPx: "Chiều rộng (px)",
       auto: "Tự động",
       heightPx: "Chiều cao (px)",
@@ -3074,6 +3266,7 @@ export const vi: TranslationKeys = {
       submit: "Xử lý GIF",
       submitBatch: "Xử lý ({count} tệp)",
       progressLabel: "Đang xử lý GIF",
+      maxDimensionExceeded: "Dùng kích thước từ 1 đến {max} px.",
     },
     "image-to-base64": {
       converting: "Đang chuyển đổi...",
@@ -3108,6 +3301,7 @@ export const vi: TranslationKeys = {
       includeText: "Hiển thị văn bản",
       submit: "Tạo mã vạch",
       download: "Tải mã vạch",
+      generateFailed: "Không thể tạo mã vạch",
     },
     "chart-maker": {
       optionalChartTitle: "Tiêu đề biểu đồ (tùy chọn)",
@@ -3118,6 +3312,10 @@ export const vi: TranslationKeys = {
       submit: "Tạo biểu đồ",
       submitBatch: "Tạo biểu đồ ({count} tệp)",
       progressLabel: "Đang tạo biểu đồ",
+      kindBar: "Cột",
+      kindLine: "Đường",
+      kindPie: "Tròn",
+      rowsSkipped: "Số hàng được vẽ: {charted}. Bị bỏ qua vì cột giá trị không có số: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Mô hình",
@@ -3508,12 +3706,12 @@ export const vi: TranslationKeys = {
       submit: "Nén",
       submitBatch: "Nén ({count} tệp)",
       submitTarget: "Nén xuống {size}",
+      batchMissed: "{count}/{total} tệp không xuống dưới {target}.",
       progressLabel: "Đang nén",
       bestEffortHint:
         "Mức tối đa trong khả năng. PDF chứa hình ảnh sẽ đạt gần mức này; PDF chỉ có văn bản có thể không thu nhỏ được xuống kích thước này.",
       targetReached: "Đã đạt mục tiêu {target} (kết quả: {size}).",
-      targetMissed:
-        "Không thể đạt {target}. Kích thước nhỏ nhất có thể đạt là {size} vì PDF này chủ yếu là văn bản hoặc vector, mà nén ảnh không thể thu nhỏ.",
+      targetMissed: "Không thể đạt {target}. Kích thước nhỏ nhất có thể đạt là {size}.",
     },
     "rotate-pdf": {
       angle: "Góc xoay",
@@ -3582,6 +3780,29 @@ export const vi: TranslationKeys = {
       pageLabel: "Trang {n}",
       orderTooLong:
         "Có quá nhiều lần di chuyển riêng lẻ để gửi. Hãy đặt lại và thử với ít thay đổi hơn.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Tối đa {docs} tệp PDF và {pages} trang đầu ra.",
+      addDocument: "Thêm PDF",
+      addAll: "Thêm tất cả các trang",
+      allPages: "Tất cả đã có trong kế hoạch",
+      addPage: "Thêm trang {n}",
+      dragHint: "Kéo để sắp xếp lại, xoay hoặc loại bỏ trang. Thêm PDF để lấy các trang của chúng.",
+      reset: "Đặt lại kế hoạch",
+      emptyPlan: "Chưa có trang nào trong kế hoạch. Hãy thêm trang từ các tài liệu ở trên.",
+      docFailed: "Không thể đọc một tài liệu.",
+      skippedNotPdf: "Đã bỏ qua {count} tệp: chỉ có thể thêm tệp PDF.",
+      skippedOverLimit: "Chưa thêm {count} tệp PDF: trình chỉnh sửa chứa tối đa {docs} tệp PDF.",
+      pageLabel: "Vị trí {n}",
+      planSummary: "Sẽ ghép {pages} trang từ {docs} tài liệu.",
+      submit: "Tạo PDF ({pages} trang)",
+      progressLabel: "Đang ghép",
+      rotateLeft: "Xoay trái",
+      rotateRight: "Xoay phải",
+      removePage: "Loại bỏ trang",
+      removeDoc: "Loại bỏ PDF",
+      zoomIn: "Phóng to",
+      zoomOut: "Thu nhỏ",
     },
     "protect-pdf": {
       userPassword: "Mật khẩu người dùng",
@@ -3702,6 +3923,9 @@ export const vi: TranslationKeys = {
         save: "Lưu và đặt",
         uploadHint: "Thả PNG / JPG, hoặc nhấp để chọn. PNG trong suốt hoạt động tốt nhất.",
       },
+      exportFailed: "Không thể đọc các chữ ký đã đặt. Vui lòng thử lại.",
+      stall: "Xử lý đã hết thời gian. Vui lòng thử lại.",
+      timeout: "Yêu cầu đã hết thời gian. Vui lòng thử lại.",
     },
     "redact-pdf": {
       terms: "Từ cần che",
@@ -3715,6 +3939,9 @@ export const vi: TranslationKeys = {
       submit: "Trích xuất văn bản",
       submitBatch: "Trích xuất văn bản ({count} tệp)",
       progressLabel: "Đang trích xuất",
+      scannedHint:
+        "PDF này là bản quét nên không có văn bản để trích xuất. OCR có thể đọc được, nhưng mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+      runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-to-word": {
       hint: "Phù hợp nhất cho PDF dạng văn bản; trang quét cần OCR",
@@ -3871,6 +4098,8 @@ export const vi: TranslationKeys = {
     importFromFiles: "Nhập từ Tệp",
     saveToFiles: "Lưu vào Tệp",
     savedToFiles: "Đã lưu vào Tệp",
+    resultExpired: "Kết quả này đã hết hạn. Hãy chạy lại công cụ.",
+    libraryFull: "Bộ nhớ tệp của bạn đã đầy. Xóa bớt một số tệp rồi thử lại.",
     librarySaveTitle: "Tệp này lấy từ Tệp của bạn",
     librarySaveAsNew: "Lưu kết quả thành tệp mới",
     librarySaveAsNewHint: "Giữ nguyên tệp gốc trong Tệp của bạn",
@@ -4090,7 +4319,7 @@ export const vi: TranslationKeys = {
       dropDescription: "Kéo thả hình ảnh vào đây để bắt đầu",
       openImageButton: "Mở hình ảnh",
       newDocumentButton: "Tài liệu mới",
-      pasteHint: "Hoặc dán từ bộ nhớ tạm (Ctrl+V)",
+      pasteHint: "Hoặc dán từ bộ nhớ tạm ({shortcut})",
     },
     mobile: {
       heading: "Khuyến nghị dùng máy tính",
@@ -4143,6 +4372,7 @@ export const vi: TranslationKeys = {
         ratioLabel: "Tỷ lệ:",
         applyTitle: "Áp dụng cắt (Enter)",
         cancelTitle: "Hủy cắt (Escape)",
+        free: "Tự do",
       },
       dodgeBurn: {
         dodge: "Làm sáng",
@@ -4159,6 +4389,9 @@ export const vi: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Lấy mẫu:",
         toggleDropdown: "Mở/đóng danh sách",
+        samplePoint: "Điểm (1x1)",
+        sampleAverage3: "Trung bình 3x3",
+        sampleAverage5: "Trung bình 5x5",
       },
       fill: {
         tolerance: "Dung sai",
@@ -4254,6 +4487,68 @@ export const vi: TranslationKeys = {
         grain: "Nhiễu hạt",
         resetAll: "Đặt lại tất cả",
         apply: "Áp dụng",
+        autoButtons: {
+          autoTone: "Tông màu tự động",
+          autoContrast: "Tương phản tự động",
+          autoColor: "Màu tự động",
+          autoEnhance: "Cải thiện tự động",
+        },
+        sliders: {
+          brightness: "Độ sáng",
+          contrast: "Độ tương phản",
+          hue: "Sắc độ",
+          saturation: "Độ bão hòa",
+          luminance: "Độ chói",
+          exposure: "Phơi sáng",
+          vibrance: "Độ rực màu",
+          warmth: "Độ ấm",
+        },
+        filters: {
+          grayscale: "Xám",
+          sepia: "Nâu đỏ",
+          invert: "Đảo ngược",
+          solarize: "Đảo sáng",
+          blur: "Làm mờ",
+          sharpen: "Làm nét",
+          noise: "Nhiễu",
+          pixelate: "Khảm điểm ảnh",
+          emboss: "Dập nổi",
+          posterize: "Áp phích hóa",
+          threshold: "Ngưỡng",
+          kaleidoscope: "Kính vạn hoa",
+          motionBlur: "Làm mờ chuyển động",
+          radialBlur: "Làm mờ tỏa tròn",
+          surfaceBlur: "Làm mờ bề mặt",
+        },
+        params: {
+          radius: "Bán kính",
+          amount: "Mức độ",
+          size: "Kích thước",
+          strength: "Cường độ",
+          levels: "Số mức",
+          level: "Mức",
+          power: "Độ mạnh",
+          angle: "Góc",
+          distance: "Khoảng cách",
+          centerX: "Tâm X",
+          centerY: "Tâm Y",
+          threshold: "Ngưỡng",
+          midpoint: "Điểm giữa",
+          roundness: "Độ tròn",
+          feather: "Làm mềm biên",
+          roughness: "Độ thô",
+        },
+        curvePresets: {
+          linear: "Tuyến tính",
+          darken: "Làm tối",
+          lighten: "Làm sáng",
+          increaseContrast: "Tăng tương phản",
+          decreaseContrast: "Giảm tương phản",
+          mediumContrast: "Tương phản vừa",
+          strongContrast: "Tương phản mạnh",
+          crossProcess: "Xử lý chéo",
+          negative: "Âm bản",
+        },
       },
       color: {
         channelAriaLabel: "Kênh màu {channel}",
@@ -4269,12 +4564,64 @@ export const vi: TranslationKeys = {
         median: "Trung vị",
       },
       history: {
-        undoTitle: "Hoàn tác (Ctrl+Z)",
-        redoTitle: "Làm lại (Ctrl+Shift+Z)",
+        undoTitle: "Hoàn tác ({shortcut})",
+        redoTitle: "Làm lại ({shortcut})",
         empty: "Chưa có lịch sử",
+        unknown: "Không rõ",
+        actions: {
+          initialState: "Trạng thái ban đầu",
+          loadImage: "Tải hình ảnh",
+          loadProject: "Mở dự án",
+          restoreAutosave: "Khôi phục bản tự động lưu",
+          resizeCanvas: "Đổi kích thước khung vẽ",
+          resizeImage: "Đổi kích thước hình ảnh",
+          rotateCanvas: "Xoay khung vẽ {degrees}",
+          flipHorizontal: "Lật ngang",
+          flipVertical: "Lật dọc",
+          trimCanvas: "Cắt viền khung vẽ",
+          addObject: "Thêm {type}",
+          layerEffect: "Hiệu ứng lớp",
+          delete: "Xóa",
+          bringToFront: "Đưa lên trước",
+          bringForward: "Đưa lên một bậc",
+          sendBackward: "Đưa xuống một bậc",
+          sendToBack: "Đưa xuống cuối",
+          addLayer: "Thêm lớp",
+          deleteLayer: "Xóa lớp",
+          duplicateLayer: "Nhân đôi lớp",
+          reorderLayers: "Sắp xếp lại lớp",
+          mergeDown: "Gộp xuống",
+          flattenAll: "Làm phẳng tất cả",
+          adjust: "Điều chỉnh {name}",
+          resetAdjustments: "Đặt lại điều chỉnh",
+          levels: "Mức độ",
+          curves: "Đường cong",
+          resetLevels: "Đặt lại mức độ",
+          resetCurves: "Đặt lại đường cong",
+          resetAll: "Đặt lại tất cả",
+          toggleFilter: "Bật/tắt bộ lọc {name}",
+          setFilterParam: "Đặt {param} của {filter}",
+          crop: "Cắt ảnh",
+          cut: "Cắt",
+          paste: "Dán",
+          pasteInPlace: "Dán tại chỗ",
+          nudge: "Dịch chuyển nhẹ",
+          brushStroke: "Nét cọ",
+          eraserStroke: "Nét tẩy",
+        },
+        objectTypes: {
+          line: "Đường thẳng",
+          rect: "Hình chữ nhật",
+          ellipse: "Hình elip",
+          text: "Văn bản",
+          image: "Hình ảnh",
+          arrow: "Mũi tên",
+          polygon: "Đa giác",
+          star: "Ngôi sao",
+        },
       },
       layers: {
-        newLayerTitle: "Lớp mới (Ctrl+Shift+N)",
+        newLayerTitle: "Lớp mới ({shortcut})",
         blend: "Hòa trộn",
         opacity: "Độ mờ",
         hideLayer: "Ẩn lớp",
@@ -4302,9 +4649,34 @@ export const vi: TranslationKeys = {
           positionCenter: "Giữa",
           positionOutside: "Bên ngoài",
         },
+        blendModes: {
+          normal: "Bình thường",
+          multiply: "Nhân",
+          screen: "Màn hình",
+          overlay: "Che phủ",
+          darken: "Làm tối",
+          lighten: "Làm sáng",
+          colorDodge: "Làm sáng màu",
+          colorBurn: "Làm tối màu",
+          hardLight: "Ánh sáng mạnh",
+          softLight: "Ánh sáng dịu",
+          difference: "Khác biệt",
+          exclusion: "Loại trừ",
+          hue: "Sắc độ",
+          saturation: "Độ bão hòa",
+          color: "Màu",
+          luminosity: "Độ sáng",
+        },
+        duplicate: "Nhân đôi",
+        flattenAll: "Làm phẳng tất cả",
       },
       navigator: {
         noImageLoaded: "Chưa tải hình ảnh",
+      },
+      tabs: {
+        layers: "Lớp",
+        adjustments: "Điều chỉnh",
+        history: "Lịch sử",
       },
     },
     ui: {
@@ -4320,6 +4692,7 @@ export const vi: TranslationKeys = {
         anchorLabel: "Neo:",
         anchorAriaLabel: "Neo {position}",
         backgroundLabel: "Nền:",
+        transparent: "Trong suốt",
         anchors: {
           topLeft: "trên trái",
           topCenter: "trên giữa",
@@ -4337,6 +4710,14 @@ export const vi: TranslationKeys = {
         original: "Gốc: {width} x {height} px",
         note: "Thu phóng mọi đối tượng theo tỷ lệ với kích thước mới.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Ảnh này quá lớn để trình duyệt chỉnh sửa bằng công cụ này. Hãy thử kích thước khung vẽ nhỏ hơn.",
+        crossOriginBlocked:
+          "Trình chỉnh sửa không đọc được điểm ảnh của ảnh tải từ trang web khác. Hãy tải ảnh xuống rồi mở tệp.",
+        sourceImageFailed:
+          "Không thể tải ảnh. Nếu ảnh được lưu trữ trên trang web khác, trang đó phải cho phép truy cập chéo nguồn gốc.",
+      },
       exportDialog: {
         heading: "Xuất hình ảnh",
         previewAlt: "Xem trước bản xuất",
@@ -4350,13 +4731,18 @@ export const vi: TranslationKeys = {
         exportButton: "Xuất",
         copied: "Đã sao chép",
         copyFailed: "Sao chép thất bại",
+        exportFailed: "Xuất không thành công. Hãy thử lại hoặc chọn một định dạng khác.",
+        tooLarge: "Bản xuất này quá lớn để trình duyệt tạo ra. Hãy thử kích thước nhỏ hơn.",
         saveProject: "Lưu dự án",
         loadProject: "Mở dự án",
+        invalidProject: "Tệp này không phải là dự án SnapOtter hợp lệ.",
       },
       autosaveRecovery: {
         message: "Đã khôi phục phần việc chưa lưu từ {time}.",
         restore: "Khôi phục",
         discard: "Bỏ qua",
+        saveFailed:
+          "Không thể lưu công việc của bạn trong trình duyệt này. Hãy xuất hoặc dùng Lưu dự án để giữ lại một bản sao.",
       },
       fillDialog: {
         heading: "Tô màu",
@@ -4382,6 +4768,7 @@ export const vi: TranslationKeys = {
           black: "Đen",
           transparent: "Trong suốt",
         },
+        presetCustom: "Tùy chỉnh",
       },
       colorSwatch: {
         ariaLabel: "Màu {color}",
@@ -4391,6 +4778,25 @@ export const vi: TranslationKeys = {
         noneSelected: "{label}: Không",
         setNone: "Không {label}",
       },
+      contextMenu: {
+        duplicate: "Nhân đôi",
+        selectAll: "Chọn tất cả",
+      },
+    },
+    toolbar: {
+      move: "Di chuyển",
+      marquee: "Vùng chọn",
+      crop: "Cắt",
+      eyedropper: "Hút màu",
+      brush: "Cọ",
+      pencil: "Bút chì",
+      cloneStamp: "Tem nhân bản",
+      eraser: "Tẩy",
+      paintBucket: "Thùng sơn",
+      gradient: "Chuyển sắc",
+      text: "Văn bản",
+      hand: "Bàn tay",
+      zoom: "Thu phóng",
     },
   },
   settings: {
@@ -4423,6 +4829,7 @@ export const vi: TranslationKeys = {
       saveButton: "Lưu cài đặt",
       saveSuccess: "Đã lưu cài đặt.",
       saveFailed: "Lưu cài đặt thất bại.",
+      loadFailed: "Không thể tải tùy chọn của bạn.",
       roleUnknown: "không rõ",
     },
     system: {
@@ -4447,6 +4854,7 @@ export const vi: TranslationKeys = {
       saveButton: "Lưu cài đặt",
       saveSuccess: "Đã lưu cài đặt.",
       saveFailed: "Lưu cài đặt thất bại.",
+      loadFailed: "Không thể tải cài đặt hệ thống.",
       limitsAndResources: "Giới hạn & Tài nguyên",
       maxFileSize: "Dung lượng tệp tối đa",
       maxBatchSize: "Kích thước lô tối đa",
@@ -4484,10 +4892,10 @@ export const vi: TranslationKeys = {
       newPasswordPlaceholder: "Mật khẩu mới",
       confirmPasswordPlaceholder: "Xác nhận mật khẩu mới",
       passwordsMismatch: "Mật khẩu không khớp",
-      passwordTooShort: "Mật khẩu phải có ít nhất 4 ký tự",
       changeSuccess: "Đã đổi mật khẩu thành công",
       changeFailed: "Đổi mật khẩu thất bại",
       currentPasswordIncorrect: "Mật khẩu hiện tại không đúng",
+      passwordChangedElsewhere: "Mật khẩu của bạn đã được đổi ở nơi khác. Hãy đăng nhập lại.",
       changePasswordButton: "Đổi mật khẩu",
       loginAttemptLimitNote: "Giới hạn đăng nhập có thể được cấu hình trong Cài đặt hệ thống.",
       twoFactorHeading: "Xác thực hai yếu tố",
@@ -4534,6 +4942,8 @@ export const vi: TranslationKeys = {
       passwordMinLengthDesc: "Số ký tự tối thiểu yêu cầu cho mật khẩu.",
       passwordRequireUppercase: "Yêu cầu chữ hoa",
       passwordRequireUppercaseDesc: "Yêu cầu ít nhất một chữ cái viết hoa.",
+      passwordRequireLowercase: "Yêu cầu chữ thường",
+      passwordRequireLowercaseDesc: "Yêu cầu ít nhất một chữ cái viết thường.",
       passwordRequireNumber: "Yêu cầu chữ số",
       passwordRequireNumberDesc: "Yêu cầu ít nhất một chữ số.",
       passwordRequireSpecial: "Yêu cầu ký tự đặc biệt",
@@ -4541,6 +4951,12 @@ export const vi: TranslationKeys = {
       passwordPolicyHeading: "Chính sách mật khẩu",
       securitySettingsSaved: "Đã lưu cài đặt bảo mật",
       securitySettingsFailed: "Không thể lưu cài đặt bảo mật",
+      adminSettingsLoadFailed: "Không thể tải cài đặt bảo mật.",
+      twoFactorStateChanged:
+        "Xác thực hai yếu tố đã thay đổi ở cửa sổ khác. Hãy tải lại rồi thử lại.",
+      twoFactorUnreadable:
+        "Máy chủ không đọc được cài đặt xác thực hai yếu tố của bạn. Hãy liên hệ quản trị viên.",
+      ssoNeedsProvider: "Để bắt buộc SSO, trước tiên hãy thiết lập nhà cung cấp OIDC hoặc SAML.",
     },
     people: {
       heading: "Thành viên",
@@ -4573,7 +4989,7 @@ export const vi: TranslationKeys = {
       updateFailed: "Cập nhật người dùng thất bại",
       cannotRemoveOwnAdmin: "Không thể xóa vai trò quản trị của chính bạn",
       resetPasswordHeading: "Đặt lại mật khẩu cho {username}",
-      newPasswordLabel: "Mật khẩu mới (tối thiểu 8 ký tự)",
+      newPasswordLabel: "Mật khẩu mới",
       resetPasswordButton: "Đặt lại mật khẩu",
       resetPasswordWarning:
         "Thao tác này sẽ vô hiệu hóa tất cả phiên và khóa API của người dùng này.",
@@ -4584,6 +5000,7 @@ export const vi: TranslationKeys = {
       tableHeaderTeam: "Nhóm",
       noSearchResults: "Không có thành viên phù hợp với tìm kiếm.",
       noUsersFound: "Không tìm thấy người dùng.",
+      loadFailed: "Không thể tải người dùng.",
       authBadgeLocalOidc: "Nội bộ + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Chỉnh sửa vai trò / Nhóm",
@@ -4596,6 +5013,13 @@ export const vi: TranslationKeys = {
         "Sao chép mật khẩu này ngay bây giờ. Bạn sẽ không thể xem lại sau khi tạo người dùng.",
       memberCount: "{count} thành viên",
       memberCountPlural: "{count} thành viên",
+      usernameTaken: "Tên người dùng này đã được sử dụng",
+      lastAdmin: "Luôn phải có ít nhất một quản trị viên",
+      cannotDeleteSelf: "Không thể xóa tài khoản của chính bạn",
+      usernameInvalid:
+        "Tên người dùng phải dài từ 3 đến 50 ký tự và chỉ dùng a-z, A-Z, 0-9, dấu chấm, dấu gạch ngang và dấu gạch dưới",
+      roleNotFound: "Vai trò này không còn tồn tại",
+      teamNotFound: "Nhóm này không còn tồn tại",
     },
     teams: {
       heading: "Nhóm",
@@ -4617,6 +5041,7 @@ export const vi: TranslationKeys = {
       tableHeaderTeamName: "Tên nhóm",
       tableHeaderMembers: "Thành viên",
       emptyState: "Không tìm thấy nhóm.",
+      loadFailed: "Không thể tải nhóm.",
       renameSaveButton: "Lưu",
       renameCancelButton: "Hủy",
       renameAction: "Đổi tên",
@@ -4632,6 +5057,7 @@ export const vi: TranslationKeys = {
       teamRetentionHoursDesc:
         "Thời gian lưu giữ tệp xử lý cho nhóm này. Để trống để dùng mặc định chung.",
       quotaSaved: "Đã lưu cài đặt nhóm",
+      quotaSaveFailed: "Lưu cài đặt nhóm thất bại",
     },
     roles: {
       heading: "Vai trò",
@@ -4656,6 +5082,7 @@ export const vi: TranslationKeys = {
       deleteSuccess: 'Đã xóa vai trò "{name}"',
       deleteFailed: "Xóa vai trò thất bại",
       emptyState: "Không tìm thấy vai trò.",
+      loadFailed: "Không thể tải vai trò.",
       builtInBadge: "Tích hợp",
       userCountBadge: "{count} người dùng",
       editRoleTitle: "Chỉnh sửa vai trò",
@@ -4669,12 +5096,17 @@ export const vi: TranslationKeys = {
         users: "Người dùng",
         teams: "Nhóm",
         system: "Hệ thống",
+        enterpriseAdmin: "Quản trị doanh nghiệp",
       },
+      nameInvalid:
+        "Tên vai trò phải dài từ 2 đến 30 ký tự và chỉ dùng a-z, 0-9, dấu gạch ngang và dấu gạch dưới",
+      permissionsRequired: "Chọn ít nhất một quyền",
     },
     auditLog: {
       heading: "Nhật ký kiểm tra",
       allActionsFilter: "Tất cả hành động",
       emptyState: "Không có mục nhật ký kiểm tra.",
+      loadFailed: "Không thể tải nhật ký kiểm tra.",
       tableHeaderTime: "Thời gian",
       tableHeaderUser: "Người dùng",
       tableHeaderAction: "Hành động",
@@ -4717,6 +5149,7 @@ export const vi: TranslationKeys = {
       teamColumn: "Nhóm",
       storageColumn: "Lưu trữ",
       usersColumn: "Người dùng",
+      loadFailed: "Không thể tải dữ liệu sử dụng.",
     },
     apiKeys: {
       heading: "Khóa API",
@@ -4726,6 +5159,7 @@ export const vi: TranslationKeys = {
       removeScopingLabel: "Bỏ giới hạn quyền",
       restrictPermissionsLabel: "Hạn chế quyền (tùy chọn)",
       expiresLabel: "Hết hạn:",
+      expiresInPast: "Ngày hết hạn phải ở trong tương lai.",
       clearButton: "Xóa",
       copyTitle: "Sao chép",
       keyWarning: "Lưu trữ khóa này an toàn. Khóa sẽ không được hiển thị lại.",
@@ -4736,6 +5170,7 @@ export const vi: TranslationKeys = {
       deleteKeyTitle: "Xóa khóa",
       deleteConfirm: "Xóa khóa API này? Mọi tích hợp sử dụng khóa này sẽ ngừng hoạt động.",
       emptyState: "Chưa có khóa API. Tạo một khóa để bắt đầu.",
+      loadFailed: "Không thể tải khóa API.",
     },
     tools: {
       heading: "Công cụ",
@@ -4776,6 +5211,7 @@ export const vi: TranslationKeys = {
       description: "Quản lý các gói mô hình AI cho xử lý tệp nâng cao.",
       installAll: "Cài đặt tất cả",
       diskUsage: "Dung lượng đĩa: {size}",
+      statusStale: "Không thể làm mới trạng thái gói. Danh sách bên dưới có thể đã cũ.",
       sizeOnDisk: "{size} trên ổ đĩa",
       installed: "Đã cài đặt",
       notInstalled: "Chưa cài đặt",
@@ -4805,6 +5241,8 @@ export const vi: TranslationKeys = {
       resetFailed: "Đặt lại thất bại: {error}",
       resetVenvKept:
         "Môi trường Python dùng chung được giữ nguyên: bản cài đặt này không có nền tảng đi kèm để dựng lại nó. Các mô hình, bộ nhớ đệm tải xuống và bản ghi cài đặt đã được xóa. Hãy tự tạo lại môi trường đó nếu một gói cũ bên trong là nguyên nhân.",
+      importBusy: "Một lượt cài đặt hoặc nhập khác đang chạy. Hãy thử lại khi nó hoàn tất.",
+      importNoSpace: "Máy chủ không đủ dung lượng đĩa cho gói này.",
     },
     about: {
       heading: "Giới thiệu",
@@ -4824,6 +5262,9 @@ export const vi: TranslationKeys = {
   auth: {
     login: "Đăng nhập",
     logout: "Đăng xuất",
+    logoutFailed: "Không thể đăng xuất. Vui lòng thử lại.",
+    idpLogoutFailed:
+      "Bạn đã đăng xuất khỏi SnapOtter, nhưng phiên tại nhà cung cấp SSO có thể vẫn đang mở. Hãy đăng xuất ở đó nữa.",
     username: "Tên đăng nhập",
     password: "Mật khẩu",
     loginButton: "Đăng nhập",
@@ -4853,10 +5294,22 @@ export const vi: TranslationKeys = {
     verify: "Xác minh",
     verifying: "Đang xác minh...",
     mfaInvalidCode: "Mã không hợp lệ. Vui lòng thử lại.",
+    mfaAttemptsExhausted: "Nhập sai mã quá nhiều lần. Vui lòng đăng nhập lại.",
+    mfaEnrollmentAttemptsExhausted:
+      "Nhập sai mã quá nhiều lần. Hãy đăng nhập lại để nhận mã QR mới và mã khôi phục mới; các mã hiển thị trước đó sẽ không dùng được.",
+    mfaExpired: "Phiên xác minh đã hết hạn. Vui lòng đăng nhập lại.",
+    mfaEnrollmentExpired:
+      "Phiên thiết lập đã hết hạn. Hãy đăng nhập lại để nhận mã QR mới và mã khôi phục mới; các mã hiển thị trước đó sẽ không dùng được.",
+    mfaNotConfigured: "Xác thực hai yếu tố chưa được thiết lập. Vui lòng đăng nhập lại.",
+    mfaAlreadyEnabled: "Xác thực hai yếu tố đã được bật. Vui lòng đăng nhập lại.",
+    mfaUnreadable:
+      "Máy chủ không đọc được dữ liệu xác thực hai yếu tố của bạn. Vui lòng liên hệ quản trị viên.",
     mfaEnrollmentHeading: "Thiết lập xác thực hai yếu tố để tiếp tục",
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",
     mfaPolicyUnavailable: "Không thể kiểm tra chính sách MFA. Vui lòng thử lại sau giây lát.",
+    accountDisabled: "Tài khoản này đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.",
+    ipNotAllowed: "Địa chỉ IP của bạn không được phép. Vui lòng liên hệ quản trị viên.",
     loginThrottled: "Quá nhiều lần đăng nhập. Vui lòng thử lại sau {minutes} phút.",
     loginThrottledPlural: "Quá nhiều lần đăng nhập. Vui lòng thử lại sau {minutes} phút.",
     loginThrottledUnknownWait: "Quá nhiều lần đăng nhập. Vui lòng đợi trước khi thử lại.",
@@ -4899,14 +5352,13 @@ export const vi: TranslationKeys = {
   },
   changePassword: {
     title: "Đổi mật khẩu của bạn",
-    description:
-      "Bạn cần đặt mật khẩu mới trước khi tiếp tục. Mật khẩu phải có ít nhất 8 ký tự bao gồm chữ hoa, chữ thường và số.",
+    description: "Bạn cần đặt mật khẩu mới trước khi tiếp tục.",
     usernameLabel: "Tên đăng nhập",
     currentPasswordLabel: "Mật khẩu hiện tại",
     currentPasswordPlaceholder: "Nhập mật khẩu hiện tại",
     newPasswordLabel: "Mật khẩu mới",
     generateButton: "Tạo mật khẩu mạnh",
-    newPasswordPlaceholder: "Ít nhất 8 ký tự",
+    newPasswordPlaceholder: "Nhập mật khẩu mới",
     confirmPasswordLabel: "Xác nhận mật khẩu mới",
     confirmPasswordPlaceholder: "Nhập lại mật khẩu mới",
     passwordsMismatch: "Mật khẩu không khớp",
@@ -4916,6 +5368,7 @@ export const vi: TranslationKeys = {
     changeButton: "Đổi mật khẩu",
     sidebarTitle: "Sắp xong rồi",
     sidebarDescription: "Đặt mật khẩu mạnh để bảo mật tài khoản, sau đó bạn có thể sử dụng ngay.",
+    sessionEnded: "Phiên của bạn đã kết thúc. Hãy đăng nhập lại để đổi mật khẩu.",
   },
   automate: {
     title: "Tự động hóa",
@@ -4925,6 +5378,15 @@ export const vi: TranslationKeys = {
     noSteps: "Tệp Pipeline không có bước nào",
     importFailed: "Nhập thất bại",
     couldNotRead: "Không thể đọc tệp Pipeline",
+    importListRefreshFailed:
+      "Đã nhập Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem.",
+    saveFailed: "Lưu Pipeline thất bại",
+    deleteFailed: "Xóa Pipeline thất bại",
+    loadFailed: "Không thể tải các Pipeline đã lưu.",
+    saveListRefreshFailed:
+      "Đã lưu Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem.",
+    deleteListRefreshFailed:
+      "Đã xóa Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem thay đổi.",
     fileCount: "{count} tệp",
     fileCountPlural: "{count} tệp",
     importFromLibrary: "Nhập từ thư viện",
@@ -5010,6 +5472,7 @@ export const vi: TranslationKeys = {
     fileCount: "{count} tệp",
     fileCountSingular: "{count} tệp",
     noFilesFound: "Không tìm thấy tệp",
+    loadFailed: "Không thể tải tệp của bạn.",
     selectFilePrompt: "Chọn tệp để xem chi tiết",
     openFile: "Mở tệp",
     selectFile: "Chọn tệp",
@@ -5028,6 +5491,7 @@ export const vi: TranslationKeys = {
     download: "Tải xuống",
     details: {
       previewFailedRetry: "Tạo xem trước thất bại. Hãy thử lại.",
+      loadFailed: "Không thể tải tệp này.",
     },
   },
   dropzone: {
@@ -5047,6 +5511,7 @@ export const vi: TranslationKeys = {
     filesSelected: "Đã chọn {count} tệp",
     dropToAdd: "Thả để thêm tệp",
     dropToReplace: "Thả để thay thế tệp",
+    ignoredWhileRunning: "Đang xử lý. Hãy đợi hoàn tất trước khi thêm tệp.",
     reorderHint: "Kéo các hình thu nhỏ để sắp xếp lại, hoặc đảo ngược thứ tự, trước khi chạy.",
   },
   reviewPanel: {
@@ -5077,6 +5542,8 @@ export const vi: TranslationKeys = {
     lessThanMinute: "Còn chưa đầy một phút",
     oneMinuteLeft: "Còn khoảng 1 phút",
     minutesLeft: "Còn khoảng {mins} phút",
+    minutesLeftFew: "Còn khoảng {mins} phút",
+    minutesLeftTwo: "Còn khoảng {mins} phút",
     progressMessages: [
       "Sắp xong rồi... có lẽ thế...",
       "Của ngon phải chờ...",
@@ -5153,6 +5620,56 @@ export const vi: TranslationKeys = {
     networkError: "Lỗi mạng. Kiểm tra kết nối của bạn.",
     invalidCredentials: "Tên đăng nhập hoặc mật khẩu không đúng",
     connectionError: "Lỗi kết nối",
+    fileTooLarge:
+      "Tệp này quá lớn để tải lên. Hãy thử tệp nhỏ hơn hoặc nhờ quản trị viên máy chủ tăng giới hạn tải lên.",
+    featureNotInstalledForTool:
+      '{tool} cần tính năng "{feature}". Hãy bật trong Cài đặt → Tính năng AI.',
+    featureNotInstalled:
+      'Tính năng "{feature}" chưa được cài đặt. Hãy bật trong Cài đặt → Tính năng AI.',
+    featureIncompatible: 'Tính năng "{feature}" không thể chạy trên phần cứng của máy chủ này.',
+    passwordTooShort: "Mật khẩu phải có ít nhất {minLength} ký tự.",
+    passwordNeedsUppercase: "Mật khẩu phải chứa một chữ cái viết hoa.",
+    passwordNeedsLowercase: "Mật khẩu phải chứa một chữ cái viết thường.",
+    passwordNeedsDigit: "Mật khẩu phải chứa một chữ số.",
+    passwordNeedsSpecial: "Mật khẩu phải chứa một ký tự đặc biệt.",
+    passwordNoControlCharacters: "Mật khẩu không được chứa ký tự điều khiển.",
+    passwordTooLong: "Mật khẩu chỉ được dài tối đa {maxLength} ký tự.",
+    passwordTooLongAdminReset:
+      "Mật khẩu quá dài (tối đa {maxLength} ký tự). Quản trị viên phải đặt lại mật khẩu.",
+    passwordNoInvalidCharacters: "Mật khẩu không được chứa ký tự không hợp lệ.",
+    tooManyRequests: "Quá nhiều lần thử. Hãy đợi một phút rồi thử lại.",
+    escalationDenied: "Việc này cần quyền truy cập cao hơn vai trò của bạn.",
+    featureNotLicensed: "Tính năng này cần giấy phép doanh nghiệp.",
+    sessionEnded: "Phiên của bạn đã kết thúc. Hãy đăng nhập lại.",
+    forbidden: "Bạn không có quyền làm việc này.",
+    invalidSetting: "Giá trị không hợp lệ cho {setting}.",
+    network: "Lỗi mạng",
+    invalidResponse: "Phản hồi không hợp lệ",
+    staleVersionReload: "Ứng dụng đã được cập nhật. Hãy tải lại trang và thử lại.",
+    failedWithStatus: "Không thể hoàn tất yêu cầu đó. Vui lòng thử lại.",
+    processingFailedWithStatus:
+      "Không thể xử lý tệp này. Hãy kiểm tra xem tệp có bị hỏng không rồi thử lại.",
+    processingFailedNoDetail: "Xử lý thất bại",
+    canceled: "Đã hủy xử lý",
+    jobTrackingFailed: "Đã xảy ra lỗi khi theo dõi tác vụ này. Vui lòng thử lại.",
+    requestTimedOut: "Yêu cầu đã hết thời gian",
+    runInterrupted: "Quá trình xử lý bị gián đoạn. Hãy chạy lại.",
+    requestFailedWithStatus: "Không thể hoàn tất yêu cầu đó. Vui lòng thử lại.",
+    invalidServerResponse: "Phản hồi không hợp lệ từ máy chủ",
+    batchFailed: "Xử lý hàng loạt không thành công",
+    batchFailedWithStatus: "Không thể hoàn tất xử lý hàng loạt. Hãy thử chạy lại.",
+    allFilesFailed: "Xử lý tất cả tệp không thành công",
+    filesFailedSuffix_one: " (1 tệp không thành công)",
+    filesFailedSuffix_other: " ({count} tệp không thành công)",
+    uploadTimeout:
+      "Đã hết thời gian tải lên. Hãy kiểm tra kết nối của bạn hoặc thử một tệp nhỏ hơn.",
+    processingInterrupted: "Quá trình xử lý bị gián đoạn. Vui lòng thử lại khi kết nối lại.",
+    processingInterruptedUnconfirmed:
+      "Quá trình xử lý bị gián đoạn và máy chủ chưa bao giờ xác nhận công việc. Vui lòng thử lại khi kết nối lại.",
+    resultNoLongerAvailable: "Kết quả hoàn thành không còn khả dụng. Vui lòng chạy lại công việc.",
+    batchDownloadFailed: "Không thể tải xuống loạt tệp đã hoàn thành. Hãy làm mới và thử lại.",
+    fileNotFoundInBatch: "Không tìm thấy tệp trong kết quả hàng loạt",
+    noFilesSelected: "Chưa chọn tệp nào",
   },
   sidebar: {
     sponsor: "Ủng hộ chúng tôi",
@@ -5188,6 +5705,7 @@ export const vi: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Ủng hộ SnapOtter trên GitHub Sponsors",
     skipToContent: "Chuyển đến nội dung chính",
     openSidebar: "Mở thanh bên",
@@ -5210,6 +5728,8 @@ export const vi: TranslationKeys = {
     imageControls: "Điều khiển xem trước",
     zoomControls: "Điều khiển thu phóng",
     dragToReorder: "Kéo để sắp xếp lại",
+    resultResizedToFit: "Đã thu nhỏ để vừa kích thước mục tiêu",
+    resultMissedTarget: "Chưa đạt kích thước mục tiêu",
     reverseOrder: "Đảo ngược thứ tự",
     whiteBackground: "Nền trắng",
     blackBackground: "Nền đen",
@@ -5290,11 +5810,47 @@ export const vi: TranslationKeys = {
       description: "Sửa chữa, tô màu và phóng to ảnh cũ hoặc hư hỏng bằng AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Xóa nền",
+      description: "Xóa nền ảnh bằng AI",
+    },
+    "face-detection": {
+      name: "Nhận diện khuôn mặt",
+      description: "Nhận diện và làm mờ khuôn mặt, sửa mắt đỏ, cắt thông minh",
+    },
+    "object-eraser-colorize": {
+      name: "Xóa đối tượng & tô màu",
+      description: "Xóa đối tượng khỏi ảnh và tô màu ảnh đen trắng",
+    },
+    "inpaint-hq": {
+      name: "Inpainting chất lượng cao",
+      description:
+        "Xóa đối tượng dựa trên khuếch tán cho vật thể lớn, kết cấu chi tiết và nền có cấu trúc",
+    },
+    "upscale-enhance": {
+      name: "Phóng to & nâng cao",
+      description: "Phóng to bằng AI, nâng cao khuôn mặt và khử nhiễu",
+    },
+    "photo-restoration": {
+      name: "Phục chế ảnh",
+      description: "Phục chế ảnh cũ hoặc hư hỏng",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Trích xuất văn bản từ ảnh và PDF",
+    },
+    transcription: {
+      name: "Phiên âm",
+      description: "Chuyển giọng nói thành văn bản cho âm thanh và video (phụ đề)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Đang nhập...",
       importCount: "Nhập ({count})",
       import: "Nhập",
+      importFailed: "Không thể nhập {failed} trong số {total} tệp.",
     },
     metadataGrid: {
       noData: "Không có dữ liệu",
@@ -5307,6 +5863,19 @@ export const vi: TranslationKeys = {
     waveform: {
       play: "Phát",
       pause: "Tạm dừng",
+    },
+    languageNames: {
+      en: "Tiếng Anh",
+      de: "Tiếng Đức",
+      fr: "Tiếng Pháp",
+      es: "Tiếng Tây Ban Nha",
+      zh: "Tiếng Trung",
+      ja: "Tiếng Nhật",
+      ko: "Tiếng Hàn",
+      ar: "Tiếng Ả Rập",
+      id: "Tiếng Indonesia",
+      th: "Tiếng Thái",
+      vi: "Tiếng Việt",
     },
   },
   privacyPolicy: {

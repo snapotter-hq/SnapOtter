@@ -1,8 +1,9 @@
 ---
 description: "Siapkan Single Sign-On SAML 2.0 untuk SnapOtter. Panduan langkah demi langkah untuk Okta, Azure AD / Entra ID, Google Workspace, dan penyedia identitas SAML lainnya."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: becd9d2f8770
+i18n_output_hash: 5dacac782c89
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Jika Anda ingin mewajibkan semua pengguna login via SAML (atau OIDC) dan memblok
 2. Di **Admin Settings > Security**, aktifkan **SSO Enforcement**.
 3. Setel **break-glass username**: ini adalah satu-satunya akun lokal yang masih dapat login dengan kata sandi, untuk akses darurat jika IdP tidak dapat dijangkau.
 
-Saat penegakan SSO aktif, setiap upaya login lokal (kecuali untuk pengguna break-glass) mengembalikan kesalahan 403 dengan pesan "Local password login is disabled. Please use SSO."
+Saat penegakan SSO aktif, hanya pengguna break-glass yang dapat login dengan kata sandi lokal. Setiap upaya login lokal lainnya ditolak dengan 401 "Invalid credentials" yang sama seperti kata sandi yang salah, meskipun kata sandinya benar, dan dihitung dalam pembatasan login.
 
 ::: tip 
 Selalu konfigurasikan break-glass username sebelum mengaktifkan penegakan SSO. Tanpanya, Anda bisa terkunci dari SnapOtter jika IdP Anda mati.

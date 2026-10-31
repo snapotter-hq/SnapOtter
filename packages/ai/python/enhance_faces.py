@@ -1,4 +1,5 @@
 """Face enhancement using GFPGAN or CodeFormer with MediaPipe detection."""
+import errno
 import sys
 import json
 import os
@@ -23,9 +24,33 @@ except (ImportError, ModuleNotFoundError):
         pass
 
 
+_OOM_MARKERS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
+    "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
+)
+
+
 def emit_progress(percent, stage):
     """Emit structured progress to stderr for bridge.ts to capture."""
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
+
+
+def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    return any(s in m for s in _OOM_MARKERS)
 
 
 _MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
@@ -96,15 +121,20 @@ def detect_faces_mediapipe(img_array, sensitivity):
 
     try:
         mp_face = mp.solutions.face_detection
+    except AttributeError:
+        mp_face = None
 
+    if mp_face is not None:
         all_detections = []
         for model_sel in [0, 1]:
             detector = mp_face.FaceDetection(
                 model_selection=model_sel,
                 min_detection_confidence=min_confidence,
             )
-            results = detector.process(scaled)
-            detector.close()
+            try:
+                results = detector.process(scaled)
+            finally:
+                detector.close()
             if results.detections:
                 all_detections.extend(results.detections)
 
@@ -123,28 +153,29 @@ def detect_faces_mediapipe(img_array, sensitivity):
             })
         return faces
 
-    except AttributeError:
-        model_path = _ensure_face_detect_model()
-        options = mp.tasks.vision.FaceDetectorOptions(
-            base_options=mp.tasks.BaseOptions(model_asset_path=model_path),
-            running_mode=mp.tasks.vision.RunningMode.IMAGE,
-            min_detection_confidence=min_confidence,
-        )
-        detector = mp.tasks.vision.FaceDetector.create_from_options(options)
+    model_path = _ensure_face_detect_model()
+    options = mp.tasks.vision.FaceDetectorOptions(
+        base_options=mp.tasks.BaseOptions(model_asset_path=model_path),
+        running_mode=mp.tasks.vision.RunningMode.IMAGE,
+        min_detection_confidence=min_confidence,
+    )
+    detector = mp.tasks.vision.FaceDetector.create_from_options(options)
+    try:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=scaled)
         result = detector.detect(mp_image)
+    finally:
         detector.close()
 
-        faces = []
-        for detection in result.detections:
-            bbox = detection.bounding_box
-            faces.append({
-                "x": int(bbox.origin_x * inv_scale),
-                "y": int(bbox.origin_y * inv_scale),
-                "w": int(bbox.width * inv_scale),
-                "h": int(bbox.height * inv_scale),
-            })
-        return faces
+    faces = []
+    for detection in result.detections:
+        bbox = detection.bounding_box
+        faces.append({
+            "x": int(bbox.origin_x * inv_scale),
+            "y": int(bbox.origin_y * inv_scale),
+            "w": int(bbox.width * inv_scale),
+            "h": int(bbox.height * inv_scale),
+        })
+    return faces
 
 
 def enhance_with_gfpgan(img_array, only_center_face):
@@ -179,6 +210,8 @@ def enhance_with_gfpgan(img_array, only_center_face):
         only_center_face=only_center_face,
         paste_back=True,
     )
+    if output is None:
+        raise RuntimeError("GFPGAN returned no result (face enhancement may have failed)")
     return output
 
 
@@ -216,10 +249,11 @@ def enhance_with_codeformer(img_array, fidelity_weight):
         img_bgr = img_array[:, :, ::-1].copy()
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_in:
-            cv2.imwrite(tmp_in.name, img_bgr)
             tmp_in_path = tmp_in.name
 
         try:
+            if not cv2.imwrite(tmp_in_path, img_bgr):
+                raise RuntimeError(f"Failed to write output image: {tmp_in_path}")
             result_path = inference_app(
                 image=tmp_in_path,
                 background_enhance=False,
@@ -233,7 +267,13 @@ def enhance_with_codeformer(img_array, fidelity_weight):
         if result_path is None:
             raise RuntimeError("CodeFormer returned no result (face detection may have failed)")
 
-        restored_bgr = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
+        try:
+            restored_bgr = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
+        finally:
+            try:
+                os.unlink(str(result_path))
+            except OSError:
+                pass
         if restored_bgr is None:
             raise RuntimeError("CodeFormer output file could not be read")
     finally:
@@ -255,22 +295,40 @@ def main():
 
     try:
         emit_progress(10, "Preparing")
-        from PIL import Image
-        import numpy as np
-
-        img = Image.open(input_path).convert("RGB")
-        img_array = np.array(img)
-
-        # Detect faces with MediaPipe
         try:
-            emit_progress(20, "Scanning for faces")
-            faces = detect_faces_mediapipe(img_array, sensitivity)
+            from PIL import Image
         except ImportError:
             print(
                 json.dumps(
                     {
                         "success": False,
-                        "error": "Face detection requires MediaPipe. Install with: pip install mediapipe",
+                        "error": "Pillow is not installed. Install with: pip install Pillow",
+                    }
+                )
+            )
+            sys.exit(1)
+
+        img = Image.open(input_path).convert("RGB")
+
+        # Detect faces with MediaPipe
+        try:
+            import numpy as np
+
+            img_array = np.array(img)
+            emit_progress(20, "Scanning for faces")
+            faces = detect_faces_mediapipe(img_array, sensitivity)
+        except ImportError as e:
+            msg = str(e).strip() or type(e).__name__
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Install with: pip install mediapipe numpy opencv-python"
+            )
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": f"Missing dependency: {msg}. {hint}",
                     }
                 )
             )
@@ -315,35 +373,68 @@ def main():
         model_used = None
 
         try:
-            if model_choice == "gfpgan":
-                enhanced = enhance_with_gfpgan(img_array, only_center_face)
-                model_used = "gfpgan"
-
-            elif model_choice == "codeformer":
-                fidelity_weight = 1.0 - strength
-                enhanced = enhance_with_codeformer(img_array, fidelity_weight)
-                model_used = "codeformer"
-
-            elif model_choice == "auto":
-                try:
-                    fidelity_weight = 1.0 - strength
-                    enhanced = enhance_with_codeformer(img_array, fidelity_weight)
-                    model_used = "codeformer"
-                except Exception as e:
-                    import traceback
-                    print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {e}", file=sys.stderr, flush=True)
-                    traceback.print_exc(file=sys.stderr)
-                    emit_progress(50, "Falling back to GFPGAN")
+            try:
+                if model_choice == "gfpgan":
                     enhanced = enhance_with_gfpgan(img_array, only_center_face)
                     model_used = "gfpgan"
 
-        finally:
-            # Restore stdout after ALL AI processing
-            sys.stdout.flush()
-            if stdout_fd is not None:
-                os.dup2(stdout_fd, 1)
-                os.close(stdout_fd)
-            sys.stdout = sys.__stdout__  # Restore Python-level stdout
+                elif model_choice == "codeformer":
+                    fidelity_weight = 1.0 - strength
+                    enhanced = enhance_with_codeformer(img_array, fidelity_weight)
+                    model_used = "codeformer"
+
+                elif model_choice == "auto":
+                    try:
+                        fidelity_weight = 1.0 - strength
+                        enhanced = enhance_with_codeformer(img_array, fidelity_weight)
+                        model_used = "codeformer"
+                    except Exception as e:
+                        if _is_oom(e):
+                            raise
+                        import traceback
+                        detail = str(e).strip() or type(e).__name__
+                        print(json.dumps({"warning": f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {detail}"}), file=sys.stderr, flush=True)
+                        traceback.print_exc(file=sys.stderr)
+                        emit_progress(50, "Falling back to GFPGAN")
+                        try:
+                            enhanced = enhance_with_gfpgan(img_array, only_center_face)
+                        except Exception as gfp_err:
+                            if _is_oom(gfp_err) or (
+                                isinstance(e, ImportError) and isinstance(gfp_err, ImportError)
+                            ):
+                                raise
+                            gfp_detail = str(gfp_err).strip() or type(gfp_err).__name__
+                            raise RuntimeError(
+                                f"CodeFormer failed ({detail}); GFPGAN fallback also failed ({gfp_detail})"
+                            ) from gfp_err
+                        model_used = "gfpgan"
+
+                else:
+                    raise ValueError(f"Unknown face enhancement model: {model_choice}")
+
+            finally:
+                # Restore stdout after ALL AI processing
+                sys.stdout.flush()
+                if stdout_fd is not None:
+                    os.dup2(stdout_fd, 1)
+                    os.close(stdout_fd)
+                sys.stdout = sys.__stdout__  # Restore Python-level stdout
+        except ImportError as e:
+            msg = str(e).strip() or type(e).__name__
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Install with: pip install torch gfpgan codeformer-pip opencv-python numpy"
+            )
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": f"Missing dependency: {msg}. {hint}",
+                    }
+                )
+            )
+            sys.exit(1)
 
         if enhanced is None:
             raise RuntimeError("Face enhancement failed: no model available")
@@ -375,18 +466,8 @@ def main():
             )
         )
 
-    except ImportError:
-        print(
-            json.dumps(
-                {
-                    "success": False,
-                    "error": "Pillow is not installed. Install with: pip install Pillow",
-                }
-            )
-        )
-        sys.exit(1)
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

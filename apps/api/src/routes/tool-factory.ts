@@ -16,12 +16,29 @@ import type { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../jobs/enqueue.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../jobs/types.js";
-import { formatZodErrors, friendlyError, stripInternalPaths } from "../lib/errors.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../jobs/types.js";
+import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
+import { markQueueEventsJobFailure, markUpstreamError, reportError } from "../lib/error-report.js";
+import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
-import { getObjectBuffer, putObject } from "../lib/object-storage.js";
+import { createUniqueNamer } from "../lib/filename.js";
+import { multipartFailure } from "../lib/multipart-parts.js";
+import {
+  deletePrefix,
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeS3ReadFault,
+  putObject,
+} from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
-import { getSettingNumber } from "../lib/settings-helpers.js";
+import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
+import { hasPersistedJobRow, settleUnenqueuedAlias } from "../lib/upload-cleanup.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
 import { type InputHandler, InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -278,8 +295,19 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       let fileId: string | null = null;
       let saveModeRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
       let fileCount = 0;
       const received: ReceivedUpload[] = [];
+      const uniqueInputName = createUniqueNamer();
+      let enqueued = false;
+      let aliasStamped = false;
+
+      // Every rejection between the upload and enqueue lands here. Without a
+      // jobs row, nothing else ever removes the upload on S3 (#1690).
+      const discardUploads = () =>
+        deletePrefix(`uploads/${jobId}/`).catch((err) =>
+          request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads"),
+        );
 
       // Parse multipart parts (file parts stream to object storage).
       // request.parts() is the keep-alive-safe iterator from
@@ -298,9 +326,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               }
               continue;
             }
+            // Resolve collisions after sanitization, before streaming either
+            // part to the same object key (e.g. two document.pdf uploads).
             const upload = await receiveUpload(part, jobId, {
               maxBytes:
                 env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined,
+              ...(maxInputs > 1 ? { uniqueName: uniqueInputName } : {}),
             });
             received.push(upload);
             if (fileCount === 1) {
@@ -318,70 +349,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               saveModeRaw = part.value as string;
             }
             if (part.fieldname === "clientJobId") {
-              const raw = part.value as string;
-              if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-                clientJobId = raw;
-              }
+              clientJobIdRaw = part.value as string;
             }
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        await discardUploads();
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
-
-      if (fileCount > maxInputs) {
-        return reply.status(400).send({
-          error: `Too many files (max ${maxInputs})`,
-        });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      // Require at least one file
-      if (received.length === 0) {
-        return reply.status(400).send({ error: "No file provided" });
-      }
-
-      // Require the tool's minimum number of files (e.g. create-zip / merge-csvs
-      // need 2). Returns 400 pre-enqueue instead of a 422 from the worker.
-      if (received.length < minInputs) {
-        return reply.status(400).send({
-          error: `This tool needs at least ${minInputs} files`,
-        });
-      }
-
-      // Stamp the client-facing alias before validation starts (#886):
-      // decode can take seconds on a big HEIC, and a cancel clicked in
-      // that window needs a durable pointer to resolve. Awaited, and ahead
-      // of the first progress write, so the lazy persist layer can never
-      // create the row first. Insert-only: a reused id keeps its previous
-      // run's state until enqueueToolJob claims and re-points it.
-      const pool = resolveToolPool(config.toolId);
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId: authUser.id, pool });
-      }
-
-      const reportProgress = (percent: number, stage?: string) => {
-        if (!clientJobId) return;
-        void updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "processing",
-          percent,
-          stage,
-        });
-      };
-
-      reportProgress(5, "Validating...");
-
-      // Resolve the tool's modality (default "image" for registry-only test tools)
-      const toolMeta = TOOLS.find((t) => t.id === config.toolId);
-      const modality = toolMeta?.modality ?? "image";
 
       // Per-request scratch dir for input handlers that need temp files during
       // validation. MUST stay distinct from the worker's job scratch dir
@@ -391,8 +367,73 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       // (both otherwise default to tmpdir()/snapotter-scratch/<jobId>). The
       // "-prep" suffix keeps the two from colliding.
       const scratchDir = join(tmpdir(), "snapotter-scratch", `${jobId}-prep`);
-      await mkdir(scratchDir, { recursive: true });
       try {
+        await mkdir(scratchDir, { recursive: true });
+        if (fileCount > maxInputs) {
+          return reply.status(400).send({
+            error: `Too many files (max ${maxInputs})`,
+          });
+        }
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
+        }
+
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+        }
+        clientJobId = clientJobIdField ?? null;
+
+        // Require at least one file
+        if (received.length === 0) {
+          return reply.status(400).send({ error: "No file provided" });
+        }
+
+        // Require the tool's minimum number of files (e.g. create-zip / merge-csvs
+        // need 2). Returns 400 pre-enqueue instead of a 422 from the worker.
+        if (received.length < minInputs) {
+          return reply.status(400).send({
+            error: `This tool needs at least ${minInputs} files`,
+          });
+        }
+
+        // Stamp the client-facing alias before validation starts (#886):
+        // decode can take seconds on a big HEIC, and a cancel clicked in
+        // that window needs a durable pointer to resolve. Awaited, and ahead
+        // of the first progress write, so the lazy persist layer can never
+        // create the row first. Insert-only: a reused id keeps its previous
+        // run's state until enqueueToolJob claims and re-points it.
+        const pool = resolveToolPool(config.toolId, config.section);
+        let ownsPreEnqueueAlias = true;
+        if (clientJobId && clientJobId !== jobId) {
+          ownsPreEnqueueAlias =
+            (await insertToolJobAlias({
+              jobId,
+              clientJobId,
+              userId: authUser.id,
+              pool,
+            })) !== false;
+          aliasStamped = ownsPreEnqueueAlias;
+        }
+
+        const reportProgress = (percent: number, stage?: string) => {
+          if (!clientJobId || !ownsPreEnqueueAlias) return;
+          void updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "processing",
+            percent,
+            stage,
+          });
+        };
+
+        reportProgress(5, "Validating...");
+
+        // Resolve the tool's modality (default "image" for registry-only test tools)
+        const toolMeta = TOOLS.find((t) => t.id === config.toolId);
+        const modality = toolMeta?.modality ?? "image";
+
         // Reject files whose extension is not in the tool's acceptedInputs.
         // Image and media modalities validate content via their input handlers
         // (sharp decode, ffprobe); document/file modalities need an explicit
@@ -430,13 +471,23 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const preparedInputs: { filename: string; buffer: Buffer }[] = [];
         for (let i = 0; i < received.length; i++) {
           const upload = received[i];
-          let fileBuffer = await getObjectBuffer(upload.key);
+          let fileBuffer: Buffer;
+          try {
+            fileBuffer = await getObjectBuffer(upload.key);
+          } catch (err) {
+            if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+            throw err;
+          }
           const originalBuffer = fileBuffer;
           let fname = upload.filename;
 
           try {
             const prepared = await handlerForPosition(i).prepare(fileBuffer, fname, {
               scratchDir,
+              // reqId comes with request.log; jobId and toolId make a
+              // normalization warn joinable to the job row, and filename says
+              // which of a multi-input upload it was (#1417).
+              log: request.log.child({ jobId, toolId: config.toolId, filename: fname }),
               lenient: config.skipStructuralValidation,
               // Reject encrypted PDFs up front only for PDF-only tools (qpdf
               // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the
@@ -452,11 +503,11 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             fname = prepared.filename;
           } catch (err) {
             if (err instanceof InputValidationError) {
+              reportEngineUnavailable(err, config.toolId, request.log);
               const errorMsg = maxInputs > 1 ? `${fname}: ${err.message}` : err.message;
               const body: Record<string, string> = { error: errorMsg };
               if (err.details) body.details = err.details;
               if (err.code) body.code = err.code;
-              // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
               return reply.status(err.statusCode).send(body);
             }
             throw err;
@@ -466,6 +517,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           // write the final version so the worker processes the correct data.
           // Skip re-upload when the buffer is reference-identical to the
           // originally streamed bytes and the filename hasn't changed.
+          if (maxInputs > 1 && fname !== upload.filename) fname = uniqueInputName(fname);
           const decodedKey = `uploads/${jobId}/${fname}`;
           if (decodedKey !== upload.key) {
             await putObject(decodedKey, fileBuffer);
@@ -491,7 +543,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
         // Parse and validate settings
         if (settingsRaw && settingsRaw.length > 65536) {
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
         }
         let settings: T;
@@ -499,7 +550,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
           const result = config.settingsSchema.safeParse(parsed);
           if (!result.success) {
-            // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
             return reply.status(400).send({
               error: "Invalid settings",
               details: formatZodErrors(result.error.issues),
@@ -507,7 +557,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
           settings = result.data;
         } catch {
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(400).send({ error: "Settings must be valid JSON" });
         }
 
@@ -519,8 +568,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             await config.preValidate({ inputs: preparedInputs, settings });
           } catch (err) {
             if (err instanceof InputValidationError) {
+              reportEngineUnavailable(err, config.toolId, request.log);
               const body: Record<string, string> = { error: err.message };
               if (err.details) body.details = err.details;
+              if (err.code) body.code = err.code;
               return reply.status(err.statusCode).send(body);
             }
             if (isToolInputError(err)) {
@@ -535,7 +586,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         if (bundleId && !isToolInstalled(config.toolId)) {
           const missingBundleId = getFirstMissingBundleForTool(config.toolId) ?? bundleId;
           const bundle = FEATURE_BUNDLES[missingBundleId];
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(501).send({
             error: "Feature not installed",
             code: "FEATURE_NOT_INSTALLED",
@@ -550,7 +600,11 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         // carry the owner so cancels can be authorized); counting them
         // would double-charge every tool-route run against the limit.
         const userId = authUser.id;
-        const maxConcurrent = await getSettingNumber("maxConcurrentJobsPerUser", 0);
+        const maxConcurrent = parseNumericSettingValue(
+          "maxConcurrentJobsPerUser",
+          await getSettingStrict("maxConcurrentJobsPerUser"),
+          0,
+        );
         if (maxConcurrent > 0 && userId) {
           const activeJobs = await db
             .select({ count: sql<number>`count(*)::int` })
@@ -578,10 +632,18 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const dbSettings = config.redactSettingsForAudit
           ? config.redactSettingsForAudit(settings)
           : undefined;
-        await enqueueToolJob({
+        // Once enqueueToolJob has written the jobs row, that row owns
+        // uploads/<jobId>/ (a failed queue add is retried from it), so the
+        // finally below must leave the upload alone. If it threw before the
+        // row landed, nothing else will ever remove the upload.
+        enqueued = true;
+        const jobData: ToolJobData = {
           jobId,
           toolId: config.toolId,
           userId,
+          username: authUser.username,
+          requestIp: request.ip,
+          requestId: request.id,
           pool,
           inputRefs,
           filename,
@@ -592,7 +654,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           clientJobId: clientJobId ?? undefined,
           kind: "tool",
           analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-        });
+        };
+        try {
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
 
         // Long tools never block the HTTP request (spec 4.5): straight to SSE.
         if (shouldSkipSyncWindow(toolMeta?.executionHint)) {
@@ -602,24 +671,36 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         try {
           const result = await waitForJob(pool, jobId);
           if (result) {
-            // Fire-and-forget: audit log must never block the response
-            import("../lib/audit.js")
-              .then(({ isToolAuditEnabled, auditFromRequest }) =>
-                isToolAuditEnabled().then((enabled) => {
-                  if (!enabled) return;
-                  return auditFromRequest(request)("TOOL_EXECUTED", {
-                    userId: authUser.id,
-                    username: authUser.username,
-                    toolId: config.toolId,
-                    inputFileCount: received.length,
-                    totalInputSize: received.reduce((sum, r) => sum + r.size, 0),
-                    outputFormat: (settings as Record<string, unknown>)?.format ?? null,
-                    status: "success",
-                    durationMs: Date.now() - startTime,
-                  });
-                }),
-              )
-              .catch(() => {});
+            if (!result.audited) {
+              // Fire-and-forget: audit log must never block the response
+              import("../lib/audit.js")
+                .then(({ isToolAuditEnabled, auditFromRequest }) =>
+                  isToolAuditEnabled().then((enabled) => {
+                    if (!enabled) return;
+                    return auditFromRequest(request)("TOOL_EXECUTED", {
+                      userId: authUser.id,
+                      username: authUser.username,
+                      toolId: config.toolId,
+                      inputFileCount: received.length,
+                      totalInputSize: received.reduce((sum, r) => sum + r.size, 0),
+                      outputFormat:
+                        ((settings as Record<string, unknown>)?.format as string | undefined) ??
+                        ((settings as Record<string, unknown>)?.outputFormat as
+                          | string
+                          | undefined) ??
+                        null,
+                      status: "success",
+                      durationMs: Date.now() - startTime,
+                    });
+                  }),
+                )
+                .catch((err) => {
+                  request.log.warn(
+                    { err, toolId: config.toolId },
+                    "Failed to emit TOOL_EXECUTED audit log",
+                  );
+                });
+            }
 
             return reply.send({
               jobId,
@@ -630,6 +711,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               originalSize: result.originalSize,
               processedSize: result.processedSize,
               savedFileId: result.savedFileId,
+              autoSaveError: result.autoSaveError,
               ...result.resultPayload,
             });
           }
@@ -648,20 +730,77 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               .from(schema.jobs)
               .where(eq(schema.jobs.id, jobId))
               .then((rows) => rows[0]?.status === "canceled")
-              .catch(() => false);
+              .catch((readErr) => {
+                request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
+                void reportError(markUpstreamError(readErr), {
+                  source: "http",
+                  route: request.routeOptions?.url,
+                  method: request.method,
+                  jobId,
+                });
+                return false;
+              });
             if (wasCanceled) {
               return reply.status(422).send({ error: "Canceled", canceled: true });
             }
           }
+          // Bad input the worker rejected answers with the status it would
+          // have got from preValidate (#1742). The class doesn't survive the
+          // queue, so the row the worker wrote is the authority.
+          const row = await db
+            .select({ status: schema.jobs.status, error: schema.jobs.error })
+            .from(schema.jobs)
+            .where(eq(schema.jobs.id, jobId))
+            .then((rows) => rows[0] ?? null)
+            .catch((readErr) => {
+              request.log.warn({ err: readErr, jobId }, "failed job row read failed");
+              void reportError(markUpstreamError(readErr), {
+                source: "http",
+                route: request.routeOptions?.url,
+                method: request.method,
+                jobId,
+              });
+              return null;
+            });
+          if (row?.status === "canceled") {
+            return reply.status(422).send({ error: "Canceled", canceled: true });
+          }
+          const failure = row?.error ?? null;
+          if (typeof failure?.httpStatus === "number") {
+            if (failure.httpStatus >= 500) {
+              request.log.error({ err, toolId: config.toolId }, "tool processing failed");
+            } else {
+              request.log.info({ err, toolId: config.toolId }, "tool rejected input");
+            }
+            const body: Record<string, unknown> = { error: failure.message };
+            if (failure.details !== undefined) body.details = failure.details;
+            if (failure.code) body.code = failure.code;
+            return reply.status(failure.httpStatus).send(body);
+          }
+          if (failure === null) {
+            throw markQueueEventsJobFailure(err);
+          }
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.
           request.log.error({ err, toolId: config.toolId }, "tool processing failed");
+          const rawDetail =
+            typeof failure?.message === "string" && failure.message.length > 0
+              ? failure.message
+              : err instanceof Error
+                ? err.message
+                : String(err);
           return reply.status(422).send({
             error: "Processing failed",
-            details: friendlyError(err instanceof Error ? err.message : String(err)),
+            details: friendlyError(rawDetail),
           });
         }
       } finally {
+        if (!enqueued) {
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
+          await discardUploads();
+        }
         await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
     },

@@ -1,8 +1,8 @@
 ---
 description: "إعداد بيئة التطوير المحلية، والأوامر، وأعراف الكود، وكيفية إضافة أداة جديدة إلى SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: ce1345aa5ed2
+i18n_output_hash: 250c45c22132
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ const MyToolSettings = lazy(() =>
 ### 4. الاختبارات {#_4-tests}
 
 أضف سمة `data-testid` إلى زر الإجراء الخاص بك (كما هو موضّح أعلاه) بحيث تتمكن اختبارات e2e من استهدافه بشكل موثوق.
+
+### 5. الصور المرجعية المرئية {#_5-visual-baselines}
+
+لا تسمح اختبارات لقطات الشاشة بتغيّر أي بكسل، والأداة الجديدة تغيّر ما تعرضه: أعداد الأدوات في الصفحة الرئيسية والكتالوج، وبطاقة جديدة في الشبكة، وصفحة خاصة بها يفشل عليها `tests/e2e/gui-visual-tools.spec.ts` برسالة "snapshot doesn't exist" إلى أن تحصل على صورة مرجعية. حدّث الصور المرجعية في طلب السحب نفسه الذي يضيف الأداة، حتى تبقى المقارنة المرئية الليلية ناجحة.
+
+يولّد CI كلًّا من الصور المرجعية لـ `linux` (`ubuntu-latest`) و`darwin` (`macos-latest`). ادفع فرعك، ثم شغّل التحديث عليه:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+يرفع كل مسار نظام تشغيل مخرجات `visual-baselines-linux-<run-id>-<attempt>` أو `visual-baselines-darwin-<run-id>-<attempt>` ويفتح طلب سحب مسودة (`chore/visual-baselines-linux-...` و`chore/visual-baselines-darwin-...`) مقابل `main` يحتوي على ملفات PNG المُعاد توليدها. يتضمن وصف كل طلب سحب مسودة أمر `gh run download`؛ شغّل كليهما من جذر نسختك المحلية لوضع ملفات PNG في فرعك، ثم أنشئ commit لها وأغلق طلبَي السحب المسودة. استخدم `update_snapshots=all` بدلًا من ذلك إذا فات `changed` لقطةً كنت تتوقع أن تتغيّر. يتطلب التشغيل صلاحية كتابة على المستودع، لذا إذا كان فرعك في fork، فاذكر في طلب السحب أنه يحتاج إلى تحديث الصور المرجعية وسيشغّله أحد المشرفين.
+
+على جهاز Mac، يمكنك أيضًا تحديث الصور المرجعية لـ `darwin` محليًا لتكرار أسرع:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+وفي كل الأحوال، افتح كل ملف PNG جديد أو معدّل قبل إنشاء commit له: فالصورة المرجعية تسجّل ما عُرض كما هو، معطوبًا كان أم لا.
+
+لا يحتاج الإصدار إلى أي من هذا. رقم إصدار التطبيق مُقنَّع في كل لقطة شاشة تعرضه، لذا فإن رفعه لا يغيّر أي صورة مرجعية.
 
 ## بناء Docker {#docker-builds}
 

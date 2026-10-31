@@ -623,6 +623,7 @@ timeout --signal=TERM --kill-after=10s "${OCR_VERIFY_TIMEOUT_SECONDS}s" \
     import { join, resolve } from "node:path";
     import {
       extractText,
+      FAST_ARABIC_UNSUPPORTED_REASON,
       FAST_KOREAN_UNSUPPORTED_REASON,
     } from "/app/packages/ai/src/ocr.ts";
     const main = async () => {
@@ -752,6 +753,35 @@ timeout --signal=TERM --kill-after=10s "${OCR_VERIFY_TIMEOUT_SECONDS}s" \
         throw error;
       } finally {
         if (scratch) await rm(scratch, { force: true, recursive: true });
+      }
+    }
+    {
+      // Arabic has no Tesseract model, so Fast must refuse it before any engine runs.
+      // Rejection precedes image decoding, so a placeholder buffer exercises the same path.
+      const arabicScratch = await mkdtemp("/tmp/verify-ocr-arabic-fast-");
+      const originalTesseractPath = process.env.TESSERACT_PATH;
+      let rejectionMessage;
+      try {
+        process.env.TESSERACT_PATH = koreanTesseractSentinelPath;
+        try {
+          await extractText(Buffer.from("not-decoded"), arabicScratch, {
+            quality: "fast",
+            language: "ar",
+          });
+        } catch (error) {
+          rejectionMessage = error instanceof Error ? error.message : String(error);
+        }
+      } finally {
+        if (originalTesseractPath === undefined) delete process.env.TESSERACT_PATH;
+        else process.env.TESSERACT_PATH = originalTesseractPath;
+        await rm(arabicScratch, { force: true, recursive: true });
+      }
+      const arabicTesseractSpawned = await koreanTesseractWasSpawned();
+      if (rejectionMessage !== FAST_ARABIC_UNSUPPORTED_REASON || arabicTesseractSpawned) {
+        throw new Error(
+          `Arabic Fast OCR decision was not enforced before Tesseract spawn: ` +
+            `${JSON.stringify({ rejectionMessage, tesseractSpawned: arabicTesseractSpawned })}`,
+        );
       }
     }
     await rm(koreanTesseractSentinelPath, { force: true });
@@ -2250,6 +2280,16 @@ language_cases = (
 for _label, path, text, _language, font_path in language_cases:
     render_text_fixture(path, text, font_path)
 
+# Shaped and visually ordered on the host with arabic_reshaper and python-bidi, so
+# the image needs no shaping library. Keep arabic_visual in sync with arabic_text.
+arabic_text = "مرحبا بالعالم 505"
+arabic_visual = "505 ﻢﻟﺎﻌﻟﺎﺑ ﺎﺒﺣﺮﻣ"
+arabic_font_path = Path("/usr/share/fonts/opentype/unifont/unifont.otf")
+if not arabic_font_path.is_file():
+    raise SystemExit("Official image is missing the Arabic verification font")
+generated_arabic = Path("/tmp/verify-ocr-arabic.png")
+render_text_fixture(generated_arabic, arabic_visual, arabic_font_path)
+
 
 LANGUAGE_QUALITY_CASES = (
     ("auto", "SnapOtter local OCR test 505", latin_font_path),
@@ -2541,6 +2581,10 @@ def compare_qualities(
         for result in (balanced_result, best_result):
             if "korean-PP-OCRv5" not in str(result.get("modelVersion", "")):
                 raise SystemExit("language=auto did not load and report the Korean recognizer")
+    if language == "ar":
+        for result in (balanced_result, best_result):
+            if "arabic-PP-OCRv5" not in str(result.get("modelVersion", "")):
+                raise SystemExit("language=ar did not load and report the Arabic recognizer")
     if category in ("clean", "ui"):
         for quality, result in (("balanced", balanced_result), ("best", best_result)):
             if not normalized_text(result.get("text", "")):
@@ -2596,6 +2640,12 @@ for label, path in (
     )
 compare_qualities("korean", generated_korean, korean_text, "ko", 0.30)
 compare_qualities("mixed-script", generated_mixed, mixed_text, "auto", 0.40)
+# The Arabic recognizer ships in a pack only after its HuggingFace publish. Until a
+# bundle carries it, checking Arabic would fail for a reason unrelated to the code.
+if "arabic_rec" in runtime.paths:
+    compare_qualities("arabic", generated_arabic, arabic_text, "ar", 0.35)
+else:
+    print("OCR bundle has no Arabic recognizer; skipping the Arabic recognition check")
 for label, path, expected, language, _font_path in language_cases:
     compare_qualities(label, path, expected, language, 0.35)
 

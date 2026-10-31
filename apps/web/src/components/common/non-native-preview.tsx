@@ -1,11 +1,14 @@
+import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import { Play, RefreshCw, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { format } from "@/lib/format";
 import { previewFailureEncoder } from "@/lib/preview-error";
+import { isIgnoredError } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 
 type PreviewState = "idle" | "generating" | "ready" | "error";
@@ -31,6 +34,10 @@ export function NonNativePreview({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   // Set when the server's ffmpeg lacks the encoder this preview needs (#1290).
   const [missingEncoder, setMissingEncoder] = useState<string | null>(null);
+  // Set when the upload is over the server's size limit (#1280).
+  const [tooLarge, setTooLarge] = useState(false);
+  // Set when the result to preview is gone from the server (#1350).
+  const [sourceExpired, setSourceExpired] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -51,6 +58,8 @@ export function NonNativePreview({
     abortRef.current?.abort();
     setState("idle");
     setMissingEncoder(null);
+    setTooLarge(false);
+    setSourceExpired(false);
     setPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
@@ -80,11 +89,27 @@ export function NonNativePreview({
     const controller = new AbortController();
     abortRef.current = controller;
     let encoder: string | null = null;
+    let expired = false;
+    let sourceStatus: string | undefined;
 
     try {
       let fileToUpload = file;
       if (!fileToUpload && src) {
         const res = await fetch(src);
+        // An expired or missing result answers with an error page; don't send
+        // that body off to be transcoded as the user's media (#1286). No
+        // statusCode on purpose: a status here is about fetching the source,
+        // not about the preview request, and must not be read as one. The
+        // report carries it as a tag instead (#1351).
+        if (!res.ok) {
+          // Only a processed result is fetched here (an input comes in as
+          // `file`), so a 404 or 410 means the result expired (#1350).
+          expired = res.status === 404 || res.status === 410;
+          sourceStatus = String(res.status);
+          throw new SafeError("Media preview could not fetch its source", {
+            code: `preview-source-http-${res.status}`,
+          });
+        }
         const blob = await res.blob();
         fileToUpload = new File([blob], filename, { type: blob.type });
       }
@@ -103,10 +128,25 @@ export function NonNativePreview({
 
       if (!response.ok) {
         encoder = await previewFailureEncoder(response);
-        throw new Error(`Preview generation failed: ${response.status}`);
+        // The message stays constant; captureHandledError tags the
+        // statusCode as status_code (#1351).
+        throw new SafeError("Media preview generation failed", {
+          code: `preview-http-${response.status}`,
+          statusCode: response.status,
+        });
       }
 
       const blob = await response.blob();
+      // A 200 is not proof of media: a proxy or captive portal can answer with
+      // HTML. The route answers with video/mp4 or audio/mpeg depending on the
+      // source, so anything else (or nothing) is a failed preview, not a
+      // broken player (#4107).
+      const isMedia = blob.type.startsWith("video/") || blob.type.startsWith("audio/");
+      if (blob.size === 0 || !isMedia) {
+        throw new SafeError("Media preview returned a non-media body", {
+          code: "preview-not-media",
+        });
+      }
       const url = URL.createObjectURL(blob);
 
       // Revoke previous URL if any
@@ -114,12 +154,38 @@ export function NonNativePreview({
 
       setPreviewUrl(url);
       setState("ready");
-    } catch {
+    } catch (err) {
       // Checked on the signal, not the error: an abort while the error body
       // was being read surfaces as an ordinary failure.
       if (!controller.signal.aborted) {
+        const status = isSafeMessageError(err) ? err.statusCode : undefined;
         setMissingEncoder(encoder);
+        setTooLarge(status === 413);
+        setSourceExpired(expired);
         setState("error");
+        // A 413 (over the upload limit) or 422 (ffmpeg couldn't decode it, or
+        // lacks the encoder) is about the file, and the panel says so.
+        // Anything else, whether a 5xx, an expired session, or a rate limit, is
+        // a fault nobody would otherwise hear about (#1280). A dropped
+        // connection is already in Sentry's IGNORE_ERRORS, so wrapping one in
+        // a SafeError would defeat that filter (#4106).
+        const reportable = isSafeMessageError(err)
+          ? status !== 413 && status !== 422
+          : !isIgnoredError(err);
+        if (reportable) {
+          void captureHandledError(
+            isSafeMessageError(err)
+              ? err
+              : new SafeError("Media preview request failed", {
+                  code: "preview-request",
+                  cause: err,
+                }),
+            {
+              error_class: "operational",
+              ...(sourceStatus ? { status_code: sourceStatus } : {}),
+            },
+          );
+        }
       }
     } finally {
       stopMessageRotation();
@@ -132,8 +198,8 @@ export function NonNativePreview({
   // Idle state: file info + generate button
   if (state === "idle") {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs">
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -159,8 +225,8 @@ export function NonNativePreview({
   if (state === "generating") {
     const previewMessages = t.toolPage.previewProgressMessages;
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs w-full">
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs w-full">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -188,28 +254,36 @@ export function NonNativePreview({
   // Error state: retry button
   if (state === "error") {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs">
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
           <p className="font-medium text-foreground mb-1">
-            {missingEncoder
-              ? format(t.toolPage.previewEncoderMissing, { encoder: missingEncoder })
-              : t.toolPage.previewFailed}
+            {sourceExpired
+              ? t.toolPage.resultExpired
+              : tooLarge
+                ? t.errors.fileTooLarge
+                : missingEncoder
+                  ? format(t.toolPage.previewEncoderMissing, { encoder: missingEncoder })
+                  : t.toolPage.previewFailed}
           </p>
           <p className="text-sm text-muted-foreground mb-3">
             {filename}
             {fileSize != null && <> &middot; {formatFileSize(fileSize)}</>}
           </p>
-          <button
-            type="button"
-            onClick={generatePreview}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {t.common.retry}
-          </button>
+          {/* The same file hits the same limit, and a gone result stays gone,
+              so a retry can't help either. */}
+          {!tooLarge && !sourceExpired && (
+            <button
+              type="button"
+              onClick={generatePreview}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {t.common.retry}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -228,7 +302,9 @@ export function NonNativePreview({
       );
     }
     return (
-      <div className="flex-1 flex items-center justify-center p-2">
+      // h-full, not flex-1: the video's max-h-full needs a definite height to cap
+      // against, or a portrait video overflows the preview area (#2192).
+      <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-2">
         {/* biome-ignore lint/a11y/useMediaCaption: preview video player */}
         <video controls className="max-h-full max-w-full rounded-md" src={previewUrl} />
       </div>

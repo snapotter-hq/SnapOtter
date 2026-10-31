@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp, { type Sharp } from "sharp";
 import { z } from "zod";
+import { asInputErrorIfUndecodable, withImageEncodeContextV2 } from "../../lib/image-error.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -36,54 +37,63 @@ export function registerLqipPlaceholder(app: FastifyInstance) {
     process: async () => {
       throw new Error("lqip-placeholder is v2-only");
     },
-    processV2: async (ctx) => {
-      const settings = settingsSchema.parse(ctx.settings);
-      const inputBuffer = ctx.inputs[0].buffer;
-      const filename = ctx.inputs[0].filename;
+    processV2: withImageEncodeContextV2<z.infer<typeof settingsSchema>>(
+      "LQIP generation failed",
+      (s) => s?.strategy ?? "blur",
+      async (ctx) => {
+        const settings = settingsSchema.parse(ctx.settings);
+        const inputBuffer = ctx.inputs[0].buffer;
+        const filename = ctx.inputs[0].filename;
 
-      let pipeline: Sharp;
+        let buffer: Buffer;
+        try {
+          let pipeline: Sharp;
 
-      if (settings.strategy === "solid") {
-        const pixel = await sharp(inputBuffer).resize(1, 1).raw().toBuffer();
-        pipeline = sharp({
-          create: {
-            width: settings.width,
-            height: settings.width,
-            channels: 3,
-            background: { r: pixel[0], g: pixel[1], b: pixel[2] },
-          },
-        });
-      } else if (settings.strategy === "pixelate") {
-        pipeline = sharp(inputBuffer).resize(settings.width, null, {
-          kernel: sharp.kernel.nearest,
-        });
-      } else {
-        pipeline = sharp(inputBuffer).resize(settings.width);
-        if (settings.blur > 0) {
-          pipeline = pipeline.blur(settings.blur);
+          if (settings.strategy === "solid") {
+            const pixel = await sharp(inputBuffer).resize(1, 1).raw().toBuffer();
+            pipeline = sharp({
+              create: {
+                width: settings.width,
+                height: settings.width,
+                channels: 3,
+                background: { r: pixel[0], g: pixel[1], b: pixel[2] },
+              },
+            });
+          } else if (settings.strategy === "pixelate") {
+            pipeline = sharp(inputBuffer).resize(settings.width, null, {
+              kernel: sharp.kernel.nearest,
+            });
+          } else {
+            pipeline = sharp(inputBuffer).resize(settings.width);
+            if (settings.blur > 0) {
+              pipeline = pipeline.blur(settings.blur);
+            }
+          }
+
+          buffer = await encode(pipeline, settings.format, settings.quality).toBuffer();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
-      }
+        const meta = await sharp(buffer).metadata();
+        const mime = MIME[settings.format];
+        const dataUri = `data:${mime};base64,${buffer.toString("base64")}`;
 
-      const buffer = await encode(pipeline, settings.format, settings.quality).toBuffer();
-      const meta = await sharp(buffer).metadata();
-      const mime = MIME[settings.format];
-      const dataUri = `data:${mime};base64,${buffer.toString("base64")}`;
-
-      const base = filename.replace(/\.[^.]+$/, "");
-      return {
-        buffer,
-        filename: `${base}_lqip${EXT[settings.format]}`,
-        contentType: mime,
-        resultPayload: {
-          dataUri,
-          width: meta.width ?? settings.width,
-          height: meta.height ?? 0,
-          bytes: buffer.length,
-          strategy: settings.strategy,
-          html: `<img src="${dataUri}" />`,
-          css: `background-image:url('${dataUri}');background-size:cover;background-position:center;`,
-        },
-      };
-    },
+        const base = filename.replace(/\.[^.]+$/, "");
+        return {
+          buffer,
+          filename: `${base}_lqip${EXT[settings.format]}`,
+          contentType: mime,
+          resultPayload: {
+            dataUri,
+            width: meta.width ?? settings.width,
+            height: meta.height ?? 0,
+            bytes: buffer.length,
+            strategy: settings.strategy,
+            html: `<img src="${dataUri}" />`,
+            css: `background-image:url('${dataUri}');background-size:cover;background-position:center;`,
+          },
+        };
+      },
+    ),
   });
 }

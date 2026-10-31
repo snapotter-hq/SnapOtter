@@ -1,4 +1,6 @@
+import { SafeError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import {
   findOcrEncodedInputViolation,
   OCR_MAX_BATCH_ENCODED_INPUT_BYTES,
@@ -55,10 +57,37 @@ describe("OCR ingress limits", () => {
     expect(ocrUploadErrorStatus(new Error("malformed multipart"))).toBe(400);
   });
 
-  it("preserves service-unavailable storage failures with a truthful client message", () => {
-    expect(ocrUploadErrorStatus({ statusCode: 503 })).toBe(503);
-    expect(ocrUploadErrorMessage(503)).toBe("Upload storage unavailable");
+  it("rethrows 5xx storage and server faults so the global error handler reports them (#1642)", () => {
+    const cap = new SafeError("Workspace storage limit reached", {
+      kind: "operational",
+      code: "workspace-cap",
+      statusCode: 503,
+    });
+    expect(() => ocrUploadErrorStatus(cap)).toThrow(cap);
+
+    const serverFault = Object.assign(new Error("storage exploded"), { statusCode: 500 });
+    expect(() => ocrUploadErrorStatus(serverFault)).toThrow(serverFault);
+
     expect(ocrUploadErrorMessage(413)).toBe("Upload exceeds the allowed size");
     expect(ocrUploadErrorMessage(400)).toBe("Failed to parse multipart request");
+  });
+
+  it("converts a V8 buffer allocation failure into DecoderOutOfMemoryError and rethrows it (#3902)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    let caught: unknown;
+    try {
+      ocrUploadErrorStatus(v8Oom);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(caught).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+
+    const otherRange = new RangeError("Invalid array length");
+    expect(ocrUploadErrorStatus(otherRange)).toBe(400);
   });
 });

@@ -4,6 +4,8 @@
  * per-modality implementations that reference these types.
  */
 
+import type { FastifyBaseLogger } from "fastify";
+
 export class InputValidationError extends Error {
   statusCode: number;
   details?: string;
@@ -52,6 +54,13 @@ export interface InputHandler {
       maxDimension?: number;
       /** Abort validation, external decoders, and normalization with the job. */
       signal?: AbortSignal;
+      /**
+       * Request-scoped logger for the lines the handler emits while
+       * normalizing (autoOrient's rotate failures, the qpdf timeout skip,
+       * the AVIF decoder fallback).
+       * Defaults to the process logger, which has no request binding (#1417).
+       */
+      log?: FastifyBaseLogger;
     },
   ): Promise<PreparedInput>;
 }

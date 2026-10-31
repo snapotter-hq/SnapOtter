@@ -1,8 +1,8 @@
 ---
 description: "AI-driven generator för pass- och ID-foton med ansiktsigenkänning, bakgrundsborttagning och plattläggning för utskriftsark."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: e44237afe18a
+i18n_output_hash: 9cd871bb7d15
 ---
 
 # Passfoto {#passport-photo}
@@ -92,7 +92,7 @@ Beskär, ändrar storlek och lägger valfritt ut fotot på ett utskriftsark. Anv
 | documentType | string | Nej | `"passport"` | Dokumenttyp (från landsspecifikation) |
 | bgColor | string | Nej | `"#FFFFFF"` | Bakgrundsfärg i hex |
 | printLayout | string | Nej | `"none"` | Utskriftspappersets layout: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | Nej | `0` | Maximal filstorleksbegränsning i KB (0 = ingen gräns) |
+| maxFileSizeKb | number | Nej | `0` | Maximal filstorlek i KB, där 1 KB = 1000 byte (0 = ingen gräns) |
 | dpi | number | Nej | `300` | Utdata-DPI (72-1200) |
 | customWidthMm | number | Nej | - | Egen fotobredd i mm (åsidosätter landsspecifikation) |
 | customHeightMm | number | Nej | - | Egen fotohöjd i mm (åsidosätter landsspecifikation) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Fel: Analysen har gått ut (410) {#error-analysis-expired-410}
+
+Generate arbetar från den bakgrundsborttagna bild som analyze sparade för `jobId`. Lagrade utdata rensas efter ett tag, så om det går för lång tid mellan de två anropen är bilden borta. Anropa analyze igen med samma foto och använd det `jobId` som returneras.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+Ett `jobId` eller `filename` som inte kan peka ut en lagrad fil (ett sökvägsseparator, `..`, en tom sträng) svarar 400.
+
 ---
 
 ### Basrutt {#base-route}
@@ -170,4 +183,4 @@ Returnerar vägledning om att använda rätt underslutpunkt.
 - Fältet `preview` i analyssvaret är en base64-kodad PNG (max 800 px bred) för snabb visning.
 - Landsspecifikationer inkluderar dokumentdimensioner, huvudhöjdsförhållanden och positionering av ögonlinjen baserat på officiella krav för passfoton.
 - Alternativet `printLayout` genererar ett plattlagt ark på 4x6\"- eller A4-papper med 2 mm mellanrum mellan fotona.
-- När `maxFileSizeKb` är satt komprimeras utdata iterativt för att rymmas inom storleksgränsen.
+- När `maxFileSizeKb` är satt sänks utdatans JPEG-kvalitet steg för steg tills den passar. Pixelstorleken är fastställd av landsspecifikationen, så om fotot fortfarande inte passar vid lägsta kvalitet returnerar `/generate` 422 med ett meddelande om det, i stället för en fil över gränsen.

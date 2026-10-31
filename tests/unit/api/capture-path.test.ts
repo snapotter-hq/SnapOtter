@@ -7,6 +7,7 @@
  * call yields exactly one captureException with the ORIGINAL error object,
  * and the throttle allows one capture per distinct signature.
  */
+import { SafeError, ToolInputError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   reportError,
@@ -86,6 +87,31 @@ describe("capture path", () => {
     expect(h.captureException).toHaveBeenCalledTimes(2);
   });
 
+  // #1414: without the job's age a sweep-aged input and a young miss look the same.
+  it.each([
+    [0, "lt_10s"],
+    [9_999, "lt_10s"],
+    [10_000, "lt_1h"],
+    [3_599_999, "lt_1h"],
+    [3_600_000, "lt_24h"],
+    [86_399_999, "lt_24h"],
+    [86_400_000, "gte_24h"],
+  ])("tags a %i ms job age as job_age=%s", async (ms, bucket) => {
+    await reportError(new Error("boom"), { source: "worker", pool: "image", jobAgeMs: ms });
+    expect(h.scope.setTag).toHaveBeenCalledWith("job_age", bucket);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["negative (clock skew)", -5],
+    ["not a number", Number.NaN],
+    ["infinite", Number.POSITIVE_INFINITY],
+  ])("sets no job_age tag when the age is %s", async (_label, ms) => {
+    await reportError(new Error("boom"), { source: "worker", pool: "image", jobAgeMs: ms });
+    const tags = h.scope.setTag.mock.calls.map((c) => c[0]);
+    expect(tags).not.toContain("job_age");
+  });
+
   it("tags job_id so the event cross-references the DB row, logs, and PostHog stream", async () => {
     await reportError(new Error("boom"), { source: "worker", pool: "image", jobId: "job-abc" });
     expect(h.scope.setTag).toHaveBeenCalledWith("job_id", "job-abc");
@@ -95,6 +121,210 @@ describe("capture path", () => {
     const full = Object.assign(new Error("disk full"), { code: "ENOSPC" });
     await reportError(full, { source: "worker", pool: "image" });
     expect(h.scope.setFingerprint).toHaveBeenCalledWith(["operational", "ENOSPC"]);
+  });
+
+  it("groups an operational SafeError by its own code, whatever backend error it wraps (#1413)", async () => {
+    // The worker's INPUT_MISSING wraps a local ENOENT or an S3 NoSuchKey
+    // (which has no string .code). Both must land in the same Sentry issue.
+    const make = (cause: unknown) =>
+      new SafeError("Input file is no longer available. Upload it again.", {
+        kind: "operational",
+        code: "INPUT_MISSING",
+        statusCode: 410,
+        cause,
+      });
+    const local = Object.assign(new Error("ENOENT: no such file or directory, open '/x'"), {
+      code: "ENOENT",
+      syscall: "open",
+    });
+    const s3 = Object.assign(new Error("The specified key does not exist."), {
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+
+    await reportError(make(local), { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "INPUT_MISSING");
+
+    resetThrottleForTests();
+    await reportError(make(s3), { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
+  });
+
+  it("unwraps an UnrecoverableError with a cause before classifying, fingerprinting, and capturing (#1176)", async () => {
+    const enoent = Object.assign(new Error("ENOENT: no such file or directory, open '/x'"), {
+      code: "ENOENT",
+      syscall: "open",
+    });
+    const inputMissing = new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      cause: enoent,
+    });
+    const wrappedMissing = Object.assign(new Error(inputMissing.message), {
+      name: "UnrecoverableError",
+      cause: inputMissing,
+    });
+
+    await reportError(wrappedMissing, { source: "worker", pool: "image", jobId: "job-1" });
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+    expect(h.captureException).toHaveBeenCalledWith(inputMissing);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "INPUT_MISSING");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
+
+    // Wrapped expected errors (ToolInputError) are still dropped before capture.
+    vi.clearAllMocks();
+    const wrappedInputErr = Object.assign(new Error("remote resources are disabled: http://x"), {
+      name: "UnrecoverableError",
+      cause: new ToolInputError("remote resources are disabled: http://x"),
+    });
+    await reportError(wrappedInputErr, { source: "worker", pool: "docs", jobId: "job-2" });
+    expect(h.captureException).not.toHaveBeenCalled();
+  });
+
+  it("groups a coded SafeError wrapping a network failure by its own code, not the shared connectivity issue (#1907)", async () => {
+    // OIDC discovery against an IdP that refuses the connection: openid-client
+    // throws undici's "fetch failed" TypeError with the ECONNREFUSED below it.
+    const refused = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:9"), {
+        code: "ECONNREFUSED",
+        syscall: "connect",
+      }),
+    });
+    const notFound = Object.assign(new Error("unexpected HTTP response status code"), {
+      name: "ResponseBodyError",
+      status: 404,
+    });
+    const discoveryFault = (cause: unknown) =>
+      new SafeError("OIDC discovery failed", { code: "OIDC_DISCOVERY_FAILED", cause });
+
+    await reportError(discoveryFault(refused), { source: "http", subsystem: "oidc-login" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "OIDC_DISCOVERY_FAILED",
+    ]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "OIDC_DISCOVERY_FAILED");
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+
+    // The same code over a 404 lands in the same issue.
+    resetThrottleForTests();
+    vi.clearAllMocks();
+    await reportError(discoveryFault(notFound), { source: "http", subsystem: "oidc-login" });
+    expect(h.scope.setFingerprint).toHaveBeenCalledTimes(1);
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "OIDC_DISCOVERY_FAILED",
+    ]);
+  });
+
+  it("a coded SafeError wrapping a lost database connection also groups by its own code (#1907)", async () => {
+    const err = new SafeError("Could not discard a staged upload", {
+      kind: "operational",
+      code: "STAGED_DISCARD_FAILED",
+      cause: Object.assign(new Error("Failed query: delete"), {
+        cause: Object.assign(new Error("57P01"), { code: "57P01" }),
+      }),
+    });
+    await reportError(err, { source: "http", subsystem: "upload-storage" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "STAGED_DISCARD_FAILED",
+    ]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "STAGED_DISCARD_FAILED");
+  });
+
+  it("a marker-copied SafeError with a code groups by that code over a network failure (#1907)", async () => {
+    // Copied across a module boundary: the marker survives, kind does not.
+    const err = Object.assign(new Error("OIDC discovery failed"), {
+      isSafeMessage: true,
+      code: "OIDC_DISCOVERY_FAILED",
+      cause: Object.assign(new Error("getaddrinfo ENOTFOUND idp.example"), { code: "ENOTFOUND" }),
+    });
+    await reportError(err, { source: "http", subsystem: "oidc-login" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "OIDC_DISCOVERY_FAILED",
+    ]);
+  });
+
+  it("keeps the connectivity fingerprint when a SafeError's own code is too long to tag", async () => {
+    // extractErrorCode drops a code over 40 characters and tags the errno
+    // instead, so there is no own code to group on.
+    const err = new SafeError("upstream down", {
+      kind: "operational",
+      code: "X".repeat(41),
+      cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "ECONNREFUSED");
+  });
+
+  it("keeps the connectivity fingerprint for a SafeError with no code of its own", async () => {
+    // With no authored code there is nothing better to group on than the
+    // outage itself.
+    const err = new SafeError("upstream down", {
+      kind: "operational",
+      cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "ECONNREFUSED");
+  });
+
+  it("keeps the connectivity fingerprint for a bug-kind SafeError that wraps a network failure", async () => {
+    // A bug-kind code is settings-derived (an output format), not a fault
+    // name, so this change leaves its grouping as it was.
+    const err = new SafeError("Image conversion failed", {
+      kind: "bug",
+      code: "png",
+      cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+  });
+
+  it("reports an undici connect timeout as a connectivity warning, not a bug (#1908)", async () => {
+    // A firewall that drops packets: undici's 10s connect timeout fires first.
+    const err = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("Connect Timeout Error"), { code: "UND_ERR_CONNECT_TIMEOUT" }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_class", "operational");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "UND_ERR_CONNECT_TIMEOUT");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+  });
+
+  it("reports an ENETUNREACH fetch failure as a connectivity warning, not a bug (#1992)", async () => {
+    const err = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ENETUNREACH 10.0.0.1:443"), { code: "ENETUNREACH" }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_class", "operational");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "ENETUNREACH");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+  });
+
+  it("reports a Smithy S3 socket or connection TimeoutError with $metadata and no code as a connectivity warning (#2774)", async () => {
+    const err = Object.assign(
+      new Error(
+        "@smithy/node-http-handler - the request socket timed out after 30000 ms of inactivity",
+      ),
+      { name: "TimeoutError", $metadata: { attempts: 3 } },
+    );
+    await reportError(err, { source: "cron", subsystem: "storage-ttl" });
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_class", "operational");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
   });
 
   it("prefers the connectivity fingerprint for infra-connectivity operational errors", async () => {

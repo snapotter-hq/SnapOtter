@@ -1,0 +1,172 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
+import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerRemoveBackground } from "../../../apps/api/src/routes/tools/remove-background.js";
+
+const aiMocks = vi.hoisted(() => ({ removeBackground: vi.fn() }));
+const putObject = vi.hoisted(() => vi.fn());
+
+vi.mock("@snapotter/ai", () => ({ removeBackground: aiMocks.removeBackground }));
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>()),
+  putObject: (...args: unknown[]) => putObject(...args),
+}));
+
+const ctx: ToolProcessCtx = {
+  signal: new AbortController().signal,
+  scratchDir: join(tmpdir(), "snapotter-remove-bg-effects-test"),
+  report: vi.fn(),
+};
+
+let original: Buffer;
+let transparent: Buffer;
+
+beforeAll(async () => {
+  original = await sharp({
+    create: { width: 20, height: 20, channels: 3, background: { r: 0, g: 0, b: 255 } },
+  })
+    .png()
+    .toBuffer();
+  // Fully transparent subject: whatever shows through is the background layer.
+  transparent = await sharp({
+    create: { width: 20, height: 20, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .png()
+    .toBuffer();
+  aiMocks.removeBackground.mockResolvedValue(transparent);
+  registerRemoveBackground({ post: vi.fn() } as unknown as FastifyInstance);
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  aiMocks.removeBackground.mockResolvedValue(transparent);
+  putObject.mockResolvedValue(undefined);
+});
+
+function job(kind: ToolJobData["kind"], settings: unknown): ToolJobData {
+  return {
+    jobId: "job-remove-background",
+    toolId: "remove-background",
+    userId: null,
+    pool: "ai",
+    inputRefs: ["uploads/job-remove-background/photo.jpg"],
+    filename: "photo.jpg",
+    settings,
+    kind,
+  };
+}
+
+async function cornerPixel(buffer: Buffer) {
+  const { data } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  return [...data.subarray(0, 4)];
+}
+
+describe("remove-background AI handler in pipelines and batches (#1047)", () => {
+  it.each(["pipeline-step", "batch-child"] as const)(
+    "composites the chosen color for a %s job",
+    async (kind) => {
+      const out = await runAiToolJob(
+        job(kind, { backgroundType: "color", backgroundColor: "#FF0000" }),
+        original,
+        ctx,
+      );
+
+      expect(out.filename).toBe("photo_nobg.png");
+      expect(out.contentType).toBe("image/png");
+      expect(out.extraOutputs ?? []).toEqual([]);
+      expect(await cornerPixel(out.buffer)).toEqual([255, 0, 0, 255]);
+    },
+  );
+
+  it("honours the webp output format and names the file to match", async () => {
+    const out = await runAiToolJob(
+      job("pipeline-step", {
+        backgroundType: "color",
+        backgroundColor: "#00FF00",
+        outputFormat: "webp",
+      }),
+      original,
+      ctx,
+    );
+
+    expect(out.filename).toBe("photo_nobg.webp");
+    expect(out.contentType).toBe("image/webp");
+    expect((await sharp(out.buffer).metadata()).format).toBe("webp");
+  });
+
+  it("blurs the original behind the subject for a pipeline step", async () => {
+    const out = await runAiToolJob(
+      job("pipeline-step", { backgroundType: "blur", blurEnabled: true, blurIntensity: 20 }),
+      original,
+      ctx,
+    );
+
+    // The original is solid blue, so the blurred layer stays blue and opaque
+    // (blur edges can shave a few levels off the channel).
+    const [r, g, b, a] = await cornerPixel(out.buffer);
+    expect([r, g, a]).toEqual([0, 0, 255]);
+    expect(b).toBeGreaterThan(240);
+  });
+
+  it("rejects the image background type for pipelines and batches", () => {
+    const schema = getToolConfig("remove-background")?.settingsSchema;
+
+    expect(schema?.safeParse({ backgroundType: "image" }).success).toBe(false);
+    expect(schema?.safeParse({ backgroundType: "color", backgroundColor: "#FF0000" }).success).toBe(
+      true,
+    );
+  });
+
+  it("keeps a transparent cutout named photo_nobg.png when no background is asked for", async () => {
+    const out = await runAiToolJob(job("pipeline-step", {}), original, ctx);
+
+    expect(out.filename).toBe("photo_nobg.png");
+    expect((await cornerPixel(out.buffer))[3]).toBe(0);
+  });
+
+  it("keeps the standalone Phase 1 contract: transparent mask, original cached under uploads/", async () => {
+    const out = await runAiToolJob(
+      job("ai-tool", { model: "u2net", edgeRefine: 2, decontaminate: true }),
+      original,
+      ctx,
+    );
+
+    expect(out.filename).toBe("photo_mask.png");
+    expect(out.buffer).toEqual(transparent);
+    // outputs/<jobId>/ is reachable by anyone holding the cutout's link, so
+    // the original stays out of it and out of the result payload.
+    expect(out.extraOutputs ?? []).toEqual([]);
+    expect(out.resultPayload).not.toHaveProperty("originalUrl");
+    expect(putObject).toHaveBeenCalledWith(
+      "uploads/job-remove-background/photo_original.png",
+      original,
+    );
+    expect(aiMocks.removeBackground).toHaveBeenCalledWith(
+      original,
+      ctx.scratchDir,
+      expect.objectContaining({ model: "u2net", edgeRefine: 2, decontaminate: true }),
+      expect.any(Function),
+    );
+  });
+
+  it("rejects background settings on a standalone Phase 1 job (#2281)", async () => {
+    await expect(
+      runAiToolJob(
+        job("ai-tool", { backgroundType: "color", backgroundColor: "#FF0000" }),
+        original,
+        ctx,
+      ),
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringMatching(/\/api\/v1\/tools\/image\/remove-background\/effects/),
+      }),
+    });
+    expect(aiMocks.removeBackground).not.toHaveBeenCalled();
+  });
+});

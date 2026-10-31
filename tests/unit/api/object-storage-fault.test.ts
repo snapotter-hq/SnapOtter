@@ -13,7 +13,10 @@
 import { SafeError } from "@snapotter/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
-import { isStorageServiceFault } from "../../../apps/api/src/lib/object-storage.js";
+import {
+  isMissingObjectError,
+  isStorageServiceFault,
+} from "../../../apps/api/src/lib/object-storage.js";
 
 const originalMode = env.STORAGE_MODE;
 
@@ -47,6 +50,40 @@ describe("isStorageServiceFault", () => {
       isStorageServiceFault(
         Object.assign(new Error("denied"), { code: "EACCES", syscall: "stat" }),
       ),
+    ).toBe(false);
+  });
+});
+
+describe("isMissingObjectError (#901)", () => {
+  it("treats a local ENOENT as a missing object", () => {
+    expect(
+      isMissingObjectError(
+        Object.assign(new Error("ENOENT: no such file or directory"), {
+          code: "ENOENT",
+          syscall: "open",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not treat other local faults as a missing object", () => {
+    expect(
+      isMissingObjectError(Object.assign(new Error("denied"), { code: "EACCES", syscall: "open" })),
+    ).toBe(false);
+    expect(isMissingObjectError(new Error("anything"))).toBe(false);
+    expect(isMissingObjectError(null)).toBe(false);
+  });
+
+  it("never reports a missing object in S3 mode while the S3 module is unloaded", () => {
+    // Fail toward "fault": an unloaded singleton must not relabel a storage
+    // outage as a vanished input, and a local errno shape means nothing there.
+    expect(
+      inS3Mode(() =>
+        isMissingObjectError({ name: "NoSuchKey", $metadata: { httpStatusCode: 404 } }),
+      ),
+    ).toBe(false);
+    expect(
+      inS3Mode(() => isMissingObjectError(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))),
     ).toBe(false);
   });
 });

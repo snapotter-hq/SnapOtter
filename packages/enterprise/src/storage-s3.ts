@@ -12,6 +12,9 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 
+export const S3_CONNECTION_TIMEOUT_MS = 10_000;
+export const S3_SOCKET_TIMEOUT_MS = 30_000;
+
 export interface S3Config {
   bucket: string;
   region: string;
@@ -20,6 +23,9 @@ export interface S3Config {
   secretAccessKey: string;
   forcePathStyle: boolean;
   prefix: string;
+  connectionTimeout?: number;
+  socketTimeout?: number;
+  requestTimeout?: number;
 }
 
 let config: S3Config | null = null;
@@ -40,6 +46,9 @@ function cfg(): S3Config {
 function getClient(): S3Client {
   if (!client) {
     const c = cfg();
+    const connectionTimeout = c.connectionTimeout ?? S3_CONNECTION_TIMEOUT_MS;
+    const socketTimeout = c.socketTimeout ?? S3_SOCKET_TIMEOUT_MS;
+    const requestTimeout = c.requestTimeout ?? 0;
     client = new S3Client({
       region: c.region,
       endpoint: c.endpoint || undefined,
@@ -48,7 +57,20 @@ function getClient(): S3Client {
         accessKeyId: c.accessKeyId,
         secretAccessKey: c.secretAccessKey,
       },
+      requestHandler: {
+        connectionTimeout,
+        socketTimeout,
+        ...(requestTimeout > 0 ? { requestTimeout, throwOnRequestTimeout: true } : {}),
+      },
     });
+    client.middlewareStack?.add(
+      (next) => async (args) => {
+        const result = await next(args);
+        armResponseBodyTimeout((result.response as { body?: unknown } | undefined)?.body);
+        return result;
+      },
+      { step: "deserialize", priority: "low", name: "armResponseBodyTimeoutMiddleware" },
+    );
   }
   return client;
 }
@@ -63,15 +85,60 @@ function thumbKey(storedName: string): string {
   return `${prefix}thumbs/${storedName}.thumb.jpg`;
 }
 
+const armedResponseBodies = new WeakSet<object>();
+
+function armResponseBodyTimeout<T>(body: T): T {
+  if (typeof body !== "object" || body === null || armedResponseBodies.has(body)) {
+    return body;
+  }
+  const socketTimeout = cfg().socketTimeout ?? S3_SOCKET_TIMEOUT_MS;
+  const readable = body as {
+    setTimeout?: (msecs: number, callback: () => void) => unknown;
+    destroy?: (err?: Error) => void;
+    listenerCount?: (event: string) => number;
+    once?: (event: string, listener: () => void) => void;
+    socket?: unknown;
+  };
+  if (
+    socketTimeout > 0 &&
+    typeof readable.setTimeout === "function" &&
+    (!("socket" in readable) || Boolean(readable.socket))
+  ) {
+    armedResponseBodies.add(body);
+    readable.setTimeout(socketTimeout, () => {
+      const timeoutError = Object.assign(
+        new Error(`S3 response body stream timed out after ${socketTimeout} ms of inactivity`),
+        { name: "TimeoutError", code: "ETIMEDOUT" },
+      );
+      if (typeof readable.listenerCount === "function" && readable.listenerCount("error") === 0) {
+        readable.once?.("error", () => {});
+      }
+      readable.destroy?.(timeoutError);
+    });
+  }
+  return body;
+}
+
 function requireObjectBody(response: GetObjectCommandOutput, key: string) {
   if (!response.Body) {
     throw new Error(`S3 object response for ${key} did not include a body`);
   }
-  return response.Body;
+  return armResponseBodyTimeout(response.Body);
 }
 
 export async function checkConnection(): Promise<void> {
-  await getClient().send(new HeadBucketCommand({ Bucket: cfg().bucket }));
+  try {
+    await getClient().send(new HeadBucketCommand({ Bucket: cfg().bucket }));
+  } catch (err) {
+    // HEAD responses carry no body, so the SDK deserializes a missing-bucket
+    // 404 from HeadBucket as NotFound rather than NoSuchBucket. HeadBucket has
+    // no object key, so any missing-object 404 shape here means the bucket
+    // itself is gone (#996).
+    if (isMissingObjectError(err)) {
+      (err as { name?: string }).name = "NoSuchBucket";
+    }
+    throw err;
+  }
 }
 
 /**
@@ -80,17 +147,61 @@ export async function checkConnection(): Promise<void> {
  * SDK stamps every dispatched error with $metadata). NoSuchBucket also
  * arrives as HTTP 404 but means the whole bucket is gone, a storage outage
  * rather than a missing file, so it stays a fault. Caveat: that carve-out
- * only works for GetObject callers. HEAD responses carry no body, so for
- * HeadObject the SDK yields the same NotFound/404 shape whether the key or
- * the whole bucket is missing, and this predicate cannot tell them apart.
+ * only works for GetObject and HeadBucket (checkConnection) callers. HEAD
+ * responses carry no body, so for HeadObject the SDK yields the same
+ * NotFound/404 shape whether the key or the whole bucket is missing, and
+ * callers that probe with HeadObject disambiguate a miss via checkConnection.
  * Service faults (AccessDenied, credential rejection, 5xx) and errors that
  * did not come from the SDK return false.
  */
+const ALLOWED_NOT_FOUND_KEYS: ReadonlySet<string> = new Set([
+  "name",
+  "message",
+  "stack",
+  "cause",
+  "$fault",
+  "$retryable",
+  "$metadata",
+  "$response",
+]);
+
 export function isMissingObjectError(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
-  const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-  if (e.name === "NoSuchBucket") return false;
-  return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
+  const e = error as {
+    name?: string;
+    message?: unknown;
+    code?: unknown;
+    Code?: unknown;
+    $metadata?: { httpStatusCode?: number };
+    $response?: { headers?: Record<string, unknown> };
+  };
+  if (typeof e.code === "string" || "$responseBodyText" in error) {
+    return false;
+  }
+  if (e.name === "NoSuchKey") return true;
+  if (e.name !== "NotFound" || e.$metadata?.httpStatusCode !== 404) return false;
+  const headers = e.$response?.headers;
+  if (headers && typeof headers === "object") {
+    for (const [k, v] of Object.entries(headers)) {
+      if (
+        k.toLowerCase() === "content-type" &&
+        typeof v === "string" &&
+        /^\s*(?:text\/html|application\/xhtml\+xml)\b/i.test(v)
+      ) {
+        return false;
+      }
+    }
+  }
+  if (e.Code === "NotFound") return true;
+  if (
+    typeof e.message === "string" &&
+    e.message !== "" &&
+    e.message !== "UnknownError" &&
+    e.message !== "NotFound"
+  ) {
+    return false;
+  }
+  return Object.keys(error).every((k) => ALLOWED_NOT_FOUND_KEYS.has(k));
 }
 
 export async function putObject(storedName: string, buffer: Buffer): Promise<void> {
@@ -103,15 +214,62 @@ export async function putObject(storedName: string, buffer: Buffer): Promise<voi
   );
 }
 
-export async function getObject(storedName: string): Promise<Buffer> {
+export async function getObject(storedName: string, signal?: AbortSignal): Promise<Buffer> {
+  signal?.throwIfAborted();
   const key = fileKey(storedName);
-  const response = await getClient().send(
-    new GetObjectCommand({
-      Bucket: cfg().bucket,
-      Key: key,
-    }),
-  );
-  return Buffer.from(await requireObjectBody(response, key).transformToByteArray());
+  const command = new GetObjectCommand({
+    Bucket: cfg().bucket,
+    Key: key,
+  });
+  let response: GetObjectCommandOutput;
+  try {
+    response = await (signal
+      ? getClient().send(command, { abortSignal: signal })
+      : getClient().send(command));
+  } catch (err) {
+    const errName = (err as { name?: unknown } | null)?.name;
+    const errCode = (err as { code?: unknown } | null)?.code;
+    if (
+      signal?.aborted &&
+      (err === signal.reason ||
+        errName === "AbortError" ||
+        errName === "RequestAbortedError" ||
+        errCode === "ECONNRESET")
+    ) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    }
+    throw err;
+  }
+  const body = requireObjectBody(response, key);
+  const abortBody = () => {
+    const reason =
+      signal?.reason instanceof Error
+        ? signal.reason
+        : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    const readable = body as {
+      listenerCount?: (event: string) => number;
+      once?: (event: string, listener: () => void) => void;
+      destroy?: (err?: Error) => void;
+    };
+    if (typeof readable.listenerCount === "function" && readable.listenerCount("error") === 0) {
+      readable.once?.("error", () => {});
+    }
+    readable.destroy?.(reason);
+  };
+  if (signal?.aborted) {
+    abortBody();
+    signal.throwIfAborted();
+  }
+  signal?.addEventListener("abort", abortBody, { once: true });
+  try {
+    const bytes = await body.transformToByteArray();
+    signal?.throwIfAborted();
+    return Buffer.from(bytes);
+  } finally {
+    signal?.removeEventListener("abort", abortBody);
+  }
 }
 
 export async function getObjectStream(storedName: string): Promise<Readable> {
@@ -125,6 +283,13 @@ export async function getObjectStream(storedName: string): Promise<Readable> {
   return requireObjectBody(response, key) as Readable;
 }
 
+/**
+ * S3's DeleteObject succeeds for a key that isn't there, so a failure here is a
+ * real one (AccessDenied, expired credentials, a missing bucket, the network)
+ * and must reach the caller rather than orphan the object (#1455). Some
+ * S3-compatible stores do answer a missing key with NoSuchKey or a 404; that is
+ * the one "already gone" case let through.
+ */
 export async function deleteObject(storedName: string): Promise<void> {
   try {
     await getClient().send(
@@ -133,8 +298,8 @@ export async function deleteObject(storedName: string): Promise<void> {
         Key: fileKey(storedName),
       }),
     );
-  } catch {
-    // Object already gone or doesn't exist
+  } catch (err) {
+    if (!isMissingObjectError(err)) throw err;
   }
 }
 
@@ -148,9 +313,40 @@ export async function getThumbnail(storedName: string): Promise<Buffer | null> {
       }),
     );
     return Buffer.from(await requireObjectBody(response, key).transformToByteArray());
-  } catch {
-    return null;
+  } catch (err) {
+    if (isMissingObjectError(err)) return null;
+    throw err;
   }
+}
+
+function sniffThumbnailContentType(buffer: Buffer): "image/webp" | "image/png" | "image/jpeg" {
+  if (
+    buffer.length >= 12 &&
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  return "image/jpeg";
 }
 
 export async function putThumbnail(storedName: string, buffer: Buffer): Promise<void> {
@@ -159,7 +355,7 @@ export async function putThumbnail(storedName: string, buffer: Buffer): Promise<
       Bucket: cfg().bucket,
       Key: thumbKey(storedName),
       Body: buffer,
-      ContentType: "image/jpeg",
+      ContentType: sniffThumbnailContentType(buffer),
     }),
   );
 }
@@ -172,8 +368,8 @@ export async function deleteThumbnail(storedName: string): Promise<void> {
         Key: thumbKey(storedName),
       }),
     );
-  } catch {
-    // Thumbnail may not exist
+  } catch (err) {
+    if (!isMissingObjectError(err)) throw err;
   }
 }
 
@@ -230,6 +426,16 @@ export async function putGenericObjectStream(
   try {
     await upload.done();
     signal?.throwIfAborted();
+  } catch (err) {
+    const errName = (err as { name?: unknown } | null)?.name;
+    if (
+      signal?.aborted &&
+      signal.reason instanceof Error &&
+      (err === signal.reason || errName === "AbortError" || errName === "RequestAbortedError")
+    ) {
+      throw signal.reason;
+    }
+    throw err;
   } finally {
     signal?.removeEventListener("abort", abortUpload);
   }
@@ -239,15 +445,16 @@ export async function getGenericObjectStream(
   key: string,
   range?: { start: number; end?: number },
 ): Promise<Readable> {
+  const fullKey = genericKey(key);
   const params: { Bucket: string; Key: string; Range?: string } = {
     Bucket: cfg().bucket,
-    Key: genericKey(key),
+    Key: fullKey,
   };
   if (range) {
     params.Range = `bytes=${range.start}-${range.end ?? ""}`;
   }
   const response = await getClient().send(new GetObjectCommand(params));
-  return response.Body as Readable;
+  return requireObjectBody(response, fullKey) as Readable;
 }
 
 export async function getGenericObjectSize(key: string): Promise<number> {
@@ -268,8 +475,8 @@ export async function deleteGenericObject(key: string): Promise<void> {
         Key: genericKey(key),
       }),
     );
-  } catch {
-    // Object already gone or doesn't exist
+  } catch (err) {
+    if (!isMissingObjectError(err)) throw err;
   }
 }
 
@@ -297,7 +504,9 @@ export async function deleteGenericPrefix(prefix: string): Promise<void> {
         );
         if (deleteResult.Errors && deleteResult.Errors.length > 0) {
           const summary = deleteResult.Errors.map((e) => `${e.Key}: ${e.Code}`).join(", ");
-          throw new Error(`S3 DeleteObjects partial failure: ${summary}`);
+          throw Object.assign(new Error(`S3 DeleteObjects partial failure: ${summary}`), {
+            $metadata: deleteResult.$metadata ?? {},
+          });
         }
       }
     }

@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { describe, expect, it, vi } from "vitest";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { outputFormatFor, resolveOutputFormat } from "../../../apps/api/src/lib/output-format.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -6,6 +8,7 @@ const JPG = readFixture(fixtures.image.base.jpg100);
 const PNG = readFixture(fixtures.image.base.png200);
 const WEBP = readFixture(fixtures.image.base.webp50);
 const GIF = readFixture(fixtures.image.animated.gif);
+const TIFF = readFixture(fixtures.image.formats("tiff"));
 
 describe("resolveOutputFormat", () => {
   it("detects JPEG input and returns jpeg config", async () => {
@@ -23,7 +26,6 @@ describe("resolveOutputFormat", () => {
     expect(result.contentType).toBe("image/png");
     // Sharp reads `quality` on PNG as "quantise to a palette", so a default
     // quality silently dithered every PNG that passed through (issue #710).
-    // Only an explicit override may request that.
     expect(result.quality).toBeUndefined();
   });
 
@@ -50,10 +52,49 @@ describe("resolveOutputFormat", () => {
     expect(result.quality).toBe(50);
   });
 
-  it("accepts quality override for PNG without error", async () => {
-    const result = await resolveOutputFormat(PNG, "image.png", 50);
-    expect(result.format).toBe("png");
-    expect(result.quality).toBe(50);
+  it("ignores quality override for PNG and PNG fallbacks so output stays lossless (#2205)", async () => {
+    const pngResult = await resolveOutputFormat(PNG, "image.png", 95);
+    expect(pngResult.format).toBe("png");
+    expect(pngResult.quality).toBeUndefined();
+    expect(pngResult.encoderOptions).toEqual({ quality: undefined });
+
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>',
+    );
+    const svgFallback = await resolveOutputFormat(svg, "vector.svg", 80);
+    expect(svgFallback.format).toBe("png");
+    expect(svgFallback.quality).toBeUndefined();
+    expect(svgFallback.encoderOptions).toEqual({ quality: undefined });
+
+    const fallbackResult = await resolveOutputFormat(
+      Buffer.from("not an image at all"),
+      "mystery.bin",
+      50,
+    );
+    expect(fallbackResult.format).toBe("png");
+    expect(fallbackResult.quality).toBeUndefined();
+    expect(fallbackResult.encoderOptions).toEqual({ quality: undefined });
+  });
+
+  it("rethrows DecoderOutOfMemoryError when sharp.metadata() hits OOM (#3809)", async () => {
+    for (const oomErr of [
+      new RangeError("Array buffer allocation failed"),
+      new Error("heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed"),
+    ]) {
+      const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(oomErr);
+      try {
+        const thrown = await resolveOutputFormat(JPG, "photo.jpg").catch((e: unknown) => e);
+        expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(thrown).toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: oomErr,
+        });
+      } finally {
+        metaSpy.mockRestore();
+      }
+    }
   });
 });
 
@@ -71,7 +112,13 @@ describe("encoderOptions", () => {
     expect(result.encoderOptions).toEqual({ quality: 95, reuse: false });
   });
 
-  it("passes no reuse key to any other encoder", async () => {
+  it("asks for LZW compression when the output is a TIFF so alpha channels survive (#2586)", async () => {
+    const result = await resolveOutputFormat(TIFF, "image.tiff");
+    expect(result.format).toBe("tiff");
+    expect(result.encoderOptions).toEqual({ quality: 95, compression: "lzw" });
+  });
+
+  it("passes no reuse or compression key to any other encoder", async () => {
     for (const [label, buffer] of [
       ["jpeg", JPG],
       ["png", PNG],
@@ -86,7 +133,7 @@ describe("encoderOptions", () => {
   });
 
   it("keeps quality and encoderOptions.quality saying the same thing", async () => {
-    for (const buffer of [JPG, PNG, WEBP, GIF]) {
+    for (const buffer of [JPG, PNG, WEBP, GIF, TIFF]) {
       const result = await resolveOutputFormat(buffer, "image");
       expect(result.encoderOptions.quality).toBe(result.quality);
     }
@@ -99,7 +146,18 @@ describe("encoderOptions", () => {
     // through here rather than writing the bag out by hand, which is how the
     // two copies of the quality could drift apart.
     expect(outputFormatFor("gif", 80).encoderOptions).toEqual({ quality: 80, reuse: false });
+    expect(outputFormatFor("tiff", 80).encoderOptions).toEqual({
+      quality: 80,
+      compression: "lzw",
+    });
     expect(outputFormatFor("png")).toMatchObject({
+      format: "png",
+      extension: "png",
+      contentType: "image/png",
+      quality: undefined,
+      encoderOptions: { quality: undefined },
+    });
+    expect(outputFormatFor("png", 95)).toMatchObject({
       format: "png",
       extension: "png",
       contentType: "image/png",

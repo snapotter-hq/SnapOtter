@@ -36,7 +36,7 @@ export function registerUnlockPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_unlocked.pdf`);
       ctx.report(10, "Decrypting");
-      await qpdfDecrypt(inPath, settings.password, outPath);
+      await qpdfDecrypt(inPath, settings.password, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

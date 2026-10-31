@@ -1,6 +1,6 @@
 ---
 description: "主體、臉部與熵感知裁切，使用 Sharp 與 AI 臉部偵測智慧地取景。"
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: 84b65e84b154
 ---

@@ -1,5 +1,6 @@
 import { isToolInputError, ToolInputError } from "@snapotter/shared";
 import sharp, { type Metadata, type Sharp } from "sharp";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { assertGifWorkload } from "./gif-limits.js";
 import { logger } from "./logger.js";
 
@@ -58,6 +59,8 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
   try {
     meta = await sharp(buffer).metadata();
   } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
     // Treating an unreadable header as a still is what the caller wants for
     // genuinely broken input, since it reopens the buffer and fails with its
     // own message a line later. A transient failure lands here too though, and
@@ -70,6 +73,7 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
     return STILL;
   }
 
+  if (meta.format !== "gif" && meta.format !== "webp") return STILL;
   const pages = meta.pages ?? 1;
   if (pages <= 1) return STILL;
 

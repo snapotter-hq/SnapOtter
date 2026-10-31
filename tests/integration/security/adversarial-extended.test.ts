@@ -38,11 +38,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // Real catalog tools resolve to their section-prefixed path; unknown ids
 // (used by the non-existent/injection negative tests below) fall back to a

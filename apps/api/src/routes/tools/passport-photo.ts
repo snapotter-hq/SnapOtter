@@ -6,21 +6,45 @@ import { detectFaceLandmarks, removeBackground } from "@snapotter/ai";
 import {
   FEATURE_BUNDLES,
   formatTargetKb,
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
   kbToBytes,
   PASSPORT_SPECS,
   PRINT_LAYOUTS,
+  ToolInputError,
 } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
+import { db, schema } from "../../db/index.js";
+import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { recordCompletedToolJob } from "../../lib/completed-job.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  getObjectBuffer,
+  isMissingObjectError,
+  isStorageServiceFault,
+  isValidObjectKey,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+} from "../../lib/object-storage.js";
+import { isUniqueViolation } from "../../lib/pg-errors.js";
+import { withRouteScratch } from "../../lib/route-scratch.js";
+import { recordInlineInputFile } from "../../lib/tool-audit.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { hasEffectivePermission } from "../../permissions.js";
+import { getAuthUser } from "../../plugins/auth.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -155,6 +179,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
 
       try {
         const parts = request.parts();
@@ -165,18 +190,19 @@ export function registerPassportPhoto(app: FastifyInstance) {
             fileBuffer = Buffer.concat(chunks);
             filename = sanitizeFilename(part.filename ?? "image");
           } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
+
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      clientJobId = clientJobIdField ?? null;
 
       if (!fileBuffer || fileBuffer.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });
@@ -187,35 +213,42 @@ export function registerPassportPhoto(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
+      // Progress goes out under the caller's clientJobId, so reserve it first:
+      // the row says whose run this is, and an id that's already taken gets a
+      // 409 instead of this run's progress landing in someone else's row.
+      if (clientJobId) {
+        try {
+          await db.insert(schema.jobs).values({
+            id: clientJobId,
+            userId: getAuthUser(request)?.id ?? null,
+            type: "single",
+            status: "processing",
+            inputRefs: [],
+          });
+        } catch (err) {
+          if (isUniqueViolation(err)) {
+            return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+          }
+          throw err;
+        }
+      }
+
       try {
-        // Decode HEIC/HEIF before processing
-        if (validation.format === "heif") {
-          fileBuffer = await decodeHeic(fileBuffer);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-        }
-
-        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-        if (needsCliDecode(validation.format)) {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-        }
-
-        // Auto-orient to fix EXIF rotation
-        fileBuffer = await autoOrient(fileBuffer);
+        const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+          log: request.log,
+          rewriteFilenameToPng: true,
+          rasterizeSvg: true,
+        });
+        fileBuffer = prepared.buffer;
+        filename = prepared.filename;
+        const orientedBuffer = fileBuffer;
 
         request.log.info(
-          { toolId: "passport-photo", imageSize: fileBuffer.length },
+          { toolId: "passport-photo", imageSize: orientedBuffer.length },
           "Starting passport photo analysis",
         );
 
         const jobId = randomUUID();
-        const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
-        await mkdir(scratchDir, { recursive: true });
-
-        // Save original to object storage for generate phase
-        await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
 
         // Progress callback
         const jobIdForProgress = clientJobId;
@@ -237,7 +270,14 @@ export function registerPassportPhoto(app: FastifyInstance) {
             }
           : undefined;
 
-        const landmarksResult = await detectFaceLandmarks(fileBuffer, landmarkProgress);
+        let landmarksResult: Awaited<ReturnType<typeof detectFaceLandmarks>>;
+        try {
+          landmarksResult = await detectFaceLandmarks(orientedBuffer, landmarkProgress, {
+            toolId: "passport-photo",
+          });
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(orientedBuffer, err);
+        }
 
         if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
           if (clientJobId) {
@@ -246,6 +286,11 @@ export function registerPassportPhoto(app: FastifyInstance) {
               phase: "complete",
               percent: 100,
               result: { jobId, faceDetected: false },
+            }).catch((persistErr) => {
+              request.log.error(
+                { err: persistErr, jobId: clientJobId, toolId: "passport-photo" },
+                "Failed to persist passport photo analysis progress",
+              );
             });
           }
           return reply.status(422).send({
@@ -262,21 +307,18 @@ export function registerPassportPhoto(app: FastifyInstance) {
             }
           : undefined;
 
-        let bgRemovedBuffer: Buffer;
-        try {
-          bgRemovedBuffer = await removeBackground(
-            fileBuffer,
-            scratchDir,
-            { model: "birefnet-portrait" },
-            bgProgress,
-          );
-        } finally {
-          await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-        }
-
-        // Save bg-removed image to object storage for generate phase
-        const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
-        await putObject(`outputs/${jobId}/${bgRemovedFilename}`, bgRemovedBuffer);
+        const bgRemovedBuffer = await withRouteScratch("passport-photo", async (scratchDir) => {
+          try {
+            return await removeBackground(
+              orientedBuffer,
+              scratchDir,
+              { model: "birefnet-portrait", toolId: "passport-photo" },
+              bgProgress,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+        });
 
         // Create a smaller preview for fast transfer (max 800px wide)
         const meta = await sharp(bgRemovedBuffer).metadata();
@@ -288,12 +330,29 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         const preview = previewBuffer.data.toString("base64");
 
+        // Save bg-removed image to object storage for generate phase. The row
+        // records who ran the analysis, which generate checks before reading it.
+        const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+        const bgRemovedKey = `outputs/${jobId}/${bgRemovedFilename}`;
+        await recordCompletedToolJob({
+          jobId,
+          userId: getAuthUser(request)?.id ?? null,
+          toolId: "passport-photo",
+          outputRefs: [bgRemovedKey],
+        });
+        await putObject(bgRemovedKey, bgRemovedBuffer);
+
         if (clientJobId) {
           await updateSingleFileProgress({
             jobId: clientJobId,
             phase: "complete",
             percent: 100,
             result: { jobId, faceDetected: true },
+          }).catch((persistErr) => {
+            request.log.error(
+              { err: persistErr, jobId: clientJobId, toolId: "passport-photo" },
+              "Failed to persist passport photo analysis progress",
+            );
           });
         }
 
@@ -307,11 +366,37 @@ export function registerPassportPhoto(app: FastifyInstance) {
           imageWidth: landmarksResult.imageWidth,
           imageHeight: landmarksResult.imageHeight,
         });
-      } catch (err) {
-        request.log.error({ err, toolId: "passport-photo" }, "Passport photo analysis failed");
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        const details = stripInternalPaths(err instanceof Error ? err.message : "Unknown error");
+        const progressError =
+          hasServerErrorStatus(err) && !isSafeMessageError(err)
+            ? "Passport photo analysis failed"
+            : details;
+        if (clientJobId) {
+          await updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "failed",
+            percent: 0,
+            error: progressError,
+          }).catch((persistErr) => {
+            request.log.error(
+              { err: persistErr, jobId: clientJobId, toolId: "passport-photo" },
+              "Failed to persist passport photo analysis progress",
+            );
+          });
+        }
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
+        }
+        if (isDecoderUnavailable(err)) throw err;
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "passport-photo" }, "Passport photo analysis failed");
+        }
         return reply.status(422).send({
           error: "Passport photo analysis failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details,
         });
       }
     },
@@ -398,11 +483,45 @@ export function registerPassportPhoto(app: FastifyInstance) {
         dpi: userDpi,
       };
 
+      // Read analyze's stored output outside the processing catch below, which
+      // answers 422 for anything. A missing object means the analysis expired
+      // and the client must re-run it (#1674); any other read failure is a
+      // storage fault and belongs to the error handler and Sentry.
+      const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+      const bgRemovedKey = `outputs/${jobId}/${bgRemovedFilename}`;
+      // A key the store would refuse is the client's mistake, not a fault.
+      if (!isValidObjectKey(bgRemovedKey)) {
+        return reply.status(400).send({ error: "Invalid jobId or filename" });
+      }
+      // The jobId comes from the client, so only the user who ran Phase 1 (or
+      // a files:all holder) may read its outputs. 404 hides whether it exists.
+      const user = getAuthUser(request);
+      if (user) {
+        const [job] = await db
+          .select({ userId: schema.jobs.userId })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId));
+        if (job?.userId !== user.id && !(await hasEffectivePermission(user, "files:all"))) {
+          return reply.status(404).send({ error: "Job not found" });
+        }
+      }
+      let bgRemovedBuffer: Buffer;
       try {
-        const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+        bgRemovedBuffer = await getObjectBuffer(bgRemovedKey);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        if (!isMissingObjectError(err)) throw err;
+        // Expected once in a while; a stream of these means the volume or
+        // bucket lost outputs it should still hold.
+        request.log.warn({ jobId, toolId: "passport-photo" }, "Analyze output missing at generate");
+        return reply.status(410).send({
+          error: "This photo's analysis has expired. Analyze it again, then generate.",
+          code: "ANALYSIS_EXPIRED",
+        });
+      }
+      recordInlineInputFile(request, bgRemovedBuffer.length);
 
-        const bgRemovedBuffer = await getObjectBuffer(`outputs/${jobId}/${bgRemovedFilename}`);
-
+      try {
         // Use actual bg-removed image dimensions for crop (may differ from
         // the original image dimensions reported by the analyze endpoint).
         const bgMeta = await sharp(bgRemovedBuffer).metadata();
@@ -510,19 +629,24 @@ export function registerPassportPhoto(app: FastifyInstance) {
           // The spec fixes the pixel dimensions, so there is nothing left to
           // trade: say so instead of returning a photo over the cap (#1288).
           if (cropped.length > targetBytes) {
-            throw new Error(
+            throw new ToolInputError(
               `Couldn't get this photo under ${formatTargetKb(targetBytes)} at the required dimensions. Try a larger size limit.`,
             );
           }
         }
 
-        // Save output
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_passport.jpg`;
-        await putObject(`outputs/${jobId}/${outputFilename}`, cropped);
+        // Store under a fresh server-generated jobId so Phase 2 never writes
+        // into a client-selected prefix or exposes the Phase 1 jobId.
+        const outputJobId = randomUUID();
+        const stem = filename.replace(/\.[^.]+$/, "");
+        const outputFilename = `${stem}_passport.jpg`;
+        const outputs: { key: string; buffer: Buffer }[] = [
+          { key: `outputs/${outputJobId}/${outputFilename}`, buffer: cropped },
+        ];
 
         const response: Record<string, unknown> = {
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+          jobId: outputJobId,
+          downloadUrl: `/api/v1/download/${outputJobId}/${encodeURIComponent(outputFilename)}`,
           dimensions: {
             widthMm: docSpec.width,
             heightMm: docSpec.height,
@@ -548,18 +672,31 @@ export function registerPassportPhoto(app: FastifyInstance) {
           );
 
           if (printBuffer) {
-            const printFilename = `${filename.replace(/\.[^.]+$/, "")}_passport_print_${printLayout}.jpg`;
-            await putObject(`outputs/${jobId}/${printFilename}`, printBuffer);
-            response.printDownloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(printFilename)}`;
+            const printFilename = `${stem}_passport_print_${printLayout}.jpg`;
+            outputs.push({ key: `outputs/${outputJobId}/${printFilename}`, buffer: printBuffer });
+            response.printDownloadUrl = `/api/v1/download/${outputJobId}/${encodeURIComponent(printFilename)}`;
           }
+        }
+
+        await recordCompletedToolJob({
+          jobId: outputJobId,
+          userId: user?.id ?? null,
+          toolId: "passport-photo",
+          outputRefs: outputs.map((o) => o.key),
+        });
+        for (const { key, buffer } of outputs) {
+          await putObject(key, buffer);
         }
 
         return reply.send(response);
       } catch (err) {
-        request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
+        }
         return reply.status(422).send({
           error: "Passport photo generation failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },
@@ -578,125 +715,142 @@ export function registerPassportPhoto(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "passport-photo",
     settingsSchema: pipelineSettingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as z.infer<typeof pipelineSettingsSchema>;
-      const orientedBuffer = await autoOrient(inputBuffer);
+    process: withImageEncodeContext<unknown>(
+      "Passport photo generation failed",
+      (s) => (s as z.infer<typeof pipelineSettingsSchema>)?.countryCode ?? "passport",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as z.infer<typeof pipelineSettingsSchema>;
+        const countrySpec = PASSPORT_SPECS.find((sp) => sp.code === s.countryCode);
+        if (!countrySpec) throw new ToolInputError(`Unknown country code: ${s.countryCode}`);
 
-      // Step 1: Detect face landmarks
-      const landmarksResult = await detectFaceLandmarks(orientedBuffer);
-      if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
-        throw new Error(
-          "No face detected. Please upload a clear, front-facing photo with good lighting.",
-        );
-      }
+        const docSpec = countrySpec.documents.find((d) => d.type === s.documentType);
+        if (!docSpec) throw new ToolInputError(`No ${s.documentType} spec for ${s.countryCode}`);
 
-      const landmarks = landmarksResult.landmarks;
-      const imgW = landmarksResult.imageWidth;
-      const imgH = landmarksResult.imageHeight;
+        const orientedBuffer = await autoOrient(inputBuffer);
 
-      // Step 2: Remove background
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        // Step 1: Detect face landmarks
+        let landmarksResult: Awaited<ReturnType<typeof detectFaceLandmarks>>;
+        try {
+          landmarksResult = await detectFaceLandmarks(orientedBuffer, undefined, {
+            toolId: "passport-photo",
+            signal: ctx?.signal,
+          });
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(orientedBuffer, err);
+        }
+        if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
+          throw new ToolInputError(
+            "No face detected. Please upload a clear, front-facing photo with good lighting.",
+          );
+        }
 
-      let bgRemovedBuffer: Buffer;
-      try {
-        bgRemovedBuffer = await removeBackground(orientedBuffer, scratchDir, {
-          model: "birefnet-portrait",
-        });
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
+        const landmarks = landmarksResult.landmarks;
+        const imgW = landmarksResult.imageWidth;
+        const imgH = landmarksResult.imageHeight;
 
-      // Step 3: Look up spec and compute crop
-      const countrySpec = PASSPORT_SPECS.find((sp) => sp.code === s.countryCode);
-      if (!countrySpec) throw new Error(`Unknown country code: ${s.countryCode}`);
+        // Step 2: Remove background
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
 
-      const docSpec = countrySpec.documents.find((d) => d.type === s.documentType);
-      if (!docSpec) throw new Error(`No ${s.documentType} spec for ${s.countryCode}`);
+        let bgRemovedBuffer: Buffer;
+        try {
+          try {
+            bgRemovedBuffer = await removeBackground(orientedBuffer, scratchDir, {
+              model: "birefnet-portrait",
+              toolId: "passport-photo",
+              signal: ctx?.signal,
+            });
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
 
-      // Use actual bg-removed image dimensions (may differ from original)
-      const bgRemovedMeta = await sharp(bgRemovedBuffer).metadata();
-      const actualW = bgRemovedMeta.width ?? imgW;
-      const actualH = bgRemovedMeta.height ?? imgH;
-      const scaleX = actualW / imgW;
-      const scaleY = actualH / imgH;
+        // Step 3: Compute crop using actual bg-removed image dimensions (may differ from original)
+        const bgRemovedMeta = await sharp(bgRemovedBuffer).metadata();
+        const actualW = bgRemovedMeta.width ?? imgW;
+        const actualH = bgRemovedMeta.height ?? imgH;
+        const scaleX = actualW / imgW;
+        const scaleY = actualH / imgH;
 
-      // Convert normalized landmarks (0-1) to pixel coordinates in bg-removed space
-      const crownYPx = (landmarks.crown.y + s.adjustY) * imgH * scaleY;
-      const chinYPx = (landmarks.chin.y + s.adjustY) * imgH * scaleY;
-      const eyeYPx = (landmarks.eyeCenter.y + s.adjustY) * imgH * scaleY;
-      const faceCenterXPx = (landmarks.faceCenterX + s.adjustX) * imgW * scaleX;
+        // Convert normalized landmarks (0-1) to pixel coordinates in bg-removed space
+        const crownYPx = (landmarks.crown.y + s.adjustY) * imgH * scaleY;
+        const chinYPx = (landmarks.chin.y + s.adjustY) * imgH * scaleY;
+        const eyeYPx = (landmarks.eyeCenter.y + s.adjustY) * imgH * scaleY;
+        const faceCenterXPx = (landmarks.faceCenterX + s.adjustX) * imgW * scaleX;
 
-      const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
-      const headHeightPx = chinYPx - crownYPx;
-      const photoHeightPx = headHeightPx / targetHeadRatio;
-      const aspectRatio = docSpec.width / docSpec.height;
-      const photoWidthPx = photoHeightPx * aspectRatio;
+        const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
+        const headHeightPx = chinYPx - crownYPx;
+        const photoHeightPx = headHeightPx / targetHeadRatio;
+        const aspectRatio = docSpec.width / docSpec.height;
+        const photoWidthPx = photoHeightPx * aspectRatio;
 
-      const topY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
-      const leftX = faceCenterXPx - photoWidthPx / 2;
+        const topY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
+        const leftX = faceCenterXPx - photoWidthPx / 2;
 
-      // Composite onto background
-      const hex = s.bgColor.replace("#", "");
-      const bgR = Number.parseInt(hex.slice(0, 2), 16);
-      const bgG = Number.parseInt(hex.slice(2, 4), 16);
-      const bgB = Number.parseInt(hex.slice(4, 6), 16);
-      const bgRgb = { r: bgR, g: bgG, b: bgB, alpha: 1 };
+        // Composite onto background
+        const hex = s.bgColor.replace("#", "");
+        const bgR = Number.parseInt(hex.slice(0, 2), 16);
+        const bgG = Number.parseInt(hex.slice(2, 4), 16);
+        const bgB = Number.parseInt(hex.slice(4, 6), 16);
+        const bgRgb = { r: bgR, g: bgG, b: bgB, alpha: 1 };
 
-      const bgLayer = await sharp({
-        create: {
-          width: actualW,
-          height: actualH,
-          channels: 4,
-          background: bgRgb,
-        },
-      })
-        .composite([{ input: bgRemovedBuffer, blend: "over" }])
-        .png()
-        .toBuffer();
-
-      // Pad instead of clamp so the crop region can extend beyond the image
-      const rawLeft = Math.round(leftX);
-      const rawTop = Math.round(topY);
-      const rawW = Math.round(photoWidthPx);
-      const rawH = Math.round(photoHeightPx);
-
-      const padLeft = Math.max(0, -rawLeft);
-      const padTop = Math.max(0, -rawTop);
-      const padRight = Math.max(0, rawLeft + rawW - actualW);
-      const padBottom = Math.max(0, rawTop + rawH - actualH);
-
-      let sourceForCrop = bgLayer;
-      if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
-        // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
-        sourceForCrop = await sharp(bgLayer)
-          .extend({
-            top: padTop,
-            bottom: padBottom,
-            left: padLeft,
-            right: padRight,
+        const bgLayer = await sharp({
+          create: {
+            width: actualW,
+            height: actualH,
+            channels: 4,
             background: bgRgb,
-          })
+          },
+        })
+          .composite([{ input: bgRemovedBuffer, blend: "over" }])
           .png()
           .toBuffer();
-      }
 
-      const cropLeft = rawLeft + padLeft;
-      const cropTop = rawTop + padTop;
+        // Pad instead of clamp so the crop region can extend beyond the image
+        const rawLeft = Math.round(leftX);
+        const rawTop = Math.round(topY);
+        const rawW = Math.round(photoWidthPx);
+        const rawH = Math.round(photoHeightPx);
 
-      const MM_PER_INCH = 25.4;
-      const targetWidthPx = Math.round((docSpec.width / MM_PER_INCH) * docSpec.dpi);
-      const targetHeightPx = Math.round((docSpec.height / MM_PER_INCH) * docSpec.dpi);
+        const padLeft = Math.max(0, -rawLeft);
+        const padTop = Math.max(0, -rawTop);
+        const padRight = Math.max(0, rawLeft + rawW - actualW);
+        const padBottom = Math.max(0, rawTop + rawH - actualH);
 
-      const result = await sharp(sourceForCrop)
-        .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
-        .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
-        .jpeg({ quality: 95 })
-        .toBuffer();
+        let sourceForCrop = bgLayer;
+        if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
+          // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
+          sourceForCrop = await sharp(bgLayer)
+            .extend({
+              top: padTop,
+              bottom: padBottom,
+              left: padLeft,
+              right: padRight,
+              background: bgRgb,
+            })
+            .png()
+            .toBuffer();
+        }
 
-      const stem = filename.replace(/\.[^.]+$/, "");
-      return { buffer: result, filename: `${stem}_passport.jpg`, contentType: "image/jpeg" };
-    },
+        const cropLeft = rawLeft + padLeft;
+        const cropTop = rawTop + padTop;
+
+        const MM_PER_INCH = 25.4;
+        const targetWidthPx = Math.round((docSpec.width / MM_PER_INCH) * docSpec.dpi);
+        const targetHeightPx = Math.round((docSpec.height / MM_PER_INCH) * docSpec.dpi);
+
+        const result = await sharp(sourceForCrop)
+          .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
+          .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
+          .jpeg({ quality: 95 })
+          .toBuffer();
+
+        const stem = filename.replace(/\.[^.]+$/, "");
+        return { buffer: result, filename: `${stem}_passport.jpg`, contentType: "image/jpeg" };
+      },
+    ),
   });
 }

@@ -4,31 +4,104 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { removeBackgroundAnimated } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  BG_REMOVAL_MODELS,
+  getBundleForTool,
+  HEX_COLOR_PATTERN,
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
+  SafeError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../../jobs/types.js";
 import { detectAnimation } from "../../lib/animation-detect.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  isDecoderUnavailable,
+} from "../../lib/format-decoders.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  getObjectBuffer,
+  isMissingObjectError,
+  isStorageServiceFault,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+  verifyS3Bucket,
+} from "../../lib/object-storage.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
-const settingsSchema = z.object({
-  model: z.string().optional(),
+const hexColor = z
+  .string()
+  .trim()
+  .regex(HEX_COLOR_PATTERN, "Use a hex color such as #FF5500 or #F50");
+
+/** A color or gradient background has to say which colors, or it comes back with a default (#2282). */
+function requireBackgroundColors(
+  s: {
+    backgroundType?: string;
+    backgroundColor?: string;
+    gradientColor1?: string;
+    gradientColor2?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  const needs: Array<"backgroundColor" | "gradientColor1" | "gradientColor2"> =
+    s.backgroundType === "color"
+      ? ["backgroundColor"]
+      : s.backgroundType === "gradient"
+        ? ["gradientColor1", "gradientColor2"]
+        : [];
+  for (const key of needs) {
+    if (s[key] === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `A ${s.backgroundType} background needs ${key}`,
+      });
+    }
+  }
+}
+
+const settingsShape = z.object({
+  model: z.enum(BG_REMOVAL_MODELS).optional(),
   outputFormat: z.enum(["webp", "gif", "apng"]).optional(),
   backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
-  backgroundColor: z.string().optional(),
-  gradientColor1: z.string().optional(),
-  gradientColor2: z.string().optional(),
+  backgroundColor: hexColor.optional(),
+  gradientColor1: hexColor.optional(),
+  gradientColor2: hexColor.optional(),
   gradientAngle: z.number().optional(),
   blurIntensity: z.number().min(0).max(100).optional(),
   shadowEnabled: z.boolean().optional(),
@@ -37,9 +110,20 @@ const settingsSchema = z.object({
   decontaminate: z.boolean().optional(),
 });
 
+const settingsSchema = settingsShape.superRefine(requireBackgroundColors);
+
+// Pipelines and batches carry settings as JSON, so an uploaded background image
+// can't reach the worker. Reject the type up front instead of returning a
+// cutout with the background dropped (#3005).
+const pipelineSettingsSchema = settingsShape
+  .extend({ backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional() })
+  .superRefine(requireBackgroundColors);
+
 // The worker also receives the staged background-image storage key (never
 // persisted to the audit row — passed via dbSettings redaction on enqueue).
-const jobSettingsSchema = settingsSchema.extend({ bgImageKey: z.string().optional() });
+const jobSettingsSchema = settingsShape
+  .extend({ bgImageKey: z.string().optional() })
+  .superRefine(requireBackgroundColors);
 
 type Settings = z.infer<typeof settingsSchema>;
 
@@ -62,13 +146,14 @@ function toWrapperOptions(s: z.infer<typeof jobSettingsSchema>, frames: number, 
   };
 }
 
-// ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("remove-gif-background", async (input, data, ctx) => {
-  const settings = jobSettingsSchema.parse(data.settings);
-
-  // ctx.signal is not plumbed to Python; drop a sentinel the loop polls between
-  // frames so a cancel stops the run instead of wasting the whole animation.
-  const cancelFile = join(ctx.scratchDir, "cancel.flag");
+/**
+ * ctx.signal is not plumbed to Python, so drop a sentinel file the frame loop
+ * polls between frames: a cancel stops the run instead of wasting the whole
+ * animation. Shared by the AI job handler and the registry process fn so both
+ * behave the same (#2076).
+ */
+function writeCancelSentinel(scratchDir: string, signal?: AbortSignal): string {
+  const cancelFile = join(scratchDir, "cancel.flag");
   const writeCancel = () => {
     try {
       writeFileSync(cancelFile, "1");
@@ -76,34 +161,88 @@ registerAiJobHandler("remove-gif-background", async (input, data, ctx) => {
       // best effort
     }
   };
-  if (ctx.signal.aborted) writeCancel();
-  else ctx.signal.addEventListener("abort", writeCancel, { once: true });
+  if (signal?.aborted) writeCancel();
+  else signal?.addEventListener("abort", writeCancel, { once: true });
+  return cancelFile;
+}
 
-  let bgImagePath: string | undefined;
-  if (settings.bgImageKey) {
-    const bg = await getObjectBuffer(settings.bgImageKey);
-    if (bg && bg.length > 0) {
-      bgImagePath = join(ctx.scratchDir, "bg-input");
-      await writeFile(bgImagePath, bg);
-    }
-  }
+// ── AI job handler (runs inside the BullMQ worker) ────────────────
+registerAiJobHandler(
+  "remove-gif-background",
+  withAiImageEncodeContext<Settings>(
+    "Animated background removal failed",
+    (s) => s?.outputFormat ?? "webp",
+    async (input, data, ctx) => {
+      const settings = jobSettingsSchema.parse(data.settings);
 
-  const { frames } = await detectAnimation(input, data.filename);
+      const cancelFile = writeCancelSentinel(ctx.scratchDir, ctx.signal);
 
-  const result = await removeBackgroundAnimated(
-    input,
-    ctx.scratchDir,
-    { ...toWrapperOptions(settings, frames, data.filename), cancelFile, bgImagePath },
-    (percent, stage) => ctx.report(percent, stage),
-  );
+      let bgImagePath: string | undefined;
+      let bgBuffer: Buffer | undefined;
+      if (settings.bgImageKey) {
+        let bg: Buffer;
+        try {
+          bg = await getObjectBuffer(settings.bgImageKey);
+        } catch (err) {
+          if (isMissingObjectError(err)) {
+            await verifyS3Bucket();
+            throw new SafeError("Input file is no longer available. Upload it again.", {
+              kind: "operational",
+              code: "INPUT_MISSING",
+              statusCode: 410,
+              cause: err,
+            });
+          }
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
+        if (bg && bg.length > 0) {
+          bgBuffer = bg;
+          bgImagePath = join(ctx.scratchDir, "bg-input");
+          await writeFile(bgImagePath, bg);
+        }
+      }
+      if (settings.backgroundType === "image" && !bgImagePath) {
+        throw new Error("An image background needs a background image");
+      }
 
-  const base = data.filename.replace(/\.[^.]+$/, "");
-  return {
-    buffer: result.buffer,
-    filename: `${base}-nobg.${result.ext}`,
-    contentType: result.contentType,
-  };
-});
+      let result: Awaited<ReturnType<typeof removeBackgroundAnimated>>;
+      try {
+        const { frames } = await detectAnimation(input, data.filename);
+        result = await removeBackgroundAnimated(
+          input,
+          ctx.scratchDir,
+          { ...toWrapperOptions(settings, frames, data.filename), cancelFile, bgImagePath },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        // removeBackgroundAnimated hands the raw file to Pillow and wraps any
+        // Python failure as a bug-kind SafeError via toSidecarError, so probe
+        // the underlying Error before letting a corrupt GIF report as a bug.
+        const probeCandidate =
+          isSafeMessageError(err) && err.kind === "bug"
+            ? (err.cause ?? new Error(err.message))
+            : err;
+        const classified = await asInputErrorIfUndecodable(input, probeCandidate);
+        if (isToolInputError(classified) || isDecoderUnavailable(classified)) throw classified;
+        if (bgBuffer) {
+          const bgClassified = await asInputErrorIfUndecodable(bgBuffer, probeCandidate);
+          if (isToolInputError(bgClassified) || isDecoderUnavailable(bgClassified)) {
+            throw bgClassified;
+          }
+        }
+        throw err;
+      }
+
+      const base = data.filename.replace(/\.[^.]+$/, "");
+      return {
+        buffer: result.buffer,
+        filename: `${base}-nobg.${result.ext}`,
+        contentType: result.contentType,
+      };
+    },
+  ),
+);
 
 /**
  * AI background removal for animated images (GIF, animated WebP, APNG). Unlike
@@ -132,6 +271,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
       let filename = "image.gif";
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
       let fileId: string | null = null;
       let saveModeRaw: string | null = null;
       let inputKey: string | null = null;
@@ -153,10 +293,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           } else if (part.fieldname === "fileId") {
             fileId = part.value as string;
           } else if (part.fieldname === "saveMode") {
@@ -164,143 +301,216 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        await discardUnenqueuedUploads(jobId, request.log);
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
-      // Stamp the client-facing alias before any pre-enqueue work (#892): a
-      // cancel landing between parse and enqueueToolJob needs a durable pointer
-      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      if (!inputKey) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const fileBuffer = await getObjectBuffer(inputKey);
-      if (!fileBuffer || fileBuffer.length === 0) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-
-      // Detect animation WITHOUT decoding/orienting (those flatten an animation
-      // to one frame). Reject stills and enforce the frame cap before enqueue.
-      let animation: { animated: boolean; frames: number };
+      let enqueued = false;
+      let aliasStamped = false;
       try {
-        animation = await detectAnimation(fileBuffer, filename);
-      } catch (err) {
-        return reply.status(400).send({
-          error: `Invalid image: ${stripInternalPaths(err instanceof Error ? err.message : "unreadable")}`,
-        });
-      }
-      if (!animation.animated) {
-        return reply.status(400).send({
-          error: "This tool only handles animated images. Use Remove Background for still images.",
-          code: "NOT_ANIMATED",
-        });
-      }
-      const cap = env.GIF_BG_MAX_FRAMES;
-      if (cap > 0 && animation.frames > cap) {
-        return reply.status(400).send({
-          error: `Animation has ${animation.frames} frames, over the ${cap}-frame limit.`,
-          code: "TOO_MANY_FRAMES",
-        });
-      }
-
-      let settings: Settings;
-      try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
         }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
+        clientJobId = clientJobIdField ?? null;
 
-      // Stage the background image for the "image" effect.
-      let bgImageKey: string | undefined;
-      if (settings.backgroundType === "image") {
-        if (!bgBuffer || bgBuffer.length === 0) {
-          return reply
-            .status(400)
-            .send({ error: "A background image is required for the image background." });
+        // Stamp the client-facing alias before any pre-enqueue work (#892): a
+        // cancel landing between parse and enqueueToolJob needs a durable pointer
+        // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
         }
-        const bgValidation = await validateImageBuffer(bgBuffer, bgName);
-        if (!bgValidation.valid) {
-          return reply
-            .status(400)
-            .send({ error: `Invalid background image: ${bgValidation.reason}` });
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
         }
-        bgImageKey = `uploads/${jobId}/bg-${bgName}`;
-        await putObject(bgImageKey, bgBuffer);
+
+        if (!inputKey) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        let fileBuffer: Buffer;
+        try {
+          fileBuffer = await getObjectBuffer(inputKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
+        if (!fileBuffer || fileBuffer.length === 0) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        const validation = await validateImageBuffer(fileBuffer, filename);
+        if (!validation.valid) {
+          return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+        }
+
+        // Detect animation WITHOUT decoding/orienting (those flatten an animation
+        // to one frame). Reject stills and enforce the frame cap before enqueue.
+        let animation: { animated: boolean; frames: number };
+        try {
+          animation = await detectAnimation(fileBuffer, filename);
+        } catch (err) {
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) throw oom;
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          return reply.status(400).send({
+            error: `Invalid image: ${stripInternalPaths(err instanceof Error ? err.message : "unreadable")}`,
+          });
+        }
+        if (!animation.animated) {
+          return reply.status(400).send({
+            error:
+              "This tool only handles animated images. Use Remove Background for still images.",
+            code: "NOT_ANIMATED",
+          });
+        }
+        const cap = env.GIF_BG_MAX_FRAMES;
+        if (cap > 0 && animation.frames > cap) {
+          return reply.status(400).send({
+            error: `Animation has ${animation.frames} frames, over the ${cap}-frame limit.`,
+            code: "TOO_MANY_FRAMES",
+          });
+        }
+
+        let settings: Settings;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply
+              .status(400)
+              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        // Stage the background image for the "image" effect.
+        let bgImageKey: string | undefined;
+        if (settings.backgroundType === "image") {
+          if (!bgBuffer || bgBuffer.length === 0) {
+            return reply
+              .status(400)
+              .send({ error: "A background image is required for the image background." });
+          }
+          const bgValidation = await validateImageBuffer(bgBuffer, bgName);
+          if (!bgValidation.valid) {
+            return reply
+              .status(400)
+              .send({ error: `Invalid background image: ${bgValidation.reason}` });
+          }
+          try {
+            const preparedBg = await prepareRouteImage(bgBuffer, bgName, bgValidation.format, {
+              log: request.log,
+              rewriteFilenameToPng: true,
+              rasterizeSvg: true,
+              rasterizeToPng: true,
+            });
+            bgBuffer = preparedBg.buffer;
+            bgName = preparedBg.filename;
+          } catch (rawErr) {
+            const err = normalizeOperationalWriteError(rawErr);
+            if (err instanceof InputValidationError) {
+              return reply.status(400).send({ error: err.message });
+            }
+            if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+            if (!isToolInputError(err)) {
+              request.log.error({ err, toolId }, "Background image decoding failed");
+            }
+            return reply.status(422).send({
+              error: "Animated background removal failed",
+              details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+            });
+          }
+          bgImageKey = `uploads/${jobId}/bg-${bgName}`;
+          await putObject(bgImageKey, bgBuffer);
+        }
+
+        enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [inputKey],
+          filename,
+          settings: { ...settings, bgImageKey },
+          dbSettings: settings, // keep the internal bgImageKey out of the audit row
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        };
+        try {
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
+
+        return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      } finally {
+        if (!enqueued) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
+        }
       }
-
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [inputKey],
-        filename,
-        settings: { ...settings, bgImageKey },
-        dbSettings: settings, // keep the internal bgImageKey out of the audit row
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-      });
-
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 
   // ── Pipeline/batch registry ──────────────────────────────────────
   registerToolProcessFn({
     toolId: "remove-gif-background",
-    settingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as Settings;
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const animation = await detectAnimation(inputBuffer, filename);
-        if (!animation.animated) {
-          throw new Error("Input is not an animated image");
+    settingsSchema: pipelineSettingsSchema,
+    process: withImageEncodeContext<unknown>(
+      "Animated background removal failed",
+      (s) => (s as Settings)?.outputFormat ?? "webp",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = pipelineSettingsSchema.parse(settings);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          const cancelFile = writeCancelSentinel(scratchDir, ctx?.signal);
+
+          // A still frame is an animation with one frame, which the sidecar
+          // handles; the tool page has always accepted one (#2076).
+          let result: Awaited<ReturnType<typeof removeBackgroundAnimated>>;
+          try {
+            const animation = await detectAnimation(inputBuffer, filename);
+            result = await removeBackgroundAnimated(
+              inputBuffer,
+              scratchDir,
+              { ...toWrapperOptions(s, animation.frames, filename), cancelFile },
+              ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            );
+          } catch (err) {
+            const probeCandidate =
+              isSafeMessageError(err) && err.kind === "bug"
+                ? (err.cause ?? new Error(err.message))
+                : err;
+            const classified = await asInputErrorIfUndecodable(inputBuffer, probeCandidate);
+            if (isToolInputError(classified) || isDecoderUnavailable(classified)) throw classified;
+            throw err;
+          }
+          const base = filename.replace(/\.[^.]+$/, "");
+          return {
+            buffer: result.buffer,
+            filename: `${base}-nobg.${result.ext}`,
+            contentType: result.contentType,
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
-        // Batch/pipeline has no per-request background image; "image" degrades
-        // to transparent in the pipeline (the Python side handles a null bg).
-        const result = await removeBackgroundAnimated(
-          inputBuffer,
-          scratchDir,
-          toWrapperOptions(s, animation.frames, filename),
-        );
-        const base = filename.replace(/\.[^.]+$/, "");
-        return {
-          buffer: result.buffer,
-          filename: `${base}-nobg.${result.ext}`,
-          contentType: result.contentType,
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+      },
+    ),
   });
 }

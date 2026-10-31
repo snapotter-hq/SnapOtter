@@ -1,5 +1,5 @@
 import { TOOLS } from "@snapotter/shared";
-import { FileImage, FileText, ImageIcon, Music, Play, Video } from "lucide-react";
+import { FileImage, FileText, ImageIcon, Music, Play, RefreshCw, Video } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -12,6 +12,7 @@ import {
   type UserFile,
   type UserFileDetail,
 } from "@/lib/api";
+import { fileFormatLabel } from "@/lib/file-format-label";
 import { format } from "@/lib/format";
 import { previewFailureEncoder } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
@@ -28,24 +29,27 @@ function AuthImage({ src, alt, className }: { src: string; alt: string; classNam
 
   useEffect(() => {
     let revoked = false;
-    fetch(src, { headers: formatHeaders() })
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    setFailed(false);
+    fetch(src, { headers: formatHeaders(), signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.blob();
       })
       .then((blob) => {
         if (revoked) return;
-        setBlobUrl(URL.createObjectURL(blob));
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
       })
       .catch(() => {
         if (!revoked) setFailed(true);
       });
     return () => {
       revoked = true;
-      setBlobUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setBlobUrl(null);
     };
   }, [src]);
 
@@ -65,7 +69,7 @@ function AuthImage({ src, alt, className }: { src: string; alt: string; classNam
     );
   }
 
-  return <img src={blobUrl} alt={alt} className={className} />;
+  return <img src={blobUrl} alt={alt} className={className} onError={() => setFailed(true)} />;
 }
 
 const NATIVE_VIDEO = new Set(["mp4", "webm", "ogg", "ogv", "m4v"]);
@@ -101,6 +105,8 @@ export function FilePreview({
 }) {
   const { t } = useTranslation();
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState(false);
+  const [mediaRetry, setMediaRetry] = useState(0);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   // Set when generating a preview failed; `encoder` names what the server's
@@ -109,66 +115,88 @@ export function FilePreview({
   // Bumped on every file change and request, so a reply for a file that is no
   // longer shown is dropped instead of landing on the current one.
   const previewRequest = useRef(0);
+  const previewSrcRef = useRef<string | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
+
+  const revokePreviewSrc = useCallback(() => {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    if (previewSrcRef.current) {
+      URL.revokeObjectURL(previewSrcRef.current);
+      previewSrcRef.current = null;
+    }
+    setPreviewSrc(null);
+  }, []);
 
   const isMedia = mimeType.startsWith("video/") || mimeType.startsWith("audio/");
   const nativePlayable = isMedia && isNativePlayable(mimeType, name);
   const isPdf = mimeType === "application/pdf";
   const isOfficeDoc = OFFICE_MIMES.has(mimeType);
 
+  const handleRetryMedia = useCallback(() => {
+    setMediaRetry((n) => n + 1);
+  }, []);
+
   // Fetch native-playable media or PDF directly from the download endpoint.
   // Also resets server-side preview state when the file changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mediaRetry triggers a fresh download attempt
   useEffect(() => {
     // Reset server-side preview state on every file change
     previewRequest.current += 1;
-    setPreviewSrc((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
+    revokePreviewSrc();
     setPreviewLoading(false);
     setPreviewError(null);
+    setMediaError(false);
 
-    if (isPdf) {
-      let revoked = false;
-      fetch(getFileDownloadUrl(fileId), { headers: formatHeaders() })
-        .then((res) => res.blob())
-        .then((blob) => {
-          if (!revoked) setMediaSrc(URL.createObjectURL(blob));
-        })
-        .catch(() => {});
+    if (!isPdf && !nativePlayable) {
       return () => {
-        revoked = true;
-        setMediaSrc((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return null;
-        });
+        previewRequest.current += 1;
+        revokePreviewSrc();
       };
     }
 
-    if (!isMedia || !nativePlayable) return;
     let revoked = false;
-    const url = getFileDownloadUrl(fileId);
-    fetch(url, { headers: formatHeaders() })
-      .then((res) => res.blob())
-      .then((blob) => {
-        if (!revoked) setMediaSrc(URL.createObjectURL(blob));
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    fetch(getFileDownloadUrl(fileId), {
+      headers: formatHeaders(),
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
       })
-      .catch(() => {});
+      .then((blob) => {
+        if (revoked) return;
+        objectUrl = URL.createObjectURL(blob);
+        setMediaSrc(objectUrl);
+      })
+      .catch((err) => {
+        if (revoked || controller.signal.aborted) return;
+        console.error(`[file-preview] failed to load file ${fileId}`, err);
+        setMediaError(true);
+      });
     return () => {
       revoked = true;
-      setMediaSrc((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      controller.abort();
+      previewRequest.current += 1;
+      setMediaError(false);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setMediaSrc(null);
+      revokePreviewSrc();
     };
-  }, [isMedia, nativePlayable, isPdf, fileId]);
+  }, [nativePlayable, isPdf, fileId, mediaRetry, revokePreviewSrc]);
 
   const handleGeneratePreview = useCallback(() => {
+    previewAbortRef.current?.abort();
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
     const request = ++previewRequest.current;
     const current = () => previewRequest.current === request;
     setPreviewLoading(true);
     setPreviewError(null);
     let encoder: string | null = null;
-    fetch(getFilePreviewUrl(fileId), { headers: formatHeaders() })
+    fetch(getFilePreviewUrl(fileId), { headers: formatHeaders(), signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) {
           encoder = await previewFailureEncoder(res);
@@ -177,12 +205,23 @@ export function FilePreview({
         return res.blob();
       })
       .then((blob) => {
-        if (current()) setPreviewSrc(URL.createObjectURL(blob));
+        if (!current() || controller.signal.aborted) return;
+        if (previewSrcRef.current) {
+          URL.revokeObjectURL(previewSrcRef.current);
+        }
+        const nextUrl = URL.createObjectURL(blob);
+        previewSrcRef.current = nextUrl;
+        setPreviewSrc(nextUrl);
       })
-      .catch(() => {
-        if (current()) setPreviewError({ encoder });
+      .catch((err) => {
+        if (!current() || controller.signal.aborted) return;
+        console.error(`[file-preview] failed to generate preview for file ${fileId}`, err);
+        setPreviewError({ encoder });
       })
       .finally(() => {
+        if (previewAbortRef.current === controller) {
+          previewAbortRef.current = null;
+        }
         if (current()) setPreviewLoading(false);
       });
   }, [fileId]);
@@ -193,9 +232,32 @@ export function FilePreview({
 
   // PDF files -- render inline in iframe
   if (isPdf) {
-    return mediaSrc ? (
-      <iframe src={mediaSrc} className="w-full h-48 rounded-lg border border-border" title={name} />
-    ) : (
+    if (mediaSrc) {
+      return (
+        <iframe
+          src={mediaSrc}
+          className="w-full h-48 rounded-lg border border-border"
+          title={name}
+        />
+      );
+    }
+    if (mediaError) {
+      return (
+        <div className="w-full h-48 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
+          <FileText className="h-8 w-8 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{t.files.details.loadFailed}</span>
+          <button
+            type="button"
+            onClick={handleRetryMedia}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            {t.common.retry}
+          </button>
+        </div>
+      );
+    }
+    return (
       <div className="w-full h-48 rounded-lg bg-muted flex items-center justify-center">
         <div className="h-4 w-4 border-2 border-muted-foreground/30 border-t-transparent rounded-full animate-spin" />
       </div>
@@ -247,11 +309,30 @@ export function FilePreview({
   if (mimeType.startsWith("video/")) {
     // Native-playable: fetch and render directly
     if (nativePlayable) {
-      return mediaSrc ? (
-        <video src={mediaSrc} controls className="w-full rounded-lg max-h-48 bg-black">
-          <track kind="captions" />
-        </video>
-      ) : (
+      if (mediaSrc) {
+        return (
+          <video src={mediaSrc} controls className="w-full rounded-lg max-h-48 bg-black">
+            <track kind="captions" />
+          </video>
+        );
+      }
+      if (mediaError) {
+        return (
+          <div className="w-full h-32 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
+            <Video className="h-8 w-8 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">{t.files.details.loadFailed}</span>
+            <button
+              type="button"
+              onClick={handleRetryMedia}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t.common.retry}
+            </button>
+          </div>
+        );
+      }
+      return (
         <div className="w-full h-32 rounded-lg bg-muted flex items-center justify-center">
           <Video className="h-8 w-8 text-muted-foreground animate-pulse" />
         </div>
@@ -300,11 +381,30 @@ export function FilePreview({
   if (mimeType.startsWith("audio/")) {
     // Native-playable: fetch and render directly
     if (nativePlayable) {
-      return mediaSrc ? (
-        <Suspense fallback={<div className="w-full h-24 rounded-lg bg-muted animate-pulse" />}>
-          <WaveformPlayer src={mediaSrc} className="w-full" />
-        </Suspense>
-      ) : (
+      if (mediaSrc) {
+        return (
+          <Suspense fallback={<div className="w-full h-24 rounded-lg bg-muted animate-pulse" />}>
+            <WaveformPlayer src={mediaSrc} className="w-full" />
+          </Suspense>
+        );
+      }
+      if (mediaError) {
+        return (
+          <div className="w-full h-24 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
+            <Music className="h-8 w-8 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">{t.files.details.loadFailed}</span>
+            <button
+              type="button"
+              onClick={handleRetryMedia}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t.common.retry}
+            </button>
+          </div>
+        );
+      }
+      return (
         <div className="w-full h-24 rounded-lg bg-muted flex items-center justify-center">
           <Music className="h-8 w-8 text-muted-foreground animate-pulse" />
         </div>
@@ -362,9 +462,7 @@ export function FilePreview({
   return (
     <div className="w-full h-32 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
       <FileText className="h-8 w-8 text-muted-foreground" />
-      <span className="text-xs text-muted-foreground">
-        {mimeType.split("/").pop()?.toUpperCase()}
-      </span>
+      <span className="text-xs text-muted-foreground">{fileFormatLabel(name, mimeType)}</span>
     </div>
   );
 }
@@ -382,11 +480,13 @@ function formatSize(bytes: number): string {
 export function getFilesToOpen({
   details,
   files,
+  knownFiles,
   checkedIds,
   filterMimePrefix,
 }: {
   details: UserFileDetail;
   files: UserFile[];
+  knownFiles?: ReadonlyMap<string, UserFile>;
   checkedIds: Set<string>;
   filterMimePrefix?: string;
 }): UserFile[] {
@@ -394,7 +494,17 @@ export function getFilesToOpen({
     !filterMimePrefix || file.mimeType.startsWith(filterMimePrefix);
 
   if (!isCompatible(details)) return [];
-  const compatibleChecked = files.filter((file) => checkedIds.has(file.id) && isCompatible(file));
+  const byId = new Map<string, UserFile>(knownFiles);
+  for (const file of files) {
+    byId.set(file.id, file);
+  }
+  const compatibleChecked: UserFile[] = [];
+  for (const id of checkedIds) {
+    const file = byId.get(id);
+    if (file && isCompatible(file)) {
+      compatibleChecked.push(file);
+    }
+  }
   if (compatibleChecked.length > 1) return compatibleChecked;
   return [details];
 }
@@ -406,77 +516,193 @@ interface FileDetailsProps {
 
 export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsProps) {
   const { t } = useTranslation();
-  const { files, selectedFileId } = useFilesPageStore();
+  const { files, knownFiles, selectedFileId, checkedIds } = useFilesPageStore();
   const setFiles = useFileStore((s) => s.setFiles);
+  const addFiles = useFileStore((s) => s.addFiles);
   const navigate = useNavigate();
   const location = useLocation();
   const selectForTool = (location.state as { selectForTool?: string } | null)?.selectForTool;
 
   const [details, setDetails] = useState<UserFileDetail | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const selectedFile = files.find((file) => file.id === selectedFileId);
+  const [detailError, setDetailError] = useState(false);
+  const [detailRetry, setDetailRetry] = useState(0);
+  const [opening, setOpening] = useState(false);
+  const [openFailed, setOpenFailed] = useState<{ failed: number; total: number } | null>(null);
+  const latestOpenRef = useRef(0);
+  const partialFailedIdsRef = useRef<Set<string> | null>(null);
+
+  const selectedFile =
+    files.find((file) => file.id === selectedFileId) ??
+    (selectedFileId ? knownFiles.get(selectedFileId) : undefined);
   const selectedFileIsCompatible =
     !filterMimePrefix || selectedFile?.mimeType.startsWith(filterMimePrefix) === true;
 
   useEffect(() => {
-    if (!selectedFileId || !selectedFileIsCompatible) {
-      setDetails(null);
+    if (partialFailedIdsRef.current && checkedIds === partialFailedIdsRef.current) {
       return;
     }
+    partialFailedIdsRef.current = null;
+    setOpenFailed(null);
+  }, [checkedIds]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: detailRetry triggers a fresh detail fetch attempt
+  useEffect(() => {
+    latestOpenRef.current += 1;
+    partialFailedIdsRef.current = null;
+    setOpening(false);
+    setOpenFailed(null);
+
+    if (!selectedFileId || !selectedFileIsCompatible) {
+      setDetails(null);
+      setDetailError(false);
+      setLoadingDetails(false);
+      return;
+    }
+    let cancelled = false;
+    setDetails(null);
+    setDetailError(false);
     setLoadingDetails(true);
     apiGetFileDetails(selectedFileId)
-      .then(setDetails)
-      .catch(() => setDetails(null))
-      .finally(() => setLoadingDetails(false));
-  }, [selectedFileId, selectedFileIsCompatible]);
+      .then((res) => {
+        if (!cancelled) setDetails(res);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(`[file-details] failed to load details for file ${selectedFileId}`, err);
+        setDetails(null);
+        setDetailError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetails(false);
+      });
+    return () => {
+      cancelled = true;
+      latestOpenRef.current += 1;
+    };
+  }, [selectedFileId, selectedFileIsCompatible, detailRetry]);
 
   async function handleOpenFile() {
-    if (!details) return;
+    if (!details || opening) return;
 
-    const { checkedIds, files: allFiles } = useFilesPageStore.getState();
-
-    // If multiple files are checked, open all of them; otherwise just the selected one
-    const filesToOpen = getFilesToOpen({
-      details,
+    const {
+      checkedIds: currentCheckedIds,
       files: allFiles,
-      checkedIds,
-      filterMimePrefix,
-    });
+      knownFiles: allKnownFiles,
+    } = useFilesPageStore.getState();
 
-    const downloaded = await Promise.all(
-      filesToOpen.map(async (f) => {
-        const res = await fetch(getFileDownloadUrl(f.id), {
-          headers: formatHeaders(),
-        });
-        if (!res.ok) return null;
-        const blob = await res.blob();
-        return { file: new File([blob], f.originalName, { type: f.mimeType }), serverId: f.id };
-      }),
-    );
+    const isCompatible = (file: Pick<UserFile, "mimeType">) =>
+      !filterMimePrefix || file.mimeType.startsWith(filterMimePrefix);
+    const isPartialRetry =
+      partialFailedIdsRef.current !== null && currentCheckedIds === partialFailedIdsRef.current;
 
-    const valid = downloaded.filter((d): d is NonNullable<typeof d> => d !== null);
-    if (valid.length === 0) return;
-
-    setFiles(valid.map((d) => d.file));
-
-    if (selectForTool) {
-      const tool = TOOLS.find((t) => t.id === selectForTool);
-      navigate(tool?.route ?? "/", { state: { fromLibrary: true } });
-    } else {
-      navigate("/", { state: { fromLibrary: true } });
-    }
-
-    // Set serverFileId on each entry so tool processing auto-saves the result
-    // to the library: an independent new file by default, or a superseding
-    // version when the user picks overwrite (#495)
-    setTimeout(() => {
-      const store = useFileStore.getState();
-      for (let i = 0; i < valid.length; i++) {
-        if (store.entries[i]) {
-          store.updateEntry(i, { serverFileId: valid[i].serverId });
+    let filesToOpen: UserFile[];
+    if (isPartialRetry) {
+      const byId = new Map<string, UserFile>(allKnownFiles);
+      for (const file of allFiles) {
+        byId.set(file.id, file);
+      }
+      filesToOpen = [];
+      for (const id of currentCheckedIds) {
+        const file = byId.get(id) ?? (id === details.id ? details : undefined);
+        if (file && isCompatible(file)) {
+          filesToOpen.push(file);
         }
       }
-    }, 0);
+    } else {
+      // If multiple files are checked, open all of them; otherwise just the selected one
+      filesToOpen = getFilesToOpen({
+        details,
+        files: allFiles,
+        knownFiles: allKnownFiles,
+        checkedIds: currentCheckedIds,
+        filterMimePrefix,
+      });
+    }
+
+    if (filesToOpen.length === 0) return;
+
+    const openRun = ++latestOpenRef.current;
+    const isLatestOpen = () => openRun === latestOpenRef.current;
+    setOpening(true);
+    setOpenFailed(null);
+
+    try {
+      const outcomes = await Promise.allSettled(
+        filesToOpen.map(async (f) => {
+          const res = await fetch(getFileDownloadUrl(f.id), {
+            headers: formatHeaders(),
+          });
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          const blob = await res.blob();
+          return { file: new File([blob], f.originalName, { type: f.mimeType }), serverId: f.id };
+        }),
+      );
+
+      if (!isLatestOpen()) return;
+
+      const valid: { file: File; serverId: string }[] = [];
+      const failedIds = new Set<string>();
+      for (let i = 0; i < outcomes.length; i++) {
+        const outcome = outcomes[i];
+        const source = filesToOpen[i];
+        if (outcome.status === "fulfilled") {
+          valid.push(outcome.value);
+        } else {
+          console.error(`[file-details] failed to download file ${source.id}`, outcome.reason);
+          failedIds.add(source.id);
+        }
+      }
+
+      if (valid.length > 0) {
+        let entryIds: string[];
+        if (isPartialRetry) {
+          const prevCount = useFileStore.getState().entries.length;
+          addFiles(valid.map((d) => d.file));
+          entryIds = useFileStore
+            .getState()
+            .entries.slice(prevCount)
+            .map((e) => e.id);
+        } else {
+          setFiles(valid.map((d) => d.file));
+          entryIds = useFileStore.getState().entries.map((e) => e.id);
+        }
+
+        // Set serverFileId on each entry so tool processing auto-saves the result
+        // to the library: an independent new file by default, or a superseding
+        // version when the user picks overwrite (#495)
+        setTimeout(() => {
+          const store = useFileStore.getState();
+          for (let i = 0; i < valid.length; i++) {
+            if (entryIds[i]) {
+              store.updateEntryById(entryIds[i], { serverFileId: valid[i].serverId });
+            }
+          }
+        }, 0);
+      }
+
+      if (failedIds.size === 0) {
+        partialFailedIdsRef.current = null;
+        if (valid.length > 0) {
+          if (selectForTool) {
+            const tool = TOOLS.find((t) => t.id === selectForTool);
+            navigate(tool?.route ?? "/", { state: { fromLibrary: true } });
+          } else {
+            navigate("/", { state: { fromLibrary: true } });
+          }
+        }
+      } else {
+        if ((valid.length > 0 || isPartialRetry) && currentCheckedIds.size > 0) {
+          partialFailedIdsRef.current = failedIds;
+          useFilesPageStore.setState({ checkedIds: failedIds });
+        }
+        setOpenFailed({ failed: failedIds.size, total: filesToOpen.length });
+      }
+    } finally {
+      if (isLatestOpen()) setOpening(false);
+    }
   }
 
   if (!selectedFileId || !selectedFileIsCompatible) {
@@ -510,6 +736,31 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
     );
   }
 
+  if (detailError) {
+    return (
+      <div
+        className={cn(
+          "flex flex-col items-center justify-center gap-2 text-muted-foreground",
+          mobile
+            ? "flex flex-col gap-4"
+            : "w-60 border-s border-border p-4 shrink-0 hidden lg:flex flex-col",
+        )}
+      >
+        <p role="alert" className="text-sm text-muted-foreground text-center">
+          {t.files.details.loadFailed}
+        </p>
+        <button
+          type="button"
+          onClick={() => setDetailRetry((n) => n + 1)}
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          {t.common.retry}
+        </button>
+      </div>
+    );
+  }
+
   if (!details) return null;
 
   return (
@@ -536,7 +787,7 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
             <DetailRow label={t.files.name} value={details.originalName} />
             <DetailRow
               label={t.files.format}
-              value={details.mimeType.split("/").pop()?.toUpperCase() ?? ""}
+              value={fileFormatLabel(details.originalName, details.mimeType) || "—"}
             />
             <DetailRow label={t.files.size} value={formatSize(details.size)} />
             <DetailRow
@@ -558,10 +809,16 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
 
       {/* Action buttons */}
       <div className={cn("border-t border-border flex flex-col gap-2", mobile ? "pt-3" : "pt-4")}>
+        {openFailed && (
+          <p role="alert" className="text-xs text-destructive">
+            {format(t.commonUi.fileLibrary.importFailed, openFailed)}
+          </p>
+        )}
         <button
           type="button"
           onClick={handleOpenFile}
-          className="w-full px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+          disabled={opening}
+          className="w-full px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {selectForTool ? t.files.selectFile : t.files.openFile}
         </button>

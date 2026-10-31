@@ -2,13 +2,18 @@
 
 import type Konva from "konva";
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
+import { reportCaptureFailure, strokeToDataUrl } from "../stage-capture";
 
 interface DragState {
   startX: number;
   startY: number;
+  /** Where the preview last ended, for a release that has no stage pointer (#2154). */
+  endX: number;
+  endY: number;
 }
 
 export interface GradientPreview {
@@ -22,6 +27,7 @@ export interface GradientPreview {
 export function useGradientTool() {
   const dragRef = useRef<DragState | null>(null);
   const [preview, setPreview] = useState<GradientPreview | null>(null);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const { activeTool, zoom, panOffset } = useEditorStore.getState();
@@ -37,7 +43,7 @@ export function useGradientTool() {
     const x = (pointer.x - panOffset.x) / zoom;
     const y = (pointer.y - panOffset.y) / zoom;
 
-    dragRef.current = { startX: x, startY: y };
+    dragRef.current = { startX: x, startY: y, endX: x, endY: y };
 
     const { gradientType } = useEditorStore.getState();
     setPreview({ startX: x, startY: y, endX: x, endY: y, gradientType });
@@ -57,11 +63,12 @@ export function useGradientTool() {
     const endX = (pointer.x - panOffset.x) / zoom;
     const endY = (pointer.y - panOffset.y) / zoom;
     const { startX, startY } = dragRef.current;
+    dragRef.current = { startX, startY, endX, endY };
 
     setPreview({ startX, startY, endX, endY, gradientType });
   }, []);
 
-  const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseUp = useCallback(() => {
     if (!dragRef.current) return;
 
     setPreview(null);
@@ -73,19 +80,12 @@ export function useGradientTool() {
       gradientOpacity,
       gradientReverse,
       canvasSize,
-      zoom,
-      panOffset,
     } = useEditorStore.getState();
 
-    const stage = e.target.getStage();
-    if (!stage) return;
-
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-
-    const endX = (pointer.x - panOffset.x) / zoom;
-    const endY = (pointer.y - panOffset.y) / zoom;
-    const { startX, startY } = dragRef.current;
+    // The end is where the preview last ended, not the stage pointer: Konva clears
+    // the pointer once it leaves the stage (a release over a panel), and a release
+    // that arrives late, from the next press, would read that press's position.
+    const { startX, startY, endX, endY } = dragRef.current;
 
     const dx = endX - startX;
     const dy = endY - startY;
@@ -122,7 +122,12 @@ export function useGradientTool() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-    const dataUrl = canvas.toDataURL();
+    const dataUrl = strokeToDataUrl(canvas);
+    if (!dataUrl) {
+      reportCaptureFailure("no-context", captureMessages);
+      dragRef.current = null;
+      return;
+    }
 
     const obj: CanvasObject = {
       id: generateId(),

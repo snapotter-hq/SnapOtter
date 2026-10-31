@@ -3,6 +3,7 @@ import { ANALYTICS_EVENTS, CATEGORIES, SECTIONS, TOOLS, toolSection } from "@sna
 import { ChevronDown, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { SearchShortcutHint } from "@/components/common/search-shortcut-hint.js";
 import { ToolCard } from "@/components/common/tool-card.js";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.js";
 import { AppLayout } from "@/components/layout/app-layout.js";
@@ -11,10 +12,13 @@ import { useFuseSearch } from "@/hooks/use-fuse-search.js";
 import { usePageTitle } from "@/hooks/use-page-title.js";
 import { useRecentTools } from "@/hooks/use-recent-tools.js";
 import { useTypeToSearch } from "@/hooks/use-type-to-search.js";
+import { canRecordFeedback } from "@/lib/feedback";
 import type { FeedbackPromptVariant } from "@/lib/feedback.js";
 import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback.js";
 import { format } from "@/lib/format.js";
 import { ICON_MAP } from "@/lib/icon-map.js";
+import { withAnalytics } from "@/lib/lazy-analytics";
+import { parseStringArray } from "@/lib/settings-payload.js";
 import { getCategoryName, getToolName } from "@/lib/tool-i18n.js";
 import { buildToolRequestDiscussionUrl } from "@/lib/tool-request.js";
 import { cn } from "@/lib/utils.js";
@@ -32,14 +36,18 @@ const COLLAPSE_STORAGE_KEY = "snapotter-collapsed-sections";
 function getCollapsedSections(): Set<string> {
   try {
     const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    return new Set(parseStringArray(raw ?? undefined));
   } catch {
     return new Set();
   }
 }
 
 function saveCollapsedSections(collapsed: Set<string>) {
-  localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsed]));
+  try {
+    localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsed]));
+  } catch {
+    // Storage blocked or full
+  }
 }
 
 const SECTION_TABS = new Set<string>(["all", ...SECTIONS.map((s) => s.id)]);
@@ -54,7 +62,9 @@ export function HomePage() {
   const fetchPins = usePinnedToolsStore((s) => s.fetch);
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
-  const analyticsOn = analyticsConfigLoaded && analyticsConfig?.enabled === true;
+  // In-app request dialog only where the request can be recorded; elsewhere
+  // the GitHub Discussions link (#2220).
+  const analyticsOn = analyticsConfigLoaded && canRecordFeedback(analyticsConfig);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestVariant, setRequestVariant] = useState<FeedbackPromptVariant>("search-empty-v1");
   // Tracks whether the request dialog was submitted, so closing it counts as a
@@ -117,7 +127,7 @@ export function HomePage() {
   useEffect(() => {
     if (!search || search.length < 2) return;
     const timer = setTimeout(() => {
-      import("@/lib/analytics").then(({ track }) => {
+      withAnalytics(({ track }) => {
         track(ANALYTICS_EVENTS.SEARCH, { results_count: searchResults.length });
       });
     }, 1000);
@@ -283,9 +293,7 @@ function HomeSearchBar({
           <X className="h-4 w-4 text-muted-foreground" />
         </button>
       ) : (
-        <kbd className="absolute end-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 rounded border border-border bg-muted/50 text-[11px] text-muted-foreground font-mono">
-          <span className="text-xs">&#8984;</span>K
-        </kbd>
+        <SearchShortcutHint />
       )}
     </div>
   );
@@ -431,7 +439,7 @@ function SearchResults({
             showPin
             onNavigate={() => {
               // search -> click attribution: which result the user opened.
-              import("@/lib/analytics").then(({ track }) =>
+              withAnalytics(({ track }) =>
                 track(ANALYTICS_EVENTS.SEARCH, {
                   results_count: results.length,
                   clicked_tool_id: tool.id,

@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(
   path.resolve(__dirname, "../../../packages/image-engine/src/index.ts"),
@@ -242,5 +242,89 @@ describe("editMetadata", () => {
         artist: "Survivor",
       }),
     ).rejects.toThrow("Cannot safely edit metadata because existing EXIF data is invalid");
+  });
+
+  it("fails safely when existing EXIF has a truncated IFD table during removal (#3882)", async () => {
+    const baseJpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const truncatedPayloads = [
+      Buffer.from("4578696600004d4d002a000010000000", "hex"),
+      Buffer.from("4578696600004d4d002a00000008000187690004000000010000100000000000", "hex"),
+      Buffer.from("4578696600004d4d002a00000008000188250004000000010000100000000000", "hex"),
+      Buffer.from(
+        "4578696600004d4d002a00000008000187690004000000010000001a000000000001a0050004000000010000100000000000",
+        "hex",
+      ),
+    ];
+
+    for (const exifPayload of truncatedPayloads) {
+      const app1Len = Buffer.alloc(2);
+      app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+      const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+      const truncatedExifJpeg = Buffer.concat([
+        baseJpeg.subarray(0, 2),
+        app1Segment,
+        baseJpeg.subarray(2),
+      ]);
+
+      await expect(
+        editMetadata(sharp(truncatedExifJpeg), {
+          fieldsToRemove: ["Software"],
+          artist: "Survivor",
+        }),
+      ).rejects.toThrow("Cannot safely edit metadata because existing EXIF data is invalid");
+    }
+  });
+
+  it("rethrows V8 buffer allocation RangeError instead of converting to ToolInputError (#3885)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed: exif");
+    const exifOomBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(exifOomBuf, "toString").mockImplementation(() => {
+      throw v8Oom;
+    });
+
+    const img = sharp(jpgWithExif);
+    const metaSpy = vi
+      .spyOn(img, "metadata")
+      .mockResolvedValue({ exif: exifOomBuf } as sharp.Metadata);
+    try {
+      await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(v8Oom);
+      await expect(editMetadata(img, { clearGps: true })).rejects.toThrow(v8Oom);
+    } finally {
+      metaSpy.mockRestore();
+    }
+
+    const nonOomRangeBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonOomRangeBuf, "toString").mockImplementationOnce(() => {
+      throw new RangeError("Attempt to access memory outside buffer bounds");
+    });
+    const rangeMetaSpy = vi
+      .spyOn(img, "metadata")
+      .mockResolvedValueOnce({ exif: nonOomRangeBuf } as sharp.Metadata);
+    try {
+      await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+    } finally {
+      rangeMetaSpy.mockRestore();
+    }
+
+    const nonRangeOomMsgBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonRangeOomMsgBuf, "toString").mockImplementationOnce(() => {
+      throw new Error("Array buffer allocation failed");
+    });
+    const nonRangeMetaSpy = vi
+      .spyOn(img, "metadata")
+      .mockResolvedValueOnce({ exif: nonRangeOomMsgBuf } as sharp.Metadata);
+    try {
+      await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+    } finally {
+      nonRangeMetaSpy.mockRestore();
+    }
   });
 });

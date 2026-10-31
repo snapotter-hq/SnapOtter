@@ -10,6 +10,10 @@ read -r -a browsers <<< "$BROWSERS"
 
 pnpm playwright install "${browsers[@]}"
 
+if [ "$(uname -s)" != "Linux" ]; then
+  exit 0
+fi
+
 attempts="${ATTEMPTS:-3}"
 for i in $(seq 1 "$attempts"); do
   if timeout -k 30 "${DEPS_TIMEOUT:-300}" pnpm playwright install-deps "${browsers[@]}"; then

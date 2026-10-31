@@ -8,13 +8,18 @@ import {
 import { AlertCircle, Clock, Download, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { useFeaturesStore } from "@/stores/features-store";
 
-function formatTimeRemaining(ms: number, t: TranslationKeys): string {
+export function formatTimeRemaining(ms: number, t: TranslationKeys, locale: string): string {
   if (ms < 60000) return t.features.lessThanMinute;
   const mins = Math.round(ms / 60000);
-  if (mins === 1) return t.features.oneMinuteLeft;
+  const rule = new Intl.PluralRules(locale).select(mins);
+  if (rule === "one") return format(t.features.oneMinuteLeft, { mins });
+  if (rule === "two") return format(t.features.minutesLeftTwo, { mins });
+  if (rule === "few") return format(t.features.minutesLeftFew, { mins });
   return format(t.features.minutesLeft, { mins });
 }
 
@@ -49,7 +54,7 @@ export function FeatureInstallPrompt({
   toolName,
   toolDescription,
 }: FeatureInstallPromptProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const {
     bundles,
     installBundle,
@@ -65,8 +70,8 @@ export function FeatureInstallPrompt({
   const isInstalling = !!progress;
   const isQueued = queued.includes(bundle.id);
   const startTime = startTimes[bundle.id] ?? null;
-  const displayName = toolName || bundle.name;
-  const displayDescription = toolDescription || bundle.description;
+  const displayName = toolName || bundleName(t, bundle);
+  const displayDescription = toolDescription || bundleDescription(t, bundle);
   const isRepair = bundle.status === "error";
   const requiredBundleIds = toolId ? getRequiredBundlesForTool(toolId) : [bundle.id];
   const requiredBundles = requiredBundleIds
@@ -119,7 +124,7 @@ export function FeatureInstallPrompt({
     // Install-prompt impression: the top of the AI-adoption funnel
     // (prompted -> ai_bundle_action install -> tool_used is_ai_tool). Non-admins
     // see a different "not enabled" message, not this prompt.
-    import("@/lib/analytics").then(({ track }) => {
+    withAnalytics(({ track }) => {
       track(ANALYTICS_EVENTS.AI_BUNDLE_PROMPTED, { bundle_id: bundle.id });
     });
   }, [bundle.id, bundle.status, isAdmin]);
@@ -130,7 +135,7 @@ export function FeatureInstallPrompt({
     const rate = progress.percent / elapsed;
     if (rate <= 0) return null;
     const remaining = (100 - progress.percent) / rate;
-    return formatTimeRemaining(remaining, t);
+    return formatTimeRemaining(remaining, t, locale);
   })();
 
   function handleInstall() {
@@ -196,7 +201,9 @@ export function FeatureInstallPrompt({
                 className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border last:border-b-0"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{candidate.name}</p>
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {bundleName(t, candidate)}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {candidate.downloadBytes
                       ? formatFileSize(candidate.downloadBytes)

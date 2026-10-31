@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter için güvenlik sıkılaştırma kılavuzu. Konteyner güvenliği, ağ yalıtımı, Docker secrets, Kubernetes dağıtımı ve uyumluluk yapıtları."
-i18n_source_hash: 9ff337fa0417
+i18n_source_hash: f37bcb6cc1c5
 i18n_provenance: machine
 i18n_output_hash: c4cee5b65715
 i18n_hash_version: 2

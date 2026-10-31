@@ -3,10 +3,12 @@ description: >-
   apt-get install with every network step bounded by a timeout. The runner's
   Azure apt mirror can degrade to kB/s and eat an entire job budget before
   tests start (#876); when an attempt stalls or fails, sources are switched
-  to the canonical Ubuntu archive and the install is retried once.
+  to the canonical Ubuntu archive and the install is retried. Downloaded .deb
+  archives are cached per runner image and package list (#1801), so a warm
+  cache installs without fetching packages, and even with the mirror down.
 inputs:
   packages:
-    description: Space-separated apt package list
+    description: Space-separated apt package names (real packages, not virtual ones)
     required: true
   update-timeout:
     description: Seconds allowed for each apt-get update attempt
@@ -19,10 +21,59 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: apt-get install (Azure mirror, then archive.ubuntu.com)
+    # The cache is scoped by runner image and package set, so every job asking
+    # for the same packages shares it (all four Integration shards do). Each
+    # save gets its own key and restores take the newest entry under the
+    # prefix, so a run that had to fetch an updated package saves a cache that
+    # includes it; runs that fetched nothing save nothing. A new image version
+    # falls back to the previous one's archives, and install.sh drops whatever
+    # no longer matches the index.
+    - name: Key the .deb archive cache
+      id: key
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
+      run: |
+        hash=$(printf '%s\n' $PACKAGES | sort -u | sha256sum | cut -c1-16)
+        prefix="apt-debs-v1-${ImageOS:-unknown}-${RUNNER_ARCH}-${hash}-"
+        image="${prefix}${ImageVersion:-unknown}-"
+        {
+          echo "prefix=${prefix}"
+          echo "image=${image}"
+          echo "key=${image}${RUN_KEY}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Restore cached .deb archives
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/apt-archives
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: |
+          ${{ steps.key.outputs.image }}
+          ${{ steps.key.outputs.prefix }}
+
+    - name: apt-get install (cache, Azure mirror, then archive.ubuntu.com)
+      id: install
       shell: bash
       env:
         PACKAGES: ${{ inputs.packages }}
         UPDATE_TIMEOUT: ${{ inputs.update-timeout }}
         INSTALL_TIMEOUT: ${{ inputs.install-timeout }}
+        APT_ARCHIVE_DIR: ${{ runner.temp }}/apt-archives
       run: bash "${{ github.action_path }}/install.sh"
+
+    # Composite steps stop at the first failure, so only a completed install
+    # is ever saved. When all four shards fetch the same thing, one save wins
+    # and the others log a warning. Branches other than main save only when
+    # nothing at all was restored: a PR restores main's entry, and a full
+    # copy per PR per upstream package update would crowd out other caches.
+    - name: Save .deb archives
+      if: >-
+        steps.install.outputs.fresh != '' && steps.install.outputs.fresh != '0' &&
+        (github.ref == 'refs/heads/main' || steps.restore.outputs.cache-matched-key == '')
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/apt-archives
+        key: ${{ steps.key.outputs.key }}

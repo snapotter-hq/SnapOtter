@@ -1,6 +1,6 @@
 ---
 description: "Ritaglio intelligente basato su soggetto, volti ed entropia che inquadra le immagini in modo intelligente usando Sharp e il rilevamento dei volti con IA."
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: f83f7a8ae90e
 ---

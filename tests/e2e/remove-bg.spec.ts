@@ -141,8 +141,9 @@ test.describe("Remove Background tool", () => {
     await skipIfFeatureNotInstalled(page);
     await uploadFile(page, fixturePath("test-portrait.jpg"));
 
-    // Select Ultra quality
+    // Select Ultra quality (unchecks Passport / ID photo so birefnet-hr-matting runs)
     await page.getByRole("button", { name: "Ultra" }).click();
+    await expect(page.locator("input[type='checkbox']").first()).not.toBeChecked();
 
     await removeBgAndWait(page);
     await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible();

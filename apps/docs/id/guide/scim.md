@@ -1,8 +1,8 @@
 ---
 description: "Siapkan provisioning SCIM 2.0 untuk menyinkronkan pengguna dan grup dari penyedia identitas Anda ke SnapOtter. Mencakup Okta, Azure AD / Entra ID, dan integrasi kustom."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: a8677d4dd025
+i18n_output_hash: 8528ca5885e0
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP mengirim lebih dari 1000 permintaan per menit. Ini biasanya terjadi selama s
 ### Pengguna di-deprovisioning tetapi tidak dihapus dari UI {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE adalah deaktivasi lunak. Pengguna yang dinonaktifkan tetap muncul dalam daftar pengguna admin dengan status dinonaktifkan. Ini disengaja agar data mereka tetap terjaga. Role mereka ditampilkan sebagai `disabled:<original-role>`.
+
+### Filter `externalId` tidak menemukan pengguna yang masuk dengan OIDC atau SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+Sebelum `externalId` milik SCIM memiliki kolom sendiri (`users.scim_external_id`), `PUT` atau `PATCH` SCIM pada pengguna yang sudah ditautkan oleh login OIDC atau SAML menulis id SCIM ke identitas login pengguna tersebut. Migrasi upgrade tidak dapat membedakan nilai itu dari subject OIDC atau NameID SAML yang asli, jadi pengguna tersebut dibiarkan. Bagi mereka, `filter=externalId eq "..."` tidak mengembalikan apa pun sampai IdP mengirim pembaruan lain yang membawa `externalId`.
+
+Jika Anda tidak ingin menunggu IdP, log audit dapat memastikan id tersebut. SCIM menulis baris `SCIM_USER_PROVISIONED` dengan `externalId` yang digunakan saat membuat setiap pengguna. Setelah Anda menjalankan rilis yang memiliki kolom `scim_external_id`, buka `psql` ke database SnapOtter ([panduan pemulihan akun](./account-recovery.md#older-images-and-fallbacks) menunjukkan caranya untuk kedua penyiapan) dan tinjau pengguna yang identitas login-nya masih sama dengan id tersebut:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Jika daftarnya terlihat benar, salin id ke kolom SCIM. Jalankan di dalam `BEGIN;` dan periksa baris yang dikembalikan sebelum `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Putaran kedua tidak mencocokkan apa pun. Pembaruan membiarkan `external_id` apa adanya, karena sebagian IdP (termasuk Okta) mengirim id yang sama sebagai `sub` OIDC dan `externalId` SCIM, dan bagi mereka menghapusnya akan merusak login OIDC. Pengguna yang `external_id`-nya memang id SCIM yang nyasar sudah gagal pada pencocokan subject. Dengan `OIDC_AUTO_LINK_USERS` (atau `SAML_AUTO_LINK_USERS`) aktif, login berikutnya dengan email terverifikasi akan menautkan ulang mereka.
+
+Sebagian pengguna tetap tidak terjangkau dan mendapatkan id itu kembali dari pembaruan IdP berikutnya:
+
+- pengguna yang tautan login-nya menggantikan id SCIM dan tidak menerima penulisan SCIM setelahnya, karena `external_id` mereka tidak lagi cocok dengan baris audit
+- pengguna yang baris audit provisioning-nya sudah dipangkas oleh retensi
+- pengguna yang `externalId`-nya diubah IdP setelah dibuat (baris pembaruan mencatat bidang mana yang berubah, bukan nilainya)
+- dua pengguna yang memegang id yang sama, yang dilewati kueri agar indeks unik tidak gagal; pratinjau tanpa klausa terakhirnya mencantumkan mereka, dan Anda yang memutuskan siapa pemilik id tersebut

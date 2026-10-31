@@ -9,24 +9,63 @@
  */
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
-import { FEATURE_BUNDLES, MODALITY_POOL, TOOLS } from "@snapotter/shared";
+import { extname } from "node:path";
+import {
+  FEATURE_BUNDLES,
+  hasServerErrorStatus,
+  isSafeMessageError,
+  MODALITY_POOL,
+  TOOLS,
+} from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { recordChildOutcome } from "../jobs/batch-progress.js";
+import { clearBatchCanceled, recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
-import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  type Pool,
+  parseClientJobIdField,
+  queueName,
+  type ToolJobData,
+  type ToolJobResult,
+} from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
-import { formatZodErrors } from "../lib/errors.js";
+import {
+  type BatchFault,
+  preFailureFaultFields,
+  reportEngineUnavailable,
+  sharedServerFault,
+} from "../lib/engine-unavailable.js";
+import { markQueueEventsJobFailure, markUpstreamError, reportError } from "../lib/error-report.js";
+import {
+  formatZodErrors,
+  friendlyError,
+  sharedFailureReason,
+  stripInternalPaths,
+} from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { deleteObject, getObjectStream, putObject } from "../lib/object-storage.js";
+import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
+import {
+  deleteObject,
+  getObjectStream,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
 import { prepareOcrIngressImage } from "../lib/ocr-image-input.js";
 import {
@@ -42,14 +81,23 @@ import {
   spoolMultipartFile,
   storeValidatedOcrPdf,
 } from "../lib/ocr-pdf-ingress.js";
+import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
-import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { settledFailureResponse } from "../lib/settled-failure.js";
+import { isStorableJson, toStorableJson } from "../lib/storable-json.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
+import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
-import { failBatchJob, updateJobProgress, updateSingleFileProgress } from "./progress.js";
+import {
+  clearTerminalReplayKey,
+  failBatchJob,
+  updateJobProgress,
+  updateSingleFileProgress,
+} from "./progress.js";
 import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
 
 /**
@@ -85,7 +133,7 @@ async function requirePipelineAccess(
 }
 
 /** Schema for a single pipeline step. */
-const pipelineStepSchema = z.object({
+export const pipelineStepSchema = z.object({
   toolId: z.string(),
   settings: z.record(z.unknown()).default({}),
 });
@@ -99,16 +147,26 @@ const stepsSchema =
         .max(env.MAX_PIPELINE_STEPS, "Pipeline exceeds maximum steps")
     : z.array(pipelineStepSchema).min(1, "Pipeline must have at least one step");
 
-const pipelineDefinitionSchema = z.object({
+export const pipelineDefinitionSchema = z.object({
   steps: stepsSchema,
 });
 
 /** Schema for saving a pipeline. */
-const savePipelineSchema = z.object({
+export const savePipelineSchema = z.object({
   name: z.string().min(1, "Pipeline name is required").max(100),
   description: z.string().max(500).optional(),
   steps: stepsSchema,
 });
+
+/** Resolve a pipeline step's toolId (routing resize with contentAware to content-aware-resize). */
+export function resolvePipelineStepToolId(step: {
+  toolId: string;
+  settings?: Record<string, unknown>;
+}): string {
+  return step.toolId === "resize" && step.settings?.contentAware
+    ? "content-aware-resize"
+    : step.toolId;
+}
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -159,6 +217,9 @@ function injectTraceContextIntoFlow(node: FlowJob): void {
 function buildPipelineFlowTree(opts: {
   jobId: string;
   userId: string | null;
+  username?: string;
+  requestIp?: string;
+  requestId?: string;
   parsedSteps: ParsedStep[];
   uploadKey: string;
   filename: string;
@@ -171,6 +232,9 @@ function buildPipelineFlowTree(opts: {
   const {
     jobId,
     userId,
+    username,
+    requestIp,
+    requestId,
     parsedSteps,
     uploadKey,
     filename,
@@ -252,6 +316,9 @@ function buildPipelineFlowTree(opts: {
       jobId,
       toolId: "pipeline",
       userId,
+      username,
+      requestIp,
+      requestId,
       pool: pipelinePool,
       totalSteps,
       clientJobId,
@@ -292,7 +359,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       return withRouteScratch("pipeline", async (scratchDir) => {
         const ingressAbort = new AbortController();
         const abortIngress = () => ingressAbort.abort();
-        let uncommittedOcrKey: string | undefined;
+        let uncommittedUploadKey: string | undefined;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
@@ -300,6 +367,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           let filename = "file";
           let pipelineRaw: string | null = null;
           let clientJobId: string | null = null;
+          let clientJobIdRaw: string | null = null;
 
           // Parse multipart
           try {
@@ -329,19 +397,26 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               } else if (part.fieldname === "pipeline") {
                 pipelineRaw = part.value as string;
               } else if (part.fieldname === "clientJobId") {
-                const raw = part.value as string;
-                if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-                  clientJobId = raw;
-                }
+                clientJobIdRaw = part.value as string;
               }
             }
           } catch (err) {
             const statusCode = ocrUploadErrorStatus(err);
+            if (statusCode === 413) {
+              const failure = multipartFailure(err);
+              return reply.status(failure.status).send(failure.body);
+            }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
+
+          const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+          if (clientJobIdField === null) {
+            return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+          }
+          clientJobId = clientJobIdField ?? null;
 
           if (!file || file.size === 0) {
             return reply.status(400).send({ error: "No file provided" });
@@ -357,111 +432,181 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             const violation = findOcrEncodedInputViolation([file.size], env.MAX_UPLOAD_SIZE_MB);
             if (violation) {
               return reply.status(413).send({
-                error: `OCR pipeline input exceeds the ${violation.limitBytes} byte ${violation.scope} safety limit`,
+                error: `OCR pipeline input exceeds the ${formatLimit(violation.limitBytes)} ${violation.scope} safety limit`,
               });
             }
           }
           const inputModality = TOOLS.find((t) => t.id === firstToolId)?.modality ?? "image";
           if (firstToolId !== "ocr-pdf") {
-            processBuffer = await readFile(file.path);
-            await rm(file.path, { force: true });
-          }
-          const preprocessingReply =
-            firstToolId === "ocr-pdf"
-              ? undefined
-              : await (async () => {
-                  if (!processBuffer) throw new Error("Pipeline input buffer is unavailable");
-                  if (inputModality === "image" && firstToolId === "ocr") {
-                    try {
-                      const prepared = await prepareOcrIngressImage(
-                        processBuffer,
-                        filename,
-                        scratchDir,
-                      );
-                      processBuffer = prepared.buffer;
-                      filename = prepared.filename;
-                    } catch (err) {
-                      if (err instanceof InputValidationError) {
-                        const body: Record<string, string> = { error: err.message };
-                        if (err.details) body.details = err.details;
-                        return reply.status(err.statusCode).send(body);
-                      }
-                      throw err;
-                    }
-                  } else if (inputModality === "image") {
-                    // Validate the initial image
-                    const validation = await validateImageBuffer(processBuffer, filename);
-                    if (!validation.valid) {
-                      return reply.status(400).send({
-                        error: `Invalid image: ${validation.reason}`,
-                      });
-                    }
+            try {
+              processBuffer = await readFile(file.path).catch((err: unknown) => {
+                throw asDecoderOutOfMemory(err);
+              });
+            } finally {
+              await rm(file.path, { force: true }).catch(() => {});
+            }
+            if (inputModality === "image" && firstToolId === "ocr") {
+              try {
+                const prepared = await prepareOcrIngressImage(processBuffer, filename, scratchDir);
+                processBuffer = prepared.buffer;
+                filename = prepared.filename;
+              } catch (err) {
+                if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: err.message };
+                  if (err.details) body.details = err.details;
+                  if (err.code) body.code = err.code;
+                  return reply.status(err.statusCode).send(body);
+                }
+                throw err;
+              }
+            } else if (inputModality === "image") {
+              // Validate the initial image
+              let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+              try {
+                validation = await validateImageBuffer(processBuffer, filename);
+              } catch (rawErr) {
+                const err = asDecoderOutOfMemory(rawErr);
+                if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                  const unavailable = engineUnavailable(err);
+                  reportEngineUnavailable(unavailable, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: unavailable.message };
+                  if (unavailable.details) body.details = unavailable.details;
+                  if (unavailable.code) body.code = unavailable.code;
+                  return reply.status(unavailable.statusCode).send(body);
+                }
+                throw rawErr;
+              }
+              if (!validation.valid) {
+                return reply.status(400).send({
+                  error: `Invalid image: ${validation.reason}`,
+                });
+              }
 
-                    // Decode HEIC/HEIF input via system heif-dec
-                    if (validation.format === "heif") {
-                      try {
-                        processBuffer = await decodeHeic(processBuffer);
-                        const ext = filename.match(/\.[^.]+$/)?.[0];
-                        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (err) {
-                        return reply.status(422).send({
-                          error:
-                            "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-                          details: err instanceof Error ? err.message : String(err),
-                        });
-                      }
-                    }
+              // Decode HEIC/HEIF input via system heif-dec
+              if (validation.format === "heif") {
+                try {
+                  processBuffer = await decodeHeic(processBuffer);
+                  const ext = filename.match(/\.[^.]+$/)?.[0];
+                  if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+                } catch (rawErr) {
+                  const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+                  return reply.status(422).send({
+                    error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+                    details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+                  });
+                }
+              }
 
-                    // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-                    if (needsCliDecode(validation.format)) {
-                      try {
-                        const fileExt = filename.split(".").pop()?.toLowerCase();
-                        processBuffer = await decodeToSharpCompat(
-                          processBuffer,
-                          validation.format,
-                          fileExt,
-                        );
-                        const ext = filename.match(/\.[^.]+$/)?.[0];
-                        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (err) {
-                        return reply.status(422).send({
-                          error: `Failed to decode ${validation.format} file`,
-                          details: err instanceof Error ? err.message : String(err),
-                        });
-                      }
-                    }
-
-                    // Sanitize SVG input and normalize EXIF orientation
-                    const isSvg = isSvgBuffer(processBuffer);
-                    if (isSvg) {
-                      processBuffer = sanitizeSvg(processBuffer);
-                    } else {
-                      processBuffer = await autoOrient(processBuffer);
-                    }
-                  } else {
-                    // Non-image input: validate/decode via the tool's modality handler.
-                    try {
-                      const prepared = await inputHandlerFor(inputModality).prepare(
-                        processBuffer,
-                        filename,
-                        {
-                          scratchDir,
-                          lenient: getToolConfig(firstToolId ?? "")?.skipStructuralValidation,
-                        },
-                      );
-                      processBuffer = prepared.buffer;
-                      filename = prepared.filename;
-                    } catch (err) {
-                      if (err instanceof InputValidationError) {
-                        const body: Record<string, string> = { error: err.message };
-                        if (err.details) body.details = err.details;
-                        return reply.status(err.statusCode).send(body);
-                      }
-                      throw err;
-                    }
+              // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+              let fallbackFormat: string | undefined;
+              if (needsCliDecode(validation.format)) {
+                try {
+                  const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+                  processBuffer = await decodeToSharpCompat(
+                    processBuffer,
+                    validation.format,
+                    fileExt,
+                  );
+                  const ext = filename.match(/\.[^.]+$/)?.[0];
+                  if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+                } catch (rawDecodeErr) {
+                  const decodeErr = normalizeOperationalWriteError(
+                    asDecoderOutOfMemory(rawDecodeErr),
+                  );
+                  if (
+                    decodeErr instanceof DecoderOutOfMemoryError ||
+                    (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                  ) {
+                    throw decodeErr;
                   }
-                })();
-          if (preprocessingReply) return preprocessingReply;
+                  try {
+                    const meta = await sharp(processBuffer).metadata();
+                    fallbackFormat = meta.format;
+                    if (fallbackFormat !== "svg") {
+                      await sharp(processBuffer).resize(1).raw().toBuffer();
+                    }
+                  } catch (rawProbeErr) {
+                    const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                    if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+                    if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                      throw decodeErr;
+                    }
+                    request.log.warn({ err: decodeErr, toolId: "pipeline" }, "Decode failed");
+                    return reply.status(422).send({
+                      error: `Failed to decode ${validation.format} file`,
+                      details: stripInternalPaths(
+                        decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                      ),
+                    });
+                  }
+                }
+              }
+
+              // Sanitize SVG input and normalize EXIF orientation
+              if (validation.format === "svg" || fallbackFormat === "svg") {
+                try {
+                  processBuffer = decompressSvgz(processBuffer);
+                  processBuffer = sanitizeSvg(processBuffer);
+                } catch (err) {
+                  if (isSvgClientError(err)) {
+                    return reply.status(400).send({
+                      error: err instanceof Error ? err.message : "Invalid SVG",
+                    });
+                  }
+                  const oom = asDecoderOutOfMemory(err);
+                  if (oom instanceof DecoderOutOfMemoryError) {
+                    const unavailable = engineUnavailable(oom);
+                    reportEngineUnavailable(unavailable, firstToolId ?? "pipeline", request.log);
+                    const body: Record<string, string> = { error: unavailable.message };
+                    if (unavailable.details) body.details = unavailable.details;
+                    if (unavailable.code) body.code = unavailable.code;
+                    return reply.status(unavailable.statusCode).send(body);
+                  }
+                  throw err;
+                }
+              } else {
+                try {
+                  processBuffer = await autoOrient(processBuffer);
+                } catch (rawErr) {
+                  const err = asDecoderOutOfMemory(rawErr);
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                    const unavailable = engineUnavailable(err);
+                    reportEngineUnavailable(unavailable, firstToolId ?? "pipeline", request.log);
+                    const body: Record<string, string> = { error: unavailable.message };
+                    if (unavailable.details) body.details = unavailable.details;
+                    if (unavailable.code) body.code = unavailable.code;
+                    return reply.status(unavailable.statusCode).send(body);
+                  }
+                  throw rawErr;
+                }
+              }
+            } else {
+              // Non-image input: validate/decode via the tool's modality handler.
+              try {
+                const prepared = await inputHandlerFor(inputModality).prepare(
+                  processBuffer,
+                  filename,
+                  {
+                    scratchDir,
+                    lenient: getToolConfig(firstToolId ?? "")?.skipStructuralValidation,
+                  },
+                );
+                processBuffer = prepared.buffer;
+                filename = prepared.filename;
+              } catch (err) {
+                if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: err.message };
+                  if (err.details) body.details = err.details;
+                  if (err.code) body.code = err.code;
+                  return reply.status(err.statusCode).send(body);
+                }
+                throw err;
+              }
+            }
+          }
 
           // Parse and validate the pipeline definition
           if (!pipelineRaw) {
@@ -490,10 +635,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             const step = pipeline.steps[i];
 
             // Route content-aware resize to its dedicated tool
-            const resolvedToolId =
-              step.toolId === "resize" && step.settings?.contentAware
-                ? "content-aware-resize"
-                : step.toolId;
+            const resolvedToolId = resolvePipelineStepToolId(step);
 
             const toolConfig = getToolConfig(resolvedToolId);
             if (!toolConfig) {
@@ -509,7 +651,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
             if (PASSWORD_TOOLS.has(step.toolId)) {
               return reply.status(400).send({
-                error: `Step ${i + 1}: This tool cannot be used in pipelines because it requires a password`,
+                error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
               });
             }
 
@@ -591,19 +733,18 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
                 signal: ingressAbort.signal,
               });
-              uncommittedOcrKey = uploadKey;
+              uncommittedUploadKey = uploadKey;
             } catch (err) {
               if (err instanceof InputValidationError) {
+                reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
                 const body: Record<string, string> = { error: err.message };
                 if (err.details) body.details = err.details;
+                if (err.code) body.code = err.code;
                 return reply.status(err.statusCode).send(body);
               }
-              const statusCode = ocrUploadErrorStatus(err);
-              if (statusCode === 413 || statusCode === 503) {
-                return reply.status(statusCode).send({
-                  error: ocrUploadErrorMessage(statusCode),
-                  details: err instanceof Error ? err.message : String(err),
-                });
+              if (ocrUploadErrorStatus(err) === 413) {
+                const failure = multipartFailure(err);
+                return reply.status(failure.status).send(failure.body);
               }
               throw err;
             } finally {
@@ -612,6 +753,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           } else {
             if (!processBuffer) throw new Error("Pipeline input buffer is unavailable");
             await putObject(uploadKey, processBuffer);
+            uncommittedUploadKey = uploadKey;
           }
 
           // Derive the pipeline's pool from the first step's modality so the
@@ -635,6 +777,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // authorization. A foreign or pre-#771 ownerless row is left
             // alone, the old lazy-create semantics, with no 409 so the
             // response cannot become an id-existence oracle.
+            const isRepoint = sql`${schema.jobs.settings}->>'pipelineFlowId' is distinct from ${jobId}`;
             const aliasRes = await db
               .insert(schema.jobs)
               .values({
@@ -652,20 +795,47 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 // batch parent or tool artifact the same user owns must
                 // keep its own cancel metadata (batch parent ids ARE
                 // client-supplied, so that collision is reachable).
-                set: { settings: { pipelineFlowId: jobId } },
+                // Reset terminal columns when the flow pointer changes (#2650,
+                // mirroring upsertToolJobAlias in #886) so a reused channel
+                // accepts nonterminal progress, cancel, and finalize writes.
+                set: {
+                  settings: { pipelineFlowId: jobId },
+                  pool: pipelinePool,
+                  createdAt: sql`CASE WHEN ${isRepoint} THEN now() ELSE ${schema.jobs.createdAt} END`,
+                  status: sql`CASE WHEN ${isRepoint} THEN 'queued' ELSE ${schema.jobs.status} END`,
+                  completedAt: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.completedAt} END`,
+                  error: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.error} END`,
+                  progress: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.progress} END`,
+                },
                 setWhere: and(eq(schema.jobs.type, "single"), eq(schema.jobs.userId, userId)),
               });
             if (((aliasRes as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
               // The claim was skipped (foreign owner or non-alias
-              // collision). The run proceeds, but its starter cannot
-              // cancel through this id; make that debuggable instead of a
-              // silent 404 months later.
+              // collision). Fall back to the server flow id so this run
+              // never publishes or persists on a channel it does not own
+              // (#895); its starter cannot cancel through clientJobId, so
+              // log the refusal instead of leaving a silent 404 later.
               request.log.warn(
                 { clientJobId, pipelineFlowId: jobId },
-                "pipeline alias claim skipped; cancel by this id will not resolve",
+                "pipeline alias claim skipped; progress and cancel fell back to the flow id",
               );
+              clientJobId = null;
             }
+          }
 
+          if (clientJobId) {
+            await clearBatchCanceled(clientJobId).catch((err) => {
+              request.log.warn(
+                { err, clientJobId, pipelineFlowId: jobId },
+                "failed to clear batch cancel flag for pipeline alias",
+              );
+            });
+            await clearTerminalReplayKey(clientJobId).catch((err) => {
+              request.log.warn(
+                { err, clientJobId, pipelineFlowId: jobId },
+                "failed to clear terminal replay key for pipeline alias",
+              );
+            });
             // Report initial progress. Awaited: this write settles the
             // client-facing row the SSE replays, which is the evidence a
             // degraded client's fresh connection relies on (#766). Dropped
@@ -683,6 +853,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           const { tree, stepJobIds } = buildPipelineFlowTree({
             jobId,
             userId,
+            username: authUser.username,
+            requestIp: request.ip,
+            requestId: request.id,
             parsedSteps,
             uploadKey,
             filename,
@@ -703,7 +876,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               type: "pipeline-step",
               status: "queued",
               inputRefs: i === 0 ? [uploadKey] : [],
-              settings: parsedSteps[i].parsedSettings as Record<string, unknown>,
+              settings: toStorableJson(parsedSteps[i].parsedSettings as Record<string, unknown>),
             });
           }
 
@@ -714,7 +887,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             pool: pipelinePool,
             type: "pipeline",
             status: "queued",
-            inputRefs: [],
+            inputRefs: [uploadKey],
             // Cancel metadata (#771): requestCancel keys the cooperative
             // flag by clientJobId (the id the steps carry) and publishes
             // stepCount step ids for the active abort.
@@ -725,50 +898,108 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           injectTraceContextIntoFlow(tree);
 
           // Add the flow to BullMQ
-          await getFlowProducer().add(tree);
-          uncommittedOcrKey = undefined;
-
-          // Wait for the finalize job (pipelines block to completion)
           try {
-            const result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
-
-            if (!result) {
-              // The flow keeps running and the finalize's terminal single
-              // frame carries the full result; the client rides the SSE to
-              // it instead of being told the run failed (#766).
-              return reply.status(202).send({ jobId: clientJobId ?? jobId, async: true });
-            }
-
-            // Check for step failure reported by the finalize handler. A
-            // canceled run keeps the same 422 shape plus the structural
-            // marker the web client settles on (#771), mirroring batch.ts.
-            if (result.resultPayload?.error) {
-              return reply.status(422).send({
-                error: result.resultPayload.error as string,
-                completedSteps: result.resultPayload.steps,
-                ...(result.resultPayload.canceled === true ? { canceled: true } : {}),
-              });
-            }
-
-            return reply.send({
-              jobId,
-              downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
-              previewUrl: result.previewRef
-                ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
-                : undefined,
-              originalSize,
-              processedSize: result.processedSize,
-              stepsCompleted: result.resultPayload?.stepsCompleted ?? parsedSteps.length,
-              steps: result.resultPayload?.steps ?? [],
-            });
+            await getFlowProducer().add(tree);
           } catch (err) {
-            return reply.status(422).send({
-              error: err instanceof Error ? err.message : "Pipeline processing failed",
+            throw markUpstreamError(err);
+          }
+          uncommittedUploadKey = undefined;
+
+          // Wait for the finalize job (pipelines block to completion). When the
+          // finalize settled the row with a status-bearing fault (a 503 storage
+          // failure during output copy), answer from the row like tool-factory
+          // does (#3479); any other rejection (Redis down, a crashed finalize)
+          // reaches the error handler, which masks it, logs it and reports it
+          // (#2179).
+          let result: ToolJobResult | null;
+          try {
+            result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
+          } catch (err) {
+            const failure = await db
+              .select({ error: schema.jobs.error })
+              .from(schema.jobs)
+              .where(eq(schema.jobs.id, jobId))
+              .then((rows) => rows[0]?.error ?? null)
+              .catch((readErr) => {
+                request.log.warn({ err: readErr, jobId }, "failed pipeline job row read failed");
+                void reportError(markUpstreamError(readErr), {
+                  source: "http",
+                  route: request.routeOptions?.url,
+                  method: request.method,
+                  jobId,
+                });
+                return null;
+              });
+            if (typeof failure?.httpStatus === "number" && failure.httpStatus >= 500) {
+              request.log.error(
+                { err, toolId: "pipeline", jobId, code: failure.code },
+                "pipeline finalize failed on a server fault",
+              );
+              const body: Record<string, unknown> = { error: failure.message };
+              if (failure.details !== undefined) body.details = failure.details;
+              if (failure.code) body.code = failure.code;
+              return reply.status(failure.httpStatus).send(body);
+            }
+            throw markQueueEventsJobFailure(err);
+          }
+
+          if (!result) {
+            // The flow keeps running and the finalize's terminal single
+            // frame carries the full result; the client rides the SSE to
+            // it instead of being told the run failed (#766).
+            return reply.status(202).send({ jobId: clientJobId ?? jobId, async: true });
+          }
+
+          // Check for step failure reported by the finalize handler. A
+          // canceled run keeps the same 422 shape plus the structural
+          // marker the web client settles on (#771), mirroring batch.ts.
+          if (result.resultPayload?.error) {
+            // A step that failed on a server fault the worker recorded a
+            // status for (an engine that broke between upload and the worker)
+            // answers with that status, code and hint, as the single-file
+            // tool route does (#1742). Anything else stays the client's 422
+            // (#2179).
+            const { httpStatus, code, details } = result.resultPayload as {
+              httpStatus?: number;
+              code?: string;
+              details?: string;
+            };
+            const serverFault =
+              typeof httpStatus === "number" && httpStatus >= 500 && httpStatus < 600;
+            if (serverFault) {
+              request.log.error(
+                { toolId: "pipeline", jobId, code },
+                "pipeline step failed on a server fault",
+              );
+            }
+            return reply.status(serverFault ? httpStatus : 422).send({
+              error: result.resultPayload.error as string,
+              ...(serverFault && code ? { code } : {}),
+              ...(serverFault && details ? { details } : {}),
+              completedSteps: result.resultPayload.steps,
+              ...(result.resultPayload.canceled === true ? { canceled: true } : {}),
             });
           }
+
+          return reply.send({
+            jobId,
+            downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+            previewUrl: result.previewRef
+              ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
+              : undefined,
+            originalSize,
+            processedSize: result.processedSize,
+            stepsCompleted: result.resultPayload?.stepsCompleted ?? parsedSteps.length,
+            steps: result.resultPayload?.steps ?? [],
+          });
         } finally {
           request.raw.removeListener("aborted", abortIngress);
-          if (uncommittedOcrKey) await deleteObject(uncommittedOcrKey).catch(() => {});
+          if (uncommittedUploadKey) {
+            const key = uncommittedUploadKey;
+            await deleteObject(key).catch((cleanupErr) => {
+              request.log.warn({ err: cleanupErr, key }, "pipeline ingress cleanup failed");
+            });
+          }
         }
       });
     },
@@ -801,39 +1032,44 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
       const { name, description, steps } = result.data;
 
+      if (!isStorableJson({ name, description, steps })) {
+        return reply.status(400).send({
+          error: "A pipeline can't contain NUL characters or unpaired surrogates",
+          code: "VALIDATION_ERROR",
+        });
+      }
+
       // Validate all tool IDs exist
       for (let i = 0; i < steps.length; i++) {
-        if (PASSWORD_TOOLS.has(steps[i].toolId)) {
-          return reply.status(400).send({
-            error: `This tool cannot be used in saved pipelines because it requires a password`,
-          });
-        }
-        const toolConfig = getToolConfig(steps[i].toolId);
+        const step = steps[i];
+        const resolvedToolId = resolvePipelineStepToolId(step);
+        const toolConfig = getToolConfig(resolvedToolId);
         if (!toolConfig) {
           return reply.status(400).send({
-            error: `Step ${i + 1}: Tool "${steps[i].toolId}" not found`,
+            error: `Step ${i + 1} (${step.toolId}): Tool not found or not available`,
           });
         }
-        if (!(await hasEffectiveToolAccess(user, steps[i].toolId))) {
+        if (!(await hasEffectiveToolAccess(user, resolvedToolId))) {
           return reply.status(403).send({
-            error: `Step ${i + 1}: You don't have permission to use this tool`,
+            error: `Step ${i + 1} (${step.toolId}): You don't have permission to use this tool`,
+          });
+        }
+        if (PASSWORD_TOOLS.has(step.toolId)) {
+          return reply.status(400).send({
+            error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
           });
         }
       }
 
       const id = randomUUID();
 
-      try {
-        await db.insert(schema.pipelines).values({
-          id,
-          userId: user.id,
-          name,
-          description: description ?? null,
-          steps,
-        });
-      } catch {
-        return reply.status(409).send({ error: "Failed to save pipeline" });
-      }
+      await db.insert(schema.pipelines).values({
+        id,
+        userId: user.id,
+        name,
+        description: description ?? null,
+        steps,
+      });
 
       return reply.status(201).send({
         id,
@@ -944,6 +1180,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         const ingressAbort = new AbortController();
         const abortIngress = () => ingressAbort.abort();
         const uncommittedOcrKeys = new Set<string>();
+        let stagedBatch: {
+          parentId: string;
+          totalFiles: number;
+          childIds: string[];
+          preFailures: Array<{ filename: string; error: string }>;
+        } | null = null;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
@@ -951,6 +1193,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           const files: SpooledMultipartFile[] = [];
           let pipelineRaw: string | null = null;
           let clientJobId: string | null = null;
+          let clientJobIdRaw: string | null = null;
           let filePartIndex = 0;
           let totalStagedBytes = 0;
 
@@ -969,35 +1212,83 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   knownFirstToolId === "ocr-pdf"
                     ? resolveOcrUploadLimits(env.MAX_UPLOAD_SIZE_MB)
                     : undefined;
+                const configuredMaxBytes = configuredUploadLimit(env.MAX_UPLOAD_SIZE_MB);
+                const fileMaxBytes =
+                  configuredMaxBytes !== undefined && knownOcrLimits !== undefined
+                    ? Math.min(configuredMaxBytes, knownOcrLimits.fileBytes)
+                    : (configuredMaxBytes ?? knownOcrLimits?.fileBytes);
                 const remainingAggregate =
-                  (knownOcrLimits?.aggregateBytes ?? Number.MAX_SAFE_INTEGER) - totalStagedBytes;
-                const file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
-                  maxBytes: Math.min(
-                    configuredUploadLimit(env.MAX_UPLOAD_SIZE_MB) ?? Number.MAX_SAFE_INTEGER,
-                    knownOcrLimits?.fileBytes ?? Number.MAX_SAFE_INTEGER,
-                    Math.max(0, remainingAggregate),
-                  ),
-                  signal: ingressAbort.signal,
-                });
-                if (file.size > 0) files.push(file);
+                  knownOcrLimits !== undefined
+                    ? Math.max(0, knownOcrLimits.aggregateBytes - totalStagedBytes)
+                    : undefined;
+                const partMaxBytes =
+                  fileMaxBytes !== undefined && remainingAggregate !== undefined
+                    ? Math.min(fileMaxBytes, remainingAggregate)
+                    : (fileMaxBytes ?? remainingAggregate);
+                let file: SpooledMultipartFile;
+                try {
+                  file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
+                    maxBytes: partMaxBytes,
+                    signal: ingressAbort.signal,
+                  });
+                } catch (spoolErr) {
+                  if (
+                    knownOcrLimits !== undefined &&
+                    remainingAggregate !== undefined &&
+                    (fileMaxBytes === undefined || remainingAggregate < fileMaxBytes) &&
+                    (spoolErr as { statusCode?: unknown })?.statusCode === 413 &&
+                    (spoolErr as { limitBytes?: unknown })?.limitBytes === remainingAggregate
+                  ) {
+                    throw new InputValidationError(
+                      `OCR pipeline input exceeds the ${formatLimit(knownOcrLimits.aggregateBytes)} aggregate safety limit`,
+                      413,
+                    );
+                  }
+                  throw spoolErr;
+                }
                 totalStagedBytes += file.size;
+                if (
+                  knownOcrLimits !== undefined &&
+                  totalStagedBytes > knownOcrLimits.aggregateBytes
+                ) {
+                  throw new InputValidationError(
+                    `OCR pipeline input exceeds the ${formatLimit(knownOcrLimits.aggregateBytes)} aggregate safety limit`,
+                    413,
+                  );
+                }
+                // Empty parts keep their slot: the client maps results back
+                // onto its own file list by index, so dropping one here
+                // would label a converted file with a different file's name
+                // (issue #2684, mirroring #645). They fail in place in the
+                // loop below.
+                files.push(file);
                 filePartIndex++;
               } else if (part.fieldname === "pipeline") {
                 pipelineRaw = part.value as string;
               } else if (part.fieldname === "clientJobId") {
-                const raw = part.value as string;
-                if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-                  clientJobId = raw;
-                }
+                clientJobIdRaw = part.value as string;
               }
             }
           } catch (err) {
+            if (err instanceof InputValidationError) {
+              return reply.status(err.statusCode).send({ error: err.message });
+            }
             const statusCode = ocrUploadErrorStatus(err);
+            if (statusCode === 413) {
+              const failure = multipartFailure(err);
+              return reply.status(failure.status).send(failure.body);
+            }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
+
+          const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+          if (clientJobIdField === null) {
+            return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+          }
+          clientJobId = clientJobIdField ?? null;
 
           if (files.length === 0) {
             return reply.status(400).send({ error: "No files provided" });
@@ -1036,15 +1327,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           for (let i = 0; i < pipeline.steps.length; i++) {
             const step = pipeline.steps[i];
 
-            const resolvedToolId =
-              step.toolId === "resize" && step.settings?.contentAware
-                ? "content-aware-resize"
-                : step.toolId;
+            const resolvedToolId = resolvePipelineStepToolId(step);
 
             const toolConfig = getToolConfig(resolvedToolId);
             if (!toolConfig) {
               return reply.status(400).send({
-                error: `Step ${i + 1}: Tool "${step.toolId}" not found`,
+                error: `Step ${i + 1} (${step.toolId}): Tool not found or not available`,
               });
             }
             if (!(await hasEffectiveToolAccess(authUser, resolvedToolId))) {
@@ -1055,7 +1343,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
             if (PASSWORD_TOOLS.has(step.toolId)) {
               return reply.status(400).send({
-                error: `Step ${i + 1}: This tool cannot be used in pipelines because it requires a password`,
+                error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
               });
             }
 
@@ -1131,7 +1419,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             );
             if (violation) {
               return reply.status(413).send({
-                error: `OCR pipeline input exceeds the ${violation.limitBytes} byte ${violation.scope} safety limit`,
+                error: `OCR pipeline input exceeds the ${formatLimit(violation.limitBytes)} ${violation.scope} safety limit`,
               });
             }
           }
@@ -1141,19 +1429,60 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           const userId = authUser.id;
 
           // Insert batch-finalize row BEFORE updateJobProgress to avoid
-          // a duplicate-key race with the progress persist layer.
-          await db.insert(schema.jobs).values({
-            id: parentId,
-            userId,
-            toolId: "pipeline-batch",
-            pool: "system",
-            type: "batch",
-            status: "queued",
-            inputRefs: [],
-            // stepCount from the first write (#771): a cancel landing while
-            // files are still validating resolves through this row.
-            settings: { flowChildCount: 0, stepCount: parsedSteps.length },
-          });
+          // a duplicate-key race with the progress persist layer. A
+          // clientJobId that is already taken fails on the primary key: the
+          // client's mistake, answered before anything is staged (#1689).
+          try {
+            await db.insert(schema.jobs).values({
+              id: parentId,
+              userId,
+              toolId: "pipeline-batch",
+              pool: "system",
+              type: "batch",
+              status: "queued",
+              inputRefs: [],
+              // stepCount from the first write (#771): a cancel landing while
+              // files are still validating resolves through this row.
+              settings: { flowChildCount: 0, stepCount: parsedSteps.length },
+            });
+          } catch (err) {
+            if (isUniqueViolation(err)) {
+              // The owner resending the same batch (a browser retrying a POST
+              // whose response it gave up on) attaches to the run already
+              // going: a 409 would fail a batch that finishes fine, while 202
+              // sends the client to the SSE and its durable result (#4139,
+              // as the tool batch route does for #2015). Another user's id
+              // stays a conflict.
+              const [existing] = await db
+                .select({
+                  userId: schema.jobs.userId,
+                  toolId: schema.jobs.toolId,
+                  type: schema.jobs.type,
+                })
+                .from(schema.jobs)
+                .where(eq(schema.jobs.id, parentId))
+                .limit(1);
+              if (
+                existing &&
+                existing.type === "batch" &&
+                existing.toolId === "pipeline-batch" &&
+                existing.userId === userId
+              ) {
+                return reply.status(202).send({ jobId: parentId, async: true });
+              }
+              return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+            }
+            throw err;
+          }
+          const preFailures: Array<{
+            originalIndex: number;
+            filename: string;
+            error: string;
+            statusCode?: number;
+            code?: string;
+            details?: string;
+          }> = [];
+          stagedBatch = { parentId, totalFiles: files.length, childIds: [], preFailures };
 
           // Emit initial batch progress
           updateJobProgress({
@@ -1167,7 +1496,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           // Validate, decode, and upload each file; build per-file pipeline chains
           const perFileChildren: FlowJob[] = [];
-          const preFailures: Array<{ originalIndex: number; filename: string; error: string }> = [];
           // Flow index -> original upload index, consumed by batch-finalize so
           // fileResults keeps index alignment across pre-failures.
           const fileIndexMap: number[] = [];
@@ -1177,7 +1505,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // audio, video, and document pipelines are not rejected by the image
           // validator.
           const batchModality =
-            TOOLS.find((t) => t.id === pipeline.steps[0]?.toolId)?.modality ?? "image";
+            TOOLS.find((t) => t.id === parsedSteps[0]?.resolvedToolId)?.modality ?? "image";
           const batchPipelinePool: Pool = MODALITY_POOL[batchModality];
           const pathBackedOcrPdf = parsedSteps[0]?.resolvedToolId === "ocr-pdf";
           for (let fi = 0; fi < files.length; fi++) {
@@ -1185,20 +1513,88 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             let processFilename = file.filename;
             const perFileJobId = `${parentId}-f${flowChildIndex}`;
             let uploadKey = `uploads/${perFileJobId}-s0/${processFilename}`;
+            let perFileTree: FlowJob | undefined;
+
+            // Reported against the slot it arrived in, so every later result
+            // stays paired with the file it came from.
+            if (file.size === 0) {
+              preFailures.push({
+                originalIndex: fi,
+                filename: file.filename,
+                error: "File is empty",
+              });
+              await rm(file.path, { force: true }).catch(() => {});
+              continue;
+            }
+
+            // Insert step + finalize rows before writing the object so a child
+            // or step id collision never overwrites or deletes an existing
+            // job's upload (#1724).
+            const insertFileRows = async (finalUploadKey: string, finalFilename: string) => {
+              const built = buildPipelineFlowTree({
+                jobId: perFileJobId,
+                userId,
+                parsedSteps,
+                uploadKey: finalUploadKey,
+                filename: finalFilename,
+                pipelinePool: batchPipelinePool,
+                parentId,
+                totalFiles: files.length,
+                analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+              });
+              perFileTree = built.tree;
+
+              for (let si = 0; si < parsedSteps.length; si++) {
+                await db.insert(schema.jobs).values({
+                  id: built.stepJobIds[si],
+                  userId,
+                  toolId: parsedSteps[si].resolvedToolId,
+                  pool: parsedSteps[si].pool,
+                  type: "pipeline-step",
+                  status: "queued",
+                  inputRefs: si === 0 ? [finalUploadKey] : [],
+                  settings: toStorableJson(
+                    parsedSteps[si].parsedSettings as Record<string, unknown>,
+                  ),
+                });
+                stagedBatch?.childIds.push(built.stepJobIds[si]);
+              }
+
+              await db.insert(schema.jobs).values({
+                id: perFileJobId,
+                userId,
+                toolId: "pipeline",
+                pool: batchPipelinePool,
+                type: "pipeline-finalize",
+                status: "queued",
+                inputRefs: [finalUploadKey],
+                settings: {},
+              });
+              stagedBatch?.childIds.push(perFileJobId);
+            };
 
             if (pathBackedOcrPdf) {
               try {
                 await storeValidatedOcrPdf(file, uploadKey, {
                   maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
                   signal: ingressAbort.signal,
+                  beforeStore: async () => {
+                    await insertFileRows(uploadKey, processFilename);
+                  },
                 });
                 uncommittedOcrKeys.add(uploadKey);
               } catch (err) {
                 if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(
+                    err,
+                    parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                    request.log,
+                  );
                   preFailures.push({
                     originalIndex: fi,
                     filename: file.filename,
                     error: err.message,
+                    ...preFailureFaultFields(err),
                   });
                   continue;
                 }
@@ -1207,8 +1603,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 await rm(file.path, { force: true }).catch(() => {});
               }
             } else {
-              let processBuffer: Buffer = await readFile(file.path);
-              await rm(file.path, { force: true }).catch(() => {});
+              let processBuffer: Buffer;
+              try {
+                processBuffer = await readFile(file.path).catch((err: unknown) => {
+                  throw asDecoderOutOfMemory(err);
+                });
+              } finally {
+                await rm(file.path, { force: true }).catch(() => {});
+              }
               if (batchModality === "image" && parsedSteps[0]?.resolvedToolId === "ocr") {
                 try {
                   const prepared = await prepareOcrIngressImage(
@@ -1220,17 +1622,44 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(
+                      err,
+                      parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                      request.log,
+                    );
                     preFailures.push({
                       originalIndex: fi,
                       filename: file.filename,
                       error: err.message,
+                      ...preFailureFaultFields(err),
                     });
                     continue;
                   }
                   throw err;
                 }
               } else if (batchModality === "image") {
-                const fileValidation = await validateImageBuffer(processBuffer, processFilename);
+                let fileValidation: Awaited<ReturnType<typeof validateImageBuffer>>;
+                try {
+                  fileValidation = await validateImageBuffer(processBuffer, processFilename);
+                } catch (rawErr) {
+                  const err = asDecoderOutOfMemory(rawErr);
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                    const unavailable = engineUnavailable(err);
+                    reportEngineUnavailable(
+                      unavailable,
+                      parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                      request.log,
+                    );
+                    preFailures.push({
+                      originalIndex: fi,
+                      filename: file.filename,
+                      error: unavailable.message,
+                      ...preFailureFaultFields(unavailable),
+                    });
+                    continue;
+                  }
+                  throw rawErr;
+                }
                 if (!fileValidation.valid) {
                   preFailures.push({
                     originalIndex: fi,
@@ -1245,7 +1674,23 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     processBuffer = await decodeHeic(processBuffer);
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch {
+                  } catch (rawErr) {
+                    const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                      const unavailable = engineUnavailable(err);
+                      reportEngineUnavailable(
+                        unavailable,
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                        request.log,
+                      );
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
                     preFailures.push({
                       originalIndex: fi,
                       filename: file.filename,
@@ -1255,9 +1700,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   }
                 }
 
+                let fallbackFormat: string | undefined;
                 if (needsCliDecode(fileValidation.format)) {
                   try {
-                    const fileExt = processFilename.split(".").pop()?.toLowerCase();
+                    const fileExt =
+                      extname(processFilename).toLowerCase().replace(/^\./, "") || undefined;
                     processBuffer = await decodeToSharpCompat(
                       processBuffer,
                       fileValidation.format,
@@ -1265,15 +1712,124 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     );
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch {
-                    // Fall through -- tool might handle it
+                  } catch (rawDecodeErr) {
+                    const decodeErr = normalizeOperationalWriteError(
+                      asDecoderOutOfMemory(rawDecodeErr),
+                    );
+                    if (
+                      decodeErr instanceof DecoderOutOfMemoryError ||
+                      (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                    ) {
+                      const unavailable = engineUnavailable(decodeErr);
+                      reportEngineUnavailable(
+                        unavailable,
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                        request.log,
+                      );
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
+                    try {
+                      const meta = await sharp(processBuffer).metadata();
+                      fallbackFormat = meta.format;
+                      if (fallbackFormat !== "svg") {
+                        await sharp(processBuffer).resize(1).raw().toBuffer();
+                      }
+                    } catch (rawProbeErr) {
+                      const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                      if (probeErr instanceof DecoderOutOfMemoryError) {
+                        const unavailable = engineUnavailable(probeErr);
+                        reportEngineUnavailable(
+                          unavailable,
+                          parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                          request.log,
+                        );
+                        preFailures.push({
+                          originalIndex: fi,
+                          filename: file.filename,
+                          error: unavailable.message,
+                          ...preFailureFaultFields(unavailable),
+                        });
+                        continue;
+                      }
+                      if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                        const unavailable = engineUnavailable(decodeErr);
+                        reportEngineUnavailable(
+                          unavailable,
+                          parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                          request.log,
+                        );
+                        preFailures.push({
+                          originalIndex: fi,
+                          filename: file.filename,
+                          error: unavailable.message,
+                          ...preFailureFaultFields(unavailable),
+                        });
+                        continue;
+                      }
+                      // Fall through: tool might handle it
+                    }
                   }
                 }
 
-                if (isSvgBuffer(processBuffer)) {
-                  processBuffer = sanitizeSvg(processBuffer);
+                if (fileValidation.format === "svg" || fallbackFormat === "svg") {
+                  try {
+                    processBuffer = decompressSvgz(processBuffer);
+                    processBuffer = sanitizeSvg(processBuffer);
+                  } catch (err) {
+                    if (isSvgClientError(err)) {
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: err instanceof Error ? err.message : "Invalid SVG",
+                      });
+                      continue;
+                    }
+                    const oom = asDecoderOutOfMemory(err);
+                    if (oom instanceof DecoderOutOfMemoryError) {
+                      const unavailable = engineUnavailable(oom);
+                      reportEngineUnavailable(
+                        unavailable,
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                        request.log,
+                      );
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
+                    throw err;
+                  }
                 } else {
-                  processBuffer = await autoOrient(processBuffer);
+                  try {
+                    processBuffer = await autoOrient(processBuffer);
+                  } catch (rawErr) {
+                    const err = asDecoderOutOfMemory(rawErr);
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                      const unavailable = engineUnavailable(err);
+                      reportEngineUnavailable(
+                        unavailable,
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                        request.log,
+                      );
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
+                    throw rawErr;
+                  }
                 }
               } else {
                 try {
@@ -1282,7 +1838,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     processFilename,
                     {
                       scratchDir,
-                      lenient: getToolConfig(pipeline.steps[0]?.toolId ?? "")
+                      lenient: getToolConfig(parsedSteps[0]?.resolvedToolId ?? "")
                         ?.skipStructuralValidation,
                     },
                   );
@@ -1290,10 +1846,16 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(
+                      err,
+                      parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                      request.log,
+                    );
                     preFailures.push({
                       originalIndex: fi,
                       filename: file.filename,
                       error: err.message,
+                      ...preFailureFaultFields(err),
                     });
                     continue;
                   }
@@ -1302,47 +1864,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               }
 
               uploadKey = `uploads/${perFileJobId}-s0/${processFilename}`;
+              await insertFileRows(uploadKey, processFilename);
+              uncommittedOcrKeys.add(uploadKey);
               await putObject(uploadKey, processBuffer);
             }
 
-            // Build per-file pipeline chain
-            const { tree: perFileTree, stepJobIds } = buildPipelineFlowTree({
-              jobId: perFileJobId,
-              userId,
-              parsedSteps,
-              uploadKey,
-              filename: processFilename,
-              pipelinePool: batchPipelinePool,
-              parentId,
-              totalFiles: files.length,
-              analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-            });
-
-            // Insert step + finalize rows for this file
-            for (let si = 0; si < parsedSteps.length; si++) {
-              await db.insert(schema.jobs).values({
-                id: stepJobIds[si],
-                userId,
-                toolId: parsedSteps[si].resolvedToolId,
-                pool: parsedSteps[si].pool,
-                type: "pipeline-step",
-                status: "queued",
-                inputRefs: si === 0 ? [uploadKey] : [],
-                settings: parsedSteps[si].parsedSettings as Record<string, unknown>,
-              });
-            }
-
-            await db.insert(schema.jobs).values({
-              id: perFileJobId,
-              userId,
-              toolId: "pipeline",
-              pool: batchPipelinePool,
-              type: "pipeline-finalize",
-              status: "queued",
-              inputRefs: [],
-              settings: {},
-            });
-
+            if (!perFileTree) throw new Error("Pipeline flow tree was not built");
             perFileChildren.push(perFileTree);
             fileIndexMap.push(fi);
             flowChildIndex++;
@@ -1357,20 +1884,52 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // All files failed validation. There is no flow to run, so no
             // finalize will ever publish a terminal frame; publish it here
             // (awaited and guarded, like the finalize's own writes) so a
-            // client that lost this response settles from SSE (#750).
+            // client that lost this response settles from SSE (#750). When
+            // they all failed on the same missing engine, that is the
+            // batch's failure: its status, code, and hint lead (#1432).
+            const shared = sharedServerFault(preFailures);
+            const errors = preFailures.map((f) => ({
+              filename: f.filename,
+              error: f.error,
+              ...(f.code && { code: f.code }),
+            }));
             await failBatchJob({
               jobId: parentId,
               totalFiles: files.length,
               completedFiles: files.length,
               failedFiles: files.length,
-              errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
-              message: "All files failed processing",
-            }).catch((err) => {
-              request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
-            });
-            return reply.status(422).send({
-              error: "All files failed processing",
-              errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+              // A blank-name entry is the run's own error to an SSE client
+              // (the worker finalize's #1161 convention), so one that lost
+              // this reply still sees the fault and its hint.
+              errors: shared
+                ? [
+                    ...errors,
+                    {
+                      filename: "",
+                      error: shared.details ? `${shared.error}: ${shared.details}` : shared.error,
+                    },
+                  ]
+                : errors,
+              message: shared?.error ?? "All files failed processing",
+              ...(shared && { code: shared.code }),
+              ...(shared?.details && { details: shared.details }),
+            })
+              .then((applied) => {
+                if (!applied) {
+                  request.log.warn(
+                    { jobId: parentId },
+                    "all-prefail pipeline batch progress row was missing or already terminal; no terminal frame announced",
+                  );
+                }
+              })
+              .catch((err) => {
+                request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
+              });
+            return reply.status(shared?.statusCode ?? 422).send({
+              error: shared?.error ?? "All files failed processing",
+              ...(shared && { code: shared.code }),
+              ...(shared?.details && { details: shared.details }),
+              errors,
             });
           }
 
@@ -1383,11 +1942,27 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               jobId: parentId,
               toolId: "pipeline-batch",
               userId,
+              username: authUser.username,
+              requestIp: request.ip,
+              requestId: request.id,
               pool: "system" as Pool,
               totalFiles: files.length,
               inputRefs: [],
               filename: "",
-              settings: { flowChildCount: perFileChildren.length, fileIndexMap },
+              settings: {
+                flowChildCount: perFileChildren.length,
+                fileIndexMap,
+                // Every file's fault, for the finalize's all-failed verdict (#1627).
+                preFailureFaults: preFailures.map(
+                  ({ filename, error, statusCode, code, details }): BatchFault => ({
+                    filename,
+                    error,
+                    ...(statusCode !== undefined && { statusCode }),
+                    ...(code && { code }),
+                    ...(details && { details }),
+                  }),
+                ),
+              },
               analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
             } satisfies ToolJobData,
             opts: { jobId: parentId, attempts: 1 },
@@ -1409,11 +1984,26 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Inject OTel trace context into every node of the batch flow tree
           injectTraceContextIntoFlow(batchTree);
 
-          await getFlowProducer().add(batchTree);
+          try {
+            await getFlowProducer().add(batchTree);
+          } catch (err) {
+            throw markUpstreamError(err);
+          }
           uncommittedOcrKeys.clear();
+          stagedBatch = null;
 
           // ── Wait for completion and stream the stored ZIP ────────────────
-          const batchResult = await waitForJob("system", parentId, 30 * 60_000);
+          let batchResult: ToolJobResult | null;
+          try {
+            batchResult = await waitForJob("system", parentId, 30 * 60_000);
+          } catch (err) {
+            // As in batch.ts: a failed finalize settles the parent row with
+            // its reason, which the sync client must see instead of the
+            // masked rejection (#2180).
+            const failure = await settledFailureResponse(parentId, request.log);
+            if (!failure) throw markQueueEventsJobFailure(err);
+            return reply.status(failure.status).send(failure.body);
+          }
 
           if (!batchResult) {
             // The flow keeps running; the finalize persists the ZIP and
@@ -1429,8 +2019,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   filename: string;
                   outputRef?: string;
                   error?: string;
+                  code?: string;
                 }>;
                 canceled?: boolean;
+                fault?: { statusCode: number; code: string; error: string; details?: string };
                 zip?: {
                   key: string;
                   filename: string;
@@ -1449,15 +2041,35 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // client settles on instead of string-matching (#771, mirroring
             // batch.ts).
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
+            const errors = [
+              ...preFailures.map((f) => ({
+                filename: f.filename,
+                error: f.error,
+                ...(f.code && { code: f.code }),
+              })),
+              ...manifestFailures.map((f) => ({
+                filename: f.filename,
+                error: f.error ?? "Failed",
+                ...(f.code && { code: f.code }),
+              })),
+            ];
+            // As in batch.ts: one engine fault behind every file answers with
+            // its status, code and hint, and one shared reason names the
+            // failure instead of the generic summary (#1627).
+            const fault = payload?.canceled ? undefined : payload?.fault;
+            if (fault) {
+              return reply.status(fault.statusCode).send({
+                error: fault.error,
+                code: fault.code,
+                ...(fault.details && { details: fault.details }),
+                errors,
+              });
+            }
             return reply.status(422).send({
-              error: payload?.canceled ? "Batch canceled" : "All files failed processing",
-              errors: [
-                ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
-                ...manifestFailures.map((f) => ({
-                  filename: f.filename,
-                  error: f.error ?? "Failed",
-                })),
-              ],
+              error: payload?.canceled
+                ? "Batch canceled"
+                : (sharedFailureReason(errors) ?? "All files failed processing"),
+              errors,
               ...(payload?.canceled ? { canceled: true } : {}),
             });
           }
@@ -1492,10 +2104,61 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             request.log.error({ err, jobId: parentId }, "Failed to open stored pipeline batch ZIP");
             reply.raw.destroy(err instanceof Error ? err : new Error(String(err)));
           }
+        } catch (err) {
+          const conflict = isUniqueViolation(err);
+          if (stagedBatch) {
+            const { parentId, totalFiles, childIds, preFailures } = stagedBatch;
+            const statusCode =
+              typeof (err as { statusCode?: unknown })?.statusCode === "number"
+                ? (err as { statusCode: number }).statusCode
+                : 500;
+            const safe = isSafeMessageError(err) && err.statusCode !== undefined;
+            const message = conflict
+              ? "Job ID already in use"
+              : statusCode >= 500 && !safe
+                ? "Internal server error"
+                : friendlyError(err instanceof Error ? err.message : String(err));
+            try {
+              if (childIds.length > 0) {
+                await db.delete(schema.jobs).where(inArray(schema.jobs.id, childIds));
+              }
+              const applied = await failBatchJob({
+                jobId: parentId,
+                totalFiles,
+                completedFiles: totalFiles,
+                failedFiles: totalFiles,
+                errors: [
+                  ...preFailures.map(({ filename, error }) => ({ filename, error })),
+                  { filename: "", error: message },
+                ],
+                message,
+                ...(conflict ? { code: "CONFLICT" } : safe && err.code ? { code: err.code } : {}),
+              });
+              if (!applied) {
+                request.log.warn(
+                  { jobId: parentId },
+                  "faulted pipeline batch progress row was missing or already terminal; no terminal frame announced",
+                );
+              }
+              if (conflict) {
+                return reply.status(409).send({ error: message, code: "CONFLICT" });
+              }
+            } catch (settleErr) {
+              request.log.error(
+                { err: settleErr, jobId: parentId },
+                "failed to settle a pipeline batch whose ingress died",
+              );
+            }
+          }
+          throw err;
         } finally {
           request.raw.removeListener("aborted", abortIngress);
           await Promise.all(
-            [...uncommittedOcrKeys].map((key) => deleteObject(key).catch(() => {})),
+            [...uncommittedOcrKeys].map((key) =>
+              deleteObject(key).catch((cleanupErr) => {
+                request.log.warn({ err: cleanupErr, key }, "pipeline batch ingress cleanup failed");
+              }),
+            ),
           );
         }
       });

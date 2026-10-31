@@ -31,11 +31,11 @@ describe("tool route drift", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   it("every non-exempt TOOLS entry has a registered process fn", () => {
     const registered = new Set(getRegisteredToolIds());

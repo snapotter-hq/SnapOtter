@@ -2,6 +2,7 @@ import { FEATURE_BUNDLES, type PipelineTemplate, templateRequiredBundles } from 
 import { Download, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { bundleName } from "@/lib/bundle-i18n";
 import { getTemplateDescription, getTemplateName } from "@/lib/template-i18n";
 import { getToolName } from "@/lib/tool-i18n";
 import { useFeaturesStore } from "@/stores/features-store";
@@ -55,7 +56,10 @@ export function TemplateCard({ template, onUse }: TemplateCardProps) {
           {requiredBundles.map((bundleId) => {
             const installed = bundles.find((b) => b.id === bundleId)?.status === "installed";
             const isInstalling = Boolean(installing[bundleId]);
-            const label = FEATURE_BUNDLES[bundleId]?.name ?? bundleId;
+            const label = bundleName(
+              t,
+              FEATURE_BUNDLES[bundleId] ?? { id: bundleId, name: bundleId },
+            );
             return (
               <span
                 key={bundleId}

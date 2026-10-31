@@ -1,11 +1,22 @@
+import { extname } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z
   .object({
@@ -171,10 +182,8 @@ export function registerColorPalette(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -189,51 +198,74 @@ export function registerColorPalette(app: FastifyInstance) {
     } catch (err) {
       return reply.status(400).send({
         error: "Invalid settings",
-        details: err instanceof Error ? err.message : String(err),
+        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
       });
     }
 
-    try {
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+    const validation = await validateImageBuffer(fileBuffer, filename);
+    if (!validation.valid) {
+      return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+    }
+    if (validation.format === "heif") {
+      try {
+        fileBuffer = await decodeHeic(fileBuffer);
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        return reply.status(422).send({
+          error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
       }
-      if (validation.format === "heif") {
+    }
+    let fallbackFormat: string | undefined;
+    if (needsCliDecode(validation.format)) {
+      try {
+        const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
+      } catch (rawDecodeErr) {
+        const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+        if (
+          decodeErr instanceof DecoderOutOfMemoryError ||
+          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+        ) {
+          throw decodeErr;
+        }
         try {
-          fileBuffer = await decodeHeic(fileBuffer);
-        } catch (err) {
+          const meta = await sharp(fileBuffer).metadata();
+          fallbackFormat = meta.format;
+          if (fallbackFormat !== "svg") {
+            await sharp(fileBuffer).resize(1).raw().toBuffer();
+          }
+        } catch (rawProbeErr) {
+          const probeErr = asDecoderOutOfMemory(rawProbeErr);
+          if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+          request.log?.warn({ err: decodeErr, toolId: "color-palette" }, "Decode failed");
           return reply.status(422).send({
-            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-            details: err instanceof Error ? err.message : String(err),
+            error: `Failed to decode ${validation.format.toUpperCase()} file`,
+            details: stripInternalPaths(
+              decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+            ),
           });
         }
       }
-      if (needsCliDecode(validation.format)) {
-        try {
-          const fileExt = filename.split(".").pop()?.toLowerCase();
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        } catch {
-          try {
-            await sharp(fileBuffer).metadata();
-          } catch (err) {
-            return reply.status(422).send({
-              error: `Failed to decode ${validation.format.toUpperCase()} file`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-      }
-      if (validation.format === "svg") {
-        try {
-          fileBuffer = decompressSvgz(fileBuffer);
-          fileBuffer = sanitizeSvg(fileBuffer);
-        } catch (err) {
+    }
+    if (validation.format === "svg" || fallbackFormat === "svg") {
+      try {
+        fileBuffer = decompressSvgz(fileBuffer);
+        fileBuffer = sanitizeSvg(fileBuffer);
+      } catch (err) {
+        if (isSvgClientError(err)) {
           return reply.status(400).send({
             error: err instanceof Error ? err.message : "Invalid SVG",
           });
         }
+        throw asDecoderOutOfMemory(err);
       }
+    }
 
+    try {
       // Resize to small image for analysis (100x100 for better sampling)
       const raw = await sharp(fileBuffer)
         .resize(100, 100, { fit: "fill" })
@@ -249,10 +281,13 @@ export function registerColorPalette(app: FastifyInstance) {
         hex,
         count: colors.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "color-palette" }, "Color extraction failed");
       return reply.status(422).send({
         error: "Color extraction failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

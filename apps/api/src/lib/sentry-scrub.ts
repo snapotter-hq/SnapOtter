@@ -73,6 +73,215 @@ function scrubBreadcrumbs(value: unknown): unknown {
   return undefined;
 }
 
+// Request headers a diagnostic event may keep: they describe the request's
+// shape, never who sent it. Everything else goes, Authorization, Cookie, and
+// the forwarding headers that carry client IPs included (#1880).
+const SAFE_REQUEST_HEADERS = new Set([
+  "accept",
+  "accept-encoding",
+  "accept-language",
+  "content-length",
+  "content-type",
+  "user-agent",
+]);
+
+/** A url or path with its query string and fragment cut off (tokens live there). */
+function stripQuery(url: string): string {
+  return url.split(/[?#]/, 1)[0] ?? "";
+}
+
+/**
+ * The parts of `event.request` a diagnostic event keeps: method, url without
+ * its query, and allowlisted headers. Never the body, cookies, query string,
+ * or env, whatever the SDK attached (#1880).
+ */
+function scrubRequest(value: unknown): AnyEvent | undefined {
+  const request = asObj(value);
+  if (!request) return undefined;
+  const out: AnyEvent = {};
+  if (typeof request.method === "string") out.method = request.method;
+  if (typeof request.url === "string") out.url = stripQuery(request.url);
+  const headers = asObj(request.headers);
+  if (headers) {
+    const safe: AnyEvent = {};
+    for (const [name, v] of Object.entries(headers)) {
+      if (typeof v === "string" && SAFE_REQUEST_HEADERS.has(name.toLowerCase())) safe[name] = v;
+    }
+    if (Object.keys(safe).length) out.headers = safe;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+// Span and breadcrumb data keys whose value is a url or path that can carry a
+// query string, and the keys that hold only a query string or fragment. The
+// Referer can be a page url with a token still in it (/login?mfaToken=...).
+const URL_DATA_KEYS = new Set([
+  "url",
+  "url.full",
+  "url.path",
+  "http.url",
+  "http.target",
+  "http.request.header.referer",
+]);
+const QUERY_DATA_KEY = /(^|\.)(query|fragment)$/;
+// Headers the SDK may flatten into span attributes; already "[Filtered]" with
+// sendDefaultPii off, dropped here so no SDK default change can put them back.
+const SECRET_HEADER_DATA_KEY =
+  /^http\.(request|response)\.header\.(authorization|proxy_authorization|cookie|set_cookie|x_forwarded_for|x_real_ip|forwarded|cf_connecting_ip|true_client_ip)/;
+// The http server span records the caller's address under these, whatever
+// sendDefaultPii says (http.client_ip is the first X-Forwarded-For hop).
+const CLIENT_IP_DATA_KEYS = new Set([
+  "http.client_ip",
+  "net.peer.ip",
+  "net.host.ip",
+  "client.address",
+  "network.peer.address",
+  "network.local.address",
+  "user.ip_address",
+]);
+
+/**
+ * A copy of span or breadcrumb `data` without query strings, fragments,
+ * request bodies, credential headers, or client IPs. Everything else is left
+ * as is.
+ */
+function scrubUrlData(value: unknown): unknown {
+  const data = asObj(value);
+  if (!data) return value;
+  const out: AnyEvent = {};
+  for (const [key, v] of Object.entries(data)) {
+    if (QUERY_DATA_KEY.test(key) || SECRET_HEADER_DATA_KEY.test(key)) continue;
+    if (CLIENT_IP_DATA_KEYS.has(key)) continue;
+    if (key === "http.request.body.data" || key === "http.response.body.data") continue;
+    out[key] = URL_DATA_KEYS.has(key) && typeof v === "string" ? stripQuery(v) : v;
+  }
+  return out;
+}
+
+/** True for an http span op ("http.server", "http.client", ...). */
+function isHttpOp(op: unknown): boolean {
+  return typeof op === "string" && op.startsWith("http");
+}
+
+// Hosts whose name says which provider was called and holds no secret. Every
+// other host is cut to its registrable domain (#1926).
+const KEEP_HOSTS = new Set(["hooks.slack.com", "discord.com", "discordapp.com"]);
+// Second-level labels that, under a two-letter country code, belong to the
+// public suffix (example.co.uk): a crude stand-in for a public-suffix list.
+const SUFFIX_SLDS = new Set(["co", "com", "org", "net", "gov", "edu", "ac"]);
+
+/**
+ * A hostname with its leading labels replaced by "*": some webhook services put
+ * the secret in the subdomain (abc123.m.pipedream.net). IP addresses and
+ * single-label hosts carry no such secret and stay; a registrable domain is the
+ * last two labels, or three under a country-code suffix such as co.uk.
+ */
+function maskHost(host: string): string {
+  const lower = host.toLowerCase();
+  if (KEEP_HOSTS.has(lower) || lower.startsWith("[") || /^[\d.]+$/.test(lower)) return host;
+  const labels = lower.split(".");
+  const keep =
+    labels.length >= 3 &&
+    labels[labels.length - 1].length === 2 &&
+    SUFFIX_SLDS.has(labels[labels.length - 2])
+      ? 3
+      : 2;
+  if (labels.length <= keep) return host;
+  return `*.${labels.slice(-keep).join(".")}`;
+}
+
+/**
+ * scheme://host[:port] of an absolute url, with the host masked by maskHost, or
+ * undefined when there is none to parse. Path, query, fragment, and userinfo
+ * all go.
+ */
+function originOf(url: string): string | undefined {
+  try {
+    const u = new URL(url);
+    if (u.origin === "null") return undefined;
+    return `${u.protocol}//${maskHost(u.hostname)}${u.port ? `:${u.port}` : ""}`;
+  } catch {
+    return undefined;
+  }
+}
+
+// Data keys of an outgoing request that hold its full url, and the ones that
+// hold only its path.
+const OUTGOING_URL_DATA_KEYS = new Set(["url", "url.full", "http.url"]);
+const OUTGOING_PATH_DATA_KEYS = new Set(["url.path", "http.target"]);
+// Data keys of an outgoing request that hold only its hostname (http.host may
+// carry a :port).
+const OUTGOING_HOST_DATA_KEYS = new Set([
+  "url.domain",
+  "server.address",
+  "net.peer.name",
+  "http.host",
+]);
+
+/**
+ * Span or breadcrumb data of an outgoing request, scrubbed as scrubUrlData
+ * does and with every url cut to its origin and every hostname masked. The url
+ * belongs to a third party, whose path can be the secret itself (a Slack or
+ * Discord webhook carries its token there, #1899) and whose subdomain can be
+ * (#1926). A url that does not parse is dropped.
+ */
+function scrubOutgoingData(value: unknown): unknown {
+  const data = asObj(scrubUrlData(value));
+  if (!data) return value;
+  const out: AnyEvent = {};
+  for (const [key, v] of Object.entries(data)) {
+    if (OUTGOING_PATH_DATA_KEYS.has(key)) continue;
+    if (OUTGOING_URL_DATA_KEYS.has(key)) {
+      // Anything but a parseable string (an attribute array, say) goes too.
+      const origin = typeof v === "string" ? originOf(v) : undefined;
+      if (origin) out[key] = origin;
+      continue;
+    }
+    if (OUTGOING_HOST_DATA_KEYS.has(key)) {
+      // As with the url keys, anything but a string goes.
+      if (typeof v !== "string") continue;
+      const port = /:\d+$/.exec(v)?.[0] ?? "";
+      out[key] = maskHost(v.slice(0, v.length - port.length)) + port;
+      continue;
+    }
+    out[key] = v;
+  }
+  return out;
+}
+
+/** An outgoing span's "METHOD url" name cut to "METHOD origin" (#1899). */
+function outgoingName(name: string): string {
+  const space = name.indexOf(" ");
+  // A bare "POST" stays; a bare url keeps only its origin.
+  if (space === -1) return /^[A-Z]+$/.test(name) ? name : (originOf(name) ?? "");
+  const origin = originOf(name.slice(space + 1));
+  return origin ? `${name.slice(0, space)} ${origin}` : name.slice(0, space);
+}
+
+/** True for the span op the SDK gives an outgoing http request. */
+function isOutgoingOp(op: unknown): boolean {
+  return op === "http.client";
+}
+
+/**
+ * Diagnostic breadcrumbs keep their data, minus query strings and secrets. An
+ * http breadcrumb is an outgoing request (the Node SDK records none for
+ * incoming ones), so its url keeps only the origin (#1899).
+ */
+function scrubDiagnosticBreadcrumbs(value: unknown): unknown {
+  const scrub = (entry: unknown) => {
+    const b = asObj(entry);
+    if (!b) return entry;
+    if (b.data === undefined) return b;
+    const data = b.category === "http" ? scrubOutgoingData(b.data) : scrubUrlData(b.data);
+    return { ...b, data };
+  };
+  if (Array.isArray(value)) return value.map(scrub);
+  const wrapped = asObj(value);
+  if (Array.isArray(wrapped?.values)) return { ...wrapped, values: wrapped.values.map(scrub) };
+  return value;
+}
+
 /**
  * A non-PII type name for grouping a stackless throw. Tolerates non-Error
  * thrown values (a rejected string or plain object), which is exactly the case
@@ -124,11 +333,29 @@ function errorDigest(err: unknown): string {
   return (h >>> 0).toString(16);
 }
 
+/**
+ * Run a scrub and drop the event if it throws. When a beforeSend hook throws,
+ * the SDK discards the event and reports the throw as a new internal event
+ * that skips beforeSend entirely, request headers and all. Dropping is the
+ * only safe answer.
+ */
+function failClosed<A extends unknown[]>(
+  scrub: (event: AnyEvent, ...rest: A) => AnyEvent | null,
+): (event: AnyEvent, ...rest: A) => AnyEvent | null {
+  return (event, ...rest) => {
+    try {
+      return scrub(event, ...rest);
+    } catch {
+      return null;
+    }
+  };
+}
+
 export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
   let windowStart = 0;
   let sentInWindow = 0;
 
-  return function beforeSend(event: AnyEvent, hint: AnyHint): AnyEvent | null {
+  return failClosed(function beforeSend(event: AnyEvent, hint: AnyHint): AnyEvent | null {
     if (!isActive()) return null;
 
     const now = Date.now();
@@ -139,9 +366,16 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
     if (++sentInWindow > CEILING_PER_HOUR) return null;
 
     if (diagnostic) {
-      // A consenting instance: keep the raw message, request, and breadcrumb data.
-      // Still drop identity, and cap message length via redactMessage raw mode.
+      // A consenting instance: keep the raw message and breadcrumb data, and
+      // the request's method, path, and harmless headers. Still drop identity,
+      // and anything that carries credentials or content: request bodies,
+      // cookies, auth headers, and query strings never leave (#1880). Cap
+      // message length via redactMessage raw mode.
       event.user = undefined;
+      event.request = scrubRequest(event.request);
+      if (event.breadcrumbs !== undefined) {
+        event.breadcrumbs = scrubDiagnosticBreadcrumbs(event.breadcrumbs);
+      }
       const values = asObj(event.exception)?.values;
       if (Array.isArray(values)) {
         for (const entry of values) {
@@ -241,5 +475,58 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
       }
     }
     return event;
-  };
+  });
+}
+
+/**
+ * Sentry beforeSendTransaction for the API. Transactions never pass through
+ * beforeSend and only exist with SENTRY_TRACES_SAMPLE_RATE set. They answer to
+ * the same analytics gate as error events, so an opted-out instance sends none
+ * (#1898). The request gets the same rule as an error event (dropped, or
+ * reduced to method, path, and harmless headers in diagnostic mode),
+ * breadcrumbs get the same scrub as on an error event, and every span's data
+ * loses query strings, bodies, and credential headers (#1880). An outgoing
+ * (http.client) span keeps only the origin of its url, in its name and its
+ * data (#1899).
+ */
+export function buildBeforeSendTransaction(isActive: () => boolean, diagnostic = false) {
+  return failClosed(function beforeSendTransaction(event: AnyEvent): AnyEvent | null {
+    if (!isActive()) return null;
+    event.request = diagnostic ? scrubRequest(event.request) : undefined;
+    // A transaction carries the scope's breadcrumbs too.
+    if (event.breadcrumbs !== undefined) {
+      event.breadcrumbs = diagnostic
+        ? scrubDiagnosticBreadcrumbs(event.breadcrumbs)
+        : scrubBreadcrumbs(event.breadcrumbs);
+    }
+    const trace = asObj(asObj(event.contexts)?.trace);
+    // An outgoing request's url is a third party's, cut to its origin (#1899);
+    // the API's own server spans keep their path, minus the query.
+    const traceOutgoing = isOutgoingOp(trace?.op);
+    if (trace && trace.data !== undefined) {
+      trace.data = traceOutgoing ? scrubOutgoingData(trace.data) : scrubUrlData(trace.data);
+    }
+    // Only http names are "METHOD url"; a db span's "?" is a placeholder.
+    if (typeof event.transaction === "string" && isHttpOp(trace?.op)) {
+      event.transaction = traceOutgoing
+        ? outgoingName(event.transaction)
+        : stripQuery(event.transaction);
+    }
+    if (Array.isArray(event.spans)) {
+      for (const entry of event.spans) {
+        const span = asObj(entry);
+        if (!span) continue;
+        const outgoing = isOutgoingOp(span.op);
+        if (span.data !== undefined) {
+          span.data = outgoing ? scrubOutgoingData(span.data) : scrubUrlData(span.data);
+        }
+        if (typeof span.description === "string" && isHttpOp(span.op)) {
+          span.description = outgoing
+            ? outgoingName(span.description)
+            : stripQuery(span.description);
+        }
+      }
+    }
+    return event;
+  });
 }

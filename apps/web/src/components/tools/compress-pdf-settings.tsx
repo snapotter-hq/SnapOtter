@@ -10,16 +10,9 @@ import { CompressControls } from "./compress-settings";
 export function CompressPdfSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["compress-pdf"];
-  const { files } = useFileStore();
-  const {
-    processFiles,
-    processAllFiles,
-    processing,
-    error,
-    progress,
-    resultPayload,
-    processedSize,
-  } = useToolProcessor("compress-pdf");
+  const { files, entries, currentEntry } = useFileStore();
+  const { processFiles, processAllFiles, processing, error, progress } =
+    useToolProcessor("compress-pdf");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
   const hasFile = files.length > 0;
@@ -30,12 +23,25 @@ export function CompressPdfSettings() {
     (settings.mode === "targetSize" && Number(settings.targetSizeKb) > 0);
 
   // Honest reporting for target-size mode: whether we actually hit the ceiling.
-  const targetMet = resultPayload?.targetMet as boolean | undefined;
-  const targetKb = resultPayload?.targetKb as number | undefined;
+  // The verdict is the selected file's own (#1292, #1375): single runs and
+  // batches both store it on the entry, so it can't describe another file,
+  // a file that hasn't finished processing, or a run that's been cleared.
+  const done = currentEntry?.status === "completed";
+  const achieved = done ? currentEntry.processedSize : null;
+  const notes = done && achieved != null ? currentEntry.resultNotes : null;
+  const targetKb = notes?.targetKb;
+  const targetMet = targetKb != null ? notes?.targetMet : undefined;
   // Same decimal KB the server measured against, exact to the byte, so a miss
   // can't read as "couldn't reach 100 KB, smallest was 98 KB" (#1272).
   const targetLabel = targetKb != null ? formatTargetKb(kbToBytes(targetKb)) : "";
-  const achievedLabel = processedSize != null ? formatTargetKb(processedSize) : "";
+  const achievedLabel = achieved != null ? formatTargetKb(achieved) : "";
+  const missed = entries.filter(
+    (entry) =>
+      entry.status === "completed" &&
+      entry.processedSize != null &&
+      entry.resultNotes?.targetMet === false,
+  );
+  const missedKb = missed[0]?.resultNotes?.targetKb;
 
   const handleProcess = () => {
     if (hasMultiple) {
@@ -56,6 +62,18 @@ export function CompressPdfSettings() {
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
+      {entries.length > 1 && missed.length > 0 && missedKb != null && (
+        <p
+          className="text-xs font-medium text-amber-700 dark:text-amber-400"
+          data-testid="compress-pdf-missed-summary"
+        >
+          {format(s.batchMissed, {
+            count: missed.length,
+            total: entries.length,
+            target: formatTargetKb(kbToBytes(missedKb)),
+          })}
+        </p>
+      )}
       {targetMet === false && (
         <p className="text-xs text-amber-700 dark:text-amber-400">
           {format(s.targetMissed, { target: targetLabel, size: achievedLabel })}

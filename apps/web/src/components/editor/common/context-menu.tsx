@@ -11,6 +11,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { hotkeysModIsMeta } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -24,6 +27,7 @@ interface MenuPosition {
 }
 
 interface MenuItem {
+  id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   shortcut?: string;
@@ -70,6 +74,7 @@ export function ContextMenu({
   onCanvasResize?: () => void;
   onImageResize?: () => void;
 }) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
@@ -86,6 +91,7 @@ export function ContextMenu({
   const clipboard = useEditorStore((s) => s.clipboard);
   const setSelection = useEditorStore((s) => s.setSelection);
   const canvasSize = useEditorStore((s) => s.canvasSize);
+  const rebaking = useEditorStore((s) => s.rebaking);
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -105,29 +111,38 @@ export function ContextMenu({
     };
   }, [onClose]);
 
+  // These name the editor's react-hotkeys-hook bindings (use-editor-shortcuts),
+  // so the modifier follows that library's rule. Duplicate has no binding of
+  // its own (mod+d is Deselect), so it shows no hint.
+  const modIsMeta = hotkeysModIsMeta();
+  const hint = (keys: string) => formatShortcut(keys, modIsMeta);
+
   const objectItems: MenuItem[] = [
     {
-      label: "Cut",
+      id: "cut",
+      label: t.editor.menu.edit.cut,
       icon: Scissors,
-      shortcut: "Ctrl+X",
+      shortcut: hint("mod+x"),
       action: () => {
         cutObjects();
         onClose();
       },
     },
     {
-      label: "Copy",
+      id: "copy",
+      label: t.editor.menu.edit.copy,
       icon: Copy,
-      shortcut: "Ctrl+C",
+      shortcut: hint("mod+c"),
       action: () => {
         copyObjects();
         onClose();
       },
     },
     {
-      label: "Paste",
+      id: "paste",
+      label: t.editor.menu.edit.paste,
       icon: ClipboardPaste,
-      shortcut: "Ctrl+V",
+      shortcut: hint("mod+v"),
       action: () => {
         pasteObjects();
         onClose();
@@ -135,9 +150,9 @@ export function ContextMenu({
       disabled: !clipboard || clipboard.length === 0,
     },
     {
-      label: "Duplicate",
+      id: "duplicate",
+      label: t.editor.ui.contextMenu.duplicate,
       icon: CopyPlus,
-      shortcut: "Ctrl+D",
       action: () => {
         copyObjectsFn();
         pasteObjectsFn();
@@ -146,7 +161,8 @@ export function ContextMenu({
       dividerAfter: true,
     },
     {
-      label: "Bring to Front",
+      id: "bringToFront",
+      label: t.editor.menu.layer.arrange.bringToFront,
       icon: ArrowUp,
       action: () => {
         for (const id of selectedObjectIds) bringToFront(id);
@@ -154,7 +170,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Bring Forward",
+      id: "bringForward",
+      label: t.editor.menu.layer.arrange.bringForward,
       icon: ArrowUp,
       action: () => {
         for (const id of selectedObjectIds) bringForward(id);
@@ -162,7 +179,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Send Backward",
+      id: "sendBackward",
+      label: t.editor.menu.layer.arrange.sendBackward,
       icon: ArrowDown,
       action: () => {
         for (const id of selectedObjectIds) sendBackward(id);
@@ -170,7 +188,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Send to Back",
+      id: "sendToBack",
+      label: t.editor.menu.layer.arrange.sendToBack,
       icon: ArrowDown,
       action: () => {
         for (const id of selectedObjectIds) sendToBack(id);
@@ -179,7 +198,8 @@ export function ContextMenu({
       dividerAfter: true,
     },
     {
-      label: "Delete",
+      id: "delete",
+      label: t.editor.menu.edit.delete,
       icon: Trash2,
       shortcut: "Del",
       action: () => {
@@ -191,9 +211,10 @@ export function ContextMenu({
 
   const canvasItems: MenuItem[] = [
     {
-      label: "Paste",
+      id: "paste",
+      label: t.editor.menu.edit.paste,
       icon: ClipboardPaste,
-      shortcut: "Ctrl+V",
+      shortcut: hint("mod+v"),
       action: () => {
         pasteObjects();
         onClose();
@@ -201,9 +222,10 @@ export function ContextMenu({
       disabled: !clipboard || clipboard.length === 0,
     },
     {
-      label: "Select All",
+      id: "selectAll",
+      label: t.editor.ui.contextMenu.selectAll,
       icon: MousePointer,
-      shortcut: "Ctrl+A",
+      shortcut: hint("mod+a"),
       action: () => {
         setSelection({
           type: "rect",
@@ -220,16 +242,20 @@ export function ContextMenu({
       dividerAfter: true,
     },
     {
-      label: "Canvas Size...",
+      id: "canvasSize",
+      label: t.editor.menu.image.canvasSize,
       icon: Maximize,
+      disabled: rebaking,
       action: () => {
         onCanvasResize?.();
         onClose();
       },
     },
     {
-      label: "Image Size...",
+      id: "imageSize",
+      label: t.editor.menu.image.imageSize,
       icon: ImageIcon,
+      disabled: rebaking,
       action: () => {
         onImageResize?.();
         onClose();
@@ -253,7 +279,7 @@ export function ContextMenu({
       style={{ left: adjustedX, top: adjustedY }}
     >
       {items.map((item) => (
-        <div key={item.label}>
+        <div key={item.id}>
           <button
             type="button"
             onClick={item.action}

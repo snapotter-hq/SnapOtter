@@ -1,8 +1,8 @@
 ---
 description: "Ubah ukuran, optimalkan, ubah kecepatan, balik, putar, dan ekstrak frame dari GIF beranimasi dalam satu alat."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: eda9be0ce6e7
+i18n_output_hash: 5d7ba0e59498
 ---
 
 # GIF Tools {#gif-tools}
@@ -34,7 +34,7 @@ Ubah ukuran, optimalkan, ubah kecepatan, balik, ekstrak frame, dan putar GIF ber
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| colors | number | No | 256 | Jumlah warna maksimum dalam palet (2 hingga 256) |
+| colors | number | No | 256 | Jumlah warna maksimum dalam palet (2, 4, 16, atau 256) |
 | dither | number | No | 1.0 | Kekuatan dithering (0 hingga 1, di mana 0 menonaktifkan dithering) |
 | effort | number | No | 7 | Tingkat upaya optimasi (1 hingga 10, lebih tinggi = lebih lambat tetapi lebih kecil) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Speed Up {#speed-up}

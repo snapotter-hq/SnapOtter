@@ -11,6 +11,7 @@ import {
 export interface ColorizeOptions {
   intensity?: number;
   model?: string;
+  signal?: AbortSignal;
 }
 
 export interface ColorizeResult {
@@ -29,12 +30,13 @@ export async function colorize(
   const inputPath = join(outputDir, "input_colorize.png");
   const outputPath = join(outputDir, "output_colorize.png");
 
+  const { signal, ...sidecarOptions } = options;
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
   await writeFile(inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "colorize.py",
-    [inputPath, outputPath, JSON.stringify(options)],
-    { onProgress },
+    [inputPath, outputPath, JSON.stringify(sidecarOptions)],
+    { onProgress, signal },
   );
 
   const result = parseStdoutJson(stdout);

@@ -1,6 +1,8 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 const root = process.cwd();
@@ -43,6 +45,7 @@ afterEach(() => {
 });
 
 async function loadConfig(overrides: Record<string, string>) {
+  for (const key of isolationEnvKeys) delete process.env[key];
   for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
   vi.resetModules();
   return (await import("../../playwright.config.js")).default;
@@ -182,17 +185,99 @@ describe("main Playwright harness isolation", () => {
   });
 
   test("generates distinct endpoint pairs when no endpoint override is supplied", async () => {
-    for (const key of isolationEnvKeys) delete process.env[key];
     const first = await loadConfig({});
     const firstApiUrl = process.env.API_URL;
     const firstWebUrl = first.use?.baseURL;
 
-    for (const key of isolationEnvKeys) delete process.env[key];
     const second = await loadConfig({});
 
     expect(firstApiUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect(firstWebUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect([process.env.API_URL, second.use?.baseURL]).not.toEqual([firstApiUrl, firstWebUrl]);
+  });
+
+  test("keeps default API and web ports disjoint and below the Linux ephemeral range (32768)", async () => {
+    const actualCrypto = await import("node:crypto");
+    const randomIntCalls: Array<[number, number]> = [];
+    vi.doMock("node:crypto", () => ({
+      ...actualCrypto,
+      randomInt: (min: number, max: number) => {
+        randomIntCalls.push([min, max]);
+        return max - 1;
+      },
+    }));
+    try {
+      const boundaryConfig = await loadConfig({});
+      expect(randomIntCalls).toEqual([
+        [15_000, 22_000],
+        [23_000, 30_000],
+      ]);
+      expect(process.env.PLAYWRIGHT_API_PORT).toBe("21999");
+      expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29999");
+      expect(boundaryConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+    } finally {
+      vi.doUnmock("node:crypto");
+    }
+
+    for (let i = 0; i < 25; i += 1) {
+      const config = await loadConfig({});
+      const apiPort = Number(process.env.PLAYWRIGHT_API_PORT);
+      const webPort = Number(process.env.PLAYWRIGHT_WEB_PORT);
+
+      expect(webPort).toBeLessThan(32_768);
+      expect(webPort).toBeGreaterThanOrEqual(23_000);
+      expect(webPort).toBeLessThan(30_000);
+      expect(apiPort).toBeGreaterThanOrEqual(15_000);
+      expect(apiPort).toBeLessThan(22_000);
+      expect(process.env.PLAYWRIGHT_API_URL).toBe(`http://127.0.0.1:${apiPort}`);
+      expect(process.env.PLAYWRIGHT_WEB_URL).toBe(`http://127.0.0.1:${webPort}`);
+      expect(config.use?.baseURL).toBe(`http://127.0.0.1:${webPort}`);
+    }
+  });
+
+  test("derives endpoint ports from URL overrides and rejects malformed endpoint overrides", async () => {
+    const portOnlyConfig = await loadConfig({
+      PLAYWRIGHT_API_PORT: "19124",
+      PLAYWRIGHT_WEB_PORT: "29124",
+    });
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://127.0.0.1:19124");
+    expect(process.env.PLAYWRIGHT_WEB_URL).toBe("http://127.0.0.1:29124");
+    expect(portOnlyConfig.use?.baseURL).toBe("http://127.0.0.1:29124");
+
+    const config = await loadConfig({
+      API_URL: "http://localhost:19123",
+      PLAYWRIGHT_WEB_URL: "http://localhost:29123",
+    });
+    const [, webServer] = config.webServer as Array<{ command: string }>;
+    expect(process.env.PLAYWRIGHT_API_PORT).toBe("19123");
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://localhost:19123");
+    expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29123");
+    expect(config.use?.baseURL).toBe("http://localhost:29123");
+    expect(webServer.command).toContain("--host localhost --port 29123 --strictPort");
+
+    await expect(loadConfig({ PLAYWRIGHT_API_PORT: "not-a-port" })).rejects.toThrow(
+      /PLAYWRIGHT_API_PORT must be an integer port/,
+    );
+    await expect(loadConfig({ PLAYWRIGHT_WEB_PORT: "1023" })).rejects.toThrow(
+      /PLAYWRIGHT_WEB_PORT must be between 1024 and 65535/,
+    );
+    await expect(loadConfig({ PLAYWRIGHT_API_URL: "https://127.0.0.1:18128" })).rejects.toThrow(
+      /PLAYWRIGHT_API_URL must use http/,
+    );
+    await expect(
+      loadConfig({ PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28128/subpath" }),
+    ).rejects.toThrow(
+      /PLAYWRIGHT_WEB_URL must be an origin without credentials, path, query, or hash/,
+    );
+    await expect(loadConfig({ PLAYWRIGHT_WEB_URL: "http://localhost" })).rejects.toThrow(
+      /PLAYWRIGHT_WEB_URL must be between 1024 and 65535, received "80"/,
+    );
+    await expect(
+      loadConfig({
+        PLAYWRIGHT_WEB_PORT: "28128",
+        PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28129",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_WEB_PORT must match the port in PLAYWRIGHT_WEB_URL/);
   });
 
   test("isolates every mutable path by a stable run identity", async () => {
@@ -584,6 +669,7 @@ describe("local analytics Playwright isolation", () => {
       PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28494",
     });
     const [apiServer, webServer] = config.webServer as Array<{
+      command: string;
       env: Record<string, string>;
       reuseExistingServer: boolean;
       url?: string;
@@ -610,6 +696,9 @@ describe("local analytics Playwright isolation", () => {
     expect(webServer.env.PORT).toBe("28494");
     expect(webServer.env.VITE_API_URL).toBe("http://127.0.0.1:18494");
     expect(webServer.reuseExistingServer).toBe(false);
+    expect(webServer.command).toBe(
+      "pnpm --filter @snapotter/web exec vite --host 127.0.0.1 --port 28494 --strictPort",
+    );
   });
 
   test("generates unique endpoints, rejects unsafe IDs, and keeps auth setup run-scoped", async () => {
@@ -631,6 +720,95 @@ describe("local analytics Playwright isolation", () => {
     expect(configSource).not.toContain("reuseExistingServer: !process.env.CI");
     expect(authSetup).toContain("PLAYWRIGHT_AUTH_FILE");
     expect(authSetup).not.toContain('"test-results", ".auth"');
+  });
+
+  test("keeps default API and web ports disjoint and below the Linux ephemeral range (32768)", async () => {
+    const actualCrypto = await import("node:crypto");
+    const randomIntCalls: Array<[number, number]> = [];
+    vi.doMock("node:crypto", () => ({
+      ...actualCrypto,
+      randomInt: (min: number, max: number) => {
+        randomIntCalls.push([min, max]);
+        return max - 1;
+      },
+    }));
+    try {
+      const boundaryConfig = await loadAnalyticsLocalConfig({});
+      expect(randomIntCalls).toEqual([
+        [15_000, 22_000],
+        [23_000, 30_000],
+      ]);
+      expect(process.env.PLAYWRIGHT_API_PORT).toBe("21999");
+      expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29999");
+      expect(boundaryConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+    } finally {
+      vi.doUnmock("node:crypto");
+    }
+
+    for (let i = 0; i < 25; i += 1) {
+      const config = await loadAnalyticsLocalConfig({});
+      const apiPort = Number(process.env.PLAYWRIGHT_API_PORT);
+      const webPort = Number(process.env.PLAYWRIGHT_WEB_PORT);
+
+      expect(webPort).toBeLessThan(32_768);
+      expect(webPort).toBeGreaterThanOrEqual(23_000);
+      expect(webPort).toBeLessThan(30_000);
+      expect(apiPort).toBeGreaterThanOrEqual(15_000);
+      expect(apiPort).toBeLessThan(22_000);
+      expect(process.env.PLAYWRIGHT_API_URL).toBe(`http://127.0.0.1:${apiPort}`);
+      expect(process.env.PLAYWRIGHT_WEB_URL).toBe(`http://127.0.0.1:${webPort}`);
+      expect(config.use?.baseURL).toBe(`http://127.0.0.1:${webPort}`);
+    }
+  });
+
+  test("derives endpoint ports from URL overrides and rejects malformed endpoint overrides", async () => {
+    const portOnlyConfig = await loadAnalyticsLocalConfig({
+      PLAYWRIGHT_API_PORT: "19491",
+      PLAYWRIGHT_WEB_PORT: "29491",
+    });
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://127.0.0.1:19491");
+    expect(process.env.PLAYWRIGHT_WEB_URL).toBe("http://127.0.0.1:29491");
+    expect(portOnlyConfig.use?.baseURL).toBe("http://127.0.0.1:29491");
+
+    const config = await loadAnalyticsLocalConfig({
+      API_URL: "http://localhost:19490",
+      PLAYWRIGHT_WEB_URL: "http://localhost:29490",
+    });
+    const [, webServer] = config.webServer as Array<{ command: string }>;
+    expect(process.env.PLAYWRIGHT_API_PORT).toBe("19490");
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://localhost:19490");
+    expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29490");
+    expect(config.use?.baseURL).toBe("http://localhost:29490");
+    expect(webServer.command).toBe(
+      "pnpm --filter @snapotter/web exec vite --host localhost --port 29490 --strictPort",
+    );
+
+    await expect(loadAnalyticsLocalConfig({ PLAYWRIGHT_API_PORT: "invalid" })).rejects.toThrow(
+      /PLAYWRIGHT_API_PORT must be an integer port/,
+    );
+    await expect(loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_PORT: "70000" })).rejects.toThrow(
+      /PLAYWRIGHT_WEB_PORT must be between 1024 and 65535/,
+    );
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_API_URL: "https://127.0.0.1:18490" }),
+    ).rejects.toThrow(/PLAYWRIGHT_API_URL must use http/);
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_URL: "http://192.168.1.10:28490" }),
+    ).rejects.toThrow(/PLAYWRIGHT_WEB_URL must use a loopback host/);
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28490?foo=1" }),
+    ).rejects.toThrow(
+      /PLAYWRIGHT_WEB_URL must be an origin without credentials, path, query, or hash/,
+    );
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_URL: "http://localhost" }),
+    ).rejects.toThrow(/PLAYWRIGHT_WEB_URL must be between 1024 and 65535, received "80"/);
+    await expect(
+      loadAnalyticsLocalConfig({
+        PLAYWRIGHT_API_PORT: "18490",
+        PLAYWRIGHT_API_URL: "http://127.0.0.1:18491",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_API_PORT must match the port in PLAYWRIGHT_API_URL/);
   });
 });
 
@@ -694,6 +872,80 @@ test("the canonical E2E command exactly covers every release browser and device 
   expect(win32Plan).toHaveLength(2);
 });
 
+test("pnpm test:e2e runs every lane even when an earlier one fails (#1390)", async () => {
+  const { runPlan } = (await import(pathToFileURL(e2eRunnerPath).href)) as {
+    runPlan: (plan: string[][], runCommand: (args: string[]) => number | string) => number;
+  };
+  const plan = [
+    ["test", "--project=chromium"],
+    ["test", "--project=chromium-serial", "--workers=1"],
+    ["test", "--project=chromium-visual"],
+  ];
+  const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  try {
+    const outcomes = [1, 0, 2];
+    const ran: string[][] = [];
+
+    // On a Mac the standard lane is red for known reasons (#912), and stopping
+    // there hid every chromium-serial and chromium-visual failure behind it.
+    const status = runPlan(plan, (args) => {
+      ran.push(args);
+      return outcomes[ran.length - 1] ?? 0;
+    });
+
+    expect(ran).toEqual(plan);
+    expect(status).toBe(1);
+    const summary = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(summary).toContain("playwright test --project=chromium (exit 1)");
+    expect(summary).toContain("playwright test --project=chromium-visual (exit 2)");
+    expect(summary).not.toContain("chromium-serial");
+
+    stderr.mockClear();
+    expect(runPlan(plan, () => 0)).toBe(0);
+    expect(stderr).not.toHaveBeenCalled();
+
+    // A lane killed by a signal has no exit code; it still fails the run.
+    const killed = ["SIGKILL", 0, 0];
+    let lane = 0;
+    expect(runPlan(plan, () => killed[lane++] ?? 0)).toBe(1);
+    expect(stderr.mock.calls.map(([chunk]) => String(chunk)).join("")).toContain(
+      "(killed by SIGKILL)",
+    );
+  } finally {
+    stderr.mockRestore();
+  }
+});
+
+test("pnpm test:e2e reaches every lane through the real entry point (#1390)", () => {
+  // Drives main() itself, so the old stop-at-first-failure loop can't come
+  // back there while runPlan stays correct and unused. A stub pnpm on PATH
+  // records each lane and fails the first one.
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "run-main-e2e-"));
+  try {
+    const logFile = path.join(binDir, "lanes.log");
+    fs.writeFileSync(
+      path.join(binDir, "pnpm"),
+      `#!/bin/sh\necho "$*" >> "${logFile}"\ncase "$*" in *--project=chromium-serial*|*visual*) exit 0 ;; esac\nexit 3\n`,
+      { mode: 0o755 },
+    );
+    const run = spawnSync(process.execPath, [e2eRunnerPath], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
+    });
+
+    const lanes = fs.readFileSync(logFile, "utf8").trim().split("\n");
+    expect(lanes).toHaveLength(3);
+    expect(lanes[0]).toContain("exec playwright test --project=chromium ");
+    expect(lanes[1]).toContain("--project=chromium-serial");
+    expect(lanes[2]).toContain("--project=chromium-visual");
+    expect(run.status).toBe(3);
+    expect(run.stderr).toContain("Failed e2e lanes:");
+  } finally {
+    fs.rmSync(binDir, { recursive: true, force: true });
+  }
+});
+
 test("Vitest excludes every Playwright spec directory", () => {
   const config = fs.readFileSync(vitestConfigPath, "utf8");
   const playwrightDirs = fs
@@ -721,7 +973,8 @@ test("Firefox and WebKit collect the supported cross-browser core suite", () => 
     expect(output, project).toContain("smoke.spec.ts");
     expect(output, project).toContain("navigation.spec.ts");
     expect(output, project).toContain("home-page.spec.ts");
-    expect(output, project).toContain("Total: 57 tests in 5 files");
+    expect(output, project).toContain("chunk-reload.spec.ts");
+    expect(output, project).toContain("Total: 59 tests in 6 files");
   }
 });
 
@@ -734,6 +987,39 @@ test("the dedicated width project owns every required browser width", () => {
     expect(output).toContain(`${width}px viewport has no horizontal overflow`);
   }
   expect(output).toContain("Total: 6 tests in 2 files");
+});
+
+// Every project logs in as the same admin, and user preferences (pinned tools)
+// live on the server. A spec that writes them while a screenshot spec runs in
+// the same invocation can put a Pinned section in a home shot (#1706). The
+// serial project runs as its own invocation with its own database in
+// `pnpm test:e2e`, so that is the only place such a spec may be collected.
+// Writers are found by text: the putPreferences helper or the preferences
+// route. A spec that only clicks a pin toggle isn't detected here; the
+// expectNoPinnedSection guard before each home shot is the runtime backstop.
+test("specs that write user preferences are collected only by the serial project (#1706)", () => {
+  const writers = fs
+    .readdirSync(e2eDir)
+    .filter((file) => file.endsWith(".spec.ts"))
+    .filter((file) => {
+      const source = fs.readFileSync(path.join(e2eDir, file), "utf8");
+      return source.includes("putPreferences(") || source.includes("/v1/preferences");
+    });
+  expect(writers).toContain("pin-tools.spec.ts");
+
+  // Collect every project at once so a project added later is covered too.
+  const listing = collectPlaywright(path.join(root, "playwright.config.ts"));
+  const projectsByFile = new Map<string, Set<string>>();
+  for (const [, project, file] of listing.matchAll(/\[([\w-]+)\] › ([\w.-]+\.spec\.ts):\d+/g)) {
+    const projects = projectsByFile.get(file) ?? new Set<string>();
+    projects.add(project);
+    projectsByFile.set(file, projects);
+  }
+  expect(projectsByFile.size).toBeGreaterThan(0);
+
+  for (const writer of writers) {
+    expect([...(projectsByFile.get(writer) ?? [])], writer).toEqual(["chromium-serial"]);
+  }
 });
 
 test("legacy visual coverage is runnable only through its dedicated collected project", () => {

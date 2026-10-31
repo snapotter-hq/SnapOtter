@@ -1,20 +1,38 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
-import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
+import { type FeedbackErrorCategory, feedbackCategoryOf } from "@/lib/feedback";
 import { format as formatMessage } from "@/lib/format";
-import { useFileStore } from "@/stores/file-store";
+import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 
 type Direction = "horizontal" | "vertical" | "grid";
 type ResizeMode = "fit" | "original" | "stretch" | "crop";
 type Alignment = "start" | "center" | "end";
 type OutputFormat = "png" | "jpeg" | "webp" | "avif" | "jxl";
 
+/** What the panel reads off the answer besides its URL. The API always sends them (#1857). */
+const RESULT_FIELDS = ["jobId", "originalSize", "processedSize"] as const;
+
+interface StitchResult {
+  jobId: string;
+  downloadUrl: string;
+  originalSize: number;
+  processedSize: number;
+}
+
 export function StitchSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
+  const { files, currentEntry, processing, error, setProcessing, setError, setJobId } =
     useFileStore();
 
   const [direction, setDirection] = useState<Direction>("horizontal");
@@ -27,16 +45,119 @@ export function StitchSettings() {
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
   const [format, setFormat] = useState<OutputFormat>("png");
   const [quality, setQuality] = useState(90);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadByEntry, setDownloadByEntry] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
+  const watchdogRef = useRef<XhrWatchdog | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  const handleProcess = async () => {
+  useEffect(() => {
+    return () => {
+      watchdogRef.current?.clear();
+    };
+  }, []);
+
+  useSettleOnUnmount(
+    () => xhrRef.current !== null,
+    () => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      watchdogRef.current?.clear();
+      watchdogRef.current = null;
+      const xhr = xhrRef.current;
+      xhrRef.current = null;
+      xhr?.abort();
+    },
+  );
+
+  const handleProcess = () => {
     if (files.length < 2) return;
+    const { entries: startEntries, selectedIndex } = useFileStore.getState();
+    const capturedEntry = startEntries[selectedIndex] ?? startEntries[0];
+    if (!capturedEntry) return;
+    const entryId = capturedEntry.id;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "stitch",
+      is_batch: false,
+      file_count: files.length,
+    });
+
+    unsubscribeRef.current?.();
+    watchdogRef.current?.clear();
+    watchdogRef.current = null;
+    xhrRef.current?.abort();
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
 
     setError(null);
     setProcessing(true);
-    setDownloadUrl(null);
+    setDownloadByEntry({});
+    for (const entry of useFileStore.getState().entries) {
+      if (
+        entry.processedUrl !== null ||
+        entry.processedPreviewUrl !== null ||
+        entry.processedSize !== null ||
+        entry.status !== "pending" ||
+        entry.error !== null
+      ) {
+        if (entry.processedUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(entry.processedUrl);
+        }
+        useFileStore.getState().updateEntryById(entry.id, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "pending",
+          error: null,
+        });
+      }
+    }
     setUploadProgress(0);
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      const hasRunEntry =
+        startEntries.length > 0
+          ? startEntries.every((b) => state.entries.some((e) => e.id === b.id && e.file === b.file))
+          : state.entries.length > 0;
+      if (!state.processing || !hasRunEntry) {
+        storeReset = true;
+        watchdogRef.current?.clear();
+        watchdogRef.current = null;
+        if (xhrRef.current === xhr) xhrRef.current = null;
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
+        unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
+        xhr.abort();
+      }
+    });
+    unsubscribeRef.current = unsubscribe;
+
+    const endSubscription = () => {
+      if (unsubscribeRef.current === unsubscribe) {
+        unsubscribeRef.current = null;
+      }
+      unsubscribe();
+    };
+
+    const failEntry = (message: string, category?: FeedbackErrorCategory) =>
+      runEndWrites([
+        () =>
+          useFileStore.getState().updateEntryById(entryId, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            processedSize: null,
+            status: "failed",
+            error: message,
+            errorCategory: category ?? null,
+          }),
+        () => setProcessing(false),
+      ]);
 
     try {
       const formData = new FormData();
@@ -59,59 +180,146 @@ export function StitchSettings() {
         }),
       );
 
-      const result = await new Promise<{
-        jobId: string;
-        downloadUrl: string;
-        originalSize: number;
-        processedSize: number;
-      }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", appUrl("/api/v1/tools/image/stitch"));
+      const watchdog = createXhrWatchdog(xhr, 300_000, () => xhrRef.current === xhr && !storeReset);
+      watchdogRef.current = watchdog;
 
-        const headers = formatHeaders();
-        headers.forEach((value, key) => {
-          xhr.setRequestHeader(key, value);
-        });
+      xhr.open("POST", appUrl("/api/v1/tools/image/stitch"));
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            setUploadProgress(Math.round((e.loaded / e.total) * 100));
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
-            } catch {
-              reject(new Error("Invalid response"));
-            }
-          } else {
-            try {
-              const body = JSON.parse(xhr.responseText);
-              reject(new Error(body.error || `Failed: ${xhr.status}`));
-            } catch {
-              reject(new Error(`Failed: ${xhr.status}`));
-            }
-          }
-        };
-
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.send(formData);
+      const headers = formatHeaders();
+      headers.forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
       });
 
-      setJobId(result.jobId);
-      setProcessedUrl(result.downloadUrl);
-      setDownloadUrl(result.downloadUrl);
-      setSizes(result.originalSize, result.processedSize);
+      xhr.upload.onprogress = (e) => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadProgress(e);
+        if (e.lengthComputable) {
+          setUploadProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+
+      xhr.upload.onload = () => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadLoad();
+      };
+
+      xhr.onload = () => {
+        watchdog.clear();
+        if (watchdogRef.current === watchdog) watchdogRef.current = null;
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        xhrRef.current = null;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          // Only a body that isn't a result is the server's fault, and it gets
+          // reported (#1740). A throw while landing a good one is our own
+          // store write failing: it fails the run with the tracking message
+          // and is rethrown so it still surfaces (#1795, after #1354).
+          let result: StitchResult;
+          try {
+            result = parseResultBody<StitchResult>(xhr.responseText, RESULT_FIELDS);
+          } catch (err) {
+            reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });
+            const teardownError = failEntry(t.errors.invalidResponse, "processing_error");
+            if (teardownError) throw teardownError.cause;
+            return;
+          }
+          try {
+            setJobId(result.jobId);
+            useFileStore.getState().updateEntryById(entryId, {
+              processedUrl: result.downloadUrl,
+              processedPreviewUrl: null,
+              processedFilename: null,
+              status: "completed",
+              originalSize: result.originalSize,
+              processedSize: result.processedSize,
+            });
+            setDownloadByEntry((prev) => ({
+              ...prev,
+              [entryId]: result.downloadUrl,
+            }));
+          } catch (err) {
+            const teardownError = failEntry(
+              jobFailureMessage({ reason: "trackingFailed" }, t.errors),
+              "processing_error",
+            );
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending a sync tool run after a result handling error failed",
+                teardownError.cause,
+                "stitch",
+              );
+            }
+            throw err;
+          }
+          setProcessing(false);
+        } else {
+          let message: string;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            message = failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+            );
+          } catch {
+            message = failedAnswerMessage(
+              t,
+              null,
+              xhr.status,
+              formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+            );
+          }
+          const teardownError = failEntry(message, xhr.status === 413 ? "upload_error" : undefined);
+          if (teardownError) throw teardownError.cause;
+        }
+      };
+
+      xhr.onerror = () => {
+        watchdog.clear();
+        if (watchdogRef.current === watchdog) watchdogRef.current = null;
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        xhrRef.current = null;
+        const teardownError = failEntry(t.errors.network, "upload_error");
+        if (teardownError) throw teardownError.cause;
+      };
+
+      xhr.ontimeout = () => {
+        watchdog.clear();
+        if (watchdogRef.current === watchdog) watchdogRef.current = null;
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        xhrRef.current = null;
+        const teardownError = failEntry(t.errors.requestTimedOut, "timeout");
+        if (teardownError) throw teardownError.cause;
+      };
+
+      watchdog.send(formData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Stitch failed");
-    } finally {
-      setProcessing(false);
+      watchdogRef.current?.clear();
+      watchdogRef.current = null;
+      endSubscription();
+      if (xhrRef.current === xhr) xhrRef.current = null;
+      if (!storeReset) {
+        const teardownError = failEntry(
+          err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed,
+          feedbackCategoryOf(err) ?? undefined,
+        );
+        if (teardownError) throw teardownError.cause;
+      }
     }
   };
 
   const hasEnoughFiles = files.length >= 2;
+  const displayError = displayStoredError(
+    currentEntry?.error ?? error,
+    t.tools.processing.canceled,
+  );
+  const downloadUrl =
+    currentEntry && currentEntry.processedUrl !== null
+      ? (downloadByEntry[currentEntry.id] ?? null)
+      : null;
 
   return (
     <div className="space-y-4">
@@ -296,7 +504,7 @@ export function StitchSettings() {
         </div>
       )}
 
-      {error && <p className="text-xs text-destructive-ink">{error}</p>}
+      {displayError && <p className="text-xs text-destructive-ink">{displayError}</p>}
 
       {processing && (
         <div className="space-y-1">
@@ -341,6 +549,7 @@ export function StitchSettings() {
           href={downloadUrl}
           testId="stitch-download"
           label={t.toolSettings.stitch.downloadStitchedImage}
+          claimEntryId={currentEntry?.id}
         />
       )}
     </div>

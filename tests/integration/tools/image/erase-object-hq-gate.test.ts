@@ -65,12 +65,12 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
   rmSync(testRoot, { recursive: true, force: true });
-}, 10_000);
+});
 
 describe("Object Eraser HQ (inpaint-hq) feature gate", () => {
   it("501s naming the base bundle when nothing is installed", async () => {
@@ -105,5 +105,26 @@ describe("Object Eraser HQ (inpaint-hq) feature gate", () => {
     const res = await postErase("hq");
     expect(res.statusCode).not.toBe(501);
     expect(res.statusCode).toBe(202);
+  });
+
+  it("keeps an image named mask.png separate from the mask part", async () => {
+    setInstalled(["object-eraser-colorize"]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "mask.png", contentType: "image/png", content: PNG },
+      {
+        name: "mask",
+        filename: "mask.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/erase-object",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/^Invalid mask:/);
   });
 });

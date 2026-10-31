@@ -1,17 +1,21 @@
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { sql } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db } from "../../../apps/api/src/db/index.js";
+import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import {
   MIGRATED_TABLES,
   type MigrationResult,
   migrateFromSqlite,
 } from "../../../apps/api/src/db/migrate-from-sqlite.js";
 import { buildLegacySqlite, seedRealistic1xData } from "../../helpers/legacy-sqlite-fixture.js";
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 /**
  * Empty the tables the importer writes into, so each suite starts from the
@@ -117,9 +121,13 @@ describe("migrate-from-sqlite", () => {
     const result = await migrateFromSqlite(sqlitePath, { force: false });
     expect(result.tables.users).toBe(1);
     expect(result.tables.pipelines).toBe(1);
+    expect(result.detached).toEqual([]);
     const [user] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u1'`)).rows;
     expect(user.username).toBe("alice");
     expect(user.must_change_password).toBe(false); // 0 became boolean false
+    // 1.x's column default was the team *name* "Default"; no team of that name
+    // came over, so it maps to the Default team's seeded id (#1474).
+    expect(user.team).toBe("default-team-00000000");
     expect(new Date(user.created_at as string).getTime()).toBe(1750000000 * 1000); // seconds became timestamptz
     const [pipeline] = (await db.execute(sql`SELECT * FROM pipelines WHERE id = 'p1'`)).rows;
     expect((pipeline.steps as Array<{ toolId: string }>)[0].toolId).toBe("compress"); // text JSON became jsonb
@@ -246,7 +254,7 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
       "sso-user",
       null,
       "user",
-      "Default",
+      "tm-3",
       0,
       "oidc",
       "ext-id-123",
@@ -480,6 +488,20 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
     expect(result.tables.jobs).toBe(4);
     expect(result.tables.audit_log).toBe(4);
     expect(result.tables.user_files).toBe(4);
+  });
+
+  it("maps 1.x team names to team ids (#1474)", async () => {
+    // 2.x looks teams up by id. 1.x wrote ids too, except where a row kept
+    // the column default 'Default', a name: any name maps to its team's id,
+    // and a value that's already an id stays.
+    const { rows } = await db.execute(
+      sql`SELECT id, team FROM users WHERE id IN ('u-admin', 'u-editor', 'u-oidc') ORDER BY id`,
+    );
+    expect(rows).toEqual([
+      { id: "u-admin", team: "tm-1" },
+      { id: "u-editor", team: "tm-2" },
+      { id: "u-oidc", team: "tm-3" },
+    ]);
   });
 
   it("boolean conversions: 0 -> false, 1 -> true", async () => {
@@ -774,6 +796,22 @@ describe("migrate-from-sqlite (twin SSO identities)", () => {
     expect(line).toContain("u-twin-b");
     // One line per detached row, and nothing for the rows left alone.
     expect(imported.warnings).toHaveLength(2);
+    expect(imported.result?.detached).toEqual([
+      {
+        id: "u-twin-a",
+        username: "sso-user-2",
+        authProvider: "oidc",
+        externalId: "ext-twin",
+        keptBy: { id: "u-twin-b", username: "sso-user" },
+      },
+      {
+        id: "u-twin-c",
+        username: "sso-user-3",
+        authProvider: "oidc",
+        externalId: "ext-twin",
+        keptBy: { id: "u-twin-b", username: "sso-user" },
+      },
+    ]);
   });
 });
 
@@ -850,6 +888,15 @@ describe("migrate-from-sqlite (an identity the target already holds)", () => {
     expect(rows.find((u) => u.id === "u-saml")?.external_id).toBe("ext-held");
     expect(run.warnings.find((w) => w.includes("u-incoming"))).toContain("ext-held");
     expect(run.warnings).toHaveLength(1);
+    expect(run.result?.detached).toEqual([
+      {
+        id: "u-incoming",
+        username: "late-sso",
+        authProvider: "oidc",
+        externalId: "ext-held",
+        keptBy: null,
+      },
+    ]);
   });
 
   it("reports nothing when the import rolls back", async () => {
@@ -863,6 +910,107 @@ describe("migrate-from-sqlite (an identity the target already holds)", () => {
     const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
     expect(rows.find((u) => u.id === "u-clash")).toBeUndefined();
     expect(rows.find((u) => u.id === "u-held")?.external_id).toBe("ext-held");
+  });
+});
+
+/**
+ * 1.x kept SCIM's externalId in users.external_id like every other provider's.
+ * The import runs after migrations, so it has to move SCIM rows' id into
+ * scim_external_id itself, the way the #1510 migration does for rows that were
+ * already in Postgres.
+ */
+describe("migrate-from-sqlite (SCIM identities, #1510)", () => {
+  const scimDir = mkdtempSync(join(tmpdir(), "snapotter-migrator-scim-"));
+  const scimPath = join(scimDir, "scim-1x.db");
+  const heldPath = join(scimDir, "scim-held-1x.db");
+  const incomingPath = join(scimDir, "scim-incoming-1x.db");
+
+  beforeAll(() => {
+    buildTwinSource(scimPath, [
+      {
+        id: "u-scim",
+        username: "scim-user",
+        provider: "scim",
+        externalId: "idp-1",
+        createdAt: 1748000000,
+      }, // prettier-ignore
+      // Same value under OIDC: a different identity, and it stays put.
+      {
+        id: "u-oidc",
+        username: "oidc-user",
+        provider: "oidc",
+        externalId: "idp-1",
+        createdAt: 1748000000,
+      }, // prettier-ignore
+    ]);
+    buildTwinSource(heldPath, [
+      {
+        id: "u-scim-held",
+        username: "scim-held",
+        provider: "scim",
+        externalId: "idp-held",
+        createdAt: 1748000000,
+      }, // prettier-ignore
+    ]);
+    buildTwinSource(incomingPath, [
+      {
+        id: "u-scim-incoming",
+        username: "scim-incoming",
+        provider: "scim",
+        externalId: "idp-held",
+        createdAt: 1700000000,
+      }, // prettier-ignore
+    ]);
+  });
+
+  afterAll(async () => {
+    await truncateMigratedTables();
+  });
+
+  it("moves a SCIM row's external_id into scim_external_id and leaves OIDC alone", async () => {
+    await truncateMigratedTables();
+    const run = await importCapturingWarnings(scimPath, { force: false });
+    expect(run.error).toBeNull();
+
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    const scim = rows.find((u) => u.id === "u-scim");
+    expect(scim?.external_id).toBeNull();
+    expect(scim?.scim_external_id).toBe("idp-1");
+    const oidc = rows.find((u) => u.id === "u-oidc");
+    expect(oidc?.external_id).toBe("idp-1");
+    expect(oidc?.scim_external_id).toBeNull();
+  });
+
+  it("keeps a SCIM id with the account already in the target under --force", async () => {
+    await truncateMigratedTables();
+    await migrateFromSqlite(heldPath, { force: false });
+
+    const run = await importCapturingWarnings(incomingPath, { force: true });
+    expect(run.error).toBeNull();
+
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    expect(rows.find((u) => u.id === "u-scim-held")?.scim_external_id).toBe("idp-held");
+    const incoming = rows.find((u) => u.id === "u-scim-incoming");
+    expect(incoming?.scim_external_id).toBeNull();
+    expect(incoming?.external_id).toBeNull();
+    expect(run.warnings.find((w) => w.includes("u-scim-incoming"))).toContain("idp-held");
+  });
+
+  it("keeps a SCIM id with a target account an OIDC link took over", async () => {
+    await truncateMigratedTables();
+    await migrateFromSqlite(heldPath, { force: false });
+    // What an OIDC auto-link does to the row: the SCIM id stays, the provider
+    // and sign-in identity change.
+    await db.execute(
+      sql`UPDATE users SET auth_provider = 'oidc', external_id = 'oidc-sub' WHERE id = 'u-scim-held'`,
+    );
+
+    const run = await importCapturingWarnings(incomingPath, { force: true });
+    expect(run.error).toBeNull();
+
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    expect(rows.find((u) => u.id === "u-scim-held")?.scim_external_id).toBe("idp-held");
+    expect(rows.find((u) => u.id === "u-scim-incoming")?.scim_external_id).toBeNull();
   });
 });
 
@@ -891,6 +1039,11 @@ describe("migrate-from-sqlite (real 1.17.2 schema)", () => {
     const [u] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u-admin'`)).rows;
     expect(u.username).toBe("admin");
     expect(u).not.toHaveProperty("analytics_enabled");
+  });
+
+  it("maps the 1.x admin's team name to the Default team's id (#1474)", async () => {
+    const [u] = (await db.execute(sql`SELECT team FROM users WHERE id = 'u-admin'`)).rows;
+    expect(u.team).toBe("default-team-00000000");
   });
 
   it("maps the out-of-enum job status 'error' to 'failed'", async () => {
@@ -1008,5 +1161,179 @@ describe("migrate-from-sqlite (a dropped row under force)", () => {
     const rows = (await db.execute(sql`SELECT id FROM users ORDER BY id`)).rows;
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe("drop-seed");
+  });
+
+  describe("OIDC email auto-link leftover repair", () => {
+    const oidcDir = mkdtempSync(join(tmpdir(), "snapotter-migrator-oidc-"));
+    const oidcSqlitePath = join(oidcDir, "snapotter-1x-oidc.db");
+
+    beforeAll(async () => {
+      const s = new Database(oidcSqlitePath);
+      s.exec(`
+        CREATE TABLE users (id text PRIMARY KEY, username text NOT NULL, password_hash text,
+          role text NOT NULL DEFAULT 'user', team text NOT NULL DEFAULT 'Default',
+          must_change_password integer NOT NULL DEFAULT 1, auth_provider text NOT NULL DEFAULT 'local',
+          external_id text, email text, created_at integer NOT NULL, updated_at integer NOT NULL);
+      `);
+      const now = 1750000000;
+      const insert = s.prepare(
+        "INSERT INTO users (id, username, password_hash, auth_provider, external_id, email, created_at, updated_at, must_change_password) VALUES (?,?,?,?,?,?,?,?,0)",
+      );
+      // Normal OIDC link from 1.17.2: auth_provider='local', external_id='sub123'
+      insert.run("u-linked", "linked", "hash", "local", "sub123", "linked@example.com", now, now);
+
+      // Collision case: auto-link left behind on 'local', but user later signed in again without
+      // auto-link, creating a brand new 'oidc' row with the same subject.
+      insert.run(
+        "u-local",
+        "collided-local",
+        "hash",
+        "local",
+        "sub456",
+        "collision@example.com",
+        now + 60,
+        now + 60,
+      );
+      insert.run(
+        "u-oidc",
+        "collided-oidc",
+        null,
+        "oidc",
+        "sub456",
+        "collision@example.com",
+        now,
+        now,
+      );
+
+      // Twin local OIDC auto-links sharing the same subject (#2448): oldest keeps the link,
+      // younger is detached instead of failing the UPDATE with 23505.
+      insert.run("u-twin-old", "twin-old", "hash", "local", "sub789", "twin@example.com", now, now);
+      insert.run(
+        "u-twin-new",
+        "twin-new",
+        "hash",
+        "local",
+        "sub789",
+        "twin@example.com",
+        now + 60,
+        now + 60,
+      );
+      s.close();
+      await truncateMigratedTables();
+    });
+
+    it("updates auth_provider to oidc for leftover auto-links, settling collisions and twins", async () => {
+      const run = await importCapturingWarnings(oidcSqlitePath, { force: false });
+      expect(run.error).toBeNull();
+
+      const linked = (
+        await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-linked'`)
+      ).rows[0];
+      expect(linked).toEqual({ auth_provider: "oidc", external_id: "sub123" });
+
+      const collided = (
+        await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-local'`)
+      ).rows[0];
+      expect(collided.external_id).toBeNull();
+
+      const twinOld = (
+        await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-twin-old'`)
+      ).rows[0];
+      expect(twinOld).toEqual({ auth_provider: "oidc", external_id: "sub789" });
+
+      const twinNew = (
+        await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-twin-new'`)
+      ).rows[0];
+      expect(twinNew.external_id).toBeNull();
+      expect(run.warnings.find((w) => w.includes("u-twin-new"))).toContain(
+        'shares the oidc identity "sub789" with user "twin-old" (id u-twin-old)',
+      );
+      expect(run.result?.detached.find((d) => d.id === "u-twin-new")).toEqual({
+        id: "u-twin-new",
+        username: "twin-new",
+        authProvider: "oidc",
+        externalId: "sub789",
+        keptBy: { id: "u-twin-old", username: "twin-old" },
+      });
+    });
+
+    it("reports keptBy: null under --force when the target already holds the OIDC subject", async () => {
+      await truncateMigratedTables();
+      const seedDb = join(oidcDir, "seed-target.db");
+      const forceDb = join(oidcDir, "force-local-oidc.db");
+      const now = 1750000000;
+      buildTwinSource(seedDb, [
+        {
+          id: "u-target-oidc",
+          username: "target-oidc",
+          provider: "oidc",
+          externalId: "sub-held",
+          createdAt: now,
+        },
+      ]);
+      buildTwinSource(forceDb, [
+        {
+          id: "u-incoming-local",
+          username: "incoming-local",
+          provider: "local",
+          externalId: "sub-held",
+          createdAt: now - 100,
+        },
+      ]);
+
+      await migrateFromSqlite(seedDb, { force: false });
+      const run = await importCapturingWarnings(forceDb, { force: true });
+      expect(run.error).toBeNull();
+      expect(run.result?.detached).toEqual([
+        {
+          id: "u-incoming-local",
+          username: "incoming-local",
+          authProvider: "oidc",
+          externalId: "sub-held",
+          keptBy: null,
+        },
+      ]);
+      expect(run.warnings[0]).toContain("which an account already in this database holds");
+    });
+
+    it("registers 0011_users_oidc_auto_link in drizzle _journal.json and runs it on existing rows", async () => {
+      const journal = JSON.parse(
+        readFileSync(join(REPO_ROOT, "apps/api/drizzle/meta/_journal.json"), "utf8"),
+      ) as { entries: Array<{ tag: string }> };
+      expect(journal.entries.some((e) => e.tag === "0011_users_oidc_auto_link")).toBe(true);
+      expect(existsSync(join(REPO_ROOT, "apps/api/drizzle/meta/0011_snapshot.json"))).toBe(true);
+      expect(existsSync(join(REPO_ROOT, "add-test.py"))).toBe(false);
+      expect(existsSync(join(REPO_ROOT, "fix-import.py"))).toBe(false);
+
+      // Verify the SQL migration repairs pre-existing local rows with external_id
+      // when replayed against a populated users table.
+      await truncateMigratedTables();
+      await db.execute(sql`
+        INSERT INTO users (id, username, password_hash, role, team, must_change_password, auth_provider, external_id, created_at, updated_at)
+        VALUES
+          ('m-linked', 'm-linked', 'hash', 'user', 'default-team-00000000', false, 'local', 'm-sub-1', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z'),
+          ('m-oidc', 'm-oidc', NULL, 'user', 'default-team-00000000', false, 'oidc', 'm-sub-2', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z'),
+          ('m-collided', 'm-collided', 'hash', 'user', 'default-team-00000000', false, 'local', 'm-sub-2', '2025-01-01T00:01:00Z', '2025-01-01T00:01:00Z')
+      `);
+      // Drop 0011 (and any later migrations) from __drizzle_migrations as
+      // privileged user and re-run runMigrations() so 0011 replays.
+      await withPrivileged(async (client) => {
+        await client.query(
+          "DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1791900000000",
+        );
+      });
+      await runMigrations();
+
+      const rows = (
+        await db.execute(
+          sql`SELECT id, auth_provider, external_id FROM users WHERE id LIKE 'm-%' ORDER BY id`,
+        )
+      ).rows;
+      expect(rows).toEqual([
+        { id: "m-collided", auth_provider: "local", external_id: null },
+        { id: "m-linked", auth_provider: "oidc", external_id: "m-sub-1" },
+        { id: "m-oidc", auth_provider: "oidc", external_id: "m-sub-2" },
+      ]);
+    });
   });
 });

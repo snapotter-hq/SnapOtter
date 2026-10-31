@@ -22,7 +22,7 @@ export function registerFlattenPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_flattened.pdf`);
       ctx.report(10, "Flattening");
-      await pdfFlattenPy(inPath, outPath);
+      await pdfFlattenPy(inPath, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

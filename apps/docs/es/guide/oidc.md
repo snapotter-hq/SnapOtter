@@ -1,6 +1,6 @@
 ---
 description: "Configura el inicio de sesión único con OpenID Connect. Guías paso a paso para Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta y otros proveedores OIDC."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: ed919192ab76
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 No definas `NODE_TLS_REJECT_UNAUTHORIZED=0`. Esto desactiva toda la verificación TLS y supone un riesgo de seguridad.
 :::
+
+## Emisores con http sin cifrar {#plain-http-issuers}
+
+SnapOtter solo acepta una URL de emisor `http://` cuando `EXTERNAL_URL` también es http sin cifrar, algo adecuado para una configuración de prueba local o en LAN. En ese caso, el descubrimiento, el intercambio del código de inicio de sesión y los tokens viajan por la red sin cifrar, así que SnapOtter registra una advertencia al arrancar con el host del emisor. Con un `EXTERNAL_URL` `https://`, un emisor http se rechaza al iniciar sesión y la advertencia de arranque lo indica. En ambos casos, la solución es servir tu proveedor de identidad por https.
 
 ## Solución de problemas {#troubleshooting}
 

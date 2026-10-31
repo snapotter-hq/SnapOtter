@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 52af8eb156a2
+i18n_output_hash: b00c9caa7ae3
 i18n_hash_version: 2
 ---
 # Odzyskiwanie dostępu do konta {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Jeśli zasada nadal wymaga MFA dla tego użytkownika, przy następnym razie trafi on na
 ścianę rejestracji, więc uruchom też `reset-mfa-policy`, zaloguj się i zarejestruj ponownie z poziomu Ustawień.
 
+## Zresetuj zapomniane hasło {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Pomiń `[password]`, a CLI wyświetli wygenerowane hasło tymczasowe. W obu przypadkach aktywne sesje użytkownika, klucze API oraz okno blokady po nieudanych logowaniach zostają wyczyszczone, a SnapOtter wymusi zmianę hasła przy kolejnym logowaniu.
+
+## Utwórz początkowe konto administratora {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Użyj tego polecenia, gdy żadne istniejące konto administratora nie może się zalogować. `[username]` domyślnie przyjmuje wartość `DEFAULT_USERNAME` (`admin`), a pominięcie `[password]` wyświetla hasło tymczasowe, które trzeba zmienić przy pierwszym logowaniu.
+
+## Odblokuj ograniczonego lub wyłączonego użytkownika {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Czyści to okno `LOGIN_THROTTLED` w Redisie i przywraca rolę konta, jeśli użytkownik był wyłączony.
+
 ## Starsze obrazy i rozwiązania awaryjne {#older-images-and-fallbacks}
 
 Na obrazie zbudowanym zanim powstała nakładka `snapotter-admin`, wywołaj skrypt
@@ -51,7 +75,7 @@ bezpośrednio:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 W ostateczności, w dowolnej wersji, ustaw zasadę w bazie danych. Na obrazie

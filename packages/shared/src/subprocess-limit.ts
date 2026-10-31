@@ -1,5 +1,3 @@
-import { accessSync, constants, statSync } from "node:fs";
-
 /**
  * Optional per-subprocess address-space cap (RLIMIT_AS) for the native media and
  * document engines.
@@ -37,6 +35,13 @@ export function wrapWithMemoryLimit(bin: string, args: string[]): [string, strin
  */
 function assertSpawnable(bin: string): void {
   if (!bin.includes("/")) return;
+  // Resolved here, not imported at the top: this package is also loaded by the
+  // web app, and the Vite dev server can't link a named import from Node's fs,
+  // so a top-level `import ... from "node:fs"` blanks `pnpm dev` (#1394). Only
+  // the server ever reaches this line.
+  const { accessSync, constants, statSync } = process.getBuiltinModule(
+    "node:fs",
+  ) as typeof import("node:fs");
   let isFile: boolean;
   try {
     isFile = statSync(bin).isFile();

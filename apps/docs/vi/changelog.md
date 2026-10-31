@@ -1,11 +1,130 @@
 ---
 description: "Ghi chú phát hành và lịch sử phiên bản của SnapOtter. Xem những gì mới, được cải thiện và được sửa trong mỗi bản phát hành."
-i18n_source_hash: 9020073f127e
+i18n_source_hash: d3c5fc4c6b75
 i18n_provenance: human
-i18n_output_hash: 4a5f17b9117c
+i18n_output_hash: e15f50f87853
 ---
 
 # Nhật ký thay đổi {#changelog}
+
+## v2.2.0 {#v2-2-0}
+
+Phần lớn 2.2 là gia cố bảo mật. Một người không phải quản trị viên nắm giữ vai trò `users:manage` được ủy quyền có thể chiếm quyền điều khiển toàn bộ thực thể, và hóa ra mọi endpoint công cụ đều thiếu kiểm tra quyền. Hãy nâng cấp nếu bạn chạy nhiều hơn một người dùng.
+
+Phần còn lại là hàng loạt vấn đề muôn thuở của tự lưu trữ: các bản tải xuống bắt đầu nhưng không bao giờ hoàn tất, các preset hỏng ngay khi bạn thêm tệp thứ hai, các container khởi động lại liên tục trong khi Postgres vẫn đang khởi động. Hai công cụ mới cũng đã ra mắt. Tài liệu và trang web giờ đã được dịch sang 21 ngôn ngữ, và giao diện cuối cùng đã đạt độ tương phản WCAG AA.
+
+> [!IMPORTANT]
+> Nếu bạn đã cấp `users:manage` cho một người không phải quản trị viên thông qua vai trò tùy chỉnh, vai trò đó có thể chiếm các tài khoản quản trị viên trên 2.0.0 đến 2.1.0. Chi tiết trong phần Bảo mật.
+
+### Bảo mật {#v2-2-0-security}
+
+- **Leo thang đặc quyền thông qua vai trò `users:manage` được ủy quyền (GHSA-9xgh-95qh-2x7h).** Một người không phải quản trị viên nắm giữ `users:manage` thông qua vai trò tùy chỉnh có thể đặt lại mật khẩu của, hoặc xóa, một tài khoản có đặc quyền cao hơn, kể cả quản trị viên tích hợp, và chiếm quyền điều khiển toàn bộ thực thể. Việc đặt lại mật khẩu và xóa tài khoản giờ đây xác minh thẩm quyền của người gọi đối với mục tiêu, nên một vai trò được ủy quyền không thể vượt quá cấp của chính nó. Bị ảnh hưởng: 2.0.0 đến 2.1.0. Được báo cáo bởi 李春来 (Chunlai Li). (#616)
+- **Mọi endpoint công cụ giờ đều được kiểm soát.** Quyền truy cập công cụ được thực thi theo từng tuyến, nên cả 45 tuyến viết tay đều phải nhớ cùng một lời gọi và không tuyến nào làm được. Một vai trò không có `tools:use` vẫn có thể chạy image-to-pdf, erase-object, upscale, sign-pdf và phần còn lại. Việc kiểm tra giờ nằm trong một preHandler duy nhất dựa trên tuyến đã khớp, nên nó bao phủ các đường dẫn con và bất kỳ tuyến nào được thêm sau này. (#646)
+- **Giới hạn tần suất có thể bị vượt qua trên các bản cài đặt Docker.** Image phát hành `TRUST_PROXY=true`, nên IP của client đến từ một header yêu cầu và một `X-Forwarded-For` giả mạo đã lọt qua bộ giới hạn đăng nhập. Mặc định giờ là danh sách tin cậy mạng riêng. (#649)
+- **Ghi cài đặt được kiểm tra theo từng cài đặt**, không phải một lần ở cửa, và việc nhập cấu hình giờ mang tính giao dịch để một khóa bị từ chối không thể để lại một nửa cấu hình được áp dụng. (#618)
+- **Tên tệp thư viện không thể thoát khỏi thư mục gốc lưu trữ.** Một tên đã lưu được tạo khéo léo, mà một bản nhập SQLite 1.x độc hại sao chép nguyên văn, có thể đọc hoặc xóa các tệp bên ngoài thư mục files. Chỉ có thể tiếp cận sau khi người vận hành nhập một cơ sở dữ liệu SQLite 1.x do kẻ tấn công cung cấp, đây là con đường duy nhất cho phép chọn một tên đã lưu. Được báo cáo bởi @Alpastx. (GHSA-55w2-8cqf-w969, #600)
+- **Việc hủy công việc thực thi quyền sở hữu**, nên một người dùng đã xác thực không còn có thể hủy công việc của người dùng khác bằng id của nó. Được báo cáo bởi @Alpastx. (GHSA-wqxf-gj2p-689x, #599)
+- **Một cuộc tái kiểm toán toàn bộ cây 2.0 đã bắt được những gì còn bỏ ngỏ**: một assertion SAML bị đánh cắp có thể bị phát lại, một thách thức MFA tồn tại qua bất kỳ số lượng mã sai nào, việc tra cứu API key theo từng yêu cầu là một lần quét toàn bảng, `MAX_WORKSPACE_SIZE_GB` là cấu hình chết, và bộ làm sạch SVG để lọt các href `javascript:` không có dấu ngoặc kép. (#620)
+- **Chín CVE đã được công bố đã được vá**: fast-uri, svgo, sharp và tar một cách gián tiếp (#619), cùng Pillow 12.3.0 (#517). Giải mã RAW trên arm64 giờ xây dựng LibRaw 0.22.2 từ mã nguồn thay vì liên kết một bản sao hệ thống chưa được vá. (#649)
+
+### Tính năng mới {#v2-2-0-new-features}
+
+- **Cắt góc tròn**: mặt nạ hình vuông bo tròn và squircle kiểu iOS, với điều khiển bán kính góc. Được tạo cho favicon và biểu tượng ứng dụng. (#602)
+- **Xóa nền GIF**: loại bỏ nền khỏi GIF động, WebP hoặc APNG từng khung hình và nhận lại một hoạt ảnh trong suốt. (#502)
+- **Lasso và chế độ Chất lượng cao của Object Eraser**: kéo một vòng tự do thay vì tô từng pixel, và tùy chọn cài đặt gói inpainting khuếch tán để lấp đầy vùng lớn sạch hơn. (#503, #566)
+- **Lưu thành mới, hoặc ghi đè.** Việc chỉnh sửa một tệp thư viện trước đây âm thầm thay thế bản gốc. Giờ bạn chọn cho từng lần chỉnh sửa, và mặc định vẫn giữ nguyên. (#564, #577)
+- **Preset tỷ lệ khung hình trong Resize.** Chọn 1:1, 4:3 hoặc 16:9 và hai kích thước vẫn được khóa, không phóng to. (#530)
+- **OCR hai tầng**: một tầng nhanh được đóng gói sẵn trong image và chạy ngoại tuyến không cần tải xuống, và một runtime chính xác hơn được cài đặt theo yêu cầu. (#519)
+- **Nhập ở bất kỳ đâu để tìm kiếm.** Bắt đầu nhập trên bảng điều khiển hoặc trang chủ và nội dung sẽ vào ô tìm kiếm. (#644)
+- **Tài liệu và trang web bằng 21 ngôn ngữ**: trang tài liệu, các trang đích và tài liệu tham khảo API đều đã được dịch, cùng với giao diện ứng dụng. Một hướng dẫn triển khai tài nguyên thấp mới bao quát Raspberry Pi và máy 2 GB. (#548)
+- **Tên công cụ rõ ràng hơn**: 18 tên mơ hồ giờ đã tự làm rõ nghĩa, nên "Compress" trở thành "Compress Image". Id công cụ và tuyến không thay đổi, nên không có gì đã đánh dấu bị hỏng. (#520)
+
+### Cải thiện {#v2-2-0-improvements}
+
+- **Độ tương phản WCAG AA trên toàn giao diện**: bảng màu đã được tinh chỉnh để màu cam sống động vẫn nằm trên các ô nền trong khi văn bản và nhãn dùng token mực dễ tiếp cận, và tất cả 57 chỉ báo tiêu điểm giờ đạt ngưỡng 3:1 cho phi văn bản. (#567, #574)
+- **Upscale và xóa nền không còn trông như bị đóng băng**: thanh tiến trình tiến lên trong quá trình suy luận thay vì dừng ở 30%, và cả hai công cụ giờ cảnh báo rằng máy chủ chỉ có CPU chậm hơn nhiều. (#605, #608)
+- **Thông báo thời gian chờ nêu đúng nguyên nhân** và tính đến máy chủ chỉ có CPU thay vì đổ lỗi cho tệp tải lên. (#596)
+- **SnapOtter chờ Postgres và Redis khi khởi động** thay vì khởi động lại liên tục, ở cả Compose và image tất-cả-trong-một. Một bản cài đặt Proxmox LXC đã khởi động lại 76 lần trước bản sửa này. (#537, #595)
+- **Tải xuống tồn tại qua reverse proxy**: SnapOtter yêu cầu nginx và các proxy tương thích không đệm phản hồi tệp, đây là lý do thường gặp khiến một bản tải xuống tự lưu trữ bắt đầu và không bao giờ kết thúc. (#604, #607)
+- **Nén PDF đạt gần kích thước mục tiêu**, và nói thật khi mục tiêu nằm ngoài tầm với. (#522)
+- **Điều khiển công cụ trên di động luôn truy cập được** khi vỏ ứng dụng định cỡ theo khung nhìn động. (#559)
+- **Convert Audio hiển thị cài đặt tần số lấy mẫu.** (#561)
+- **Quản trị viên có thể nới lỏng độ dài mật khẩu tối thiểu**, xuống còn 1 cho một thực thể LAN tin cậy. (#543)
+- **MFA là tự phục vụ**, khóa chính sách đã được đóng lại, và đăng nhập OIDC hoặc SAML nhận được thách thức MFA thực sự thay vì bị chặn cứng. (#531, #536)
+- **Một `Error: Error` trần giờ nêu nguyên nhân.** Lỗi mã hóa Sharp, thoát sidecar AI, đầu ra sidecar tài liệu không phải JSON, và lỗi xóa nền trước đây đều đến với lý do đã bị xóa sạch. (#532, #534, #535, #538, #612)
+- **Hộp thoại trợ giúp đã được dịch.** Nhãn phím tắt và văn bản bắt đầu của nó đã bị mã hóa cứng bằng tiếng Anh trong khi các bản dịch hoàn chỉnh nằm không dùng trong cả 21 tệp ngôn ngữ. (#647)
+
+### Sửa lỗi {#v2-2-0-bug-fixes}
+
+- **Tệp HEIC từ iPhone bị từ chối** là không đọc được trước khi chúng đến bộ giải mã xử lý chúng. (#631)
+- **Preset chuyển đổi thất bại ở tệp thứ hai**: jpg-to-pdf và các công cụ anh em image-to-pdf, cùng pdf-to-png, pdf-to-jpg và pdf-to-tiff, đều trả về `Tool not found` khi bạn tải lên hai tệp. (#633, #643)
+- **Preset chuyển đổi PDF mất nút tải xuống.** (#629)
+- **Thời gian chờ xử lý không giới hạn không được tôn trọng**, và các luồng tiến trình bị đình trệ giờ phục hồi thay vì để giao diện chờ đợi. (#638)
+- **Tải xuống bị treo thay vì thất bại** khi một tệp đã lưu ngắn hơn độ dài được ghi của nó. (#617)
+- **Công cụ trang PDF thất bại trên tệp ngắn và được mã hóa**: Remove Pages mặc định dùng một phạm vi trang mà không tài liệu nào dưới sáu trang có, và các PDF được bảo vệ bằng mật khẩu thất bại một cách khó hiểu bên trong worker. (#594)
+- **PDF to Text âm thầm trả về tệp rỗng** cho các PDF quét. Giờ nó chỉ bạn đến OCR và phục vụ văn bản dưới dạng UTF-8. (#603)
+- **PDF to Word làm rơi các khối văn bản có màu** và tách chúng qua trang. (#500)
+- **Object Eraser để lại tàn dư ma** và làm mờ các vật thể nhỏ trong ảnh độ phân giải cao. (#501)
+- **Stabilize Video ghi đầu ra không phát được** nếu không có faststart. (#593)
+- **Sửa lỗi trình chỉnh sửa ảnh**: xoay, lật, thay đổi kích thước, mức, đường cong, bộ lọc và khóa lớp. (#597)
+- **Sign PDF hiển thị khung vẽ trống** thay vì báo cáo lý do PDF không tải được. (#545)
+- **Thư viện tệp ghi kích thước 0x0** và bỏ qua bản xem trước cho các tệp tải lên HEIC, RAW và PSD. (#636, #637)
+- **Cài đặt nhiều hơn một gói AI** khiến virtualenv dùng chung có nhiều phiên bản và âm thầm làm hỏng ba công cụ. (#649)
+- **Chuyển đổi sang JXL ở chất lượng 1 đến 4 trả về 500**, và một ffmpeg bị thiếu được báo cho bạn là tệp tải lên bị hỏng. (#649)
+- **Một sự cố Postgres tạm thời làm mắc kẹt các công việc đã hoàn thành**, để đầu ra trên đĩa mà không có hàng nào trỏ đến nó. Một bộ đối soát giờ tiếp nhận công việc đó thay vì bỏ nó. (#649)
+- **Một endpoint Redis đổi địa chỉ làm kẹt mọi consumer** trong khi kiểm tra sức khỏe vẫn trả lời 200. (#649)
+- **Sửa lỗi trang web và tài liệu**: các liên kết bản địa hóa không còn làm rơi đoạn `#` hoặc viết thường `zh-CN`, thanh điều hướng tài liệu vẫn nằm trong khung nhìn trên máy tính bảng, và cả hai trang không còn gọi API GitHub từ trình duyệt của bạn nữa. (#516, #562, #570, #560)
+
+### Ghi chú nâng cấp {#v2-2-0-upgrade-notes}
+
+Không có gì cần di trú, nhưng hai giá trị mặc định được phát hành đã thay đổi:
+
+- **`TRUST_PROXY` giờ mặc định là `loopback,linklocal,uniquelocal`** thay vì tin cậy mọi peer. Mạng cầu Docker và mạng Compose nằm trong phạm vi đó, nên hầu hết các thiết lập không cần thay đổi. Nếu reverse proxy của bạn tiếp cận SnapOtter từ một địa chỉ công khai, hãy đặt `TRUST_PROXY` một cách rõ ràng, nếu không giới hạn tần suất và nhật ký kiểm toán sẽ gán mọi yêu cầu cho proxy.
+- **`MAX_AI_JOBS_PER_USER` mặc định là 5** công việc AI một tệp đang xử lý cho mỗi người dùng. Các lượt chạy AI hàng loạt và pipeline vẫn không bị giới hạn.
+
+Các nút tùy chọn mới: `DB_STARTUP_TIMEOUT_MS`, `SUBPROCESS_MEMORY_LIMIT_MB` (tắt theo mặc định) và `GIF_BG_MAX_FRAMES`.
+
+### Lời cảm ơn {#v2-2-0-acknowledgements}
+
+Một phần lớn của bản phát hành này bắt đầu từ báo cáo lỗi của người khác.
+
+Mã nguồn và đóng góp:
+
+- **@mvanhorn** ❤️: Viết lại lỗi thời gian chờ xóa nền thành một thông điệp nói rõ cần làm gì, thay vì một lần chờ trần. (#518, #494)
+- **@EuanTop** ❤️: Khôi phục thao tác tải xuống trên các trang preset chuyển đổi PDF bằng cách làm cho tuyến đồng bộ trả về hợp đồng kết quả công cụ chuẩn. (#629, #623)
+- **@harshjainnn** ❤️: Chẩn đoán bản tải xuống bắt đầu và không bao giờ kết thúc, và đề xuất hướng đặt lại socket mà bản sửa được xây dựng trên đó. (#617, #590)
+
+Công bố bảo mật:
+
+- **李春来 (Chunlai Li)** ❤️ ([@laijunyue](https://github.com/laijunyue)): Công bố riêng việc leo thang đặc quyền thông qua vai trò `users:manage` được ủy quyền, với phân tích đầy đủ từ nguồn đến đích và một chuỗi khai thác hoạt động. (GHSA-9xgh-95qh-2x7h, #616)
+- **@Alpastx** ❤️ (Alpesh Bhagwatkar): Công bố một IDOR đã xác thực trên việc hủy công việc, và một lỗ hổng path traversal trong tên tệp đã lưu của thư viện có thể tiếp cận sau một bản nhập SQLite 1.x độc hại, với một bằng chứng khái niệm hoạt động cho mỗi lỗi. (#599, #600)
+
+Báo cáo lỗi:
+
+- **@riz467** ❤️: Tệp HEIC thật từ iPhone bị từ chối ở bước xác thực, với nguyên nhân gốc được làm rõ trong báo cáo. (#622)
+- **@coupej** ❤️: Các trang preset PDF treo mãi mãi, và jpg-to-pdf thất bại ngay khi thêm tệp thứ hai. Hai lỗi riêng biệt, được tách đúng. (#623, #627)
+- **@linuxuser1** ❤️: `PROCESSING_TIMEOUT_S=0` được ghi là không giới hạn nhưng bị giới hạn ở năm phút. (#630)
+- **@bezibaerchen** ❤️: Convert Audio ẩn cài đặt tần số lấy mẫu mà chính mô tả của nó hứa hẹn. (#558)
+- **@hell-toupee** ❤️: Gói OCR chính xác không cài đặt được với lỗi `libpaddle`. (#505)
+- **@Michael1260** ❤️ và **@And-CSH** ❤️: Xác nhận độc lập lỗi cài đặt OCR đó và xác định rằng trích xuất thủ công hoạt động trong khi trình cài đặt trong ứng dụng không hoạt động, điều này ghim lỗi vào trình cài đặt. (#505)
+- **@TomErnst1972** ❤️: Bật chính sách yêu cầu MFA khóa quản trị viên khỏi thực thể của chính họ. (#515)
+- **@thokich** ❤️: Xóa vật thể tạo ra các vùng lấp đầy mờ, không dùng được, điều này thúc đẩy cả việc viết lại inpainting HD và gói chất lượng cao tùy chọn. (#141)
+- **@Hennie-git** ❤️: Một bản cài đặt Proxmox LXC khởi động lại 76 lần với một Postgres chưa chấp nhận kết nối. (community-scripts/ProxmoxVE#15796)
+- **MickLesk** ❤️ (Proxmox VE community-scripts): Phân loại báo cáo đó trong thời gian thực và đưa ra chẩn đoán mà bản sửa khởi động được xây dựng trên đó. (#537)
+
+Yêu cầu tính năng và phản hồi:
+
+- **@LECOQQ** ❤️: Yêu cầu nới lỏng độ phức tạp mật khẩu trên một bản cài đặt máy chủ tại nhà. (#136)
+- **@killervette42** ❤️: Yêu cầu một Unraid Community App, hiện đã được phát hành trên Unraid CA store. (#96)
+- **@alienatedsec** ❤️: Chỉ ra rằng bản sửa GPU-tự-động-chuyển-về-CPU bị chôn trong một issue đã đóng và khó khám phá, đó là lý do nó giờ nằm trong tài liệu triển khai. (#490, #587)
+- **@neilp316** ❤️: Xác nhận lỗi GPU Blackwell trên RTX 5060 và vạch ra con đường nâng cấp CUDA 12.8 hoạt động. (#120)
+- **@Roiki11** ❤️: Lập luận cho lưu trữ dùng chung với tham chiếu đường dẫn thay vì truyền tệp qua HTTP cho tính toán AI ngoài máy. (#189)
+
+Cảm ơn cả các thành viên cộng đồng đã báo cáo những vấn đề này qua Discord và email, những người chúng tôi không ghi lại tên: yêu cầu cắt squircle (#602), bản tải xuống image-to-PDF bắt đầu và không bao giờ kết thúc (#604, #607), công cụ Delete Pages bị kẹt (#594), văn bản tiếng Ả Rập bị thiếu trong pdf-to-text (#603), và chẩn đoán đằng sau cơ chế dự phòng GPU ONNX (#490).
+
+[Toàn bộ diff trên GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.1.0...v2.2.0)
+
+---
 
 ## v2.0.0 {#v2-0-0}
 

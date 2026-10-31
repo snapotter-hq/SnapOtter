@@ -1,8 +1,8 @@
 ---
 description: "Ridimensiona, ottimizza, cambia velocità, inverti, ruota ed estrai fotogrammi da GIF animate in un unico strumento."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 5f9277240963
+i18n_output_hash: 8b046e964f18
 ---
 
 # Strumenti GIF {#gif-tools}
@@ -34,7 +34,7 @@ Ridimensiona, ottimizza, cambia velocità, inverti, estrai fotogrammi e ruota GI
 
 | Parametro | Tipo | Obbligatorio | Predefinito | Descrizione |
 |-----------|------|----------|---------|-------------|
-| colors | number | No | 256 | Numero massimo di colori nella palette (da 2 a 256) |
+| colors | number | No | 256 | Numero massimo di colori nella palette (2, 4, 16 o 256) |
 | dither | number | No | 1.0 | Intensità del dithering (da 0 a 1, dove 0 disabilita il dithering) |
 | effort | number | No | 7 | Livello di impegno dell'ottimizzazione (da 1 a 10, più alto = più lento ma più piccolo) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Speed Up {#speed-up}

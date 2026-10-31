@@ -1,31 +1,60 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { seamCarve } from "@snapotter/ai";
+import {
+  hasServerErrorStatus,
+  isToolInputError,
+  MAX_CONTENT_AWARE_RESIZE_PIXELS,
+  MAX_RESIZE_OUTPUT_DIMENSION,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { autoOrient } from "../../lib/auto-orient.js";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
-import { putObject } from "../../lib/object-storage.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
+const MISSING_DIMENSIONS_MESSAGE = "Either width, height, or square mode must be specified";
+
 // caire's -width/-height/-blur/-sobel flags are integer-only; a fractional
 // value makes the binary exit with a flag parse error.
-const settingsSchema = z.object({
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
-  protectFaces: z.boolean().default(false),
-  blurRadius: z.number().int().min(0).max(20).default(4),
-  sobelThreshold: z.number().int().min(1).max(20).default(2),
-  square: z.boolean().default(false),
-});
+const settingsSchema = z
+  .object({
+    width: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
+    height: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
+    protectFaces: z.boolean().default(false),
+    blurRadius: z.number().int().min(0).max(20).default(4),
+    sobelThreshold: z.number().int().min(1).max(20).default(2),
+    square: z.boolean().default(false),
+  })
+  .superRefine((s, ctx) => {
+    if (!s.square && s.width === undefined && s.height === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: MISSING_DIMENSIONS_MESSAGE,
+      });
+      return;
+    }
+    if (s.square || s.width === undefined || s.height === undefined) return;
+    if (s.width > MAX_RESIZE_OUTPUT_DIMENSION || s.height > MAX_RESIZE_OUTPUT_DIMENSION) return;
+    if (s.width * s.height > MAX_CONTENT_AWARE_RESIZE_PIXELS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["width"],
+        message: `Target size ${s.width} x ${s.height} is over the ${MAX_CONTENT_AWARE_RESIZE_PIXELS} pixel limit`,
+      });
+    }
+  });
 
 type Settings = z.infer<typeof settingsSchema>;
 
@@ -53,10 +82,8 @@ export function registerContentAwareResize(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (!fileBuffer || fileBuffer.length === 0) {
@@ -76,8 +103,9 @@ export function registerContentAwareResize(app: FastifyInstance) {
         filename = prepared.filename;
       } catch (err) {
         if (err instanceof InputValidationError) {
-          return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+          return sendInputValidationError(reply, err, "content-aware-resize", request.log);
         }
+        if (hasServerErrorStatus(err)) throw err;
         return reply.status(422).send({
           error: "Failed to prepare image",
           details: friendlyError(err instanceof Error ? err.message : String(err)),
@@ -90,20 +118,18 @@ export function registerContentAwareResize(app: FastifyInstance) {
         const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
         const result = settingsSchema.safeParse(parsed);
         if (!result.success) {
+          const issues = result.error.issues;
+          if (issues.length === 1 && issues[0]?.message === MISSING_DIMENSIONS_MESSAGE) {
+            return reply.status(400).send({ error: MISSING_DIMENSIONS_MESSAGE });
+          }
           return reply.status(400).send({
             error: "Invalid settings",
-            details: formatZodErrors(result.error.issues),
+            details: formatZodErrors(issues),
           });
         }
         settings = result.data;
       } catch {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
-
-      if (!settings.square && !settings.width && !settings.height) {
-        return reply.status(400).send({
-          error: "Either width, height, or square mode must be specified",
-        });
       }
 
       try {
@@ -121,18 +147,20 @@ export function registerContentAwareResize(app: FastifyInstance) {
         await mkdir(scratchDir, { recursive: true });
 
         try {
-          // Save input to object storage
-          await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
-
           // Process with caire
-          const result = await seamCarve(fileBuffer, scratchDir, {
-            width: settings.width,
-            height: settings.height,
-            protectFaces: settings.protectFaces,
-            blurRadius: settings.blurRadius,
-            sobelThreshold: settings.sobelThreshold,
-            square: settings.square,
-          });
+          let result: Awaited<ReturnType<typeof seamCarve>>;
+          try {
+            result = await seamCarve(fileBuffer, scratchDir, {
+              width: settings.width,
+              height: settings.height,
+              protectFaces: settings.protectFaces,
+              blurRadius: settings.blurRadius,
+              sobelThreshold: settings.sobelThreshold,
+              square: settings.square,
+            });
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(fileBuffer, err);
+          }
 
           // Save output to object storage
           const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
@@ -149,8 +177,12 @@ export function registerContentAwareResize(app: FastifyInstance) {
         } finally {
           await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
-      } catch (err) {
-        request.log.error({ err, toolId: "content-aware-resize" }, "Content-aware resize failed");
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "content-aware-resize" }, "Content-aware resize failed");
+        }
         return reply.status(422).send({
           error: "Content-aware resize failed",
           details: friendlyError(err instanceof Error ? err.message : "Unknown error"),
@@ -163,37 +195,47 @@ export function registerContentAwareResize(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "content-aware-resize",
     settingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as Settings;
-      // Decode HEIC/HEIF for pipeline/batch mode
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-      let buf = inputBuffer;
-      if (["heic", "heif", "hif"].includes(ext)) {
-        buf = await decodeHeic(buf);
-      }
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR) for pipeline/batch mode
-      const cliCheck = await validateImageBuffer(inputBuffer, filename);
-      if (cliCheck.valid && needsCliDecode(cliCheck.format)) {
-        buf = await decodeToSharpCompat(inputBuffer, cliCheck.format);
-      }
-      const orientedBuffer = await autoOrient(buf);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const result = await seamCarve(orientedBuffer, scratchDir, {
-          width: s.width,
-          height: s.height,
-          protectFaces: s.protectFaces,
-          blurRadius: s.blurRadius,
-          sobelThreshold: s.sobelThreshold,
-          square: s.square,
+    process: withImageEncodeContext<unknown>(
+      "Content-aware resize failed",
+      (s) => ((s as Settings)?.square ? "square" : "custom"),
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as Settings;
+        const cliCheck = await validateImageBuffer(inputBuffer, filename);
+        const ext = extname(filename).toLowerCase().replace(/^\./, "");
+        const format = cliCheck.valid
+          ? cliCheck.format
+          : ["heic", "heif", "hif"].includes(ext)
+            ? "heif"
+            : ext === "svg" || ext === "svgz"
+              ? "svg"
+              : "png";
+        const prepared = await prepareRouteImage(inputBuffer, filename, format, {
+          rasterizeSvg: true,
         });
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
-        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+        const orientedBuffer = prepared.buffer;
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let result: Awaited<ReturnType<typeof seamCarve>>;
+          try {
+            result = await seamCarve(orientedBuffer, scratchDir, {
+              width: s.width,
+              height: s.height,
+              protectFaces: s.protectFaces,
+              blurRadius: s.blurRadius,
+              sobelThreshold: s.sobelThreshold,
+              square: s.square,
+            });
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
+          return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

@@ -37,23 +37,83 @@ describe("runPdfcpu (shared runner via pdfcpuCropMargin)", () => {
 
   it("rejects on non-zero exit with the stderr tail", async () => {
     h.nextClose({ stderr: "pdfcpu: cannot read file", code: 1 });
-    await expect(
-      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
-    ).rejects.toThrow("pdfcpu exited 1: pdfcpu: cannot read file");
+    const err = await import("../src/pdfcpu.js")
+      .then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("pdfcpu exited 1: pdfcpu: cannot read file");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("falls back to stdout in the error when stderr is empty", async () => {
+  it("falls back to stdout in the error when stderr is empty or whitespace-only", async () => {
     h.nextClose({ stdout: "problem on stdout", code: 2 });
     await expect(
       import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
     ).rejects.toThrow("pdfcpu exited 2: problem on stdout");
-  });
 
-  it("reports the signal when code is null", async () => {
-    h.nextClose({ stderr: "killed", code: null, signal: "SIGKILL" });
+    h.nextClose({
+      stderr: "  \n",
+      stdout: "stdout-only diagnostic\n",
+      code: null,
+      signal: "SIGKILL",
+    });
     await expect(
       import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
-    ).rejects.toThrow("pdfcpu exited SIGKILL: killed");
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited SIGKILL: stdout-only diagnostic",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    h.nextClose({ stderr: "killed\n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited SIGKILL: killed",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    h.nextClose({ stderr: "", stdout: "", code: null, signal: "SIGTERM" });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "spawn /usr/bin/pdfcpu ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+      signal: "SIGTERM",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3829)", async () => {
+    h.nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+    });
+
+    h.nextClose({ stderr: "sh: pdfcpu: not found\n", code: 127 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuNup("/in.pdf", 2, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited 127: sh: pdfcpu: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+    });
   });
 
   it("rejects on an error event", async () => {
@@ -85,6 +145,78 @@ describe("runPdfcpu (shared runner via pdfcpuCropMargin)", () => {
       await vi.advanceTimersByTimeAsync(60_000);
       await settled;
       expect(child.killSignals).toContain("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/pdfcpu.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(
+      mod.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(mod.pdfcpuNup("/in.pdf", 2, "/out.pdf", { signal: ac.signal })).rejects.toThrow(
+      "Canceled",
+    );
+    await expect(
+      mod.pdfcpuBooklet("/in.pdf", 2, "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.pdfcpuTextStamp("/in.pdf", validStamp, "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("kills the child with SIGKILL and rejects with Canceled when signal aborts mid-run across all pdfcpu wrappers", async () => {
+    const mod = await import("../src/pdfcpu.js");
+    const calls = [
+      (signal: AbortSignal) => mod.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.pdfcpuNup("/in.pdf", 2, "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.pdfcpuBooklet("/in.pdf", 2, "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.pdfcpuTextStamp("/in.pdf", validStamp, "/out.pdf", { signal }),
+    ];
+    for (const invoke of calls) {
+      const child = h.nextManual();
+      const ac = new AbortController();
+      const pending = invoke(ac.signal);
+      ac.abort();
+      await expect(pending).rejects.toThrow("Canceled");
+      expect(child.killSignals).toContain("SIGKILL");
+    }
+  });
+
+  it("removes the abort listener on close, error, and timeout", async () => {
+    const mod = await import("../src/pdfcpu.js");
+    const acClose = new AbortController();
+    const removeClose = vi.spyOn(acClose.signal, "removeEventListener");
+    h.nextClose({ code: 0 });
+    await mod.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf", { signal: acClose.signal });
+    expect(removeClose).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const acErr = new AbortController();
+    const removeErr = vi.spyOn(acErr.signal, "removeEventListener");
+    h.nextError(new Error("spawn pdfcpu ENOENT"));
+    await expect(
+      mod.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf", { signal: acErr.signal }),
+    ).rejects.toThrow("spawn pdfcpu ENOENT");
+    expect(removeErr).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    vi.useFakeTimers();
+    try {
+      const acTimeout = new AbortController();
+      const removeTimeout = vi.spyOn(acTimeout.signal, "removeEventListener");
+      h.nextManual();
+      const settled = expect(
+        mod.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf", {
+          timeoutMs: 5_000,
+          signal: acTimeout.signal,
+        }),
+      ).rejects.toThrow("pdfcpu timed out after 5s");
+      await vi.advanceTimersByTimeAsync(5_000);
+      await settled;
+      expect(removeTimeout).toHaveBeenCalledWith("abort", expect.any(Function));
     } finally {
       vi.useRealTimers();
     }

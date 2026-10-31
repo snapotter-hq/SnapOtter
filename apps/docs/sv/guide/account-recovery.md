@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 572c4343a83f
+i18n_output_hash: 7de86d39db90
 i18n_hash_version: 2
 ---
 # Kontoåterställning {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Om policyn fortfarande kräver MFA för den användaren stöter de på registrerings-
 väggen härnäst, så kör även `reset-mfa-policy`, logga in och registrera på nytt från Inställningar.
 
+## Återställ ett glömt lösenord {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Utelämna `[password]` så skriver CLI:t ut ett genererat tillfälligt lösenord. Oavsett vilket rensas användarens aktiva sessioner, API-nycklar och spärrfönster för misslyckade inloggningar, och SnapOtter kräver lösenordsbyte vid nästa inloggning.
+
+## Skapa ett nytt administratörskonto {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Använd detta när inget befintligt administratörskonto kan logga in. `[username]` har `DEFAULT_USERNAME` (`admin`) som standard, och om du utelämnar `[password]` skrivs ett tillfälligt lösenord ut som måste bytas vid första inloggningen.
+
+## Lås upp en begränsad eller inaktiverad användare {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Detta rensar fönstret `LOGIN_THROTTLED` i Redis och återställer kontots roll om användaren var inaktiverad.
+
 ## Äldre avbildningar och reservlösningar {#older-images-and-fallbacks}
 
 På en avbildning som byggdes innan omslaget `snapotter-admin` fanns anropar du skriptet
@@ -51,7 +75,7 @@ direkt:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Som en sista utväg på vilken version som helst kan du sätta policyn i databasen. På

@@ -11,8 +11,10 @@ import { useFileStore } from "@/stores/file-store";
 type Method = "adaptive" | "unsharp-mask" | "high-pass";
 type Denoise = "off" | "light" | "medium" | "strong";
 
+type PresetId = "light" | "medium" | "strong" | "portrait" | "landscape" | "detail" | "print";
+
 interface Preset {
-  name: string;
+  id: PresetId;
   sigma: number;
   m1: number;
   m2: number;
@@ -22,13 +24,13 @@ interface Preset {
 }
 
 const PRESETS: Preset[] = [
-  { name: "Light", sigma: 0.5, m1: 0.5, m2: 1.5, x1: 2.0, y2: 8, y3: 15 },
-  { name: "Medium", sigma: 1.0, m1: 1.0, m2: 3.0, x1: 2.0, y2: 12, y3: 20 },
-  { name: "Strong", sigma: 1.5, m1: 1.5, m2: 5.0, x1: 2.0, y2: 15, y3: 25 },
-  { name: "Portrait", sigma: 1.0, m1: 0.0, m2: 2.5, x1: 3.0, y2: 8, y3: 15 },
-  { name: "Landscape", sigma: 0.8, m1: 1.0, m2: 4.0, x1: 1.5, y2: 12, y3: 20 },
-  { name: "Detail", sigma: 0.5, m1: 2.0, m2: 5.0, x1: 1.0, y2: 15, y3: 25 },
-  { name: "Print", sigma: 1.5, m1: 1.5, m2: 3.5, x1: 2.0, y2: 15, y3: 25 },
+  { id: "light", sigma: 0.5, m1: 0.5, m2: 1.5, x1: 2.0, y2: 8, y3: 15 },
+  { id: "medium", sigma: 1.0, m1: 1.0, m2: 3.0, x1: 2.0, y2: 12, y3: 20 },
+  { id: "strong", sigma: 1.5, m1: 1.5, m2: 5.0, x1: 2.0, y2: 15, y3: 25 },
+  { id: "portrait", sigma: 1.0, m1: 0.0, m2: 2.5, x1: 3.0, y2: 8, y3: 15 },
+  { id: "landscape", sigma: 0.8, m1: 1.0, m2: 4.0, x1: 1.5, y2: 12, y3: 20 },
+  { id: "detail", sigma: 0.5, m1: 2.0, m2: 5.0, x1: 1.0, y2: 15, y3: 25 },
+  { id: "print", sigma: 1.5, m1: 1.5, m2: 3.5, x1: 2.0, y2: 15, y3: 25 },
 ];
 
 export function SharpeningSettings() {
@@ -59,7 +61,7 @@ export function SharpeningSettings() {
   const [kernelSize, setKernelSize] = useState<3 | 5>(3);
   const [denoise, setDenoise] = useState<Denoise>("off");
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [activePreset, setActivePreset] = useState<string | null>("Medium");
+  const [activePreset, setActivePreset] = useState<PresetId | null>("medium");
 
   const applyPreset = (preset: Preset) => {
     setMethod("adaptive");
@@ -69,7 +71,7 @@ export function SharpeningSettings() {
     setX1(preset.x1);
     setY2(preset.y2);
     setY3(preset.y3);
-    setActivePreset(preset.name);
+    setActivePreset(preset.id);
   };
 
   const clearPreset = () => setActivePreset(null);
@@ -140,15 +142,15 @@ export function SharpeningSettings() {
             {PRESETS.map((p) => (
               <button
                 type="button"
-                key={p.name}
+                key={p.id}
                 onClick={() => applyPreset(p)}
                 className={`text-xs py-1.5 rounded transition-colors ${
-                  activePreset === p.name
+                  activePreset === p.id
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-primary/10"
                 }`}
               >
-                {p.name}
+                {t.toolSettings.sharpening.presetNames[p.id]}
               </button>
             ))}
           </div>

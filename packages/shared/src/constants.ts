@@ -4,6 +4,34 @@ import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "./mod
 import { toolSection } from "./section.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
 
+export const PDF_MULTI_TOOL_LIMITS = { documents: 20, outputPages: 1200 } as const;
+
+/**
+ * Largest width or height, in pixels, the resize-style tools accept. The API schemas
+ * enforce it (image-engine re-exports it for them); web panels import it from here
+ * to bound their inputs.
+ */
+export const MAX_RESIZE_OUTPUT_DIMENSION = 16383;
+
+/**
+ * Largest width x height product the resize-style tools accept, in pixels (64 MP).
+ * Defined here for the same reason as the side ceiling: the API schemas and the web
+ * panels must agree on it, and the panels cannot import the Node image engine.
+ */
+export const MAX_RESIZE_OUTPUT_PIXELS = 67_108_864;
+
+/**
+ * Largest scale factor, in percent, the resize route accepts.
+ */
+export const MAX_RESIZE_PERCENTAGE = 1000;
+
+/**
+ * Largest width x height product the content-aware resize route accepts, in pixels
+ * (25 MP). Seam carving is far more expensive than a plain resize, so it cannot use
+ * the full MAX_RESIZE_OUTPUT_PIXELS budget.
+ */
+export const MAX_CONTENT_AWARE_RESIZE_PIXELS = 25_000_000;
+
 export const CATEGORIES: CategoryInfo[] = [
   // Image
   { id: "essentials", name: "Essentials", icon: "Layers", color: "#3B82F6" },
@@ -1499,6 +1527,18 @@ const BASE_TOOLS: Tool[] = [
     executionHint: "fast",
   },
   {
+    id: "multi-tool-pdf",
+    name: "PDF Multi-Tool",
+    description: "Reorder, rotate, delete, and pull in pages from other PDFs in one editor",
+    category: "pdf-organize",
+    icon: "LayoutGrid",
+    route: "/multi-tool-pdf",
+    modality: "document",
+    acceptedInputs: [".pdf"],
+    keywords: ["pdf multi tool", "organize merge pages", "page editor"],
+    executionHint: "fast",
+  },
+  {
     id: "protect-pdf",
     name: "Protect PDF",
     description: "Add password protection (AES-256 encryption)",
@@ -2737,3 +2777,28 @@ export const PYTHON_SIDECAR_TOOLS = [
   "background-replace",
   "blur-background",
 ] as const;
+
+/**
+ * X-File-Notes key meaning "this note applies to every file with a result".
+ * Sent instead of one identical entry per file, so a batch where every file
+ * carries the same note (Deep Enhance unavailable, say) keeps a small header
+ * however many files it has (#1303).
+ */
+export const FILE_NOTES_ALL_FILES = "*";
+
+/**
+ * Allowed model identifiers for background removal.
+ * Matches packages/ai/python/remove_bg.py ALLOWED_MODELS.
+ */
+export const BG_REMOVAL_MODELS = [
+  "u2net",
+  "isnet-general-use",
+  "bria-rmbg",
+  "birefnet-general-lite",
+  "birefnet-portrait",
+  "birefnet-general",
+  "birefnet-matting",
+  "birefnet-hr-matting",
+] as const;
+
+export type BgRemovalModel = (typeof BG_REMOVAL_MODELS)[number];

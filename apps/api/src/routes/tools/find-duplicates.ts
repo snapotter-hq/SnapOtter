@@ -1,13 +1,27 @@
+import { extname } from "node:path";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { reportError, safeFormatTag } from "../../lib/error-report.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+  noteDecoderFallback,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
+import { logger } from "../../lib/logger.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   threshold: z.number().min(0).max(20).default(8),
@@ -79,8 +93,16 @@ async function extractFileInfo(file: FileData): Promise<FileInfo> {
       .jpeg({ quality: 70 })
       .toBuffer();
     thumbnail = `data:image/jpeg;base64,${thumbBuffer.toString("base64")}`;
-  } catch {
-    // Non-fatal: some formats may fail thumbnail generation
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+    // Non-fatal: the UI shows the entry without a preview. Info rather than
+    // debug, since it fires once per file and only on failure, and the default
+    // LOG_LEVEL would hide a debug line.
+    logger.info(
+      { err: rawErr, filename: file.filename, format },
+      "find-duplicates: thumbnail failed, returning null",
+    );
   }
 
   return {
@@ -123,10 +145,8 @@ export function registerFindDuplicates(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     // Parse and validate settings
@@ -152,71 +172,120 @@ export function registerFindDuplicates(app: FastifyInstance) {
         .send({ error: "At least 2 images are required for duplicate detection" });
     }
 
-    try {
-      const skippedFiles: Array<{ filename: string; reason: string }> = [];
-      const processableFiles: FileData[] = [];
+    const skippedFiles: Array<{ filename: string; reason: string }> = [];
+    const processableFiles: FileData[] = [];
 
-      for (const file of files) {
-        const validation = await validateImageBuffer(file.buffer, file.filename);
-        if (!validation.valid) {
-          skippedFiles.push({ filename: file.filename, reason: validation.reason });
-          continue;
+    for (const file of files) {
+      const validation = await validateImageBuffer(file.buffer, file.filename);
+      if (!validation.valid) {
+        if (validation.cause) {
+          logger.info(
+            { err: validation.cause, filename: file.filename },
+            "Image validation failed",
+          );
         }
-        if (validation.format === "heif") {
-          try {
-            file.buffer = await decodeHeic(file.buffer);
-          } catch {
-            skippedFiles.push({ filename: file.filename, reason: "Failed to decode HEIC" });
-            continue;
-          }
-        }
-        if (needsCliDecode(validation.format)) {
-          try {
-            const fileExt = file.filename.split(".").pop()?.toLowerCase();
-            file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-          } catch {
-            try {
-              await sharp(file.buffer).metadata();
-            } catch {
-              skippedFiles.push({
-                filename: file.filename,
-                reason: `Failed to decode ${validation.format.toUpperCase()}`,
-              });
-              continue;
-            }
-          }
-        }
-        if (validation.format === "svg") {
-          try {
-            file.buffer = decompressSvgz(file.buffer);
-            file.buffer = sanitizeSvg(file.buffer);
-          } catch {
-            skippedFiles.push({ filename: file.filename, reason: "Invalid SVG" });
-            continue;
-          }
-        }
+        skippedFiles.push({ filename: file.filename, reason: validation.reason });
+        continue;
+      }
+      if (validation.format === "heif") {
         try {
-          file.buffer = await autoOrient(file.buffer);
-        } catch {
-          skippedFiles.push({
-            filename: file.filename,
-            reason: "Failed to read image orientation",
-          });
+          file.buffer = await decodeHeic(file.buffer);
+        } catch (rawErr) {
+          // A missing decoder or storage write fault is the operator's
+          // problem, not this file's: rethrow it so the request answers
+          // 503 (#2800).
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          logger.warn(
+            { err, filename: file.filename, format: validation.format },
+            "find-duplicates: skipping file, HEIC decode failed",
+          );
+          skippedFiles.push({ filename: file.filename, reason: "Failed to decode HEIC" });
           continue;
         }
-        processableFiles.push(file);
       }
-
-      if (processableFiles.length < 2) {
-        return reply.status(400).send({
-          error:
-            processableFiles.length === 0
-              ? "No supported images found"
-              : "At least 2 processable images are required for duplicate detection",
-          skippedFiles,
-        });
+      let fallbackFormat: string | undefined;
+      if (needsCliDecode(validation.format)) {
+        try {
+          const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
+          file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
+          // Sharp reads some of these formats itself (DNG is a TIFF), so the
+          // decoder's failure only matters once that fallback fails too.
+          try {
+            const meta = await sharp(file.buffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(file.buffer).resize(1).raw().toBuffer();
+            }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+              throw decodeErr;
+            }
+            // pino serializes only the `err` key as an Error, so the fallback
+            // failure goes in as its message or it would land as `{}`.
+            logger.warn(
+              {
+                err: decodeErr,
+                probeErr: rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+                filename: file.filename,
+                format: validation.format,
+              },
+              "find-duplicates: skipping file, decode failed",
+            );
+            skippedFiles.push({
+              filename: file.filename,
+              reason: `Failed to decode ${validation.format.toUpperCase()}`,
+            });
+            continue;
+          }
+        }
       }
+      if (validation.format === "svg" || fallbackFormat === "svg") {
+        try {
+          file.buffer = decompressSvgz(file.buffer);
+          file.buffer = sanitizeSvg(file.buffer);
+        } catch (err) {
+          if (!isSvgClientError(err)) throw asDecoderOutOfMemory(err);
+          logger.warn(
+            { err, filename: file.filename, format: validation.format },
+            "find-duplicates: skipping file, SVG sanitize failed",
+          );
+          skippedFiles.push({ filename: file.filename, reason: "Invalid SVG" });
+          continue;
+        }
+      } else {
+        // autoOrient rethrows DecoderOutOfMemoryError and otherwise logs and
+        // returns the input when rotation fails; the hash step below is what
+        // rejects a buffer Sharp can't decode.
+        file.buffer = await autoOrient(file.buffer);
+      }
+      processableFiles.push(file);
+    }
 
+    if (processableFiles.length < 2) {
+      return reply.status(400).send({
+        error:
+          processableFiles.length === 0
+            ? "No supported images found"
+            : "At least 2 processable images are required for duplicate detection",
+        skippedFiles,
+      });
+    }
+
+    try {
       // Extract metadata, thumbnails, and compute hashes
       const fileInfos: FileInfo[] = [];
       for (const file of processableFiles) {
@@ -224,8 +293,37 @@ export function registerFindDuplicates(app: FastifyInstance) {
           const info = await extractFileInfo(file);
           info.hash = await computeDHash128(file.buffer);
           fileInfos.push(info);
-        } catch {
-          skippedFiles.push({ filename: file.filename, reason: "Failed to compute image hash" });
+        } catch (err) {
+          // This is where a buffer Sharp can't decode gets rejected. The probe
+          // in asInputErrorIfUndecodable tells a corrupt upload (expected: the
+          // user is told, info line, no Sentry) from a hash failure on an image
+          // Sharp can decode (a real fault: error line and a report). It logs
+          // the probe result itself; the line here adds the filename.
+          const classified = await asInputErrorIfUndecodable(
+            file.buffer,
+            normalizeOperationalWriteError(asDecoderOutOfMemory(err)),
+          );
+          if (isDecoderUnavailable(classified) || hasServerErrorStatus(classified)) {
+            throw classified;
+          }
+          if (isToolInputError(classified)) {
+            logger.info(
+              { err, filename: file.filename, reason: classified.message },
+              "find-duplicates: skipping undecodable file",
+            );
+            skippedFiles.push({ filename: file.filename, reason: classified.message });
+          } else {
+            logger.error(
+              { err, filename: file.filename },
+              "find-duplicates: hash failed on a decodable image",
+            );
+            void reportError(err, {
+              source: "http",
+              toolId: "find-duplicates",
+              inputFormat: safeFormatTag(file.filename),
+            });
+            skippedFiles.push({ filename: file.filename, reason: "Failed to compute image hash" });
+          }
         }
       }
 
@@ -331,10 +429,15 @@ export function registerFindDuplicates(app: FastifyInstance) {
         spaceSaveable,
         skippedFiles: skippedFiles.length > 0 ? skippedFiles : undefined,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      // Let the global handler answer a missing decoder or storage write fault
+      // as 503 and report it, the way the other custom routes do (#795, #1428, #2800).
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "find-duplicates" }, "Duplicate detection failed");
       return reply.status(422).send({
         error: "Duplicate detection failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

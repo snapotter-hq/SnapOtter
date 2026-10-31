@@ -1,83 +1,190 @@
-import { Check, ClipboardCopy, Copy, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { Check, ClipboardCopy, Copy, Loader2, X } from "lucide-react";
+import { type ReactNode, useRef, useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { useTimeouts } from "@/hooks/use-timeouts";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 type ColorFormat = "hex" | "rgb" | "hsl";
 
+interface ExtractedPalette {
+  colors: string[];
+  hexColors: string[];
+}
+
+interface ColorPaletteResponse {
+  colors: string[];
+  hex: string[];
+}
+
+function isNonEmptyStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((item) => typeof item === "string" && item.length > 0)
+  );
+}
+
+function isColorPaletteResponse(value: unknown): value is ColorPaletteResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    isNonEmptyStringArray(data.colors) &&
+    isNonEmptyStringArray(data.hex) &&
+    data.colors.length === data.hex.length
+  );
+}
+
+const FALLBACK_ENTRY_KEY = "__default__";
+
 export function ColorPaletteSettings() {
   const { t } = useTranslation();
   const ts = t.toolSettings["color-palette"];
-  const { files, processing, error, setProcessing, setError } = useFileStore();
+  const { entries, selectedIndex, files, processing, error, setProcessing, setError } =
+    useFileStore();
   const [count, setCount] = useState(8);
   const [format, setFormat] = useState<ColorFormat>("hex");
-  const [colors, setColors] = useState<string[]>([]);
-  const [hexColors, setHexColors] = useState<string[]>([]);
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [copiedExport, setCopiedExport] = useState<"css" | "json" | null>(null);
+  const [palettesByEntry, setPalettesByEntry] = useState<Record<string, ExtractedPalette>>({});
+  const [swatchCopy, setSwatchCopy] = useState<{ idx: number; ok: boolean } | null>(null);
+  const [exportCopy, setExportCopy] = useState<{ kind: "css" | "json"; ok: boolean } | null>(null);
+  const later = useTimeouts();
+  const abortRef = useRef<AbortController | null>(null);
+
+  const selectedEntry = entries[selectedIndex] ?? entries[0];
+  const activeEntryKey = selectedEntry?.id ?? FALLBACK_ENTRY_KEY;
+  const activePalette = palettesByEntry[activeEntryKey];
+  const colors = activePalette?.colors ?? [];
+  const hexColors = activePalette?.hexColors ?? [];
+
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleProcess = async () => {
-    if (files.length === 0) return;
+    const { entries: currentEntries, selectedIndex, files: currentFiles } = useFileStore.getState();
+    const capturedEntry = currentEntries[selectedIndex] ?? currentEntries[0];
+    const targetFile = capturedEntry?.file ?? currentFiles[0];
+    if (!targetFile) return;
+    const targetEntryKey = capturedEntry?.id ?? FALLBACK_ENTRY_KEY;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "color-palette",
+      is_batch: false,
+      file_count: 1,
+    });
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     setProcessing(true);
     setError(null);
-    setColors([]);
-    setHexColors([]);
+    setPalettesByEntry((prev) => {
+      if (!(targetEntryKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[targetEntryKey];
+      return next;
+    });
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      const hasCapturedEntry = capturedEntry
+        ? state.entries.some((e) => e.id === capturedEntry.id && e.file === capturedEntry.file)
+        : state.files.includes(targetFile);
+      if (!state.processing || !hasCapturedEntry) {
+        storeReset = true;
+        if (abortRef.current === controller) abortRef.current = null;
+        unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
+        controller.abort();
+      }
+    });
 
     try {
       const formData = new FormData();
-      formData.append("file", files[0]);
+      formData.append("file", targetFile);
       formData.append("settings", JSON.stringify({ count, format }));
 
       const res = await fetch(appUrl("/api/v1/tools/image/color-palette"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Failed: ${res.status}`);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
       }
 
-      const data = await res.json();
-      setColors(data.colors);
-      setHexColors(data.hex);
+      const data = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
+      if (controller.signal.aborted || storeReset) return;
+      if (!isColorPaletteResponse(data)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+      setPalettesByEntry((prev) => ({
+        ...prev,
+        [targetEntryKey]: { colors: data.colors, hexColors: data.hex },
+      }));
     } catch (err) {
+      if (
+        controller.signal.aborted ||
+        storeReset ||
+        (err instanceof DOMException && err.name === "AbortError")
+      ) {
+        return;
+      }
+      unsubscribe();
       setError(err instanceof Error ? err.message : ts.extracting);
     } finally {
-      setProcessing(false);
+      unsubscribe();
+      if (abortRef.current === controller) abortRef.current = null;
+      if (!controller.signal.aborted && !storeReset) {
+        setProcessing(false);
+      }
     }
   };
 
   const copyColor = async (color: string, idx: number) => {
     const ok = await copyToClipboard(color);
-    if (ok) {
-      setCopiedIdx(idx);
-      setTimeout(() => setCopiedIdx(null), 1500);
-    }
+    setSwatchCopy({ idx, ok });
+    later(() => setSwatchCopy(null), 1500, "swatchCopy");
   };
 
-  const copyCss = async () => {
+  const copyExport = async (kind: "css" | "json", text: string) => {
+    const ok = await copyToClipboard(text);
+    setExportCopy({ kind, ok });
+    later(() => setExportCopy(null), 1500, "exportCopy");
+  };
+
+  const copyCss = () => {
     const vars = hexColors.map((c, i) => `  --color-${i + 1}: ${c};`).join("\n");
-    const css = `:root {\n${vars}\n}`;
-    const ok = await copyToClipboard(css);
-    if (ok) {
-      setCopiedExport("css");
-      setTimeout(() => setCopiedExport(null), 1500);
-    }
+    return copyExport("css", `:root {\n${vars}\n}`);
   };
 
-  const copyJson = async () => {
-    const ok = await copyToClipboard(JSON.stringify(colors));
-    if (ok) {
-      setCopiedExport("json");
-      setTimeout(() => setCopiedExport(null), 1500);
-    }
-  };
+  const copyJson = () => copyExport("json", JSON.stringify(colors));
+
+  /** The tick, the cross, or the idle icon for one copy control. */
+  const copyIcon = (result: { ok: boolean } | null, idle: ReactNode) =>
+    result === null ? (
+      idle
+    ) : result.ok ? (
+      <Check className="h-3 w-3 text-success-ink shrink-0" />
+    ) : (
+      <X className="h-3 w-3 text-destructive shrink-0" />
+    );
 
   const hasFile = files.length > 0;
 
@@ -156,11 +263,13 @@ export function ColorPaletteSettings() {
                 onClick={copyCss}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
                 data-testid="color-palette-copy-css"
+                title={
+                  exportCopy?.kind === "css" && !exportCopy.ok ? t.common.copyFailed : undefined
+                }
               >
-                {copiedExport === "css" ? (
-                  <Check className="h-3 w-3 text-success-ink" />
-                ) : (
-                  <ClipboardCopy className="h-3 w-3" />
+                {copyIcon(
+                  exportCopy?.kind === "css" ? exportCopy : null,
+                  <ClipboardCopy className="h-3 w-3" />,
                 )}
                 CSS
               </button>
@@ -169,14 +278,17 @@ export function ColorPaletteSettings() {
                 onClick={copyJson}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
                 data-testid="color-palette-copy-json"
+                title={
+                  exportCopy?.kind === "json" && !exportCopy.ok ? t.common.copyFailed : undefined
+                }
               >
-                {copiedExport === "json" ? (
-                  <Check className="h-3 w-3 text-success-ink" />
-                ) : (
-                  <ClipboardCopy className="h-3 w-3" />
+                {copyIcon(
+                  exportCopy?.kind === "json" ? exportCopy : null,
+                  <ClipboardCopy className="h-3 w-3" />,
                 )}
                 JSON
               </button>
+              <CopyFeedback key={exportCopy?.kind} status={exportCopy} />
             </div>
           </div>
 
@@ -188,6 +300,7 @@ export function ColorPaletteSettings() {
                 key={hexColors[i]}
                 onClick={() => copyColor(color, i)}
                 className="flex items-center gap-2 p-1.5 rounded border border-border hover:bg-muted transition-colors"
+                title={swatchCopy?.idx === i && !swatchCopy.ok ? t.common.copyFailed : undefined}
               >
                 <div
                   className="w-6 h-6 rounded border border-border shrink-0"
@@ -196,14 +309,14 @@ export function ColorPaletteSettings() {
                 <span className="text-xs font-mono text-foreground flex-1 text-start truncate">
                   {color}
                 </span>
-                {copiedIdx === i ? (
-                  <Check className="h-3 w-3 text-success-ink shrink-0" />
-                ) : (
-                  <Copy className="h-3 w-3 text-muted-foreground shrink-0" />
+                {copyIcon(
+                  swatchCopy?.idx === i ? swatchCopy : null,
+                  <Copy className="h-3 w-3 text-muted-foreground shrink-0" />,
                 )}
               </button>
             ))}
           </div>
+          <CopyFeedback key={swatchCopy?.idx} status={swatchCopy} />
         </div>
       )}
     </div>

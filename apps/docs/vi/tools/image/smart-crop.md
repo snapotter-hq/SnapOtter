@@ -1,6 +1,6 @@
 ---
 description: "Cắt ảnh nhận biết chủ thể, khuôn mặt và entropy để đóng khung ảnh thông minh bằng Sharp và AI phát hiện khuôn mặt."
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: 61a1c1077782
 ---

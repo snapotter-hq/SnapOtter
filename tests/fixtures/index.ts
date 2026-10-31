@@ -89,6 +89,13 @@ export const fixtures = {
       blank: p("image/edge/test-blank.png"),
       tall: p("image/edge/test-portrait-tall.png"),
       extreme: p("image/edge/test-portrait-extreme.png"),
+      // TGA layouts sample.tga (uncompressed true-colour, no footer) doesn't
+      // cover, from ImageMagick 7 and Pillow 12 (the TGA 2.0 footer one).
+      tgaColormap: p("image/edge/tga-colormap.tga"),
+      tgaColormapRle: p("image/edge/tga-colormap-rle.tga"),
+      tgaGrayRle: p("image/edge/tga-gray-rle.tga"),
+      tgaRgbaRle: p("image/edge/tga-rgba-rle.tga"),
+      tga2RleFooter: p("image/edge/tga2-rle-footer.tga"),
     },
     formats: (ext: string) => p(`image/formats/sample.${ext}`),
     multipageTiff: p("image/formats/multipage.tiff"),
@@ -140,6 +147,7 @@ export const fixtures = {
     pdf2: p("document/valid/alt-2page.pdf"),
     pdf3: p("document/valid/test-3page.pdf"),
     pdfScanned: p("document/valid/ocr-scanned.pdf"),
+    pdfCidFont: p("document/valid/cid-font-not-embedded.pdf"),
     encrypted: p("document/valid/encrypted.pdf"),
     coloredBlock: p("document/edge/colored-block.pdf"),
     tiny: (ext: string) => p(`document/formats/tiny.${ext}`),
@@ -161,6 +169,7 @@ export const fixtures = {
   },
   security: {
     svgXxeFile: p("security/svg-xxe-file-read.svg"),
+    svgXxeFileZipped: p("security/svg-xxe-file-read.svgz"),
     svgXxeSsrf: p("security/svg-xxe-ssrf.svg"),
     svgXssNamespace: p("security/svg-xss-namespace.svg"),
     svgDoctypeFirst: p("security/svg-doctype-first.svg"),

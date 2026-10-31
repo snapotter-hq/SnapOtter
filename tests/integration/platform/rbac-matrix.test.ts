@@ -47,11 +47,11 @@ beforeAll(async () => {
     payload: { username: "matrix_user", password: "UserPass12" },
   });
   userToken = JSON.parse(userLogin.body).token;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 interface RouteTest {
   method: "GET" | "POST" | "PUT" | "DELETE";

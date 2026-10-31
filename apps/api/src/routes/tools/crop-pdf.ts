@@ -25,7 +25,7 @@ export function registerCropPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_cropped.pdf`);
       ctx.report(10, "Cropping");
-      await pdfcpuCropMargin(inPath, settings.margin, outPath);
+      await pdfcpuCropMargin(inPath, settings.margin, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

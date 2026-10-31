@@ -285,6 +285,110 @@ describe("qpdfLinearize", () => {
   });
 });
 
+describe("qpdfRotatePages", () => {
+  it("builds one --rotate flag per distinct angle with the page list", async () => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdf-ops.js").then((m) =>
+      m.qpdfRotatePages(
+        "/in.pdf",
+        [
+          { page: 2, angle: 90 },
+          { page: 5, angle: 90 },
+          { page: 7, angle: 180 },
+          { page: 1, angle: 270 },
+        ],
+        "/out.pdf",
+      ),
+    );
+    // Flags group by angle; page lists keep arrival order within an angle
+    // (absolute page references, so order does not matter to qpdf).
+    expect(h.lastArgs().slice(0, 3)).toEqual([
+      "--rotate=+90:2,5",
+      "--rotate=+180:7",
+      "--rotate=+270:1",
+    ]);
+    expect(h.lastArgs().slice(3)).toEqual(["/in.pdf", "/out.pdf"]);
+  });
+
+  it("validates page numbers and angles before spawning", async () => {
+    const mod = await import("../src/pdf-ops.js");
+    await expect(
+      mod.qpdfRotatePages("/in.pdf", [{ page: 0, angle: 90 }], "/out.pdf"),
+    ).rejects.toThrow("Invalid page number");
+    await expect(
+      mod.qpdfRotatePages("/in.pdf", [{ page: 2, angle: 45 as 90 }], "/out.pdf"),
+    ).rejects.toThrow("Invalid rotation");
+    await expect(mod.qpdfRotatePages("/in.pdf", [], "/out.pdf")).rejects.toThrow(
+      "qpdfRotatePages needs at least one rotation",
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
+describe("qpdfAssemblePages", () => {
+  it("builds --empty --pages <file> <spec> runs in plan order", async () => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdf-ops.js").then((m) =>
+      m.qpdfAssemblePages(
+        ["/a.pdf", "/b.pdf"],
+        [
+          { doc: 0, page: 3 },
+          { doc: 0, page: 1 },
+          { doc: 1, page: 2 },
+          { doc: 0, page: 5 },
+        ],
+        "/out.pdf",
+      ),
+    );
+    // Consecutive same-doc items merge into one run; output order follows the
+    // plan, including the doc0/doc1/doc0 interleave at the end.
+    expect(h.lastArgs()).toEqual([
+      "--empty",
+      "--pages",
+      "/a.pdf",
+      "3,1",
+      "/b.pdf",
+      "2",
+      "/a.pdf",
+      "5",
+      "--",
+      "/out.pdf",
+    ]);
+  });
+
+  it("keeps duplicates as plain repeated page numbers inside one run", async () => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdf-ops.js").then((m) =>
+      m.qpdfAssemblePages(
+        ["/a.pdf"],
+        [
+          { doc: 0, page: 2 },
+          { doc: 0, page: 2 },
+        ],
+        "/out.pdf",
+      ),
+    );
+    expect(h.lastArgs()).toEqual(["--empty", "--pages", "/a.pdf", "2,2", "--", "/out.pdf"]);
+  });
+
+  it("validates everything before spawning", async () => {
+    const mod = await import("../src/pdf-ops.js");
+    await expect(mod.qpdfAssemblePages([], [{ doc: 0, page: 1 }], "/out.pdf")).rejects.toThrow(
+      "at least one input",
+    );
+    await expect(mod.qpdfAssemblePages(["/a.pdf"], [], "/out.pdf")).rejects.toThrow(
+      "at least one page",
+    );
+    await expect(
+      mod.qpdfAssemblePages(["/a.pdf"], [{ doc: 1, page: 1 }], "/out.pdf"),
+    ).rejects.toThrow("Invalid doc index 1");
+    await expect(
+      mod.qpdfAssemblePages(["/a.pdf"], [{ doc: 0, page: 0 }], "/out.pdf"),
+    ).rejects.toThrow("Invalid page number 0");
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
 describe("qpdfRepair", () => {
   it("builds <in> <out> (plain rewrite)", async () => {
     h.nextClose({ code: 0 });
@@ -309,6 +413,119 @@ describe("qpdf pdf-ops use the 60s timeout", () => {
       expect(child.killSignals).toContain("SIGKILL");
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("preserves the 60s default timeout when opts carries signal without timeoutMs, and honors an explicit timeoutMs override", async () => {
+    const mod = await import("../src/pdf-ops.js");
+    vi.useFakeTimers();
+    try {
+      const child = h.nextManual();
+      const ac = new AbortController();
+      const settled = expect(
+        mod.qpdfLinearize("/in.pdf", "/out.pdf", { signal: ac.signal, timeoutMs: undefined }),
+      ).rejects.toThrow("qpdf timed out after 60s");
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(child.killed).toBe(false);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await settled;
+      expect(child.killSignals).toContain("SIGKILL");
+
+      const childCustom = h.nextManual();
+      const settledCustom = expect(
+        mod.qpdfLinearize("/in.pdf", "/out.pdf", { signal: ac.signal, timeoutMs: 10_000 }),
+      ).rejects.toThrow("qpdf timed out after 10s");
+      await vi.advanceTimersByTimeAsync(10_000);
+      await settledCustom;
+      expect(childCustom.killSignals).toContain("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("qpdf pdf-ops AbortSignal handling (#3305)", () => {
+  it("rejects immediately with Canceled without spawning when signal is already aborted across all pdf-ops", async () => {
+    const mod = await import("../src/pdf-ops.js");
+    const ac = new AbortController();
+    ac.abort();
+
+    await expect(
+      mod.qpdfMerge(["/a.pdf", "/b.pdf"], "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.qpdfSplitRanges("/in.pdf", "1-2", "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.qpdfRotate("/in.pdf", 90, "1-z", "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.qpdfEncrypt("/in.pdf", "user", "owner", "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.qpdfDecrypt("/in.pdf", "secret", "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.qpdfPagesSpec("/in.pdf", "1,2", "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.qpdfPagesSpecUnchecked("/in.pdf", "1,2", "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(mod.qpdfLinearize("/in.pdf", "/out.pdf", { signal: ac.signal })).rejects.toThrow(
+      "Canceled",
+    );
+    await expect(
+      mod.qpdfRotatePages("/in.pdf", [{ page: 1, angle: 90 }], "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.qpdfAssemblePages(["/a.pdf"], [{ doc: 0, page: 1 }], "/out.pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(mod.qpdfRepair("/in.pdf", "/out.pdf", { signal: ac.signal })).rejects.toThrow(
+      "Canceled",
+    );
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("kills the child with SIGKILL and unlinks the temporary job-JSON file when qpdfEncrypt aborts mid-run", async () => {
+    const child = h.nextManual();
+    const { qpdfEncrypt } = await import("../src/pdf-ops.js");
+    const ac = new AbortController();
+    const pending = qpdfEncrypt("/in.pdf", "userpw", "ownerpw", "/out.pdf", { signal: ac.signal });
+
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalled());
+    const jobPath = h.lastArgs()[0].replace("--job-json-file=", "");
+    expect(existsSync(jobPath)).toBe(true);
+
+    ac.abort();
+    await expect(pending).rejects.toThrow("Canceled");
+    expect(child.killSignals).toContain("SIGKILL");
+    expect(existsSync(jobPath)).toBe(false);
+  });
+
+  it("kills the child with SIGKILL when signal aborts mid-run across the remaining pdf-ops", async () => {
+    const mod = await import("../src/pdf-ops.js");
+    const calls = [
+      (signal: AbortSignal) => mod.qpdfMerge(["/a.pdf", "/b.pdf"], "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.qpdfSplitRanges("/in.pdf", "1-2", "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.qpdfRotate("/in.pdf", 90, "1-z", "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.qpdfDecrypt("/in.pdf", "secret", "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.qpdfPagesSpec("/in.pdf", "1,2", "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.qpdfPagesSpecUnchecked("/in.pdf", "1,2", "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.qpdfLinearize("/in.pdf", "/out.pdf", { signal }),
+      (signal: AbortSignal) =>
+        mod.qpdfRotatePages("/in.pdf", [{ page: 1, angle: 90 }], "/out.pdf", { signal }),
+      (signal: AbortSignal) =>
+        mod.qpdfAssemblePages(["/a.pdf"], [{ doc: 0, page: 1 }], "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.qpdfRepair("/in.pdf", "/out.pdf", { signal }),
+    ];
+    for (const invoke of calls) {
+      const child = h.nextManual();
+      const ac = new AbortController();
+      const pending = invoke(ac.signal);
+      ac.abort();
+      await expect(pending).rejects.toThrow("Canceled");
+      expect(child.killSignals).toContain("SIGKILL");
     }
   });
 });

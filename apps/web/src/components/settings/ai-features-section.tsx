@@ -11,15 +11,29 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { apiGet, formatHeaders } from "@/lib/api";
+import { apiGet, failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
-function formatTimeRemaining(ms: number, t: TranslationKeys): string {
+export function formatTimeRemaining(ms: number, t: TranslationKeys, locale: string): string {
   if (ms < 60000) return t.features.lessThanMinute;
   const mins = Math.round(ms / 60000);
-  if (mins === 1) return t.features.oneMinuteLeft;
+
+  let rule = "other";
+  try {
+    rule = new Intl.PluralRules(locale).select(mins);
+  } catch (err) {
+    // If the locale is invalid or unsupported, fallback to default 'other' behavior
+    console.error(`Invalid locale for PluralRules: ${locale}`, err);
+  }
+
+  if (rule === "one" && t.features.oneMinuteLeft) return format(t.features.oneMinuteLeft, { mins });
+  if (rule === "two" && t.features.minutesLeftTwo)
+    return format(t.features.minutesLeftTwo, { mins });
+  if (rule === "few" && t.features.minutesLeftFew)
+    return format(t.features.minutesLeftFew, { mins });
   return format(t.features.minutesLeft, { mins });
 }
 
@@ -27,6 +41,7 @@ export function AiFeaturesSection() {
   const { t } = useTranslation();
   const {
     bundles,
+    bundlesStale,
     fetch,
     installing,
     errors,
@@ -89,6 +104,11 @@ export function AiFeaturesSection() {
       </div>
 
       <div className="space-y-3">
+        {bundlesStale && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t.settings.aiFeatures.statusStale}
+          </p>
+        )}
         {bundles.map((bundle) => (
           <BundleCard
             key={bundle.id}
@@ -257,9 +277,21 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
         body: formData,
       });
 
+      // These two refusals are fixed by their status alone, so they get their
+      // own translated line (#1445).
+      if (res.status === 409 || res.status === 507) {
+        setFeedback({
+          type: "error",
+          message:
+            res.status === 409
+              ? t.settings.aiFeatures.importBusy
+              : t.settings.aiFeatures.importNoSpace,
+        });
+        return;
+      }
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(body.error || `Import failed: ${res.status}`);
+        const body = await res.json().catch(() => null);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Import failed: ${res.status}`));
       }
 
       setFeedback({ type: "success", message: t.settings.aiFeatures.importSuccess });
@@ -271,7 +303,10 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
       }
       onImported();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
+      // The import's reasons are specific and technical (a bad signature, a
+      // missing file in the archive) and carry no code to translate, so the
+      // detail stays inside the translated sentence.
+      const msg = err instanceof Error ? err.message : t.errors.generic;
       setFeedback({
         type: "error",
         message: format(t.settings.aiFeatures.importError, { error: msg }),
@@ -418,7 +453,7 @@ function BundleCard({
   isQueued: boolean;
   startTime: number | null;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const incompatible = bundle.compatibility === "incompatible";
   const displayedError = error ?? bundle.error;
@@ -443,16 +478,16 @@ function BundleCard({
     const rate = progress.percent / elapsed;
     if (rate <= 0) return null;
     const remaining = (100 - progress.percent) / rate;
-    return formatTimeRemaining(remaining, t);
+    return formatTimeRemaining(remaining, t, locale);
   })();
 
   return (
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">{bundle.name}</p>
+          <p className="text-sm font-medium text-foreground">{bundleName(t, bundle)}</p>
           <p className="text-xs text-muted-foreground">
-            {bundle.description} (~
+            {bundleDescription(t, bundle)} (~
             {bundle.downloadBytes ? formatFileSize(bundle.downloadBytes) : bundle.estimatedSize}
             {bundle.installedBytes
               ? `, ${format(t.settings.aiFeatures.sizeOnDisk, {

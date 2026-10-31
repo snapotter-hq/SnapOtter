@@ -1,6 +1,6 @@
 ---
 description: "使用 OpenID Connect 设置单点登录。提供 Keycloak、Authentik、Google、Microsoft Entra ID (Azure AD)、Okta 及其他 OIDC 提供商的分步指南。"
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: 57678911503c
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 请勿设置 `NODE_TLS_REJECT_UNAUTHORIZED=0`。这会禁用所有 TLS 验证，存在安全风险。
 :::
+
+## 使用明文 http 的颁发者 {#plain-http-issuers}
+
+只有当 `EXTERNAL_URL` 也是明文 http 时，SnapOtter 才接受 `http://` 开头的颁发者 URL，这适用于本地或局域网测试环境。此时发现请求、登录代码交换和令牌都以未加密的形式在网络上传输，因此 SnapOtter 会在启动时记录一条警告，并注明颁发者的主机。如果 `EXTERNAL_URL` 是 `https://`，使用 http 的颁发者会在登录时被拒绝，启动警告也会说明这一点。无论哪种情况，解决方法都是通过 https 提供身份提供商服务。
 
 ## 故障排查 {#troubleshooting}
 

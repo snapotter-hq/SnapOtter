@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ffmpegAvailable, resolveFfmpeg } from "../src/binaries.js";
 import {
   type EncoderTarget,
+  isVaapiEncoder,
   parseEncoderNames,
   resolveEncoder,
   setEncoderInventoryForTests,
+  VAAPI_DEVICE,
+  VAAPI_FILTER,
 } from "../src/encoders.js";
 
 /**
@@ -119,6 +122,14 @@ describe("resolveEncoder falls back when the binary lacks the encoder (#1054)", 
     expect(resolveEncoder("av1")).toBe("av1_nvenc");
   });
 
+  it("falls back to software when the build lists the encoder and the trial encode fails (#1089)", () => {
+    setEncoderInventoryForTests(parseEncoderNames(WITH_NVENC), parseEncoderNames(SHIPPED_QSV_ONLY));
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(resolveEncoder("h264")).toBe("libx264");
+    expect(resolveEncoder("hevc")).toBe("libx265");
+    expect(resolveEncoder("av1")).toBe("libsvtav1");
+  });
+
   it("treats an unreadable inventory as absent rather than assuming presence", () => {
     setEncoderInventoryForTests(null);
     process.env.SNAPOTTER_HW_ACCEL = "nvenc";
@@ -191,6 +202,32 @@ describe.runIf(ffmpegAvailable())("resolveEncoder against the real ffmpeg binary
           installed.has(chosen),
           `${target} resolved to "${chosen}", which this ffmpeg does not list`,
         ).toBe(true);
+        // If a hardware encoder was returned, it must actually encode a frame (#1089).
+        if (chosen.endsWith("_nvenc") || chosen.endsWith("_vaapi")) {
+          const bin = resolveFfmpeg() as string;
+          const vaapi = isVaapiEncoder(chosen);
+          const trial = spawnSync(
+            bin,
+            [
+              "-hide_banner",
+              ...(vaapi ? ["-vaapi_device", VAAPI_DEVICE] : []),
+              "-f",
+              "lavfi",
+              "-i",
+              "nullsrc=s=256x256",
+              ...(vaapi ? ["-vf", VAAPI_FILTER] : []),
+              "-frames:v",
+              "1",
+              "-c:v",
+              chosen,
+              "-f",
+              "null",
+              "-",
+            ],
+            { encoding: "utf8" },
+          );
+          expect(trial.status, `${chosen} failed trial encode: ${trial.stderr}`).toBe(0);
+        }
       }
     });
   }

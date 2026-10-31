@@ -4,6 +4,7 @@ import { gsCompressPdfTuned } from "@snapotter/doc-engine";
 import { kbToBytes } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { scrubPdfProducerFile } from "../../lib/pdf-producer.js";
 import { createToolRoute } from "../tool-factory.js";
 
 // Mirrors the image "compress" tool: compress by a quality slider or to a
@@ -11,13 +12,18 @@ import { createToolRoute } from "../tool-factory.js";
 // into one monotonic quality axis (paramsForQuality). Quality mode runs one
 // pass at the slider value; target-size binary-searches the axis for the
 // largest output that still fits the target.
-const settingsSchema = z.object({
-  mode: z.enum(["quality", "targetSize"]).default("quality"),
-  quality: z.number().int().min(1).max(100).optional(),
-  targetSizeKb: z.number().positive().optional(),
-});
+const settingsSchema = z
+  .object({
+    mode: z.enum(["quality", "targetSize"]).default("quality"),
+    quality: z.number().int().min(1).max(100).optional(),
+    targetSizeKb: z.number().positive().optional(),
+  })
+  .refine((s) => s.mode !== "targetSize" || s.targetSizeKb !== undefined, {
+    message: "targetSizeKb is required when mode is targetSize",
+    path: ["targetSizeKb"],
+  });
 
-const MIN_DPI = 20;
+const MIN_DPI = 150;
 const MAX_DPI = 300;
 
 /**
@@ -25,6 +31,12 @@ const MAX_DPI = 300;
  * (dpi, qFactor) pair whose output size increases with q. The top half (q>=50)
  * preserves resolution and trades JPEG quality; the bottom half drops resolution
  * for aggressive targets. Verified monotonic on real scans (see spec).
+ *
+ * MIN_DPI is a legibility floor, not just a clamp: below ~150 dpi the
+ * downsampling plus DCT re-encode turns 10.5pt text on a 300 dpi scan into
+ * blocks (#1086), and target-size mode searched all the way down. 150 dpi is
+ * Ghostscript's own /ebook floor. Targets smaller than a legible output can
+ * reach now report targetMet=false instead of shipping unreadable text.
  */
 export function paramsForQuality(q: number): { dpi: number; qFactor: number } {
   const clamped = Math.max(1, Math.min(100, Math.round(q)));
@@ -42,10 +54,12 @@ export function registerCompressPdf(app: FastifyInstance) {
     },
     processV2: async (ctx) => {
       const settings = settingsSchema.parse(ctx.settings);
+      ctx.signal.throwIfAborted();
       const input = ctx.inputs[0];
       const base = input.filename.replace(/\.[^.]+$/, "");
       const inPath = join(ctx.scratchDir, `in-${input.filename.replace(/[^A-Za-z0-9._-]/g, "_")}`);
       await writeFile(inPath, input.buffer);
+      ctx.signal.throwIfAborted();
       const outPath = join(ctx.scratchDir, `${base}_compressed.pdf`);
 
       let resultPayload: Record<string, unknown> | undefined;
@@ -61,7 +75,8 @@ export function registerCompressPdf(app: FastifyInstance) {
           if (hit) return hit;
           const { dpi, qFactor } = paramsForQuality(key);
           const path = join(ctx.scratchDir, `cand-q${key}.pdf`);
-          await gsCompressPdfTuned(inPath, path, dpi, qFactor);
+          await gsCompressPdfTuned(inPath, path, dpi, qFactor, { signal: ctx.signal });
+          await scrubPdfProducerFile(path, { signal: ctx.signal });
           const entry = { path, size: (await stat(path)).size };
           cache.set(key, entry);
           return entry;
@@ -73,6 +88,7 @@ export function registerCompressPdf(app: FastifyInstance) {
         let smallest: { path: string; size: number } | null = null;
         const MAX_ITERS = 8;
         for (let iter = 0; iter < MAX_ITERS && lo <= hi; iter++) {
+          ctx.signal.throwIfAborted();
           const q = Math.round((lo + hi) / 2);
           ctx.report(10 + iter * 10, "Searching");
           const cand = await runQ(q);
@@ -98,7 +114,8 @@ export function registerCompressPdf(app: FastifyInstance) {
       } else {
         ctx.report(10, "Compressing");
         const { dpi, qFactor } = paramsForQuality(settings.quality ?? 75);
-        await gsCompressPdfTuned(inPath, outPath, dpi, qFactor);
+        await gsCompressPdfTuned(inPath, outPath, dpi, qFactor, { signal: ctx.signal });
+        await scrubPdfProducerFile(outPath, { signal: ctx.signal });
         // A "Compress" tool must never enlarge the file.
         if ((await stat(outPath)).size >= input.buffer.length) {
           await writeFile(outPath, input.buffer);

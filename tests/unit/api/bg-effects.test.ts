@@ -7,6 +7,7 @@ import {
   compositeOnColor,
   compositeOnImage,
   createGradientBackground,
+  normalizeHexColor,
 } from "../../../apps/api/src/lib/bg-effects.js";
 
 async function createTestImage(
@@ -201,6 +202,76 @@ describe("createGradientBackground", () => {
     const grad2 = await createGradientBackground(100, 100, "#00ff00", "#ffff00");
     expect(grad1.equals(grad2)).toBe(false);
   });
+
+  describe("gradient corner orientation (#2279)", () => {
+    it("angle 0 has color1 at bottom and color2 at top", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 0);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color2 (#0000ff)
+      expect(data[0]).toBeLessThan(50);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeGreaterThan(200);
+      // Bottom-left (0, 2) is color1 (#ff0000)
+      const i = (2 * 3 + 0) * 4;
+      expect(data[i]).toBeGreaterThan(200);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeLessThan(50);
+    });
+
+    it("angle 90 has color1 at left and color2 at right", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 90);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color1 (#ff0000)
+      expect(data[0]).toBeGreaterThan(200);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeLessThan(50);
+      // Top-right (2, 0) is color2 (#0000ff)
+      const i = (0 * 3 + 2) * 4;
+      expect(data[i]).toBeLessThan(50);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeGreaterThan(200);
+    });
+
+    it("angle 180 has color1 at top and color2 at bottom", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 180);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color1 (#ff0000)
+      expect(data[0]).toBeGreaterThan(200);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeLessThan(50);
+      // Bottom-left (0, 2) is color2 (#0000ff)
+      const i = (2 * 3 + 0) * 4;
+      expect(data[i]).toBeLessThan(50);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeGreaterThan(200);
+    });
+
+    it("angle 270 has color1 at right and color2 at left", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 270);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color2 (#0000ff)
+      expect(data[0]).toBeLessThan(50);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeGreaterThan(200);
+      // Top-right (2, 0) is color1 (#ff0000)
+      const i = (0 * 3 + 2) * 4;
+      expect(data[i]).toBeGreaterThan(200);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeLessThan(50);
+    });
+  });
 });
 
 describe("compositeOnColor", () => {
@@ -357,6 +428,34 @@ describe("applyEffects", () => {
     expect(result.equals(subject)).toBe(false);
   });
 
+  it("defaults gradientAngle to 180 (color1 at top, color2 at bottom) when not provided (#2279)", async () => {
+    const subject = await createSubjectWithAlpha(4, 3);
+    const original = await createTestImage(4, 3, 3);
+    const withDefault = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+    });
+    const with180 = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+      gradientAngle: 180,
+    });
+    expect(withDefault.equals(with180)).toBe(true);
+    const { data } = await sharp(withDefault)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    // Right half (x = 3) is transparent in the subject, showing top=color1 and bottom=color2
+    const topRight = (0 * 4 + 3) * 4;
+    expect(data[topRight]).toBeGreaterThan(200);
+    expect(data[topRight + 2]).toBeLessThan(50);
+    const bottomRight = (2 * 4 + 3) * 4;
+    expect(data[bottomRight]).toBeLessThan(50);
+    expect(data[bottomRight + 2]).toBeGreaterThan(200);
+  });
+
   it("image backgroundType composites on provided image", async () => {
     const subject = await createSubjectWithAlpha(100, 100);
     const original = await createTestImage(100, 100, 3);
@@ -443,5 +542,97 @@ describe("applyEffects", () => {
     const original = await createTestImage(100, 100, 3);
     const result = await applyEffects(subject, original, {});
     expect(result.equals(subject)).toBe(true);
+  });
+  // #2075: a bgType or flag that names an effect must produce it, not a silent no-op.
+  it("backgroundType blur blurs the original without blurEnabled", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createMultiColorImage(100, 100);
+    const result = await applyEffects(subject, original, { backgroundType: "blur" });
+    expect(result.equals(subject)).toBe(false);
+    const { data } = await sharp(result).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    // Right half of the subject is transparent, so the blurred original shows there.
+    const i = (50 * 100 + 90) * 4;
+    expect(data[i + 3]).toBe(255);
+  });
+
+  it("shadowEnabled without shadowOpacity uses the 35 default the UI shows", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const implicit = await applyEffects(subject, original, { shadowEnabled: true });
+    const explicit = await applyEffects(subject, original, {
+      shadowEnabled: true,
+      shadowOpacity: 35,
+    });
+    expect(implicit.equals(subject)).toBe(false);
+    expect(implicit.equals(explicit)).toBe(true);
+  });
+
+  it("expands a 3-digit hex color before compositing", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const short = await applyEffects(subject, original, {
+      backgroundType: "color",
+      backgroundColor: "#0f0",
+    });
+    const long = await applyEffects(subject, original, {
+      backgroundType: "color",
+      backgroundColor: "#00ff00",
+    });
+    expect(short.equals(long)).toBe(true);
+  });
+
+  it("expands 3-digit hex in gradient stops", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const short = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#f00",
+      gradientColor2: "#00f",
+    });
+    const long = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+    });
+    expect(short.equals(long)).toBe(true);
+  });
+  it("renders gradient stops written without the hash", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const bare = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "ff0000",
+      gradientColor2: "0000ff",
+    });
+    const hashed = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+    });
+    expect(bare.equals(hashed)).toBe(true);
+  });
+
+  it.each([
+    ["an image background with no image", { backgroundType: "image" }],
+    ["a color background with no color", { backgroundType: "color" }],
+    ["a gradient with one stop", { backgroundType: "gradient", gradientColor1: "#000000" }],
+  ])("throws for %s instead of returning a transparent result", async (_label, settings) => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    await expect(applyEffects(subject, original, settings)).rejects.toThrow(/needs/);
+  });
+});
+
+describe("normalizeHexColor", () => {
+  it.each([
+    ["#FF5500", "#ff5500"],
+    ["F50", "#ff5500"],
+    ["#f50", "#ff5500"],
+  ])("%s -> %s", (input, expected) => {
+    expect(normalizeHexColor(input)).toBe(expected);
+  });
+
+  it.each(["red", "#ff", "#ff00000", "", "#ff0000 "])("throws on %j", (input) => {
+    expect(() => normalizeHexColor(input)).toThrow(/Not a hex color/);
   });
 });

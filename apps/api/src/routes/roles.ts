@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { Permission } from "@snapotter/shared";
-import { eq, sql } from "drizzle-orm";
+import {
+  normalizeRoleName,
+  type Permission,
+  ROLE_NAME_MAX_LENGTH,
+  ROLE_NAME_MIN_LENGTH,
+  ROLE_NAME_PATTERN,
+} from "@snapotter/shared";
+import { eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
@@ -10,10 +16,30 @@ import {
   canAssignRole,
   canGrantRoleDefinition,
   canManageRoleDefinition,
+  hasEffectivePermission,
   requirePermission,
 } from "../permissions.js";
+import type { AuthUser } from "../plugins/auth.js";
 
-const ALL_PERMISSIONS: Permission[] = [
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function resolveTransactionActor(tx: Tx, user: AuthUser): Promise<AuthUser | null> {
+  let currentActor = user;
+  if (user.id !== "anonymous") {
+    const [currentActorRow] = await tx
+      .select({ role: schema.users.role })
+      .from(schema.users)
+      .where(eq(schema.users.id, user.id));
+    if (!currentActorRow) return null;
+    currentActor = { ...user, role: currentActorRow.role };
+  }
+  if (!(await hasEffectivePermission(currentActor, "security:manage", tx))) {
+    return null;
+  }
+  return currentActor;
+}
+
+export const ALL_PERMISSIONS: Permission[] = [
   "tools:use",
   "files:own",
   "files:all",
@@ -33,16 +59,20 @@ const ALL_PERMISSIONS: Permission[] = [
   "security:manage",
 ];
 
-const roleNameField = z
+export function validatePermissions(permissions: string[]): string[] {
+  return permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+}
+
+export const roleNameField = z
   .string()
-  .transform((v) => v.trim().toLowerCase())
+  .transform(normalizeRoleName)
   .pipe(
     z
       .string()
-      .min(2, "Role name must be 2-30 characters")
-      .max(30, "Role name must be 2-30 characters")
+      .min(ROLE_NAME_MIN_LENGTH, "Role name must be 2-30 characters")
+      .max(ROLE_NAME_MAX_LENGTH, "Role name must be 2-30 characters")
       .regex(
-        /^[a-z0-9_-]+$/,
+        ROLE_NAME_PATTERN,
         "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
       ),
   );
@@ -55,17 +85,17 @@ const toolPermissionsSchema = z
   .nullable()
   .optional();
 
-const createRoleSchema = z.object({
+export const createRoleSchema = z.object({
   name: roleNameField,
   description: z.string().max(500).optional(),
   permissions: z.array(z.string()).min(1, "At least one permission is required"),
   toolPermissions: toolPermissionsSchema,
 });
 
-const updateRoleSchema = z.object({
+export const updateRoleSchema = z.object({
   name: roleNameField.optional(),
   description: z.string().max(500).optional(),
-  permissions: z.array(z.string()).optional(),
+  permissions: z.array(z.string()).min(1, "At least one permission is required").optional(),
   toolPermissions: toolPermissionsSchema,
 });
 
@@ -82,6 +112,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         count: sql<number>`COUNT(*)::int`,
       })
       .from(schema.users)
+      .where(ne(schema.users.id, "anonymous"))
       .groupBy(schema.users.role);
     const countMap = new Map(userCounts.map((r) => [r.role, r.count]));
 
@@ -114,7 +145,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     }
     const { name, description, permissions, toolPermissions } = parsed.data;
 
-    const invalid = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+    const invalid = validatePermissions(permissions);
     if (invalid.length > 0) {
       return reply
         .status(400)
@@ -154,6 +185,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
 
     await auditFromRequest(request)("ROLE_CREATED", {
       adminId: user.id,
+      username: user.username,
       roleId: id,
       roleName: name,
     });
@@ -215,7 +247,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         updates.description = body.description.trim();
       }
       if (body.permissions) {
-        const invalid = body.permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+        const invalid = validatePermissions(body.permissions);
         if (invalid.length > 0) {
           return reply.status(400).send({
             error: `Invalid permissions: ${invalid.join(", ")}`,
@@ -249,23 +281,53 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
       // rewrite back on the rollback.
       //
       // The role row is locked and re-read inside the transaction instead of
-      // trusted from the select above (issue #1152). Two renames of one role
-      // both read the old name up there; the second one's users.role rewrite
-      // then matched nothing, its roles UPDATE still landed, and every
+      // trusted from the select above (issues #1152, #1196). Two renames of
+      // one role both read the old name up there; the second one's users.role
+      // rewrite then matched nothing, its roles UPDATE still landed, and every
       // assignee was left on a name with no row behind it. Under the lock the
       // second rename waits for the first and rewrites from the name it
-      // committed, and a role deleted in that window comes back as no row
-      // rather than a no-op 200. Lock order is the roles row, then users
-      // rows; the delete below takes them in the same order, so one always
-      // waits for the other instead of the two deadlocking.
+      // committed, a role deleted in that window comes back as no row rather
+      // than a no-op 200, and the authority checks re-run against the locked
+      // definition so permissions widened in that window cannot be bypassed.
+      // Lock order is the roles row, then users rows; the delete below takes
+      // them in the same order, so one always waits for the other instead of
+      // the two deadlocking.
       try {
-        const found = await db.transaction(async (tx) => {
+        const outcome = await db.transaction(async (tx) => {
           const [locked] = await tx
             .select()
             .from(schema.roles)
             .where(eq(schema.roles.id, id))
             .for("update");
-          if (!locked) return false;
+          const currentActor = await resolveTransactionActor(tx, user);
+          if (!currentActor) return "manage-denied" as const;
+          if (!locked) return "vanished" as const;
+          if (
+            !(await canManageRoleDefinition(
+              currentActor,
+              locked.name,
+              locked.permissions,
+              locked.toolPermissions,
+              tx,
+            ))
+          ) {
+            return "manage-denied" as const;
+          }
+          const lockedProspectivePermissions = body.permissions ?? locked.permissions;
+          const lockedProspectiveToolPermissions =
+            body.toolPermissions !== undefined
+              ? (body.toolPermissions ?? null)
+              : locked.toolPermissions;
+          if (
+            !(await canGrantRoleDefinition(
+              currentActor,
+              lockedProspectivePermissions,
+              lockedProspectiveToolPermissions,
+              tx,
+            ))
+          ) {
+            return "grant-denied" as const;
+          }
           if (body.name) {
             const renamedDisabledRole = `disabled:${body.name}`;
             await tx
@@ -282,11 +344,23 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
               );
           }
           await tx.update(schema.roles).set(updates).where(eq(schema.roles.id, id));
-          return true;
+          return "updated" as const;
         });
-        if (!found) {
+        if (outcome === "vanished") {
           request.log.info({ roleId: id }, "role deleted between its pre-checks and the row lock");
           return reply.status(404).send({ error: "Role not found", code: "NOT_FOUND" });
+        }
+        if (outcome === "manage-denied") {
+          return reply.status(403).send({
+            error: "Cannot manage a role beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (outcome === "grant-denied") {
+          return reply.status(403).send({
+            error: "Cannot update a role beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
         }
       } catch (err) {
         // Narrowed to the rename: `name` is the only unique column on roles, so
@@ -298,7 +372,11 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
-      await auditFromRequest(request)("ROLE_UPDATED", { adminId: user.id, roleId: id });
+      await auditFromRequest(request)("ROLE_UPDATED", {
+        adminId: user.id,
+        username: user.username,
+        roleId: id,
+      });
 
       return reply.send({ ok: true });
     },
@@ -340,18 +418,35 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Same lock, same order as the rename above (issue #1152): the role row
-      // first, then its users, with the name taken from the locked row. A
-      // rename that committed since the select above has already moved the
-      // assignees onto its new name, and matching on the stale one would
-      // leave them there with no row behind it.
+      // Same lock, same order as the rename above (issues #1152, #1196): the
+      // role row first, then its users, with the name and authority checked
+      // against the locked row. A rename that committed since the select above
+      // has already moved the assignees onto its new name, and a permissions
+      // change in that window may have raised the role beyond the caller's
+      // authority.
       const removed = await db.transaction(async (tx) => {
         const [locked] = await tx
           .select()
           .from(schema.roles)
           .where(eq(schema.roles.id, id))
           .for("update");
-        if (!locked) return null;
+        const currentActor = await resolveTransactionActor(tx, user);
+        if (!currentActor) return "denied" as const;
+        if (!locked) return "vanished" as const;
+        if (
+          !(await canManageRoleDefinition(
+            currentActor,
+            locked.name,
+            locked.permissions,
+            locked.toolPermissions,
+            tx,
+          ))
+        ) {
+          return "denied" as const;
+        }
+        if (!(await canAssignRole(currentActor, "user", tx))) {
+          return "reassign-denied" as const;
+        }
         await tx
           .update(schema.users)
           .set({
@@ -365,12 +460,25 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         await tx.delete(schema.roles).where(eq(schema.roles.id, id));
         return locked;
       });
-      if (!removed) {
+      if (removed === "vanished") {
         request.log.info({ roleId: id }, "role deleted between its pre-checks and the row lock");
         return reply.status(404).send({ error: "Role not found", code: "NOT_FOUND" });
       }
+      if (removed === "denied") {
+        return reply.status(403).send({
+          error: "Cannot manage a role beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+      if (removed === "reassign-denied") {
+        return reply.status(403).send({
+          error: "Cannot reassign role members beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
       await auditFromRequest(request)("ROLE_DELETED", {
         adminId: user.id,
+        username: user.username,
         roleId: id,
         roleName: removed.name,
       });

@@ -30,6 +30,7 @@ export const tr: TranslationKeys = {
     clear: "Temizle",
     copy: "Kopyala",
     copied: "Kopyalandı!",
+    copyFailed: "Kopyalama başarısız",
     noResults: "Sonuç bulunamadı",
     showLess: "Daha az göster",
     showMore: "{count} tane daha göster",
@@ -1103,6 +1104,11 @@ export const tr: TranslationKeys = {
       name: "PDF Düzenle",
       description: "Sayfaları belirli bir sırayla yeniden düzenle",
     },
+    "multi-tool-pdf": {
+      name: "PDF Çoklu Araç",
+      description:
+        "Sayfaları tek bir düzenleyicide yeniden sıralayın, döndürün, silin ve diğer PDF'lerden alın",
+    },
     "protect-pdf": {
       name: "PDF Koru",
       description: "Parola koruması ekle (AES-256 şifreleme)",
@@ -1239,7 +1245,13 @@ export const tr: TranslationKeys = {
       name: "Pipeline Oluşturucu",
       description: "Birden fazla aracı bir iş akışında zincirleyin",
     },
-    processing: { canceled: "İşlem iptal edildi" },
+    processing: {
+      canceled: "İşlem iptal edildi",
+      cancelUnavailable: "Bu işlem şu anda iptal edilemez. Hâlâ sürüyor.",
+      cancelNotAllowed:
+        "İptal edilemedi: oturumunuz kapalı ya da bu işlemi durdurma izniniz yok. İşlem sürüyor.",
+      cancelFailed: "İşlem iptal edilemedi. Hâlâ sürüyor, tekrar deneyin.",
+    },
     mediaPlayer: {
       unsupported: "Tarayıcınız bu medya formatını desteklemiyor.",
     },
@@ -1265,7 +1277,6 @@ export const tr: TranslationKeys = {
       paintOverObjectsToErase: "Silmek için nesnelerin üzerini boyayın",
     },
     "crop-canvas": {
-      original: "Orijinal:",
       cropPreview: "Kırpma önizlemesi",
       cropRegionSize: "Kırpma bölgesi: {width} x {height}",
       originalSize: "Orijinal: {width} x {height}",
@@ -1298,7 +1309,6 @@ export const tr: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} ızgara . {count} karo",
     },
     "remove-bg": {
-      original: "Orijinal:",
       transparent: "Saydam",
       color: "Renkli",
       gradient: "Gradyan",
@@ -1325,7 +1335,6 @@ export const tr: TranslationKeys = {
       theExtractedTextWillAppear: "OCR'yi çalıştırdıktan sonra çıkarılan metin burada görünecek.",
     },
     "image-enhancement": {
-      original: "Orijinal:",
       removesNoiseAndArtifactsUsing: "AI kullanarak gürültü ve kusurları kaldırır",
       analyzingImage: "Görüntü analiz ediliyor...",
       imageLooksGoodFineTune: "Görüntü iyi görünüyor. Yoğunluk kaydırıcısıyla ince ayar yapın.",
@@ -1337,8 +1346,6 @@ export const tr: TranslationKeys = {
       enhancedSizeKb: "İyileştirilmiş: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Tümü",
-      group: "Grup",
       dimensions: "Boyutlar",
       format: "Biçim",
       scanned: "Taranan:",
@@ -1373,7 +1380,6 @@ export const tr: TranslationKeys = {
       pageSize: "Sayfa boyutu",
     },
     color: {
-      original: "Orijinal:",
       light: "Işık",
       brightness: "Parlaklık",
       contrast: "Kontrast",
@@ -1411,6 +1417,7 @@ export const tr: TranslationKeys = {
       submitBatch: "Sıkıştır ({count} dosya)",
       submitTarget: "{size} KB'a sıkıştır",
       resizedToFit: "{size} KB sınırına sığması için {width} × {height} boyutuna küçültüldü",
+      batchResized: "{total} görüntüden {count} tanesi {size} KB sınırına sığması için küçültüldü.",
       progressLabel: "Sıkıştırılıyor",
       original: "Orijinal: {size} KB",
       processed: "İşlenmiş: {size} KB",
@@ -1442,6 +1449,8 @@ export const tr: TranslationKeys = {
       submit: "Boyutlandır",
       submitBatch: "Boyutlandır ({count} dosya)",
       progressLabel: "Boyutlandırılıyor",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      maxPercentageExceeded: "%1 ile %{max} arasında bir ölçek kullanın.",
     },
     crop: {
       width: "Genişlik",
@@ -1465,6 +1474,7 @@ export const tr: TranslationKeys = {
       submit: "Kırp",
       submitBatch: "Kırp ({count} dosya)",
       progressLabel: "Kırpılıyor",
+      free: "Serbest",
     },
     rotate: {
       rotate90CounterClockwise: "Saat yönünün tersine 90° döndür",
@@ -1484,7 +1494,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Uygulanıyor",
     },
     convert: {
-      original: "Orijinal:",
       originalSizeKb: "Orijinal: {size} KB",
       processedSizeKb: "İşlenmiş: {size} KB",
       targetFormat: "Hedef Biçim",
@@ -1514,7 +1523,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Optimize ediliyor",
     },
     "strip-metadata": {
-      original: "Orijinal:",
       iccProfile: "ICC Verisi",
       originalSize: "Orijinal: {size} KB",
       processedSize: "İşlenmiş: {size} KB",
@@ -1538,9 +1546,9 @@ export const tr: TranslationKeys = {
       metadataRemoved: "Kaldırılan meta veri: {size} KB",
       submit: "Meta Verileri Kaldır",
       progressLabel: "Meta veriler kaldırılıyor",
+      inspectFailed: "Meta veriler incelenemedi",
     },
     "edit-metadata": {
-      original: "Orijinal:",
       imageDescription: "Görüntü açıklaması",
       photographerCreatorName: "Fotoğrafçı / oluşturan adı",
       imageTitle: "Görüntü başlığı",
@@ -1601,6 +1609,7 @@ export const tr: TranslationKeys = {
       datesShifted: "tarihler kaydırıldı",
       submit: "Meta Verileri Uygula",
       progressLabel: "Meta veriler yazılıyor",
+      inspectFailed: "Dosya incelenemedi",
     },
     "bulk-rename": {
       pattern: "Kalıp",
@@ -1611,6 +1620,7 @@ export const tr: TranslationKeys = {
       renaming: "Yeniden adlandırılıyor...",
       submit: "{count} Dosyayı Yeniden Adlandır",
       zipDownloaded: "ZIP başarıyla indirildi",
+      renameFailed: "Yeniden adlandırma başarısız oldu",
     },
     "image-to-pdf": {
       preview: "Önizleme",
@@ -1640,10 +1650,12 @@ export const tr: TranslationKeys = {
       progressLabel: "PDF oluşturuluyor",
       uploadingImages: "Görüntüler yükleniyor...",
       processingPages: "{count} sayfa işleniyor...",
+      parseResponseFailed: "Sunucu yanıtı ayrıştırılamadı",
+      creationFailedWithStatus: "PDF oluşturulamadı. Görsellerinizi kontrol edip tekrar deneyin.",
+      networkErrorCreation: "PDF oluşturulurken ağ hatası",
+      requestTimedOut: "İstek zaman aşımına uğradı, sunucu aşırı yüklü olabilir",
     },
     "pdf-to-image": {
-      converting2: "Dönüştürülüyor",
-      page: "sayfa",
       custom: "Özel",
       uploadAPdfToGet: "Başlamak için bir PDF yükleyin",
       generatingPagePreviews: "Sayfa önizlemeleri oluşturuluyor...",
@@ -1700,6 +1712,12 @@ export const tr: TranslationKeys = {
       submitPlural: "Favicon Oluştur ({count} görüntü)",
       downloadZip: "Favicon ZIP'i İndir",
       progressLabel: "Faviconlar oluşturuluyor",
+      generationFailed: "Favicon oluşturulamadı. Başka bir görsel deneyin.",
+      networkError: "Favicon oluşturulurken ağ hatası",
+      timeout: "İstek zaman aşımına uğradı, sunucu aşırı yüklü olabilir",
+      uploadingImages: "Görüntüler yükleniyor...",
+      processingImagesOne: "{count} görüntü işleniyor...",
+      processingImagesOther: "{count} görüntü işleniyor...",
     },
     "adjust-colors": {
       light: "Işık",
@@ -1731,7 +1749,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Renkler ayarlanıyor",
     },
     sharpening: {
-      original: "Orijinal:",
       originalSize: "Orijinal: {size} KB",
       processedSize: "İşlenmiş: {size} KB",
       method: "Yöntem",
@@ -1758,9 +1775,17 @@ export const tr: TranslationKeys = {
       submit: "Keskinleştir",
       submitBatch: "Keskinleştir ({count} dosya)",
       progressLabel: "Keskinleştiriliyor",
+      presetNames: {
+        light: "Hafif",
+        medium: "Orta",
+        strong: "Güçlü",
+        portrait: "Portre",
+        landscape: "Manzara",
+        detail: "Ayrıntı",
+        print: "Baskı",
+      },
     },
     "replace-color": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       sourceColor: "Kaynak Renk (değiştirilecek)",
@@ -1774,7 +1799,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Renk değiştiriliyor",
     },
     "color-blindness": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       simulationType: "Simülasyon Türü",
@@ -1784,6 +1808,41 @@ export const tr: TranslationKeys = {
       submit: "Simüle Et",
       submitBatch: "Simüle Et ({count} dosya)",
       progressLabel: "Renk körlüğü simüle ediliyor",
+      types: {
+        protanopia: {
+          label: "Protanopi",
+          description: "Kırmızı koni yok. Kırmızılar koyu görünür. Erkeklerin ~%1'i.",
+        },
+        protanomaly: {
+          label: "Protanomali",
+          description: "Kırmızıya duyarlılık azalmıştır. Erkeklerin ~%1'i.",
+        },
+        deuteranopia: {
+          label: "Döteranopi",
+          description:
+            "Yeşil koni yok. Kırmızılar ve yeşiller birbirine benzer görünür. Erkeklerin ~%1'i.",
+        },
+        deuteranomaly: {
+          label: "Döteranomali",
+          description: "Yeşile duyarlılık azalmıştır. En yaygın tür. Erkeklerin ~%5'i.",
+        },
+        tritanopia: {
+          label: "Tritanopi",
+          description: "Mavi koni yok. Maviler ve yeşiller birbirine benzer görünür. Çok nadir.",
+        },
+        tritanomaly: {
+          label: "Tritanomali",
+          description: "Maviye duyarlılık azalmıştır. Çok nadir.",
+        },
+        achromatopsia: {
+          label: "Akromatopsi",
+          description: "Tam renk körlüğü. Yalnızca parlaklığı görür. Çok nadir.",
+        },
+        blueConeMonochromacy: {
+          label: "Mavi Koni Monokromazisi",
+          description: "Yalnızca mavi koniler çalışır. Renk algısı çok sınırlıdır. Çok nadir.",
+        },
+      },
     },
     "remove-background": {
       subject: "Konu",
@@ -1822,6 +1881,28 @@ export const tr: TranslationKeys = {
       progressLabel: "Arka plan kaldırılıyor",
       cpuNote:
         "Bir yapay zeka modeli kullanır. GPU olmadan büyük bir görüntü biraz zaman alabilir.",
+      colorPresets: {
+        white: "Beyaz",
+        black: "Siyah",
+        red: "Kırmızı",
+        green: "Yeşil",
+        blue: "Mavi",
+      },
+      gradientPresets: {
+        purple: "Mor",
+        pink: "Pembe",
+        blue: "Mavi",
+        green: "Yeşil",
+        sunset: "Gün Batımı",
+        lavender: "Lavanta",
+      },
+      effectsProcessingFailed: "Efekt işleme başarısız oldu",
+      effectsExpired:
+        "Önceki arka plan kaldırma işleminin süresi doldu, bu yüzden yeniden çalıştırılıyor. Bittiğinde efektleri uygulayın.",
+      refineChanged:
+        "Konu, kalite, kenar yumuşatma ve renk arındırma, arka plan kaldırılırken uygulanır. Yeni ayarları kullanmak için yeniden çalıştırın.",
+      backgroundImageRequired: "Devam etmek için bir arka plan görseli seçin.",
+      invalidHexColor: "#FF5500 veya #F50 gibi bir onaltılık renk kullanın.",
     },
     "remove-gif-background": {
       quality: "Kalite",
@@ -1860,7 +1941,6 @@ export const tr: TranslationKeys = {
       download: "İndir",
     },
     upscale: {
-      original: "Orijinal:",
       off: "Kapalı",
       originalKb: "Orijinal: {size} KB",
       upscaledKb: "Büyütülmüş: {size} KB",
@@ -1877,9 +1957,11 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntü büyütülüyor",
       cpuNote:
         "Yapay zeka ile büyütme yoğun işlem gerektirir. GPU olmadan büyük bir görüntü birkaç dakika sürebilir.",
+      qualityFast: "Hızlı",
+      qualityBalanced: "Dengeli",
+      qualityBest: "En İyi",
     },
     "erase-object": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       qualityFast: "Hızlı",
@@ -1896,12 +1978,16 @@ export const tr: TranslationKeys = {
       outputFormat: "Çıktı Biçimi",
       quality: "Kalite",
       paintHint:
-        "Kaldırmak istediğiniz nesnelerin üzerini boyayın. Geri almak için Ctrl+Z kullanın.",
+        "Kaldırmak istediğiniz nesnelerin üzerini boyayın. Geri almak için {shortcut} kullanın.",
       lassoHint:
-        "Kaldırmak istediğiniz nesnenin etrafına bir ilmek çizin. Geri almak için Ctrl+Z kullanın.",
+        "Kaldırmak istediğiniz nesnenin etrafına bir ilmek çizin. Geri almak için {shortcut} kullanın.",
       submit: "Nesneyi Sil",
       submitBatch: "Tümünü Sil ({count})",
       progressLabel: "Nesne siliniyor",
+      stall: "İşlem ilerleme olmadan zaman aşımına uğradı. Tekrar deneyin.",
+      stallBatch: "İşlem zaman aşımına uğradı. Tekrar deneyin.",
+      timeoutOverloaded: "İstek zaman aşımına uğradı, sunucu aşırı yüklü olabilir. Tekrar deneyin.",
+      erasingProgress: "Siliniyor {current}/{total}",
     },
     ocr: {
       copied: "Kopyalandı",
@@ -1911,6 +1997,8 @@ export const tr: TranslationKeys = {
         "Tanımadan önce yerel kontrastı iyileştirir. Hızlı doğrudan uygular; Dengeli ve En İyi yalnızca kalibre edilmiş puan sonucu iyileştirirse bu varyantı kullanır.",
       fastKoreanUnsupported:
         "Hızlı OCR Koreceyi desteklemez. Doğru OCR paketini yükleyip Dengeli veya En İyi seçeneğini seçin.",
+      fastArabicUnsupported:
+        "Hızlı OCR Arapçayı desteklemez. Doğru OCR paketini yükleyip Dengeli veya En İyi seçeneğini seçin.",
       language: "Dil",
       autoDetect: "Otomatik algıla",
       extractedText: "Çıkarılan Metin",
@@ -1919,6 +2007,9 @@ export const tr: TranslationKeys = {
       submit: "Metin Çıkar",
       submitBatch: "Metin Çıkar ({count} dosya)",
       progressLabel: "Metin çıkarılıyor",
+      filesFailed: "{total} dosyadan {failed} tanesi başarısız oldu",
+      noTextDetectedInline: "(metin algılanamadı)",
+      fileErrorInline: "(hata: {message})",
     },
     "ocr-pdf": {
       quality: "Kalite",
@@ -1932,7 +2023,6 @@ export const tr: TranslationKeys = {
       progressLabel: "PDF'den metin çıkarılıyor",
     },
     "blur-faces": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       blurRadius: "Bulanıklaştırma Yarıçapı",
@@ -1945,7 +2035,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Yüzler bulanıklaştırılıyor",
     },
     "enhance-faces": {
-      original: "Orijinal:",
       subtle: "Hafif",
       maximum: "Maksimum",
       fewerFaces: "Daha az yüz",
@@ -2006,6 +2095,9 @@ export const tr: TranslationKeys = {
       submitSubject: "Akıllı Kırp",
       submitFace: "Yüz Kırpma",
       submitTrim: "Kenarlıkları Kırp",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      cropAreaExceeded:
+        "Bu kırpma {max} piksel sınırını aşıyor. Genişliği, yüksekliği veya dolguyu azaltın.",
     },
     imageEnhancement: {
       enhancementMode: "İyileştirme Modu",
@@ -2041,6 +2133,14 @@ export const tr: TranslationKeys = {
         "Derin İyileştirme için Büyütme ve İyileştirme paketi gerekiyor ama yüklü değil, bu yüzden standart iyileştirme uygulandı.",
       deepEnhanceSkippedAnimated:
         "Derin İyileştirme animasyonlu görüntülerde çalışmaz, bu yüzden her kareye standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkipped:
+        "Derin İyileştirme {total} görüntünün {count} tanesinde çalışmadı, bu yüzden standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkippedFailed:
+        "Derin İyileştirme {total} görüntünün {count} tanesinde başarısız oldu, bu yüzden standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Büyütme ve İyileştirme paketi yüklü olmadığı için Derin İyileştirme {total} görüntünün {count} tanesinde çalışmadı.",
+      batchDeepEnhanceSkippedAnimated:
+        "Derin İyileştirme, animasyonlu oldukları için {total} görüntünün {count} tanesini atladı.",
     },
     "noise-removal": {
       off: "Kapalı",
@@ -2072,7 +2172,6 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntüden gürültü gideriliyor",
     },
     "red-eye-removal": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       fixedKb: "Düzeltilmiş: {size} KB",
       sensitivity: "Hassasiyet",
@@ -2089,7 +2188,6 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntüde kırmızı göz düzeltiliyor",
     },
     "restore-photo": {
-      original: "Orijinal:",
       subtle: "Hafif",
       strong: "Güçlü",
       originalKb: "Orijinal: {size} KB",
@@ -2125,6 +2223,9 @@ export const tr: TranslationKeys = {
       submit: "Boyutlandır",
       submitBatch: "Boyutlandır ({count} dosya)",
       progressLabel: "İçerik duyarlı boyutlandırma",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
+      areaExceeded:
+        "İçerik algılayan yeniden boyutlandırma toplam {max} piksel ile sınırlıdır. Genişliği veya yüksekliği azaltın.",
     },
     "ai-canvas-expand": {
       quality: "Kalite",
@@ -2146,7 +2247,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Tuval genişletiliyor",
     },
     colorize: {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       colorizedKb: "Renklendirilmiş: {size} KB",
       aiModel: "AI Modeli",
@@ -2291,6 +2391,12 @@ export const tr: TranslationKeys = {
       dragToAdjust: "Ayarlamak için sürükleyin",
       scrollToZoom: "Yakınlaştırmak için kaydırın",
       photoGenerated: "Fotoğraf oluşturuldu. Sol panelden indirin.",
+      analysisFailedWithStatus: "Bu fotoğraf analiz edilemedi. Daha net bir fotoğraf deneyin.",
+      faceAnalysisFailed: "Yüz analizi başarısız oldu",
+      generationFailedWithStatus: "Pasaport fotoğrafı oluşturulamadı. Lütfen tekrar deneyin.",
+      photoGenerationFailed: "Fotoğraf oluşturma başarısız oldu",
+      analysisExpired:
+        "Analizin süresi doldu, bu yüzden fotoğraf yeniden analiz ediliyor. Bittiğinde oluşturun.",
     },
     "transcribe-audio": {
       language: "Dil",
@@ -2348,7 +2454,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Arka plan bulanıklaştırılıyor",
     },
     "watermark-text": {
-      original: "Orijinal:",
       applyWatermark: "Filigranı Uygula",
       tiledRepeating: "Döşemeli (Tekrarlayan)",
       originalKb: "Orijinal: {size} KB",
@@ -2371,7 +2476,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Filigran ekleniyor",
     },
     "watermark-image": {
-      original: "Orijinal:",
       center: "Orta",
       topLeft: "Sol Üst",
       topRight: "Sağ Üst",
@@ -2390,7 +2494,6 @@ export const tr: TranslationKeys = {
       submitBatch: "Filigranı Uygula ({count} dosya)",
     },
     "text-overlay": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       text: "Metin",
@@ -2410,7 +2513,6 @@ export const tr: TranslationKeys = {
       defaultText: "Metninizi Buraya Yazın",
     },
     compose: {
-      original: "Orijinal:",
       screen: "Ekran",
       processing: "İşleniyor...",
       overlayImage: "Kaplama Görüntüsü",
@@ -2465,9 +2567,6 @@ export const tr: TranslationKeys = {
       backToGallery: "Galeriye Dön",
     },
     info: {
-      min: "min:",
-      max: "maks:",
-      mean: "ort:",
       minValue: "min:{value}",
       maxValue: "maks:{value}",
       meanValue: "ort:{value}",
@@ -2504,6 +2603,7 @@ export const tr: TranslationKeys = {
       similarity: "Benzerlik: %{percent}",
       submit: "Karşılaştır",
       downloadDiff: "Farkı İndir",
+      comparisonFailed: "Karşılaştırma başarısız oldu",
     },
     "find-duplicates": {
       sensitivity: "Hassasiyet",
@@ -2534,6 +2634,10 @@ export const tr: TranslationKeys = {
       threshold: "Eşik",
       submit: "Yinelenenleri Tara",
       scanning: "Taranıyor...",
+      parseResultsFailed: "Tarama sonuçları ayrıştırılamadı",
+      networkErrorUpload:
+        "Yükleme sırasında ağ hatası. Daha az dosyayla deneyin veya bağlantınızı kontrol edin.",
+      requestTimedOut: "İstek zaman aşımına uğradı. Daha az dosyayla deneyin.",
     },
     "color-palette": {
       colors: "Renkler",
@@ -2604,6 +2708,26 @@ export const tr: TranslationKeys = {
       downloadFormat: "İndirme Biçimi",
       submit: "QR Kodu Oluştur",
       download: "QR Kodunu İndir",
+      styleSquare: "Kare",
+      styleRounded: "Yuvarlak",
+      styleDots: "Noktalar",
+      styleClassy: "Şık",
+      styleClassyRounded: "Şık Yuv.",
+      styleExtraRounded: "Ekstra Yuv.",
+      styleDot: "Nokta",
+      formatDescPng: "Dijital için ideal",
+      formatDescSvg: "Baskı için ideal",
+      formatDescJpeg: "Daha küçük dosya",
+      formatDescWebp: "Modern biçim",
+      vcardFirstName: "Ad",
+      vcardFirstNamePlaceholder: "Ahmet",
+      vcardLastName: "Soyad",
+      vcardLastNamePlaceholder: "Yılmaz",
+      vcardOrganization: "Kuruluş",
+      vcardOrganizationPlaceholder: "Şirket",
+      vcardJobTitle: "Unvan",
+      vcardJobTitlePlaceholder: "Geliştirici",
+      vcardWebsite: "Web Sitesi",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2653,6 +2777,9 @@ export const tr: TranslationKeys = {
       noBarcodesFound: "Barkod bulunamadı",
       barcodesFound: "{count} barkod bulundu",
       barcodesFoundPlural: "{count} barkod bulundu",
+      scanningFile: "{name} taranıyor...",
+      scanningFailedWithStatus: "Bu görsel taranamadı. Başka bir görsel deneyin.",
+      filesFailed: "{total} dosyadan {count} tanesi başarısız oldu",
     },
     collage: {
       sideBySide: "Yan yana",
@@ -2673,9 +2800,6 @@ export const tr: TranslationKeys = {
       mosaic: "Mozaik",
       uploadingImages: "Görüntüler yükleniyor...",
       processingCollage: "Kolaj işleniyor...",
-      loaded: "yüklendi",
-      images: "görüntü",
-      collage: "Kolaj:",
       snapotter: "SnapOtter",
       background: "Arka Plan",
       format: "Biçim",
@@ -2711,6 +2835,12 @@ export const tr: TranslationKeys = {
       quality: "Kalite",
       submit: "Kolaj Oluştur",
       downloadCollage: "Kolajı İndir",
+      ratioFree: "Serbest",
+      bgWhite: "Beyaz",
+      bgBlack: "Siyah",
+      bgNone: "Yok",
+      bgCustom: "Özel",
+      collageFailed: "Kolaj oluşturulamadı",
     },
     stitch: {
       format: "Biçim",
@@ -2740,6 +2870,7 @@ export const tr: TranslationKeys = {
       outputFormat: "Çıktı Biçimi",
       quality: "Kalite",
       submit: "Görüntüleri Birleştir",
+      stitchFailed: "Birleştirme başarısız oldu",
     },
     split: {
       splitMode: "Bölme Modu",
@@ -2768,6 +2899,21 @@ export const tr: TranslationKeys = {
       submit: "Görüntüyü Böl",
       downloadAll: "Tümünü İndir (ZIP)",
       tileWarningSmall: "Karolar çok küçük olacak ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Yatay yarım",
+        verticalHalf: "Dikey yarım",
+        quarters: "Çeyrekler",
+        horizontalStrip: "Yatay şerit",
+        verticalStrip: "Dikey şerit",
+        grid9: "9 karolu ızgara",
+        portrait6: "6 karolu dikey",
+        landscape6: "6 karolu yatay",
+        grid16: "16 karolu ızgara",
+      },
+      keepOriginal: "Orijinali Koru",
+      auto: "Otomatik",
+      splitFailed: "Bölme başarısız oldu",
+      failedToSplit: "{name} bölünemedi: {detail}",
     },
     border: {
       blur: "Bulanıklık",
@@ -2793,6 +2939,16 @@ export const tr: TranslationKeys = {
       submit: "Kenarlık Ekle",
       submitBatch: "Kenarlık Ekle ({count} dosya)",
       progressLabel: "Kenarlık ekleniyor",
+      presetNames: {
+        cleanWhite: "Temiz Beyaz",
+        galleryBlack: "Galeri Siyahı",
+        shadow: "Gölge",
+        rounded: "Yuvarlak",
+        polaroid: "Polaroid",
+        vintage: "Vintage",
+        minimal: "Minimal",
+        cinematic: "Sinematik",
+      },
     },
     beautify: {
       background: "Arka Plan",
@@ -2809,7 +2965,6 @@ export const tr: TranslationKeys = {
       text: "Metin",
       position: "Konum",
       newTab: "Yeni Sekme",
-      frame: "Çerçeve",
       quickPresets: "Hızlı Şablonlar",
       linear: "Doğrusal",
       radial: "Dairesel",
@@ -2837,6 +2992,33 @@ export const tr: TranslationKeys = {
       submit: "Güzelleştir",
       submitBatch: "Güzelleştir ({count} dosya)",
       progressLabel: "Ekran görüntüsü güzelleştiriliyor",
+      presetPurpleHaze: "Mor Sis",
+      presetFlamingo: "Flamingo",
+      presetOcean: "Okyanus",
+      presetMidnight: "Gece Yarısı",
+      presetMint: "Nane",
+      presetSunset: "Gün Batımı",
+      presetCleanWhite: "Temiz Beyaz",
+      presetNoBackground: "Arka Plan Yok",
+      bgGradient: "Gradyan",
+      bgSolid: "Düz",
+      bgImage: "Görsel",
+      none: "Yok",
+      frameBrowser: "Tarayıcı",
+      shadowSubtle: "Hafif",
+      shadowMedium: "Orta",
+      shadowDramatic: "Dramatik",
+      shadowCustom: "Özel",
+      socialOriginal: "Orijinal",
+      socialIgSquare: "IG Kare",
+      socialIgStory: "IG Hikaye",
+      positionTopLeft: "Sol Üst",
+      positionTopRight: "Sağ Üst",
+      positionCenter: "Orta",
+      positionBottomLeft: "Sol Alt",
+      positionBottomRight: "Sağ Alt",
+      processingFailed: "İşlem başarısız oldu",
+      processingFailedStatus: "Bu görsel işlenemedi. Lütfen tekrar deneyin.",
     },
     "circle-crop": {
       border: "Kenarlık",
@@ -2875,6 +3057,16 @@ export const tr: TranslationKeys = {
       submit: "Çift Ton Uygula",
       submitBatch: "Çift Ton Uygula ({count} dosya)",
       progressLabel: "Çift ton uygulanıyor",
+      presetNames: {
+        classic: "Klasik",
+        noir: "Noir",
+        sepia: "Sepya",
+        midnight: "Gece Yarısı",
+        sunset: "Gün Batımı",
+        cyber: "Siber",
+        ocean: "Okyanus",
+        forest: "Orman",
+      },
     },
     "image-pad": {
       background: "Arka Plan",
@@ -2887,6 +3079,7 @@ export const tr: TranslationKeys = {
       submit: "Görsel Dolgula",
       submitBatch: "Görsel Dolgula ({count} dosya)",
       progressLabel: "Görsel dolgulanıyor",
+      custom: "Özel",
     },
     pixelate: {
       blockSize: "Blok Boyutu",
@@ -2988,7 +3181,6 @@ export const tr: TranslationKeys = {
       progressLabel: "SVG dönüştürülüyor",
     },
     vectorize: {
-      original: "Orijinal:",
       detail: "Ayrıntı",
       smoothing: "Yumuşatma",
       blackWhite: "Siyah-Beyaz",
@@ -3025,7 +3217,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Vektörleştiriliyor",
     },
     "gif-tools": {
-      original: "Orijinal:",
       widthPx: "Genişlik (px)",
       auto: "Otomatik",
       heightPx: "Yükseklik (px)",
@@ -3082,6 +3273,7 @@ export const tr: TranslationKeys = {
       submit: "GIF İşle",
       submitBatch: "İşle ({count} dosya)",
       progressLabel: "GIF işleniyor",
+      maxDimensionExceeded: "1 ile {max} px arasında bir boyut kullanın.",
     },
     "image-to-base64": {
       converting: "Dönüştürülüyor...",
@@ -3116,6 +3308,7 @@ export const tr: TranslationKeys = {
       includeText: "Metin Ekle",
       submit: "Barkod Oluştur",
       download: "Barkodu İndir",
+      generateFailed: "Barkod oluşturulamadı",
     },
     "chart-maker": {
       optionalChartTitle: "İsteğe bağlı grafik başlığı",
@@ -3126,6 +3319,11 @@ export const tr: TranslationKeys = {
       submit: "Grafik Oluştur",
       submitBatch: "Grafik Oluştur ({count} dosya)",
       progressLabel: "Grafik oluşturuluyor",
+      kindBar: "Çubuk",
+      kindLine: "Çizgi",
+      kindPie: "Pasta",
+      rowsSkipped:
+        "Grafiğe eklenen satırlar: {charted}. Değer sütununda sayı olmadığı için atlananlar: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Model",
@@ -3516,12 +3714,12 @@ export const tr: TranslationKeys = {
       submit: "Sıkıştır",
       submitBatch: "Sıkıştır ({count} dosya)",
       submitTarget: "{size}'a sıkıştır",
+      batchMissed: "{total} dosyadan {count} tanesi {target} altına inemedi.",
       progressLabel: "Sıkıştırılıyor",
       bestEffortHint:
         "Elden gelenin en fazlası. Görüntü tabanlı PDF'ler bu boyuta yaklaşır; yalnızca metin içeren PDF'ler bu boyuta küçülmeyebilir.",
       targetReached: "{target} hedefinize ulaşıldı (sonuç: {size}).",
-      targetMissed:
-        "{target} boyutuna ulaşılamadı. Ulaşılabilen en küçük boyut {size} oldu; çünkü bu PDF çoğunlukla metin veya vektörlerden oluşuyor ve görüntü sıkıştırma bunları küçültemez.",
+      targetMissed: "{target} boyutuna ulaşılamadı. Ulaşılabilen en küçük boyut {size} oldu.",
     },
     "rotate-pdf": {
       angle: "Döndürme açısı",
@@ -3590,6 +3788,30 @@ export const tr: TranslationKeys = {
       pageLabel: "Sayfa {n}",
       orderTooLong:
         "Gönderilemeyecek kadar çok ayrı taşıma var. Sıfırlayın ve daha az değişiklikle deneyin.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "En fazla {docs} PDF ve {pages} çıktı sayfası.",
+      addDocument: "PDF ekle",
+      addAll: "Tüm sayfaları ekle",
+      allPages: "Tümü planda",
+      addPage: "{n}. sayfayı ekle",
+      dragHint:
+        "Yeniden sıralamak, döndürmek veya kaldırmak için sürükleyin. Sayfalarını almak için PDF ekleyin.",
+      reset: "Planı sıfırla",
+      emptyPlan: "Planda henüz sayfa yok. Yukarıdaki belgelerden sayfa ekleyin.",
+      docFailed: "Bir belge okunamadı.",
+      skippedNotPdf: "{count} dosya atlandı: yalnızca PDF eklenebilir.",
+      skippedOverLimit: "{count} PDF eklenmedi: düzenleyici en fazla {docs} PDF alır.",
+      pageLabel: "Konum {n}",
+      planSummary: "{docs} belgeden {pages} sayfa birleştirilecek.",
+      submit: "PDF oluştur ({pages} sayfa)",
+      progressLabel: "Birleştiriliyor",
+      rotateLeft: "Sola döndür",
+      rotateRight: "Sağa döndür",
+      removePage: "Sayfayı kaldır",
+      removeDoc: "PDF'yi kaldır",
+      zoomIn: "Yakınlaştır",
+      zoomOut: "Uzaklaştır",
     },
     "protect-pdf": {
       userPassword: "Kullanıcı şifresi",
@@ -3710,6 +3932,9 @@ export const tr: TranslationKeys = {
         uploadHint:
           "Bir PNG / JPG bırakın veya seçmek için tıklayın. Şeffaf PNG en iyi sonucu verir.",
       },
+      exportFailed: "Yerleştirilen imzalar okunamadı. Tekrar deneyin.",
+      stall: "İşlem zaman aşımına uğradı. Tekrar deneyin.",
+      timeout: "İstek zaman aşımına uğradı. Tekrar deneyin.",
     },
     "redact-pdf": {
       terms: "Karalanacak terimler",
@@ -3723,6 +3948,9 @@ export const tr: TranslationKeys = {
       submit: "Metni Çıkar",
       submitBatch: "Metni Çıkar ({count} dosya)",
       progressLabel: "Çıkarılıyor",
+      scannedHint:
+        "Bu PDF taranmış, bu yüzden çıkarılacak metin yok. OCR okuyabilir, ancak daha uzun sürer ve OCR yapay zeka paketinin kurulu olmasını gerektirir.",
+      runOcr: "Bu PDF'de OCR çalıştır",
     },
     "pdf-to-word": {
       hint: "Metin tabanlı PDF'ler için en iyisidir; taranan sayfalar OCR gerektirir",
@@ -3879,6 +4107,8 @@ export const tr: TranslationKeys = {
     importFromFiles: "Dosyalardan İçe Aktar",
     saveToFiles: "Dosyalara Kaydet",
     savedToFiles: "Dosyalara Kaydedildi",
+    resultExpired: "Bu sonucun süresi doldu. Aracı yeniden çalıştırın.",
+    libraryFull: "Dosya depolama alanınız dolu. Birkaç dosyayı silip yeniden deneyin.",
     librarySaveTitle: "Bu dosya Dosyalarınızdan geliyor",
     librarySaveAsNew: "Sonucu yeni dosya olarak kaydet",
     librarySaveAsNewHint: "Orijinal, Dosyalarınızda kalır",
@@ -4099,7 +4329,7 @@ export const tr: TranslationKeys = {
       dropDescription: "Başlamak için buraya bir görüntü bırakın",
       openImageButton: "Görüntü Aç",
       newDocumentButton: "Yeni Belge",
-      pasteHint: "Veya panodan yapıştırın (Ctrl+V)",
+      pasteHint: "Veya panodan yapıştırın ({shortcut})",
     },
     mobile: {
       heading: "Masaüstü Önerilir",
@@ -4152,6 +4382,7 @@ export const tr: TranslationKeys = {
         ratioLabel: "Oran:",
         applyTitle: "Kırpmayı Uygula (Enter)",
         cancelTitle: "Kırpmayı İptal Et (Escape)",
+        free: "Serbest",
       },
       dodgeBurn: {
         dodge: "Soldur",
@@ -4168,6 +4399,9 @@ export const tr: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Örnek:",
         toggleDropdown: "Açılır menüyü aç/kapat",
+        samplePoint: "Nokta (1x1)",
+        sampleAverage3: "3x3 Ortalama",
+        sampleAverage5: "5x5 Ortalama",
       },
       fill: {
         tolerance: "Tolerans",
@@ -4264,6 +4498,68 @@ export const tr: TranslationKeys = {
         grain: "Gren",
         resetAll: "Tümünü Sıfırla",
         apply: "Uygula",
+        autoButtons: {
+          autoTone: "Otomatik Ton",
+          autoContrast: "Otomatik Kontrast",
+          autoColor: "Otomatik Renk",
+          autoEnhance: "Otomatik İyileştir",
+        },
+        sliders: {
+          brightness: "Parlaklık",
+          contrast: "Kontrast",
+          hue: "Ton",
+          saturation: "Doygunluk",
+          luminance: "Işıklılık",
+          exposure: "Pozlama",
+          vibrance: "Canlılık",
+          warmth: "Sıcaklık",
+        },
+        filters: {
+          grayscale: "Gri Tonlama",
+          sepia: "Sepya",
+          invert: "Ters Çevir",
+          solarize: "Solarize Et",
+          blur: "Bulanıklık",
+          sharpen: "Keskinleştir",
+          noise: "Gürültü",
+          pixelate: "Pikselleştir",
+          emboss: "Kabartma",
+          posterize: "Posterize Et",
+          threshold: "Eşik",
+          kaleidoscope: "Kaleydoskop",
+          motionBlur: "Hareket Bulanıklaştırma",
+          radialBlur: "Dairesel Bulanıklaştırma",
+          surfaceBlur: "Yüzey Bulanıklaştırma",
+        },
+        params: {
+          radius: "Yarıçap",
+          amount: "Miktar",
+          size: "Boyut",
+          strength: "Güç",
+          levels: "Düzeyler",
+          level: "Düzey",
+          power: "Kuvvet",
+          angle: "Açı",
+          distance: "Mesafe",
+          centerX: "Merkez X",
+          centerY: "Merkez Y",
+          threshold: "Eşik",
+          midpoint: "Orta Nokta",
+          roundness: "Yuvarlaklık",
+          feather: "Yumuşatma",
+          roughness: "Pürüzlülük",
+        },
+        curvePresets: {
+          linear: "Doğrusal",
+          darken: "Koyulaştır",
+          lighten: "Açıklaştır",
+          increaseContrast: "Kontrastı Artır",
+          decreaseContrast: "Kontrastı Azalt",
+          mediumContrast: "Orta Kontrast",
+          strongContrast: "Güçlü Kontrast",
+          crossProcess: "Çapraz İşlem",
+          negative: "Negatif",
+        },
       },
       color: {
         channelAriaLabel: "{channel} renk kanalı",
@@ -4279,12 +4575,64 @@ export const tr: TranslationKeys = {
         median: "Medyan",
       },
       history: {
-        undoTitle: "Geri Al (Ctrl+Z)",
-        redoTitle: "Yinele (Ctrl+Shift+Z)",
+        undoTitle: "Geri Al ({shortcut})",
+        redoTitle: "Yinele ({shortcut})",
         empty: "Henüz geçmiş yok",
+        unknown: "Bilinmiyor",
+        actions: {
+          initialState: "Başlangıç Durumu",
+          loadImage: "Görüntüyü Yükle",
+          loadProject: "Projeyi Yükle",
+          restoreAutosave: "Otomatik Kaydı Geri Yükle",
+          resizeCanvas: "Tuvali Yeniden Boyutlandır",
+          resizeImage: "Görüntüyü Yeniden Boyutlandır",
+          rotateCanvas: "Tuvali Döndür {degrees}",
+          flipHorizontal: "Yatay Çevir",
+          flipVertical: "Dikey Çevir",
+          trimCanvas: "Tuvali Kırp",
+          addObject: "{type} Ekle",
+          layerEffect: "Katman Efekti",
+          delete: "Sil",
+          bringToFront: "En Öne Getir",
+          bringForward: "Öne Getir",
+          sendBackward: "Arkaya Gönder",
+          sendToBack: "En Arkaya Gönder",
+          addLayer: "Katman Ekle",
+          deleteLayer: "Katmanı Sil",
+          duplicateLayer: "Katmanı Çoğalt",
+          reorderLayers: "Katmanları Yeniden Sırala",
+          mergeDown: "Aşağı Birleştir",
+          flattenAll: "Tümünü Düzleştir",
+          adjust: "{name} Ayarla",
+          resetAdjustments: "Ayarlamaları Sıfırla",
+          levels: "Düzeyler",
+          curves: "Eğriler",
+          resetLevels: "Düzeyleri Sıfırla",
+          resetCurves: "Eğrileri Sıfırla",
+          resetAll: "Tümünü Sıfırla",
+          toggleFilter: "{name} Filtresini Aç/Kapat",
+          setFilterParam: "{filter} {param} Ayarla",
+          crop: "Kırp",
+          cut: "Kes",
+          paste: "Yapıştır",
+          pasteInPlace: "Yerine Yapıştır",
+          nudge: "Hafifçe Kaydır",
+          brushStroke: "Fırça Darbesi",
+          eraserStroke: "Silgi Darbesi",
+        },
+        objectTypes: {
+          line: "Çizgi",
+          rect: "Dikdörtgen",
+          ellipse: "Elips",
+          text: "Metin",
+          image: "Görüntü",
+          arrow: "Ok",
+          polygon: "Çokgen",
+          star: "Yıldız",
+        },
       },
       layers: {
-        newLayerTitle: "Yeni Katman (Ctrl+Shift+N)",
+        newLayerTitle: "Yeni Katman ({shortcut})",
         blend: "Karışım",
         opacity: "Opaklık",
         hideLayer: "Katmanı gizle",
@@ -4312,9 +4660,34 @@ export const tr: TranslationKeys = {
           positionCenter: "Ortada",
           positionOutside: "Dışta",
         },
+        blendModes: {
+          normal: "Normal",
+          multiply: "Çarpma",
+          screen: "Ekran",
+          overlay: "Kaplama",
+          darken: "Koyulaştır",
+          lighten: "Açıklaştır",
+          colorDodge: "Renk Soldurma",
+          colorBurn: "Renk Yakma",
+          hardLight: "Sert Işık",
+          softLight: "Yumuşak Işık",
+          difference: "Fark",
+          exclusion: "Dışlama",
+          hue: "Ton",
+          saturation: "Doygunluk",
+          color: "Renk",
+          luminosity: "Işıklılık",
+        },
+        duplicate: "Çoğalt",
+        flattenAll: "Tümünü Düzleştir",
       },
       navigator: {
         noImageLoaded: "Görüntü yüklenmedi",
+      },
+      tabs: {
+        layers: "Katmanlar",
+        adjustments: "Ayarlamalar",
+        history: "Geçmiş",
       },
     },
     ui: {
@@ -4330,6 +4703,7 @@ export const tr: TranslationKeys = {
         anchorLabel: "Sabitleme:",
         anchorAriaLabel: "Sabitleme: {position}",
         backgroundLabel: "Arka plan:",
+        transparent: "Saydam",
         anchors: {
           topLeft: "üst sol",
           topCenter: "üst orta",
@@ -4347,6 +4721,14 @@ export const tr: TranslationKeys = {
         original: "Orijinal: {width} x {height} px",
         note: "Tüm nesneleri yeni boyutlara orantılı olarak ölçekler.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Bu görsel, tarayıcının bu araçla düzenleyemeyeceği kadar büyük. Daha küçük bir tuval boyutu deneyin.",
+        crossOriginBlocked:
+          "Düzenleyici, başka bir siteden yüklenen görselin piksellerini okuyamıyor. Görseli indirip dosyayı açın.",
+        sourceImageFailed:
+          "Görsel yüklenemedi. Başka bir sitede barındırılıyorsa o sitenin çapraz kaynak erişimine izin vermesi gerekir.",
+      },
       exportDialog: {
         heading: "Görüntüyü Dışa Aktar",
         previewAlt: "Dışa aktarma önizlemesi",
@@ -4360,13 +4742,19 @@ export const tr: TranslationKeys = {
         exportButton: "Dışa Aktar",
         copied: "Kopyalandı",
         copyFailed: "Kopyalanamadı",
+        exportFailed: "Dışa aktarma başarısız oldu. Tekrar deneyin veya başka bir format seçin.",
+        tooLarge:
+          "Bu dışa aktarma, tarayıcının oluşturamayacağı kadar büyük. Daha küçük boyutlar deneyin.",
         saveProject: "Projeyi Kaydet",
         loadProject: "Projeyi Yükle",
+        invalidProject: "Bu dosya geçerli bir SnapOtter projesi değil.",
       },
       autosaveRecovery: {
         message: "{time} tarihinden kaydedilmemiş çalışma kurtarıldı.",
         restore: "Geri Yükle",
         discard: "Yoksay",
+        saveFailed:
+          "Çalışmanız bu tarayıcıya kaydedilemedi. Bir kopyasını saklamak için dışa aktarın veya Projeyi Kaydet'i kullanın.",
       },
       fillDialog: {
         heading: "Doldur",
@@ -4392,6 +4780,7 @@ export const tr: TranslationKeys = {
           black: "Siyah",
           transparent: "Saydam",
         },
+        presetCustom: "Özel",
       },
       colorSwatch: {
         ariaLabel: "Renk {color}",
@@ -4401,6 +4790,25 @@ export const tr: TranslationKeys = {
         noneSelected: "{label}: Yok",
         setNone: "{label} yok",
       },
+      contextMenu: {
+        duplicate: "Çoğalt",
+        selectAll: "Tümünü Seç",
+      },
+    },
+    toolbar: {
+      move: "Taşı",
+      marquee: "Seçim Çerçevesi",
+      crop: "Kırp",
+      eyedropper: "Damlalık",
+      brush: "Fırça",
+      pencil: "Kalem",
+      cloneStamp: "Klon Damgası",
+      eraser: "Silgi",
+      paintBucket: "Boya Kovası",
+      gradient: "Gradyan",
+      text: "Metin",
+      hand: "El",
+      zoom: "Yakınlaştırma",
     },
   },
   settings: {
@@ -4433,6 +4841,7 @@ export const tr: TranslationKeys = {
       saveButton: "Ayarları Kaydet",
       saveSuccess: "Ayarlar kaydedildi.",
       saveFailed: "Ayarlar kaydedilemedi.",
+      loadFailed: "Tercihleriniz yüklenemedi.",
       roleUnknown: "bilinmiyor",
     },
     system: {
@@ -4458,6 +4867,7 @@ export const tr: TranslationKeys = {
       saveButton: "Ayarları Kaydet",
       saveSuccess: "Ayarlar kaydedildi.",
       saveFailed: "Ayarlar kaydedilemedi.",
+      loadFailed: "Sistem ayarları yüklenemedi.",
       limitsAndResources: "Limitler ve Kaynaklar",
       maxFileSize: "Maksimum Dosya Boyutu",
       maxBatchSize: "Maksimum Toplu İşlem Boyutu",
@@ -4495,10 +4905,10 @@ export const tr: TranslationKeys = {
       newPasswordPlaceholder: "Yeni Parola",
       confirmPasswordPlaceholder: "Yeni Parolayı Onayla",
       passwordsMismatch: "Parolalar eşleşmiyor",
-      passwordTooShort: "Parola en az 4 karakter olmalıdır",
       changeSuccess: "Parola başarıyla değiştirildi",
       changeFailed: "Parola değiştirilemedi",
       currentPasswordIncorrect: "Mevcut parola yanlış",
+      passwordChangedElsewhere: "Parolanız başka bir yerde değiştirildi. Yeniden oturum açın.",
       changePasswordButton: "Parolayı Değiştir",
       loginAttemptLimitNote: "Giriş deneme limitleri Sistem Ayarlarından yapılandırılabilir.",
       twoFactorHeading: "İki Faktörlü Kimlik Doğrulama",
@@ -4548,6 +4958,8 @@ export const tr: TranslationKeys = {
       passwordMinLengthDesc: "Parolalar için gereken minimum karakter sayısı.",
       passwordRequireUppercase: "Büyük Harf Gerekli",
       passwordRequireUppercaseDesc: "En az bir büyük harf gerektirir.",
+      passwordRequireLowercase: "Küçük Harf Gerekli",
+      passwordRequireLowercaseDesc: "En az bir küçük harf gerektirir.",
       passwordRequireNumber: "Rakam Gerekli",
       passwordRequireNumberDesc: "En az bir rakam gerektirir.",
       passwordRequireSpecial: "Özel Karakter Gerekli",
@@ -4555,6 +4967,13 @@ export const tr: TranslationKeys = {
       passwordPolicyHeading: "Parola Politikası",
       securitySettingsSaved: "Güvenlik ayarları kaydedildi",
       securitySettingsFailed: "Güvenlik ayarları kaydedilemedi",
+      adminSettingsLoadFailed: "Güvenlik ayarları yüklenemedi.",
+      twoFactorStateChanged:
+        "İki faktörlü kimlik doğrulama başka bir pencerede değiştirildi. Sayfayı yenileyip tekrar deneyin.",
+      twoFactorUnreadable:
+        "Sunucu iki faktörlü kimlik doğrulama ayarlarınızı okuyamıyor. Bir yöneticiye başvurun.",
+      ssoNeedsProvider:
+        "SSO zorunluluğu için önce bir OIDC veya SAML sağlayıcısı yapılandırılmalıdır.",
     },
     people: {
       heading: "Kişiler",
@@ -4587,7 +5006,7 @@ export const tr: TranslationKeys = {
       updateFailed: "Kullanıcı güncellenemedi",
       cannotRemoveOwnAdmin: "Kendi yönetici rolünüzü kaldıramazsınız",
       resetPasswordHeading: "{username} için parolayı sıfırla",
-      newPasswordLabel: "Yeni parola (en az 8 karakter)",
+      newPasswordLabel: "Yeni parola",
       resetPasswordButton: "Parolayı Sıfırla",
       resetPasswordWarning:
         "Bu, kullanıcının tüm oturumlarını ve API anahtarlarını geçersiz kılar.",
@@ -4598,6 +5017,7 @@ export const tr: TranslationKeys = {
       tableHeaderTeam: "Takım",
       noSearchResults: "Aramanızla eşleşen üye bulunamadı.",
       noUsersFound: "Kullanıcı bulunamadı.",
+      loadFailed: "Kullanıcılar yüklenemedi.",
       authBadgeLocalOidc: "Yerel + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Rol / Takım Düzenle",
@@ -4610,6 +5030,13 @@ export const tr: TranslationKeys = {
         "Bu şifreyi şimdi kopyalayın. Kullanıcıyı oluşturduktan sonra göremezsiniz.",
       memberCount: "{count} üye",
       memberCountPlural: "{count} üye",
+      usernameTaken: "Bu kullanıcı adı zaten alınmış",
+      lastAdmin: "Her zaman en az bir yönetici olmalıdır",
+      cannotDeleteSelf: "Kendi hesabınızı silemezsiniz",
+      usernameInvalid:
+        "Kullanıcı adı 3 ile 50 karakter arasında olmalı ve yalnızca a-z, A-Z, 0-9, nokta, kısa çizgi ve alt çizgi içermelidir",
+      roleNotFound: "Bu rol artık mevcut değil",
+      teamNotFound: "Bu takım artık mevcut değil",
     },
     teams: {
       heading: "Takımlar",
@@ -4631,6 +5058,7 @@ export const tr: TranslationKeys = {
       tableHeaderTeamName: "Takım Adı",
       tableHeaderMembers: "Üyeler",
       emptyState: "Takım bulunamadı.",
+      loadFailed: "Takımlar yüklenemedi.",
       renameSaveButton: "Kaydet",
       renameCancelButton: "İptal",
       renameAction: "Yeniden Adlandır",
@@ -4646,6 +5074,7 @@ export const tr: TranslationKeys = {
       teamRetentionHoursDesc:
         "Bu takım için işleme dosyası saklama süresi. Genel varsayılanı kullanmak için boş bırakın.",
       quotaSaved: "Takım ayarları kaydedildi",
+      quotaSaveFailed: "Takım ayarları kaydedilemedi",
     },
     roles: {
       heading: "Roller",
@@ -4670,6 +5099,7 @@ export const tr: TranslationKeys = {
       deleteSuccess: '"{name}" rolü silindi',
       deleteFailed: "Rol silinemedi",
       emptyState: "Rol bulunamadı.",
+      loadFailed: "Roller yüklenemedi.",
       builtInBadge: "Yerleşik",
       userCountBadge: "{count} kullanıcı",
       editRoleTitle: "Rolü düzenle",
@@ -4683,12 +5113,17 @@ export const tr: TranslationKeys = {
         users: "Kullanıcılar",
         teams: "Takımlar",
         system: "Sistem",
+        enterpriseAdmin: "Kurumsal Yönetim",
       },
+      nameInvalid:
+        "Rol adı 2 ile 30 karakter arasında olmalı ve yalnızca a-z, 0-9, kısa çizgi ve alt çizgi içermelidir",
+      permissionsRequired: "En az bir izin seçin",
     },
     auditLog: {
       heading: "Denetim Günlüğü",
       allActionsFilter: "Tüm işlemler",
       emptyState: "Denetim günlüğü kaydı yok.",
+      loadFailed: "Denetim günlüğü yüklenemedi.",
       tableHeaderTime: "Zaman",
       tableHeaderUser: "Kullanıcı",
       tableHeaderAction: "İşlem",
@@ -4731,6 +5166,7 @@ export const tr: TranslationKeys = {
       teamColumn: "Takım",
       storageColumn: "Depolama",
       usersColumn: "Kullanıcılar",
+      loadFailed: "Kullanım verileri yüklenemedi.",
     },
     apiKeys: {
       heading: "API Anahtarları",
@@ -4740,6 +5176,7 @@ export const tr: TranslationKeys = {
       removeScopingLabel: "İzin kapsamını kaldır",
       restrictPermissionsLabel: "İzinleri kısıtla (isteğe bağlı)",
       expiresLabel: "Son kullanma:",
+      expiresInPast: "Son kullanma tarihi gelecekte olmalıdır.",
       clearButton: "Temizle",
       copyTitle: "Kopyala",
       keyWarning: "Bu anahtarı güvenli bir yerde saklayın. Bir daha gösterilmeyecektir.",
@@ -4751,6 +5188,7 @@ export const tr: TranslationKeys = {
       deleteConfirm:
         "Bu API anahtarı silinsin mi? Bunu kullanan tüm entegrasyonlar çalışmayı durduracak.",
       emptyState: "Henüz API anahtarı yok. Başlamak için bir tane oluşturun.",
+      loadFailed: "API anahtarları yüklenemedi.",
     },
     tools: {
       heading: "Araçlar",
@@ -4793,6 +5231,7 @@ export const tr: TranslationKeys = {
       description: "Gelişmiş dosya işleme için AI model paketlerini yönetin.",
       installAll: "Tümünü Kur",
       diskUsage: "Disk kullanımı: {size}",
+      statusStale: "Paket durumu yenilenemedi. Aşağıdaki liste güncel olmayabilir.",
       sizeOnDisk: "diskte {size}",
       installed: "Kurulu",
       notInstalled: "Kurulu değil",
@@ -4823,6 +5262,8 @@ export const tr: TranslationKeys = {
       resetFailed: "Sıfırlama başarısız oldu: {error}",
       resetVenvKept:
         "Paylaşılan Python ortamı olduğu gibi bırakıldı: bu kurulumda ortamı yeniden oluşturacak paketlenmiş bir temel yok. Modeller, indirme önbelleği ve kurulum kayıtları temizlendi. Sorun ortamdaki eski bir paketse, o ortamı kendiniz yeniden oluşturun.",
+      importBusy: "Başka bir kurulum veya içe aktarma zaten sürüyor. Bittiğinde tekrar deneyin.",
+      importNoSpace: "Sunucuda bu paket için yeterli disk alanı yok.",
     },
     about: {
       heading: "Hakkında",
@@ -4842,6 +5283,9 @@ export const tr: TranslationKeys = {
   auth: {
     login: "Giriş Yap",
     logout: "Çıkış yap",
+    logoutFailed: "Çıkış yapılamadı. Tekrar deneyin.",
+    idpLogoutFailed:
+      "SnapOtter oturumunuz kapatıldı, ancak SSO sağlayıcınızdaki oturumunuz hâlâ açık olabilir. Oradan da çıkış yapın.",
     username: "Kullanıcı adı",
     password: "Parola",
     loginButton: "Giriş Yap",
@@ -4871,10 +5315,22 @@ export const tr: TranslationKeys = {
     verify: "Doğrula",
     verifying: "Doğrulanıyor...",
     mfaInvalidCode: "Geçersiz kod. Lütfen tekrar deneyin.",
+    mfaAttemptsExhausted: "Çok fazla geçersiz kod. Lütfen tekrar giriş yapın.",
+    mfaEnrollmentAttemptsExhausted:
+      "Çok fazla geçersiz kod. Yeni bir QR kodu ve yeni kurtarma kodları almak için tekrar giriş yapın; daha önce gösterilenler çalışmayacak.",
+    mfaExpired: "Doğrulama oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.",
+    mfaEnrollmentExpired:
+      "Kurulum oturumunuzun süresi doldu. Yeni bir QR kodu ve yeni kurtarma kodları almak için tekrar giriş yapın; daha önce gösterilenler çalışmayacak.",
+    mfaNotConfigured: "İki faktörlü kimlik doğrulama ayarlanmamış. Lütfen tekrar giriş yapın.",
+    mfaAlreadyEnabled: "İki faktörlü kimlik doğrulama zaten etkin. Lütfen tekrar giriş yapın.",
+    mfaUnreadable:
+      "Sunucu iki faktörlü kimlik doğrulama verilerinizi okuyamıyor. Bir yönetici ile iletişime geçin.",
     mfaEnrollmentHeading: "Devam etmek için iki faktörlü kimlik doğrulamayı ayarlayın",
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",
     mfaPolicyUnavailable: "MFA politikası kontrol edilemedi. Lütfen birazdan tekrar deneyin.",
+    accountDisabled: "Bu hesap devre dışı bırakıldı. Bir yönetici ile iletişime geçin.",
+    ipNotAllowed: "IP adresinize izin verilmiyor. Bir yönetici ile iletişime geçin.",
     loginThrottled: "Çok fazla giriş denemesi. {minutes} dakika sonra tekrar deneyin.",
     loginThrottledPlural: "Çok fazla giriş denemesi. {minutes} dakika sonra tekrar deneyin.",
     loginThrottledUnknownWait: "Çok fazla giriş denemesi. Lütfen tekrar denemeden önce bekleyin.",
@@ -4918,14 +5374,13 @@ export const tr: TranslationKeys = {
   },
   changePassword: {
     title: "Parolanızı değiştirin",
-    description:
-      "Devam etmeden önce yeni bir parola belirlemeniz gerekiyor. Parolanız en az 8 karakter uzunluğunda olmalı ve büyük harf, küçük harf ile bir rakam içermelidir.",
+    description: "Devam etmeden önce yeni bir parola belirlemeniz gerekiyor.",
     usernameLabel: "Kullanıcı adı",
     currentPasswordLabel: "Mevcut parola",
     currentPasswordPlaceholder: "Mevcut parolayı girin",
     newPasswordLabel: "Yeni parola",
     generateButton: "Güçlü parola oluştur",
-    newPasswordPlaceholder: "En az 8 karakter",
+    newPasswordPlaceholder: "Yeni parolayı girin",
     confirmPasswordLabel: "Yeni parolayı onaylayın",
     confirmPasswordPlaceholder: "Yeni parolayı tekrarlayın",
     passwordsMismatch: "Parolalar eşleşmiyor",
@@ -4936,6 +5391,7 @@ export const tr: TranslationKeys = {
     sidebarTitle: "Neredeyse tamam",
     sidebarDescription:
       "Hesabınızı güvence altına almak için güçlü bir parola belirleyin, ardından hazırsınız.",
+    sessionEnded: "Oturumunuz sona erdi. Parolanızı değiştirmek için yeniden giriş yapın.",
   },
   automate: {
     title: "Otomatikleştir",
@@ -4945,6 +5401,15 @@ export const tr: TranslationKeys = {
     noSteps: "Pipeline dosyasında adım yok",
     importFailed: "İçe aktarma başarısız",
     couldNotRead: "Pipeline dosyası okunamadı",
+    importListRefreshFailed:
+      "Pipeline içe aktarıldı ancak kayıtlı liste yenilenmedi. Görmek için sayfayı yenileyin.",
+    saveFailed: "Pipeline kaydedilemedi",
+    deleteFailed: "Pipeline silinemedi",
+    loadFailed: "Kayıtlı Pipeline'lar yüklenemedi.",
+    saveListRefreshFailed:
+      "Pipeline kaydedildi ancak kayıtlı liste yenilenmedi. Görmek için sayfayı yenileyin.",
+    deleteListRefreshFailed:
+      "Pipeline silindi ancak kayıtlı liste yenilenmedi. Değişikliği görmek için sayfayı yenileyin.",
     fileCount: "{count} dosya",
     fileCountPlural: "{count} dosya",
     importFromLibrary: "Kitaplıktan İçe Aktar",
@@ -5030,6 +5495,7 @@ export const tr: TranslationKeys = {
     fileCount: "{count} dosya",
     fileCountSingular: "{count} dosya",
     noFilesFound: "Dosya bulunamadı",
+    loadFailed: "Dosyalarınız yüklenemedi.",
     selectFilePrompt: "Ayrıntıları görmek için bir dosya seçin",
     openFile: "Dosyayı Aç",
     selectFile: "Dosya Seç",
@@ -5048,6 +5514,7 @@ export const tr: TranslationKeys = {
     download: "İndir",
     details: {
       previewFailedRetry: "Önizleme oluşturulamadı. Tekrar deneyin.",
+      loadFailed: "Bu dosya yüklenemedi.",
     },
   },
   dropzone: {
@@ -5067,6 +5534,7 @@ export const tr: TranslationKeys = {
     filesSelected: "{count} dosya seçildi",
     dropToAdd: "Dosya eklemek için bırakın",
     dropToReplace: "Dosyayı değiştirmek için bırakın",
+    ignoredWhileRunning: "İşlem devam ediyor. Dosya eklemeden önce bitmesini bekleyin.",
     reorderHint:
       "Çalıştırmadan önce sıralamak için küçük resimleri sürükleyin veya sırayı tersine çevirin.",
   },
@@ -5099,6 +5567,8 @@ export const tr: TranslationKeys = {
     lessThanMinute: "Bir dakikadan az kaldı",
     oneMinuteLeft: "~1 dakika kaldı",
     minutesLeft: "~{mins} dakika kaldı",
+    minutesLeftFew: "~{mins} dakika kaldı",
+    minutesLeftTwo: "~{mins} dakika kaldı",
     progressMessages: [
       "Neredeyse bitti... muhtemelen...",
       "Güzel şeyler zaman alır...",
@@ -5175,6 +5645,56 @@ export const tr: TranslationKeys = {
     networkError: "Ağ hatası. Bağlantınızı kontrol edin.",
     invalidCredentials: "Geçersiz kullanıcı adı veya parola",
     connectionError: "Bağlantı hatası",
+    fileTooLarge:
+      "Bu dosya yüklemek için çok büyük. Daha küçük bir dosya deneyin veya sunucu yöneticinizden yükleme sınırını artırmasını isteyin.",
+    featureNotInstalledForTool:
+      '{tool} için "{feature}" özelliği gerekiyor. Ayarlar → AI Özellikleri bölümünden etkinleştirin.',
+    featureNotInstalled:
+      '"{feature}" özelliği yüklü değil. Ayarlar → AI Özellikleri bölümünden etkinleştirin.',
+    featureIncompatible: '"{feature}" özelliği bu sunucunun donanımında çalıştırılamıyor.',
+    passwordTooShort: "Parola en az {minLength} karakter olmalıdır.",
+    passwordNeedsUppercase: "Parola bir büyük harf içermelidir.",
+    passwordNeedsLowercase: "Parola bir küçük harf içermelidir.",
+    passwordNeedsDigit: "Parola bir rakam içermelidir.",
+    passwordNeedsSpecial: "Parola bir özel karakter içermelidir.",
+    passwordNoControlCharacters: "Parola kontrol karakterleri içermemelidir.",
+    passwordTooLong: "Parola en fazla {maxLength} karakter olmalıdır.",
+    passwordTooLongAdminReset:
+      "Parola çok uzun (en fazla {maxLength} karakter). Bir yönetici tarafından sıfırlanması gerekiyor.",
+    passwordNoInvalidCharacters: "Parola geçersiz karakterler içermemelidir.",
+    tooManyRequests: "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
+    escalationDenied: "Bu işlem, rolünüzün sahip olduğundan daha fazla erişim gerektirir.",
+    featureNotLicensed: "Bunun için kurumsal lisans gerekir.",
+    sessionEnded: "Oturumunuz sona erdi. Yeniden oturum açın.",
+    forbidden: "Bunu yapma izniniz yok.",
+    invalidSetting: "{setting} için geçersiz değer.",
+    network: "Ağ hatası",
+    invalidResponse: "Geçersiz yanıt",
+    staleVersionReload: "Uygulama güncellendi. Sayfayı yenileyip tekrar deneyin.",
+    failedWithStatus: "Bu isteği tamamlayamadık. Lütfen tekrar deneyin.",
+    processingFailedWithStatus:
+      "Bu dosyayı işleyemedik. Dosyanın bozuk olmadığından emin olup tekrar deneyin.",
+    processingFailedNoDetail: "İşlem başarısız oldu",
+    canceled: "İşlem iptal edildi",
+    jobTrackingFailed: "Bu iş takip edilirken bir sorun oluştu. Tekrar deneyin.",
+    requestTimedOut: "İstek zaman aşımına uğradı",
+    runInterrupted: "İşlem kesintiye uğradı. Yeniden çalıştırın.",
+    requestFailedWithStatus: "Bu isteği tamamlayamadık. Lütfen tekrar deneyin.",
+    invalidServerResponse: "Sunucudan geçersiz yanıt",
+    batchFailed: "Toplu işlem başarısız oldu",
+    batchFailedWithStatus: "Bu dosyaların toplu işlemini tamamlayamadık. Lütfen tekrar deneyin.",
+    allFilesFailed: "Tüm dosyalar işlenemedi",
+    filesFailedSuffix_one: " (1 dosya başarısız oldu)",
+    filesFailedSuffix_other: " ({count} dosya başarısız oldu)",
+    uploadTimeout:
+      "Yükleme zaman aşımına uğradı. Bağlantınızı kontrol edin veya daha küçük bir dosya deneyin.",
+    processingInterrupted: "İşlem kesintiye uğradı. Yeniden bağlandığınızda tekrar deneyin.",
+    processingInterruptedUnconfirmed:
+      "İşlem kesintiye uğradı ve sunucu işi hiçbir zaman onaylamadı. Yeniden bağlandığınızda tekrar deneyin.",
+    resultNoLongerAvailable: "Tamamlanan sonuç artık mevcut değil. İşi tekrar çalıştırın.",
+    batchDownloadFailed: "Tamamlanan toplu iş indirilemedi. Sayfayı yenileyip tekrar deneyin.",
+    fileNotFoundInBatch: "Dosya toplu iş sonuçlarında bulunamadı",
+    noFilesSelected: "Dosya seçilmedi",
   },
   sidebar: {
     sponsor: "Bize destek olun",
@@ -5210,6 +5730,7 @@ export const tr: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "SnapOtter'ı GitHub Sponsors'ta destekleyin",
     skipToContent: "Ana içeriğe geç",
     openSidebar: "Kenar çubuğunu aç",
@@ -5232,6 +5753,8 @@ export const tr: TranslationKeys = {
     imageControls: "Önizleme kontrolleri",
     zoomControls: "Yakınlaştırma kontrolleri",
     dragToReorder: "Sıralamak için sürükleyin",
+    resultResizedToFit: "Hedef boyuta sığması için küçültüldü",
+    resultMissedTarget: "Hedef boyuta ulaşılamadı",
     reverseOrder: "Sırayı tersine çevir",
     whiteBackground: "Beyaz arka plan",
     blackBackground: "Siyah arka plan",
@@ -5314,11 +5837,47 @@ export const tr: TranslationKeys = {
       description: "Eski veya hasarlı bir fotoğrafı yapay zekâ ile onar, renklendir ve büyüt.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Arka Plan Kaldırma",
+      description: "Görüntülerin arka planını yapay zekâ ile kaldır",
+    },
+    "face-detection": {
+      name: "Yüz Algılama",
+      description: "Yüzleri algıla ve bulanıklaştır, kırmızı gözü düzelt, akıllı kırpma",
+    },
+    "object-eraser-colorize": {
+      name: "Nesne Silici ve Renklendirme",
+      description: "Fotoğraflardan nesneleri sil ve siyah beyaz görüntüleri renklendir",
+    },
+    "inpaint-hq": {
+      name: "Yüksek Kaliteli Inpainting",
+      description:
+        "Büyük nesneler, ayrıntılı dokular ve yapılı arka planlar için difüzyon tabanlı nesne kaldırma",
+    },
+    "upscale-enhance": {
+      name: "Büyütme ve İyileştirme",
+      description: "Yapay zekâ ile büyütme, yüz iyileştirme ve gürültü giderme",
+    },
+    "photo-restoration": {
+      name: "Fotoğraf Restorasyonu",
+      description: "Eski veya hasarlı fotoğrafları onar",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Görüntülerden ve PDF'lerden metin çıkar",
+    },
+    transcription: {
+      name: "Transkripsiyon",
+      description: "Ses ve video için konuşmadan metne (altyazı)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "İçe aktarılıyor...",
       importCount: "İçe Aktar ({count})",
       import: "İçe Aktar",
+      importFailed: "{total} dosyadan {failed} tanesi içe aktarılamadı.",
     },
     metadataGrid: {
       noData: "Veri yok",
@@ -5331,6 +5890,19 @@ export const tr: TranslationKeys = {
     waveform: {
       play: "Oynat",
       pause: "Duraklat",
+    },
+    languageNames: {
+      en: "İngilizce",
+      de: "Almanca",
+      fr: "Fransızca",
+      es: "İspanyolca",
+      zh: "Çince",
+      ja: "Japonca",
+      ko: "Korece",
+      ar: "Arapça",
+      id: "Endonezce",
+      th: "Tayca",
+      vi: "Vietnamca",
     },
   },
   privacyPolicy: {

@@ -1,11 +1,78 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
-import { useBase64Store } from "@/stores/base64-store";
+import {
+  type Base64Error,
+  type Base64Result,
+  beginBase64Run,
+  useBase64Store,
+} from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
+
+type ServerBase64Result = Omit<Base64Result, "entryId">;
+type ServerBase64Error = Omit<Base64Error, "entryId">;
+
+interface Base64Response {
+  results: ServerBase64Result[];
+  errors: ServerBase64Error[];
+}
+
+function isBase64Result(value: unknown): value is ServerBase64Result {
+  if (value === null || typeof value !== "object") return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.filename === "string" &&
+    r.filename.length > 0 &&
+    typeof r.mimeType === "string" &&
+    r.mimeType.length > 0 &&
+    typeof r.width === "number" &&
+    Number.isFinite(r.width) &&
+    r.width >= 0 &&
+    typeof r.height === "number" &&
+    Number.isFinite(r.height) &&
+    r.height >= 0 &&
+    typeof r.originalSize === "number" &&
+    Number.isFinite(r.originalSize) &&
+    r.originalSize >= 0 &&
+    typeof r.encodedSize === "number" &&
+    Number.isFinite(r.encodedSize) &&
+    r.encodedSize >= 0 &&
+    typeof r.overheadPercent === "number" &&
+    Number.isFinite(r.overheadPercent) &&
+    typeof r.base64 === "string" &&
+    r.base64.length > 0 &&
+    typeof r.dataUri === "string" &&
+    r.dataUri.length > 0
+  );
+}
+
+function isBase64Error(value: unknown): value is ServerBase64Error {
+  if (value === null || typeof value !== "object") return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.filename === "string" &&
+    e.filename.length > 0 &&
+    typeof e.error === "string" &&
+    e.error.trim().length > 0
+  );
+}
+
+function isBase64Response(value: unknown): value is Base64Response {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    Array.isArray(data.results) &&
+    data.results.every(isBase64Result) &&
+    Array.isArray(data.errors) &&
+    data.errors.every(isBase64Error) &&
+    data.results.length + data.errors.length > 0
+  );
+}
 
 // Format names (JPEG, PNG, ...) are locale-invariant; "original" resolves via i18n.
 const OUTPUT_FORMATS = [
@@ -20,7 +87,7 @@ const OUTPUT_FORMATS = [
 export function ImageToBase64Settings() {
   const { t } = useTranslation();
   const ts = t.toolSettings["image-to-base64"];
-  const { files } = useFileStore();
+  const { entries } = useFileStore();
   const { processing, setProcessing, setProgress, addResult, addError, reset } = useBase64Store();
 
   const [outputFormat, setOutputFormat] = useState("original");
@@ -30,52 +97,142 @@ export function ImageToBase64Settings() {
   const [error, setError] = useState<string | null>(null);
 
   const handleProcess = async () => {
-    if (files.length === 0) return;
+    if (entries.length === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "image-to-base64",
+      is_batch: entries.length > 1,
+      file_count: entries.length,
+    });
 
     setProcessing(true);
     setError(null);
     reset();
     setProcessing(true);
 
+    const runController = new AbortController();
+    let currentEntryId: string | null = null;
+    let currentEntryController: AbortController | null = null;
+    const run = beginBase64Run(() => {
+      runController.abort();
+      currentEntryController?.abort();
+    });
+    const runEntryIds = new Set(entries.map((e) => e.id));
+    const isEntryPresent = (id: string) => useFileStore.getState().entries.some((e) => e.id === id);
+    const unsubscribeFiles = useFileStore.subscribe((state) => {
+      if (!state.entries.some((e) => runEntryIds.has(e.id))) {
+        runController.abort();
+        currentEntryController?.abort();
+      } else if (currentEntryId && !state.entries.some((e) => e.id === currentEntryId)) {
+        currentEntryController?.abort();
+      }
+    });
+    const isCanceled = () => !run.isCurrent() || runController.signal.aborted;
+
     const settings = JSON.stringify({ outputFormat, quality, maxWidth, maxHeight });
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setProgress({ completed: i, total: files.length, currentFile: file.name });
+    try {
+      for (let i = 0; i < entries.length; i++) {
+        if (isCanceled()) break;
+        const { id: entryId, file } = entries[i];
+        if (!isEntryPresent(entryId)) continue;
+        setProgress({ completed: i, total: entries.length, currentFile: file.name });
 
-      try {
-        const formData = new FormData();
-        formData.append("files", file);
-        formData.append("settings", settings);
+        const entryController = new AbortController();
+        currentEntryId = entryId;
+        currentEntryController = entryController;
 
-        const res = await fetch(appUrl("/api/v1/tools/image/image-to-base64"), {
-          method: "POST",
-          headers: formatHeaders(),
-          body: formData,
-        });
+        let res: Response;
+        try {
+          const formData = new FormData();
+          formData.append("files", file);
+          formData.append("settings", settings);
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          addError({ filename: file.name, error: body.error || `Failed: ${res.status}` });
+          res = await fetch(appUrl("/api/v1/tools/image/image-to-base64"), {
+            method: "POST",
+            headers: formatHeaders(),
+            body: formData,
+            signal: entryController.signal,
+          });
+        } catch (err) {
+          if (isCanceled()) break;
+          if (
+            entryController.signal.aborted ||
+            !isEntryPresent(entryId) ||
+            (err instanceof DOMException && err.name === "AbortError")
+          ) {
+            continue;
+          }
+          addError({
+            entryId,
+            filename: file.name,
+            error: err instanceof Error ? err.message : "Failed to convert",
+          });
           continue;
         }
 
-        const data = await res.json();
-        for (const r of data.results) addResult(r);
-        for (const e of data.errors) addError(e);
-      } catch (err) {
-        addError({
-          filename: file.name,
-          error: err instanceof Error ? err.message : "Failed to convert",
-        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          if (isCanceled()) break;
+          if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
+          addError({
+            entryId,
+            filename: file.name,
+            error: failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`),
+          });
+          continue;
+        }
+
+        let data: unknown;
+        try {
+          data = await res.json();
+        } catch (err) {
+          if (isCanceled()) break;
+          if (
+            entryController.signal.aborted ||
+            !isEntryPresent(entryId) ||
+            (err instanceof DOMException && err.name === "AbortError")
+          ) {
+            continue;
+          }
+          console.warn(
+            "Unexpected image-to-base64 response:",
+            err instanceof Error ? err.message : err,
+          );
+          addError({
+            entryId,
+            filename: file.name,
+            error: t.errors.invalidServerResponse,
+          });
+          continue;
+        }
+        if (isCanceled()) break;
+        if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
+        if (!isBase64Response(data)) {
+          console.warn("Unexpected image-to-base64 response shape");
+          addError({
+            entryId,
+            filename: file.name,
+            error: t.errors.invalidServerResponse,
+          });
+          continue;
+        }
+        for (const r of data.results) addResult({ ...r, entryId });
+        for (const e of data.errors) addError({ ...e, entryId });
+      }
+    } finally {
+      currentEntryId = null;
+      currentEntryController = null;
+      unsubscribeFiles();
+      run.end();
+      if (run.isCurrent()) {
+        setProgress(null);
+        setProcessing(false);
       }
     }
-
-    setProgress(null);
-    setProcessing(false);
   };
 
-  const hasFiles = files.length > 0;
+  const hasFiles = entries.length > 0;
   const showQuality =
     outputFormat === "jpeg" ||
     outputFormat === "webp" ||
@@ -176,8 +333,8 @@ export function ImageToBase64Settings() {
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {processing
           ? ts.converting
-          : files.length > 1
-            ? format(ts.submitWithCount, { count: files.length })
+          : entries.length > 1
+            ? format(ts.submitWithCount, { count: entries.length })
             : ts.submit}
       </button>
 

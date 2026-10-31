@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { formatZodErrors } from "../../lib/errors.js";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { putObject } from "../../lib/object-storage.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
@@ -48,10 +52,8 @@ export function registerWatermarkImage(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!mainBuffer || mainBuffer.length === 0) {
@@ -100,11 +102,18 @@ export function registerWatermarkImage(app: FastifyInstance) {
         // Attribute validation failures to the watermark upload so the user
         // knows which of the two files was rejected, preserving the route's
         // established "Invalid watermark image: ..." message contract.
-        if (err instanceof InputValidationError) {
+        if (err instanceof InputValidationError && err.statusCode < 500) {
           const message = err.message.startsWith("Invalid image")
             ? err.message.replace("Invalid image", "Invalid watermark image")
             : `${err.message} (watermark)`;
-          throw new InputValidationError(message, err.statusCode, err.details);
+          const rewrapped = new InputValidationError(
+            message,
+            err.statusCode,
+            err.details,
+            err.code,
+          );
+          if (err.cause !== undefined) rewrapped.cause = err.cause;
+          throw rewrapped;
         }
         throw err;
       }
@@ -188,13 +197,16 @@ export function registerWatermarkImage(app: FastifyInstance) {
         originalSize: mainBuffer.length,
         processedSize: result.length,
       });
-    } catch (err) {
-      if (err instanceof InputValidationError) {
-        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+    } catch (rawErr) {
+      if (rawErr instanceof InputValidationError) {
+        return sendInputValidationError(reply, rawErr, "watermark-image", request.log);
       }
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "watermark-image" }, "Image watermarking failed");
       return reply.status(422).send({
         error: "Processing failed",
-        details: err instanceof Error ? err.message : "Image processing failed",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Image processing failed"),
       });
     }
   });

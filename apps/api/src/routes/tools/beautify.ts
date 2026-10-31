@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { FastifyInstance } from "fastify";
+import { extname } from "node:path";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../../lib/auto-orient.js";
 import {
@@ -16,13 +18,22 @@ import {
 } from "../../lib/beautify/constants.js";
 import { renderFrame } from "../../lib/beautify/frames.js";
 import { applyShadow } from "../../lib/beautify/shadow.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
@@ -64,8 +75,93 @@ function needsAlphaOutput(settings: BeautifySettings): boolean {
 /** Compute the output filename with the correct extension. */
 function resolveOutputFilename(filename: string, settings: BeautifySettings): string {
   const forcedPng = needsAlphaOutput(settings) && !ALPHA_FORMATS.has(settings.outputFormat);
-  const ext = forcedPng ? ".png" : `.${settings.outputFormat}`;
-  return filename.replace(/\.[^.]+$/, ext);
+  const targetExt = forcedPng ? ".png" : `.${settings.outputFormat}`;
+  const currentExt = extname(filename);
+  const baseName = currentExt ? filename.slice(0, -currentExt.length) : filename;
+  return `${baseName}${targetExt}`;
+}
+
+function sanitizeSvgInput(buf: Buffer): Buffer {
+  try {
+    const decompressed = decompressSvgz(buf);
+    return sanitizeSvg(decompressed);
+  } catch (err) {
+    if (isSvgClientError(err)) {
+      const validationErr = new InputValidationError(
+        err instanceof Error ? err.message : "Invalid SVG",
+      );
+      validationErr.cause = err;
+      throw validationErr;
+    }
+    throw asDecoderOutOfMemory(err);
+  }
+}
+
+async function prepareBeautifyImage(
+  inputBuffer: Buffer,
+  filename: string,
+  errorPrefix: "Invalid image" | "Invalid background image",
+  log?: Pick<FastifyBaseLogger, "warn">,
+): Promise<Buffer> {
+  let buf = inputBuffer;
+  const validation = await validateImageBuffer(buf, filename);
+  if (!validation.valid) {
+    throw new InputValidationError(`${errorPrefix}: ${validation.reason}`);
+  }
+  if (validation.format === "heif") {
+    try {
+      buf = await decodeHeic(buf);
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      throw await asInputErrorIfUndecodable(buf, err);
+    }
+  }
+  let fallbackFormat: string | undefined;
+  if (needsCliDecode(validation.format)) {
+    try {
+      const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+      buf = await decodeToSharpCompat(buf, validation.format, fileExt);
+    } catch (rawDecodeErr) {
+      const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+      if (
+        decodeErr instanceof DecoderOutOfMemoryError ||
+        (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+      ) {
+        throw decodeErr;
+      }
+      try {
+        const meta = await sharp(buf).metadata();
+        fallbackFormat = meta.format;
+        if (fallbackFormat !== "svg") {
+          await sharp(buf).resize(1).raw().toBuffer();
+        }
+      } catch (rawProbeErr) {
+        const probeErr = asDecoderOutOfMemory(rawProbeErr);
+        if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+        if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+        log?.warn({ err: decodeErr, toolId: "beautify" }, "Decode failed");
+        throw await asInputErrorIfUndecodable(buf, rawProbeErr);
+      }
+    }
+  }
+  let isSvg = validation.format === "svg" || fallbackFormat === "svg";
+  if (!isSvg && validation.format === "png" && filename.toLowerCase().endsWith(".apng")) {
+    const meta = await sharp(buf)
+      .metadata()
+      .catch((err: unknown) => {
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
+        return null;
+      });
+    if (meta?.format === "svg") isSvg = true;
+  }
+  if (isSvg) {
+    buf = sanitizeSvgInput(buf);
+  } else {
+    buf = await autoOrient(buf, log);
+  }
+  return buf;
 }
 
 export async function processBeautify(
@@ -73,27 +169,29 @@ export async function processBeautify(
   settings: BeautifySettings,
   _filename: string,
   bgImageBuffer?: Buffer,
+  bgFilename = "background",
+  log?: Pick<FastifyBaseLogger, "warn">,
 ): Promise<Buffer> {
   // 1. Decode & Prepare
-  let buf = inputBuffer;
-  const validation = await validateImageBuffer(buf, _filename);
-  if (validation.valid && validation.format === "heif") {
-    buf = await decodeHeic(buf);
+  const buf = await prepareBeautifyImage(inputBuffer, _filename, "Invalid image", log);
+  const preparedBgBuffer =
+    settings.backgroundType === "image" && bgImageBuffer !== undefined
+      ? await prepareBeautifyImage(bgImageBuffer, bgFilename, "Invalid background image", log)
+      : undefined;
+  return renderBeautify(buf, settings, preparedBgBuffer);
+}
+
+async function renderBeautify(
+  preparedMainBuffer: Buffer,
+  settings: BeautifySettings,
+  preparedBgBuffer?: Buffer,
+): Promise<Buffer> {
+  let buf = preparedMainBuffer;
+  try {
+    buf = await sharp(buf).ensureAlpha().png().toBuffer();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(buf, err);
   }
-  if (validation.valid && needsCliDecode(validation.format)) {
-    try {
-      const fileExt = _filename.split(".").pop()?.toLowerCase();
-      buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-    } catch {
-      await sharp(buf).metadata();
-    }
-  }
-  if (validation.valid && validation.format === "svg") {
-    buf = decompressSvgz(buf);
-    buf = sanitizeSvg(buf);
-  }
-  buf = await autoOrient(buf);
-  buf = await sharp(buf).ensureAlpha().png().toBuffer();
 
   // 2. Apply Border Radius (skip for device frames that have their own bezels)
   const hasDeviceFrame = settings.frame !== "none" && DEVICE_FRAMES.has(settings.frame);
@@ -132,8 +230,8 @@ export async function processBeautify(
   const canvasH = framedH + padding * 2;
 
   let bgOpts: BackgroundOpts;
-  if (settings.backgroundType === "image" && bgImageBuffer) {
-    bgOpts = { type: "image", imageBuffer: bgImageBuffer, width: canvasW, height: canvasH };
+  if (settings.backgroundType === "image" && preparedBgBuffer) {
+    bgOpts = { type: "image", imageBuffer: preparedBgBuffer, width: canvasW, height: canvasH };
   } else if (settings.backgroundType === "solid") {
     bgOpts = { type: "solid", color: settings.backgroundColor, width: canvasW, height: canvasH };
   } else if (
@@ -151,7 +249,15 @@ export async function processBeautify(
     bgOpts = { type: "transparent", width: canvasW, height: canvasH };
   }
 
-  const background = await generateBackground(bgOpts);
+  let background: Buffer;
+  try {
+    background = await generateBackground(bgOpts);
+  } catch (err) {
+    if (bgOpts.type === "image") {
+      throw await asInputErrorIfUndecodable(bgOpts.imageBuffer, err);
+    }
+    throw err;
+  }
 
   // 7. Composite onto Background
   buf = await sharp(background)
@@ -249,6 +355,7 @@ export function registerBeautify(app: FastifyInstance) {
     let mainBuffer: Buffer | null = null;
     let bgImageBuffer: Buffer | null = null;
     let filename = "image";
+    let bgFilename = "background";
     let settingsRaw: string | null = null;
 
     try {
@@ -262,6 +369,7 @@ export function registerBeautify(app: FastifyInstance) {
           const buf = Buffer.concat(chunks);
           if (part.fieldname === "backgroundImage") {
             bgImageBuffer = buf;
+            bgFilename = sanitizeFilename(part.filename ?? "background");
           } else {
             mainBuffer = buf;
             filename = sanitizeFilename(part.filename ?? "image");
@@ -271,10 +379,8 @@ export function registerBeautify(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!mainBuffer || mainBuffer.length === 0) {
@@ -295,14 +401,42 @@ export function registerBeautify(app: FastifyInstance) {
       return reply.status(400).send({ error: "Settings must be valid JSON" });
     }
 
+    const originalSize = mainBuffer.length;
+    let preparedMainBuffer: Buffer;
+    let preparedBgBuffer: Buffer | undefined;
     try {
-      const originalSize = mainBuffer.length;
-      const outputBuf = await processBeautify(
+      preparedMainBuffer = await prepareBeautifyImage(
         mainBuffer,
-        settings,
         filename,
-        bgImageBuffer ?? undefined,
+        "Invalid image",
+        request.log,
       );
+      preparedBgBuffer =
+        settings.backgroundType === "image" && bgImageBuffer !== null
+          ? await prepareBeautifyImage(
+              bgImageBuffer,
+              bgFilename,
+              "Invalid background image",
+              request.log,
+            )
+          : undefined;
+    } catch (err) {
+      if (err instanceof InputValidationError) {
+        return reply.status(400).send({
+          error: err.message,
+        });
+      }
+      if (isToolInputError(err)) {
+        return reply.status(422).send({
+          error: "Processing failed",
+          details: stripInternalPaths(err.message),
+        });
+      }
+      throw err;
+    }
+
+    try {
+      const outputBuf = await renderBeautify(preparedMainBuffer, settings, preparedBgBuffer);
       const outFilename = resolveOutputFilename(filename, settings);
 
       const jobId = randomUUID();
@@ -314,10 +448,21 @@ export function registerBeautify(app: FastifyInstance) {
         originalSize,
         processedSize: outputBuf.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err)) throw err;
+      if (hasServerErrorStatus(err)) throw err;
+      if (err instanceof InputValidationError) {
+        return reply.status(400).send({
+          error: err.message,
+        });
+      }
+      if (!isToolInputError(err)) {
+        request.log?.error({ err, toolId: "beautify" }, "Beautify processing failed");
+      }
       return reply.status(422).send({
         error: "Processing failed",
-        details: err instanceof Error ? err.message : "Image processing failed",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Image processing failed"),
       });
     }
   });
@@ -326,15 +471,19 @@ export function registerBeautify(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "beautify",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const s = settings as BeautifySettings;
-      const buffer = await processBeautify(inputBuffer, s, filename);
-      const outFilename = resolveOutputFilename(filename, s);
-      const forcedPng = needsAlphaOutput(s) && !ALPHA_FORMATS.has(s.outputFormat);
-      const ext = forcedPng ? "png" : s.outputFormat;
-      const contentType =
-        ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
-      return { buffer, filename: outFilename, contentType };
-    },
+    process: withImageEncodeContext<unknown>(
+      "Image beautify failed",
+      (s) => (s as BeautifySettings)?.outputFormat ?? "png",
+      async (inputBuffer, settings, filename) => {
+        const s = settings as BeautifySettings;
+        const buffer = await processBeautify(inputBuffer, s, filename);
+        const outFilename = resolveOutputFilename(filename, s);
+        const forcedPng = needsAlphaOutput(s) && !ALPHA_FORMATS.has(s.outputFormat);
+        const ext = forcedPng ? "png" : s.outputFormat;
+        const contentType =
+          ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
+        return { buffer, filename: outFilename, contentType };
+      },
+    ),
   });
 }

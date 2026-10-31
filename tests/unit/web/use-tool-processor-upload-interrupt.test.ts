@@ -10,6 +10,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -80,6 +81,11 @@ beforeEach(() => {
   xhrs = [];
   MockEventSource.instances = [];
   vi.stubGlobal("EventSource", MockEventSource);
+  // Unmounting mid-run asks the server to cancel the job (#2125); no server here.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+  );
   vi.stubGlobal(
     "XMLHttpRequest",
     vi.fn(() => {
@@ -195,6 +201,10 @@ describe("useToolProcessor upload interruption (#722)", () => {
     expect(useFileStore.getState().error).toBe(
       "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
     );
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      errorCategory: "upload_error",
+    });
     expect(useFileStore.getState().processing).toBe(false);
     expect(useFileStore.getState().activeJobId).toBeNull();
 
@@ -336,7 +346,11 @@ describe("useToolProcessor upload interruption (#722)", () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(120_000);
+      vi.advanceTimersByTime(60_000);
+      (xhrs[1].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded: 32, total: 64 }),
+      );
+      vi.advanceTimersByTime(60_000);
     });
 
     expect(useFileStore.getState().error).toBeNull();

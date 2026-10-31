@@ -1,7 +1,7 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 20d37040e8ea
-i18n_source_hash: 899149b272e4
+i18n_output_hash: cfac7756f9de
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | Автентиф. | Перевірка поточної сесії |
 | `POST` | `/api/auth/change-password` | Автентиф. | Зміна власного пароля (робить недійсними всі інші сесії + API-ключі) |
 | `GET` | `/api/auth/users` | Адмін | Список усіх користувачів |
-| `POST` | `/api/auth/register` | Адмін | Створення нового користувача |
-| `PUT` | `/api/auth/users/:id` | Адмін | Оновлення ролі або команди користувача |
-| `POST` | `/api/auth/users/:id/reset-password` | Адмін | Скидання пароля користувача |
-| `DELETE` | `/api/auth/users/:id` | Адмін | Видалення користувача |
+| `POST` | `/api/auth/register` | Адмін (`users:manage`; повноваження щодо запропонованої ролі) | Створення нового користувача |
+| `PUT` | `/api/auth/users/:id` | Адмін (`users:manage`; повноваження щодо цілі) | Оновлення ролі або команди користувача |
+| `POST` | `/api/auth/users/:id/reset-password` | Адмін (`users:manage`; повноваження щодо цілі) | Скидання пароля користувача |
+| `DELETE` | `/api/auth/users/:id` | Адмін (`users:manage`; повноваження щодо цілі) | Видалення користувача |
 | `GET` | `/api/v1/config/auth` | Публічний | Перевірка, чи ввімкнено автентифікацію (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Автентиф. | Початок реєстрації TOTP MFA. Потребує корпоративної можливості `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Автентиф. | Підтвердження реєстрації MFA кодом TOTP |
 | `POST` | `/api/auth/mfa/complete` | Публічний | Завершення очікуваного виклику входу MFA |
 | `POST` | `/api/auth/mfa/disable` | Автентиф. | Вимкнення MFA для поточного користувача |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Адмін (`users:manage`) | Скидання MFA для користувача |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Адмін (`users:manage`; повноваження щодо цілі) | Скидання MFA для користувача |
 | `GET` | `/api/auth/oidc/login` | Публічний | Початок входу OIDC, коли OIDC увімкнено |
 | `GET` | `/api/auth/oidc/callback` | Публічний | Зворотний виклик авторизації OIDC |
 | `GET` | `/api/auth/saml/metadata` | Публічний | XML метаданих SAML SP, коли SAML увімкнено |
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | ID інструмента | Назва | AI-модель | Ключові налаштування |
 |---------|------|---------|-------------|
-| `remove-background` | Видалення фону | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Видалення фону | rembg (BiRefNet / U2-Net) | Фаза 1: `model`, `edgeRefine` (0-3), `decontaminate`. Фаза 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` і конвеєри: `backgroundType` (transparent/color/gradient/blur, а також image на `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Масштабування зображення | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Ластик об'єктів | LaMa (ONNX) | Маска надсилається як друга частина файлу (ім'я поля `mask`), `format`, `quality` |
 | `ocr` | OCR / Вилучення тексту | Tesseract (швидкий); RapidOCR + PP-OCR ONNX (збалансований/найкращий) | `quality` (швидкий/збалансований/найкращий), `language`, `enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG у растр | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Зображення в SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF-інструменти | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), параметри, специфічні для дії |
+| `gif-tools` | GIF-інструменти | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | Конвертер GIF/WebP | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Відеоінструменти {#video-tools}
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Адмін (`teams:manage`) | Список команд |
 | `POST` | `/api/v1/teams` | Адмін (`teams:manage`) | Створити команду |
-| `PUT` | `/api/v1/teams/:id` | Адмін (`teams:manage`) | Перейменувати команду |
+| `PUT` | `/api/v1/teams/:id` | Адмін (`teams:manage`) | Оновити команду (потрібне щонайменше одне поле) |
 | `DELETE` | `/api/v1/teams/:id` | Адмін (`teams:manage`) | Видалити команду (не можна видалити команду за замовчуванням або команди з учасниками) |
 
 ## Налаштування {#settings}
@@ -559,6 +559,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ## Ролі {#roles}
 
 Керування власними ролями з детальними дозволами.
+
+Створення та змінення ролей обмежені правилом утримання повноважень: запропонована або поточна роль не може перевищувати ранг суб'єкта, виходити за межі його фактичних дозволів або розширювати його область доступу до інструментів. Області дії ключів API враховуються під час цієї перевірки. Видалення власної ролі також потребує повноважень призначати вбудовану резервну роль `user`, яка використовується для її учасників.
 
 | Метод | Шлях | Доступ | Опис |
 |--------|------|--------|-------------|
@@ -651,8 +653,8 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Адмін (`security:manage`) | Оновити білий список CIDR із запобіганням самоблокуванню |
 | `GET` | `/api/v1/enterprise/legal-hold` | Адмін (`compliance:manage`) | Список правових утримань користувачів і команд |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Адмін (`compliance:manage`) | Застосувати або зняти правове утримання для користувача чи команди |
-| `POST` | `/api/v1/enterprise/scim/token` | Адмін (`users:manage`) | Згенерувати bearer-токен SCIM, повертається один раз |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Адмін (`users:manage`) | Відкликати поточний bearer-токен SCIM |
+| `POST` | `/api/v1/enterprise/scim/token` | Вбудований адміністратор із повними правами | Згенерувати bearer-токен SCIM, повертається один раз |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Вбудований адміністратор із повними правами | Відкликати поточний bearer-токен SCIM |
 | `GET` | `/api/v1/enterprise/siem/config` | Адмін (`webhooks:manage`) | Прочитати конфігурацію пересилання SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Адмін (`webhooks:manage`) | Оновити конфігурацію пересилання SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Адмін (`webhooks:manage`) | Список призначень вебхуків |
@@ -662,15 +664,15 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Адмін (`webhooks:manage`) | Надіслати тестове корисне навантаження вебхука |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Адмін (`compliance:manage`) | Запустити завдання експорту користувача GDPR |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Адмін (`compliance:manage`) | Прочитати статус експорту GDPR і URL завантаження |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Адмін (`compliance:manage`) | Остаточно очистити дані користувача після підтвердження |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Адмін (`compliance:manage`) | Остаточно очистити дані команди після підтвердження |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Адмін (`compliance:manage`; повноваження щодо цілі) | Остаточно очистити дані користувача після підтвердження |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Адмін (`compliance:manage`; повноваження щодо всіх учасників) | Остаточно очистити дані команди після підтвердження |
 | `GET` | `/api/v1/admin/version` | Адмін (`system:health`) | Прочитати метадані версії застосунку, збірки, Node і схеми |
 | `GET` | `/api/v1/admin/migrations/pending` | Адмін (`system:health`) | Порівняти упаковані міграції із застосованими міграціями |
 | `GET` | `/api/v1/admin/upgrade-check` | Адмін (`system:health`) | Запустити перевірки готовності до оновлення |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Кінцеві точки виявлення SCIM є публічними. Кінцеві точки користувачів і груп потребують bearer-токена SCIM, згенерованого вище.
+Кінцеві точки виявлення SCIM є публічними. Кінцеві точки користувачів і груп потребують bearer-токена SCIM, згенерованого вище. Застарілі неверсійовані токени недійсні й мають бути перевипущені як токени `so_scim_v2_...` вбудованим адміністратором із повними правами.
 
 | Метод | Шлях | Доступ | Опис |
 |--------|------|--------|-------------|

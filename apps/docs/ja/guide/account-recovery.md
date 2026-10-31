@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 65113aec1e39
+i18n_output_hash: 4e425f53ee15
 i18n_hash_version: 2
 ---
 # アカウントの復旧 {#account-recovery}
@@ -38,13 +38,37 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 そのユーザーに対してポリシーがまだ MFA を要求している場合、次は登録の障壁にぶつかるので、`reset-mfa-policy` も実行し、ログインして、設定から再登録してください。
 
+## 忘れたパスワードをリセットする {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+`[password]` を省略すると、CLI は生成した一時パスワードを出力します。いずれの場合も、そのユーザーの有効なセッション、API キー、ログイン失敗のスロットルウィンドウが消去され、SnapOtter は次回のログイン時にパスワード変更を要求します。
+
+## 管理者アカウントを初期作成する {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+既存の管理者アカウントで一切サインインできない場合に使用します。`[username]` の既定値は `DEFAULT_USERNAME`（`admin`）で、`[password]` を省略すると初回ログイン時に変更が必要な一時パスワードが出力されます。
+
+## スロットル中または無効化されたユーザーを解除する {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+これは Redis 内の `LOGIN_THROTTLED` ウィンドウを消去し、ユーザーが無効化されていた場合はアカウントのロールを復元します。
+
 ## 古いイメージとフォールバック {#older-images-and-fallbacks}
 
 `snapotter-admin` ラッパーが存在する前にビルドされたイメージでは、スクリプトを直接呼び出してください。
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 どのバージョンでも最後の手段として、データベースでポリシーを設定します。オールインワンイメージでは、Postgres はコンテナ内部で動作します。

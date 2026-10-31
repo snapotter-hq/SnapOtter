@@ -5,18 +5,27 @@
  * cancellation.
  */
 import { randomUUID } from "node:crypto";
+import { RedisConnection } from "bullmq";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import {
+  closeFlowProducer,
   closeQueueEvents,
   enqueueToolJob,
+  getFlowProducer,
   waitForJob,
   warmQueueEvents,
 } from "../../../apps/api/src/jobs/enqueue.js";
-import { getQueue } from "../../../apps/api/src/jobs/queues.js";
-import { bullPrefix, type ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
+import {
+  bullPrefix,
+  POOLS,
+  queueName,
+  type ToolJobData,
+} from "../../../apps/api/src/jobs/types.js";
+import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
 import { putObject } from "../../../apps/api/src/lib/object-storage.js";
 import {
   registerToolProcessFn,
@@ -71,11 +80,11 @@ let testApp: TestApp;
 // Workers + cancel listener are started by test-server.ts (ensureSpine).
 beforeAll(async () => {
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Job spine", () => {
   it("enqueue -> worker -> result round-trip (spine-echo)", async () => {
@@ -250,4 +259,163 @@ describe("QueueEvents warm-up (sync-wait flake guard)", () => {
     expect(result).not.toBeNull();
     expect(result!.outputRefs.length).toBeGreaterThan(0);
   }, 20_000);
+});
+
+describe("BullMQ connection teardown (#3284)", () => {
+  it("closes underlying ioredis sockets across closeQueues, closeFlowProducer, closeQueueEvents, and closeWorkers", async () => {
+    const forkClientPrefixes = POOLS.map(
+      (pool) => `name=bull:${Buffer.from(queueName(pool)).toString("base64")}`,
+    );
+    const countForkNamedRedisClients = async (): Promise<number> => {
+      const list = (await sharedRedis().client("LIST")) as string;
+      return list
+        .trim()
+        .split("\n")
+        .filter((line) => forkClientPrefixes.some((prefix) => line.includes(prefix))).length;
+    };
+
+    const initSpy = vi.spyOn(RedisConnection.prototype, "init");
+    let cleanupResults: PromiseSettledResult<void>[] = [];
+
+    try {
+      await closeWorkers();
+      await closeQueueEvents();
+      await closeQueues();
+      await closeFlowProducer();
+
+      await vi.waitFor(
+        async () => {
+          expect(await countForkNamedRedisClients()).toBe(0);
+        },
+        { timeout: 2_000, interval: 25 },
+      );
+
+      initSpy.mockClear();
+
+      startWorkers();
+      await warmQueueEvents();
+      const qClients = await Promise.all(POOLS.map((pool) => getQueue(pool).client));
+      const fpClient = await getFlowProducer().client;
+
+      await vi.waitFor(
+        async () => {
+          for (const pool of POOLS) {
+            expect(await getQueue(pool).getWorkersCount()).toBe(1);
+          }
+          expect(await countForkNamedRedisClients()).toBe(POOLS.length * 2);
+        },
+        { timeout: 2_000, interval: 25 },
+      );
+
+      // 5 Queues + 1 FlowProducer + 5 QueueEvents + 10 Worker connections (5 main + 5 blocking) = 21
+      expect(initSpy.mock.results).toHaveLength(POOLS.length * 4 + 1);
+      const allClients = (await Promise.all(
+        initSpy.mock.results.map((r: { value: unknown }) => r.value),
+      )) as Array<{
+        status: string;
+      }>;
+      for (const client of allClients) {
+        expect(client.status).toBe("ready");
+      }
+
+      await closeQueues();
+      for (const qClient of qClients) {
+        expect(qClient.status).toBe("end");
+      }
+
+      await closeFlowProducer();
+      expect(fpClient.status).toBe("end");
+
+      await closeQueueEvents();
+      await closeWorkers();
+
+      for (const client of allClients) {
+        expect(client.status).toBe("end");
+      }
+
+      await vi.waitFor(
+        async () => {
+          expect(await countForkNamedRedisClients()).toBe(0);
+        },
+        { timeout: 2_000, interval: 25 },
+      );
+    } finally {
+      initSpy.mockRestore();
+      cleanupResults = await Promise.allSettled([
+        closeWorkers(),
+        closeQueueEvents(),
+        closeQueues(),
+        closeFlowProducer(),
+      ]);
+      startWorkers();
+      await warmQueueEvents();
+      await vi.waitFor(
+        async () => {
+          for (const pool of POOLS) {
+            expect(await getQueue(pool).getWorkersCount()).toBe(1);
+          }
+        },
+        { timeout: 2_000, interval: 25 },
+      );
+    }
+    expect(cleanupResults.filter((r) => r.status === "rejected")).toEqual([]);
+  });
+
+  it("closeWorkers() resolves when worker blocking connections are in reconnecting state (#3604)", async () => {
+    const initSpy = vi.spyOn(RedisConnection.prototype, "init");
+
+    try {
+      await closeWorkers();
+      initSpy.mockClear();
+
+      startWorkers();
+      // 5 workers * 2 connections each (main + blocking) = 10 connections
+      expect(initSpy.mock.results).toHaveLength(POOLS.length * 2);
+      const workerClients = (await Promise.all(
+        initSpy.mock.results.map((r: { value: unknown }) => r.value),
+      )) as Array<{
+        status: string;
+        disconnect: (reconnect?: boolean) => void;
+        once: (event: string, listener: () => void) => void;
+      }>;
+
+      // Every odd-indexed client (1, 3, 5, 7, 9) is a worker's blockingConnection.
+      const blockingClients = workerClients.filter((_, idx) => idx % 2 === 1);
+      expect(blockingClients).toHaveLength(POOLS.length);
+
+      // Put every blocking connection into "reconnecting", mirroring BullMQ's
+      // waitForJob watchdog firing bclient.disconnect(true) after a >6s stall.
+      await Promise.all(
+        blockingClients.map(
+          (bclient) =>
+            new Promise<void>((resolve) => {
+              bclient.once("reconnecting", resolve);
+              bclient.disconnect(true);
+            }),
+        ),
+      );
+      for (const bclient of blockingClients) {
+        expect(bclient.status).toBe("reconnecting");
+      }
+
+      await expect(closeWorkers()).resolves.toBeUndefined();
+
+      for (const client of workerClients) {
+        expect(client.status).toBe("end");
+      }
+    } finally {
+      initSpy.mockRestore();
+      await closeWorkers();
+      startWorkers();
+      await warmQueueEvents();
+      await vi.waitFor(
+        async () => {
+          for (const pool of POOLS) {
+            expect(await getQueue(pool).getWorkersCount()).toBe(1);
+          }
+        },
+        { timeout: 2_000, interval: 25 },
+      );
+    }
+  });
 });

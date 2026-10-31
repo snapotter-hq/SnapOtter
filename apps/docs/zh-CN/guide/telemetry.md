@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter 收集哪些匿名使用数据、何时发送，以及如何关闭实例范围的产品分析。"
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 694a13753955
 ---

@@ -1,6 +1,6 @@
 ---
 description: "ما بيانات الاستخدام المجهولة التي يجمعها SnapOtter، ومتى تُرسَل، وكيف تُوقِف تحليلات المنتج على مستوى المثيل بأكمله."
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 16572bfa9ebc
 ---

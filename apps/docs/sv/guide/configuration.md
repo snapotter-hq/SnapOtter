@@ -1,8 +1,8 @@
 ---
 description: "Alla SnapOtter-miljövariabler med standardvärden. Konfigurera autentisering, lagring, AI-modeller, analys med mera."
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: 2ecff13095a6
+i18n_output_hash: 9966c9bb9ee4
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ All konfiguration görs via miljövariabler. Varje variabel har ett vettigt stan
 | Variabel | Standard | Beskrivning |
 |---|---|---|
 | `PORT` | `1349` | Port som servern lyssnar på. |
+| `BASE_PATH` | (tom) | Offentlig distributionssökväg, t.ex. `/snapotter`. Tom eller `/` serverar på domänens rot. Tillämpas vid körning; ingen ombyggnad av avbildningen krävs. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximalt antal förfrågningar per minut per IP. Sätt till 0 för att inaktivera hastighetsbegränsning. |
 | `CORS_ORIGIN` | (tom) | Kommaseparerade tillåtna ursprung för CORS, eller tom för endast samma ursprung. |
 | `LOG_LEVEL` | `info` | Loggutförlighet. En av: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -40,7 +41,8 @@ De två booleska värdena nedan accepterar bara `true` och `false`. Allt annat, 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` eller `s3`. S3 och MinIO kräver en licens med funktionen s3_storage plus `S3_*`-variablerna nedan. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-anslutningssträng. Compose-stacken pekar den mot sin `postgres`-tjänst; lämna den osatt (tillsammans med `REDIS_URL`) för att få inbäddat läge. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-anslutningssträng, och den anslutning som varje förfrågan betjänas på. Från och med 2.3.0 anger du även `DATABASE_MIGRATION_URL`, och då blir denna den minst privilegierade körtidsrollen, med DML på appens tabeller och inget annat. Compose-stacken pekar den mot sin `postgres`-tjänst; lämna den osatt (tillsammans med `REDIS_URL`) för att få inbäddat läge. |
+| `DATABASE_MIGRATION_URL` | (tom) | Tillgänglig från 2.3.0; 2.2.0-avbildningen ignorerar den och kräver att `DATABASE_URL` namnger databasens ägare. Privilegierad anslutning som endast används vid start för att köra migreringar och bevilja körtidsrollen, och som stängs innan den första förfrågan. Lämna den tom så kör SnapOtter med en enda roll, där `DATABASE_URL` utför båda uppgifterna. Se [Roller med minsta möjliga behörighet](/sv/guide/database#least-privilege-roles). |
 | `REDIS_URL` | `redis://localhost:6379` | Redis-anslutningssträng (används för BullMQ-jobbköer). Compose pekar den mot sin `redis`-tjänst. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Katalog för tillfälliga filer under bearbetning. Rensas automatiskt. Avbildningen sätter `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Katalog för beständiga användarfiler (uppladdade bilder, sparade resultat). Avbildningen sätter `/data/files`. |
@@ -74,6 +76,8 @@ Kör avbildningen utan `DATABASE_URL` och utan `REDIS_URL` så startar den sin e
 |---|---|---|
 | `EMBEDDED` | `auto` | Aktiveras automatiskt när både `DATABASE_URL` och `REDIS_URL` är osatta. Sätt till `0` för att inaktivera det (appen misslyckas då snabbt om ingen extern `DATABASE_URL`/`REDIS_URL` är satt, i stället för att tyst starta en databas i containern). |
 | `REDIS_MAXMEMORY` | `512mb` | Minnestak för den inbäddade Redis (endast inbäddat läge). Sänk det på minnesbegränsade värdar som en Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Antal sekunder som starten väntar på att den inbäddade Redis ska svara på `PING` innan den ger upp. Vid timeout stoppas containern och orsaken loggas, i stället för att hänga. Hela sekunder från 1 till 999999; det finns inget obegränsat värde, eftersom den här gränsen finns just för att förhindra att väntan aldrig tar slut. Höj den bara om en långsam värd utlöser den. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Samma sak för den inbäddade PostgreSQL. Klockan startar efter att första startens `initdb` har slutförts, så den täcker serverstart och kraschåterställning snarare än den initiala databasskapelsen. |
 
 Uppgradering från 1.x: lägg din gamla `snapotter.db` på `/data/snapotter.db` i volymen så importerar inbäddat läge den till den inbäddade PostgreSQL vid första start. Importen körs en gång; senare starter hoppar över den.
 
@@ -93,6 +97,23 @@ Telemetrinotering: inbäddat läge ärver avbildningens analysstandard som all a
 | `MAX_CANVAS_PIXELS` | `0` (ingen gräns) | Maximal arbetsytestorlek i pixlar för utdatabilder. Sätt till 0 för ingen gräns. |
 | `MAX_SVG_SIZE_MB` | `50` | Största SVG som accepteras före sanering, i megabyte. `0` beter sig annorlunda här än i raderna omkring. Det tar bort storleksgränsen före parsning helt i stället för att höja den, så låt den här vara satt. |
 | `MAX_PDF_PAGES` | `0` (obegränsat) | Maximalt antal PDF-sidor för PDF-till-bild-konvertering. Sätt till 0 för obegränsat. |
+
+### Motorer {#engines}
+
+SnapOtter slår upp varje bearbetningsbinär i `$PATH` inuti containern, så dessa förblir tomma om du inte monterar ett eget bygge.
+
+| Variabel | Standard | Beskrivning |
+|---|---|---|
+| `FFMPEG_PATH` | (tom) | Sökväg till binären `ffmpeg` bakom video- och ljudverktygen. |
+| `FFPROBE_PATH` | (tom) | Sökväg till `ffprobe`, som läser mediefiler innan de bearbetas. Peka den på samma bygge som `FFMPEG_PATH`. |
+| `QPDF_PATH` | (tom) | Sökväg till `qpdf`, som används av PDF-verktygen och för att kontrollera uppladdade PDF-filer. |
+| `SOFFICE_PATH` | (tom) | Sökväg till LibreOffices `soffice`, som används för konvertering av kontorsdokument. |
+| `PDFCPU_PATH` | (tom) | Sökväg till `pdfcpu`, som används av vissa PDF-verktyg. |
+| `SNAPOTTER_HW_ACCEL` | (tom) | Familj av hårdvaruvideoencoder, `nvenc` eller `vaapi`. Tom kodar i programvara. |
+
+`SNAPOTTER_HW_ACCEL` kräver ett ffmpeg som är byggt med den encoderfamiljen, och ffmpeg i avbildningen har ingen av dem. Med avbildningens egen binär faller inställningen tillbaka på programvarukodning och säger det i startloggen. För att använda den, montera ditt eget ffmpeg-bygge, peka `FFMPEG_PATH` och `FFPROBE_PATH` på det och ge containern GPU-enheten. För `nvenc`, ange även `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: avbildningen begär bara `compute,utility`, och utan `video` monterar NVIDIA-körtiden inte encodingsbiblioteket, så encodern listas men varje encoding misslyckas. En sökvägsöverskuggning som inte finns eller inte är körbar namnges också i startloggen, och varje jobb som behöver den binären misslyckas tills du rättar sökvägen eller tar bort den.
+
+De publicerade Compose-filerna skickar igenom alla sex från `.env`, så det räcker att ange dem där.
 
 ### Rensning {#cleanup}
 

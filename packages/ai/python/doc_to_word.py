@@ -12,21 +12,24 @@ def main():
         print(json.dumps({"error": "missing path/out"}))
         sys.exit(1)
     try:
+        # PyMuPDF's message system writes to sys.stdout by default, and MuPDF
+        # errors ("error: No common ancestor in structure tree") are routed
+        # through it. This stdout is a one-JSON-line protocol; keep library
+        # diagnostics on stderr (issue #843, Sentry NODE-5M). Redirect before
+        # importing pdf2docx so fitz import-time notices land on stderr too.
+        import pymupdf
+
+        pymupdf.set_messages(stream=sys.stderr)
+    except Exception as exc:  # noqa: BLE001
+        # Degraded mode: MuPDF noise will share the JSON channel. Leave a
+        # breadcrumb on stderr so the failed redirect is visible in bridge logs.
+        print(f"[doc_to_word] pymupdf message redirect unavailable: {exc}", file=sys.stderr)
+    try:
         from pdf2docx import Converter
         from pdf2docx_layout import install_pdf2docx_layout_fixes
     except ImportError:
         print(json.dumps({"error": "pdf2docx not installed"}))
         sys.exit(1)
-    try:
-        # PyMuPDF's message system writes to sys.stdout by default, and MuPDF
-        # errors ("error: No common ancestor in structure tree") are routed
-        # through it. This stdout is a one-JSON-line protocol; keep library
-        # diagnostics on stderr (issue #843, Sentry NODE-5M).
-        import pymupdf
-
-        pymupdf.set_messages(stream=sys.stderr)
-    except Exception:  # noqa: BLE001
-        pass
     try:
         install_pdf2docx_layout_fixes()
         cv = Converter(path)
@@ -36,7 +39,7 @@ def main():
             cv.close()
         print(json.dumps({"ok": True}))
     except Exception as exc:  # noqa: BLE001
-        print(json.dumps({"error": str(exc)}))
+        print(json.dumps({"error": str(exc).strip() or type(exc).__name__}))
         sys.exit(1)
 
 

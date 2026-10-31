@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 3b688bc7f813
+i18n_output_hash: d14b1dfe08e8
 i18n_hash_version: 2
 ---
 # 账户恢复 {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 如果策略仍要求该用户使用 MFA，那么他们接下来会撞上注册
 关卡，所以还需运行 `reset-mfa-policy`，登录后从“设置”中重新注册。
 
+## 重置忘记的密码 {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+如果省略 `[password]`，CLI 会打印出一个生成的临时密码。无论哪种方式，该用户的活动会话、API 密钥和登录失败限流窗口都会被清除，并且 SnapOtter 会要求其在下次登录时修改密码。
+
+## 引导创建管理员账户 {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+当没有任何现有管理员账户能够登录时，请使用此命令。`[username]` 默认为 `DEFAULT_USERNAME`（`admin`），省略 `[password]` 会打印出一个首次登录时必须修改的临时密码。
+
+## 解锁被限流或已禁用的用户 {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+这会清除 Redis 中的 `LOGIN_THROTTLED` 窗口，并在用户被禁用时恢复该账户的角色。
+
 ## 较旧的镜像与回退方案 {#older-images-and-fallbacks}
 
 在 `snapotter-admin` 包装器出现之前构建的镜像上，请直接调用该
@@ -51,7 +75,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 作为任何版本上的最后手段，可在数据库中设置该策略。在

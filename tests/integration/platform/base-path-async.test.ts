@@ -56,7 +56,7 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   try {
@@ -64,7 +64,7 @@ afterAll(async () => {
   } finally {
     env.BASE_PATH = originalBasePath;
   }
-}, 10_000);
+});
 
 /** Poll the Redis terminal replay key until the terminal frame appears. */
 async function waitForTerminalFrame(

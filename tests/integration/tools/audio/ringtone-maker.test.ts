@@ -23,11 +23,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([
@@ -72,9 +72,9 @@ describe.skipIf(!ffmpegAvailable())("ringtone-maker (requires ffmpeg)", () => {
     }
   }, 60_000);
 
-  it("rejects startS beyond audio duration (422)", async () => {
+  it("rejects startS beyond audio duration (400)", async () => {
     const res = await runTool({ startS: 5 });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     expect(res.body).toMatch(/beyond the end/i);
   }, 60_000);
 

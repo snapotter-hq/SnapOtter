@@ -1,13 +1,13 @@
 ---
 description: "Konversi antar CSV dan JSON, kedua arah."
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: 690573599e35
+i18n_output_hash: 1984bc96ae12
 ---
 
 # CSV to JSON {#csv-to-json}
 
-Konversi antar format CSV dan JSON dalam kedua arah. Unggah file CSV atau TSV untuk mendapatkan array objek JSON, atau unggah array JSON untuk mendapatkan file CSV.
+Konversi antar format CSV dan JSON dalam kedua arah. Unggah file CSV atau TSV untuk mendapatkan array objek JSON, atau unggah JSON (array objek, atau objek yang membungkusnya) untuk mendapatkan file CSV.
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - Arah konversi terdeteksi otomatis dari ekstensi file input: `.csv` atau `.tsv` menghasilkan `.json`, dan `.json` menghasilkan `.csv`.
 - Parameter `pretty` hanya memengaruhi output JSON. Ketika diatur ke `false`, output berupa string JSON satu baris yang kompak.
-- Input JSON harus berupa array objek dengan key yang konsisten. Setiap objek menjadi baris, dan setiap key menjadi header kolom.
+- Input JSON bisa berupa array objek, objek dengan satu key yang berisi array seperti itu (misalnya `{"data": [...]}`), atau objek datar berisi nilai skalar. Setiap objek menjadi baris, dan setiap key menjadi header kolom. Objek datar menghasilkan tabel dua kolom `key,value`. Objek dengan beberapa key tingkat atas dan array kosong ditolak.
 - File TSV (nilai yang dipisahkan tab) didukung selain CSV.

@@ -9,16 +9,28 @@
  * returns results with download URLs.
  */
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
-import type { FastifyInstance } from "fastify";
+import { basename, extname } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
+import { deleteRecordedToolJob, recordCompletedToolJob } from "../lib/completed-job.js";
+import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
+import { reportError } from "../lib/error-report.js";
+import { stripInternalPaths } from "../lib/errors.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { putObject } from "../lib/object-storage.js";
+import { logger } from "../lib/logger.js";
+import { deletePrefix, normalizeOperationalWriteError, putObject } from "../lib/object-storage.js";
 import {
   FETCH_TIMEOUT_MS,
   MAX_URL_FETCH_SIZE,
@@ -26,6 +38,15 @@ import {
   safeFetch,
   URL_FETCH_CONCURRENCY,
 } from "../lib/ssrf.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgClientError,
+  isSvgzClientError,
+  sanitizeSvg,
+} from "../lib/svg-sanitize.js";
+import { engineUnavailable } from "../modality/image-input.js";
+import { requireFileAccess } from "../permissions.js";
 
 /** Formats browsers can display natively (no preview needed). */
 const BROWSER_PREVIEWABLE = new Set([
@@ -99,14 +120,18 @@ type FetchResult = SuccessResult | FailureResult;
 /**
  * Extract a usable filename from a URL path, falling back to a UUID-based name.
  */
-function filenameFromUrl(url: string): string {
+export function filenameFromUrl(url: string): string {
   try {
     const pathname = new URL(url).pathname;
     const base = basename(pathname);
     // Decode percent-encoded characters
     const decoded = decodeURIComponent(base);
-    // Only use it if it looks like a file with an extension
-    if (decoded?.includes(".") && decoded.length <= 255) {
+    // Only use it if it looks like a file with an extension before and after sanitizing
+    if (
+      extname(decoded).replace(/^\./, "") !== "" &&
+      extname(sanitizeFilename(decoded)).replace(/^\./, "") !== "" &&
+      decoded.length <= 255
+    ) {
       return decoded;
     }
   } catch {
@@ -120,7 +145,7 @@ function filenameFromUrl(url: string): string {
  * Appends `_1`, `_2`, etc. before the extension when a collision is found.
  * Mirrors the deduplication logic in batch.ts.
  */
-function getUniqueName(name: string, used: Set<string>): string {
+export function getUniqueName(name: string, used: Set<string>): string {
   if (!used.has(name)) {
     used.add(name);
     return name;
@@ -138,11 +163,21 @@ function getUniqueName(name: string, used: Set<string>): string {
   return candidate;
 }
 
+function unverifiedMime(claimedMime: string): string {
+  return claimedMime.toLowerCase().startsWith("image/") ? "application/octet-stream" : claimedMime;
+}
+
 export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/v1/fetch-urls",
     { config: { rateLimit: { max: 200, timeWindow: "1 hour" } } },
     async (request, reply) => {
+      // A URL import stages files behind a public download link exactly as
+      // /api/v1/upload does, so it takes the same file permission. This route
+      // sits outside /api/v1/tools/, where the tool-access gate applies.
+      const user = await requireFileAccess(request, reply);
+      if (!user) return;
+
       // Validate body
       const parsed = fetchUrlsSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -152,6 +187,46 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
 
       const { urls } = parsed.data;
       const jobId = randomUUID();
+      const userId = user.id;
+
+      let aborted = false;
+      let recordedJob = false;
+      let wroteUpload = false;
+      let recordJobPromise: Promise<void> | null = null;
+
+      const beforeWrite = async (firstOutputRef: string): Promise<void> => {
+        if (!recordJobPromise) {
+          recordJobPromise = recordCompletedToolJob({
+            jobId,
+            userId,
+            toolId: "fetch-urls",
+            outputRefs: [firstOutputRef],
+          }).then(() => {
+            recordedJob = true;
+          });
+        }
+        await recordJobPromise;
+      };
+
+      const discardUploads = async () => {
+        if (recordJobPromise) {
+          await recordJobPromise.catch(() => {});
+        }
+        let prefixDeleted = true;
+        if (wroteUpload) {
+          wroteUpload = false;
+          await deletePrefix(`outputs/${jobId}/`).catch((err) => {
+            prefixDeleted = false;
+            request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
+          });
+        }
+        if (recordedJob && prefixDeleted) {
+          recordedJob = false;
+          await deleteRecordedToolJob(jobId).catch((err) => {
+            request.log.warn({ err, jobId }, "failed to delete a rejected request's job row");
+          });
+        }
+      };
 
       const queue = new PQueue({ concurrency: URL_FETCH_CONCURRENCY });
 
@@ -162,23 +237,45 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
       // Pre-allocate result slots to preserve order
       const resultSlots: FetchResult[] = new Array(urls.length);
 
-      await Promise.all(
-        urls.map((url, index) =>
-          queue.add(async () => {
-            resultSlots[index] = await fetchSingleUrl(url, jobId, usedFilenames);
-          }),
-        ),
-      );
+      try {
+        await Promise.all(
+          urls.map((url, index) =>
+            queue.add(async () => {
+              resultSlots[index] = await fetchSingleUrl(url, jobId, usedFilenames, request.log, {
+                isAborted: () => aborted,
+                beforeWrite,
+                markWrote: () => {
+                  wroteUpload = true;
+                },
+              });
+            }),
+          ),
+        );
+      } catch (err) {
+        aborted = true;
+        queue.clear();
+        await queue.onIdle().catch(() => {});
+        await discardUploads();
+        throw err;
+      }
 
       return reply.send({ results: resultSlots });
     },
   );
 }
 
+interface FetchWriteHooks {
+  isAborted?: () => boolean;
+  beforeWrite?: (firstOutputRef: string) => Promise<void>;
+  markWrote?: () => void;
+}
+
 async function fetchSingleUrl(
   url: string,
   jobId: string,
   usedFilenames: Set<string>,
+  log: Pick<FastifyBaseLogger, "warn"> & Partial<Pick<FastifyBaseLogger, "error">> = logger,
+  hooks?: FetchWriteHooks,
 ): Promise<FetchResult> {
   try {
     // Fetch with SSRF protection and timeout
@@ -236,65 +333,218 @@ async function fetchSingleUrl(
       return { success: false, url, error: "Empty response body" };
     }
 
-    // Derive filename from URL, deduplicating to prevent overwrites when
-    // multiple URLs resolve to the same name (all URLs share one workspace).
+    // Derive filename from URL, decompressing .svgz and sanitizing SVG content
+    // before validation and storage so hostile DOCTYPE/script payloads are
+    // stripped even when Sharp rejects the post-sanitized SVG.
     const rawFilename = filenameFromUrl(url);
-    const filename = getUniqueName(sanitizeFilename(rawFilename), usedFilenames);
+    let safeName = sanitizeFilename(rawFilename);
+    let safeBuffer: Buffer = buffer;
+    const uploadExt = extname(safeName).toLowerCase();
+    let isDecompressedSvg = false;
+    let sanitizedAsSvg = false;
+    if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
+      try {
+        if (uploadExt === ".svgz") {
+          safeBuffer = decompressSvgz(buffer);
+        }
+        if (isSvgBuffer(safeBuffer)) {
+          safeBuffer = sanitizeSvg(safeBuffer);
+          sanitizedAsSvg = true;
+          if (uploadExt === ".svgz") {
+            isDecompressedSvg = true;
+          }
+        }
+      } catch (err) {
+        if ((err as { message?: string })?.message?.includes("SVGZ file does not contain")) {
+          log.warn(
+            { err, filename: rawFilename },
+            "Fetched .svgz file does not contain SVG, storing as opaque file",
+          );
+          safeBuffer = buffer;
+        } else if (isSvgzClientError(err)) {
+          log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
+          return { success: false, url, error: (err as Error).message };
+        } else {
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) throw oom;
+          (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
+          void reportError(err, {
+            source: "http",
+            route: "/api/v1/fetch-urls",
+            method: "POST",
+            statusCode: 500,
+          });
+          return { success: false, url, error: "Internal server error" };
+        }
+      }
+    }
+
+    if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
+      safeName = safeName.replace(/\.svgz$/i, ".svg");
+    }
+    const filename = getUniqueName(safeName, usedFilenames);
 
     // Try image validation; non-image media (audio/video/document/data) is
     // accepted and typed from the HTTP response so URL import works for every
     // modality. The consuming tool runs modality-specific validation at
     // process time, and SSRF + size limits still bound what can be fetched.
-    const validation = await validateImageBuffer(buffer, filename).catch(() => null);
-
-    // Save to object storage uploads prefix (raw fetched files)
-    await putObject(`uploads/${jobId}/${filename}`, buffer);
+    const validation = await validateImageBuffer(safeBuffer, filename).catch((err) => {
+      if (err instanceof DecoderOutOfMemoryError || hasServerErrorStatus(err)) throw err;
+      log.warn({ err, filename }, "Image validation threw unexpectedly");
+      return null;
+    });
+    const isValidImage = validation?.valid === true && !validation.nameOnly;
+    if (!sanitizedAsSvg && isValidImage && validation.format === "svg") {
+      try {
+        safeBuffer = sanitizeSvg(decompressSvgz(safeBuffer));
+        sanitizedAsSvg = true;
+      } catch (err) {
+        if (isSvgClientError(err)) {
+          log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
+          return { success: false, url, error: (err as Error).message };
+        }
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
+        (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
+        void reportError(err, {
+          source: "http",
+          route: "/api/v1/fetch-urls",
+          method: "POST",
+          statusCode: 500,
+        });
+        return { success: false, url, error: "Internal server error" };
+      }
+    }
 
     const responseContentType = response.headers.get("content-type")?.split(";")[0]?.trim();
-    const contentType = validation?.valid
+    const contentType = isValidImage
       ? (FORMAT_TO_MIME[validation.format] ?? "application/octet-stream")
-      : responseContentType || "application/octet-stream";
+      : unverifiedMime(responseContentType || "application/octet-stream");
     const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
 
     // Formats in CLI_DECODED_FORMATS (HEIC, RAW, PSD, TGA, ...) validate
-    // successfully without Sharp ever decoding pixels -- validateImageBuffer
+    // successfully without Sharp ever decoding pixels: validateImageBuffer
     // reports width/height as 0 for them by design. Decode once here (to a
     // Sharp-compatible PNG buffer) so both the preview and the real
     // dimensions below can be computed from actual pixel data, the same
     // pre-processing every other Sharp-touching consumer of
     // validateImageBuffer() already does (image-input.ts, erase-object.ts,
-    // user-files.ts thumbnails). Decode failure is non-fatal: fall back to
-    // the raw buffer, which preserves today's behavior (skip preview, 0x0
-    // dimensions) for whatever edge case failed to decode.
-    let decodedBuffer: Buffer<ArrayBuffer> = buffer;
+    // user-files.ts thumbnails). Decode failure is non-fatal: skip preview
+    // and keep the 0x0 dimensions for whatever edge case failed to decode.
+    let decodedBuffer: Buffer | null = safeBuffer;
     let didDecode = false;
-    if (validation?.valid) {
+    let fallbackFormat: string | undefined;
+    if (isValidImage) {
       try {
         if (validation.format === "heif") {
-          decodedBuffer = Buffer.from(await decodeHeic(buffer));
+          decodedBuffer = Buffer.from(await decodeHeic(safeBuffer));
           didDecode = true;
         } else if (needsCliDecode(validation.format)) {
-          decodedBuffer = Buffer.from(await decodeToSharpCompat(buffer, validation.format));
+          const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+          try {
+            decodedBuffer = Buffer.from(
+              await decodeToSharpCompat(safeBuffer, validation.format, fileExt),
+            );
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
+            // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
+            // only surface a CLI decode failure if Sharp cannot read it either.
+            try {
+              const meta = await sharp(safeBuffer).metadata();
+              fallbackFormat = meta.format;
+              if (fallbackFormat !== "svg") {
+                await sharp(safeBuffer).resize(1).raw().toBuffer();
+              }
+            } catch (rawProbeErr) {
+              const probeErr = asDecoderOutOfMemory(rawProbeErr);
+              if (probeErr instanceof DecoderOutOfMemoryError) {
+                throw probeErr;
+              }
+              throw decodeErr;
+            }
+          }
           didDecode = true;
         }
-      } catch {
-        // Decode failed -- non-fatal, fall back to the raw buffer below.
-        decodedBuffer = buffer;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          reportEngineUnavailable(engineUnavailable(err), "fetch-urls", log);
+        } else {
+          log.warn(
+            { err: rawErr, jobId, contentType },
+            "preview generation failed; result has no renderable preview",
+          );
+        }
+        // Decode failed: non-fatal, skip preview and keep the 0x0 fallback.
+        decodedBuffer = null;
         didDecode = false;
       }
     }
 
+    if (fallbackFormat === "svg") {
+      try {
+        safeBuffer = sanitizeSvg(decompressSvgz(safeBuffer));
+        decodedBuffer = Buffer.from(safeBuffer);
+      } catch (err) {
+        if (isSvgClientError(err)) {
+          log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
+          return { success: false, url, error: (err as Error).message };
+        }
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
+        (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
+        void reportError(err, {
+          source: "http",
+          route: "/api/v1/fetch-urls",
+          method: "POST",
+          statusCode: 500,
+        });
+        return { success: false, url, error: "Internal server error" };
+      }
+    }
+
+    // Record a completed jobs row before the first write so the S3 TTL sweep
+    // can expire the prefix (#3624).
+    if (hooks?.isAborted?.()) {
+      return { success: false, url, error: "Request aborted" };
+    }
+    const uploadKey = `outputs/${jobId}/${filename}`;
+    await hooks?.beforeWrite?.(uploadKey);
+    if (hooks?.isAborted?.()) {
+      return { success: false, url, error: "Request aborted" };
+    }
+
+    // Save to the outputs prefix: /api/v1/download serves outputs/ only.
+    try {
+      hooks?.markWrote?.();
+      await putObject(uploadKey, safeBuffer);
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
+      if (hasServerErrorStatus(err)) {
+        throw err;
+      }
+      throw Object.assign(err instanceof Error ? err : new Error(String(err)), {
+        statusCode: 500,
+      });
+    }
+
     // Real dimensions for formats that just got decoded above; every other
     // valid format already has real width/height from validateImageBuffer.
-    let width = validation?.valid ? validation.width : undefined;
-    let height = validation?.valid ? validation.height : undefined;
-    if (didDecode) {
+    let width = isValidImage ? validation.width : undefined;
+    let height = isValidImage ? validation.height : undefined;
+    if (didDecode && decodedBuffer) {
       try {
         const metadata = await sharp(decodedBuffer).metadata();
         width = metadata.width ?? width;
         height = metadata.height ?? height;
       } catch {
-        // Metadata read failed -- non-fatal, keep the 0x0 fallback.
+        // Metadata read failed: non-fatal, keep the 0x0 fallback.
       }
     }
 
@@ -304,14 +554,25 @@ async function fetchSingleUrl(
     // ...) produce a real preview instead of failing on the raw, undecoded
     // buffer.
     let previewUrl: string | null = null;
-    if (validation?.valid && !BROWSER_PREVIEWABLE.has(contentType)) {
+    if (decodedBuffer && isValidImage && !BROWSER_PREVIEWABLE.has(contentType)) {
       try {
         const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
-        const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
-        await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
-        previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
-      } catch {
-        // Preview generation failed -- non-fatal, skip preview
+        if (!hooks?.isAborted?.()) {
+          const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
+          await putObject(`outputs/${jobId}/${previewFilename}`, previewBuffer);
+          previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
+        }
+      } catch (err) {
+        const decoderErr = asDecoderOutOfMemory(err);
+        if (isDecoderUnavailable(decoderErr)) {
+          reportEngineUnavailable(engineUnavailable(decoderErr), "fetch-urls", log);
+        } else {
+          log.warn(
+            { err, jobId, contentType },
+            "preview generation failed; result has no renderable preview",
+          );
+        }
+        // Preview generation failed: non-fatal, skip preview
       }
     }
 
@@ -320,14 +581,17 @@ async function fetchSingleUrl(
       url,
       filename,
       contentType,
-      size: buffer.length,
+      size: safeBuffer.length,
       width,
       height,
       downloadUrl,
       previewUrl,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    if (hasServerErrorStatus(err)) {
+      throw err;
+    }
+    const message = stripInternalPaths(err instanceof Error ? err.message : "Unknown error");
     return { success: false, url, error: message };
   }
 }

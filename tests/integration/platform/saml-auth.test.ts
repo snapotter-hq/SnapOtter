@@ -11,12 +11,17 @@
  * tests (#978) use to make one call throw.
  */
 import { randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { inspect } from "node:util";
+import { asc, DrizzleQueryError, eq, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { loadEnv } from "../../../apps/api/src/lib/env.js";
+import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
+import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
+import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
 // Hoisted so the vi.mock factories (which vitest hoists above the imports) can
 // close over them. saml.ts imports @node-saml STATICALLY, so it must be
@@ -40,14 +45,27 @@ const getMfaPolicyMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 // resolveExternalUser stays REAL by default. The #978 tests swap in a throw for
 // one call each: the retry-exhaustion error the resolver raises after three
 // lost username races (not worth staging against a real DB) and a plain fault
-// that must keep surfacing as a 500.
-const resolverFailure = vi.hoisted(() => ({ next: null as Error | null }));
+// that must keep surfacing as a 500. The wrapper also records the username
+// argument so a callback test can tell a pre-allocated suffix from the base
+// the resolver is supposed to receive.
+const resolverFailure = vi.hoisted(() => ({
+  next: null as Error | null,
+  beforeResolve: null as (() => Promise<void>) | null,
+}));
+const seenResolverUsernames = vi.hoisted(() => ({ list: [] as string[] }));
 vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   const realResolve = actual.resolveExternalUser as (...args: unknown[]) => Promise<unknown>;
   return {
     ...actual,
     resolveExternalUser: async (...args: unknown[]) => {
+      const username = (args[0] as { username?: string } | undefined)?.username;
+      if (typeof username === "string") seenResolverUsernames.list.push(username);
+      const beforeResolve = resolverFailure.beforeResolve;
+      if (beforeResolve) {
+        resolverFailure.beforeResolve = null;
+        await beforeResolve();
+      }
       const err = resolverFailure.next;
       if (err) {
         resolverFailure.next = null;
@@ -56,6 +74,14 @@ vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOrig
       return realResolve(...args);
     },
   };
+});
+
+// reportError is mocked so the callback tests can read exactly what it hands
+// Sentry (#1866, #1868); every other error-report export stays real.
+const reportErrorSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, reportError: reportErrorSpy };
 });
 
 vi.mock("@node-saml/node-saml", () => ({
@@ -119,19 +145,21 @@ beforeAll(async () => {
     (env as Record<string, unknown>)[k] = v;
   }
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterAll(async () => {
   for (const [k, v] of Object.entries(saved)) {
     (env as Record<string, unknown>)[k] = v;
   }
   await testApp.cleanup();
-}, 10_000);
+});
 
 afterEach(() => {
   // An armed throw is consumed only if the ACS route reaches the resolver;
   // never let one leak into the next test.
   resolverFailure.next = null;
+  resolverFailure.beforeResolve = null;
+  seenResolverUsernames.list.length = 0;
 });
 
 function postCallback() {
@@ -153,6 +181,137 @@ describe("SAML metadata", () => {
     expect(res.headers["content-type"]).toContain("xml");
     expect(res.body).toContain("EntityDescriptor");
   });
+
+  it("passes trimmed SAML_IDP_SSO_URL, SAML_CALLBACK_URL, and SAML_ENTITY_ID from loadEnv to SAML and falls back when overrides are whitespace-only (#2876)", async () => {
+    const prevSsoUrl = env.SAML_IDP_SSO_URL;
+    const prevCallbackUrl = env.SAML_CALLBACK_URL;
+    const prevEntityId = env.SAML_ENTITY_ID;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_CERTIFICATE: env.SAML_IDP_CERTIFICATE,
+        SAML_IDP_SSO_URL: " https://idp.example.com/sso\n",
+        SAML_CALLBACK_URL: " https://sp.example.com/api/auth/saml/callback\n",
+        SAML_ENTITY_ID: " urn:snapotter:custom-sp\n",
+      });
+      env.SAML_IDP_SSO_URL = configured.SAML_IDP_SSO_URL;
+      env.SAML_CALLBACK_URL = configured.SAML_CALLBACK_URL;
+      env.SAML_ENTITY_ID = configured.SAML_ENTITY_ID;
+      samlCtorMock.mockClear();
+      samlMock.generateServiceProviderMetadata.mockReturnValue(
+        '<?xml version="1.0"?><EntityDescriptor entityID="sp"/>',
+      );
+
+      const res = await testApp.app.inject({ method: "GET", url: "/api/auth/saml/metadata" });
+      expect(res.statusCode).toBe(200);
+      expect(samlCtorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entryPoint: "https://idp.example.com/sso",
+          callbackUrl: "https://sp.example.com/api/auth/saml/callback",
+          issuer: "urn:snapotter:custom-sp",
+        }),
+      );
+
+      const blankOverrides = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_CERTIFICATE: env.SAML_IDP_CERTIFICATE,
+        SAML_IDP_SSO_URL: " https://idp.example.com/sso\n",
+        SAML_CALLBACK_URL: "   ",
+        SAML_ENTITY_ID: "   ",
+      });
+      env.SAML_IDP_SSO_URL = blankOverrides.SAML_IDP_SSO_URL;
+      env.SAML_CALLBACK_URL = blankOverrides.SAML_CALLBACK_URL;
+      env.SAML_ENTITY_ID = blankOverrides.SAML_ENTITY_ID;
+      samlCtorMock.mockClear();
+
+      const fallbackRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/auth/saml/metadata",
+      });
+      expect(fallbackRes.statusCode).toBe(200);
+      expect(samlCtorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entryPoint: "https://idp.example.com/sso",
+          callbackUrl: `${env.EXTERNAL_URL}/api/auth/saml/callback`,
+          issuer: `${env.EXTERNAL_URL}/api/auth/saml/metadata`,
+        }),
+      );
+    } finally {
+      env.SAML_IDP_SSO_URL = prevSsoUrl;
+      env.SAML_CALLBACK_URL = prevCallbackUrl;
+      env.SAML_ENTITY_ID = prevEntityId;
+    }
+  });
+
+  it("passes trimmed SAML_IDP_CERTIFICATE and SAML_PROVIDER_NAME from loadEnv to SAML and /api/v1/config/auth (#3295)", async () => {
+    const prevCert = env.SAML_IDP_CERTIFICATE;
+    const prevProvider = env.SAML_PROVIDER_NAME;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_SSO_URL: env.SAML_IDP_SSO_URL,
+        SAML_IDP_CERTIFICATE: " MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==\n",
+        SAML_PROVIDER_NAME: " Okta \n",
+      });
+      env.SAML_IDP_CERTIFICATE = configured.SAML_IDP_CERTIFICATE;
+      env.SAML_PROVIDER_NAME = configured.SAML_PROVIDER_NAME;
+      samlCtorMock.mockClear();
+      samlMock.generateServiceProviderMetadata.mockReturnValue(
+        '<?xml version="1.0"?><EntityDescriptor entityID="sp"/>',
+      );
+
+      const metaRes = await testApp.app.inject({ method: "GET", url: "/api/auth/saml/metadata" });
+      expect(metaRes.statusCode).toBe(200);
+      expect(samlCtorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idpCert: "MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==",
+        }),
+      );
+
+      const authConfigRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/config/auth",
+      });
+      expect(authConfigRes.statusCode).toBe(200);
+      expect(authConfigRes.json()).toMatchObject({
+        samlEnabled: true,
+        samlProviderName: "Okta",
+      });
+
+      const blankProvider = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_SSO_URL: env.SAML_IDP_SSO_URL,
+        SAML_IDP_CERTIFICATE: env.SAML_IDP_CERTIFICATE,
+        SAML_PROVIDER_NAME: "   ",
+      });
+      env.SAML_PROVIDER_NAME = blankProvider.SAML_PROVIDER_NAME;
+
+      const fallbackRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/config/auth",
+      });
+      expect(fallbackRes.statusCode).toBe(200);
+      expect(fallbackRes.json()).toMatchObject({
+        samlEnabled: true,
+        samlProviderName: "SSO",
+      });
+    } finally {
+      env.SAML_IDP_CERTIFICATE = prevCert;
+      env.SAML_PROVIDER_NAME = prevProvider;
+    }
+  });
 });
 
 describe("SAML login redirect", () => {
@@ -172,11 +331,20 @@ describe("SAML login redirect", () => {
 });
 
 describe("SAML callback", () => {
+  // Cleared before (not after) each test so a report from an earlier describe
+  // can't leak into the first assertion here.
+  beforeEach(() => {
+    reportErrorSpy.mockClear();
+  });
+
   it("rejects an assertion that fails validation", async () => {
     samlMock.validatePostResponseAsync.mockRejectedValue(new Error("invalid signature"));
     const res = await postCallback();
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe("/login?error=saml_auth_failed");
+    // Anyone can POST a junk assertion here, so a rejected one must never
+    // reach Sentry: unauthenticated traffic would flood it.
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("rejects an assertion with no nameID", async () => {
@@ -184,6 +352,7 @@ describe("SAML callback", () => {
     const res = await postCallback();
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe("/login?error=saml_auth_failed");
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("provisions a user, creates a session, and sets the cookie on success", async () => {
@@ -209,6 +378,8 @@ describe("SAML callback", () => {
       .from(schema.sessions)
       .where(eq(schema.sessions.userId, user?.id as string));
     expect(sessions.length).toBeGreaterThan(0);
+    // A clean login is not a fault: nothing goes to Sentry.
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("derives the username from the configured username attribute", async () => {
@@ -232,6 +403,189 @@ describe("SAML callback", () => {
     }
   });
 
+  it("extracts email and username attributes when SAML_EMAIL_ATTRIBUTE and SAML_USERNAME_ATTRIBUTE have surrounding whitespace or blank email fallback (#3295)", async () => {
+    const prevUsernameAttr = env.SAML_USERNAME_ATTRIBUTE;
+    const prevEmailAttr = env.SAML_EMAIL_ATTRIBUTE;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        SAML_USERNAME_ATTRIBUTE: " uid \n",
+        SAML_EMAIL_ATTRIBUTE: " mail \n",
+      });
+      env.SAML_USERNAME_ATTRIBUTE = configured.SAML_USERNAME_ATTRIBUTE;
+      env.SAML_EMAIL_ATTRIBUTE = configured.SAML_EMAIL_ATTRIBUTE;
+
+      const uid = `trim${randomUUID().slice(0, 6)}`;
+      const mail = `${uid}@example.com`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: `id-${uid}`, mail, uid },
+      });
+      mfaOutcomeMock.mockReturnValue("proceed");
+      const res = await postCallback();
+      expect(res.statusCode).toBe(302);
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, `id-${uid}`));
+      expect(user?.username).toBe(uid.toLowerCase());
+      expect(user?.email).toBe(mail);
+
+      const blankEmail = loadEnv({
+        ...process.env,
+        SAML_USERNAME_ATTRIBUTE: "   ",
+        SAML_EMAIL_ATTRIBUTE: "   ",
+      });
+      env.SAML_USERNAME_ATTRIBUTE = blankEmail.SAML_USERNAME_ATTRIBUTE;
+      env.SAML_EMAIL_ATTRIBUTE = blankEmail.SAML_EMAIL_ATTRIBUTE;
+
+      const fallbackEmail = `fallback-${randomUUID().slice(0, 6)}@example.com`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: `id-${fallbackEmail}`, email: fallbackEmail, "   ": "wrong" },
+      });
+      const fallbackRes = await postCallback();
+      expect(fallbackRes.statusCode).toBe(302);
+      const [fallbackUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, `id-${fallbackEmail}`));
+      expect(fallbackUser?.email).toBe(fallbackEmail);
+      expect(fallbackUser?.username).toBe(fallbackEmail.split("@")[0].toLowerCase());
+    } finally {
+      env.SAML_USERNAME_ATTRIBUTE = prevUsernameAttr;
+      env.SAML_EMAIL_ATTRIBUTE = prevEmailAttr;
+    }
+  });
+
+  it("allocates a colliding username once in the resolver", async () => {
+    // 46 characters is sanitizeUsername's cap. Seed `base` through `${base}_9`
+    // so the next free suffix when the request arrives is `${base}_10` (49
+    // chars), then claim `${base}_10` right as resolveExternalUser starts. A
+    // callback-level findUniqueUsername used to hand `${base}_10` to the
+    // resolver, which then suffixed a second time into `${base}_10_2` (51
+    // chars, exceeding the 50-character username limit).
+    const token = randomUUID().replace(/-/g, "").slice(0, 8);
+    const base = `${token}${"n".repeat(46 - token.length)}`;
+    const seededNames = [base, ...Array.from({ length: 8 }, (_, idx) => `${base}_${idx + 2}`)];
+    await db.insert(schema.users).values(
+      seededNames.map((username) => ({
+        id: randomUUID(),
+        username,
+        role: "user",
+        team: "default-team-00000000",
+        mustChangePassword: false,
+        authProvider: "local",
+      })),
+    );
+
+    let usernameReads = 0;
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && Object.keys(selection).join() === "username") {
+        usernameReads++;
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+
+    (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = "uid";
+    mfaOutcomeMock.mockReturnValue("proceed");
+    try {
+      const nameID = `saml-${token}`;
+      const email = `saml-${token}@example.com`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID, email, uid: base },
+      });
+      resolverFailure.beforeResolve = async () => {
+        await db.insert(schema.users).values({
+          id: randomUUID(),
+          username: `${base}_10`,
+          role: "user",
+          team: "default-team-00000000",
+          mustChangePassword: false,
+          authProvider: "local",
+        });
+      };
+      seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
+
+      const created = await postCallback();
+      expect(created.statusCode).toBe(302);
+      expect(created.headers.location).toBe("/");
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, nameID));
+      expect(user?.username.length).toBeLessThanOrEqual(50);
+      expect(user?.username).toBe(`${base}_11`);
+      expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBeGreaterThan(0);
+
+      // Existing external-ID match does not look up a username first.
+      seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
+      const matched = await postCallback();
+      expect(matched.statusCode).toBe(302);
+      expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBe(0);
+      const [still] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, nameID));
+      expect(still?.username).toBe(`${base}_11`);
+
+      // Email link of a local account keeps its username and runs no username lookup.
+      const linkId = randomUUID();
+      const linkUsername = `local${token}`;
+      const linkEmail = `link-${token}@example.com`;
+      await db.insert(schema.users).values({
+        id: linkId,
+        username: linkUsername,
+        email: linkEmail,
+        role: "user",
+        team: "default-team-00000000",
+        mustChangePassword: false,
+        authProvider: "local",
+      });
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: `link-${token}`, email: linkEmail, uid: base },
+      });
+      seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
+      const linked = await postCallback();
+      expect(linked.statusCode).toBe(302);
+      expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBe(0);
+      const [linkedUser] = await db.select().from(schema.users).where(eq(schema.users.id, linkId));
+      expect(linkedUser?.authProvider).toBe("saml");
+      expect(linkedUser?.externalId).toBe(`link-${token}`);
+      expect(linkedUser?.username).toBe(linkUsername);
+
+      // Auto-create disabled: the denial is not preceded by a username lookup.
+      (env as Record<string, unknown>).SAML_AUTO_CREATE_USERS = false;
+      const deniedId = `denied-${token}`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: deniedId, email: `denied-${token}@example.com`, uid: base },
+      });
+      seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
+      const denied = await postCallback();
+      expect(denied.statusCode).toBe(302);
+      expect(denied.headers.location).toBe("/login?error=saml_user_not_authorized");
+      expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBe(0);
+      const [deniedUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, deniedId));
+      expect(deniedUser).toBeUndefined();
+    } finally {
+      selectSpy.mockRestore();
+      (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = undefined;
+      (env as Record<string, unknown>).SAML_AUTO_CREATE_USERS = true;
+    }
+  });
+
   it("denies an unknown user when auto-create is off", async () => {
     (env as Record<string, unknown>).SAML_AUTO_CREATE_USERS = false;
     try {
@@ -240,6 +594,8 @@ describe("SAML callback", () => {
       const res = await postCallback();
       expect(res.statusCode).toBe(302);
       expect(res.headers.location).toBe("/login?error=saml_user_not_authorized");
+      // A denial is a login outcome, not a fault, so it isn't reported.
+      expect(reportErrorSpy).not.toHaveBeenCalled();
     } finally {
       (env as Record<string, unknown>).SAML_AUTO_CREATE_USERS = true;
     }
@@ -299,6 +655,7 @@ describe("SAML callback", () => {
           sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'user_limit_reached' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
         );
       expect(auditRows).toHaveLength(1);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
     } finally {
       (env as Record<string, unknown>).MAX_USERS = origMaxUsers;
     }
@@ -306,8 +663,20 @@ describe("SAML callback", () => {
 
   it("redirects to saml_auth_failed instead of a raw 500 when auto-create exhausts its username-race retries (#978)", async () => {
     const email = `raced-${randomUUID().slice(0, 8)}@example.com`;
+    const attemptedUsername = email.split("@")[0];
+    // Seed the base username so a pre-resolver findUniqueUsername in saml.ts
+    // would suffix attemptedUsername to `${attemptedUsername}_2` in the audit row.
+    await db.insert(schema.users).values({
+      id: randomUUID(),
+      username: attemptedUsername,
+      role: "user",
+      team: "default-team-00000000",
+      mustChangePassword: false,
+      authProvider: "local",
+    });
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
-    resolverFailure.next = new UsernameRaceExhaustedError("saml", "raced", 3);
+    const raceErr = new UsernameRaceExhaustedError();
+    resolverFailure.next = raceErr;
 
     const res = await postCallback();
 
@@ -316,7 +685,8 @@ describe("SAML callback", () => {
     const setCookie = res.headers["set-cookie"];
     expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
 
-    // Exhaustion gets the same audit trail as every other terminal denial.
+    // Exhaustion gets the same audit trail as every other terminal denial,
+    // with the unsuffixed sanitized base recorded as attemptedUsername.
     const auditRows = await db
       .select()
       .from(schema.auditLog)
@@ -324,7 +694,30 @@ describe("SAML callback", () => {
         sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'auto_create_race_exhausted' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
       );
     expect(auditRows).toHaveLength(1);
-    expect(auditRows[0].details).toMatchObject({ attemptedUsername: email.split("@")[0] });
+    expect(auditRows[0].details).toMatchObject({ attemptedUsername });
+
+    // Reported once, the error passed through untouched, with route-level
+    // context only: the exact match rules out a username in the context. The
+    // rest guards the callback against wrapping or annotating the error with
+    // the username on the way out (#1866); the error's own contents are pinned
+    // at the real throw site in tests/unit/api/external-auth-resolver-mutation.test.ts.
+    expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+    expect(reportErrorSpy).toHaveBeenCalledWith(raceErr, {
+      source: "http",
+      route: "/api/auth/saml/callback",
+      method: "POST",
+      subsystem: "external-auth",
+    });
+    const reported = reportErrorSpy.mock.calls[0][0] as Error;
+    expect(inspect(reported, { showHidden: true, depth: Number.POSITIVE_INFINITY })).not.toContain(
+      attemptedUsername,
+    );
+    for (const diagnostic of [false, true]) {
+      const event = { exception: { values: [{ type: reported.name, value: reported.message }] } };
+      const sent = buildBeforeSend(() => true, diagnostic)(event, { originalException: reported });
+      expect(sent).not.toBeNull();
+      expect(JSON.stringify(sent)).not.toContain(attemptedUsername);
+    }
   });
 
   it("still surfaces any other resolver throw as a 500 with no misclassified audit row", async () => {
@@ -348,23 +741,44 @@ describe("SAML callback", () => {
         sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
       );
     expect(auditRows).toHaveLength(0);
+    // The callback's own catch must not report it as username contention; the
+    // 500 is the global error handler's to report. buildTestApp() doesn't
+    // install that handler yet (#1243), so this only rules out the callback's
+    // report and holds whether or not the handler is there.
+    expect(reportErrorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ subsystem: "external-auth" }),
+    );
   });
 
-  it("fails the login closed when the MFA enrollment-status read throws", async () => {
-    // The users read that decides whether MFA is checked is intentionally
-    // unguarded in saml.ts: a DB error there must fail the login, never
-    // silently skip MFA for an enrolled user. Spy only the totpEnabled select
+  it("fails the login closed and reports the fault once when the MFA enrollment-status read throws (#1867)", async () => {
+    // The users read that decides whether MFA is checked sits in its own catch
+    // in saml.ts: a DB error there must fail the login, never silently skip
+    // MFA for an enrolled user. Spy only the single-column totpEnabled select
     // (the same shape saml.ts issues) so provisioning/session selects still hit
     // the real DB. Mirrors the OIDC-callback fail-closed test.
     const email = `dberr-${randomUUID().slice(0, 8)}@example.com`;
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
     mfaOutcomeMock.mockReturnValue("proceed");
 
+    // Shaped like the real failure: drizzle wraps the driver's error (a lost
+    // Postgres connection, SQLSTATE 57P01) in a DrizzleQueryError.
+    const pgFault = Object.assign(
+      new Error("terminating connection due to administrator command"),
+      { code: "57P01" },
+    );
+    const enrollmentFault = new DrizzleQueryError(
+      'select "totp_enabled" from "users" where "users"."id" = $1',
+      ["00000000-0000-0000-0000-000000000000"],
+      pgFault,
+    );
+    let enrollmentReads = 0;
     const originalSelect = db.select.bind(db);
     const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
       const selection = args[0] as Record<string, unknown> | undefined;
-      if (selection && "totpEnabled" in selection) {
-        throw new Error("simulated DB failure");
+      if (selection && Object.keys(selection).join() === "totpEnabled") {
+        enrollmentReads++;
+        throw enrollmentFault;
       }
       // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
       return (originalSelect as any)(...args);
@@ -375,6 +789,7 @@ describe("SAML callback", () => {
 
       // Must NOT proceed to a session and must NOT issue an MFA challenge:
       // a broken enrollment-status read means the login fails, full stop.
+      expect(enrollmentReads).toBe(1);
       expect(res.statusCode).toBe(302);
       expect(res.headers.location).toBe("/login?error=saml_auth_failed");
       const setCookie = res.headers["set-cookie"];
@@ -388,6 +803,29 @@ describe("SAML callback", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, user?.id as string));
       expect(sessions.length).toBe(0);
+      const auditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'mfa_check_error' AND ${schema.auditLog.details}->>'userId' = ${user?.id as string}`,
+        );
+      expect(auditRows).toHaveLength(1);
+
+      // The catch keeps the fault from the global error handler, so the
+      // callback reports it itself, exactly once, tagged with its own
+      // subsystem so triage can tell it from the MFA-policy fault. The exact
+      // context match rules out a user id or email riding along in it.
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(enrollmentFault, {
+        source: "http",
+        route: "/api/auth/saml/callback",
+        method: "POST",
+        statusCode: 503,
+        subsystem: "mfa-enrollment",
+      });
+      // The real reportError drops "expected" errors; a lost database is the
+      // operator's environment, so it goes out as a throttled warning.
+      expect(classifyError(enrollmentFault, "http")).toBe("operational");
     } finally {
       selectSpy.mockRestore();
     }
@@ -400,7 +838,19 @@ describe("SAML callback", () => {
     // so an unenrolled user is denied with a distinct retryable error param.
     const email = `mfaerr-${randomUUID().slice(0, 8)}@example.com`;
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
-    getMfaPolicyMock.mockRejectedValueOnce(new Error("mfa policy store unavailable"));
+    // Shaped like the real failure: getMfaPolicy's settings read is a drizzle
+    // select, so a lost Postgres connection (SQLSTATE 57P01) arrives wrapped
+    // in a DrizzleQueryError.
+    const pgFault = Object.assign(
+      new Error("terminating connection due to administrator command"),
+      { code: "57P01" },
+    );
+    const policyFault = new DrizzleQueryError(
+      'select "value" from "settings" where "settings"."key" = $1 limit $2',
+      ["mfaPolicy", 1],
+      pgFault,
+    );
+    getMfaPolicyMock.mockRejectedValueOnce(policyFault);
     // Mirror what the real resolver returns for ("unavailable", role, false);
     // the pure mapping itself is covered exhaustively in tests/unit/api/mfa.test.ts.
     mfaOutcomeMock.mockReturnValue("policy_unavailable");
@@ -426,7 +876,24 @@ describe("SAML callback", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, user?.id as string));
       expect(sessions.length).toBe(0);
+
+      // The catch keeps the fault from the global error handler, so the
+      // callback reports it itself, exactly once: a settings fault denying
+      // every SSO login must show up in triage, not only in the log. The exact
+      // context match rules out a user id or email riding along in it.
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(policyFault, {
+        source: "http",
+        route: "/api/auth/saml/callback",
+        method: "POST",
+        statusCode: 503,
+        subsystem: "mfa-policy",
+      });
+      // A lost database is the operator's environment, so it reaches Sentry
+      // as a throttled warning rather than being dropped as expected.
+      expect(classifyError(policyFault, "http")).toBe("operational");
     } finally {
+      getMfaPolicyMock.mockReset();
       getMfaPolicyMock.mockResolvedValue({});
       mfaOutcomeMock.mockReturnValue("proceed");
     }
@@ -444,7 +911,11 @@ describe("SAML callback", () => {
       .set({ totpEnabled: true })
       .where(eq(schema.users.externalId, email));
 
-    getMfaPolicyMock.mockRejectedValueOnce(new Error("mfa policy store unavailable"));
+    // The provisioning login above is clean, so anything reported from here
+    // on comes from the faulted login.
+    expect(reportErrorSpy).not.toHaveBeenCalled();
+    const policyFault = new Error("mfa policy store unavailable");
+    getMfaPolicyMock.mockRejectedValueOnce(policyFault);
     // Mirror what the real resolver returns for ("unavailable", role, true).
     mfaOutcomeMock.mockReturnValue("challenge");
     try {
@@ -458,21 +929,150 @@ describe("SAML callback", () => {
       // regression that hardcodes totpEnabled=false on the failure path, or
       // denies before consulting the resolver, trips this.
       expect(mfaOutcomeMock).toHaveBeenLastCalledWith("unavailable", expect.any(String), true);
+      // The login still goes through to a challenge, but the policy fault is
+      // reported all the same: the read failed whether or not it denied.
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(policyFault, {
+        source: "http",
+        route: "/api/auth/saml/callback",
+        method: "POST",
+        statusCode: 503,
+        subsystem: "mfa-policy",
+      });
     } finally {
+      getMfaPolicyMock.mockReset();
       getMfaPolicyMock.mockResolvedValue({});
       mfaOutcomeMock.mockReturnValue("proceed");
     }
   });
+
+  it("evicts the oldest sessions on POST /api/auth/saml/callback when maxSessionsPerUser is exceeded and rolls back on settings or eviction failure (#2540)", async () => {
+    const email = `saml-maxsess-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    mfaOutcomeMock.mockReturnValue("proceed");
+
+    await db
+      .insert(schema.settings)
+      .values({ key: "maxSessionsPerUser", value: "2" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "2" } });
+
+    try {
+      const r1 = await postCallback();
+      expect(r1.statusCode).toBe(302);
+      const t1 = String(r1.headers["set-cookie"] ?? "").match(/snapotter-session=([^;]+)/)?.[1];
+      expect(t1).toBeTruthy();
+
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.externalId, email));
+      expect(user).toBeDefined();
+      const userId = user?.id as string;
+
+      // Backdate t1 so ordering between t1 and t2 is deterministic even within one millisecond tick.
+      await db
+        .update(schema.sessions)
+        .set({ createdAt: new Date(Date.now() - 60_000) })
+        .where(eq(schema.sessions.id, t1 as string));
+
+      const r2 = await postCallback();
+      expect(r2.statusCode).toBe(302);
+      const t2 = String(r2.headers["set-cookie"] ?? "").match(/snapotter-session=([^;]+)/)?.[1];
+      expect(t2).toBeTruthy();
+
+      // 1. Failing the maxSessionsPerUser read aborts with 500 and creates no session.
+      const originalSelect = db.select.bind(db);
+      const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+        const selection = args[0] as Record<string, unknown> | undefined;
+        // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+        const builder = (originalSelect as any)(...args);
+        if (selection && "value" in selection) {
+          const origFrom = builder.from.bind(builder);
+          builder.from = (...fromArgs: unknown[]) => {
+            const query = origFrom(...fromArgs);
+            const origWhere = query.where.bind(query);
+            query.where = (...whereArgs: unknown[]) => {
+              const filtered = origWhere(...whereArgs);
+              if (filtered.toSQL().params.includes("maxSessionsPerUser")) {
+                throw new Error("simulated settings store failure for maxSessionsPerUser");
+              }
+              return filtered;
+            };
+            return query;
+          };
+        }
+        return builder;
+      });
+      try {
+        const failReadRes = await postCallback();
+        expect(failReadRes.statusCode).toBe(500);
+        expect(String(failReadRes.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      } finally {
+        selectSpy.mockRestore();
+      }
+
+      // 2. Failing FIFO eviction inside the transaction rolls back the inserted session.
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const failingTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "delete") {
+                return () => {
+                  throw new Error("simulated FIFO eviction delete failure");
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(failingTx);
+        }, config)) as unknown as typeof db.transaction);
+      try {
+        const failEvictRes = await postCallback();
+        expect(failEvictRes.statusCode).toBe(500);
+        expect(String(failEvictRes.headers["set-cookie"] ?? "")).not.toContain(
+          "snapotter-session=",
+        );
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      const midSessions = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(midSessions.map((r) => r.id)).toEqual([t1, t2]);
+
+      // 3. Third SAML login succeeds and evicts t1 (oldest).
+      const r3 = await postCallback();
+      expect(r3.statusCode).toBe(302);
+      const t3 = String(r3.headers["set-cookie"] ?? "").match(/snapotter-session=([^;]+)/)?.[1];
+      expect(t3).toBeTruthy();
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(remaining.map((r) => r.id)).toEqual([t2, t3]);
+    } finally {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
+    }
+  });
 });
 
-describe.each(["", "/snapotter"])("SAML deployment at '%s'", (basePath) => {
+describe.each(SSO_DEPLOYMENTS)("SAML deployment at '%s', EXTERNAL_URL %s", (basePath, typed) => {
   const originalBasePath = env.BASE_PATH;
   let externalUrl: string;
 
   beforeAll(() => {
     externalUrl = env.EXTERNAL_URL;
     env.BASE_PATH = basePath;
-    env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+    env.EXTERNAL_URL = parseExternalUrl(typed);
   });
   afterAll(() => {
     env.BASE_PATH = originalBasePath;

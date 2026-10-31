@@ -1,8 +1,8 @@
 ---
 description: "การตั้งค่าสภาพแวดล้อมการพัฒนาในเครื่อง คำสั่ง แนวทางการเขียนโค้ด และวิธีเพิ่มเครื่องมือใหม่ใน SnapOtter"
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: a42eaf432db1
+i18n_output_hash: 2ff1146f7814
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ const MyToolSettings = lazy(() =>
 ### 4. เทสต์ {#_4-tests}
 
 เพิ่มแอตทริบิวต์ `data-testid` ให้กับปุ่มการกระทำของคุณ (ดังที่แสดงด้านบน) เพื่อให้เทสต์ e2e สามารถกำหนดเป้าหมายได้อย่างน่าเชื่อถือ
+
+### 5. ภาพ baseline สำหรับเทสต์ภาพ {#_5-visual-baselines}
+
+เทสต์ภาพหน้าจอไม่ยอมให้มีพิกเซลเปลี่ยนแม้แต่พิกเซลเดียว และเครื่องมือใหม่จะเปลี่ยนสิ่งที่เทสต์เรนเดอร์ ได้แก่ จำนวนเครื่องมือในหน้าแรกและแคตตาล็อก การ์ดใหม่ในกริด และหน้าของเครื่องมือเองที่ `tests/e2e/gui-visual-tools.spec.ts` จะล้มเหลวด้วย "snapshot doesn't exist" จนกว่าหน้านั้นจะมี baseline ให้รีเฟรช baseline ใน PR เดียวกับเครื่องมือ เพื่อให้การเทียบภาพทุกคืนยังผ่านอยู่
+
+CI สร้าง baseline ทั้งของ `linux` (`ubuntu-latest`) และ `darwin` (`macos-latest`) ให้ push branch ของคุณ แล้วสั่งรีเฟรชบน branch นั้น:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+แต่ละงานของระบบปฏิบัติการจะอัปโหลดอาร์ติแฟกต์ `visual-baselines-linux-<run-id>-<attempt>` หรือ `visual-baselines-darwin-<run-id>-<attempt>` และเปิด PR แบบร่าง (`chore/visual-baselines-linux-...` และ `chore/visual-baselines-darwin-...`) ไปยัง `main` พร้อมไฟล์ PNG ที่สร้างใหม่ ในคำอธิบายของแต่ละ PR แบบร่างมีคำสั่ง `gh run download` ให้รันทั้งสองคำสั่งจากรูทของ checkout เพื่อนำ PNG เข้ามาใน branch ของคุณ commit แล้วปิด PR แบบร่าง หาก `changed` พลาดภาพที่คุณคาดว่าจะเปลี่ยน ให้ใช้ `update_snapshots=all` แทน การสั่งรันต้องมีสิทธิ์เขียนในรีโพซิทอรี ถ้า branch ของคุณอยู่บน fork ให้แจ้งใน PR ว่าต้องรีเฟรช baseline แล้วผู้ดูแลจะรันให้
+
+บน Mac คุณสามารถรีเฟรช baseline ของ `darwin` บนเครื่องได้ด้วยเพื่อความรวดเร็วในการพัฒนา:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+ไม่ว่ากรณีใด ให้เปิดดู PNG ที่เพิ่มหรือเปลี่ยนทุกไฟล์ก่อน commit เพราะ baseline จะบันทึกสิ่งที่เรนเดอร์ออกมาไม่ว่าจะเสียหรือไม่
+
+การออกรีลีสไม่ต้องทำสิ่งเหล่านี้ เวอร์ชันของแอปถูกมาสก์ไว้ในทุกภาพหน้าจอที่แสดงเวอร์ชัน การเพิ่มเวอร์ชันจึงไม่เปลี่ยน baseline ใดเลย
 
 ## การ build Docker {#docker-builds}
 

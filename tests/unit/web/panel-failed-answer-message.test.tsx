@@ -1,0 +1,955 @@
+// @vitest-environment jsdom
+import "@testing-library/jest-dom/vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { en } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
+
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+
+// The panels render in German, so every fallback check proves which key the
+// panel used: in English "Failed: 422" reads the same from the translated key
+// and from a hard-coded literal, and "Processing failed: 422" is also
+// parseApiError's own default.
+vi.mock("@/contexts/i18n-context", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/contexts/i18n-context")>();
+  const { de: german } = await import("@snapotter/shared/i18n/de.js");
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: german,
+      locale: "de",
+      dir: "ltr",
+      setLocale: () => {},
+      supportedLocales: [],
+    }),
+  };
+});
+
+import { BarcodeGenerateSettings } from "@/components/tools/barcode-generate-settings";
+import { BarcodeReadSettings } from "@/components/tools/barcode-read-settings";
+import { BeautifySettings } from "@/components/tools/beautify-settings";
+import { BulkRenameSettings } from "@/components/tools/bulk-rename-settings";
+import { CollageSettings } from "@/components/tools/collage-settings";
+import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
+import { CompareSettings } from "@/components/tools/compare-settings";
+import { ComposeSettings } from "@/components/tools/compose-settings";
+import { EditMetadataSettings } from "@/components/tools/edit-metadata-settings";
+import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
+import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
+import { FaviconSettings } from "@/components/tools/favicon-settings";
+import { FindDuplicatesSettings } from "@/components/tools/find-duplicates-settings";
+import { ImageToBase64Settings } from "@/components/tools/image-to-base64-settings";
+import { ImageToPdfSettings } from "@/components/tools/image-to-pdf-settings";
+import { InfoSettings } from "@/components/tools/info-settings";
+import { ocrOneFile } from "@/components/tools/ocr-settings";
+import { PassportPhotoSettings } from "@/components/tools/passport-photo-settings";
+import type { SignCanvasRef } from "@/components/tools/sign-canvas";
+import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
+import { SplitSettings } from "@/components/tools/split-settings";
+import { StitchSettings } from "@/components/tools/stitch-settings";
+import { StripMetadataSettings } from "@/components/tools/strip-metadata-settings";
+import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
+import { failedAnswerMessage, parseApiError } from "@/lib/api";
+import { format } from "@/lib/format";
+import { useBase64Store } from "@/stores/base64-store";
+import { useCollageStore } from "@/stores/collage-store";
+import { useFileStore } from "@/stores/file-store";
+import { type AnalyzeResult, usePassportPhotoStore } from "@/stores/passport-photo-store";
+import { useSplitStore } from "@/stores/split-store";
+
+/**
+ * Tool panels that post with their own XHR or fetch used to read a failed
+ * answer as `body.error || fallback`. An object-valued `error` reached the
+ * screen as "[object Object]", and a `details`-only answer showed the bare
+ * status fallback instead of its reason (#1858). They now go through
+ * failedAnswerMessage, the same parseApiError reading useToolProcessor uses,
+ * with each panel's own fallback kept for an answer that names no reason.
+ */
+
+const STATUS = 422;
+
+describe("parseApiError and failedAnswerMessage", () => {
+  const FALLBACK = "Panel fallback";
+
+  it.each([
+    ["a string error", { error: "Bad file" }, "Bad file"],
+    ["an object error", { error: { reason: "x" } }, FALLBACK],
+    ["an array error", { error: ["x"] }, FALLBACK],
+    ["details alone", { details: "Not enough memory" }, "Not enough memory"],
+    ["an object error with details", { error: { reason: "x" }, details: "why" }, "why"],
+    [
+      "error and different details",
+      { error: "Invalid settings", details: "x: too big" },
+      "Invalid settings: x: too big",
+    ],
+    [
+      "the error handler's echo of one message",
+      { error: "Bad file", details: "Bad file" },
+      "Bad file",
+    ],
+    ["array details", { error: "Invalid", details: [{ message: "a" }, "b"] }, "Invalid: a; b"],
+    [
+      "an array details item whose message is not a string",
+      { details: [{ message: { x: 1 } }] },
+      '{"message":{"x":1}}',
+    ],
+    ["empty array details", { error: "Bad file", details: [] }, "Bad file"],
+    ["empty string details", { error: "Bad file", details: "" }, "Bad file"],
+    ["a string message", { message: "Not found" }, "Not found"],
+    ["an object message", { message: { text: "x" } }, FALLBACK],
+    ["an empty object", {}, FALLBACK],
+  ])("reads %s", (_label, body, expected) => {
+    expect(failedAnswerMessage(en, body, STATUS, FALLBACK)).toBe(expected);
+    expect(parseApiError(body as Record<string, unknown>, STATUS, FALLBACK)).toBe(expected);
+  });
+
+  it.each([
+    ["null", null],
+    ["an array", [{ error: "x" }]],
+    ["a string", "Bad file"],
+    ["a number", 7],
+  ])("answers the fallback for a body that is %s", (_label, body) => {
+    expect(failedAnswerMessage(en, body, STATUS, FALLBACK)).toBe(FALLBACK);
+  });
+
+  // The API's own 413 and a reverse proxy's body-size page read the same to
+  // the user, in their language, as useToolProcessor shows them (#1916).
+  it.each([
+    ["the API's JSON body", { error: "File too large", details: "Max 100 MB" }],
+    ["a proxy page that did not parse", null],
+    ["an empty object", {}],
+  ])("answers a 413 with %s as the translated file-too-large message", (_label, body) => {
+    expect(failedAnswerMessage(de, body, 413, FALLBACK)).toBe(de.errors.fileTooLarge);
+  });
+
+  it("keeps parseApiError's status fallback when no fallback is passed", () => {
+    expect(parseApiError({ error: { reason: "x" } }, STATUS)).toBe("Processing failed: 422");
+  });
+
+  it("turns FEATURE_NOT_INSTALLED into the translated install message", () => {
+    const body = {
+      error: "Feature not installed",
+      code: "FEATURE_NOT_INSTALLED",
+      feature: "background-removal",
+      featureName: "Background Removal",
+      estimatedSize: "500MB",
+    };
+    const feature = en.featureBundles["background-removal"].name;
+    expect(failedAnswerMessage(en, body, 501, FALLBACK)).toBe(
+      format(en.errors.featureNotInstalled, { feature }),
+    );
+    expect(failedAnswerMessage(en, body, 501, FALLBACK, "Remove Background")).toBe(
+      format(en.errors.featureNotInstalledForTool, { tool: "Remove Background", feature }),
+    );
+  });
+
+  it("turns FEATURE_INCOMPATIBLE into the translated incompatible message", () => {
+    const body = {
+      error: "Feature incompatible",
+      code: "FEATURE_INCOMPATIBLE",
+      feature: "ocr",
+      featureName: "OCR",
+      compatibilityReason: "unsupported-host",
+    };
+    const feature = de.featureBundles.ocr.name;
+    expect(failedAnswerMessage(de, body, 501, FALLBACK)).toBe(
+      format(de.errors.featureIncompatible, { feature }),
+    );
+    expect(
+      failedAnswerMessage(
+        de,
+        { ...body, compatibilityReason: "fast-korean-unsupported" },
+        501,
+        FALLBACK,
+      ),
+    ).toBe(de.toolSettings.ocr.fastKoreanUnsupported);
+  });
+
+  it("turns a structural canceled: true response into the translated canceled message (#4009)", () => {
+    expect(failedAnswerMessage(de, { error: "Canceled", canceled: true }, STATUS, FALLBACK)).toBe(
+      de.errors.canceled,
+    );
+    expect(
+      failedAnswerMessage(de, { error: "Batch canceled", canceled: true }, STATUS, FALLBACK),
+    ).toBe(de.errors.canceled);
+    expect(failedAnswerMessage(de, { error: "Bad file", canceled: false }, STATUS, FALLBACK)).toBe(
+      "Bad file",
+    );
+  });
+});
+
+// ── Panels ──────────────────────────────────────────────────────
+
+class FakeXhr {
+  static instances: FakeXhr[] = [];
+
+  responseType = "";
+  timeout = 0;
+  status = 0;
+  readyState = 0;
+  response: unknown = null;
+  #responseText = "";
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  upload: { onprogress: unknown; onload: unknown } = { onprogress: null, onload: null };
+
+  constructor() {
+    FakeXhr.instances.push(this);
+  }
+
+  get responseText(): string {
+    if (this.responseType === "blob") {
+      throw new DOMException(
+        "The value is only accessible if the object's 'responseType' is '' or 'text' (was 'blob').",
+        "InvalidStateError",
+      );
+    }
+    return this.#responseText;
+  }
+
+  set responseText(value: string) {
+    this.#responseText = value;
+  }
+
+  open() {}
+  setRequestHeader() {}
+  send() {}
+  abort() {}
+
+  respond(status: number, body: unknown) {
+    act(() => {
+      this.status = status;
+      this.readyState = 4;
+      const text = body === NOT_JSON ? PROXY_PAGE : JSON.stringify(body);
+      this.#responseText = text;
+      this.response = this.responseType === "blob" ? new Blob([text]) : text;
+      this.onload?.();
+    });
+  }
+}
+
+class FakeEventSource {
+  onmessage: unknown = null;
+  onerror: unknown = null;
+  onopen: unknown = null;
+  close() {}
+  addEventListener() {}
+  removeEventListener() {}
+}
+
+function image(name: string): File {
+  return new File(["png"], name, { type: "image/png" });
+}
+
+function chooseFile(container: HTMLElement, file: File) {
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+  if (!input) throw new Error("panel has no file input");
+  fireEvent.change(input, { target: { files: [file] } });
+}
+
+/** A proxy's error page: res.json() rejects on it. */
+const NOT_JSON = Symbol("not JSON");
+const PROXY_PAGE = "<html><body><h1>413 Request Entity Too Large</h1></body></html>";
+
+let answer: { status: number; body: unknown };
+
+function stubFetch() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: false,
+      status: answer.status,
+      json: async () => {
+        if (answer.body === NOT_JSON) throw new SyntaxError("Unexpected token '<'");
+        return answer.body;
+      },
+    })),
+  );
+}
+
+interface PanelRow {
+  panel: string;
+  transport: "xhr" | "fetch";
+  fallback: string;
+  /** The fallback when the body is not JSON, if it differs from `fallback`. */
+  nonJsonFallback?: string;
+  /** Renders the panel and starts the request. */
+  start: () => void | Promise<void>;
+  /** The failure text the panel ended on, or null while it has none. */
+  shown?: () => string | null | undefined;
+  /** How the panel frames the message, when it adds to it. */
+  framed?: (message: string) => string;
+}
+
+function fakeSignCanvas(): SignCanvasRef {
+  return {
+    addSignature: vi.fn(),
+    deleteSelected: vi.fn(),
+    hasPlacements: () => true,
+    exportPlacements: async () => ({
+      pngs: [new Blob(["png"], { type: "image/png" })],
+      placements: [{ sig: 0, page: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.1 }],
+    }),
+  };
+}
+
+function fakeEraserCanvas(): EraserCanvasRef {
+  const mask = () => new Blob(["mask"], { type: "image/png" });
+  return {
+    exportMask: async () => mask(),
+    exportAllMasks: async () =>
+      new Map(useFileStore.getState().entries.map((e) => [e.blobUrl, mask()] as const)),
+    getMaskCenter: () => null,
+    clear: vi.fn(),
+    clearAll: vi.fn(),
+    undo: vi.fn(),
+  };
+}
+
+const PASSPORT_ANALYZE_RESULT: AnalyzeResult = {
+  preview: "",
+  landmarks: {
+    leftEye: { x: 0.42, y: 0.4 },
+    rightEye: { x: 0.58, y: 0.4 },
+    eyeCenter: { x: 0.5, y: 0.4 },
+    chin: { x: 0.5, y: 0.62 },
+    forehead: { x: 0.5, y: 0.25 },
+    crown: { x: 0.5, y: 0.18 },
+    nose: { x: 0.5, y: 0.5 },
+    faceCenterX: 0.5,
+  },
+  imageWidth: 900,
+  imageHeight: 1200,
+  jobId: "passport-job-1",
+  filename: "photo.png",
+};
+
+const failedWithStatus = format(de.errors.failedWithStatus, { status: STATUS });
+const processingFailedWithStatus = format(de.errors.processingFailedWithStatus, {
+  status: STATUS,
+});
+
+const PANELS: PanelRow[] = [
+  {
+    panel: "stitch",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      render(<StitchSettings />);
+      fireEvent.click(screen.getByTestId("stitch-submit"));
+    },
+  },
+  {
+    panel: "collage",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    start: () => {
+      useCollageStore.getState().addImages([image("one.png"), image("two.png")]);
+      render(<CollageSettings />);
+      fireEvent.click(screen.getByTestId("collage-submit"));
+    },
+  },
+  {
+    panel: "barcode-read",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: format(de.toolSettings["barcode-read"].scanningFailedWithStatus, {
+      status: STATUS,
+    }),
+    start: () => {
+      useFileStore.getState().setFiles([image("code.png")]);
+      render(<BarcodeReadSettings />);
+      fireEvent.click(screen.getByTestId("barcode-read-submit"));
+    },
+    framed: (message) => `code.png: ${message}`,
+  },
+  {
+    panel: "beautify (image background)",
+    transport: "fetch",
+    fallback: format(de.toolSettings.beautify.processingFailedStatus, { status: STATUS }),
+    start: () => {
+      useFileStore.getState().setFiles([image("shot.png")]);
+      const { container } = render(<BeautifySettings />);
+      fireEvent.click(screen.getByRole("button", { name: de.toolSettings.beautify.bgImage }));
+      chooseFile(container, image("bg.png"));
+      fireEvent.click(screen.getByTestId("beautify-submit"));
+    },
+  },
+  {
+    panel: "color-palette",
+    transport: "fetch",
+    fallback: `Failed: ${STATUS}`,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<ColorPaletteSettings />);
+      fireEvent.click(screen.getByTestId("color-palette-submit"));
+    },
+  },
+  {
+    panel: "strip-metadata (inspect)",
+    transport: "fetch",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<StripMetadataSettings />);
+    },
+  },
+  {
+    panel: "edit-metadata (inspect)",
+    transport: "fetch",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<EditMetadataSettings />);
+    },
+  },
+  {
+    panel: "watermark-image (one file)",
+    transport: "fetch",
+    fallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      const { container } = render(<WatermarkImageSettings />);
+      chooseFile(container, image("mark.png"));
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    },
+  },
+  {
+    panel: "watermark-image (several files)",
+    transport: "fetch",
+    fallback: de.errors.processingFailedNoDetail,
+    start: () => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      const { container } = render(<WatermarkImageSettings />);
+      chooseFile(container, image("mark.png"));
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    },
+    shown: () => useFileStore.getState().entries[0]?.error,
+  },
+  {
+    panel: "find-duplicates",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      render(<FindDuplicatesSettings />);
+      fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    },
+  },
+  {
+    panel: "compare",
+    transport: "fetch",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("one.png")]);
+      const { container } = render(<CompareSettings />);
+      chooseFile(container, image("two.png"));
+      fireEvent.click(screen.getByTestId("compare-submit"));
+    },
+  },
+  {
+    panel: "compose",
+    transport: "fetch",
+    fallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("base.png")]);
+      const { container } = render(<ComposeSettings />);
+      chooseFile(container, image("overlay.png"));
+      fireEvent.click(screen.getByTestId("compose-submit"));
+    },
+  },
+  {
+    panel: "barcode-generate",
+    transport: "fetch",
+    fallback: format(de.errors.requestFailedWithStatus, { status: STATUS }),
+    start: () => {
+      render(<BarcodeGenerateSettings />);
+      fireEvent.change(screen.getByTestId("barcode-input-text"), { target: { value: "12345" } });
+      fireEvent.click(screen.getByTestId("barcode-generate-submit"));
+    },
+  },
+  {
+    panel: "info",
+    transport: "fetch",
+    fallback: `Failed: ${STATUS}`,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<InfoSettings />);
+      fireEvent.click(screen.getByTestId("info-submit"));
+    },
+  },
+  {
+    panel: "image-to-base64",
+    transport: "fetch",
+    fallback: `Failed: ${STATUS}`,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<ImageToBase64Settings />);
+      fireEvent.click(screen.getByTestId("base64-submit"));
+    },
+    shown: () => useBase64Store.getState().errors[0]?.error,
+  },
+  {
+    panel: "image-to-pdf",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: format(de.toolSettings["image-to-pdf"].creationFailedWithStatus, {
+      status: STATUS,
+    }),
+    start: () => {
+      useFileStore.getState().setFiles([image("page.png")]);
+      render(<ImageToPdfSettings />);
+      fireEvent.click(screen.getByTestId("image-to-pdf-submit"));
+    },
+  },
+  {
+    panel: "sign-pdf",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["%PDF-1.4"], "doc.pdf", { type: "application/pdf" })]);
+      render(
+        <SignPdfSettings
+          signProps={{
+            canvasRef: { current: fakeSignCanvas() },
+            hasSelection: false,
+            placementCount: 1,
+          }}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: de.toolPage.applyAndDownload }));
+    },
+  },
+  {
+    panel: "erase-object (one file)",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(
+        <EraseObjectSettings
+          eraserRef={{ current: fakeEraserCanvas() }}
+          hasStrokes
+          brushSize={30}
+          onBrushSizeChange={vi.fn()}
+          mode="brush"
+          onModeChange={vi.fn()}
+          maskedFileCount={1}
+        />,
+      );
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    },
+  },
+  {
+    panel: "erase-object (several files)",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      render(
+        <EraseObjectSettings
+          eraserRef={{ current: fakeEraserCanvas() }}
+          hasStrokes
+          brushSize={30}
+          onBrushSizeChange={vi.fn()}
+          mode="brush"
+          onModeChange={vi.fn()}
+          maskedFileCount={2}
+        />,
+      );
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    },
+    shown: () => useFileStore.getState().entries[0]?.error,
+  },
+  {
+    panel: "passport-photo (analyze)",
+    transport: "fetch",
+    fallback: format(de.toolSettings["passport-photo"].analysisFailedWithStatus, {
+      status: STATUS,
+    }),
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<PassportPhotoSettings />);
+    },
+  },
+  {
+    panel: "passport-photo (generate)",
+    transport: "fetch",
+    fallback: format(de.toolSettings["passport-photo"].generationFailedWithStatus, {
+      status: STATUS,
+    }),
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      usePassportPhotoStore.getState().setAnalyzeResult(PASSPORT_ANALYZE_RESULT);
+      render(<PassportPhotoSettings />);
+      fireEvent.click(screen.getByTestId("passport-photo-generate"));
+    },
+  },
+  {
+    panel: "favicon",
+    transport: "xhr",
+    fallback: format(de.toolSettings.favicon.generationFailed, { status: STATUS }),
+    start: () => {
+      useFileStore.getState().setFiles([image("logo.png")]);
+      render(<FaviconSettings />);
+      fireEvent.click(screen.getByTestId("favicon-submit"));
+    },
+  },
+  {
+    panel: "bulk-rename",
+    transport: "fetch",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<BulkRenameSettings />);
+      fireEvent.click(screen.getByTestId("bulk-rename-submit"));
+    },
+  },
+  {
+    panel: "split",
+    transport: "fetch",
+    fallback: String(STATUS),
+    start: () => {
+      useFileStore.getState().setFiles([image("grid.png")]);
+      render(<SplitSettings />);
+      fireEvent.click(screen.getByTestId("split-submit"));
+    },
+    framed: (message) =>
+      format(de.toolSettings.split.failedToSplit, { name: "grid.png", detail: message }),
+  },
+];
+
+/** Answers a few panel shapes a real server sends, with what the panel should end on. */
+function answers(fallback: string): Array<[string, unknown, string]> {
+  return [
+    ["an object error", { error: { reason: "x" } }, fallback],
+    ["details alone", { details: "Not enough memory" }, "Not enough memory"],
+    ["array details", { details: ["bad field"] }, "bad field"],
+    ["a string error", { error: "Bad file" }, "Bad file"],
+    [
+      "error and different details",
+      { error: "Invalid settings", details: "x: too big" },
+      "Invalid settings: x: too big",
+    ],
+    [
+      "the error handler's echo of one message",
+      { error: "Bad file", details: "Bad file" },
+      "Bad file",
+    ],
+  ];
+}
+
+beforeEach(() => {
+  let blobCount = 0;
+  URL.createObjectURL = vi.fn(() => `blob:mock-${++blobCount}`);
+  URL.revokeObjectURL = vi.fn();
+  FakeXhr.instances = [];
+  vi.stubGlobal("XMLHttpRequest", FakeXhr);
+  vi.stubGlobal("EventSource", FakeEventSource);
+  stubFetch();
+  useFileStore.getState().reset();
+  useCollageStore.getState().reset();
+  useBase64Store.getState().reset();
+  usePassportPhotoStore.getState().reset();
+  useSplitStore.getState().reset();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  useFileStore.getState().reset();
+  useCollageStore.getState().reset();
+  useBase64Store.getState().reset();
+  usePassportPhotoStore.getState().reset();
+  useSplitStore.getState().reset();
+});
+
+describe.each(PANELS)("$panel: a failed answer", (row) => {
+  const shapes: Array<[string, unknown, string]> = [
+    ...answers(row.fallback),
+    ["a body that is not JSON", NOT_JSON, row.nonJsonFallback ?? row.fallback],
+  ];
+
+  it.each(shapes)("shows %s as readable text", async (_label, body, message) => {
+    const expected = row.framed ? row.framed(message) : message;
+    answer = { status: STATUS, body };
+    await row.start();
+    if (row.transport === "xhr") {
+      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+      FakeXhr.instances[0].respond(STATUS, body);
+    }
+
+    if (row.shown) {
+      await waitFor(() => expect(row.shown?.()).toBe(expected), { timeout: 3000 });
+    } else {
+      await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument(), {
+        timeout: 3000,
+      });
+    }
+    expect(document.body.textContent).not.toContain("[object Object]");
+  });
+});
+
+describe.each(PANELS)("$panel: a 413", (row) => {
+  const shapes: Array<[string, unknown]> = [
+    ["the API's JSON body", { error: "File too large", details: "Max 100 MB" }],
+    ["a proxy's HTML page", NOT_JSON],
+  ];
+
+  it.each(shapes)("shows %s as the translated file-too-large message", async (_label, body) => {
+    const message = de.errors.fileTooLarge;
+    const expected = row.framed ? row.framed(message) : message;
+    answer = { status: 413, body };
+    await row.start();
+    if (row.transport === "xhr") {
+      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+      FakeXhr.instances[0].respond(413, body);
+    }
+
+    if (row.shown) {
+      await waitFor(() => expect(row.shown?.()).toBe(expected), { timeout: 3000 });
+    } else {
+      await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument(), {
+        timeout: 3000,
+      });
+    }
+  });
+});
+
+describe.each(
+  PANELS.filter(
+    (row) =>
+      row.panel === "sign-pdf" ||
+      row.panel === "erase-object (one file)" ||
+      row.panel === "erase-object (several files)",
+  ),
+)("$panel: a canceled sync 422 (#4009)", (row) => {
+  it.each([
+    ["the standard Canceled message", { error: "Canceled", canceled: true }],
+    ["a non-Canceled server string", { error: "Batch canceled", canceled: true }],
+  ])("shows %s as the translated canceled message", async (_label, body) => {
+    answer = { status: STATUS, body };
+    await row.start();
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(STATUS, body);
+
+    if (row.shown) {
+      await waitFor(() => expect(row.shown?.()).toBe(de.errors.canceled), { timeout: 3000 });
+    } else {
+      await waitFor(() => expect(screen.getByText(de.errors.canceled)).toBeInTheDocument(), {
+        timeout: 3000,
+      });
+    }
+    expect(document.body.textContent).not.toContain("Canceled");
+    expect(document.body.textContent).not.toContain("Batch canceled");
+  });
+});
+
+describe("ocr: a failed answer", () => {
+  it.each([
+    ...answers(`Failed: ${STATUS}`),
+    ["a body that is not JSON", NOT_JSON, `Processing failed: ${STATUS}`],
+  ])("rejects %s with readable text", async (_label, body, expected) => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "fast", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: en },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(STATUS, body);
+
+    await expect(run).rejects.toThrow(expected);
+  });
+
+  it("rejects FEATURE_NOT_INSTALLED with the install message in the locale it was given", async () => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "best", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(501, {
+      error: "Feature not installed",
+      code: "FEATURE_NOT_INSTALLED",
+      feature: "ocr",
+      featureName: "OCR",
+      estimatedSize: "1 GB",
+    });
+
+    await expect(run).rejects.toThrow(
+      format(de.errors.featureNotInstalled, { feature: de.featureBundles.ocr.name }),
+    );
+  });
+
+  it("rejects FEATURE_INCOMPATIBLE with the incompatible message in the locale it was given", async () => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "best", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(501, {
+      error: "Feature incompatible",
+      code: "FEATURE_INCOMPATIBLE",
+      feature: "ocr",
+      featureName: "OCR",
+      requestedQuality: "best",
+      compatibilityReason: "unsupported-host",
+    });
+
+    await expect(run).rejects.toThrow(
+      format(de.errors.featureIncompatible, { feature: de.featureBundles.ocr.name }),
+    );
+  });
+
+  it("rejects a canceled sync 422 with the canceled message in the locale it was given (#4009)", async () => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "fast", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(422, { error: "Canceled", canceled: true });
+
+    await expect(run).rejects.toThrow(de.errors.canceled);
+  });
+
+  it.each([
+    ["the API's 413", { error: "File too large" }],
+    ["a proxy's 413 HTML page", NOT_JSON],
+  ])(
+    "rejects %s with the file-too-large message in the locale it was given",
+    async (_label, body) => {
+      const run = ocrOneFile(
+        image("scan.png"),
+        { quality: "fast", language: "en", enhance: false },
+        { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+        { t: de },
+      );
+      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+      FakeXhr.instances[0].respond(413, body);
+
+      await expect(run).rejects.toThrow(de.errors.fileTooLarge);
+    },
+  );
+
+  it("is handed the panel's locale", () => {
+    const source = readFileSync(
+      resolve(__dirname, "../../../apps/web/src/components/tools/ocr-settings.tsx"),
+      "utf8",
+    );
+    expect(source).toMatch(/processingFailed: t\.errors\.processingFailed,\s*t,/);
+  });
+});
+
+describe("no panel reads a failed answer's body by hand", () => {
+  // Every tool panel that posts for itself and reads a non-2xx JSON body.
+  // Remove Background is listed here rather than rendered above because its
+  // effects request only exists after a finished first pass.
+  const ROUTED = [
+    "barcode-generate",
+    "barcode-read",
+    "beautify",
+    "bulk-rename",
+    "collage",
+    "color-palette",
+    "compare",
+    "compose",
+    "edit-metadata",
+    "erase-object",
+    "favicon",
+    "find-duplicates",
+    "image-to-base64",
+    "image-to-pdf",
+    "info",
+    "ocr",
+    "passport-photo",
+    "remove-bg",
+    "sign-pdf",
+    "split",
+    "stitch",
+    "strip-metadata",
+    "watermark-image",
+  ];
+
+  it.each(ROUTED)("%s goes through failedAnswerMessage", (id) => {
+    const source = readFileSync(
+      resolve(__dirname, `../../../apps/web/src/components/tools/${id}-settings.tsx`),
+      "utf8",
+    );
+    expect(source).toContain("failedAnswerMessage(");
+    expect(source).not.toMatch(/body\??\.(error|details)\s*\|\|/);
+    expect(source).not.toMatch(/typeof\s+\w+\.(error|details)\s*===\s*"string"\s*\?/);
+  });
+
+  it("watermark-image multi-file loop lands each file's outcome on its own entry after a reorder (#1114)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const resolvers: Array<(res: Response) => void> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolvers.push(resolve);
+          }),
+      ),
+    );
+    const { container } = render(<WatermarkImageSettings />);
+    chooseFile(container, image("mark.png"));
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+
+    await waitFor(() => expect(resolvers).toHaveLength(1));
+    // Reorder [one.png, two.png] -> [two.png, one.png] while one.png is in flight.
+    act(() => {
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+    await act(async () => {
+      resolvers[0](
+        new Response(
+          JSON.stringify({
+            jobId: "j1",
+            downloadUrl: "/api/v1/download/j1/one-watermarked.png",
+            originalSize: 100,
+            processedSize: 90,
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    await waitFor(() => expect(resolvers).toHaveLength(2));
+    await act(async () => {
+      resolvers[1](new Response(JSON.stringify({ error: "Second failed" }), { status: 422 }));
+    });
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    const { entries } = useFileStore.getState();
+    expect(entries[1].file.name).toBe("one.png");
+    expect(entries[1].status).toBe("completed");
+    expect(entries[1].processedUrl).toBe("/api/v1/download/j1/one-watermarked.png");
+    expect(entries[0].file.name).toBe("two.png");
+    expect(entries[0].status).toBe("failed");
+    expect(entries[0].error).toBe("Second failed");
+  });
+});

@@ -58,11 +58,11 @@ beforeAll(async () => {
     payload: { username: userUsername, password: "UserPass12" },
   });
   userToken = JSON.parse(userLogin.body).token;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ---------------------------------------------------------------------------
 // Route permission matrix

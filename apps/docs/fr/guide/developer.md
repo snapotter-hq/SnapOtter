@@ -1,8 +1,8 @@
 ---
 description: "Configuration de l'environnement de développement local, commandes, conventions de code et comment ajouter un nouvel outil à SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 64e0523fcee3
+i18n_output_hash: c6d09c77591a
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ Ajoutez à `packages/shared/src/i18n/en.ts` :
 ### 4. Tests {#_4-tests}
 
 Ajoutez un attribut `data-testid` à votre bouton d'action (comme montré ci-dessus) afin que les tests e2e puissent le cibler de manière fiable.
+
+### 5. Baselines visuelles {#_5-visual-baselines}
+
+Les tests de captures d'écran n'autorisent aucun pixel modifié, et un nouvel outil change ce qu'ils affichent : le nombre d'outils sur la page d'accueil et dans le catalogue, une nouvelle carte dans la grille, et une page à lui sur laquelle `tests/e2e/gui-visual-tools.spec.ts` échoue avec "snapshot doesn't exist" tant qu'elle n'a pas de baseline. Mettez à jour les baselines dans la même PR que l'outil, pour que la comparaison visuelle nocturne reste au vert.
+
+La CI génère à la fois les baselines `linux` (`ubuntu-latest`) et `darwin` (`macos-latest`). Poussez votre branche, puis lancez la mise à jour dessus :
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Chaque job par système d'exploitation téléverse un artefact `visual-baselines-linux-<run-id>-<attempt>` ou `visual-baselines-darwin-<run-id>-<attempt>` et ouvre une PR brouillon (`chore/visual-baselines-linux-...` et `chore/visual-baselines-darwin-...`) vers `main` avec les PNG régénérés. La description de chaque PR brouillon contient une commande `gh run download` ; lancez-les toutes les deux depuis la racine de votre checkout pour récupérer les PNG dans votre branche, committez-les et fermez les PR brouillons. Utilisez plutôt `update_snapshots=all` si `changed` rate une capture que vous attendiez voir changer. Le lancement demande un accès en écriture au dépôt : si votre branche vit sur un fork, indiquez dans la PR qu'elle a besoin d'une mise à jour des baselines et un mainteneur s'en chargera.
+
+Sur un Mac, vous pouvez aussi mettre à jour les baselines `darwin` localement pour itérer plus vite :
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Dans tous les cas, ouvrez chaque PNG nouveau ou modifié avant de le committer : une baseline enregistre ce qui a été rendu, cassé ou non.
+
+Une release n'a besoin de rien de tout cela. La version de l'application est masquée dans chaque capture qui l'affiche, donc la changer ne modifie aucune baseline.
 
 ## Builds Docker {#docker-builds}
 

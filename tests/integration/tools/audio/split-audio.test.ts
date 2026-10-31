@@ -17,11 +17,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("split-audio (requires ffmpeg)", () => {
   it("splits into 2 parts via parts mode", async () => {
@@ -87,9 +87,9 @@ describe.skipIf(!ffmpegAvailable())("split-audio (requires ffmpeg)", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/no silence found/i);
+    expect(parsed.error).toMatch(/no silence found/i);
   }, 60_000);
 
   it("splits by time mode on tone-gap.wav (segmentS=1)", async () => {

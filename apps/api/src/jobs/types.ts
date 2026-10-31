@@ -1,6 +1,6 @@
 /**
  * Shared types and naming helpers for the BullMQ job system, plus the
- * saveMode multipart-field validation shared by tool-factory and the
+ * saveMode and clientJobId multipart-field validation shared by tool-factory and the
  * hand-written tool routes.
  */
 
@@ -25,6 +25,9 @@ export interface ToolJobData {
   jobId: string;
   toolId: string;
   userId: string | null;
+  username?: string;
+  requestIp?: string;
+  requestId?: string;
   pool: Pool;
   inputRefs: string[];
   filename: string;
@@ -68,6 +71,27 @@ export function parseSaveModeField(raw: string | null): LibrarySaveMode | undefi
   return (LIBRARY_SAVE_MODES as readonly string[]).includes(raw) ? (raw as LibrarySaveMode) : null;
 }
 
+/** Error message for the { error } 400 response when a multipart clientJobId field is malformed. */
+export const INVALID_CLIENT_JOB_ID_ERROR =
+  "Invalid clientJobId (expected 1-128 letters, digits, '_', '-' or '.', starting with a letter or digit, not all digits, no '..')";
+
+// The batch routes also use the id as a BullMQ flow job id (no ':', not an
+// integer) and as an object-key segment (VALID_KEY in lib/object-storage.ts:
+// alphanumeric first character, no '..'), so the pattern is the intersection.
+// openapi.yaml documents the same pattern on every clientJobId field.
+export const CLIENT_JOB_ID_PATTERN = /^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
+
+/**
+ * Validate a client-supplied multipart clientJobId field. The value becomes a
+ * jobs.id primary key, so control characters must not get through: Postgres
+ * rejects a NUL byte in a text column, which surfaced as a 500 (#1329).
+ * Returns undefined when the field was absent, null when the value is invalid.
+ */
+export function parseClientJobIdField(raw: string | null): string | undefined | null {
+  if (raw === null) return undefined;
+  return CLIENT_JOB_ID_PATTERN.test(raw) ? raw : null;
+}
+
 /** Result returned by a completed BullMQ job. */
 export interface ToolJobResult {
   outputRefs: string[];
@@ -77,5 +101,18 @@ export interface ToolJobResult {
   processedSize: number;
   previewRef?: string;
   savedFileId?: string;
+  autoSaveError?: string;
   resultPayload?: Record<string, unknown>;
+  audited?: boolean;
+}
+
+/**
+ * Sidecar object written next to a job's output so stranded-job reconciliation
+ * can restore the tool's own `resultPayload` fields (such as `resizedTo`,
+ * `targetKb`, and `targetMet`) when the worker's terminal DB write is lost (#1389).
+ */
+export const RESULT_PAYLOAD_FILENAME = ".result-payload.json";
+
+export function resultPayloadKey(jobId: string): string {
+  return `outputs/${jobId}/${RESULT_PAYLOAD_FILENAME}`;
 }

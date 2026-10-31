@@ -30,7 +30,7 @@ export function registerRotatePdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_rotated.pdf`);
       ctx.report(10, "Rotating");
-      await qpdfRotate(inPath, settings.angle, settings.range, outPath);
+      await qpdfRotate(inPath, settings.angle, settings.range, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

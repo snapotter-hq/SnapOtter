@@ -1,6 +1,6 @@
 ---
 description: "علامات صورة SnapOtter على Docker، ومقاييس أداء GPU، وتثبيت الإصدارات، ودعم المنصات المتعددة لـ AMD64 وARM64."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: 869e3732ed43
 i18n_hash_version: 2

@@ -43,6 +43,17 @@ services:
         "**/tests/unit/helpers/run-generated-tool.test.ts",
         "--exclude",
         "**/tests/unit/web/lazy-chunks-stay-lazy.test.ts",
+        # The surface harness audit reads the landing and docs Playwright
+        # configs and starts their previews; the lean image installs neither
+        # workspace's dependencies (no astro, no vitepress), and host CI runs
+        # this spec on every PR.
+        "--exclude",
+        "**/tests/unit/surface-playwright-harness.test.ts",
+        # These run standalone node:test suites that resolve the campaign
+        # commit with git. Dockerfile.test.dockerignore prunes .git, so the
+        # runner fails closed before the suite starts. Host CI runs them too.
+        "--exclude",
+        "**/tests/unit/scripts/node-test-suites.test.ts",
       ]
     environment:
       - NODE_ENV=test
@@ -71,6 +82,11 @@ services:
       # One vitest fork bounds peak memory on a 7GB CI runner; the 90-minute
       # job budget absorbs the slower serial run.
       - VITEST_MAX_FORKS=1
+      # Dockerfile.test bakes PyMuPDF into /app/.venv. This turns a suite that
+      # can't find it into a failure, not a lane of silently skipped fitz
+      # tests (#1610). Setting PYTHON_VENV_PATH here would point the suite
+      # away from that venv.
+      - REQUIRE_PYTHON_FITZ=1
     # No tmpfs: the tools write multi-megapixel encodes and video transcodes to
     # WORKSPACE_PATH and /tmp, and a RAM-backed mount made that scratch count
     # against the 7GB runner alongside the app, Postgres, and Redis, which

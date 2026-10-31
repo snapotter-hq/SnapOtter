@@ -38,6 +38,35 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 If the policy still requires MFA for that user, they will hit the enrollment
 wall next, so also run `reset-mfa-policy`, log in, and re-enroll from Settings.
 
+## Reset a forgotten password {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Omit `[password]` and the CLI prints a generated temporary password. Either way,
+the user's active sessions, API keys, and failed-login throttle window are
+cleared, and SnapOtter requires a password change on their next login.
+
+## Bootstrap an admin account {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Use this when no existing admin account can sign in. `[username]` defaults to
+`DEFAULT_USERNAME` (`admin`), and omitting `[password]` prints a temporary
+password that must be changed on first login.
+
+## Unlock a throttled or disabled user {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+This clears the `LOGIN_THROTTLED` window in Redis and restores the account's
+role if the user was disabled.
+
 ## Older images and fallbacks {#older-images-and-fallbacks}
 
 On an image built before the `snapotter-admin` wrapper existed, call the script
@@ -45,7 +74,7 @@ directly:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 As a last resort on any version, set the policy in the database. On the

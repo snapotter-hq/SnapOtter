@@ -12,6 +12,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
+import { isStorableJson } from "../lib/storable-json.js";
 import {
   getEffectivePermissions,
   hasEffectivePermission,
@@ -24,11 +25,44 @@ import { type AuthUser, computeKeyPrefix, hashPassword, requireAuth } from "../p
 // hit the list endpoint in quick succession on a shared IP.
 const API_KEYS_RATE_LIMIT = { max: env.API_KEYS_RATE_LIMIT_PER_MIN, timeWindow: "1 minute" };
 
-const createApiKeySchema = z.object({
+export const createApiKeySchema = z.object({
   name: z.string().max(100, "Key name must be 100 characters or fewer").optional(),
   permissions: z.array(z.string()).optional(),
   expiresAt: z.string().optional(),
 });
+
+export function validateExpiresAt(
+  dateStr: string,
+): { valid: true; date: Date } | { valid: false; error: string } {
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) {
+    return { valid: false, error: "Invalid expiresAt date" };
+  }
+  if (parsed <= new Date()) {
+    return { valid: false, error: "expiresAt must be in the future" };
+  }
+  return { valid: true, date: parsed };
+}
+
+export function serializeApiKeyRow(k: {
+  id: string;
+  name: string;
+  keyPrefix: string | null;
+  permissions: string[] | null;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+}) {
+  return {
+    id: k.id,
+    name: k.name,
+    prefix: k.keyPrefix ?? "",
+    permissions: k.permissions ?? null,
+    createdAt: k.createdAt.toISOString(),
+    lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
+    expiresAt: k.expiresAt?.toISOString() ?? null,
+  };
+}
 
 async function requireApiKeyManagement(
   request: FastifyRequest,
@@ -84,6 +118,12 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
         });
       }
       const body = parsed.data;
+      if (!isStorableJson(body)) {
+        return reply.status(400).send({
+          error: "API key fields can't contain NUL characters or unpaired surrogates",
+          code: "VALIDATION_ERROR",
+        });
+      }
       const name = body.name?.trim() || "Default API Key";
 
       const scoped = await deriveApiKeyPermissionsForCreate(user, body.permissions);
@@ -96,18 +136,11 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
 
       let expiresAt: Date | null = null;
       if (body.expiresAt) {
-        const parsedDate = new Date(body.expiresAt);
-        if (Number.isNaN(parsedDate.getTime())) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid expiresAt date", code: "VALIDATION_ERROR" });
+        const expiryCheck = validateExpiresAt(body.expiresAt);
+        if (!expiryCheck.valid) {
+          return reply.status(400).send({ error: expiryCheck.error, code: "VALIDATION_ERROR" });
         }
-        if (parsedDate <= new Date()) {
-          return reply
-            .status(400)
-            .send({ error: "expiresAt must be in the future", code: "VALIDATION_ERROR" });
-        }
-        expiresAt = parsedDate;
+        expiresAt = expiryCheck.date;
       }
 
       // Generate a raw API key: "si_" prefix + 48 random bytes as hex
@@ -116,22 +149,19 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
       const keyPrefix = computeKeyPrefix(rawKey);
       const id = randomUUID();
 
-      try {
-        await db.insert(schema.apiKeys).values({
-          id,
-          userId: user.id,
-          keyHash,
-          keyPrefix,
-          name,
-          permissions: scoped.permissions,
-          expiresAt,
-        });
-      } catch {
-        return reply.status(409).send({ error: "Failed to create API key" });
-      }
+      await db.insert(schema.apiKeys).values({
+        id,
+        userId: user.id,
+        keyHash,
+        keyPrefix,
+        name,
+        permissions: scoped.permissions,
+        expiresAt,
+      });
 
       await auditFromRequest(request)("API_KEY_CREATED", {
         userId: user.id,
+        username: user.username,
         keyId: id,
         keyName: name,
       });
@@ -173,15 +203,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
             .where(eq(schema.apiKeys.userId, user.id));
 
       return reply.send({
-        apiKeys: keys.map((k) => ({
-          id: k.id,
-          name: k.name,
-          prefix: k.keyPrefix ?? "",
-          permissions: k.permissions ?? null,
-          createdAt: k.createdAt.toISOString(),
-          lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
-          expiresAt: k.expiresAt?.toISOString() ?? null,
-        })),
+        apiKeys: keys.map(serializeApiKeyRow),
       });
     },
   );
@@ -211,7 +233,11 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
 
       await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
 
-      await auditFromRequest(request)("API_KEY_DELETED", { userId: user.id, keyId: id });
+      await auditFromRequest(request)("API_KEY_DELETED", {
+        userId: user.id,
+        username: user.username,
+        keyId: id,
+      });
 
       return reply.send({ ok: true });
     },

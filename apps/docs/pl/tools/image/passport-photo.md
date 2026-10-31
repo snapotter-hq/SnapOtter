@@ -1,8 +1,8 @@
 ---
 description: "Generator zdjęć paszportowych i do dokumentów wspomagany AI z wykrywaniem twarzy, usuwaniem tła i układaniem na arkuszu do druku."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: e7771c6de920
+i18n_output_hash: da25c55ba66f
 ---
 
 # Zdjęcie paszportowe {#passport-photo}
@@ -92,7 +92,7 @@ Kadruje, zmienia rozmiar i opcjonalnie układa zdjęcie na arkuszu do druku. Kor
 | documentType | string | Nie | `"passport"` | Typ dokumentu (ze specyfikacji kraju) |
 | bgColor | string | Nie | `"#FFFFFF"` | Kolor tła w formacie hex |
 | printLayout | string | Nie | `"none"` | Układ papieru do druku: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | Nie | `0` | Ograniczenie maksymalnego rozmiaru pliku w KB (0 = bez limitu) |
+| maxFileSizeKb | number | Nie | `0` | Maksymalny rozmiar pliku w KB, gdzie 1 KB = 1000 bajtów (0 = bez limitu) |
 | dpi | number | Nie | `300` | DPI wyjścia (72-1200) |
 | customWidthMm | number | Nie | - | Własna szerokość zdjęcia w mm (nadpisuje specyfikację kraju) |
 | customHeightMm | number | Nie | - | Własna wysokość zdjęcia w mm (nadpisuje specyfikację kraju) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Błąd: Analiza wygasła (410) {#error-analysis-expired-410}
+
+Generowanie działa na obrazie po usunięciu tła, który analiza zapisała dla `jobId`. Zapisane wyniki są po pewnym czasie czyszczone, więc jeśli między oboma wywołaniami minie zbyt dużo czasu, ten obraz znika. Wywołaj analizę ponownie na tym samym zdjęciu i użyj zwróconego `jobId`.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+`jobId` lub `filename`, które nie wskazują zapisanego pliku (separator ścieżki, `..`, pusty ciąg), zwraca 400.
+
 ---
 
 ### Trasa bazowa {#base-route}
@@ -170,4 +183,4 @@ Zwraca wskazówki, aby użyć właściwego podrzędnego punktu końcowego.
 - Pole `preview` w odpowiedzi analizy to zakodowany w base64 obraz PNG (maks. 800px szerokości) dla szybkiego wyświetlania.
 - Specyfikacje krajów obejmują wymiary dokumentu, proporcje wysokości głowy i pozycjonowanie linii oczu na podstawie oficjalnych wymagań dotyczących zdjęć paszportowych.
 - Opcja `printLayout` generuje arkusz z ułożonymi zdjęciami na papierze 4x6\" lub A4 z 2mm odstępami między zdjęciami.
-- Gdy ustawiono `maxFileSizeKb`, wynik jest iteracyjnie kompresowany, aby zmieścić się w limicie rozmiaru.
+- Gdy ustawiono `maxFileSizeKb`, jakość JPEG wyniku jest obniżana krok po kroku, aż plik zmieści się w limicie. Rozmiar w pikselach jest ustalony przez specyfikację kraju, więc jeśli zdjęcie nadal się nie mieści przy najniższej jakości, `/generate` zwraca 422 z komunikatem, który to wyjaśnia, zamiast pliku przekraczającego limit.

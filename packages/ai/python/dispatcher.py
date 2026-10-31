@@ -27,6 +27,7 @@ import io
 import os
 import traceback
 
+import session_cache
 from sidecar_errors import build_error_envelope
 
 
@@ -130,11 +131,13 @@ TOOL_BUNDLE_MAP = {
 
 def _get_installed_bundles():
     try:
-        with open(INSTALLED_PATH) as f:
+        with open(INSTALLED_PATH, encoding="utf-8") as f:
             data = json.load(f)
-            return set(data.get("bundles", {}).keys())
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return set()
+    if isinstance(data, dict) and isinstance(data.get("bundles"), dict):
+        return set(data["bundles"].keys())
+    return set()
 
 
 def emit_progress(percent, stage):
@@ -204,6 +207,10 @@ if DISPATCHER_PROFILE == "ai":
 # ── Script handlers ─────────────────────────────────────────────────
 # Each handler sets sys.argv and calls the script's main() function,
 # capturing stdout. The scripts remain unchanged.
+
+
+# Scripts that load their rembg sessions through session_cache.
+_SESSION_CACHE_SCRIPTS = frozenset({"remove_bg", "gif_remove_bg"})
 
 
 def _run_script_main(script_name, args):
@@ -279,6 +286,11 @@ def _run_script_main(script_name, args):
     drain_thread.start()
 
     exit_code = 0
+    if script_name not in _SESSION_CACHE_SCRIPTS:
+        # Cached sessions hold up to 40% of VRAM; another GPU tool gets the
+        # card to itself instead of competing with models it never asked for.
+        session_cache.evict_all(f"running {script_name}")
+    session_cache.request_started()
     try:
         sys.argv = ["script.py"] + args
 
@@ -307,6 +319,8 @@ def _run_script_main(script_name, args):
         sys.stdout.flush()
         exit_code = 1
     finally:
+        session_cache.request_finished()
+
         # Flush before restoring
         sys.stdout.flush()
 
@@ -329,7 +343,98 @@ def _run_script_main(script_name, args):
 # ── Main loop ───────────────────────────────────────────────────────
 
 
-MAX_REQUESTS = int(os.environ.get("DISPATCHER_MAX_REQUESTS", "50"))
+def _env_non_negative_int(name, default):
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        val = int(float(raw))
+        return val if val >= 0 else default
+    except (ValueError, OverflowError):
+        return default
+
+
+MAX_REQUESTS = _env_non_negative_int("DISPATCHER_MAX_REQUESTS", 50)
+MAX_CONSECUTIVE_FAILURES = _env_non_negative_int("DISPATCHER_MAX_CONSECUTIVE_FAILURES", 3)
+
+_CUDA_POISON_RE = re.compile(
+    r"cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|"
+    r"cublas_status_(?:not_initialized|internal_error|execution_failed)|"
+    r"ort_runtime_exception|onnxruntimeerror|device-side\s+assert|"
+    r"illegal\s+memory\s+access|unspecified\s+launch\s+failure",
+    re.IGNORECASE,
+)
+
+_PRE_EXEC_GATE_ERRORS = frozenset(
+    {"invalid_script_name", "script_not_allowed", "feature_not_installed"}
+)
+
+
+def _extract_failure_detail(stdout_output, exit_code):
+    """Return (outcome, detail) where outcome is 'failed', 'succeeded', or 'ignored'."""
+    text = (stdout_output or "").strip()
+    if text:
+        for candidate in (text, text.splitlines()[-1].strip()):
+            if not candidate.startswith("{"):
+                continue
+            try:
+                parsed = json.loads(candidate)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if isinstance(parsed, dict):
+                err_val = parsed.get("error")
+                if err_val == "canceled" or err_val in _PRE_EXEC_GATE_ERRORS:
+                    return "ignored", ""
+                err_str = str(err_val or "").strip()
+                info = parsed.get("errorInfo")
+                info_type = (
+                    str(info.get("type") or "").strip() if isinstance(info, dict) else ""
+                )
+                detail = f"{info_type}: {err_str}".strip(": ") or text
+                if (
+                    exit_code != 0
+                    or parsed.get("success") is False
+                    or (bool(err_str) and parsed.get("success") is not True)
+                ):
+                    return "failed", detail
+                return "succeeded", ""
+    if exit_code != 0:
+        return "failed", text
+    return "succeeded", ""
+
+
+def _is_cuda_poison_error(detail):
+    """Whether an error string indicates a poisoned CUDA or ONNX Runtime context."""
+    return bool(_CUDA_POISON_RE.search(detail or ""))
+
+
+def _should_recycle_after_request(
+    stdout_output,
+    exit_code,
+    consecutive_failures,
+    request_count,
+    max_requests=None,
+    max_consecutive_failures=None,
+):
+    """Return (consecutive_failures, recycle_reason) after a request completes."""
+    if max_requests is None:
+        max_requests = MAX_REQUESTS
+    if max_consecutive_failures is None:
+        max_consecutive_failures = MAX_CONSECUTIVE_FAILURES
+
+    outcome, detail = _extract_failure_detail(stdout_output, exit_code)
+    if outcome == "failed":
+        consecutive_failures += 1
+        if _is_cuda_poison_error(detail):
+            return consecutive_failures, "cuda_error"
+        if max_consecutive_failures > 0 and consecutive_failures >= max_consecutive_failures:
+            return consecutive_failures, "consecutive_failures"
+    elif outcome == "succeeded":
+        consecutive_failures = 0
+
+    if max_requests > 0 and request_count >= max_requests:
+        return consecutive_failures, "max_requests"
+    return consecutive_failures, None
 
 
 def _cleanup_after_request():
@@ -341,22 +446,32 @@ def _cleanup_after_request():
             torch.cuda.empty_cache()
     except ImportError:
         pass
+    except Exception as e:
+        print(json.dumps({"warning": f"[dispatcher] GPU cache cleanup failed: {e}"}), file=sys.stderr, flush=True)
 
 
 def main():
     # Signal readiness with GPU status
     gpu = False
+    gpu_frameworks = {"torch": False, "onnx": False, "ctranslate2": False}
     try:
-        from gpu import gpu_available
+        from gpu import gpu_available, gpu_frameworks_available
         gpu = gpu_available()
-    except ImportError as e:
-        print(f"[dispatcher] GPU detection failed: {e}", file=sys.stderr, flush=True)
-    print(json.dumps({"ready": True, "gpu": gpu}), file=sys.stderr, flush=True)
+        gpu_frameworks = gpu_frameworks_available()
+    except Exception as e:
+        print(json.dumps({"warning": f"[dispatcher] GPU detection failed: {e}"}), file=sys.stderr, flush=True)
+    print(
+        json.dumps({"ready": True, "gpu": gpu, "gpuFrameworks": gpu_frameworks}),
+        file=sys.stderr,
+        flush=True,
+    )
     print(f"[dispatcher] Ready. GPU: {gpu}. Max requests: {MAX_REQUESTS}. Modules: {list(available_modules.keys())}", file=sys.stderr, flush=True)
 
+    session_cache.start_idle_reaper()
     _init_tracing()
 
     request_count = 0
+    consecutive_failures = 0
 
     for line in sys.stdin:
         line = line.strip()
@@ -412,7 +527,7 @@ def main():
         except Exception as e:
             response = {
                 "id": request_id,
-                "stdout": json.dumps({"success": False, "error": str(e)}),
+                "stdout": json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}),
                 "exitCode": 1,
             }
 
@@ -420,13 +535,34 @@ def main():
         sys.stdout.write(json.dumps(response) + "\n")
         sys.stdout.flush()
 
-        _cleanup_after_request()
         request_count += 1
+        consecutive_failures, recycle_reason = _should_recycle_after_request(
+            response.get("stdout", ""),
+            response.get("exitCode", 1),
+            consecutive_failures,
+            request_count,
+        )
 
-        if request_count >= MAX_REQUESTS:
+        if recycle_reason == "cuda_error":
+            print(
+                "[dispatcher] CUDA/ORT runtime failure detected, shutting down for restart",
+                file=sys.stderr,
+                flush=True,
+            )
+            break
+        if recycle_reason == "consecutive_failures":
+            print(
+                f"[dispatcher] Reached consecutive script failure limit ({MAX_CONSECUTIVE_FAILURES}), shutting down for restart",
+                file=sys.stderr,
+                flush=True,
+            )
+            break
+        if recycle_reason == "max_requests":
             print(f"[dispatcher] Reached max requests ({MAX_REQUESTS}), shutting down for restart",
                   file=sys.stderr, flush=True)
             break
+
+        _cleanup_after_request()
 
     if _tracer_provider:
         try:

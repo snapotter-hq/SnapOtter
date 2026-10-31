@@ -19,6 +19,7 @@ test.describe("GET /api/v1/config/analytics (public)", () => {
     expect(config).toHaveProperty("enabled");
     expect(config).toHaveProperty("posthogApiKey");
     expect(config).toHaveProperty("posthogHost");
+    expect(config).toHaveProperty("feedbackSink");
     expect(config).toHaveProperty("sentryDsn");
     expect(config).toHaveProperty("sentryDsnWeb");
     expect(config).toHaveProperty("posthogSampleRate");
@@ -27,6 +28,7 @@ test.describe("GET /api/v1/config/analytics (public)", () => {
     expect(typeof config.enabled).toBe("boolean");
     expect(typeof config.posthogApiKey).toBe("string");
     expect(typeof config.posthogHost).toBe("string");
+    expect(typeof config.feedbackSink).toBe("boolean");
     expect(typeof config.sentryDsn).toBe("string");
     expect(typeof config.sentryDsnWeb).toBe("string");
     expect(typeof config.posthogSampleRate).toBe("number");

@@ -2,8 +2,10 @@ export interface FeatureBundleInfo {
   id: string;
   name: string;
   description: string;
+  /** Bare download size ("4-5 GB", "600 MB"). Callers add their own "~" and wording. */
   estimatedSize: string;
   enablesTools: string[];
+  smokeImports: string[];
 }
 
 export type FeatureStatus = "not_installed" | "queued" | "installing" | "installed" | "error";
@@ -54,6 +56,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
       "background-replace",
       "blur-background",
     ],
+    smokeImports: ["rembg", "onnxruntime"],
   },
   "face-detection": {
     id: "face-detection",
@@ -61,6 +64,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     description: "Detect and blur faces, fix red-eye, smart crop",
     estimatedSize: "200-300 MB",
     enablesTools: ["blur-faces", "red-eye-removal", "smart-crop"],
+    smokeImports: ["mediapipe"],
   },
   "object-eraser-colorize": {
     id: "object-eraser-colorize",
@@ -68,6 +72,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     description: "Erase objects from photos and colorize B&W images",
     estimatedSize: "1-2 GB",
     enablesTools: ["erase-object", "colorize", "ai-canvas-expand"],
+    smokeImports: ["onnxruntime"],
   },
   "inpaint-hq": {
     id: "inpaint-hq",
@@ -76,6 +81,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
       "Diffusion-based object removal for large objects, detailed textures, and structured backgrounds",
     estimatedSize: "5-7 GB",
     enablesTools: ["erase-object"],
+    smokeImports: ["diffusers", "torch", "transformers"],
   },
   "upscale-enhance": {
     id: "upscale-enhance",
@@ -83,6 +89,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     description: "AI upscaling, face enhancement, and noise removal",
     estimatedSize: "5-6 GB",
     enablesTools: ["upscale", "enhance-faces", "noise-removal"],
+    smokeImports: ["torch", "torchvision"],
   },
   "photo-restoration": {
     id: "photo-restoration",
@@ -90,20 +97,23 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     description: "Restore old or damaged photos",
     estimatedSize: "4-5 GB",
     enablesTools: ["restore-photo"],
+    smokeImports: ["onnxruntime", "torch", "mediapipe"],
   },
   ocr: {
     id: "ocr",
     name: "OCR",
     description: "Extract text from images and PDFs",
-    estimatedSize: "~208-234 MiB download / ~409-488 MiB installed",
+    estimatedSize: "208-234 MiB",
     enablesTools: ["ocr", "ocr-pdf"],
+    smokeImports: ["rapidocr", "onnxruntime"],
   },
   transcription: {
     id: "transcription",
     name: "Transcription",
     description: "Speech to text for audio and video (subtitles)",
-    estimatedSize: "~600 MB",
+    estimatedSize: "600 MB",
     enablesTools: ["transcribe-audio", "auto-subtitles"],
+    smokeImports: ["faster_whisper", "ctranslate2"],
   },
 };
 
@@ -177,3 +187,10 @@ export function getRequiredBundlesForTool(toolId: string): string[] {
   const extras = TOOL_EXTRA_BUNDLES[toolId] ?? [];
   return [...new Set([primary, ...extras])];
 }
+
+/**
+ * Languages that only the Accurate runtime's dedicated recognizers can read.
+ * Fast runs on the bundled Tesseract tier, which has no model for them, so
+ * Fast is rejected for each one and the Accurate tiers are required instead.
+ */
+export const OCR_FAST_UNSUPPORTED_LANGUAGES = ["ko", "ar"] as const;

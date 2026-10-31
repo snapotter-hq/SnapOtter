@@ -27,12 +27,12 @@ describe("download endpoint over a real socket (#590)", () => {
     await testApp.app.listen({ port: 0, host: "127.0.0.1" });
     const addr = testApp.app.server.address() as AddressInfo;
     baseUrl = `http://127.0.0.1:${addr.port}`;
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await deletePrefix(`outputs/${jobId}/`);
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   // Force the route's declared Content-Length (from getObjectSize) to exceed the
   // bytes the stream yields: #590 "cause 2", a stat/stream size disagreement.

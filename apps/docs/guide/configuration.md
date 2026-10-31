@@ -94,6 +94,23 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 | `MAX_SVG_SIZE_MB` | `50` | Largest SVG accepted before sanitizing, in megabytes. `0` behaves differently here than in the rows around it. It removes the pre-parse size cap entirely rather than raising it, so leave this one set. |
 | `MAX_PDF_PAGES` | `0` (unlimited) | Maximum number of PDF pages for PDF-to-image conversion. Set to 0 for unlimited. |
 
+### Engines {#engines}
+
+SnapOtter looks up each processing binary on `$PATH` inside the container, so these stay empty unless you mount a build of your own.
+
+| Variable | Default | Description |
+|---|---|---|
+| `FFMPEG_PATH` | (empty) | Path to the `ffmpeg` binary behind the video and audio tools. |
+| `FFPROBE_PATH` | (empty) | Path to `ffprobe`, which reads media files before they're processed. Point it at the same build as `FFMPEG_PATH`. |
+| `QPDF_PATH` | (empty) | Path to `qpdf`, used by the PDF tools and to check uploaded PDFs. |
+| `SOFFICE_PATH` | (empty) | Path to LibreOffice's `soffice`, used for office document conversions. |
+| `PDFCPU_PATH` | (empty) | Path to `pdfcpu`, used by some PDF tools. |
+| `SNAPOTTER_HW_ACCEL` | (empty) | Hardware video encoder family, `nvenc` or `vaapi`. Empty encodes in software. |
+
+`SNAPOTTER_HW_ACCEL` needs an ffmpeg built with that encoder family, and the ffmpeg in the image has neither. With the image's own binary the setting falls back to software encoding and says so in the startup log. To use it, mount your own ffmpeg build, point `FFMPEG_PATH` and `FFPROBE_PATH` at it, and give the container the GPU device. For `nvenc`, also set `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: the image asks for `compute,utility` only, and without `video` the NVIDIA runtime doesn't mount the encode library, so the encoder is listed but every encode fails. A path override that doesn't exist or isn't executable is also named in the startup log, and every job that needs that binary fails until you fix the path or unset it.
+
+The published Compose files pass all six through from `.env`, so setting them there is enough.
+
 ### Cleanup {#cleanup}
 
 | Variable | Default | Description |

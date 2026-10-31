@@ -2,8 +2,10 @@
 // A "ratio" here is always width / height (16:9 -> 16/9 -> 1.777...).
 // Kept free of React/DOM so it can be unit-tested in isolation.
 
-// Matches the resize route's Sharp guardrail (apps/api/src/routes/tools/resize.ts).
-export const MAX_RESIZE_DIMENSION = 16383;
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
+
+// The resize route's Sharp guardrail (apps/api/src/routes/tools/resize.ts), shared.
+export const MAX_RESIZE_DIMENSION = MAX_RESIZE_OUTPUT_DIMENSION;
 
 export interface RatioPreset {
   id: string;

@@ -18,6 +18,7 @@
  * Container-free: db, config, and audit are mocked; isDisabledRole is the real
  * function (it is pure).
  */
+import { inspect } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mock state ──────────────────────────────────────────────────
@@ -118,10 +119,12 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
   };
 });
 
+import { isSafeMessageError } from "@snapotter/shared";
 import {
   resolveExternalUser,
   UsernameRaceExhaustedError,
 } from "../../../apps/api/src/lib/external-auth-resolver.js";
+import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
 
 function makeLogger() {
   return { info: vi.fn(), warn: vi.fn() };
@@ -184,7 +187,7 @@ describe("resolveExternalUser: match by externalId", () => {
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
     expect(state.auditCalls[0]).toEqual({
       event: "OIDC_LOGIN_FAILED",
-      details: { reason: "user_disabled", userId: "u-existing" },
+      details: { reason: "user_disabled", userId: "u-existing", username: "existing" },
     });
   });
 
@@ -241,12 +244,19 @@ describe("resolveExternalUser: auto-link by email", () => {
   });
 
   it("denies linking when the email-matched user is disabled", async () => {
-    state.selectRows = [[], [dbUser({ id: "u-dis", role: "disabled:pending" })]];
+    state.selectRows = [
+      [],
+      [dbUser({ id: "u-dis", username: "dis-email", role: "disabled:pending" })],
+    ];
     const result = await resolveExternalUser(
       baseParams({ autoLink: true, email: "known@example.com", emailVerified: true }),
     );
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
     expect(state.updates).toHaveLength(0);
+    expect(state.auditCalls.at(-1)).toEqual({
+      event: "OIDC_LOGIN_FAILED",
+      details: { reason: "user_disabled", userId: "u-dis", username: "dis-email" },
+    });
   });
 
   it("does not auto-link when emailVerified is false (falls through to denied)", async () => {
@@ -413,6 +423,20 @@ describe("resolveExternalUser: auto-create", () => {
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result.action).toBe("created");
   });
+
+  it("suffixes a sanitized 'anonymous' username to 'anonymous_2' even when no 'anonymous' row exists (#2469)", async () => {
+    state.selectRows = [
+      [], // extId miss
+      [], // findUniqueUsername skips 'anonymous' and checks 'anonymous_2' directly
+      [{ id: "team-default" }],
+    ];
+    const result = await resolveExternalUser(
+      baseParams({ autoCreate: true, username: "anonymous" }),
+    );
+    expect(result.action).toBe("created");
+    expect(result.user?.username).toBe("anonymous_2");
+    expect(state.inserts[0].username).toBe("anonymous_2");
+  });
 });
 
 // ── 3b. Auto-create username races (issue #927) ─────────────────────────
@@ -448,11 +472,14 @@ describe("resolveExternalUser: auto-create username race", () => {
       [], // extId miss
       [], // base free
       [{ id: "team-default" }],
-      [dbUser({ id: "u-winner", role: "disabled" })], // winner re-check
+      [dbUser({ id: "u-winner", username: "dis-winner", role: "disabled" })], // winner re-check
     ];
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
-    expect(state.auditCalls.at(-1)?.event).toBe("OIDC_LOGIN_FAILED");
+    expect(state.auditCalls.at(-1)).toEqual({
+      event: "OIDC_LOGIN_FAILED",
+      details: { reason: "user_disabled", userId: "u-winner", username: "dis-winner" },
+    });
   });
 
   it("joins the winner when the scan picked a suffixed name and the identity index refused the insert", async () => {
@@ -523,6 +550,50 @@ describe("resolveExternalUser: auto-create username race", () => {
     // resolver has to keep throwing exactly it, not a plain Error.
     await expect(exhausted).rejects.toBeInstanceOf(UsernameRaceExhaustedError);
     expect(state.inserts).toHaveLength(3);
+  });
+
+  it("keeps the username out of everything the exhaustion error hands Sentry (#1866)", async () => {
+    state.insertRowCounts = [0, 0, 0];
+    state.selectRows = [
+      [],
+      [],
+      [{ id: "team-default" }],
+      [],
+      [],
+      [{ id: "team-default" }],
+      [],
+      [],
+      [{ id: "team-default" }],
+      [],
+    ];
+    // Short on purpose: the scrubber masks quoted runs of 24+ characters, so a
+    // name this length is exactly what used to reach Sentry verbatim.
+    const username = "jane_smith";
+    const err: unknown = await resolveExternalUser(
+      baseParams({ autoCreate: true, username }),
+    ).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UsernameRaceExhaustedError);
+    const raced = err as Error;
+    // Pinned exactly, so the externalId (a SAML NameID is usually an email),
+    // the email, or anything else interpolated later fails here too.
+    expect(raced.message).toBe("SSO auto-create lost the username race on every retry");
+    // Every property, hidden or not, the stack, and any cause chain.
+    expect(inspect(raced, { showHidden: true, depth: Number.POSITIVE_INFINITY })).not.toContain(
+      username,
+    );
+    // A constant, authored message: the scrubber sends SafeError text as is.
+    expect(isSafeMessageError(raced)).toBe(true);
+
+    // What beforeSend leaves of a real capture, on the default path and on a
+    // consenting (diagnostic) instance that keeps the raw message.
+    for (const diagnostic of [false, true]) {
+      const beforeSend = buildBeforeSend(() => true, diagnostic);
+      const event = { exception: { values: [{ type: raced.name, value: raced.message }] } };
+      const sent = beforeSend(event, { originalException: raced });
+      expect(sent).not.toBeNull();
+      expect(JSON.stringify(sent)).not.toContain(username);
+    }
   });
 });
 

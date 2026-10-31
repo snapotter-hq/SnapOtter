@@ -1,28 +1,51 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import { pipeline, type Readable, Transform } from "node:stream";
+import { hasServerErrorStatus, IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
+import { deleteRecordedToolJob, recordCompletedToolJob } from "../lib/completed-job.js";
+import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
+import { stripInternalPaths } from "../lib/errors.js";
 import { readImageDimensions } from "../lib/exiftool.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
-import { decodeHeic } from "../lib/heic-converter.js";
 import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
+import { decodeHeic } from "../lib/heic-converter.js";
+import { readFilePart } from "../lib/multipart-parts.js";
+import {
+  deletePrefix,
   getObjectSize,
   getObjectStream,
+  isS3MissingShape,
   isStorageServiceFault,
   isValidObjectKey,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
+  verifyS3Bucket,
 } from "../lib/object-storage.js";
-import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgClientError,
+  isSvgzClientError,
+  sanitizeSvg,
+} from "../lib/svg-sanitize.js";
+import { engineUnavailable } from "../modality/image-input.js";
 import { requireFileAccess, requirePermission } from "../permissions.js";
 
 /**
  * Guard against path traversal in URL params.
  */
-function isPathTraversal(segment: string): boolean {
+export function isPathTraversal(segment: string): boolean {
   return (
     segment.includes("..") ||
     segment.includes("/") ||
@@ -96,7 +119,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // Persists bytes that /api/v1/download then serves without auth, so this
       // needs the same grant as the rest of the file surface. The tool-access
       // middleware only covers /api/v1/tools/, and never reached this route.
-      if (!(await requireFileAccess(request, reply))) return;
+      const user = await requireFileAccess(request, reply);
+      if (!user) return;
 
       const jobId = randomUUID();
 
@@ -105,66 +129,156 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         size: number;
         format: string;
       }> = [];
+      let recordedJob = false;
+      let wroteUpload = false;
+      const discardUploads = async () => {
+        let prefixDeleted = true;
+        if (wroteUpload) {
+          wroteUpload = false;
+          await deletePrefix(`outputs/${jobId}/`).catch((err) => {
+            prefixDeleted = false;
+            request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
+          });
+        }
+        if (recordedJob && prefixDeleted) {
+          recordedJob = false;
+          await deleteRecordedToolJob(jobId).catch((err) => {
+            request.log.warn({ err, jobId }, "failed to delete a rejected request's job row");
+          });
+        }
+      };
 
       const parts = request.parts();
 
-      for await (const part of parts) {
-        // Skip non-file fields
-        if (part.type !== "file") continue;
+      try {
+        for await (const part of parts) {
+          // Skip non-file fields
+          if (part.type !== "file") continue;
 
-        // Consume buffer from the stream
-        const chunks: Buffer[] = [];
-        for await (const chunk of part.file) {
-          chunks.push(chunk);
-        }
-        const buffer = Buffer.concat(chunks);
+          // Consume buffer from the stream
+          const buffer = await readFilePart(part.file);
 
-        // Skip empty parts (e.g. empty file field)
-        if (buffer.length === 0) continue;
+          // Skip empty parts (e.g. empty file field)
+          if (buffer.length === 0) continue;
 
-        // Try image validation; non-image files are accepted with format from extension
-        const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
-        const isValidImage = validation?.valid === true;
-
-        // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
-        // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
-        // an external entity, say) makes Sharp fail validation, and gating the
-        // sanitizer on a successful decode would store the payload untouched.
-        // Throwing out of the multipart loop gets rewritten to a generic 400 by
-        // the stream teardown, so handle it here like the quota check below:
-        // return the sanitizer's reason for a size/element-cap rejection, and
-        // report + 500 for anything unexpected rather than storing the file.
-        let safeBuffer: Buffer = buffer;
-        if (isSvgBuffer(buffer)) {
-          try {
-            safeBuffer = sanitizeSvg(buffer);
-          } catch (err) {
-            if ((err as { statusCode?: number }).statusCode === 400) {
-              return reply.status(400).send({ error: (err as Error).message });
+          // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
+          // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
+          // an external entity, say) makes Sharp fail validation, and gating the
+          // sanitizer on a successful decode would store the payload untouched.
+          // Throwing out of the multipart loop gets rewritten to a generic 400 by
+          // the stream teardown, so handle it here like the quota check below:
+          // return the sanitizer's reason for a size/element-cap rejection, and
+          // report + 500 for anything unexpected rather than storing the file.
+          // Sanitize filename (canonical; do NOT re-sanitize downstream)
+          let safeName = sanitizeFilename(part.filename ?? "upload");
+          let safeBuffer: Buffer = buffer;
+          const uploadExt = extname(safeName).toLowerCase();
+          let isDecompressedSvg = false;
+          let sanitizedAsSvg = false;
+          if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
+            try {
+              if (uploadExt === ".svgz") {
+                safeBuffer = decompressSvgz(buffer);
+              }
+              if (isSvgBuffer(safeBuffer)) {
+                safeBuffer = sanitizeSvg(safeBuffer);
+                sanitizedAsSvg = true;
+                if (uploadExt === ".svgz") {
+                  isDecompressedSvg = true;
+                }
+              }
+            } catch (err) {
+              if ((err as { message?: string })?.message?.includes("SVGZ file does not contain")) {
+                request.log.warn(
+                  { err, filename: part.filename },
+                  "Uploaded .svgz file does not contain SVG, storing as opaque file",
+                );
+                safeBuffer = buffer;
+              } else if (isSvgzClientError(err)) {
+                request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
+                await discardUploads();
+                return reply.status(400).send({ error: (err as Error).message });
+              } else {
+                const oom = asDecoderOutOfMemory(err);
+                if (oom instanceof DecoderOutOfMemoryError) throw oom;
+                request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+                void reportError(err, {
+                  source: "http",
+                  route: "/api/v1/upload",
+                  method: "POST",
+                  statusCode: 500,
+                });
+                await discardUploads();
+                return reply.status(500).send({ error: "Internal server error" });
+              }
             }
-            request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
-            void reportError(err, {
-              source: "http",
-              route: "/api/v1/upload",
-              method: "POST",
-              statusCode: 500,
-            });
-            return reply.status(500).send({ error: "Internal server error" });
           }
+
+          if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
+            safeName = safeName.replace(/\.svgz$/i, ".svg");
+          }
+
+          // Try image validation on the stored bytes; non-image files are accepted
+          // with format from extension
+          const validation = await validateImageBuffer(safeBuffer, safeName).catch((err) => {
+            if (err instanceof DecoderOutOfMemoryError || hasServerErrorStatus(err)) throw err;
+            request.log.warn({ err, filename: safeName }, "Image validation threw unexpectedly");
+            return null;
+          });
+          const isValidImage = validation?.valid === true && !validation.nameOnly;
+
+          if (!sanitizedAsSvg && isValidImage && validation.format === "svg") {
+            try {
+              safeBuffer = sanitizeSvg(decompressSvgz(safeBuffer));
+              sanitizedAsSvg = true;
+            } catch (err) {
+              if (isSvgClientError(err)) {
+                request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
+                await discardUploads();
+                return reply.status(400).send({ error: (err as Error).message });
+              }
+              const oom = asDecoderOutOfMemory(err);
+              if (oom instanceof DecoderOutOfMemoryError) throw oom;
+              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+              void reportError(err, {
+                source: "http",
+                route: "/api/v1/upload",
+                method: "POST",
+                statusCode: 500,
+              });
+              await discardUploads();
+              return reply.status(500).send({ error: "Internal server error" });
+            }
+          }
+
+          // Record a completed jobs row before the first write so the S3 TTL
+          // sweep can expire the prefix (#3624).
+          const uploadKey = `outputs/${jobId}/${safeName}`;
+          if (!recordedJob) {
+            await recordCompletedToolJob({
+              jobId,
+              userId: user.id ?? null,
+              toolId: "upload",
+              outputRefs: [uploadKey],
+            });
+            recordedJob = true;
+          }
+
+          // Write to the outputs prefix: /api/v1/download serves outputs/ only,
+          // never the raw tool inputs under uploads/.
+          wroteUpload = true;
+          await putObject(uploadKey, safeBuffer);
+
+          const fileExt = extname(safeName).toLowerCase().replace(/^\./, "");
+          uploadedFiles.push({
+            name: safeName,
+            size: safeBuffer.length,
+            format: isValidImage ? validation.format : fileExt,
+          });
         }
-
-        // Sanitize filename (canonical; do NOT re-sanitize downstream)
-        const safeName = sanitizeFilename(part.filename ?? "upload");
-
-        // Write to object storage uploads prefix
-        await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
-
-        const fileExt = safeName.split(".").pop()?.toLowerCase() ?? "";
-        uploadedFiles.push({
-          name: safeName,
-          size: safeBuffer.length,
-          format: isValidImage ? validation.format : fileExt,
-        });
+      } catch (err) {
+        await discardUploads();
+        throw err;
       }
 
       if (uploadedFiles.length === 0) {
@@ -201,36 +315,33 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "File not found" });
       }
 
-      // A size-probe rejection is only a miss when storage says the object
-      // is not there. A syscall fault other than ENOENT (EACCES, ENOTDIR)
-      // or an S3 service fault (AccessDenied, rotated credentials, S3 5xx)
-      // is a storage outage that must keep reaching the global handler and
-      // Sentry, not fold into "File not found" (#974, sibling of #937).
-      // ENAMETOOLONG counts as a miss: no object can exist at such a key,
-      // and this route takes unauthenticated client-supplied names (params
-      // up to maxParamLength: 500 exceed the 255-byte filename limit), so
-      // long garbage must stay 404 instead of paging Sentry.
+      // A size-probe or stream-open rejection is only a miss when storage
+      // says the object is not there (ENOENT, S3 NoSuchKey/404) or when the
+      // client supplied a filename exceeding the filesystem limit
+      // (ENAMETOOLONG, since maxParamLength: 500 exceeds 255 bytes). Every
+      // other local or S3 fault (EACCES, ENOTDIR, ERR_FS_FILE_TOO_LARGE,
+      // AccessDenied, rotated credentials, S3 5xx) must reach the global
+      // handler and Sentry rather than fold into "File not found" (#974,
+      // #2808, #2851).
       const rethrowIfStorageFault = (e: unknown): void => {
-        const { code, syscall } = e as NodeJS.ErrnoException;
-        if (syscall && code !== "ENOENT" && code !== "ENAMETOOLONG") throw e;
-        if (isStorageServiceFault(e)) throw e;
+        if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
+        if (isS3MissingShape(e)) return;
+        const { code } = (e ?? {}) as NodeJS.ErrnoException;
+        if (code === "ENOENT" || code === "ENAMETOOLONG") return;
+        throw e;
       };
 
-      // Resolve from object storage: outputs/ first, then uploads/
-      let key = `outputs/${jobId}/${filename}`;
+      // Resolve from object storage outputs/ only: never fall back to uploads/,
+      // which holds raw unprocessed tool inputs under the same jobId.
+      const key = `outputs/${jobId}/${filename}`;
       let size: number;
       try {
         size = await getObjectSize(key);
       } catch (outputsErr) {
         rethrowIfStorageFault(outputsErr);
-        key = `uploads/${jobId}/${filename}`;
-        try {
-          size = await getObjectSize(key);
-        } catch (uploadsErr) {
-          rethrowIfStorageFault(uploadsErr);
-          request.log.warn({ jobId, filename }, "result download: object missing in storage");
-          return reply.status(404).send({ error: "File not found" });
-        }
+        await verifyS3Bucket();
+        request.log.warn({ jobId, filename }, "result download: object missing in storage");
+        return reply.status(404).send({ error: "File not found" });
       }
 
       const ext = extname(filename).toLowerCase().replace(/^\./, "");
@@ -246,6 +357,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       reply.header("X-Accel-Buffering", "no");
 
       const range = request.headers.range;
+      let byteRange: { start: number; end: number } | undefined;
       if (range) {
         const m = range.match(/^bytes=(\d+)-(\d*)$/);
         const start = m ? Number.parseInt(m[1], 10) : Number.NaN;
@@ -256,37 +368,39 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
             .header("Content-Range", `bytes */${size}`)
             .send({ error: "Range not satisfiable" });
         }
-        const clampedEnd = Math.min(end, size - 1);
+        byteRange = { start, end: Math.min(end, size - 1) };
+      }
+
+      // Open the stream before setting attachment headers (#997). If the blob
+      // vanished or became unreadable after the size probe above, an already-set
+      // Content-Type or Content-Disposition would either pollute the 404/500 or
+      // make the error handler fail JSON serialization.
+      let stream: Readable;
+      try {
+        stream = await getObjectStream(key, byteRange);
+      } catch (streamErr) {
+        rethrowIfStorageFault(streamErr);
+        request.log.warn({ jobId, filename }, "result download: object missing in storage");
+        return reply.status(404).send({ error: "File not found" });
+      }
+
+      const contentDisposition = `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+      if (byteRange) {
+        const rangeLength = byteRange.end - byteRange.start + 1;
         return reply
           .code(206)
           .header("Content-Type", contentType)
-          .header(
-            "Content-Disposition",
-            `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-          )
-          .header("Content-Range", `bytes ${start}-${clampedEnd}/${size}`)
-          .header("Content-Length", String(clampedEnd - start + 1))
-          .send(
-            guardedDownloadStream(
-              request,
-              reply,
-              await getObjectStream(key, { start, end: clampedEnd }),
-              key,
-              clampedEnd - start + 1,
-            ),
-          );
+          .header("Content-Disposition", contentDisposition)
+          .header("Content-Range", `bytes ${byteRange.start}-${byteRange.end}/${size}`)
+          .header("Content-Length", String(rangeLength))
+          .send(guardedDownloadStream(request, reply, stream, key, rangeLength));
       }
 
       reply
         .header("Content-Type", contentType)
-        .header(
-          "Content-Disposition",
-          `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-        )
+        .header("Content-Disposition", contentDisposition)
         .header("Content-Length", String(size));
-      return reply.send(
-        guardedDownloadStream(request, reply, await getObjectStream(key), key, size),
-      );
+      return reply.send(guardedDownloadStream(request, reply, stream, key, size));
     },
   );
 
@@ -301,11 +415,24 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     if (!data) {
       return reply.status(400).send({ error: "No file provided" });
     }
-    const originalBuffer = await data.toBuffer();
+    const originalBuffer = await data.toBuffer().catch((err) => {
+      throw asDecoderOutOfMemory(err);
+    });
     let buffer = originalBuffer;
-    const ext = data.filename?.split(".").pop()?.toLowerCase();
+    const ext = data.filename
+      ? extname(data.filename).toLowerCase().replace(/^\./, "") || undefined
+      : undefined;
 
-    const validation = await validateImageBuffer(buffer, data.filename);
+    let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+    try {
+      validation = await validateImageBuffer(buffer, data.filename);
+    } catch (rawErr) {
+      const err = asDecoderOutOfMemory(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+        return sendInputValidationError(reply, engineUnavailable(err), "file-preview", request.log);
+      }
+      throw rawErr;
+    }
     if (!validation.valid) {
       return reply.status(400).send({ error: validation.reason });
     }
@@ -314,24 +441,98 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     if (validation.format === "heif") {
       try {
         buffer = await decodeHeic(buffer);
-      } catch {
-        return reply.status(422).send({ error: "Failed to decode HEIC/HEIF file" });
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "file-preview",
+            request.log,
+          );
+        }
+        request.log.warn({ err, toolId: "file-preview" }, "Decode failed");
+        return reply.status(422).send({
+          error: "Failed to decode HEIC/HEIF file",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
       }
     }
 
     // Decode CLI-decoded formats (RAW, PSD, TGA, EXR, HDR) via external tools
+    let fallbackFormat: string | undefined;
     if (needsCliDecode(validation.format)) {
       try {
-        buffer = await decodeToSharpCompat(buffer, validation.format);
-      } catch {
-        // CLI decoder unavailable -- try Sharp directly as fallback for preview
+        buffer = await decodeToSharpCompat(buffer, validation.format, ext);
+      } catch (rawDecodeErr) {
+        const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+        if (
+          decodeErr instanceof DecoderOutOfMemoryError ||
+          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+        ) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(decodeErr),
+            "file-preview",
+            request.log,
+          );
+        }
+        // CLI decoder unavailable: try Sharp directly as fallback for preview
         try {
-          await sharp(buffer).metadata();
-        } catch {
+          const meta = await sharp(buffer).metadata();
+          fallbackFormat = meta.format;
+          if (fallbackFormat !== "svg") {
+            await sharp(buffer).resize(1).raw().toBuffer();
+          }
+        } catch (rawProbeErr) {
+          const probeErr = asDecoderOutOfMemory(rawProbeErr);
+          if (probeErr instanceof DecoderOutOfMemoryError) {
+            return sendInputValidationError(
+              reply,
+              engineUnavailable(probeErr),
+              "file-preview",
+              request.log,
+            );
+          }
+          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+            return sendInputValidationError(
+              reply,
+              engineUnavailable(decodeErr),
+              "file-preview",
+              request.log,
+            );
+          }
+          request.log?.warn({ err: decodeErr, toolId: "file-preview" }, "Decode failed");
           return reply.status(422).send({
             error: `Failed to decode ${validation.format.toUpperCase()} file`,
+            details: stripInternalPaths(
+              decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+            ),
           });
         }
+      }
+    }
+
+    if (validation.format === "svg" || fallbackFormat === "svg") {
+      try {
+        buffer = decompressSvgz(buffer);
+        buffer = sanitizeSvg(buffer);
+      } catch (rawErr) {
+        if (isSvgClientError(rawErr)) {
+          return reply.status(400).send({
+            error: rawErr instanceof Error ? rawErr.message : "Invalid SVG",
+          });
+        }
+        const err = asDecoderOutOfMemory(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "file-preview",
+            request.log,
+          );
+        }
+        throw rawErr;
       }
     }
 
@@ -340,7 +541,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       let origWidth = preMeta.width ?? 0;
       let origHeight = preMeta.height ?? 0;
 
-      if (validation.format === "raw") {
+      if (validation.format === "raw" && fallbackFormat !== "svg") {
         const dims = await readImageDimensions(originalBuffer, ext);
         if (dims) {
           origWidth = dims.width;
@@ -357,7 +558,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         .header("X-Original-Width", String(origWidth))
         .header("X-Original-Height", String(origHeight))
         .send(webp);
-    } catch {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+        return sendInputValidationError(reply, engineUnavailable(err), "file-preview", request.log);
+      }
       return reply.status(422).send({
         error: `Failed to generate preview for ${validation.format.toUpperCase()} file`,
       });
@@ -367,19 +572,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
 
 export function getContentType(ext: string): string {
   const map: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    tif: "image/tiff",
-    avif: "image/avif",
-    svg: "image/svg+xml",
     pdf: "application/pdf",
     zip: "application/zip",
-    ico: "image/x-icon",
     json: "application/json",
     csv: "text/csv",
     tsv: "text/tab-separated-values",
@@ -427,21 +621,8 @@ export function getContentType(ext: string): string {
     epub: "application/epub+zip",
     srt: "application/x-subrip",
     vtt: "text/vtt",
-    jxl: "image/jxl",
-    dng: "image/x-adobe-dng",
-    cr2: "image/x-canon-cr2",
-    nef: "image/x-nikon-nef",
-    arw: "image/x-sony-arw",
-    orf: "image/x-olympus-orf",
-    rw2: "image/x-panasonic-rw2",
-    tga: "image/x-tga",
-    psd: "image/vnd.adobe.photoshop",
-    exr: "image/x-exr",
-    hdr: "image/vnd.radiance",
-    heic: "image/heic",
-    heif: "image/heif",
   };
-  const type = map[ext] ?? "application/octet-stream";
+  const type = map[ext] ?? IMAGE_EXT_TO_MIME[ext] ?? "application/octet-stream";
   // Text payloads (extracted text, markdown, CSV, subtitles) are written UTF-8.
   // Without an explicit charset a browser can sniff a legacy encoding and
   // mojibake non-Latin scripts like Arabic when the file is viewed inline (#589).

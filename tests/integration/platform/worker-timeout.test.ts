@@ -7,7 +7,83 @@
  * all dynamic imports capture the override.
  */
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { PassThrough } from "node:stream";
+import { SafeError } from "@snapotter/shared";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Injects a storage fault into the worker's output write for one job, standing
+// in for rotated S3 credentials or a full disk that hit after the deadline
+// (#2144). Scoped by key prefix so every other write runs for real.
+const outputWriteFault = vi.hoisted(() => ({ prefix: null as string | null }));
+
+// Stalls a streamed output upload (putObjectStream) for one key or prefix so
+// the worker's post-handler upload deadline is exercised end to end (#2295).
+const stalledUpload = vi.hoisted(() => ({ match: null as string | null }));
+
+// Sends every scratchPath output through the worker's streamed branch while
+// set, so putObjectStream's behaviour after the deadline is reachable without
+// a 1.5 GiB file (#2144). Buffer outputs are unaffected.
+const streamOutputs = vi.hoisted(() => ({ on: false }));
+
+vi.mock("../../../apps/api/src/jobs/output-resolve.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/jobs/output-resolve.js")>();
+  return {
+    ...actual,
+    resolveOutputSource: (out: Parameters<typeof actual.resolveOutputSource>[0], message: string) =>
+      actual.resolveOutputSource(out, message, streamOutputs.on ? { maxBufferedBytes: 0 } : {}),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      if (outputWriteFault.prefix && key.startsWith(outputWriteFault.prefix)) {
+        throw new Error("injected storage outage");
+      }
+      return actual.putObject(key, data);
+    },
+    putObjectStream: async (
+      key: string,
+      source: Parameters<typeof actual.putObjectStream>[1],
+      opts?: Parameters<typeof actual.putObjectStream>[2],
+    ) => {
+      if (stalledUpload.match && key.startsWith(stalledUpload.match)) {
+        source.destroy();
+        const stalled = new PassThrough();
+        stalled.write(Buffer.from("partial"));
+        return actual.putObjectStream(key, stalled, opts);
+      }
+      return actual.putObjectStream(key, source, opts);
+    },
+  };
+});
+
+// What the worker's failed listener hands the Sentry path, per job, so a test
+// can tell a report of the real fault from a synthesized timeout error.
+const reported = vi.hoisted(
+  () => [] as Array<{ jobId?: string; message: string; timeoutMessage?: string }>,
+);
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (err: unknown, ctx: Parameters<typeof actual.reportError>[1]) => {
+      reported.push({
+        jobId: ctx.jobId,
+        message: err instanceof Error ? err.message : String(err),
+        timeoutMessage: (err as { timeoutMessage?: string } | null)?.timeoutMessage,
+      });
+      return actual.reportError(err, ctx);
+    },
+  };
+});
 
 // Override timeout BEFORE any API module is loaded (static imports
 // above are vitest-only and do not trigger config.ts).
@@ -16,15 +92,19 @@ process.env.JOB_TIMEOUT_FAST_S = "1";
 // Dynamic imports so config.ts picks up the 1-second timeout.
 const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
-const { startCancelListener, stopCancelListener } = await import(
+const { requestCancel, startCancelListener, stopCancelListener } = await import(
   "../../../apps/api/src/jobs/cancel.js"
 );
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { enqueueToolJob } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/worker.js");
-const { putObject } = await import("../../../apps/api/src/lib/object-storage.js");
-const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
+const { readStoredFile } = await import("../../../apps/api/src/lib/file-storage.js");
+const { logger } = await import("../../../apps/api/src/lib/logger.js");
+const { listObjects, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
+const { getToolConfig, registerToolProcessFn } = await import(
+  "../../../apps/api/src/routes/tool-factory.js"
+);
 const { env } = await import("../../../apps/api/src/config.js");
 
 // Sanity: the env override must have taken effect.
@@ -55,6 +135,82 @@ registerToolProcessFn({
   },
 });
 
+// A tool whose legacy 3-argument process fn never reads ctx.signal and finishes
+// after the worker deadline fired.
+registerToolProcessFn({
+  toolId: "timeout-ignores-signal",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async (inputBuffer: Buffer, _settings: unknown, filename: string) => {
+    await new Promise((r) => setTimeout(r, 2_500));
+    return { buffer: inputBuffer, filename, contentType: "image/png" };
+  },
+});
+
+// The streamed twin: a scratchPath output that the resolveOutputSource mock
+// above sends through putObjectStream.
+registerToolProcessFn({
+  toolId: "timeout-ignores-signal-stream",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async () => {
+    throw new Error("legacy process must not run when processV2 is registered");
+  },
+  processV2: async (ctx) => {
+    await new Promise((r) => setTimeout(r, 2_500));
+    const outPath = join(ctx.scratchDir, "late.bin");
+    await writeFile(outPath, Buffer.alloc(64 * 1024, 1));
+    return { scratchPath: outPath, filename: "late.bin", contentType: "application/octet-stream" };
+  },
+});
+
+// Fast streamed output with an extra scratchPath output so both putObjectStream
+// calls in processToolJob are reachable (#2295).
+registerToolProcessFn({
+  toolId: "timeout-stream-with-extra",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async () => {
+    throw new Error("legacy process must not run when processV2 is registered");
+  },
+  processV2: async (ctx) => {
+    const outPath = join(ctx.scratchDir, "primary.bin");
+    const extraPath = join(ctx.scratchDir, "extra.bin");
+    await writeFile(outPath, Buffer.alloc(64 * 1024, 1));
+    await writeFile(extraPath, Buffer.alloc(64 * 1024, 2));
+    return {
+      scratchPath: outPath,
+      filename: "primary.bin",
+      contentType: "application/octet-stream",
+      extraOutputs: [
+        { name: "extra.bin", scratchPath: extraPath, contentType: "application/octet-stream" },
+      ],
+    };
+  },
+});
+
+// A tool that ignores the signal and fails on a storage fault after the
+// deadline, so the job ends as a timeout or a cancel that the fault raced.
+registerToolProcessFn({
+  toolId: "timeout-storage-fault",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async () => {
+    await new Promise((r) => setTimeout(r, 2_500));
+    throw new SafeError("The server's storage is full.", {
+      statusCode: 503,
+      code: "storage-full",
+    });
+  },
+});
+
+// A tool that ignores the signal, runs past the deadline, and then throws its
+// own non-abort error (#2294).
+registerToolProcessFn({
+  toolId: "timeout-handler-fault",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async () => {
+    await new Promise((r) => setTimeout(r, 2_500));
+    throw new Error("ffmpeg exited 1: bad frame after deadline");
+  },
+});
+
 // Ensure workspace dir exists (test-server.ts normally does this, but
 // we bypass it to avoid loading the full app).
 const { mkdirSync } = await import("node:fs");
@@ -68,36 +224,308 @@ await runMigrations();
 beforeAll(async () => {
   await startCancelListener();
   startWorkers();
-}, 30_000);
+});
 
 afterAll(async () => {
   await closeWorkers();
   await stopCancelListener();
-}, 10_000);
+});
 
 describe("Worker timeout classification", () => {
   it("timed-out job is retried then fails with timeout message, not canceled", async () => {
     const jobId = randomUUID();
     const inputBuffer = Buffer.from("timeout-test-data");
+    const errorLog = vi.spyOn(logger, "error");
 
-    // Store input so the worker can retrieve it
+    try {
+      // Store input so the worker can retrieve it
+      const inputRef = `uploads/${jobId}/test.png`;
+      await putObject(inputRef, inputBuffer);
+
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-slow",
+        userId: null,
+        pool: "image", // image pool: default attempts = 2, backoff 1s
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      // Poll the DB until the job reaches a terminal state.
+      // Budget: ~20s (attempt 1 times out at 1s, 1s backoff, attempt 2
+      // times out at 1s, plus processing overhead).
+      let finalRow: Record<string, unknown> | undefined;
+      for (let i = 0; i < 100; i++) {
+        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        if (row && row.status !== "processing" && row.status !== "queued") {
+          finalRow = row as Record<string, unknown>;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      expect(finalRow).toBeDefined();
+
+      // Must be "failed", NOT "canceled"
+      expect(finalRow?.status).toBe("failed");
+
+      // Error message must mention timeout
+      const error = finalRow?.error as { message: string };
+      expect(error.message).toMatch(/timed out after 1s/i);
+      // Fail-fast message must include actionable guidance (issue #494)
+      expect(error.message).toMatch(
+        /model may still be downloading|too large for CPU|worker may be busy/i,
+      );
+
+      // Both attempts ran (attempts column is set at the start of each attempt)
+      expect(finalRow?.attempts).toBe(2);
+
+      // Terminal SSE replay key must exist with the timeout message
+      const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
+      const cached = await sharedRedis().get(terminalKeyName);
+      expect(cached).not.toBeNull();
+      const parsed = JSON.parse(cached ?? "{}");
+      expect(parsed.phase).toBe("failed");
+      expect(parsed.error).toMatch(/timed out after 1s/i);
+      // Must NOT say "Canceled"
+      expect(parsed.error).not.toBe("Canceled");
+      expect(parsed.jobId).toBe(jobId);
+
+      // Cooperative signal abort stays a quiet timeout: no error log, and the
+      // failed listener gets the synthesized timeout message (#2294).
+      const logged = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(logged).toEqual([]);
+      await vi.waitFor(() => {
+        expect(reported.filter((r) => r.jobId === jobId)).toHaveLength(2);
+      });
+      for (const report of reported.filter((r) => r.jobId === jobId)) {
+        expect(report.message).toMatch(/timed out after 1s/i);
+        expect(report.timeoutMessage).toBeUndefined();
+      }
+    } finally {
+      errorLog.mockRestore();
+    }
+  }, 25_000);
+
+  it("does not stamp a storage fault's code or status on a job that timed out (#2210)", async () => {
+    // The row says the job timed out; a client replaying it must not also be
+    // told it was a full volume, which the timeout never established.
+    const jobId = randomUUID();
     const inputRef = `uploads/${jobId}/test.png`;
-    await putObject(inputRef, inputBuffer);
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
 
     await enqueueToolJob({
       jobId,
-      toolId: "timeout-slow",
+      toolId: "timeout-storage-fault",
       userId: null,
-      pool: "image", // image pool: default attempts = 2, backoff 1s
+      pool: "image",
       inputRefs: [inputRef],
       filename: "test.png",
       settings: {},
       kind: "tool",
     });
 
-    // Poll the DB until the job reaches a terminal state.
-    // Budget: ~20s (attempt 1 times out at 1s, 1s backoff, attempt 2
-    // times out at 1s, plus processing overhead).
+    let finalRow: Record<string, unknown> | undefined;
+    for (let i = 0; i < 150; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && row.status !== "processing" && row.status !== "queued") {
+        finalRow = row as Record<string, unknown>;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    expect(finalRow?.status).toBe("failed");
+    const error = finalRow?.error as { message: string; code?: string; httpStatus?: number };
+    expect(error.message).toMatch(/timed out after 1s/i);
+    expect(error.code).toBeUndefined();
+    expect(error.httpStatus).toBeUndefined();
+
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+    const frame = JSON.parse(cached ?? "{}");
+    expect(frame.error).toMatch(/timed out after 1s/i);
+    expect(frame.code).toBeUndefined();
+    expect(frame.httpStatus).toBeUndefined();
+  }, 30_000);
+
+  it("does not stamp a storage fault's code or status on a job the user canceled (#2210)", async () => {
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-storage-fault",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    // Past the 1s deadline, before the tool's 2.5s are up.
+    await new Promise((r) => setTimeout(r, 1_700));
+    expect(await requestCancel(jobId)).toBe(true);
+
+    let finalRow: Record<string, unknown> | undefined;
+    for (let i = 0; i < 150; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && row.status !== "processing" && row.status !== "queued") {
+        finalRow = row as Record<string, unknown>;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    expect(finalRow?.status).toBe("canceled");
+    const error = finalRow?.error as { code?: string; httpStatus?: number };
+    expect(error.code).toBeUndefined();
+    expect(error.httpStatus).toBeUndefined();
+  }, 30_000);
+
+  it("keeps the result of a handler that ignores the signal and finishes after the timeout (#2092)", async () => {
+    // The post-handler cancel guard is for user cancels. A timeout abort must
+    // not make it discard a finished result and rerun the whole job.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    const warnLog = vi.spyOn(logger, "warn");
+
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-ignores-signal",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId);
+      expect(finalRow?.status).toBe("completed");
+      expect(finalRow?.attempts).toBe(1);
+      // The overrun is the only trace an operator tuning the deadline gets (#2144).
+      expect(warnLog).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId, timeoutMs: 1_000 }),
+        "handler returned after the job deadline; result kept",
+      );
+    } finally {
+      warnLog.mockRestore();
+    }
+  }, 25_000);
+
+  it("keeps the library save of a handler that finished after the timeout (#2143)", async () => {
+    // The save watches the user-cancel signal, which the deadline never fires.
+    // Handed the job's own signal instead, it would read the expired deadline as
+    // a cancel, throw the finished result away, and retry the job.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    const userId = randomUUID();
+    await db
+      .insert(schema.users)
+      .values({ id: userId, username: `wt-timeout-${userId.slice(0, 8)}` });
+    const fileId = randomUUID();
+    await db.insert(schema.userFiles).values({
+      id: fileId,
+      userId,
+      originalName: "test.png",
+      storedName: `${randomUUID()}.png`,
+      mimeType: "image/png",
+      size: 17,
+      version: 1,
+      toolChain: [],
+    });
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-ignores-signal",
+      userId,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+      fileId,
+      saveMode: "overwrite",
+    });
+
+    const finalRow = await terminalJobRow(jobId);
+    expect(finalRow?.status).toBe("completed");
+    expect(finalRow?.attempts).toBe(1);
+    const versions = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.parentId, fileId));
+    expect(versions).toHaveLength(1);
+    expect(versions[0]).toMatchObject({ userId, version: 2 });
+    await expect(readStoredFile(versions[0]?.storedName ?? "")).resolves.toBeInstanceOf(Buffer);
+  }, 25_000);
+
+  it("keeps a streamed result that finished after the deadline (#2144)", async () => {
+    // Over-cap outputs stream through putObjectStream, which refuses an
+    // already-aborted signal up front. Given the job signal, a deadline that
+    // had fired under the handler threw the finished result away and reran the
+    // job; the upload waits on the user-cancel signal instead.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    streamOutputs.on = true;
+
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-ignores-signal-stream",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId);
+      expect(finalRow?.status).toBe("completed");
+      expect(finalRow?.attempts).toBe(1);
+      expect(Number(finalRow?.bytesOut)).toBe(64 * 1024);
+      expect((await listObjects(`outputs/${jobId}/`)).map((o) => o.key)).toEqual([
+        `outputs/${jobId}/late.bin`,
+      ]);
+    } finally {
+      streamOutputs.on = false;
+    }
+  }, 25_000);
+
+  it("still settles canceled when the user cancel lands after the deadline fired (#2092)", async () => {
+    // The deadline aborted the controller at 1s, so the cancel's own abort() is
+    // a no-op and the signal reason stays "timeout". The user asked for a cancel
+    // and was told true; the late result must not be saved or retried.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-ignores-signal",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    // Past the 1s deadline, before the handler's 2.5s are up.
+    await new Promise((r) => setTimeout(r, 1_700));
+    expect(await requestCancel(jobId)).toBe(true);
+
     let finalRow: Record<string, unknown> | undefined;
     for (let i = 0; i < 100; i++) {
       const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
@@ -108,31 +536,338 @@ describe("Worker timeout classification", () => {
       await new Promise((r) => setTimeout(r, 200));
     }
 
-    expect(finalRow).toBeDefined();
+    expect(finalRow?.status).toBe("canceled");
+    expect(finalRow?.attempts).toBe(1);
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  }, 25_000);
 
-    // Must be "failed", NOT "canceled"
-    expect(finalRow?.status).toBe("failed");
+  it("keeps a storage fault after the deadline as its own error, not a timeout (#2144)", async () => {
+    // The handler ignored the signal and returned after the 1s deadline, then
+    // the output write hit a real storage fault. The signal still reads
+    // "timeout", but the fault has to keep its own message, error log and
+    // Sentry report: telling the user the job merely took too long hides an
+    // outage, and a retry would not help.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    outputWriteFault.prefix = `outputs/${jobId}/`;
+    const errorLog = vi.spyOn(logger, "error");
 
-    // Error message must mention timeout
-    const error = finalRow?.error as { message: string };
-    expect(error.message).toMatch(/timed out after 1s/i);
-    // Fail-fast message must include actionable guidance (issue #494)
-    expect(error.message).toMatch(
-      /model may still be downloading|too large for CPU|worker may be busy/i,
-    );
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-ignores-signal",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
 
-    // Both attempts ran (attempts column is set at the start of each attempt)
-    expect(finalRow?.attempts).toBe(2);
+      const finalRow = await terminalJobRow(jobId);
+      expect(finalRow?.status).toBe("failed");
+      // A real fault is retried like any other (image pool: 2 attempts).
+      expect(finalRow?.attempts).toBe(2);
+      const error = finalRow?.error as { message: string };
+      expect(error.message).toBe("injected storage outage");
 
-    // Terminal SSE replay key must exist with the timeout message
-    const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
-    const cached = await sharedRedis().get(terminalKeyName);
-    expect(cached).not.toBeNull();
-    const parsed = JSON.parse(cached ?? "{}");
-    expect(parsed.phase).toBe("failed");
-    expect(parsed.error).toMatch(/timed out after 1s/i);
-    // Must NOT say "Canceled"
-    expect(parsed.error).not.toBe("Canceled");
-    expect(parsed.jobId).toBe(jobId);
+      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+      expect(JSON.parse(cached ?? "{}").error).toBe("injected storage outage");
+
+      // The fault reached the error log under its own message, once per attempt.
+      const logged = errorLog.mock.calls
+        .filter(
+          ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+        )
+        .map(([ctx]) => (ctx as { err: Error }).err.message);
+      expect(logged).toEqual(["injected storage outage", "injected storage outage"]);
+
+      // And the Sentry path got the fault itself, not a synthesized timeout error.
+      const reports = reported.filter((r) => r.jobId === jobId).map((r) => r.message);
+      expect(reports).not.toHaveLength(0);
+      expect(new Set(reports)).toEqual(new Set(["injected storage outage"]));
+    } finally {
+      outputWriteFault.prefix = null;
+      errorLog.mockRestore();
+    }
+  }, 25_000);
+
+  it("logs and reports the handler's own error when it ignores the signal and fails after the deadline (#2294)", async () => {
+    // The deadline did pass while the handler was running, so the row and the
+    // terminal frame still tell the user the job timed out. The handler's own
+    // non-abort error must still reach logger.error and the failed listener
+    // with the timeout message attached as context instead of being replaced by
+    // a synthesized Error(timeoutMessage) that classifyError drops.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    const errorLog = vi.spyOn(logger, "error");
+
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-handler-fault",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId);
+      expect(finalRow?.status).toBe("failed");
+      expect(finalRow?.attempts).toBe(2);
+      const error = finalRow?.error as { message: string };
+      expect(error.message).toMatch(/timed out after 1s/i);
+
+      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+      expect(JSON.parse(cached ?? "{}").error).toMatch(/timed out after 1s/i);
+
+      const logged = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(logged).toHaveLength(2);
+      for (const [ctx] of logged) {
+        const record = ctx as { err: Error; toolId?: string; timeoutMessage?: string };
+        expect(record.err.message).toBe("ffmpeg exited 1: bad frame after deadline");
+        expect(record.toolId).toBe("timeout-handler-fault");
+        expect(record.timeoutMessage).toMatch(/timed out after 1s/i);
+      }
+
+      await vi.waitFor(() => {
+        expect(reported.filter((r) => r.jobId === jobId)).toHaveLength(2);
+      });
+      const jobReports = reported.filter((r) => r.jobId === jobId);
+      for (const report of jobReports) {
+        expect(report.message).toBe("ffmpeg exited 1: bad frame after deadline");
+        expect(report.timeoutMessage).toMatch(/timed out after 1s/i);
+      }
+    } finally {
+      errorLog.mockRestore();
+    }
+  }, 30_000);
+
+  it("aborts a stalled streamed primary or extra output upload after a fresh upload budget and retries it as a storage fault (#2295)", async () => {
+    for (const target of ["primary", "extra"] as const) {
+      const jobId = randomUUID();
+      const inputRef = `uploads/${jobId}/test.png`;
+      await putObject(inputRef, Buffer.from("timeout-test-data"));
+      streamOutputs.on = true;
+      stalledUpload.match =
+        target === "primary" ? `outputs/${jobId}/primary.bin` : `outputs/${jobId}/extra.bin`;
+      const errorLog = vi.spyOn(logger, "error");
+
+      try {
+        await enqueueToolJob({
+          jobId,
+          toolId: "timeout-stream-with-extra",
+          userId: null,
+          pool: "image",
+          inputRefs: [inputRef],
+          filename: "test.png",
+          settings: {},
+          kind: "tool",
+        });
+
+        const finalRow = await terminalJobRow(jobId, 40);
+        expect(finalRow).toBeDefined();
+        expect(finalRow?.status).toBe("failed");
+        expect(finalRow?.attempts).toBe(2);
+
+        const error = finalRow?.error as { message: string; code?: string; httpStatus?: number };
+        expect(error.message).toBe("The server couldn't write to its storage.");
+        expect(error.code).toBe("storage-write-failed");
+        expect(error.httpStatus).toBe(503);
+
+        const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+        const frame = JSON.parse(cached ?? "{}");
+        expect(frame.error).toBe(error.message);
+
+        const logged = errorLog.mock.calls.filter(
+          ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+        );
+        expect(logged).toHaveLength(2);
+        for (const [ctx] of logged) {
+          const record = ctx as { err: Error; timeoutMessage?: string };
+          expect([record.err.name, (record.err.cause as Error | undefined)?.name]).toContain(
+            "TimeoutError",
+          );
+          expect(record.timeoutMessage).toBeUndefined();
+        }
+
+        await vi.waitFor(() => {
+          expect(reported.filter((r) => r.jobId === jobId)).toHaveLength(2);
+        });
+        for (const report of reported.filter((r) => r.jobId === jobId)) {
+          expect(report.message).toBe(error.message);
+          expect(report.timeoutMessage).toBeUndefined();
+        }
+      } finally {
+        stalledUpload.match = null;
+        streamOutputs.on = false;
+        errorLog.mockRestore();
+      }
+    }
+  }, 30_000);
+
+  it("still classifies a stalled upload as a storage fault when the handler already overran the job deadline (#2295)", async () => {
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    streamOutputs.on = true;
+    stalledUpload.match = `outputs/${jobId}/late.bin`;
+    const errorLog = vi.spyOn(logger, "error");
+
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-ignores-signal-stream",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId, 60);
+      expect(finalRow).toBeDefined();
+      expect(finalRow?.status).toBe("failed");
+      expect(finalRow?.attempts).toBe(2);
+
+      const error = finalRow?.error as { message: string; code?: string; httpStatus?: number };
+      expect(error.message).toBe("The server couldn't write to its storage.");
+      expect(error.code).toBe("storage-write-failed");
+      expect(error.httpStatus).toBe(503);
+
+      const logged = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(logged).toHaveLength(2);
+      for (const [ctx] of logged) {
+        const record = ctx as { err: Error; timeoutMessage?: string };
+        expect([record.err.name, (record.err.cause as Error | undefined)?.name]).toContain(
+          "TimeoutError",
+        );
+        expect(record.timeoutMessage).toBeUndefined();
+      }
+    } finally {
+      stalledUpload.match = null;
+      streamOutputs.on = false;
+      errorLog.mockRestore();
+    }
+  }, 30_000);
+
+  it("settles canceled and cleans up outputs when a user cancel arrives during a stalled streamed upload (#2295)", async () => {
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    streamOutputs.on = true;
+    stalledUpload.match = `outputs/${jobId}/extra.bin`;
+    const errorLog = vi.spyOn(logger, "error");
+
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-stream-with-extra",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      // Wait until primary.bin is written and extra.bin is stalled in putObjectStream,
+      // then cancel before the 1s upload budget expires.
+      await vi.waitFor(
+        async () => {
+          expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+        },
+        { timeout: 5_000, interval: 50 },
+      );
+      expect(await requestCancel(jobId)).toBe(true);
+
+      const finalRow = await terminalJobRow(jobId, 40);
+      expect(finalRow?.status).toBe("canceled");
+      expect(finalRow?.attempts).toBe(1);
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+
+      const logged = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(logged).toEqual([]);
+    } finally {
+      stalledUpload.match = null;
+      streamOutputs.on = false;
+      errorLog.mockRestore();
+    }
+  }, 30_000);
+
+  it("grants JOB_TIMEOUT_LONG_S to executionHint: 'long' tools on the docs pool (#3253)", async () => {
+    const previousConfig = getToolConfig("pdf-to-word");
+    registerToolProcessFn({
+      toolId: "pdf-to-word",
+      settingsSchema: { parse: (v: unknown) => v } as never,
+      process: async () => {
+        throw new Error("legacy process must not run when processV2 is registered");
+      },
+      processV2: async (ctx) => {
+        // Run for 1.8s (past JOB_TIMEOUT_FAST_S = 1s), checking ctx.signal every 100ms.
+        for (let i = 0; i < 18; i++) {
+          if (ctx.signal.aborted) {
+            throw new Error("Aborted by signal");
+          }
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return {
+          buffer: Buffer.from("docx-bytes"),
+          filename: "converted.docx",
+          contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        };
+      },
+    });
+
+    try {
+      const jobId = randomUUID();
+      const inputRef = `uploads/${jobId}/sample.pdf`;
+      await putObject(inputRef, Buffer.from("%PDF-1.4"));
+
+      await enqueueToolJob({
+        jobId,
+        toolId: "pdf-to-word",
+        userId: null,
+        pool: "docs",
+        inputRefs: [inputRef],
+        filename: "sample.pdf",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId, 40);
+      expect(finalRow?.status).toBe("completed");
+      expect(finalRow?.attempts).toBe(1);
+    } finally {
+      if (previousConfig) {
+        registerToolProcessFn(previousConfig);
+      }
+    }
   }, 25_000);
 });
+
+/** Poll the job row until it leaves queued/processing; undefined after ~20s. */
+async function terminalJobRow(
+  jobId: string,
+  maxPolls = 100,
+): Promise<Record<string, unknown> | undefined> {
+  for (let i = 0; i < maxPolls; i++) {
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    if (row && row.status !== "processing" && row.status !== "queued") {
+      return row as Record<string, unknown>;
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return undefined;
+}

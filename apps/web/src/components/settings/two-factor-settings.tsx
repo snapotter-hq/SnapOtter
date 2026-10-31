@@ -2,10 +2,41 @@ import QRCodeStyling from "qr-code-styling";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { apiPost } from "@/lib/api";
+import { useTimeouts } from "@/hooks/use-timeouts";
+import { ApiError, apiErrorMessage, apiPost } from "@/lib/api";
 import { cn, copyToClipboard } from "@/lib/utils";
 
 type Step = "idle" | "enrolling" | "disabling";
+
+/**
+ * Translated copy for a failed enroll, verify or disable (#1445): by status
+ * and code, never the server's English text.
+ */
+function mfaErrorMessage(
+  t: ReturnType<typeof useTranslation>["t"],
+  err: unknown,
+  fallback: string,
+): string {
+  // A plain rate-limit 429 carries no code.
+  if (err instanceof ApiError && err.status === 429) return t.auth.mfaThrottledUnknownWait;
+  return apiErrorMessage(
+    t,
+    err,
+    {
+      INVALID_CODE: t.auth.mfaInvalidCode,
+      VALIDATION_ERROR: t.auth.mfaInvalidCode,
+      FEATURE_NOT_LICENSED: t.errors.featureNotLicensed,
+      // Two-factor was turned on or off (or setup restarted) in another window.
+      MFA_ALREADY_ENABLED: t.settings.security.twoFactorStateChanged,
+      MFA_NOT_ENABLED: t.settings.security.twoFactorStateChanged,
+      NO_PENDING_ENROLLMENT: t.settings.security.twoFactorStateChanged,
+      // The server can't read the stored secret (its encryption key changed):
+      // not the user's code, and nothing they can fix themselves.
+      DECRYPTION_FAILED: t.settings.security.twoFactorUnreadable,
+    },
+    fallback,
+  );
+}
 
 interface EnrollResponse {
   uri: string;
@@ -50,6 +81,7 @@ function QrCode({ uri }: { uri: string }) {
 
 export function TwoFactorSettings() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const { totpEnabled: initialEnabled } = useAuth();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [step, setStep] = useState<Step>("idle");
@@ -81,7 +113,7 @@ export function TwoFactorSettings() {
     } catch (err) {
       setMessage({
         type: "error",
-        text: err instanceof Error ? err.message : t.settings.security.securitySettingsFailed,
+        text: mfaErrorMessage(t, err, t.settings.security.securitySettingsFailed),
       });
     } finally {
       setSubmitting(false);
@@ -100,10 +132,7 @@ export function TwoFactorSettings() {
       setCode("");
       setCodesCopied(false);
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err instanceof Error ? err.message : t.auth.mfaInvalidCode,
-      });
+      setMessage({ type: "error", text: mfaErrorMessage(t, err, t.errors.generic) });
     } finally {
       setSubmitting(false);
     }
@@ -119,10 +148,7 @@ export function TwoFactorSettings() {
       setStep("idle");
       setCode("");
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err instanceof Error ? err.message : t.auth.mfaInvalidCode,
-      });
+      setMessage({ type: "error", text: mfaErrorMessage(t, err, t.errors.generic) });
     } finally {
       setSubmitting(false);
     }
@@ -130,10 +156,13 @@ export function TwoFactorSettings() {
 
   const handleCopyCodes = async () => {
     if (!enrollment) return;
+    // Clear an earlier copy failure before the attempt so a retry that fails
+    // again remounts the alert region and announces to screen readers (#3988).
+    setMessage((m) => (m?.text === t.settings.security.twoFactorCopyFailed ? null : m));
     const ok = await copyToClipboard(enrollment.recoveryCodes.join("\n"));
     if (ok) {
       setCodesCopied(true);
-      setTimeout(() => setCodesCopied(false), 2000);
+      later(() => setCodesCopied(false), 2000, "codesCopied");
     } else {
       setMessage({ type: "error", text: t.settings.security.twoFactorCopyFailed });
     }
@@ -159,7 +188,14 @@ export function TwoFactorSettings() {
           </p>
           <button
             type="button"
-            onClick={() => (enabled ? setStep("disabling") : handleEnrollStart())}
+            onClick={() => {
+              if (enabled) {
+                setMessage(null);
+                setStep("disabling");
+              } else {
+                handleEnrollStart();
+              }
+            }}
             disabled={submitting}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
@@ -218,15 +254,16 @@ export function TwoFactorSettings() {
               type="text"
               inputMode="numeric"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
+              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
               placeholder={t.settings.security.twoFactorCodePlaceholder}
-              maxLength={6}
+              maxLength={20}
               className="w-40 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground tracking-widest"
             />
           </div>
 
           {message && (
             <p
+              role={message.type === "error" ? "alert" : "status"}
               className={cn(
                 "text-sm",
                 message.type === "error" ? "text-destructive" : "text-success-ink",
@@ -264,15 +301,16 @@ export function TwoFactorSettings() {
             type="text"
             inputMode="numeric"
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
+            onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
             placeholder={t.settings.security.twoFactorCodePlaceholder}
-            maxLength={6}
+            maxLength={20}
             aria-label={t.settings.security.twoFactorEnterCode}
             className="w-40 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground tracking-widest"
           />
 
           {message && (
             <p
+              role={message.type === "error" ? "alert" : "status"}
               className={cn(
                 "text-sm",
                 message.type === "error" ? "text-destructive" : "text-success-ink",
@@ -305,6 +343,7 @@ export function TwoFactorSettings() {
 
       {step === "idle" && message && (
         <p
+          role={message.type === "error" ? "alert" : "status"}
           className={cn(
             "text-sm",
             message.type === "error" ? "text-destructive" : "text-success-ink",

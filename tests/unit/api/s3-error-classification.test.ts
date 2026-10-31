@@ -9,6 +9,9 @@
  * route end to end; CI has no minio, so the shapes are pinned here.
  */
 
+import http from "node:http";
+import net from "node:net";
+import { Readable } from "node:stream";
 import { loadS3Storage, type S3StorageModule } from "@snapotter/enterprise";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -33,6 +36,26 @@ describe("isMissingObjectError", () => {
 
   it("recognizes an unmodeled 404 from an S3-compatible store", () => {
     expect(s3.isMissingObjectError(sdkError("NotFound", 404))).toBe(true);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("UnknownError"), {
+          name: "NotFound",
+          $metadata: { httpStatusCode: 404 },
+          $response: { headers: { "content-type": "application/xml" } },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("The specified key does not exist."), {
+          name: "NotFound",
+          Code: "NotFound",
+          RequestId: "req-1",
+          $metadata: { httpStatusCode: 404 },
+          $response: { headers: { "content-type": "application/xml" } },
+        }),
+      ),
+    ).toBe(true);
   });
 
   it("treats a vanished bucket as a fault, not a missing object", () => {
@@ -56,11 +79,810 @@ describe("isMissingObjectError", () => {
     expect(s3.isMissingObjectError(sdkError("TimeoutError", undefined))).toBe(false);
   });
 
+  it("rejects TimeoutError and ETIMEDOUT even when deserializerMiddleware stamped httpStatusCode 404 (#3256)", () => {
+    expect(s3.isMissingObjectError(sdkError("TimeoutError", 404))).toBe(false);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("read ETIMEDOUT"), {
+          name: "Error",
+          code: "ETIMEDOUT",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects non-timeout HTTP 404 body stream resets and XML parse failures (#3265)", () => {
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+          name: "Error",
+          code: "ECONNRESET",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("Premature close"), {
+          name: "CustomStreamError",
+          code: "ERR_STREAM_PREMATURE_CLOSE",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ),
+    ).toBe(false);
+    const xmlParseErr = Object.assign(
+      new Error("@aws-sdk XML parse error: missing closing tag </Code>."),
+      {
+        name: "CustomParserError",
+        $metadata: { httpStatusCode: 404 },
+      },
+    );
+    Object.defineProperty(xmlParseErr, "$responseBodyText", {
+      value: '<?xml version="1.0"?><Error><Code>NoSuchBucket',
+    });
+    expect(s3.isMissingObjectError(xmlParseErr)).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("Error", 404))).toBe(false);
+  });
+
+  it("rejects non-NoSuchKey S3 404 XML error codes and void-tag-free HTML 404 responses (#3533)", () => {
+    expect(s3.isMissingObjectError(sdkError("NoSuchVersion", 404))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("NoSuchUpload", 404))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("RouteNotFound", 404))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("NotFound", 500))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("NotFound", undefined))).toBe(false);
+
+    const htmlContentType404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "text/html; charset=utf-8" } },
+    });
+    expect(s3.isMissingObjectError(htmlContentType404)).toBe(false);
+
+    const mixedCaseHtmlHeader404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "Content-Type": "  TEXT/HTML; charset=utf-8" } },
+    });
+    expect(s3.isMissingObjectError(mixedCaseHtmlHeader404)).toBe(false);
+
+    const xhtmlContentType404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "application/xhtml+xml" } },
+    });
+    expect(s3.isMissingObjectError(xhtmlContentType404)).toBe(false);
+
+    const htmlShape404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      head: { title: "404 Not Found" },
+      body: { h1: "404 Not Found" },
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(htmlShape404)).toBe(false);
+
+    const headlessHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      h1: "404 Not Found",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(headlessHtml404)).toBe(false);
+
+    const uppercaseHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      HEAD: { TITLE: "404 Not Found" },
+      BODY: { H1: "404 Not Found" },
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(uppercaseHtml404)).toBe(false);
+
+    const singleTagHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      0: "4",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(singleTagHtml404)).toBe(false);
+
+    const keylessXmlError404 = Object.assign(new Error("Backend unavailable"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(keylessXmlError404)).toBe(false);
+  });
+
   it("rejects non-SDK errors", () => {
     expect(s3.isMissingObjectError(new Error("boom"))).toBe(false);
     expect(s3.isMissingObjectError({ code: "ENOENT", syscall: "open" })).toBe(false);
     expect(s3.isMissingObjectError(null)).toBe(false);
     expect(s3.isMissingObjectError(undefined)).toBe(false);
     expect(s3.isMissingObjectError("NoSuchKey")).toBe(false);
+  });
+});
+
+describe("S3Client stalled endpoint timeout (#2755)", () => {
+  it("rejects un-signaled S3 helpers with a non-missing TimeoutError when an endpoint accepts TCP and never replies", async () => {
+    const sockets = new Set<net.Socket>();
+    const server = net.createServer((socket) => {
+      sockets.add(socket);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "stalled-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        connectionTimeout: 80,
+        socketTimeout: 80,
+      });
+
+      const headErr = await Promise.race([
+        s3.getGenericObjectSize("outputs/job-1/result.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(headErr).toBeInstanceOf(Error);
+      expect(headErr).toMatchObject({ name: "TimeoutError" });
+      expect(headErr).toHaveProperty("$metadata");
+      expect(
+        (headErr as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode,
+      ).toBeUndefined();
+      expect(s3.isMissingObjectError(headErr)).toBe(false);
+
+      const listErr = await Promise.race([
+        s3.listGenericJobDirs("outputs").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(listErr).toBeInstanceOf(Error);
+      expect(listErr).toMatchObject({ name: "TimeoutError" });
+      expect(listErr).toHaveProperty("$metadata");
+      expect(
+        (listErr as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode,
+      ).toBeUndefined();
+      expect(s3.isMissingObjectError(listErr)).toBe(false);
+
+      s3.configureS3({
+        bucket: "stalled-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        connectionTimeout: 80,
+        socketTimeout: 0,
+        requestTimeout: 80,
+      });
+
+      const reqTimeoutErr = await Promise.race([
+        s3.getGenericObjectSize("outputs/job-1/result.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(reqTimeoutErr).toBeInstanceOf(Error);
+      expect(reqTimeoutErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(reqTimeoutErr).toHaveProperty("$metadata");
+      expect(s3.isMissingObjectError(reqTimeoutErr)).toBe(false);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("arms the idle socket timeout on S3 response body streams when headers arrive under 3s and rejects mid-body stalls (#2773)", async () => {
+    const sockets = new Set<net.Socket>();
+    const server = http.createServer((_req, res) => {
+      res.writeHead(200, { "Content-Length": "1000" });
+      res.write("hello");
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      // 1. Default S3_SOCKET_TIMEOUT_MS (30,000 ms >= 6,000 ms): @smithy/node-http-handler
+      // defers setSocketTimeout by 3,000 ms and clearTimeouts() cancels it when headers
+      // arrive in <3s. Verify the response body stream still arms socket.timeout.
+      s3.configureS3({
+        bucket: "stalled-body-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const objStream = await s3.getObjectStream("photo.png");
+      expect((objStream as { socket?: { timeout?: number } }).socket?.timeout).toBe(
+        s3.S3_SOCKET_TIMEOUT_MS,
+      );
+      objStream.destroy();
+
+      const genericStream = await s3.getGenericObjectStream("outputs/job-1/result.png");
+      expect((genericStream as { socket?: { timeout?: number } }).socket?.timeout).toBe(
+        s3.S3_SOCKET_TIMEOUT_MS,
+      );
+      genericStream.destroy();
+
+      // 2. Short socketTimeout: mid-body stalls after fast 200 OK headers reject with
+      // TimeoutError (code: ETIMEDOUT) across getObject, getThumbnail, getObjectStream,
+      // and getGenericObjectStream.
+      s3.configureS3({
+        bucket: "stalled-body-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        socketTimeout: 80,
+      });
+
+      const getObjectErr = await Promise.race([
+        s3.getObject("photo.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(getObjectErr).toBeInstanceOf(Error);
+      expect(getObjectErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(getObjectErr)).toBe(false);
+
+      const getThumbErr = await Promise.race([
+        s3.getThumbnail("photo.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(getThumbErr).toBeInstanceOf(Error);
+      expect(getThumbErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(getThumbErr)).toBe(false);
+
+      const streamToConsume = await s3.getGenericObjectStream("outputs/job-1/result.png");
+      const streamErr = await Promise.race([
+        (async () => {
+          for await (const _chunk of streamToConsume) {
+            // consume until stalled body times out
+          }
+          return null;
+        })().catch((err: unknown) => err),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(streamErr).toBeInstanceOf(Error);
+      expect(streamErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(streamErr)).toBe(false);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("arms the idle socket timeout on XML response bodies inside deserializerMiddleware when headers arrive under 3s and socketTimeout >= 6000 (#3256)", async () => {
+    const sockets = new Set<net.Socket>();
+    let observedClientTimeout: number | undefined;
+    let statusCode = 200;
+    let xmlMode: "fast-list" | "stalled-list" | "list-then-stalled-delete" | "stalled-404" =
+      "fast-list";
+    let requestCount = 0;
+
+    const server = http.createServer((req, res) => {
+      requestCount += 1;
+      if (
+        xmlMode === "fast-list" ||
+        (xmlMode === "list-then-stalled-delete" && req.method === "GET")
+      ) {
+        const listXml =
+          '<?xml version="1.0" encoding="UTF-8"?><ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>uploads/job-1/a.png</Key><Size>1</Size></Contents></ListBucketResult>';
+        res.writeHead(200, {
+          "Content-Length": String(Buffer.byteLength(listXml)),
+          "Content-Type": "application/xml",
+        });
+        res.end(listXml);
+        return;
+      }
+      res.writeHead(statusCode, {
+        "Content-Length": "1000",
+        "Content-Type": "application/xml",
+      });
+      res.write(
+        statusCode === 404
+          ? '<?xml version="1.0"?><Error><Code>NoSuchBucket'
+          : '<?xml version="1.0"?>',
+      );
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    const origSetTimeout = http.IncomingMessage.prototype.setTimeout;
+    http.IncomingMessage.prototype.setTimeout = function (msecs: number, cb?: () => void) {
+      observedClientTimeout = msecs;
+      return origSetTimeout.call(this, msecs, cb);
+    };
+
+    try {
+      // 1. socketTimeout >= 6000 (default 30_000 ms): verify the deserialize middleware
+      // arms IncomingMessage.setTimeout(30_000) before deserializerMiddleware reads the XML body.
+      s3.configureS3({
+        bucket: "stalled-xml-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      await expect(s3.listGenericObjects("uploads/job-1/")).resolves.toEqual([
+        { key: "uploads/job-1/a.png", size: 1, mtimeMs: 0 },
+      ]);
+      expect(observedClientTimeout).toBe(s3.S3_SOCKET_TIMEOUT_MS);
+
+      // 2. Short socketTimeout: verify listGenericObjects, listGenericJobDirs,
+      // deleteGenericPrefix (DeleteObjectsCommand), and stalled 404 XML error responses
+      // time out with TimeoutError (ETIMEDOUT) and are not misclassified as missing objects.
+      xmlMode = "stalled-list";
+      s3.configureS3({
+        bucket: "stalled-xml-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        socketTimeout: 80,
+      });
+
+      const listObjectsErr = await s3.listGenericObjects("uploads/job-1/").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(listObjectsErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(listObjectsErr)).toBe(false);
+
+      const listDirsErr = await s3.listGenericJobDirs("outputs").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(listDirsErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(listDirsErr)).toBe(false);
+
+      xmlMode = "list-then-stalled-delete";
+      const deletePrefixErr = await s3.deleteGenericPrefix("uploads/job-1/").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(deletePrefixErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(deletePrefixErr)).toBe(false);
+
+      xmlMode = "stalled-404";
+      statusCode = 404;
+      requestCount = 0;
+      const stalled404ThumbErr = await s3.getThumbnail("photo.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(requestCount).toBeGreaterThan(0);
+      expect(stalled404ThumbErr).toMatchObject({
+        name: "TimeoutError",
+        code: "ETIMEDOUT",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(stalled404ThumbErr)).toBe(false);
+
+      const stalled404DeleteErr = await s3.deleteObject("photo.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(stalled404DeleteErr).toMatchObject({
+        name: "TimeoutError",
+        code: "ETIMEDOUT",
+        $metadata: { httpStatusCode: 404 },
+      });
+    } finally {
+      http.IncomingMessage.prototype.setTimeout = origSetTimeout;
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("propagates HTTP 404 body stream resets and XML parse failures instead of treating them as missing objects (#3265)", async () => {
+    const sockets = new Set<net.Socket>();
+    let responseMode:
+      | "reset-404"
+      | "truncated-xml-404"
+      | "html-404"
+      | "html-no-void-tags-404"
+      | "xml-no-such-version-404" = "reset-404";
+
+    const server = http.createServer((_req, res) => {
+      if (responseMode === "reset-404") {
+        res.writeHead(404, {
+          "Content-Length": "1000",
+          "Content-Type": "application/xml",
+        });
+        res.write('<?xml version="1.0"?><Error><Code>NoSuchBucket');
+        setTimeout(() => {
+          res.socket?.destroy();
+        }, 20);
+        return;
+      }
+      if (responseMode === "truncated-xml-404") {
+        const body = '<?xml version="1.0"?><Error><Code>NoSuchBucket';
+        res.writeHead(404, {
+          "Content-Length": String(Buffer.byteLength(body)),
+          "Content-Type": "application/xml",
+        });
+        res.end(body);
+        return;
+      }
+      if (responseMode === "html-no-void-tags-404") {
+        const html =
+          "<html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1><p>nginx</p></body></html>";
+        res.writeHead(404, {
+          "Content-Length": String(Buffer.byteLength(html)),
+          "Content-Type": "text/html; charset=utf-8",
+        });
+        res.end(html);
+        return;
+      }
+      if (responseMode === "xml-no-such-version-404") {
+        const xml =
+          '<?xml version="1.0"?><Error><Code>NoSuchVersion</Code><Message>The specified version does not exist.</Message></Error>';
+        res.writeHead(404, {
+          "Content-Length": String(Buffer.byteLength(xml)),
+          "Content-Type": "application/xml",
+        });
+        res.end(xml);
+        return;
+      }
+      const html = "<html><body><h1>404 Not Found</h1><hr>nginx</body></html>";
+      res.writeHead(404, {
+        "Content-Length": String(Buffer.byteLength(html)),
+        "Content-Type": "text/html",
+      });
+      res.end(html);
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "broken-404-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      // 1. Mid-body TCP reset on a 404 XML response (e.g. NoSuchBucket truncated by a reset).
+      responseMode = "reset-404";
+      const resetThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(resetThumbErr).toMatchObject({
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(resetThumbErr)).toBe(false);
+
+      const resetDeleteErr = await s3.deleteObject("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(resetDeleteErr).toMatchObject({
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 404 },
+      });
+
+      // 2. Truncated XML 404 body that closes cleanly before </Code>.
+      responseMode = "truncated-xml-404";
+      const truncatedThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(truncatedThumbErr).toMatchObject({
+        name: "Error",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(truncatedThumbErr).toHaveProperty("$responseBodyText");
+      expect(s3.isMissingObjectError(truncatedThumbErr)).toBe(false);
+
+      const truncatedDeleteThumbErr = await s3.deleteThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(truncatedDeleteThumbErr).toMatchObject({
+        name: "Error",
+        $metadata: { httpStatusCode: 404 },
+      });
+
+      // 3. Reverse-proxy HTML 404 error page (with void tags).
+      responseMode = "html-404";
+      const htmlDeleteGenericErr = await s3.deleteGenericObject("uploads/job-1/a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(htmlDeleteGenericErr).toMatchObject({
+        name: "Error",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(htmlDeleteGenericErr).toHaveProperty("$responseBodyText");
+      expect(s3.isMissingObjectError(htmlDeleteGenericErr)).toBe(false);
+
+      // 4. Reverse-proxy void-tag-free HTML 404 error page (#3533).
+      responseMode = "html-no-void-tags-404";
+      const wellFormedHtmlThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(wellFormedHtmlThumbErr).toMatchObject({
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(wellFormedHtmlThumbErr)).toBe(false);
+
+      const wellFormedHtmlDeleteErr = await s3.deleteObject("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(wellFormedHtmlDeleteErr).toMatchObject({
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+
+      // 5. Non-NoSuchKey S3 404 XML error code (#3533).
+      responseMode = "xml-no-such-version-404";
+      const noSuchVersionThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(noSuchVersionThumbErr).toMatchObject({
+        name: "NoSuchVersion",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(noSuchVersionThumbErr)).toBe(false);
+
+      const noSuchVersionDeleteErr = await s3.deleteObject("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(noSuchVersionDeleteErr).toMatchObject({
+        name: "NoSuchVersion",
+        $metadata: { httpStatusCode: 404 },
+      });
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
+
+describe("checkConnection missing-bucket normalization (#996)", () => {
+  it("normalizes a HeadBucket 404 NotFound into NoSuchBucket so isMissingObjectError rejects it", async () => {
+    let statusToReturn = 404;
+    let headersToReturn: Record<string, string> = {};
+    const server = http.createServer((_req, res) => {
+      res.writeHead(statusToReturn, headersToReturn);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "vanished-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const missingBucketErr = await s3.checkConnection().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(missingBucketErr).toBeInstanceOf(Error);
+      expect(missingBucketErr).toMatchObject({
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(missingBucketErr)).toBe(false);
+
+      headersToReturn = { "Content-Type": "text/html; charset=utf-8" };
+      const htmlProxy404Err = await s3.checkConnection().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(htmlProxy404Err).toBeInstanceOf(Error);
+      expect(htmlProxy404Err).toMatchObject({
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(htmlProxy404Err)).toBe(false);
+      headersToReturn = {};
+
+      statusToReturn = 403;
+      const forbiddenErr = await s3.checkConnection().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(forbiddenErr).toBeInstanceOf(Error);
+      expect((forbiddenErr as { name?: string }).name).not.toBe("NoSuchBucket");
+      expect(s3.isMissingObjectError(forbiddenErr)).toBe(false);
+
+      statusToReturn = 200;
+      await expect(s3.checkConnection()).resolves.toBeUndefined();
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
+
+describe("putGenericObjectStream signal.reason preservation (#2881)", () => {
+  it("rethrows signal.reason (TimeoutError) instead of @aws-sdk/lib-storage's generic AbortError when a stalled PUT is aborted by AbortSignal.timeout", async () => {
+    const sockets = new Set<net.Socket>();
+    const server = http.createServer((_req, _res) => {
+      // Accept PUT and never respond.
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "stalled-upload-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const timeoutSignal = AbortSignal.timeout(80);
+      const timeoutErr = await s3
+        .putGenericObjectStream(
+          "outputs/job-1/out.bin",
+          Readable.from([Buffer.alloc(64 * 1024, 1)]),
+          timeoutSignal,
+        )
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+      expect(timeoutErr).toBe(timeoutSignal.reason);
+      expect(timeoutErr).toMatchObject({ name: "TimeoutError" });
+
+      const cancelController = new AbortController();
+      setTimeout(() => cancelController.abort(), 50);
+      const cancelErr = await s3
+        .putGenericObjectStream(
+          "outputs/job-1/out.bin",
+          Readable.from([Buffer.alloc(64 * 1024, 1)]),
+          cancelController.signal,
+        )
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+      expect(cancelErr).toBe(cancelController.signal.reason);
+      expect(cancelErr).toMatchObject({ name: "AbortError" });
+
+      const primitiveAbortController = new AbortController();
+      setTimeout(() => primitiveAbortController.abort("canceled"), 50);
+      const primitiveAbortErr = await s3
+        .putGenericObjectStream(
+          "outputs/job-1/out.bin",
+          Readable.from([Buffer.alloc(64 * 1024, 1)]),
+          primitiveAbortController.signal,
+        )
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+      expect(primitiveAbortErr).toMatchObject({ name: "AbortError", message: "Upload aborted." });
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
+
+describe("getObject signal.reason preservation on post-header error-body abort (#3535)", () => {
+  it("rethrows signal.reason instead of ECONNRESET when signal aborts while deserializerMiddleware reads a 404 error body", async () => {
+    const sockets = new Set<net.Socket>();
+    let requestCount = 0;
+    let onFinalAttemptHeaders: (() => void) | undefined;
+
+    const server = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(404, {
+        "Content-Length": "1000",
+        "Content-Type": "application/xml",
+      });
+      res.write('<?xml version="1.0"?><Error><Code>NoSuchKey');
+      if (requestCount % 3 === 0) {
+        setTimeout(() => onFinalAttemptHeaders?.(), 20);
+      } else {
+        setTimeout(() => res.socket?.destroy(), 10);
+      }
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "abort-error-body-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const cancelController = new AbortController();
+      const cancelReason = Object.assign(new Error("The operation was aborted"), {
+        name: "AbortError",
+      });
+      onFinalAttemptHeaders = () => cancelController.abort(cancelReason);
+      const cancelErr = await s3.getObject("a.png", cancelController.signal).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(cancelErr).toBe(cancelReason);
+      expect(cancelErr).toMatchObject({ name: "AbortError" });
+
+      const timeoutController = new AbortController();
+      const timeoutReason = Object.assign(new Error("The operation was aborted due to timeout"), {
+        name: "TimeoutError",
+      });
+      onFinalAttemptHeaders = () => timeoutController.abort(timeoutReason);
+      const timeoutErr = await s3.getObject("a.png", timeoutController.signal).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(timeoutErr).toBe(timeoutReason);
+      expect(timeoutErr).toMatchObject({ name: "TimeoutError" });
+
+      const primitiveController = new AbortController();
+      onFinalAttemptHeaders = () => primitiveController.abort("canceled");
+      const primitiveErr = await s3.getObject("a.png", primitiveController.signal).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(primitiveErr).toMatchObject({
+        name: "AbortError",
+        message: "The operation was aborted",
+      });
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

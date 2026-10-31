@@ -9,6 +9,7 @@ export {
   sofficeAvailable,
 } from "./binaries.js";
 export {
+  type GsOptions,
   gsCompressPdf,
   gsCompressPdfTuned,
   gsGrayscalePdf,
@@ -19,6 +20,9 @@ export { type ConvertOptions, convertDocument, parseConvertTarget } from "./libr
 export { buildPandocArgs, type PandocOptions, pandocAvailable, runPandoc } from "./pandoc.js";
 export {
   assertValidRange,
+  type PdfPagePlanItem,
+  type PdfPageRotation,
+  qpdfAssemblePages,
   qpdfDecrypt,
   qpdfEncrypt,
   qpdfLinearize,
@@ -27,11 +31,13 @@ export {
   qpdfPagesSpecUnchecked,
   qpdfRepair,
   qpdfRotate,
+  qpdfRotatePages,
   qpdfSplitRanges,
 } from "./pdf-ops.js";
 export {
   type BookletValue,
   type NupValue,
+  type PdfcpuOptions,
   pdfcpuBooklet,
   pdfcpuCropMargin,
   pdfcpuNup,
@@ -39,6 +45,7 @@ export {
   type TextStampOptions,
 } from "./pdfcpu.js";
 export {
+  type DocsScriptOptions,
   htmlToPdfPy,
   pdfFlattenPy,
   pdfMetadataGetPy,
@@ -50,4 +57,10 @@ export {
   pdfTextPy,
   pdfToWordPy,
 } from "./python-docs.js";
-export { QpdfTimeoutError, qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";
+export {
+  type QpdfOptions,
+  QpdfTimeoutError,
+  qpdfCheck,
+  qpdfPageCount,
+  qpdfRequiresPassword,
+} from "./qpdf.js";

@@ -1,27 +1,147 @@
-import { expect, openSettings, test, uploadTestImage } from "./helpers";
+import { errors } from "@playwright/test";
+import {
+  type AppVersionMask,
+  expect,
+  expectNoPinnedSection,
+  maskAppVersion,
+  openSettings,
+  test,
+  uploadTestImage,
+} from "./helpers";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
 // ---------------------------------------------------------------------------
-// Helper: toggle theme and wait for CSS transition to settle
+// Helper: fail unless the page is showing the given theme. The app marks dark
+// mode with a `dark` class on <html> and nothing else, so that class is the
+// only reliable signal. Call it right before every themed screenshot: without
+// it a theme switch that silently did nothing gets screenshotted as the other
+// theme, and a freshly written baseline stores the wrong theme for good.
+// ---------------------------------------------------------------------------
+async function expectTheme(
+  page: import("@playwright/test").Page,
+  theme: "light" | "dark",
+  detail?: string,
+) {
+  const html = page.locator("html");
+  const base =
+    theme === "dark"
+      ? "expected the dark theme (html.dark), but the page is still light, so a dark screenshot would capture the light theme"
+      : "expected the light theme (no html.dark), but the page is still dark, so a light screenshot would capture the dark theme";
+  const message = detail ? `${base} (${detail})` : base;
+  if (theme === "dark") {
+    await expect(html, message).toHaveClass(/\bdark\b/);
+  } else {
+    await expect(html, message).not.toHaveClass(/\bdark\b/);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: toggle theme, check it applied, and wait for CSS transition to settle
 // ---------------------------------------------------------------------------
 async function setTheme(page: import("@playwright/test").Page, theme: "light" | "dark") {
   const isDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
   const wantDark = theme === "dark";
+  let detail: string | undefined;
   if (isDark !== wantDark) {
     // The toggle lives in the top nav. On pages without it (login) or when a
-    // dialog overlay covers it (settings, help), the click is not actionable,
-    // so fall back to the global mod+shift+d shortcut.
+    // dialog overlay covers it (settings, help), the click times out, so fall
+    // back to the global mod+shift+d shortcut. Any other click error is a real
+    // failure and propagates. The app ignores that shortcut while an input,
+    // textarea, or select has focus, so the switch can still fail; expectTheme
+    // below catches that and names what had focus.
     const clicked = await page
       .locator("button[title='Toggle theme']")
       .click({ timeout: 1000 })
       .then(() => true)
-      .catch(() => false);
-    if (!clicked) {
+      .catch((err: unknown) => {
+        if (err instanceof errors.TimeoutError) return false;
+        throw err;
+      });
+    if (clicked) {
+      detail = "switched with the nav toggle";
+    } else {
+      const focused = await page.evaluate(
+        () => document.activeElement?.tagName.toLowerCase() ?? "nothing",
+      );
       await page.keyboard.press(`${MOD}+Shift+d`);
+      detail = `toggle not clickable, pressed ${MOD}+Shift+D with focus on <${focused}>`;
     }
     await page.waitForTimeout(300);
   }
+  await expectTheme(page, theme, detail);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: the login hero's rotating phrase changes every 3s on a timer, so
+// whichever phrase (or the blank fade between two) is up when the shot is
+// taken depends on timing. Mask it so the login shots compare everything else.
+// ---------------------------------------------------------------------------
+async function rotatingPhraseMask(page: import("@playwright/test").Page) {
+  const phrase = page.getByTestId("login-rotating-phrase");
+  await expect(phrase).toBeVisible();
+  return [phrase];
+}
+
+// ---------------------------------------------------------------------------
+// Helper: fail unless `count` images match and every one has decoded. A
+// visible <img> can still be blank while its bytes load, and a screenshot of
+// that would become the baseline.
+// ---------------------------------------------------------------------------
+async function expectImagesLoaded(images: import("@playwright/test").Locator, count: number) {
+  await expect(images).toHaveCount(count);
+  await expect
+    .poll(
+      () =>
+        images.evaluateAll((els) =>
+          els.every((el) => el instanceof HTMLImageElement && el.complete && el.naturalWidth > 0),
+        ),
+      { message: "an image never finished loading", timeout: 10000 },
+    )
+    .toBe(true);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: what the QR preview is currently drawing, or null while it's blank.
+// qr-code-styling swaps in a fresh, empty canvas on every update and paints it
+// a moment later, so a blank canvas means "still drawing", not a result.
+// ---------------------------------------------------------------------------
+async function qrContent(qrCode: import("@playwright/test").Locator) {
+  return qrCode.evaluate((el) => {
+    if (!(el instanceof HTMLCanvasElement)) return el.outerHTML;
+    const blank = document.createElement("canvas");
+    blank.width = el.width;
+    blank.height = el.height;
+    const drawn = el.toDataURL();
+    return drawn === blank.toDataURL() ? null : drawn;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helper: wait until the QR preview has finished drawing something other than
+// `previous`, and return it. "Finished" means two polls in a row read the same
+// non-blank content.
+// ---------------------------------------------------------------------------
+async function settledQr(
+  qrCode: import("@playwright/test").Locator,
+  previous: string | null,
+  message: string,
+) {
+  let last: string | null = null;
+  let settled: string | null = null;
+  await expect
+    .poll(
+      async () => {
+        const now = await qrContent(qrCode);
+        const ready = now !== null && now !== previous && now === last;
+        last = now;
+        if (ready) settled = now;
+        return ready;
+      },
+      { message, timeout: 10000 },
+    )
+    .toBe(true);
+  return settled as string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,13 +151,15 @@ async function takeThemedScreenshots(
   page: import("@playwright/test").Page,
   baseName: string,
   target?: import("@playwright/test").Locator,
+  extra: AppVersionMask = {},
 ) {
   // When a target locator is given (e.g. the settings dialog), screenshot just
   // that element so the live page behind a modal -- whose catalog/collapse state
   // varies between runs -- does not make the comparison flaky. fullPage only
-  // applies to a full-page screenshot.
+  // applies to a full-page screenshot. `extra` carries masks, such as
+  // maskAppVersion()'s.
   const subject = target ?? page;
-  const opts = target ? {} : { fullPage: false };
+  const opts = target ? { ...extra } : { fullPage: false, ...extra };
 
   // Light theme
   await setTheme(page, "light");
@@ -65,18 +187,23 @@ test.describe("Visual Desktop (1280x720)", () => {
       await page.goto("/login");
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(500);
+      const mask = await rotatingPhraseMask(page);
 
       // Light screenshot
+      await expectTheme(page, "light");
       await expect(page).toHaveScreenshot("desktop-login-empty-light.png", {
         fullPage: false,
+        mask,
       });
 
       // Toggle to dark via keyboard shortcut (login page may lack footer toggle)
       await page.keyboard.press(`${MOD}+Shift+d`);
       await page.waitForTimeout(300);
+      await expectTheme(page, "dark");
 
       await expect(page).toHaveScreenshot("desktop-login-empty-dark.png", {
         fullPage: false,
+        mask,
       });
     });
 
@@ -84,6 +211,7 @@ test.describe("Visual Desktop (1280x720)", () => {
       await page.goto("/login");
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(500);
+      const mask = await rotatingPhraseMask(page);
 
       // Fill in invalid credentials and submit
       await page.getByLabel("Username").fill("wronguser");
@@ -95,16 +223,20 @@ test.describe("Visual Desktop (1280x720)", () => {
       await expect(page.getByText(/invalid|incorrect|failed/i).first()).toBeVisible();
 
       // Light screenshot with error
+      await expectTheme(page, "light");
       await expect(page).toHaveScreenshot("desktop-login-error-light.png", {
         fullPage: false,
+        mask,
       });
 
       // Toggle to dark
       await page.keyboard.press(`${MOD}+Shift+d`);
       await page.waitForTimeout(300);
+      await expectTheme(page, "dark");
 
       await expect(page).toHaveScreenshot("desktop-login-error-dark.png", {
         fullPage: false,
+        mask,
       });
     });
   });
@@ -113,6 +245,7 @@ test.describe("Visual Desktop (1280x720)", () => {
   test("home page empty - light and dark", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "home-empty");
   });
@@ -123,6 +256,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     // Capture the loaded catalog state.
     await expect(page.locator("[data-search-input]")).toBeVisible();
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "home-uploaded");
   });
@@ -134,6 +268,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.locator("[data-search-input]")).toBeVisible();
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "fullscreen-details-shown");
   });
@@ -150,6 +285,7 @@ test.describe("Visual Desktop (1280x720)", () => {
       .first()
       .click();
     await page.waitForTimeout(300);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "fullscreen-details-hidden");
   });
@@ -204,7 +340,8 @@ test.describe("Visual Desktop (1280x720)", () => {
     await openSettings(page);
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-general", page.getByRole("dialog"));
+    const dialog = page.getByRole("dialog");
+    await takeThemedScreenshots(page, "settings-general", dialog, await maskAppVersion(dialog));
   });
 
   // ---- Settings dialog - People tab ----
@@ -226,13 +363,15 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("button", { name: "About" }).click();
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-about", page.getByRole("dialog"));
+    const dialog = page.getByRole("dialog");
+    await takeThemedScreenshots(page, "settings-about", dialog, await maskAppVersion(dialog));
   });
 
   // ---- Help dialog ----
   test("help dialog - light and dark", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     // 2.0 moved Help to the top nav bar (the sidebar was removed).
     await page.getByRole("button", { name: "Help", exact: true }).click();
@@ -268,13 +407,27 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
-    // Upload image and wait for auto-processing
+    // Compress doesn't run on upload: the default Target Size mode starts
+    // empty with the button disabled. Quality mode has a default, so pick it
+    // and run the tool.
     await uploadTestImage(page);
-    await page.waitForTimeout(1000);
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
+    await page.getByTestId("compress-submit").click();
 
-    // Wait for the before-after slider to appear (indicates processing complete)
-    const slider = page.locator("[class*='before-after'], [class*='BeforeAfter']").first();
-    await slider.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+    // The comparison slider only mounts once the result is back. If it never
+    // does, fail here instead of screenshotting the upload state (#1861).
+    const slider = page.getByRole("slider", { name: "Before/after comparison slider" });
+    await expect(slider).toBeVisible({ timeout: 15000 });
+    const sliderImages = slider.locator("img");
+    await expectImagesLoaded(sliderImages, 2);
+    // Before and after must be different files, or the shot shows the
+    // original twice.
+    const [beforeSrc, afterSrc] = await sliderImages.evaluateAll((els) =>
+      els.map((el) => (el as HTMLImageElement).src),
+    );
+    expect(afterSrc, "the after image is the original, not the compressed result").not.toBe(
+      beforeSrc,
+    );
     await page.waitForTimeout(500);
 
     await takeThemedScreenshots(page, "tool-compress-result");
@@ -289,9 +442,14 @@ test.describe("Visual Desktop (1280x720)", () => {
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
-    // Wait for the crop canvas to render
-    const canvas = page.locator("canvas").first();
-    await canvas.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+    // The crop stage is react-image-crop over a plain <img>, not a canvas.
+    // Wait for the image to decode, the selection box to draw, and the info
+    // bar to read the original size (set from the image's onLoad).
+    const cropImage = page.getByRole("img", { name: "Crop preview" });
+    await expect(cropImage).toBeVisible({ timeout: 10000 });
+    await expectImagesLoaded(cropImage, 1);
+    await expect(page.locator(".ReactCrop__crop-selection")).toBeVisible();
+    await expect(page.getByText(/^Original: \d+ x \d+$/)).toBeVisible();
     await page.waitForTimeout(500);
 
     await takeThemedScreenshots(page, "tool-crop-canvas");
@@ -303,14 +461,16 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
-    // QR generate is a no-dropzone tool; enter text to generate a QR code
-    const textInput = page.getByTestId("qr-input-url");
-    await textInput.fill("https://snapotter.com");
-    await page.waitForTimeout(1000);
+    // The preview draws a placeholder QR before any input, so "a QR is
+    // visible" proves nothing. Record the finished placeholder, enter the URL,
+    // and wait for the preview to finish drawing something else (#1861).
+    const qrCode = page.getByTestId("qr-preview").locator("canvas, svg");
+    await expect(qrCode).toBeVisible({ timeout: 10000 });
+    const placeholder = await settledQr(qrCode, null, "the placeholder QR never finished drawing");
 
-    // Wait for QR preview to render
-    const preview = page.locator("img, canvas, svg").first();
-    await preview.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+    await page.getByTestId("qr-input-url").fill("https://snapotter.com");
+    await expect(page.getByText("Enter content to generate a QR code")).toBeHidden();
+    await settledQr(qrCode, placeholder, "the QR preview never redrew for the entered URL");
     await page.waitForTimeout(500);
 
     await takeThemedScreenshots(page, "tool-qr-generate-preview");
@@ -345,6 +505,7 @@ test.describe("Visual Desktop (1280x720)", () => {
       await page.waitForTimeout(500);
 
       // Light screenshot
+      await expectTheme(page, "light");
       await expect(page).toHaveScreenshot("desktop-privacy-policy-light.png", {
         fullPage: false,
       });
@@ -352,6 +513,7 @@ test.describe("Visual Desktop (1280x720)", () => {
       // Toggle to dark
       await page.keyboard.press(`${MOD}+Shift+d`);
       await page.waitForTimeout(300);
+      await expectTheme(page, "dark");
 
       await expect(page).toHaveScreenshot("desktop-privacy-policy-dark.png", {
         fullPage: false,
@@ -449,12 +611,30 @@ test.describe("Visual Desktop (1280x720)", () => {
   test("home page search focused - light and dark", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
-    // Focus search bar via keyboard shortcut
+    const search = page.locator("[data-search-input]");
+
+    // Light theme: focus the search bar via its keyboard shortcut
+    await setTheme(page, "light");
     await page.keyboard.press(`${MOD}+k`);
+    await expect(search).toBeFocused();
     await page.waitForTimeout(300);
+    await expect(page).toHaveScreenshot("desktop-home-search-focused-light.png", {
+      fullPage: false,
+    });
 
-    await takeThemedScreenshots(page, "home-search-focused");
+    // Dark theme: setTheme clicks the nav toggle, which takes focus, so focus
+    // the search bar again after the switch. Without this the dark shot shows
+    // the search box unfocused (#1527). The focus ring was under the old 1%
+    // pixel tolerance, so the screenshot alone did not notice.
+    await setTheme(page, "dark");
+    await page.keyboard.press(`${MOD}+k`);
+    await expect(search).toBeFocused();
+    await page.waitForTimeout(300);
+    await expect(page).toHaveScreenshot("desktop-home-search-focused-dark.png", {
+      fullPage: false,
+    });
   });
 
   // ---- Tool page - strip-metadata (no-comparison mode) ----

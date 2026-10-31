@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -12,15 +12,24 @@ const { buildTestApp, loginAsAdmin, loginAsUser, createUserAndLogin } = await im
 );
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+const { verifyRecoveryCode } = await import("../../../apps/api/src/plugins/mfa.js");
 
 import type { TestApp } from "../test-server.js";
 
 let testApp: TestApp;
 let adminToken: string;
 
-function generateTotpCode(uri: string): string {
+function generateTotpCode(uri: string, timestamp = Date.now()): string {
   const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
-  return totp.generate();
+  return totp.generate({ timestamp });
+}
+
+async function generatePrevStepTotpCode(uri: string): Promise<string> {
+  const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+  if (remainingMs < 2_000) {
+    await new Promise((r) => setTimeout(r, remainingMs + 50));
+  }
+  return generateTotpCode(uri, Date.now() - 30_000);
 }
 
 async function clearMfaState(username: string): Promise<void> {
@@ -38,12 +47,12 @@ async function clearMfaState(username: string): Promise<void> {
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await clearMfaState("admin");
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("POST /api/auth/mfa/enroll", () => {
   afterEach(async () => {
@@ -172,7 +181,10 @@ describe("POST /api/auth/mfa/verify", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("returns 401 with invalid code", async () => {
+  it("returns 401 with invalid code and creates an audit log", async () => {
+    // Clear any previous logs for a clean test
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
     await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/enroll",
@@ -188,6 +200,13 @@ describe("POST /api/auth/mfa/verify", () => {
     expect(res.statusCode).toBe(401);
     const body = JSON.parse(res.body);
     expect(body.code).toBe("INVALID_CODE");
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0].details).toMatchObject({ username: "admin" });
   });
 
   it("successfully activates MFA with correct TOTP code", async () => {
@@ -250,6 +269,87 @@ describe("POST /api/auth/mfa/verify", () => {
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).code).toBe("MFA_ALREADY_ENABLED");
   });
+
+  it("accepts a TOTP typed with a space or dash, and refuses an empty-after-normalization code with 400 (#2478)", async () => {
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+
+    for (const empty of [" ", "-", " - ", "--", "  ", "- -"]) {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: empty },
+      });
+      expect(res.statusCode, JSON.stringify(empty)).toBe(400);
+      expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    }
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(0);
+
+    const code = generateTotpCode(uri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: ` ${code.slice(0, 3)}-${code.slice(3)} ` },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("releases the consumed TOTP step if the DB update throws, so a retry with the same code succeeds (#2574)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 3_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+    const code = generateTotpCode(uri);
+
+    const updateSpy = vi.spyOn(db, "update").mockImplementationOnce(() => {
+      throw new Error("simulated DB update failure");
+    });
+
+    try {
+      const errRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code },
+      });
+      expect(errRes.statusCode).toBe(500);
+    } finally {
+      updateSpy.mockRestore();
+    }
+
+    const [userMid] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "admin"));
+    expect(userMid.totpEnabled).toBe(false);
+
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code },
+    });
+    expect(retryRes.statusCode).toBe(200);
+  });
 });
 
 describe("POST /api/auth/mfa/disable", () => {
@@ -288,19 +388,23 @@ describe("POST /api/auth/mfa/disable", () => {
     expect(JSON.parse(res.body).code).toBe("MFA_NOT_ENABLED");
   });
 
-  it("returns 401 INVALID_CODE when the TOTP code is wrong", async () => {
+  it("returns 401 INVALID_CODE when the TOTP code is wrong and creates an audit log", async () => {
+    // Clear any previous logs for a clean test
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
     const enrollRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/enroll",
       headers: { authorization: `Bearer ${adminToken}` },
     });
     const { uri } = JSON.parse(enrollRes.body);
-    await testApp.app.inject({
+    const verifyRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/verify",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { code: generateTotpCode(uri) },
+      payload: { code: await generatePrevStepTotpCode(uri) },
     });
+    expect(verifyRes.statusCode).toBe(200);
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -310,6 +414,13 @@ describe("POST /api/auth/mfa/disable", () => {
     });
     expect(res.statusCode).toBe(401);
     expect(JSON.parse(res.body).code).toBe("INVALID_CODE");
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0].details).toMatchObject({ username: "admin" });
   });
 
   it("clears all MFA data on success with a valid TOTP code", async () => {
@@ -319,12 +430,13 @@ describe("POST /api/auth/mfa/disable", () => {
       headers: { authorization: `Bearer ${adminToken}` },
     });
     const { uri } = JSON.parse(enrollRes.body);
-    await testApp.app.inject({
+    const verifyRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/verify",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { code: generateTotpCode(uri) },
+      payload: { code: await generatePrevStepTotpCode(uri) },
     });
+    expect(verifyRes.statusCode).toBe(200);
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -339,6 +451,121 @@ describe("POST /api/auth/mfa/disable", () => {
     expect(dbUser.totpEnabled).toBe(false);
     expect(dbUser.totpSecret).toBeNull();
     expect(dbUser.recoveryCodesHash).toBeNull();
+  });
+
+  it("accepts a TOTP typed with a space or dash, and refuses an empty-after-normalization code with 400 (#2478)", async () => {
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    const verifyRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: await generatePrevStepTotpCode(uri) },
+    });
+    expect(verifyRes.statusCode).toBe(200);
+
+    for (const empty of [" ", "-", " - ", "--", "  ", "- -"]) {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: empty },
+      });
+      expect(res.statusCode, JSON.stringify(empty)).toBe(400);
+      expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    }
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(0);
+
+    const code = generateTotpCode(uri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: ` ${code.slice(0, 3)}-${code.slice(3)} ` },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("restores the prior TOTP step if clearUserMfa throws, so a retry with the same code succeeds while the prior step stays blocked (#2575)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 5_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+    const now = Date.now();
+    const prevCode = generateTotpCode(uri, now - 30_000);
+    const currentCode = generateTotpCode(uri, now);
+
+    const verifyRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: prevCode },
+    });
+    expect(verifyRes.statusCode).toBe(200);
+
+    const updateSpy = vi.spyOn(db, "update").mockImplementationOnce(() => {
+      throw new Error("simulated clearUserMfa failure");
+    });
+
+    try {
+      const errRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: currentCode },
+      });
+      expect(errRes.statusCode).toBe(500);
+    } finally {
+      updateSpy.mockRestore();
+    }
+
+    const [userMid] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "admin"));
+    expect(userMid.totpEnabled).toBe(true);
+
+    // The prior step (used on /mfa/verify) must still be rejected as a replay.
+    const replayPrevRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: prevCode },
+    });
+    expect(replayPrevRes.statusCode).toBe(401);
+    expect(JSON.parse(replayPrevRes.body).code).toBe("INVALID_CODE");
+
+    // Retrying with the same current-step code succeeds once the DB fault clears.
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: currentCode },
+    });
+    expect(retryRes.statusCode).toBe(200);
+
+    const [userAfter] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "admin"));
+    expect(userAfter.totpEnabled).toBe(false);
   });
 });
 
@@ -468,6 +695,14 @@ describe("POST /api/auth/users/:id/mfa/reset", () => {
     expect(dbUser.totpSecret).toBeNull();
     expect(dbUser.recoveryCodesHash).toBeNull();
 
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "MFA_RESET"), eq(schema.auditLog.targetId, userId)));
+    expect(auditRow?.actorUsername).toBe("admin");
+    expect(auditRow?.targetType).toBe("user");
+    expect(auditRow?.targetId).toBe(userId);
+
     await db.delete(schema.users).where(eq(schema.users.id, userId));
   });
 });
@@ -525,14 +760,15 @@ describe("MFA login flow", () => {
       headers: { authorization: `Bearer ${adminToken}` },
     });
     totpUri = JSON.parse(enrollRes.body).uri;
-    const code = generateTotpCode(totpUri);
+    const code = await generatePrevStepTotpCode(totpUri);
 
-    await testApp.app.inject({
+    const verifyRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/verify",
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { code },
     });
+    expect(verifyRes.statusCode).toBe(200);
   });
 
   afterAll(async () => {
@@ -584,15 +820,25 @@ describe("MFA login flow", () => {
     });
     const { mfaToken } = JSON.parse(loginRes.body);
 
-    // Exhaust the wrong-code budget. Each wrong attempt is a 401.
-    for (let i = 0; i < 5; i++) {
+    // First four wrong attempts return 401 INVALID_CODE; the 5th exhausts the
+    // budget and returns 401 MFA_ATTEMPTS_EXHAUSTED (#2019).
+    for (let i = 0; i < 4; i++) {
       const bad = await testApp.app.inject({
         method: "POST",
         url: "/api/auth/mfa/complete",
         payload: { mfaToken, code: "000000" },
       });
       expect(bad.statusCode).toBe(401);
+      expect(JSON.parse(bad.body).code).toBe("INVALID_CODE");
     }
+
+    const fifth = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: "000000" },
+    });
+    expect(fifth.statusCode).toBe(401);
+    expect(JSON.parse(fifth.body).code).toBe("MFA_ATTEMPTS_EXHAUSTED");
 
     // The challenge is now burned: even the correct TOTP is rejected as expired,
     // forcing the attacker back through the login (and its rate limit).
@@ -649,40 +895,90 @@ describe("POST /api/auth/mfa/complete edge cases", () => {
     await sharedRedis().del(`mfa:${mfaToken}`);
   });
 
-  it("returns 401 MFA_NOT_CONFIGURED when the challenged user's role is disabled", async () => {
+  it("returns 403 USER_DISABLED and burns the challenge when the challenged user's role is disabled (#2049)", async () => {
     // Enroll + verify a disposable user so it has a real secret, then disable
-    // its role. The disabled-role guard must reject even with a valid secret.
+    // its role. The disabled-role guard must reject with 403 USER_DISABLED and
+    // delete both the challenge token and any failed-attempt counter.
     const username = "mfa_disabled_complete_user";
-    const { userId, token: userToken } = await createUserAndLogin(testApp.app, username, "user");
+    const { userId, token: userToken } = await createUserAndLogin(
+      testApp.app,
+      username,
+      "user",
+      "TestPassword1!",
+    );
 
-    const enrollRes = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/mfa/enroll",
-      headers: { authorization: `Bearer ${userToken}` },
-    });
-    const { uri } = JSON.parse(enrollRes.body);
-    await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/mfa/verify",
-      headers: { authorization: `Bearer ${userToken}` },
-      payload: { code: generateTotpCode(uri) },
-    });
+    try {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${userToken}` },
+      });
+      const { uri } = JSON.parse(enrollRes.body);
+      await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${userToken}` },
+        payload: { code: await generatePrevStepTotpCode(uri) },
+      });
 
-    await db.update(schema.users).set({ role: "disabled" }).where(eq(schema.users.id, userId));
+      const loginRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password: "TestPassword1!" },
+      });
+      expect(loginRes.statusCode).toBe(200);
+      const { mfaToken } = JSON.parse(loginRes.body);
 
-    const mfaToken = randomUUID();
-    await sharedRedis().setex(`mfa:${mfaToken}`, 300, userId);
+      // Record one wrong attempt before the account is disabled to confirm attemptsKey is cleaned up.
+      const badRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "000000" },
+      });
+      expect(badRes.statusCode).toBe(401);
+      expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("1");
 
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/mfa/complete",
-      payload: { mfaToken, code: generateTotpCode(uri) },
-    });
-    expect(res.statusCode).toBe(401);
-    expect(JSON.parse(res.body).code).toBe("MFA_NOT_CONFIGURED");
+      // Also clear totpSecret and passwordHash (as in MFA reset + SCIM DELETE deprovisioning)
+      // to verify USER_DISABLED takes precedence over MFA_NOT_CONFIGURED and password_removed.
+      await db
+        .update(schema.users)
+        .set({ role: "disabled:user", totpSecret: null, passwordHash: null })
+        .where(eq(schema.users.id, userId));
 
-    await sharedRedis().del(`mfa:${mfaToken}`);
-    await db.delete(schema.users).where(eq(schema.users.id, userId));
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: generateTotpCode(uri) },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "User is disabled",
+        code: "USER_DISABLED",
+      });
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+      expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+
+      const auditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+      const disabledAudit = auditRows.find((row) => {
+        const details = row.details as { userId?: string; reason?: string } | null;
+        return details?.userId === userId && details?.reason === "disabled_user";
+      });
+      expect(disabledAudit).toBeDefined();
+
+      // A subsequent attempt sees an expired token, not another challenge round.
+      const secondRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: generateTotpCode(uri) },
+      });
+      expect(secondRes.statusCode).toBe(401);
+      expect(JSON.parse(secondRes.body).code).toBe("MFA_EXPIRED");
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, userId));
+    }
   });
 
   it("completes login with a recovery code and consumes it", async () => {
@@ -723,6 +1019,392 @@ describe("POST /api/auth/mfa/complete edge cases", () => {
     expect(dbUser.recoveryCodesHash).not.toBeNull();
     const remaining = (dbUser.recoveryCodesHash ?? "").split(",").filter(Boolean);
     expect(remaining).toHaveLength(recoveryCodes.length - 1);
+  });
+
+  it("accepts a recovery code typed in capitals with a dash (#2050)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri, recoveryCodes } = JSON.parse(enrollRes.body);
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: generateTotpCode(uri) },
+    });
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    const stored: string = recoveryCodes[0];
+    const typed = `${stored.slice(0, 4)}-${stored.slice(4)}`.toUpperCase();
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: typed },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).token).toBeDefined();
+  });
+
+  it("accepts a TOTP typed with a space, and refuses an empty code without costing an attempt (#2050)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    const verifyRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: await generatePrevStepTotpCode(uri) },
+    });
+    expect(verifyRes.statusCode).toBe(200);
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    // Whitespace and dashes only: nothing left to check, so a 400, not a 401.
+    // More than the 5 failed attempts that would burn the challenge.
+    for (const empty of [" ", "-", " - ", "--", "  ", "- -"]) {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: empty },
+      });
+      expect(res.statusCode, JSON.stringify(empty)).toBe(400);
+    }
+
+    const code = generateTotpCode(uri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: `${code.slice(0, 3)} ${code.slice(3)}` },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  describe("simultaneous recovery-code logins (#2275)", () => {
+    async function enrollAdmin(): Promise<string[]> {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const { uri, recoveryCodes } = JSON.parse(enrollRes.body);
+      await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: generateTotpCode(uri) },
+      });
+      return recoveryCodes as string[];
+    }
+
+    async function challenge(): Promise<string> {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: "admin", password: "Adminpass1" },
+      });
+      return JSON.parse(res.body).mfaToken as string;
+    }
+
+    function complete(mfaToken: string, code: string) {
+      return testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code },
+      });
+    }
+
+    it("lets one of two logins using the same code in, and refuses the other", async () => {
+      const codes = await enrollAdmin();
+      const [first, second] = [await challenge(), await challenge()];
+
+      const [a, b] = await Promise.all([complete(first, codes[0]), complete(second, codes[0])]);
+
+      expect([a.statusCode, b.statusCode].sort()).toEqual([200, 401]);
+      const [dbUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, "admin"));
+      expect((dbUser.recoveryCodesHash ?? "").split(",").filter(Boolean)).toHaveLength(
+        codes.length - 1,
+      );
+    });
+
+    it("lets two logins using different codes both in, and spends both codes", async () => {
+      const codes = await enrollAdmin();
+      const [first, second] = [await challenge(), await challenge()];
+
+      const [a, b] = await Promise.all([complete(first, codes[0]), complete(second, codes[1])]);
+
+      expect([a.statusCode, b.statusCode]).toEqual([200, 200]);
+      const [dbUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, "admin"));
+      const remaining = (dbUser.recoveryCodesHash ?? "").split(",").filter(Boolean);
+      expect(remaining).toHaveLength(codes.length - 2);
+      // Neither spent code comes back.
+      expect(verifyRecoveryCode(codes[0], dbUser.recoveryCodesHash ?? "").valid).toBe(false);
+      expect(verifyRecoveryCode(codes[1], dbUser.recoveryCodesHash ?? "").valid).toBe(false);
+    });
+  });
+
+  describe("TOTP replay protection (#2327)", () => {
+    async function enrollAdminForTotp(verifyTimestamp?: number): Promise<OTPAuth.TOTP> {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const { uri } = JSON.parse(enrollRes.body);
+      const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
+      const code =
+        verifyTimestamp !== undefined
+          ? totp.generate({ timestamp: verifyTimestamp })
+          : await generatePrevStepTotpCode(uri);
+      const verifyRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code },
+      });
+      expect(verifyRes.statusCode).toBe(200);
+      return totp;
+    }
+
+    async function challenge(): Promise<string> {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: "admin", password: "Adminpass1" },
+      });
+      return JSON.parse(res.body).mfaToken as string;
+    }
+
+    function complete(mfaToken: string, code: string) {
+      return testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code },
+      });
+    }
+
+    it("refuses a TOTP step that already completed a challenge (or an earlier step) and accepts the next step", async () => {
+      const totp = await enrollAdminForTotp();
+      const [first, second, third] = [await challenge(), await challenge(), await challenge()];
+
+      // Ensure at least 5s remain in the 30s TOTP period after scrypt logins
+      // complete so prevCode stays at delta=-1 through the assertions below.
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+
+      const now = Date.now();
+      const prevCode = totp.generate({ timestamp: now - 30_000 });
+      const currentCode = totp.generate({ timestamp: now });
+      const nextCode = totp.generate({ timestamp: now + 30_000 });
+
+      // First challenge succeeds with the current step's code.
+      const firstRes = await complete(first, currentCode);
+      expect(firstRes.statusCode).toBe(200);
+      const { token: sessionToken, user: firstUser } = JSON.parse(firstRes.body);
+
+      // The recorded step key in Redis carries a bounded replay-window TTL (<= 120s).
+      const { createHash } = await import("node:crypto");
+      const secretFp = createHash("sha256").update(totp.secret.base32).digest("hex").slice(0, 16);
+      const stepPttl = await sharedRedis().pttl(`mfa:totp-step:${firstUser.id}:${secretFp}`);
+      expect(stepPttl).toBeGreaterThan(0);
+      expect(stepPttl).toBeLessThanOrEqual(120_000);
+
+      await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
+      // Replaying the same code on a second challenge is refused and audited.
+      const replayRes = await complete(second, currentCode);
+      expect(replayRes.statusCode).toBe(401);
+      expect(JSON.parse(replayRes.body).code).toBe("INVALID_CODE");
+
+      const failedAudits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+      expect(failedAudits).toHaveLength(1);
+
+      // An earlier step still inside the +-1 drift window is also refused.
+      const earlierStepRes = await complete(second, prevCode);
+      expect(earlierStepRes.statusCode).toBe(401);
+      expect(JSON.parse(earlierStepRes.body).code).toBe("INVALID_CODE");
+
+      // Replaying the login code to disable MFA is also refused.
+      const disableReplayRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${sessionToken}` },
+        payload: { code: currentCode },
+      });
+      expect(disableReplayRes.statusCode).toBe(401);
+      expect(JSON.parse(disableReplayRes.body).code).toBe("INVALID_CODE");
+
+      // Advancing to the next 30s step succeeds on the second challenge.
+      const nextStepRes = await complete(second, nextCode);
+      expect(nextStepRes.statusCode).toBe(200);
+
+      // And that newly accepted step cannot be replayed on a third challenge.
+      const nextReplayRes = await complete(third, nextCode);
+      expect(nextReplayRes.statusCode).toBe(401);
+      expect(JSON.parse(nextReplayRes.body).code).toBe("INVALID_CODE");
+    });
+
+    it("lets only one of two simultaneous challenges in when both submit the same TOTP code", async () => {
+      const totp = await enrollAdminForTotp();
+      const [adminRow] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, "admin"));
+      const sessionsBefore = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, adminRow.id));
+      const [first, second] = [await challenge(), await challenge()];
+
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 3_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+      const code = totp.generate();
+
+      const [a, b] = await Promise.all([complete(first, code), complete(second, code)]);
+
+      expect([a.statusCode, b.statusCode].sort()).toEqual([200, 401]);
+      const winner = a.statusCode === 200 ? a : b;
+      const loser = a.statusCode === 401 ? a : b;
+      expect(JSON.parse(winner.body).token).toBeDefined();
+      expect(JSON.parse(loser.body).code).toBe("INVALID_CODE");
+
+      const sessionsAfter = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, adminRow.id));
+      expect(sessionsAfter).toHaveLength(sessionsBefore.length + 1);
+    });
+
+    it("does not block a fresh enrollment's current step after disabling and re-enrolling MFA", async () => {
+      const firstTotp = await enrollAdminForTotp();
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+
+      // Consume the current step on the first enrollment by disabling MFA.
+      const disableRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: firstTotp.generate() },
+      });
+      expect(disableRes.statusCode).toBe(200);
+
+      // Re-enroll with a new secret in the same 30s period and complete a login
+      // with the current step's code: the new secret has its own replay key.
+      const secondTotp = await enrollAdminForTotp();
+      const mfaToken = await challenge();
+      const completeRes = await complete(mfaToken, secondTotp.generate());
+      expect(completeRes.statusCode).toBe(200);
+    });
+
+    it("refuses replaying the TOTP step used to confirm self-service enrollment on /complete or /disable (#2574)", async () => {
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+      const now = Date.now();
+      const totp = await enrollAdminForTotp(now);
+      const enrollCode = totp.generate({ timestamp: now });
+      const prevCode = totp.generate({ timestamp: now - 30_000 });
+      const nextCode = totp.generate({ timestamp: now + 30_000 });
+
+      const mfaToken = await challenge();
+
+      // Replaying the exact code used on /mfa/verify (or an earlier step in its window)
+      // on /mfa/complete or /mfa/disable must be refused with 401 INVALID_CODE.
+      const replayComplete = await complete(mfaToken, enrollCode);
+      expect(replayComplete.statusCode).toBe(401);
+      expect(JSON.parse(replayComplete.body).code).toBe("INVALID_CODE");
+
+      const earlierComplete = await complete(mfaToken, prevCode);
+      expect(earlierComplete.statusCode).toBe(401);
+      expect(JSON.parse(earlierComplete.body).code).toBe("INVALID_CODE");
+
+      const replayDisable = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: enrollCode },
+      });
+      expect(replayDisable.statusCode).toBe(401);
+      expect(JSON.parse(replayDisable.body).code).toBe("INVALID_CODE");
+
+      // The next 30s step succeeds on /mfa/complete.
+      const nextRes = await complete(mfaToken, nextCode);
+      expect(nextRes.statusCode).toBe(200);
+    });
+  });
+
+  it("sets the session cookie when the TOTP step completes, so the token isn't the only credential (#2053)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    const verifyRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: await generatePrevStepTotpCode(uri) },
+    });
+    expect(verifyRes.statusCode).toBe(200);
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode(uri) },
+    });
+    expect(res.statusCode).toBe(200);
+    const { token } = JSON.parse(res.body);
+
+    const cookie = String(res.headers["set-cookie"]);
+    expect(cookie).toContain(`snapotter-session=${token}`);
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/SameSite=Strict/i);
+
+    const cookieOnly = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      cookies: { "snapotter-session": token },
+    });
+    expect(cookieOnly.statusCode).toBe(200);
   });
 
   it("burns the last remaining recovery code to an empty stored list", async () => {
@@ -886,5 +1568,164 @@ describe("PUT /api/v1/settings mfaPolicy (licensed)", () => {
       payload: { mfaPolicy: "admins_only" },
     });
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe("POST /api/auth/mfa/complete maxSessionsPerUser enforcement (#2540)", () => {
+  afterEach(async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
+  });
+
+  function breakMaxSessionsRead() {
+    const originalSelect = db.select.bind(db);
+    return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      const builder = (originalSelect as any)(...args);
+      if (selection && "value" in selection) {
+        const origFrom = builder.from.bind(builder);
+        builder.from = (...fromArgs: unknown[]) => {
+          const query = origFrom(...fromArgs);
+          const origWhere = query.where.bind(query);
+          query.where = (...whereArgs: unknown[]) => {
+            const filtered = origWhere(...whereArgs);
+            if (filtered.toSQL().params.includes("maxSessionsPerUser")) {
+              throw new Error("simulated settings store failure for maxSessionsPerUser");
+            }
+            return filtered;
+          };
+          return query;
+        };
+      }
+      return builder;
+    });
+  }
+
+  it("evicts the oldest sessions when completing MFA exceeds maxSessionsPerUser, and fails closed without burning the challenge or recovery code on a settings or eviction failure", async () => {
+    const username = `mfa_max_sess_${Date.now()}`;
+    const password = "TestPassword1!";
+    const { userId, token: t1 } = await createUserAndLogin(testApp.app, username, "user", password);
+
+    try {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${t1}` },
+      });
+      const { uri, recoveryCodes } = JSON.parse(enrollRes.body) as {
+        uri: string;
+        recoveryCodes: string[];
+      };
+      const verifyRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${t1}` },
+        payload: { code: await generatePrevStepTotpCode(uri) },
+      });
+      expect(verifyRes.statusCode).toBe(200);
+
+      // Seed a second session older than t1's follow-up login so the user already holds 2 sessions.
+      const t0 = randomUUID();
+      await db.insert(schema.sessions).values({
+        id: t0,
+        userId,
+        createdAt: new Date(Date.now() - 60_000),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+
+      await db
+        .insert(schema.settings)
+        .values({ key: "maxSessionsPerUser", value: "2" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "2" } });
+
+      const loginRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password },
+      });
+      expect(loginRes.statusCode).toBe(200);
+      const { mfaToken } = JSON.parse(loginRes.body) as { mfaToken: string };
+
+      // 1. If reading maxSessionsPerUser fails, /mfa/complete fails closed with 500 without
+      // burning either the challenge token in Redis or the offered recovery code.
+      const selectSpy = breakMaxSessionsRead();
+      try {
+        const failReadRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/complete",
+          payload: { mfaToken, code: recoveryCodes[0] },
+        });
+        expect(failReadRes.statusCode).toBe(500);
+      } finally {
+        selectSpy.mockRestore();
+      }
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+      const [userAfterFailRead] = await db
+        .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId));
+      expect(
+        verifyRecoveryCode(recoveryCodes[0], userAfterFailRead.recoveryCodesHash ?? "").valid,
+      ).toBe(true);
+
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+      const totpCode = generateTotpCode(uri);
+
+      // 2. If FIFO eviction fails inside the transaction, the new session rolls back and
+      // the challenge + TOTP step are restored so retrying the same TOTP code succeeds.
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const failingTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "delete") {
+                return () => {
+                  throw new Error("simulated FIFO eviction delete failure");
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(failingTx);
+        }, config)) as unknown as typeof db.transaction);
+      try {
+        const failEvictRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/complete",
+          payload: { mfaToken, code: totpCode },
+        });
+        expect(failEvictRes.statusCode).toBe(500);
+      } finally {
+        txSpy.mockRestore();
+      }
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+
+      // 3. Retrying with the same TOTP code succeeds and evicts t0 (oldest).
+      const completeRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: totpCode },
+      });
+      expect(completeRes.statusCode).toBe(200);
+      const { token: t2 } = JSON.parse(completeRes.body) as { token: string };
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(remaining.map((r) => r.id)).toEqual([t1, t2]);
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, userId));
+    }
   });
 });

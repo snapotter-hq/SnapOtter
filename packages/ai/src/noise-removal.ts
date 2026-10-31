@@ -15,6 +15,8 @@ export interface NoiseRemovalOptions {
   colorNoise?: number;
   format?: string;
   quality?: number;
+  toolId?: string;
+  signal?: AbortSignal;
 }
 
 export interface NoiseRemovalResult {
@@ -31,6 +33,7 @@ export async function noiseRemoval(
   options: NoiseRemovalOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<NoiseRemovalResult> {
+  const { signal, toolId, ...sidecarOptions } = options;
   const inputPath = join(outputDir, "input_denoise.png");
   const outputPath = join(outputDir, "output_denoise.png");
 
@@ -43,8 +46,8 @@ export async function noiseRemoval(
 
   const { stdout } = await runPythonWithProgress(
     "noise_removal.py",
-    [inputPath, outputPath, JSON.stringify(options)],
-    { onProgress, timeout },
+    [inputPath, outputPath, JSON.stringify(sidecarOptions)],
+    { onProgress, timeout, signal, ...(toolId ? { toolId } : {}) },
   );
 
   const result = parseStdoutJson(stdout);

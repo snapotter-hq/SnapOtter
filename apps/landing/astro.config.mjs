@@ -41,6 +41,9 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    preview: {
+      strictPort: true,
+    },
     resolve: {
       extensions: [".ts", ".tsx", ".js", ".jsx"],
       conditions: ["import", "module"],

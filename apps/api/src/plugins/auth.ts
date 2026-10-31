@@ -1,16 +1,29 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import {
+  ANALYTICS_EVENTS,
+  isPasswordRuleEnabled,
+  PASSWORD_MAX_CODE_UNITS,
+  PASSWORD_MAX_LENGTH,
+  type PasswordRule,
+  SafeError,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from "@snapotter/shared";
+import { and, eq, ne } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
+import { isAnonymousUserId } from "../lib/anonymous-user.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { isHttpsUrl } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
+import { assertNotLastAdmin, LastAdminError } from "../lib/last-admin.js";
 import {
   checkLoginThrottle,
   clearLoginFailures,
@@ -18,13 +31,23 @@ import {
   recordLoginFailure,
 } from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
-import { isSecureRequest } from "../lib/secure-cookie.js";
-import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
+import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
+import {
+  evictExcessUserSessions,
+  readMaxSessionsPerUser,
+  setSessionCookie,
+} from "../lib/session-cookie.js";
+import {
+  getSettingNumber,
+  getSettingStrict,
+  parseNumericSettingValue,
+} from "../lib/settings-helpers.js";
 import { userLimitReached } from "../lib/user-limit.js";
 import {
   canAssignRole,
   canManageTargetRole,
   getPermissions,
+  hasEffectivePermission,
   isDisabledRole,
   requirePermission,
 } from "../permissions.js";
@@ -33,6 +56,13 @@ import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
 const scryptAsync = promisify(scrypt);
 
 // ── Types ─────────────────────────────────────────────────────────
+
+export class EscalationDeniedError extends Error {
+  constructor() {
+    super("Cannot manage a user beyond your role authority");
+    this.name = "EscalationDeniedError";
+  }
+}
 
 export interface AuthUser {
   id: string;
@@ -62,22 +92,74 @@ export async function verifyPassword(password: string, stored: string): Promise<
 }
 
 /**
- * Fixed-cost hash used to equalize login timing for usernames that don't
- * exist (or have no local password). Computed once per process and cached;
- * without this, a login attempt for an unknown username returns as soon as
- * the user lookup misses, while a wrong password for a real user waits on a
- * full scrypt run. That gap is a timing side-channel an attacker can use to
- * enumerate valid usernames even though both cases return an identical 401
- * body. Running verifyPassword against this dummy hash pays the same scrypt
- * cost on the "unknown user" path so the two cases are timing-indistinguishable.
+ * Check a typed password against a stored user hash (#2056). The normalized form is
+ * tried first, since that is what every hash made from now on is built from; when the
+ * text as typed differs from it, that is tried second, because a hash made before
+ * normalization was built from the raw text. `legacy` says the second try is the one
+ * that matched, so the caller can upgrade the hash. API keys and SCIM tokens do not go
+ * through this; they are compared as they are with verifyPassword.
+ *
+ * The number of scrypt runs depends only on the typed text, never on whether the user
+ * exists: the unknown-user path in login runs this same function against a dummy hash.
  */
-let dummyHashPromise: Promise<string> | null = null;
-function getDummyHash(): Promise<string> {
-  if (!dummyHashPromise) {
-    dummyHashPromise = hashPassword(randomBytes(SALT_LENGTH).toString("hex"));
+async function verifyUserPassword(
+  password: string,
+  stored: string,
+): Promise<{ valid: boolean; legacy: boolean }> {
+  for (const [index, candidate] of passwordCandidates(password).entries()) {
+    if (await verifyPassword(candidate, stored)) return { valid: true, legacy: index > 0 };
   }
-  return dummyHashPromise;
+  return { valid: false, legacy: false };
 }
+
+/**
+ * Re-hash a password that matched only as typed (a hash from before #2056) from its
+ * normalized form, so the other spelling of it works from now on. Best effort: the
+ * sign-in already succeeded. The update names the hash it verified, so it can never
+ * overwrite a password changed in the meantime.
+ */
+async function upgradeLegacyPasswordHash(
+  request: FastifyRequest,
+  userId: string,
+  verifiedHash: string,
+  password: string,
+): Promise<string | undefined> {
+  try {
+    const upgraded = await hashPassword(normalizePassword(password));
+    await db
+      .update(schema.users)
+      .set({ passwordHash: upgraded })
+      .where(and(eq(schema.users.id, userId), eq(schema.users.passwordHash, verifiedHash)));
+    return upgraded;
+  } catch (err) {
+    request.log.warn({ err, userId }, "Could not upgrade a password hash to its normalized form");
+    // request.log has no Sentry bridge, and a fault that persists leaves the other
+    // spelling of this password failing for good, so it has to be seen (#2056).
+    void reportError(err, {
+      source: "http",
+      route: request.routeOptions?.url,
+      method: request.method,
+      subsystem: "password-hash-upgrade",
+    });
+  }
+}
+
+/**
+ * Stand-in hash used to equalize login timing for usernames that don't exist (or
+ * have no local password). Without it, a login attempt for an unknown username
+ * returns as soon as the user lookup misses, while a wrong password for a real user
+ * waits on a full scrypt run. That gap is a timing side-channel an attacker can use
+ * to enumerate valid usernames even though both cases return an identical 401 body.
+ * Running verifyUserPassword against this hash pays the same scrypt cost on the
+ * "unknown user" path so the two cases are timing-indistinguishable.
+ *
+ * It only has to be well formed: a salt and a key of the lengths hashPassword makes,
+ * so verifyPassword runs scrypt and the constant-time compare exactly as it does for
+ * a real hash. Its result is discarded, so it never authenticates anyone. A constant,
+ * not a hash built on first use: built lazily, the first unknown-user login after boot
+ * ran one scrypt computation more than a real user's wrong password (#2254).
+ */
+const DUMMY_HASH = `${"0".repeat(SALT_LENGTH * 2)}:${"0".repeat(KEY_LENGTH * 2)}`;
 
 /**
  * Compute a fast lookup prefix for an API key.
@@ -87,32 +169,152 @@ export function computeKeyPrefix(rawKey: string): string {
   return createHash("sha256").update(rawKey).digest("hex").slice(0, 16);
 }
 
-async function validatePasswordStrength(password: string): Promise<string | null> {
-  const minLength = await getSettingNumber("passwordMinLength", 8);
-  if (password.length < minLength) return `Password must be at least ${minLength} characters`;
-
-  const requireUpper = await getSettingString("passwordRequireUppercase", "true");
-  const requireLower = await getSettingString("passwordRequireLowercase", "true");
-  const requireDigit = await getSettingString("passwordRequireDigit", "true");
-  const requireSpecial = await getSettingString("passwordRequireSpecial", "false");
-
-  if (requireUpper === "true" && !/[A-Z]/.test(password))
-    return "Password must contain an uppercase letter";
-  if (requireLower === "true" && !/[a-z]/.test(password))
-    return "Password must contain a lowercase letter";
-  if (requireDigit === "true" && !/\d/.test(password)) return "Password must contain a digit";
-  if (requireSpecial === "true" && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password))
-    return "Password must contain a special character";
-
-  return null;
+/**
+ * The password-policy rules a password broke. `rules` lists every one, so the
+ * client can show them all at once; `rule` is the first, kept for clients that
+ * read a single rule. `rule`, `rules` (and `minLength` or `maxLength`) travel in the 400 so a
+ * client can word the failure in its own language; it can't read the policy
+ * itself before the user has a usable password (#1446, #1569).
+ */
+interface PasswordRuleFailure {
+  message: string;
+  rule: PasswordRule;
+  rules: PasswordRule[];
+  minLength?: number;
+  maxLength?: number;
 }
 
-function validateUsername(username: string): string | null {
-  if (username.length < 3 || username.length > 50) {
+export async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
+  // Before normalizing: a hard body-size guard to protect the NFKC normalization
+  // step from pathological inputs. Normal usage never hits this.
+  if (typed.length > PASSWORD_MAX_CODE_UNITS) {
+    return {
+      message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: PASSWORD_MAX_LENGTH,
+    };
+  }
+
+  // The rules judge the text that will be hashed, not the spelling it was typed in (#2056).
+  const password = normalizePassword(typed);
+
+  // Both the minimum and the maximum are measured in Unicode code points (#2310).
+  if (Array.from(password).length > PASSWORD_MAX_LENGTH) {
+    return {
+      message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: PASSWORD_MAX_LENGTH,
+    };
+  }
+  // A control character can be saved but never typed back: login refuses NUL
+  // outright and browsers strip LF and CR from password inputs (#2055).
+  if (/\p{Cc}/u.test(password)) {
+    return {
+      message: "Password must not contain control characters",
+      rule: "controlCharacter",
+      rules: ["controlCharacter"],
+    };
+  }
+  // A lone UTF-16 surrogate can't be encoded. Node's UTF-8 turns each one into
+  // U+FFFD before the hash sees it, so "\uD800" x8 and "\uFFFD" x8 hash alike and
+  // every string of lone surrogates of that length would log in. Only an API
+  // client can send one; a browser form can't produce it (#2170). With the u flag
+  // a valid surrogate pair is one astral code point, so only a lone one matches.
+  if (/\p{Cs}/u.test(password)) {
+    return {
+      message: "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    };
+  }
+
+  const minLength = parseNumericSettingValue(
+    "passwordMinLength",
+    await getSettingStrict("passwordMinLength"),
+    8,
+  );
+  const requireUpper = isPasswordRuleEnabled(
+    "passwordRequireUppercase",
+    await getSettingStrict("passwordRequireUppercase"),
+  );
+  const requireLower = isPasswordRuleEnabled(
+    "passwordRequireLowercase",
+    await getSettingStrict("passwordRequireLowercase"),
+  );
+  const requireDigit = isPasswordRuleEnabled(
+    "passwordRequireDigit",
+    await getSettingStrict("passwordRequireDigit"),
+  );
+  const requireSpecial = isPasswordRuleEnabled(
+    "passwordRequireSpecial",
+    await getSettingStrict("passwordRequireSpecial"),
+  );
+
+  // The rules mean "has an uppercase letter / a lowercase letter / a digit /
+  // punctuation, a symbol or a space" in any script, so a Russian or Arabic
+  // password isn't rejected for a rule it visibly meets (#1568). Special is an
+  // allowlist of those three classes rather than "not a letter or number", which
+  // would also pass invisible and control characters (a zero-width space, a tab,
+  // NUL) that nobody can see or that the login page can't send.
+  // The three default-on rules are off only when stored as "false", which is
+  // how the Security tab reads them via isPasswordRuleEnabled (#2026, #2036).
+  // Special defaults off and is on only for "true".
+  const broken: { rule: PasswordRule; message: string }[] = [];
+  // Characters, not UTF-16 code units: an astral character is two units, so four
+  // of them used to meet a minimum of 8 (#2057). Code points are what NIST SP
+  // 800-63B counts. It only runs when a password is set, so it locks nobody out.
+  // The count is the smaller of the composed form and the NFKC form: the composed
+  // form so a letter typed as a base plus a combining mark is one character, and
+  // the NFKC form so a compatibility character that expands (U+FDFA becomes 18)
+  // is not credited for the letters it turns into (#2056).
+  const length = Math.min([...typed.normalize("NFC")].length, [...password].length);
+  if (length < minLength)
+    broken.push({
+      rule: "minLength",
+      message: `Password must be at least ${minLength} characters`,
+    });
+  if (requireUpper && !/\p{Lu}/u.test(password))
+    broken.push({ rule: "uppercase", message: "Password must contain an uppercase letter" });
+  if (requireLower && !/\p{Ll}/u.test(password))
+    broken.push({ rule: "lowercase", message: "Password must contain a lowercase letter" });
+  if (requireDigit && !/\p{Nd}/u.test(password))
+    broken.push({ rule: "digit", message: "Password must contain a digit" });
+  if (requireSpecial && !/[\p{P}\p{S}\p{Zs}]/u.test(password))
+    broken.push({ rule: "special", message: "Password must contain a special character" });
+
+  if (broken.length === 0) return null;
+  const rules = broken.map((b) => b.rule);
+  return {
+    message: broken[0].message,
+    rule: broken[0].rule,
+    rules,
+    ...(rules.includes("minLength") && { minLength }),
+  };
+}
+
+/** The 400 body for a password that broke the policy. */
+function weakPasswordBody({ message, rule, rules, minLength, maxLength }: PasswordRuleFailure) {
+  return {
+    error: message,
+    code: "VALIDATION_ERROR",
+    rule,
+    rules,
+    ...(minLength !== undefined && { minLength }),
+    ...(maxLength !== undefined && { maxLength }),
+  };
+}
+
+export function validateUsername(username: string): string | null {
+  if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
     return "Username must be between 3 and 50 characters";
   }
-  if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+  if (!USERNAME_PATTERN.test(username)) {
     return "Username can only contain letters, numbers, dots, hyphens, and underscores";
+  }
+  if (username.toLowerCase() === "anonymous") {
+    return "Username 'anonymous' is reserved";
   }
   return null;
 }
@@ -121,17 +323,33 @@ function validateUsername(username: string): string | null {
 
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required").max(255, "Username too long"),
-  password: z.string().min(1, "Password is required").max(1024, "Password too long"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .max(PASSWORD_MAX_CODE_UNITS, "Password too long")
+    .superRefine((val, ctx) => {
+      if (Array.from(normalizePassword(val)).length > PASSWORD_MAX_LENGTH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_big,
+          maximum: PASSWORD_MAX_LENGTH,
+          type: "string",
+          inclusive: true,
+          message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+        });
+      }
+    }),
 });
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required").max(1024, "Password too long"),
-  newPassword: z.string().min(1, "New password is required").max(1024, "Password too long"),
+  // Longer than the cap can't be the current password; the handler says so as
+  // "incorrect" instead of a schema failure with no reason (#2037).
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(1, "New password is required"),
 });
 
 export const registerSchema = z.object({
   username: z.string().min(1, "Username is required").max(255, "Username too long"),
-  password: z.string().min(1, "Password is required").max(1024, "Password too long"),
+  password: z.string().min(1, "Password is required"),
   role: z.string().optional(),
   team: z.string().optional(),
 });
@@ -142,7 +360,7 @@ const updateUserSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  newPassword: z.string().min(1, "New password is required").max(1024, "Password too long"),
+  newPassword: z.string().min(1, "New password is required"),
 });
 
 // ── Request helpers ───────────────────────────────────────────────
@@ -196,8 +414,23 @@ export function createSessionToken(): string {
 export async function ensureDefaultTeam(): Promise<void> {
   await db
     .insert(schema.teams)
-    .values({ id: "default-team-00000000", name: "Default" })
+    .values({ id: schema.DEFAULT_TEAM_ID, name: "Default" })
     .onConflictDoNothing();
+}
+
+/**
+ * The Default team's id: the team named "Default", else the seeded id (the
+ * seeded team renamed). Register, SSO, and SCIM resolve it the same way, and
+ * the bootstrap users need it explicitly (#1474): the seed above is skipped
+ * when another team already holds the name, so the column default alone can
+ * point at a team that doesn't exist.
+ */
+async function defaultTeamId(): Promise<string> {
+  const [team] = await db
+    .select({ id: schema.teams.id })
+    .from(schema.teams)
+    .where(eq(schema.teams.name, "Default"));
+  return team?.id ?? schema.DEFAULT_TEAM_ID;
 }
 
 export async function ensureAnonymousUser(): Promise<void> {
@@ -210,6 +443,7 @@ export async function ensureAnonymousUser(): Promise<void> {
       id: "anonymous",
       username: "anonymous",
       role: "admin",
+      team: await defaultTeamId(),
       mustChangePassword: false,
       authProvider: "local",
     })
@@ -218,12 +452,45 @@ export async function ensureAnonymousUser(): Promise<void> {
 
 export async function ensureDefaultAdmin(): Promise<void> {
   const existingUsers = await db.select().from(schema.users);
-  if (existingUsers.length > 0) return;
+  if (existingUsers.some((user) => user.id !== "anonymous")) return;
+
+  // Checked here, not in the env schema: an install that already has its admin
+  // never uses this value and must keep booting with a stale one. Browsers strip
+  // LF and CR from password inputs and login refuses NUL, so an admin created
+  // from such a value could never sign in (#2085).
+  if (/\p{Cc}/u.test(env.DEFAULT_PASSWORD)) {
+    throw new Error(
+      "DEFAULT_PASSWORD must not contain control characters (a trailing newline from a quoted compose or .env value, or Windows line endings in a secret file, is the usual cause)",
+    );
+  }
+  // Login refuses an empty password and one past the cap, so either makes an
+  // admin nobody can sign in as (#2307). An empty value reaches here from a
+  // bare-metal `DEFAULT_PASSWORD=` line; the Docker entrypoint turns it into the
+  // default instead.
+  if (env.DEFAULT_PASSWORD.length === 0) {
+    throw new Error("DEFAULT_PASSWORD must not be empty; sign-in refuses an empty password");
+  }
+  if (env.DEFAULT_PASSWORD.length > PASSWORD_MAX_CODE_UNITS) {
+    throw new Error(
+      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_CODE_UNITS} characters; sign-in refuses a longer password`,
+    );
+  }
+  if (Array.from(normalizePassword(env.DEFAULT_PASSWORD)).length > PASSWORD_MAX_LENGTH) {
+    throw new Error(
+      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_LENGTH} characters; sign-in refuses a longer password`,
+    );
+  }
+
+  const usernameError = validateUsername(env.DEFAULT_USERNAME);
+  if (usernameError) {
+    throw new Error(`DEFAULT_USERNAME is invalid: ${usernameError}`);
+  }
 
   const id = randomUUID();
-  const passwordHash = await hashPassword(env.DEFAULT_PASSWORD);
+  const passwordHash = await hashPassword(normalizePassword(env.DEFAULT_PASSWORD));
 
   const mustChange = !env.SKIP_MUST_CHANGE_PASSWORD;
+
   const result = await db
     .insert(schema.users)
     .values({
@@ -231,6 +498,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
       username: env.DEFAULT_USERNAME,
       passwordHash,
       role: "admin",
+      team: await defaultTeamId(),
       mustChangePassword: mustChange,
     })
     .onConflictDoNothing();
@@ -346,6 +614,22 @@ async function getLoginThrottleConfig(): Promise<LoginThrottleConfig> {
   };
 }
 
+/**
+ * True when SSO enforcement is on (and licensed) and `username` is not the
+ * break-glass account, so a local password login must not produce a session.
+ * The settings are read strictly: getSettingString would answer "false" on a
+ * database fault and switch enforcement off, so a fault throws instead and the
+ * error handler answers 500 with no session written (the MFA policy read is
+ * fail-closed for the same reason, #815).
+ */
+async function isLocalLoginRefusedBySso(username: string): Promise<boolean> {
+  // The licence first: it needs no database read, so an unlicensed instance
+  // never touches the settings table here.
+  if (!(await isEnterpriseFeatureEnabled("sso_enforcement"))) return false;
+  if ((await getSettingStrict("ssoEnforcement")) !== "true") return false;
+  return username !== ((await getSettingStrict("ssoBreakGlassUsername")) ?? "");
+}
+
 // ── Auth routes ────────────────────────────────────────────────────
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
@@ -358,26 +642,28 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "Authentication is disabled" });
       }
 
-      // SSO enforcement check
-      const ssoEnforced = await getSettingString("ssoEnforcement", "false");
-      if (ssoEnforced === "true") {
-        const isEnabled = await isEnterpriseFeatureEnabled("sso_enforcement");
-
-        if (isEnabled) {
-          const breakGlassUsername = await getSettingString("ssoBreakGlassUsername", "");
-          const { username } = loginSchema.parse(request.body);
-
-          if (username !== breakGlassUsername) {
-            return reply.status(403).send({
-              error: "Local password login is disabled. Please use SSO.",
-              code: "SSO_ENFORCED",
-            });
-          }
-        }
-      }
-
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {
+        const passwordIssue = parsed.error.issues.find(
+          (i) => i.path[0] === "password" && i.code === "too_big",
+        );
+        if (passwordIssue) {
+          const audit = auditFromRequest(request);
+          const rawBody = request.body as Record<string, unknown> | null;
+          const rawUsername = typeof rawBody?.username === "string" ? rawBody.username : "";
+
+          await audit("LOGIN_FAILED", {
+            username: sanitizeAuditInput(rawUsername),
+            reason: "password_too_long",
+          });
+
+          return reply.status(400).send({
+            error: passwordIssue.message,
+            code: "VALIDATION_ERROR",
+            rule: "maxLength",
+            maxLength: PASSWORD_MAX_LENGTH,
+          });
+        }
         return reply.status(400).send({ error: "Username and password are required" });
       }
       const body = parsed.data;
@@ -388,6 +674,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (body.username.includes("\x00") || body.password.includes("\x00")) {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
+      // Login does not apply the password policy, and a lone surrogate is not
+      // refused here either, on purpose: an account whose password was set with one
+      // before #2170 must still sign in. It compares as U+FFFD, which is why setting
+      // one is refused (validatePasswordStrength). Don't add the check here.
 
       const audit = auditFromRequest(request);
       const redis = sharedRedis();
@@ -427,24 +717,36 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .from(schema.users)
         .where(eq(schema.users.username, body.username));
 
-      if (!user?.passwordHash) {
+      // With SSO enforced, a local password login for any account but the
+      // break-glass one is refused the way a wrong password is: same cost,
+      // same throttle, same 401, whether or not the password was right. Any
+      // other answer would let a caller tell the accounts apart, or test a
+      // password that SSO is meant to have replaced.
+      const ssoRefused = await isLocalLoginRefusedBySso(body.username);
+
+      if (ssoRefused || !user?.passwordHash) {
         // Pay the same scrypt cost a real password check would take, so
         // response timing doesn't reveal whether the username exists.
-        await verifyPassword(body.password, await getDummyHash());
+        await verifyUserPassword(body.password, DUMMY_HASH);
         authAttempts.inc({ method: "password", result: "failure" });
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
+          ...(ssoRefused && user && { userId: user.id }),
           // An SSO-provisioned account that was later disabled has no local
           // hash and lands here too; keep the precise audit reason while the
           // response stays the generic 401.
-          reason: user && isDisabledRole(user.role) ? "disabled_user" : "unknown_user",
+          reason: ssoRefused
+            ? "sso_enforced"
+            : user && isDisabledRole(user.role)
+              ? "disabled_user"
+              : "unknown_user",
         });
         await recordThrottleFailure();
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
-      const valid = await verifyPassword(body.password, user.passwordHash);
+      const { valid, legacy } = await verifyUserPassword(body.password, user.passwordHash);
       if (!valid) {
         authAttempts.inc({ method: "password", result: "failure" });
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
@@ -472,6 +774,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           reason: "disabled_user",
         });
         return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
+      }
+
+      // Before the MFA branch, which never sees the password again.
+      if (legacy) {
+        const upgraded = await upgradeLegacyPasswordHash(
+          request,
+          user.id,
+          user.passwordHash,
+          body.password,
+        );
+        if (upgraded) {
+          user.passwordHash = upgraded;
+        }
       }
 
       // Two failures used to share one silent catch here and they want
@@ -515,7 +830,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // ── MFA challenge ──────────────────────────────────────────
       if (user.totpEnabled) {
         const mfaToken = randomUUID();
-        await redis.setex(`mfa:${mfaToken}`, 300, user.id);
+        let payload = user.id;
+        if (user.passwordHash) {
+          const hashFingerprint = createHash("sha256")
+            .update(user.passwordHash)
+            .digest("hex")
+            .substring(0, 16);
+          payload = `${user.id}:${hashFingerprint}`;
+        }
+        await redis.setex(`mfa:${mfaToken}`, 300, payload);
 
         await audit("MFA_CHALLENGE_ISSUED", { userId: user.id, username: user.username });
 
@@ -570,51 +893,101 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // Read before inserting the session so a failed settings query aborts
+      // with 500 instead of persisting an un-evicted session row (#2517).
+      const maxSessions = await readMaxSessionsPerUser();
+
       // Create session
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: user.id,
-        expiresAt,
+      // Wrap the session insert in a transaction that takes FOR SHARE on the user row
+      // and refuses if the hash or role differs from the one verified. This conflicts
+      // with the FOR NO KEY UPDATE / FOR UPDATE in the password and role change routes,
+      // closing the race condition (#2235, #2823).
+      const inserted = await db.transaction(async (tx) => {
+        const [lockedUser] = await tx
+          .select({
+            passwordHash: schema.users.passwordHash,
+            role: schema.users.role,
+            team: schema.users.team,
+          })
+          .from(schema.users)
+          .where(eq(schema.users.id, user.id))
+          .for("share");
+
+        if (!lockedUser) {
+          return { status: "password_changed" as const };
+        }
+        if (lockedUser.passwordHash !== user.passwordHash) {
+          return {
+            status:
+              lockedUser.passwordHash === null && isDisabledRole(lockedUser.role)
+                ? ("user_disabled" as const)
+                : ("password_changed" as const),
+          };
+        }
+        if (isDisabledRole(lockedUser.role)) {
+          return { status: "user_disabled" as const };
+        }
+        if (lockedUser.role !== user.role) {
+          return { status: "role_changed" as const };
+        }
+
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: user.id,
+          expiresAt,
+        });
+
+        await evictExcessUserSessions(tx, user.id, maxSessions, token);
+
+        const [teamRow] = await tx
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, lockedUser.team));
+        const permissions = await getPermissions(lockedUser.role, tx);
+
+        return {
+          status: "ok" as const,
+          permissions,
+          teamName: teamRow?.name ?? lockedUser.team,
+        };
       });
 
-      // ── Concurrent session limit (FIFO eviction) ──────────────
-      const maxSessions = await getSettingNumber("maxSessionsPerUser");
-      if (maxSessions > 0) {
-        const sessions = await db
-          .select({ id: schema.sessions.id, createdAt: schema.sessions.createdAt })
-          .from(schema.sessions)
-          .where(eq(schema.sessions.userId, user.id))
-          .orderBy(asc(schema.sessions.createdAt));
+      if (inserted.status === "user_disabled") {
+        authAttempts.inc({ method: "password", result: "failure" });
+        await audit("LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason: "disabled_user",
+        });
+        return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
+      }
 
-        if (sessions.length > maxSessions) {
-          const toDelete = sessions.slice(0, sessions.length - maxSessions);
-          for (const s of toDelete) {
-            await db.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
-          }
+      if (inserted.status !== "ok") {
+        authAttempts.inc({ method: "password", result: "failure" });
+        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        await audit("LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason:
+            inserted.status === "role_changed"
+              ? "role_changed_concurrently"
+              : "password_changed_concurrently",
+        });
+
+        // Only count a concurrent password rotation against the brute-force throttle;
+        // a concurrent role update on a user who proved their password should not lock them out.
+        if (inserted.status === "password_changed") {
+          await recordThrottleFailure();
         }
+        return reply.status(401).send({ error: "Invalid credentials" });
       }
 
       authAttempts.inc({ method: "password", result: "success" });
       void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN, { method: "password" });
       await audit("LOGIN_SUCCESS", { userId: user.id, username: user.username });
 
-      const [teamRow] = await db.select().from(schema.teams).where(eq(schema.teams.id, user.team));
-
-      const cookieReply = reply as FastifyReply & {
-        setCookie?: (name: string, value: string, opts: Record<string, unknown>) => FastifyReply;
-      };
-      if (typeof cookieReply.setCookie === "function") {
-        cookieReply.setCookie("snapotter-session", token, {
-          path: `${env.BASE_PATH}/`,
-          httpOnly: true,
-          sameSite: "strict",
-          secure: isSecureRequest(request),
-          maxAge: SESSION_DURATION_MS / 1000,
-        });
-      }
+      setSessionCookie(request, reply, token);
 
       return reply.send({
         token,
@@ -623,8 +996,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: user.username,
           role: user.role,
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
-          permissions: await getPermissions(user.role),
-          teamName: teamRow?.name ?? user.team,
+          permissions: inserted.permissions,
+          teamName: inserted.teamName,
         },
         expiresAt: expiresAt.toISOString(),
       });
@@ -636,6 +1009,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const token = extractToken(request);
     const user = getAuthUser(request);
     let logoutUrl: string | undefined;
+    let idpLogout: "failed" | undefined;
 
     if (token) {
       const [session] = await db
@@ -644,18 +1018,68 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(schema.sessions.id, token));
 
       if (session?.idToken && env.OIDC_ENABLED) {
+        // A null endpoint means a local-only logout without a fault: the IdP
+        // advertises no end_session_endpoint. A process that hasn't run
+        // discovery yet runs it now instead of skipping the IdP (#1787). A
+        // throw is a fault (a failed or timed-out discovery, or a broken
+        // import): the session below is still destroyed, but the IdP session
+        // stays open, so report it and tell the caller (#1800).
         try {
           const { getOidcEndSessionEndpoint } = await import("./oidc.js");
-          const endSessionEndpoint = getOidcEndSessionEndpoint();
+          const endSessionEndpoint = await getOidcEndSessionEndpoint();
           if (endSessionEndpoint) {
-            const params = new URLSearchParams({
-              id_token_hint: session.idToken,
-              post_logout_redirect_uri: `${env.EXTERNAL_URL}/login`,
-            });
-            logoutUrl = `${endSessionEndpoint}?${params.toString()}`;
+            // Set on the parsed URL rather than appending "?...": some IdPs
+            // advertise the endpoint with a query already on it (Azure AD
+            // B2C's `?p=<user flow>`), which has to survive. set() also
+            // replaces any copy of our two parameters the endpoint carries.
+            // An endpoint that isn't a URL (a relative path, any garbage) is
+            // an IdP fault like a bad scheme (#1788). Check it first rather
+            // than letting new URL throw: its TypeError carries the raw
+            // endpoint in an enumerable `input` and classifies as a bug. No
+            // `cause`, which would carry it again (#1887). canParse applies
+            // the same whitespace trimming as new URL.
+            if (!URL.canParse(endSessionEndpoint)) {
+              throw new SafeError("OIDC end_session_endpoint is not a valid URL", {
+                code: "OIDC_END_SESSION_INVALID",
+              });
+            }
+            const url = new URL(endSessionEndpoint);
+            // Discovery takes any string as end_session_endpoint, and the web
+            // app navigates to logoutUrl, so a javascript: or data: endpoint
+            // would run in our origin (#1855). Plain http only where discovery
+            // itself may use it (an http EXTERNAL_URL, i.e. a dev setup); on
+            // https it would also send the ID token in the clear. The message
+            // is constant so no part of the endpoint reaches Sentry; only the
+            // local log names the scheme, so an operator can tell an http
+            // endpoint on an https deployment from a hostile one.
+            const allowed = isHttpsUrl(env.EXTERNAL_URL) ? ["https:"] : ["https:", "http:"];
+            if (!allowed.includes(url.protocol)) {
+              request.log.warn(
+                { scheme: url.protocol.slice(0, 32), userId: session.userId },
+                "logout: OIDC end_session_endpoint scheme not allowed",
+              );
+              throw new SafeError("OIDC end_session_endpoint has an unsupported scheme", {
+                code: "OIDC_END_SESSION_SCHEME",
+              });
+            }
+            url.searchParams.set("id_token_hint", session.idToken);
+            url.searchParams.set("post_logout_redirect_uri", `${env.EXTERNAL_URL}/login`);
+            logoutUrl = url.toString();
           }
-        } catch {
-          // OIDC plugin not loaded or discovery not cached
+        } catch (err) {
+          idpLogout = "failed";
+          request.log.error(
+            { err, userId: session.userId },
+            "logout: failed to build the OIDC logout URL; IdP session left open",
+          );
+          // request.log has no Sentry bridge, and by catching here the error
+          // never reaches the global handler's reportError (#1514).
+          void reportError(err, {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            subsystem: "oidc-logout",
+          });
         }
       }
 
@@ -670,8 +1094,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       cookieReply.clearCookie("snapotter-session", { path: `${env.BASE_PATH}/` });
     }
 
-    await auditFromRequest(request)("LOGOUT", { userId: user?.id });
-    return reply.send({ ok: true, ...(logoutUrl && { logoutUrl }) });
+    await auditFromRequest(request)("LOGOUT", {
+      userId: user?.id,
+      username: user?.username,
+    });
+    return reply.send({
+      ok: true,
+      ...(logoutUrl && { logoutUrl }),
+      ...(idpLogout && { idpLogout }),
+    });
   });
 
   // GET /api/auth/session
@@ -725,7 +1156,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         loginMethod: session.idToken ? "oidc" : user.authProvider === "saml" ? "saml" : "local",
         email: user.email ?? null,
         hasLocalPassword: !!user.passwordHash,
-        hasOidcLink: !!user.externalId,
+        // external_id also holds SAML NameIDs, so the provider decides (#1606).
+        hasOidcLink: user.authProvider === "oidc" && !!user.externalId,
         totpEnabled: user.totpEnabled,
       },
       expiresAt: session.expiresAt.toISOString(),
@@ -749,14 +1181,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       const body = parsed.data;
 
-      const pwError = await validatePasswordStrength(body.newPassword);
-      if (pwError) {
-        return reply.status(400).send({
-          error: pwError,
-          code: "VALIDATION_ERROR",
-        });
-      }
-
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, authUser.id));
 
       if (!user) {
@@ -770,32 +1194,74 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const valid = await verifyPassword(body.currentPassword, user.passwordHash);
+      const pwError = await validatePasswordStrength(body.newPassword);
+      if (pwError) {
+        return reply.status(400).send(weakPasswordBody(pwError));
+      }
+
+      const valid =
+        body.currentPassword.length <= PASSWORD_MAX_CODE_UNITS &&
+        (await verifyUserPassword(body.currentPassword, user.passwordHash)).valid;
       if (!valid) {
         return reply
           .status(401)
           .send({ error: "Current password is incorrect", code: "INVALID_PASSWORD" });
       }
 
-      const newHash = await hashPassword(body.newPassword);
+      const newHash = await hashPassword(normalizePassword(body.newPassword));
 
-      await db
-        .update(schema.users)
-        .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
-        .where(eq(schema.users.id, authUser.id));
-
-      // Invalidate all other sessions for this user
+      // One transaction: if a revoke fails the old password stays in place, so
+      // the user is told the change failed and a retry with the old password
+      // works, instead of a new password beside surviving sessions and keys (#2089).
       const currentToken = extractToken(request);
-      if (currentToken) {
-        await db
-          .delete(schema.sessions)
-          .where(
-            and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)),
-          );
-      }
+      const outcome = await db.transaction(async (tx) => {
+        // Lock the row and check the password is still the one just verified.
+        // Two requests that both proved the old password otherwise both
+        // write, and the first caller is told a change succeeded that the
+        // second one overwrote (#2127). The lock also orders the revokes below
+        // after any concurrent change has committed. NO KEY UPDATE, not
+        // UPDATE: it still excludes every other writer of this row, but
+        // doesn't hold up inserts that only reference it (sessions, keys,
+        // audit rows).
+        const [locked] = await tx
+          .select({ passwordHash: schema.users.passwordHash })
+          .from(schema.users)
+          .where(eq(schema.users.id, authUser.id))
+          .for("no key update");
+        if (!locked) return "gone" as const;
+        if (locked.passwordHash !== user.passwordHash) return "changed" as const;
 
-      // Revoke all API keys - if credentials were compromised, keys must be rotated too
-      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
+        await tx
+          .update(schema.users)
+          .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
+          .where(eq(schema.users.id, authUser.id));
+
+        // Invalidate all other sessions for this user
+        if (currentToken) {
+          await tx
+            .delete(schema.sessions)
+            .where(
+              and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)),
+            );
+        }
+
+        // Revoke all API keys - if credentials were compromised, keys must be rotated too
+        await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
+        return "changed-here" as const;
+      });
+
+      if (outcome === "gone") {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
+      if (outcome === "changed") {
+        // Another change won: the user's own in another tab, an admin reset,
+        // or a SCIM deprovision. Nothing was written here.
+        request.log.info({ userId: authUser.id }, "Password change lost to a concurrent change");
+        return reply.status(409).send({
+          error: "Your password was changed elsewhere. Sign in again.",
+          code: "PASSWORD_CHANGED",
+        });
+      }
 
       await auditFromRequest(request)("PASSWORD_CHANGED", {
         userId: authUser.id,
@@ -823,7 +1289,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         passwordHash: schema.users.passwordHash,
         createdAt: schema.users.createdAt,
       })
-      .from(schema.users);
+      .from(schema.users)
+      .where(ne(schema.users.id, "anonymous"));
 
     // Build a team ID -> name lookup
     const allTeams = await db.select().from(schema.teams);
@@ -838,7 +1305,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         authProvider: u.authProvider ?? "local",
         email: u.email ?? null,
         hasLocalPassword: !!u.passwordHash,
-        hasOidcLink: !!u.externalId,
+        // Same rule as the session response: external_id alone could be SAML's.
+        hasOidcLink: u.authProvider === "oidc" && !!u.externalId,
         createdAt: u.createdAt.toISOString(),
       })),
       maxUsers: env.MAX_USERS,
@@ -869,15 +1337,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     const registerPwError = await validatePasswordStrength(body.password);
     if (registerPwError) {
-      return reply.status(400).send({
-        error: registerPwError,
-        code: "VALIDATION_ERROR",
-      });
+      return reply.status(400).send(weakPasswordBody(registerPwError));
     }
 
     const validBuiltinRoles = ["admin", "editor", "user"];
     let role: string = "user";
-    if (body.role) {
+    if (body.role !== undefined) {
       if (validBuiltinRoles.includes(body.role)) {
         role = body.role;
       } else {
@@ -885,9 +1350,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           .select()
           .from(schema.roles)
           .where(eq(schema.roles.name, body.role));
-        if (customRole) {
-          role = body.role;
+        if (!customRole) {
+          return reply.status(400).send({
+            error: "Role not found",
+            code: "UNKNOWN_ROLE",
+          });
         }
+        role = body.role;
       }
     }
 
@@ -899,11 +1368,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Resolve team -- frontend sends team name (e.g. "Default"), not ID
-    const requestedTeam = body.team;
+    const requestedTeam = body.team?.trim();
     let teamId: string;
     let teamName: string;
 
-    if (requestedTeam) {
+    if (body.team !== undefined) {
+      if (!requestedTeam) {
+        return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+      }
       // Look up by name first, then fall back to ID
       const [teamByName] = await db
         .select()
@@ -913,8 +1385,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         ? [null]
         : await db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam));
       const found = teamByName || teamById;
-      if (!found)
-        return reply.status(400).send({ error: "Team not found", code: "VALIDATION_ERROR" });
+      if (!found) {
+        return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+      }
       teamId = found.id;
       teamName = found.name;
     } else {
@@ -942,7 +1415,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const id = randomUUID();
     // Hash before the transaction: scrypt takes ~100ms and must not extend
     // the user-limit lock window.
-    const passwordHash = await hashPassword(body.password);
+    const passwordHash = await hashPassword(normalizePassword(body.password));
 
     // The duplicate pre-check above can't close the username race (issue
     // #900), and a plain count check can't close the limit race: two
@@ -950,6 +1423,43 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // #928). The locked count and the insert share one transaction so the
     // loser sees the winner's committed row.
     const inserted = await db.transaction(async (tx) => {
+      let roleExists = true;
+      if (!validBuiltinRoles.includes(role)) {
+        const [lockedRole] = await tx
+          .select({ id: schema.roles.id })
+          .from(schema.roles)
+          .where(eq(schema.roles.name, role))
+          .for("share");
+        roleExists = Boolean(lockedRole);
+      }
+      let teamExists = true;
+      if (body.team !== undefined) {
+        const [lockedTeam] = await tx
+          .select({ id: schema.teams.id, name: schema.teams.name })
+          .from(schema.teams)
+          .where(eq(schema.teams.id, teamId))
+          .for("share");
+        if (lockedTeam) {
+          teamName = lockedTeam.name;
+        } else {
+          teamExists = false;
+        }
+      }
+      const [currentAdmin] = await tx
+        .select({ role: schema.users.role })
+        .from(schema.users)
+        .where(eq(schema.users.id, admin.id));
+      if (!currentAdmin) return "escalation-denied" as const;
+
+      const currentActor = { ...admin, role: currentAdmin.role };
+      if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
+        return "escalation-denied" as const;
+      }
+      if (!roleExists) return "unknown-role" as const;
+      if (!(await canAssignRole(currentActor, role, tx))) {
+        return "escalation-denied" as const;
+      }
+      if (!teamExists) return "unknown-team" as const;
       if (await userLimitReached(tx)) return "limit" as const;
       return tx
         .insert(schema.users)
@@ -963,6 +1473,27 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         })
         .onConflictDoNothing({ target: schema.users.username });
     });
+
+    if (inserted === "unknown-role") {
+      return reply.status(400).send({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+    }
+
+    if (inserted === "unknown-team") {
+      return reply.status(400).send({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+    }
+
+    if (inserted === "escalation-denied") {
+      return reply.status(403).send({
+        error: "Cannot create a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+    }
 
     if (inserted === "limit") {
       return reply.status(403).send({
@@ -980,6 +1511,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     await auditFromRequest(request)("USER_CREATED", {
       adminId: admin.id,
+      username: admin.username,
       newUserId: id,
       newUsername: body.username,
       role,
@@ -1001,6 +1533,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
       const parsed = updateUserSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({
@@ -1027,75 +1562,195 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         updatedAt: new Date(),
       };
 
-      if (body.role) {
-        const validBuiltinRoles = ["admin", "editor", "user"];
+      const validBuiltinRoles = ["admin", "editor", "user"];
+      if (body.role !== undefined) {
         const [customRoleRow] = validBuiltinRoles.includes(body.role)
           ? [null]
           : await db.select().from(schema.roles).where(eq(schema.roles.name, body.role));
         const isValid = validBuiltinRoles.includes(body.role) || customRoleRow;
-        if (isValid) {
-          if (!(await canAssignRole(admin, body.role))) {
-            return reply.status(403).send({
-              error: "Cannot assign a role beyond your role authority",
-              code: "ESCALATION_DENIED",
-            });
-          }
-
-          // Prevent removing your own admin role
-          if (id === admin.id && body.role !== "admin") {
-            return reply.status(400).send({
-              error: "Cannot remove your own admin role",
-              code: "SELF_DEMOTE",
-            });
-          }
-
-          // Last admin protection
-          if (user.role === "admin" && body.role !== "admin") {
-            const [adminCount] = await db
-              .select({ count: sql<number>`COUNT(*)` })
-              .from(schema.users)
-              .where(eq(schema.users.role, "admin"));
-            if (adminCount && adminCount.count <= 1) {
-              return reply.status(400).send({
-                error: "Cannot demote the last admin",
-                code: "LAST_ADMIN",
-              });
-            }
-          }
-
-          updates.role = body.role;
+        if (!isValid) {
+          return reply.status(400).send({
+            error: "Role not found",
+            code: "UNKNOWN_ROLE",
+          });
         }
+        if (!(await canAssignRole(admin, body.role))) {
+          return reply.status(403).send({
+            error: "Cannot assign a role beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+
+        // Prevent removing your own admin role
+        if (id === admin.id && body.role !== user.role) {
+          return reply.status(400).send({
+            error: "Cannot remove your own admin role",
+            code: "SELF_DEMOTE",
+          });
+        }
+
+        updates.role = body.role;
       }
 
-      if (body.team?.trim()) {
+      if (body.team !== undefined) {
+        const requestedTeam = body.team.trim();
+        if (!requestedTeam) {
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+        }
         // Look up by name first, then fall back to ID
         const [teamByName] = await db
           .select()
           .from(schema.teams)
-          .where(eq(schema.teams.name, body.team.trim()));
+          .where(eq(schema.teams.name, requestedTeam));
         const [teamById] = teamByName
           ? [null]
-          : await db.select().from(schema.teams).where(eq(schema.teams.id, body.team.trim()));
+          : await db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam));
         const found = teamByName || teamById;
         if (!found) {
-          return reply.status(400).send({ error: "Team not found", code: "VALIDATION_ERROR" });
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
         }
         updates.team = found.id;
       }
 
-      await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
+      // One transaction: a role change whose session revoke failed would leave
+      // the new role in place while the old sessions keep the old permissions
+      // (#2126).
+      let roleChanged = false;
+      let previousRole = user.role;
+      try {
+        await db.transaction(async (tx) => {
+          let roleExists = true;
+          if (updates.role && !validBuiltinRoles.includes(updates.role)) {
+            const [lockedRole] = await tx
+              .select({ id: schema.roles.id })
+              .from(schema.roles)
+              .where(eq(schema.roles.name, updates.role))
+              .for("share");
+            roleExists = Boolean(lockedRole);
+          }
+          let teamExists = true;
+          if (updates.team) {
+            const [lockedTeam] = await tx
+              .select({ id: schema.teams.id })
+              .from(schema.teams)
+              .where(eq(schema.teams.id, updates.team))
+              .for("share");
+            teamExists = Boolean(lockedTeam);
+          }
+          // Last admin protection, under the lock every admin removal shares (#2231).
+          let lastAdminBlocked = false;
+          if (id !== admin.id && updates.role && updates.role !== "admin") {
+            try {
+              await assertNotLastAdmin(tx, id);
+            } catch (err) {
+              if (err instanceof LastAdminError) {
+                lastAdminBlocked = true;
+              } else {
+                throw err;
+              }
+            }
+          }
 
-      // Invalidate all sessions when role changes to force re-login with new permissions
-      if (updates.role && updates.role !== user.role) {
-        await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+          const [currentUser] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, id))
+            .for("no key update");
+          const [currentAdmin] =
+            id === admin.id
+              ? [currentUser]
+              : await tx
+                  .select({ role: schema.users.role })
+                  .from(schema.users)
+                  .where(eq(schema.users.id, admin.id));
+
+          if (!currentAdmin) {
+            throw new EscalationDeniedError();
+          }
+
+          const currentActor = { ...admin, role: currentAdmin.role };
+
+          if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!currentUser) {
+            throw new Error("NOT_FOUND");
+          }
+
+          if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!roleExists) {
+            throw new Error("UNKNOWN_ROLE");
+          }
+
+          if (updates.role && !(await canAssignRole(currentActor, updates.role, tx))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (id === admin.id && updates.role && updates.role !== currentUser.role) {
+            throw new Error("SELF_DEMOTE");
+          }
+
+          if (!teamExists) {
+            throw new Error("UNKNOWN_TEAM");
+          }
+
+          if (lastAdminBlocked) {
+            throw new LastAdminError();
+          }
+
+          previousRole = currentUser.role;
+          roleChanged = Boolean(updates.role && updates.role !== currentUser.role);
+
+          await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
+          // Invalidate all sessions when role changes to force re-login with new permissions
+          if (roleChanged) {
+            await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+          }
+        });
+      } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "UNKNOWN_ROLE") {
+          return reply.status(400).send({ error: "Role not found", code: "UNKNOWN_ROLE" });
+        }
+        if (err instanceof Error && err.message === "SELF_DEMOTE") {
+          return reply.status(400).send({
+            error: "Cannot remove your own admin role",
+            code: "SELF_DEMOTE",
+          });
+        }
+        if (err instanceof Error && err.message === "UNKNOWN_TEAM") {
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
+        if (err instanceof LastAdminError) {
+          return reply.status(400).send({
+            error: "Cannot demote the last admin",
+            code: "LAST_ADMIN",
+          });
+        }
+        throw err;
+      }
+      if (roleChanged) {
         request.log.info(
-          { targetUserId: id, oldRole: user.role, newRole: updates.role },
+          { targetUserId: id, oldRole: previousRole, newRole: updates.role },
           "Sessions invalidated due to role change",
         );
       }
 
       await auditFromRequest(request)("USER_UPDATED", {
         adminId: admin.id,
+        username: admin.username,
         targetUserId: id,
         changes: { role: updates.role, team: updates.team },
       });
@@ -1112,6 +1767,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
       const parsed = resetPasswordSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({
@@ -1120,14 +1778,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
       const body = parsed.data;
-
-      const pwError = await validatePasswordStrength(body.newPassword);
-      if (pwError) {
-        return reply.status(400).send({
-          error: pwError,
-          code: "VALIDATION_ERROR",
-        });
-      }
 
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
@@ -1149,21 +1799,81 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const newHash = await hashPassword(body.newPassword);
+      const pwError = await validatePasswordStrength(body.newPassword);
+      if (pwError) {
+        return reply.status(400).send(weakPasswordBody(pwError));
+      }
 
-      await db
-        .update(schema.users)
-        .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: new Date() })
-        .where(eq(schema.users.id, id));
+      const newHash = await hashPassword(normalizePassword(body.newPassword));
 
-      // Invalidate all sessions for this user
-      await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      // One transaction, for the same reason as change-password (#2089).
+      try {
+        await db.transaction(async (tx) => {
+          const [currentUser] = await tx
+            .select({ role: schema.users.role, passwordHash: schema.users.passwordHash })
+            .from(schema.users)
+            .where(eq(schema.users.id, id))
+            .for("no key update");
+          const [currentAdmin] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, admin.id));
 
-      // Revoke all API keys
-      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+          if (!currentAdmin) {
+            throw new EscalationDeniedError();
+          }
+
+          const currentActor = { ...admin, role: currentAdmin.role };
+
+          if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!currentUser) {
+            throw new Error("NOT_FOUND");
+          }
+
+          if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!currentUser.passwordHash) {
+            throw new Error("OIDC_NO_PASSWORD");
+          }
+
+          await tx
+            .update(schema.users)
+            .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: new Date() })
+            .where(eq(schema.users.id, id));
+
+          // Invalidate all sessions for this user
+          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+
+          // Revoke all API keys
+          await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+        });
+      } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
+        if (err instanceof Error && err.message === "OIDC_NO_PASSWORD") {
+          return reply.status(400).send({
+            error: "Cannot reset password for OIDC user.",
+            code: "OIDC_NO_PASSWORD",
+          });
+        }
+        throw err;
+      }
 
       await auditFromRequest(request)("PASSWORD_RESET", {
         adminId: admin.id,
+        username: admin.username,
         targetUserId: id,
         targetUsername: user.username,
       });
@@ -1180,6 +1890,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
 
       if (id === admin.id) {
         return reply.status(400).send({
@@ -1201,14 +1915,123 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Delete associated sessions
-      await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      // Loaded here rather than at the top: it reaches the preview route and the
+      // logger, which the auth plugin otherwise has no need to pull in.
+      const { deleteLibraryFileStorage } = await import("../lib/library-cleanup.js");
+      const assertDeleteAllowed = async (
+        tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+      ) => {
+        let lastAdminBlocked = false;
+        try {
+          await assertNotLastAdmin(tx, id);
+        } catch (err) {
+          if (err instanceof LastAdminError) {
+            lastAdminBlocked = true;
+          } else {
+            throw err;
+          }
+        }
 
-      // Delete the user (cascades to api_keys via FK)
-      await db.delete(schema.users).where(eq(schema.users.id, id));
+        const [currentAdmin] = await tx
+          .select({ role: schema.users.role })
+          .from(schema.users)
+          .where(eq(schema.users.id, admin.id));
+        const [currentUser] = await tx
+          .select({ role: schema.users.role })
+          .from(schema.users)
+          .where(eq(schema.users.id, id));
+
+        if (!currentAdmin) {
+          throw new EscalationDeniedError();
+        }
+
+        const currentActor = { ...admin, role: currentAdmin.role };
+
+        if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
+          throw new EscalationDeniedError();
+        }
+
+        if (!currentUser) {
+          throw new Error("NOT_FOUND");
+        }
+
+        if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
+          throw new EscalationDeniedError();
+        }
+
+        if (lastAdminBlocked) {
+          throw new LastAdminError();
+        }
+      };
+
+      // Refuse the last admin before anything is removed. The row deletes below
+      // check again under the lock every admin removal shares, which is what
+      // holds against two admins deleting each other at once (#2231).
+      try {
+        await db.transaction((tx) => assertDeleteAllowed(tx));
+      } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
+        if (err instanceof LastAdminError) {
+          return reply.status(400).send({
+            error: "Cannot delete the last admin",
+            code: "LAST_ADMIN",
+          });
+        }
+        throw err;
+      }
+
+      // The FK cascade below drops the user's user_files rows but not what they
+      // point at, so clear the stored files, thumbnails, and previews first (#1405).
+      // A storage delete that fails stops the user delete (#1455). This runs
+      // outside the lock so storage IO never holds up other admin removals.
+      const libraryFiles = await db
+        .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, id));
+      for (const file of libraryFiles) {
+        await deleteLibraryFileStorage(file);
+      }
+
+      try {
+        await db.transaction(async (tx) => {
+          await assertDeleteAllowed(tx);
+
+          // Delete associated sessions
+          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+
+          // Delete the user (cascades to api_keys and user_files via FK)
+          await tx.delete(schema.users).where(eq(schema.users.id, id));
+        });
+      } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
+        if (err instanceof LastAdminError) {
+          return reply.status(400).send({
+            error: "Cannot delete the last admin",
+            code: "LAST_ADMIN",
+          });
+        }
+        throw err;
+      }
 
       await auditFromRequest(request)("USER_DELETED", {
         adminId: admin.id,
+        username: admin.username,
         deletedUserId: id,
         deletedUsername: user.username,
       });
@@ -1220,7 +2043,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
 // ── Token extraction ───────────────────────────────────────────────
 
-function extractToken(request: FastifyRequest): string | null {
+export function extractToken(request: FastifyRequest): string | null {
   const authHeader = request.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.slice(7);
@@ -1234,7 +2057,7 @@ function extractToken(request: FastifyRequest): string | null {
 
 // ── Auth middleware ────────────────────────────────────────────────
 
-const PUBLIC_PATHS = [
+export const PUBLIC_PATHS = [
   "/api/v1/health",
   "/api/v1/readyz",
   "/api/v1/config/",
@@ -1247,7 +2070,7 @@ const PUBLIC_PATHS = [
   "/api/v1/scim/",
 ];
 
-function isPublicRoute(url: string): boolean {
+export function isPublicRoute(url: string): boolean {
   // Non-API routes are public (SPA static files — auth is handled client-side)
   if (!url.startsWith("/api/")) return true;
   // Download URLs use unguessable UUIDs as capability tokens — no auth needed
@@ -1354,7 +2177,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
               .select()
               .from(schema.users)
               .where(eq(schema.users.id, key.userId));
-            if (apiUser && !isDisabledRole(apiUser.role)) {
+            if (apiUser && apiUser.id !== "anonymous" && !isDisabledRole(apiUser.role)) {
               authAttempts.inc({ method: "apikey", result: "success" });
               const keyPermissions = key.permissions ?? undefined;
               (request as FastifyRequest & { user?: AuthUser }).user = {
@@ -1395,7 +2218,11 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
     }
 
     // ── Idle timeout enforcement ───────────────────────────────────
-    const idleTimeoutMinutes = await getSettingNumber("sessionIdleTimeoutMinutes");
+    const idleTimeoutMinutes = parseNumericSettingValue(
+      "sessionIdleTimeoutMinutes",
+      await getSettingStrict("sessionIdleTimeoutMinutes"),
+      0,
+    );
     if (idleTimeoutMinutes > 0) {
       const redis = sharedRedis();
       const idleKey = `session:idle:${token}`;

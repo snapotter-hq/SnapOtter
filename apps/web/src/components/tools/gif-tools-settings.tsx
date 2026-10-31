@@ -1,3 +1,4 @@
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { FlipHorizontal2, FlipVertical2, Link, RotateCw, Unlink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -5,6 +6,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useGifInfo } from "@/hooks/use-gif-info";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { isDimensionWithinLimit } from "@/lib/dimension-limits";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -12,6 +14,12 @@ type GifMode = "resize" | "optimize" | "speed" | "reverse" | "extract" | "rotate
 type LoopMode = "infinite" | "once" | "custom";
 type ResizeTab = "pixel" | "percentage";
 type ExtractTab = "single" | "range" | "all";
+
+const OPTIMIZE_COLORS = [2, 4, 16, 256] as const;
+type OptimizeColors = (typeof OPTIMIZE_COLORS)[number];
+const EXTRACT_TABS: readonly ExtractTab[] = ["single", "range", "all"];
+const EXTRACT_FORMATS: readonly ("png" | "webp")[] = ["png", "webp"];
+const ROTATE_ANGLES = [90, 180, 270] as const;
 
 const MODES: { id: GifMode; requiresAnimation: boolean }[] = [
   { id: "resize", requiresAnimation: false },
@@ -43,7 +51,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
   const [lockAspect, setLockAspect] = useState(true);
 
   // Optimize state
-  const [colors, setColors] = useState(256);
+  const [colors, setColors] = useState<OptimizeColors>(256);
   const [dither, setDither] = useState(1.0);
   const [effort, setEffort] = useState(7);
 
@@ -75,23 +83,106 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
   useEffect(() => {
     if (!initialSettings || initializedRef.current) return;
     initializedRef.current = true;
-    if (initialSettings.mode != null) setMode(initialSettings.mode as GifMode);
+    if (
+      typeof initialSettings.mode === "string" &&
+      MODES.some((m) => m.id === initialSettings.mode)
+    ) {
+      setMode(initialSettings.mode as GifMode);
+    }
     if (initialSettings.width != null) setWidth(String(initialSettings.width));
     if (initialSettings.height != null) setHeight(String(initialSettings.height));
-    if (initialSettings.percentage != null) setPercentage(String(initialSettings.percentage));
+    if (initialSettings.percentage != null) {
+      setPercentage(String(initialSettings.percentage));
+      if (initialSettings.width == null && initialSettings.height == null) {
+        setResizeTab("percentage");
+      }
+    }
+    if (
+      typeof initialSettings.colors === "number" &&
+      (OPTIMIZE_COLORS as readonly number[]).includes(initialSettings.colors)
+    ) {
+      setColors(initialSettings.colors as OptimizeColors);
+    }
+    if (initialSettings.dither != null) {
+      const d = Number(initialSettings.dither);
+      if (Number.isFinite(d) && d >= 0 && d <= 1) setDither(d);
+    }
+    if (initialSettings.effort != null) {
+      const e = Number(initialSettings.effort);
+      if (Number.isFinite(e) && e >= 1 && e <= 10) setEffort(e);
+    }
+    if (initialSettings.speedFactor != null) {
+      const factor = Number(initialSettings.speedFactor);
+      if (Number.isFinite(factor) && factor >= 0.1 && factor <= 10) {
+        setSpeedFactor(factor);
+        if (initialSettings.mode === "reverse") {
+          setReverseAdjustSpeed(true);
+          setReverseSpeed(factor);
+        }
+      }
+    }
+    if (
+      typeof initialSettings.extractMode === "string" &&
+      EXTRACT_TABS.includes(initialSettings.extractMode as ExtractTab)
+    ) {
+      setExtractTab(initialSettings.extractMode as ExtractTab);
+    }
+    if (initialSettings.frameNumber != null) {
+      setFrameNumber(String(initialSettings.frameNumber));
+    }
+    if (initialSettings.frameStart != null) {
+      setFrameStart(String(initialSettings.frameStart));
+    }
+    if (initialSettings.frameEnd != null) {
+      setFrameEnd(String(initialSettings.frameEnd));
+    }
+    if (
+      typeof initialSettings.extractFormat === "string" &&
+      EXTRACT_FORMATS.includes(initialSettings.extractFormat as "png" | "webp")
+    ) {
+      setExtractFormat(initialSettings.extractFormat as "png" | "webp");
+    }
+    if (initialSettings.angle != null) {
+      const a = Number(initialSettings.angle);
+      if ((ROTATE_ANGLES as readonly number[]).includes(a)) {
+        setAngle(a);
+      }
+    }
+    if (initialSettings.flipH != null) setFlipH(Boolean(initialSettings.flipH));
+    if (initialSettings.flipV != null) setFlipV(Boolean(initialSettings.flipV));
+    if (initialSettings.loop != null) {
+      const loop = Number(initialSettings.loop);
+      if (loop === 0) setLoopMode("infinite");
+      else if (loop === 1) setLoopMode("once");
+      else if (Number.isFinite(loop) && loop >= 2) {
+        setLoopMode("custom");
+        setLoopCount(String(loop));
+      }
+    }
   }, [initialSettings]);
 
   // Initialize loop from metadata
   useEffect(() => {
-    if (info) {
-      if (info.loop === 0) setLoopMode("infinite");
-      else if (info.loop === 1) setLoopMode("once");
-      else {
-        setLoopMode("custom");
-        setLoopCount(String(info.loop));
-      }
+    if (!info || initialSettings != null) return;
+    if (info.loop === 0) setLoopMode("infinite");
+    else if (info.loop === 1) setLoopMode("once");
+    else if (Number.isFinite(info.loop) && info.loop >= 2) {
+      setLoopMode("custom");
+      setLoopCount(String(info.loop));
     }
-  }, [info]);
+  }, [info, initialSettings]);
+
+  // Reset animation-only modes when standalone metadata resolves as a static image
+  useEffect(() => {
+    if (
+      initialSettings === undefined &&
+      info != null &&
+      info.pages <= 1 &&
+      MODES.find((m) => m.id === mode)?.requiresAnimation
+    ) {
+      setMode("resize");
+    }
+  }, [info, initialSettings, mode]);
 
   // Emit settings
   const onChangeRef = useRef(onChange);
@@ -181,7 +272,14 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
     rotate: t.toolSettings["gif-tools"].rotateMode,
   };
 
-  const maxFrame = Math.max(0, (info?.pages ?? 1) - 1);
+  const widthOverLimit =
+    resizeTab === "pixel" && width !== "" && !isDimensionWithinLimit(Number(width));
+  const heightOverLimit =
+    resizeTab === "pixel" && height !== "" && !isDimensionWithinLimit(Number(height));
+  const dimensionsOverLimit = widthOverLimit || heightOverLimit;
+
+  const maxFrame =
+    initialSettings === undefined && info != null ? Math.max(0, info.pages - 1) : undefined;
 
   return (
     <div className="space-y-4">
@@ -226,7 +324,11 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
         <p className="text-xs text-muted-foreground mb-1">{t.toolSettings["gif-tools"].mode}</p>
         <div className="grid grid-cols-3 gap-1">
           {MODES.map((m) => {
-            const disabled = m.requiresAnimation && !isAnimated;
+            const disabled =
+              m.requiresAnimation &&
+              initialSettings === undefined &&
+              info != null &&
+              info.pages <= 1;
             return (
               <button
                 key={m.id}
@@ -271,45 +373,62 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
           </div>
 
           {resizeTab === "pixel" ? (
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <label htmlFor="gif-width" className="text-xs text-muted-foreground">
-                  {t.toolSettings["gif-tools"].widthPx}
-                </label>
-                <input
-                  id="gif-width"
-                  type="number"
-                  value={width}
-                  onChange={(e) => setWidth(e.target.value)}
-                  placeholder={t.toolSettings["gif-tools"].auto}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-                />
+            <div>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label htmlFor="gif-width" className="text-xs text-muted-foreground">
+                    {t.toolSettings["gif-tools"].widthPx}
+                  </label>
+                  <input
+                    id="gif-width"
+                    type="number"
+                    value={width}
+                    onChange={(e) => setWidth(e.target.value)}
+                    placeholder={t.toolSettings["gif-tools"].auto}
+                    min={1}
+                    max={MAX_RESIZE_OUTPUT_DIMENSION}
+                    aria-invalid={widthOverLimit || undefined}
+                    aria-describedby={dimensionsOverLimit ? "gif-dimension-error" : undefined}
+                    className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLockAspect(!lockAspect)}
+                  className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
+                  title={
+                    lockAspect
+                      ? t.toolSettings["gif-tools"].unlockAspectRatio
+                      : t.toolSettings["gif-tools"].lockAspectRatio
+                  }
+                >
+                  {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
+                </button>
+                <div className="flex-1">
+                  <label htmlFor="gif-height" className="text-xs text-muted-foreground">
+                    {t.toolSettings["gif-tools"].heightPx}
+                  </label>
+                  <input
+                    id="gif-height"
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    placeholder={t.toolSettings["gif-tools"].auto}
+                    min={1}
+                    max={MAX_RESIZE_OUTPUT_DIMENSION}
+                    aria-invalid={heightOverLimit || undefined}
+                    aria-describedby={dimensionsOverLimit ? "gif-dimension-error" : undefined}
+                    className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+                  />
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setLockAspect(!lockAspect)}
-                className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
-                title={
-                  lockAspect
-                    ? t.toolSettings["gif-tools"].unlockAspectRatio
-                    : t.toolSettings["gif-tools"].lockAspectRatio
-                }
-              >
-                {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
-              </button>
-              <div className="flex-1">
-                <label htmlFor="gif-height" className="text-xs text-muted-foreground">
-                  {t.toolSettings["gif-tools"].heightPx}
-                </label>
-                <input
-                  id="gif-height"
-                  type="number"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  placeholder={t.toolSettings["gif-tools"].auto}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-                />
-              </div>
+              {dimensionsOverLimit && (
+                <p id="gif-dimension-error" className="mt-1 text-xs text-destructive-ink">
+                  {format(t.toolSettings["gif-tools"].maxDimensionExceeded, {
+                    max: MAX_RESIZE_OUTPUT_DIMENSION,
+                  })}
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -350,22 +469,22 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
       {mode === "optimize" && (
         <div className="space-y-3">
           <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="gif-colors" className="text-xs text-muted-foreground">
-                {t.toolSettings["gif-tools"].colors}
-              </label>
-              <span className="text-xs tabular-nums text-muted-foreground">{colors}</span>
+            <p className="text-xs text-muted-foreground mb-1">
+              {t.toolSettings["gif-tools"].colors}
+            </p>
+            <div id="gif-colors" className="flex gap-1">
+              {OPTIMIZE_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={colors === c}
+                  onClick={() => setColors(c)}
+                  className={tabClass(colors === c)}
+                >
+                  {c}
+                </button>
+              ))}
             </div>
-            <input
-              id="gif-colors"
-              type="range"
-              min={2}
-              max={256}
-              step={2}
-              value={colors}
-              onChange={(e) => setColors(Number(e.target.value))}
-              className="w-full mt-1 h-1.5 rounded-full appearance-none bg-muted accent-primary"
-            />
             <p className="text-[10px] text-muted-foreground mt-0.5">
               {t.toolSettings["gif-tools"].fewerColorsSmallerFile}
             </p>
@@ -530,9 +649,11 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                 max={maxFrame}
                 className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
               />
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {format(t.toolSettings["gif-tools"].frameRangeHint, { max: maxFrame })}
-              </p>
+              {maxFrame !== undefined && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {format(t.toolSettings["gif-tools"].frameRangeHint, { max: maxFrame })}
+                </p>
+              )}
             </div>
           )}
 
@@ -563,7 +684,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                   onChange={(e) => setFrameEnd(e.target.value)}
                   min={0}
                   max={maxFrame}
-                  placeholder={String(maxFrame)}
+                  placeholder={maxFrame !== undefined ? String(maxFrame) : undefined}
                   className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
                 />
               </div>
@@ -703,6 +824,11 @@ export function GifToolsSettings() {
   };
 
   const hasFile = files.length > 0;
+  const dimensionInvalid =
+    settings.mode === "resize" &&
+    [settings.width, settings.height].some(
+      (value) => typeof value === "number" && !isDimensionWithinLimit(value),
+    );
 
   return (
     <div className="space-y-4">
@@ -744,7 +870,7 @@ export function GifToolsSettings() {
           type="button"
           data-testid="gif-tools-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || dimensionInvalid}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {files.length > 1

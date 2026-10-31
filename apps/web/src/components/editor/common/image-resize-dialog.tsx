@@ -1,6 +1,9 @@
+import { SafeError } from "@snapotter/shared";
 import { Lock, Unlock, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
@@ -9,10 +12,12 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
   const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const resizeImage = useEditorStore((s) => s.resizeImage);
+  const rebaking = useEditorStore((s) => s.rebaking);
 
   const [width, setWidth] = useState(canvasSize.width);
   const [height, setHeight] = useState(canvasSize.height);
   const [lockAspect, setLockAspect] = useState(true);
+  const [applying, setApplying] = useState(false);
 
   const aspectRatio = canvasSize.width / canvasSize.height;
 
@@ -46,10 +51,23 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
     [lockAspect, aspectRatio],
   );
 
-  const handleApply = useCallback(() => {
-    resizeImage(width, height);
-    onClose();
-  }, [width, height, resizeImage, onClose]);
+  const handleApply = useCallback(async () => {
+    if (applying || rebaking) return;
+    setApplying(true);
+    try {
+      const applied = await resizeImage(width, height);
+      if (applied !== false) onClose();
+    } catch (err) {
+      console.error("Image resize failed", err);
+      void captureHandledError(
+        new SafeError("Editor could not resize the image", { kind: "operational", cause: err }),
+        { error_class: "operational" },
+      );
+      toast.error(t.common.somethingWentWrong);
+    } finally {
+      setApplying(false);
+    }
+  }, [applying, rebaking, width, height, resizeImage, onClose, t]);
 
   const pctWidth = canvasSize.width > 0 ? ((width / canvasSize.width) * 100).toFixed(1) : "100.0";
   const pctHeight =
@@ -157,10 +175,11 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
           </button>
           <button
             type="button"
-            onClick={handleApply}
+            onClick={() => void handleApply()}
+            disabled={applying || rebaking}
             className={cn(
               "h-8 rounded bg-primary px-3 text-sm text-primary-foreground",
-              "hover:bg-primary/90 transition-colors",
+              "hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
             )}
           >
             {t.editor.ui.apply}

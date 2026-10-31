@@ -119,18 +119,80 @@ describe("runQpdf via qpdfCheck (exit-code handling)", () => {
     );
   });
 
-  it("falls back to stdout in the error message when stderr is empty", async () => {
+  it("falls back to stdout in the error message when stderr is empty or whitespace-only", async () => {
     nextChild({ stdout: "stdout-only diagnostic", code: 2 });
     await expect(import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf"))).rejects.toThrow(
       "qpdf exited 2: stdout-only diagnostic",
     );
+
+    nextChild({ stderr: "  \n", stdout: "stdout-only diagnostic", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited SIGKILL: stdout-only diagnostic",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
   });
 
   it("reports the signal when the exit code is null", async () => {
     nextChild({ stderr: "killed by signal", code: null, signal: "SIGTERM" });
-    await expect(import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf"))).rejects.toThrow(
-      "qpdf exited SIGTERM: killed by signal",
-    );
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited SIGTERM: killed by signal",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGTERM",
+    });
+  });
+
+  it("rejects exit codes 126 and 127 as errno-coded spawn failures (#2920)", async () => {
+    nextChild({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+
+    nextChild({ stderr: "sh: qpdf: not found\n", code: 127 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfPageCount("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 127: sh: qpdf: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#2920)", async () => {
+    nextChild({ stderr: "", stdout: "", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfPageCount("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: `spawn ${QPDF_STUB} ENOMEM`,
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
+  });
+
+  it("does not mark ordinary qpdf exit codes as spawn failures (#2920)", async () => {
+    nextChild({ stderr: "unable to find trailer dictionary", code: 2 });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfPageCount("/doc.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("qpdf exited 2: unable to find trailer dictionary");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
   it("rejects with the spawn error object on an error event", async () => {
@@ -201,6 +263,57 @@ describe("runQpdf timeout", () => {
       vi.useRealTimers();
     }
   });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/qpdf.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(mod.qpdfCheck("/doc.pdf", { signal: ac.signal })).rejects.toThrow("Canceled");
+    await expect(mod.qpdfPageCount("/doc.pdf", { signal: ac.signal })).rejects.toThrow("Canceled");
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("kills the child with SIGKILL and rejects with Canceled when signal aborts mid-run", async () => {
+    const mod = await import("../src/qpdf.js");
+    const child = nextManualChild();
+    const ac = new AbortController();
+    const pending = mod.qpdfPageCount("/doc.pdf", { signal: ac.signal });
+    ac.abort();
+    await expect(pending).rejects.toThrow("Canceled");
+    expect(child.killSignals).toContain("SIGKILL");
+  });
+
+  it("removes the abort listener on close, error, and timeout in runQpdf", async () => {
+    const mod = await import("../src/qpdf.js");
+    const acClose = new AbortController();
+    const removeClose = vi.spyOn(acClose.signal, "removeEventListener");
+    nextChild({ code: 0 });
+    await mod.qpdfCheck("/doc.pdf", { signal: acClose.signal });
+    expect(removeClose).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const acErr = new AbortController();
+    const removeErr = vi.spyOn(acErr.signal, "removeEventListener");
+    nextChildError(new Error("spawn qpdf ENOENT"));
+    await expect(mod.qpdfCheck("/doc.pdf", { signal: acErr.signal })).rejects.toThrow(
+      "spawn qpdf ENOENT",
+    );
+    expect(removeErr).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    vi.useFakeTimers();
+    try {
+      const acTimeout = new AbortController();
+      const removeTimeout = vi.spyOn(acTimeout.signal, "removeEventListener");
+      nextManualChild();
+      const settled = expect(
+        mod.qpdfCheck("/doc.pdf", { timeoutMs: 5_000, signal: acTimeout.signal }),
+      ).rejects.toThrow("qpdf timed out after 5s");
+      await vi.advanceTimersByTimeAsync(5_000);
+      await settled;
+      expect(removeTimeout).toHaveBeenCalledWith("abort", expect.any(Function));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("qpdfCheck argument shape", () => {
@@ -238,6 +351,62 @@ describe("qpdfRequiresPassword", () => {
     await expect(
       import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/plain.pdf")),
     ).resolves.toBe(false);
+  });
+
+  it("rejects exit codes 126 and 127 as errno-coded spawn failures (#1331)", async () => {
+    nextChild({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+
+    nextChild({ stderr: "sh: qpdf: not found\n", code: 127 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 127: sh: qpdf: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+  });
+
+  it("rejects a signal kill (code === null) as an errno-coded spawn failure (#1331)", async () => {
+    nextChild({ stderr: "", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: `spawn ${QPDF_STUB} ENOMEM`,
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
+
+    nextChild({ stderr: "Out of memory\n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited SIGKILL: Out of memory",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
+  });
+
+  it("rejects any other non-zero exit code with the captured stderr (#1331)", async () => {
+    nextChild({ stderr: "qpdf: unexpected crash", code: 1 });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfRequiresPassword("/enc.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("qpdf exited 1: qpdf: unexpected crash");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
   it("rejects on an error event", async () => {
@@ -284,6 +453,58 @@ describe("qpdfRequiresPassword", () => {
       );
       await vi.advanceTimersByTimeAsync(30_000);
       await settled;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/qpdf.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(mod.qpdfRequiresPassword("/enc.pdf", { signal: ac.signal })).rejects.toThrow(
+      "Canceled",
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("kills the child with SIGKILL and rejects with Canceled when signal aborts mid-run", async () => {
+    const mod = await import("../src/qpdf.js");
+    const child = nextManualChild();
+    const ac = new AbortController();
+    const pending = mod.qpdfRequiresPassword("/enc.pdf", { signal: ac.signal });
+    ac.abort();
+    await expect(pending).rejects.toThrow("Canceled");
+    expect(child.killSignals).toContain("SIGKILL");
+  });
+
+  it("removes the abort listener on close, error, and timeout in qpdfRequiresPassword", async () => {
+    const mod = await import("../src/qpdf.js");
+    const acClose = new AbortController();
+    const removeClose = vi.spyOn(acClose.signal, "removeEventListener");
+    nextChild({ code: 2 });
+    await mod.qpdfRequiresPassword("/enc.pdf", { signal: acClose.signal });
+    expect(removeClose).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const acErr = new AbortController();
+    const removeErr = vi.spyOn(acErr.signal, "removeEventListener");
+    nextChildError(new Error("spawn failed"));
+    await expect(mod.qpdfRequiresPassword("/enc.pdf", { signal: acErr.signal })).rejects.toThrow(
+      "spawn failed",
+    );
+    expect(removeErr).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    vi.useFakeTimers();
+    try {
+      const acTimeout = new AbortController();
+      const removeTimeout = vi.spyOn(acTimeout.signal, "removeEventListener");
+      nextManualChild();
+      const settled = expect(
+        mod.qpdfRequiresPassword("/enc.pdf", { timeoutMs: 5_000, signal: acTimeout.signal }),
+      ).rejects.toThrow("qpdf timed out after 5s");
+      await vi.advanceTimersByTimeAsync(5_000);
+      await settled;
+      expect(removeTimeout).toHaveBeenCalledWith("abort", expect.any(Function));
     } finally {
       vi.useRealTimers();
     }

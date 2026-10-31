@@ -93,17 +93,30 @@ export function redirectIfUnprefixed(
 ): boolean {
   const unprefixed = unprefixPathname(location.pathname);
   if (unprefixed === null) {
-    storage?.removeItem(REDIRECT_STAMP_KEY);
+    try {
+      storage?.removeItem(REDIRECT_STAMP_KEY);
+    } catch {
+      // Storage blocked
+    }
     return false;
   }
-  const last = Number(storage?.getItem(REDIRECT_STAMP_KEY) ?? 0);
+  let last = 0;
+  try {
+    last = Number(storage?.getItem(REDIRECT_STAMP_KEY) ?? 0);
+  } catch {
+    // Storage blocked: redirect without a loop-guard record
+  }
   if (now - last < REDIRECT_LOOP_WINDOW_MS) {
     console.error(
       `Not redirecting ${location.pathname} to ${BASE_PATH} again: the last redirect came straight back. Check that the proxy forwards ${BASE_PATH}/ unchanged.`,
     );
     return false;
   }
-  storage?.setItem(REDIRECT_STAMP_KEY, String(now));
+  try {
+    storage?.setItem(REDIRECT_STAMP_KEY, String(now));
+  } catch {
+    // Storage blocked or full: redirect still happens, only loop protection is lost
+  }
   location.replace(appUrl(`${unprefixed}${location.search}${location.hash}`));
   return true;
 }

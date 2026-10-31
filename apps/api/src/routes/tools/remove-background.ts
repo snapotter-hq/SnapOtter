@@ -3,84 +3,283 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  BG_REMOVAL_MODELS,
+  getBundleForTool,
+  HEX_COLOR_PATTERN,
+  hasServerErrorStatus,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { db, schema } from "../../db/index.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
 import { autoSaveToLibrary } from "../../jobs/postprocess.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import {
   applyEffects,
   BG_FORMAT_CONTENT_TYPES,
   type BgOutputFormat,
 } from "../../lib/bg-effects.js";
+import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  getObjectBuffer,
+  isMissingObjectError,
+  isStorageServiceFault,
+  isValidObjectKey,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+} from "../../lib/object-storage.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { hasEffectivePermission } from "../../permissions.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
-const settingsSchema = z.object({
-  model: z.string().optional(),
-  backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
-  backgroundColor: z.string().optional(),
-  gradientColor1: z.string().optional(),
-  gradientColor2: z.string().optional(),
+const hexColor = z
+  .string()
+  .trim()
+  .regex(HEX_COLOR_PATTERN, "Use a hex color such as #FF5500 or #F50");
+
+const BACKGROUND_TYPES = ["transparent", "color", "gradient", "blur", "image"] as const;
+
+const backgroundFields = {
+  backgroundColor: hexColor.optional(),
+  gradientColor1: hexColor.optional(),
+  gradientColor2: hexColor.optional(),
   gradientAngle: z.number().optional(),
   blurEnabled: z.boolean().optional(),
   blurIntensity: z.number().min(0).max(100).optional(),
   shadowEnabled: z.boolean().optional(),
   shadowOpacity: z.number().min(0).max(100).optional(),
   outputFormat: z.enum(["png", "webp", "avif"]).optional(),
+};
+
+/** A color or gradient background has to say which colors, or it comes back transparent (#2075). */
+function requireBackgroundColors(
+  s: {
+    backgroundType?: string;
+    backgroundColor?: string;
+    gradientColor1?: string;
+    gradientColor2?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  const needs: Array<"backgroundColor" | "gradientColor1" | "gradientColor2"> =
+    s.backgroundType === "color"
+      ? ["backgroundColor"]
+      : s.backgroundType === "gradient"
+        ? ["gradientColor1", "gradientColor2"]
+        : [];
+  for (const key of needs) {
+    if (s[key] === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `A ${s.backgroundType} background needs ${key}`,
+      });
+    }
+  }
+}
+
+const settingsShape = z.object({
+  model: z.enum(BG_REMOVAL_MODELS).optional(),
+  backgroundType: z.enum(BACKGROUND_TYPES).optional(),
+  ...backgroundFields,
   edgeRefine: z.number().int().min(0).max(3).optional(),
   decontaminate: z.boolean().optional(),
 });
 
-// ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("remove-background", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+const settingsSchema = settingsShape.superRefine(requireBackgroundColors);
 
-  // Phase 1: AI background removal -> transparent PNG
-  const transparentResult = await removeBackground(
-    input,
-    ctx.scratchDir,
-    {
-      model: settings.model,
-      edgeRefine: settings.edgeRefine,
-      decontaminate: settings.decontaminate,
-      signal: ctx.signal,
-    },
-    (percent, stage) => ctx.report(percent, stage),
-  );
+type RemoveBgSettings = z.infer<typeof settingsSchema>;
 
-  // The mask IS the transparent result; cache original for effects re-apply
-  const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
-  const originalFilename = `${data.filename.replace(/\.[^.]+$/, "")}_original.png`;
+const PHASE_2_BACKGROUND_FIELDS = [
+  "backgroundType",
+  ...(Object.keys(backgroundFields) as Array<keyof typeof backgroundFields>),
+] as const;
 
-  const maskUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(maskFilename)}`;
-  const originalUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(originalFilename)}`;
+const PHASE_2_ONLY_MESSAGE =
+  "Phase 1 only returns the transparent mask; pass background and effect settings to POST /api/v1/tools/image/remove-background/effects";
 
+const phase2RejectedShape = Object.fromEntries(
+  PHASE_2_BACKGROUND_FIELDS.map((key) => [key, z.unknown().optional()]),
+) as Record<(typeof PHASE_2_BACKGROUND_FIELDS)[number], z.ZodOptional<z.ZodUnknown>>;
+
+// Phase 1 returns the transparent mask and caches the original; compositing happens
+// in Phase 2 (/effects) or in pipelines and batches (#2281).
+export const phase1SettingsSchema = z
+  .object({
+    model: z.enum(BG_REMOVAL_MODELS).optional(),
+    edgeRefine: z.number().int().min(0).max(3).optional(),
+    decontaminate: z.boolean().optional(),
+    ...phase2RejectedShape,
+  })
+  .superRefine((s, ctx) => {
+    for (const key of PHASE_2_BACKGROUND_FIELDS) {
+      if (s[key] !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: PHASE_2_ONLY_MESSAGE,
+        });
+      }
+    }
+  })
+  .transform(({ model, edgeRefine, decontaminate }) => ({
+    ...(model !== undefined ? { model } : {}),
+    ...(edgeRefine !== undefined ? { edgeRefine } : {}),
+    ...(decontaminate !== undefined ? { decontaminate } : {}),
+  }));
+
+// Pipelines and batches carry settings as JSON, so an uploaded background image
+// can't reach the worker. Reject the type up front instead of returning a
+// cutout with the background silently dropped (#1047).
+const pipelineSettingsSchema = settingsShape
+  .extend({ backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional() })
+  .superRefine(requireBackgroundColors);
+
+export const effectsSchema = z
+  .object({
+    jobId: z.string().min(1),
+    filename: z.string().min(1),
+    backgroundType: z.enum(BACKGROUND_TYPES).optional(),
+    ...backgroundFields,
+  })
+  .superRefine(requireBackgroundColors);
+
+/**
+ * Composite the cutout over the requested background and name the result.
+ * Shared by the pipeline/batch path of the AI handler and the registry process
+ * fn so the two cannot drift apart again (#1047).
+ */
+async function compositeCutout(
+  transparent: Buffer,
+  original: Buffer,
+  s: RemoveBgSettings,
+  filename: string,
+) {
+  const fmt = (s.outputFormat ?? "png") as BgOutputFormat;
+  const buffer = await applyEffects(transparent, original, {
+    backgroundType: s.backgroundType,
+    backgroundColor: s.backgroundColor,
+    gradientColor1: s.gradientColor1,
+    gradientColor2: s.gradientColor2,
+    gradientAngle: s.gradientAngle,
+    blurEnabled: s.blurEnabled,
+    blurIntensity: s.blurIntensity,
+    shadowEnabled: s.shadowEnabled,
+    shadowOpacity: s.shadowOpacity,
+    outputFormat: fmt,
+  });
   return {
-    buffer: transparentResult,
-    filename: maskFilename,
-    contentType: "image/png",
-    resultPayload: {
-      maskUrl,
-      originalUrl,
-      filename: data.filename,
-      model: settings.model,
-    },
-    extraOutputs: [{ name: originalFilename, buffer: input, contentType: "image/png" }],
+    buffer,
+    filename: `${filename.replace(/\.[^.]+$/, "")}_nobg.${fmt}`,
+    contentType: BG_FORMAT_CONTENT_TYPES[fmt],
   };
-});
+}
+
+/** Where Phase 1 caches the input that effects composites over. */
+function phase1OriginalKey(jobId: string, filename: string): string {
+  return `uploads/${jobId}/${filename.replace(/\.[^.]+$/, "")}_original.png`;
+}
+
+// ── AI job handler (runs inside the BullMQ worker) ────────────────
+// Standalone jobs ("ai-tool") are Phase 1 of the two-phase flow and return the
+// transparent mask. The composite below is the belt to the registry process
+// fn's braces: since #2076 that fn owns pipeline steps and batch children, and
+// the only kind reaching here is "ai-tool", but both paths call the same
+// compositeCutout so neither can drift from the other.
+registerAiJobHandler(
+  "remove-background",
+  withAiImageEncodeContext<RemoveBgSettings>(
+    "Background removal failed",
+    (s) => s?.outputFormat ?? "png",
+    async (input, data, ctx) => {
+      const standalone = data.kind === "ai-tool";
+      const settings = standalone
+        ? phase1SettingsSchema.parse(data.settings)
+        : settingsSchema.parse(data.settings);
+      const source = standalone ? input : await autoOrient(input);
+
+      // Phase 1: AI background removal -> transparent PNG
+      let transparentResult: Buffer;
+      try {
+        transparentResult = await removeBackground(
+          source,
+          ctx.scratchDir,
+          {
+            model: settings.model,
+            edgeRefine: settings.edgeRefine,
+            decontaminate: settings.decontaminate,
+            signal: ctx.signal,
+          },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(source, err);
+      }
+
+      if (!standalone) {
+        return compositeCutout(
+          transparentResult,
+          source,
+          settings as RemoveBgSettings,
+          data.filename,
+        );
+      }
+
+      // The mask IS the transparent result. The original is cached for effects
+      // under uploads/, which /api/v1/download never serves: outputs/<jobId>/
+      // is reachable by anyone holding the cutout's link, and that link must
+      // not hand out the input it was cut from.
+      const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
+      await putObject(phase1OriginalKey(data.jobId, data.filename), input);
+
+      const maskUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(maskFilename)}`;
+
+      return {
+        buffer: transparentResult,
+        filename: maskFilename,
+        contentType: "image/png",
+        resultPayload: {
+          maskUrl,
+          filename: data.filename,
+          model: settings.model,
+        },
+      };
+    },
+  ),
+);
 
 /**
  * AI background removal with two-phase flow:
@@ -116,6 +315,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
       let filename = "image";
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
       let fileId: string | null = null;
       let saveModeRaw: string | null = null;
       let inputKey: string | null = null;
@@ -130,10 +330,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           } else if (part.fieldname === "fileId") {
             fileId = part.value as string;
           } else if (part.fieldname === "saveMode") {
@@ -141,107 +338,132 @@ export function registerRemoveBackground(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        await discardUnenqueuedUploads(jobId, request.log);
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
-      // Stamp the client-facing alias before any pre-enqueue work (#892): a
-      // cancel landing between parse and enqueueToolJob needs a durable pointer
-      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      if (!inputKey) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      fileBuffer = await getObjectBuffer(inputKey);
-
-      if (!fileBuffer || fileBuffer.length === 0) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-
-      let settings: z.infer<typeof settingsSchema>;
+      let enqueued = false;
+      let aliasStamped = false;
       try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
         }
-        settings = result.data;
-      } catch {
-        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
+        clientJobId = clientJobIdField ?? null;
 
-      try {
-        // Decode HEIC/HEIF before processing
-        if (validation.format === "heif") {
-          fileBuffer = await decodeHeic(fileBuffer);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+        // Stamp the client-facing alias before any pre-enqueue work (#892): a
+        // cancel landing between parse and enqueueToolJob needs a durable pointer
+        // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
         }
 
-        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-        if (needsCliDecode(validation.format)) {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
         }
 
-        // Auto-orient to fix EXIF rotation
-        fileBuffer = await autoOrient(fileBuffer);
-      } catch (err) {
-        request.log.error({ err, toolId: "remove-background" }, "Input decoding failed");
-        return reply.status(422).send({
-          error: "Background removal failed",
-          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
-        });
+        if (!inputKey) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        try {
+          fileBuffer = await getObjectBuffer(inputKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
+
+        if (!fileBuffer || fileBuffer.length === 0) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        const validation = await validateImageBuffer(fileBuffer, filename);
+        if (!validation.valid) {
+          return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+        }
+
+        let settings: z.infer<typeof phase1SettingsSchema>;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = phase1SettingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply
+              .status(400)
+              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        try {
+          const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+            log: request.log,
+            rewriteFilenameToPng: true,
+            rasterizeSvg: true,
+          });
+          fileBuffer = prepared.buffer;
+          filename = prepared.filename;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
+          }
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId: "remove-background" }, "Input decoding failed");
+          }
+          return reply.status(422).send({
+            error: "Background removal failed",
+            details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+          });
+        }
+
+        // Write decoded input for the worker
+        const decodedKey = `uploads/${jobId}/${filename}`;
+        if (decodedKey !== inputKey) {
+          await putObject(decodedKey, fileBuffer);
+          inputKey = decodedKey;
+        } else {
+          await putObject(inputKey, fileBuffer);
+        }
+
+        // Enqueue on the AI pool
+        enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [inputKey],
+          filename,
+          settings,
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        };
+        try {
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
+
+        // AI tools always return 202 (no sync window)
+        return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      } finally {
+        if (!enqueued) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
+        }
       }
-
-      // Write decoded input for the worker
-      const decodedKey = `uploads/${jobId}/${filename}`;
-      if (decodedKey !== inputKey) {
-        await putObject(decodedKey, fileBuffer);
-        inputKey = decodedKey;
-      } else {
-        await putObject(inputKey, fileBuffer);
-      }
-
-      // Enqueue on the AI pool
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [inputKey],
-        filename,
-        settings,
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-      });
-
-      // AI tools always return 202 (no sync window)
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 
@@ -272,10 +494,8 @@ export function registerRemoveBackground(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       // Same 400 gate as the Phase 1 route: this is the FINAL request when the
@@ -289,82 +509,155 @@ export function registerRemoveBackground(app: FastifyInstance) {
         return reply.status(400).send({ error: "No settings provided" });
       }
 
-      const effectsSchema = z.object({
-        jobId: z.string().min(1),
-        filename: z.string().min(1),
-        backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
-        backgroundColor: z.string().optional(),
-        gradientColor1: z.string().optional(),
-        gradientColor2: z.string().optional(),
-        gradientAngle: z.number().optional(),
-        blurEnabled: z.boolean().optional(),
-        blurIntensity: z.number().min(0).max(100).optional(),
-        shadowEnabled: z.boolean().optional(),
-        shadowOpacity: z.number().min(0).max(100).optional(),
-        outputFormat: z.enum(["png", "webp", "avif"]).optional(),
-      });
+      let settings: z.infer<typeof effectsSchema>;
+      try {
+        const parsed = JSON.parse(settingsRaw);
+        const result = effectsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: formatZodErrors(result.error.issues),
+          });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      // Without the file this type falls through to a transparent result (#2075).
+      if (settings.backgroundType === "image" && !bgImageBuffer?.length) {
+        return reply.status(400).send({
+          error: "Invalid settings",
+          details: "backgroundType: An image background needs a backgroundImage file",
+        });
+      }
+
+      const { jobId, filename } = settings;
+
+      const baseName = filename.replace(/\.[^.]+$/, "");
+      const maskKey = `outputs/${jobId}/${baseName}_mask.png`;
+      const originalKey = phase1OriginalKey(jobId, filename);
+      // A key the store would refuse is the client's mistake, not a fault.
+      if (!isValidObjectKey(maskKey) || !isValidObjectKey(originalKey)) {
+        return reply.status(400).send({ error: "Invalid jobId or filename" });
+      }
+      // The jobId comes from the client, so only the user who ran Phase 1 (or
+      // a files:all holder) may read its outputs. 404 hides whether it exists.
+      const user = getAuthUser(request);
+      if (user) {
+        const [job] = await db
+          .select({ userId: schema.jobs.userId })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId));
+        if (job?.userId !== user.id && !(await hasEffectivePermission(user, "files:all"))) {
+          return reply.status(404).send({ error: "Job not found" });
+        }
+      }
+
+      // Read what the earlier removal stored outside the processing catch below,
+      // which answers 422 for anything (#2119). A missing object means the
+      // removal expired and the client must run it again; any other read failure
+      // is a storage fault and belongs to the error handler and Sentry. Both
+      // reads settle first, so a missing object can't hide a fault on the other.
+      const [maskRead, originalRead] = await Promise.allSettled([
+        getObjectBuffer(maskKey),
+        getObjectBuffer(originalKey),
+      ]);
+      if (maskRead.status === "rejected" || originalRead.status === "rejected") {
+        const reads = [
+          { key: maskKey, read: maskRead },
+          { key: originalKey, read: originalRead },
+        ].flatMap(({ key, read }) =>
+          read.status === "rejected" ? [{ key, err: read.reason }] : [],
+        );
+        const faults = reads
+          .filter(({ err }) => !isMissingObjectError(err))
+          .map(({ key, err }) => ({
+            key,
+            err: isStorageServiceFault(err) ? normalizeS3ReadFault(err) : err,
+          }));
+        if (faults.length > 0) {
+          // Only the first reaches the error handler; keep the rest in the logs.
+          for (const { key, err } of faults.slice(1)) {
+            request.log.error({ err, key }, "Stored cutout read failed");
+          }
+          throw faults[0].err;
+        }
+        // Expected once in a while; a stream of these means the volume or
+        // bucket lost outputs it should still hold. Both missing is a swept
+        // job; only one missing is an anomaly worth noticing.
+        request.log.warn(
+          { jobId, toolId: "remove-background", missing: reads.map(({ key }) => key) },
+          "Cutout missing at effects",
+        );
+        return reply.status(410).send({
+          error: "This image's background removal has expired. Remove the background again.",
+          code: "BACKGROUND_REMOVAL_EXPIRED",
+        });
+      }
+      const maskBuffer = maskRead.value;
+      const originalBuffer = originalRead.value;
 
       try {
-        let settings: z.infer<typeof effectsSchema>;
-        try {
-          const parsed = JSON.parse(settingsRaw);
-          const result = effectsSchema.safeParse(parsed);
-          if (!result.success) {
-            return reply.status(400).send({
-              error: "Invalid settings",
-              details: formatZodErrors(result.error.issues),
-            });
-          }
-          settings = result.data;
-        } catch {
-          return reply.status(400).send({ error: "Settings must be valid JSON" });
-        }
-
-        const { jobId, filename } = settings;
-
-        const baseName = filename.replace(/\.[^.]+$/, "");
-        const maskKey = `outputs/${jobId}/${baseName}_mask.png`;
-        const originalKey = `outputs/${jobId}/${baseName}_original.png`;
-
-        const [maskBuffer, originalBuffer] = await Promise.all([
-          getObjectBuffer(maskKey),
-          getObjectBuffer(originalKey),
-        ]);
-
-        // Decode HEIC/HEIF background image if needed
-        if (bgImageBuffer) {
+        // Validate and decode the custom background image when one is used
+        if (settings.backgroundType === "image" && bgImageBuffer) {
           const bgValidation = await validateImageBuffer(bgImageBuffer, bgFilename);
-          if (bgValidation.valid && bgValidation.format === "heif") {
-            bgImageBuffer = await decodeHeic(bgImageBuffer);
+          if (!bgValidation.valid) {
+            return reply
+              .status(400)
+              .send({ error: `Invalid background image: ${bgValidation.reason}` });
           }
-          if (bgValidation.valid && needsCliDecode(bgValidation.format)) {
-            bgImageBuffer = await decodeToSharpCompat(bgImageBuffer, bgValidation.format);
-          }
+          const preparedBg = await prepareRouteImage(
+            bgImageBuffer,
+            bgFilename,
+            bgValidation.format,
+            { log: request.log },
+          );
+          bgImageBuffer = preparedBg.buffer;
         }
 
         // Apply effects using cached mask + original
         const fmt = (settings.outputFormat ?? "png") as BgOutputFormat;
-        const resultBuffer = await applyEffects(maskBuffer, originalBuffer, {
-          backgroundType: settings.backgroundType,
-          backgroundColor: settings.backgroundColor,
-          gradientColor1: settings.gradientColor1,
-          gradientColor2: settings.gradientColor2,
-          gradientAngle: settings.gradientAngle,
-          backgroundImageBuffer: bgImageBuffer ?? undefined,
-          blurEnabled: settings.blurEnabled,
-          blurIntensity: settings.blurIntensity,
-          shadowEnabled: settings.shadowEnabled,
-          shadowOpacity: settings.shadowOpacity,
-          outputFormat: fmt,
-        });
+        let resultBuffer: Buffer;
+        try {
+          resultBuffer = await applyEffects(maskBuffer, originalBuffer, {
+            backgroundType: settings.backgroundType,
+            backgroundColor: settings.backgroundColor,
+            gradientColor1: settings.gradientColor1,
+            gradientColor2: settings.gradientColor2,
+            gradientAngle: settings.gradientAngle,
+            backgroundImageBuffer:
+              settings.backgroundType === "image" ? (bgImageBuffer ?? undefined) : undefined,
+            blurEnabled: settings.blurEnabled,
+            blurIntensity: settings.blurIntensity,
+            shadowEnabled: settings.shadowEnabled,
+            shadowOpacity: settings.shadowOpacity,
+            outputFormat: fmt,
+          });
+        } catch (err) {
+          if (settings.backgroundType === "image" && bgImageBuffer) {
+            throw await asInputErrorIfUndecodable(bgImageBuffer, err);
+          }
+          throw err;
+        }
 
-        // Save the final output
+        // Save the final output under a fresh server-generated jobId so
+        // Phase 2 never writes into a client-selected prefix or exposes the
+        // Phase 1 jobId in the final downloadUrl.
+        const outputJobId = randomUUID();
         const outputFilename = `${baseName}_nobg.${fmt}`;
-        await putObject(`outputs/${jobId}/${outputFilename}`, resultBuffer);
+        const outputKey = `outputs/${outputJobId}/${outputFilename}`;
+        await recordCompletedToolJob({
+          jobId: outputJobId,
+          userId: user?.id ?? null,
+          toolId: "remove-background",
+          outputRefs: [outputKey],
+        });
+        await putObject(outputKey, resultBuffer);
 
         // Auto-save the composited result (not the Phase 1 transparent
         // intermediate) to the library when the run referenced a library file.
-        const savedFileId = await autoSaveToLibrary({
+        const autoSaveResult = await autoSaveToLibrary({
           fileId: fileId ?? undefined,
           saveMode,
           userId: getAuthUser(request)?.id ?? null,
@@ -372,16 +665,27 @@ export function registerRemoveBackground(app: FastifyInstance) {
           outName: outputFilename,
           contentType: BG_FORMAT_CONTENT_TYPES[fmt],
           toolId: "remove-background",
+          jobId: outputJobId,
         });
+        const savedFileId = autoSaveResult.fileId;
 
         return reply.send({
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+          jobId: outputJobId,
+          downloadUrl: `/api/v1/download/${outputJobId}/${encodeURIComponent(outputFilename)}`,
           processedSize: resultBuffer.length,
           savedFileId,
+          autoSaveError: autoSaveResult.error,
         });
-      } catch (err) {
-        request.log.error({ err }, "Effects processing failed");
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
+        }
+        if (isDecoderUnavailable(err)) throw err;
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err }, "Effects processing failed");
+        }
         return reply.status(422).send({
           error: "Effects processing failed",
           details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
@@ -393,44 +697,34 @@ export function registerRemoveBackground(app: FastifyInstance) {
   // ── Pipeline/batch registry ──────────────────────────────────────
   registerToolProcessFn({
     toolId: "remove-background",
-    settingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as z.infer<typeof settingsSchema>;
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const transparentResult = await removeBackground(orientedBuffer, scratchDir, {
-          model: s.model,
-          edgeRefine: s.edgeRefine,
-          decontaminate: s.decontaminate,
-          signal: ctx?.signal,
-        });
+    settingsSchema: pipelineSettingsSchema,
+    process: withImageEncodeContext<unknown>(
+      "Background removal failed",
+      (s) => (s as RemoveBgSettings)?.outputFormat ?? "png",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as z.infer<typeof settingsSchema>;
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let transparentResult: Buffer;
+          try {
+            transparentResult = await removeBackground(orientedBuffer, scratchDir, {
+              model: s.model,
+              edgeRefine: s.edgeRefine,
+              decontaminate: s.decontaminate,
+              signal: ctx?.signal,
+            });
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
 
-        const fmt = (s.outputFormat ?? "png") as BgOutputFormat;
-        const resultBuffer = await applyEffects(transparentResult, orientedBuffer, {
-          backgroundType: s.backgroundType,
-          backgroundColor: s.backgroundColor,
-          gradientColor1: s.gradientColor1,
-          gradientColor2: s.gradientColor2,
-          gradientAngle: s.gradientAngle,
-          blurEnabled: s.blurEnabled,
-          blurIntensity: s.blurIntensity,
-          shadowEnabled: s.shadowEnabled,
-          shadowOpacity: s.shadowOpacity,
-          outputFormat: fmt,
-        });
-
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.${fmt}`;
-        return {
-          buffer: resultBuffer,
-          filename: outputFilename,
-          contentType: BG_FORMAT_CONTENT_TYPES[fmt],
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+          return await compositeCutout(transparentResult, orientedBuffer, s, filename);
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

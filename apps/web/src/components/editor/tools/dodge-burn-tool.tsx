@@ -2,18 +2,24 @@
 
 import type Konva from "konva";
 import { useCallback, useRef } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject, ToolType } from "@/types/editor";
-import { captureDocumentCanvas } from "../stage-capture";
+import {
+  captureDocumentContext,
+  finishStroke,
+  reportCaptureFailure,
+  strokeToDataUrl,
+} from "../stage-capture";
 
 const DODGE_BURN_TOOLS = new Set<ToolType>(["dodge", "burn", "sponge"]);
 
 interface StrokeState {
   objectId: string;
   canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  sourceSnapshot: ImageData;
+  strokeCtx: CanvasRenderingContext2D;
+  workingCtx: CanvasRenderingContext2D;
 }
 
 function getRangeFactor(
@@ -96,6 +102,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) {
   const strokeRef = useRef<StrokeState | null>(null);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const handleMouseDown = useCallback(
     (_e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -113,27 +120,35 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
       const y = Math.floor((pointer.y - panOffset.y) / zoom);
       if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) return;
 
-      // Snapshot the document pixels at document resolution.
-      const stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
+      // Snapshot the document pixels at document resolution. The capture is the
+      // working buffer: each dab reads from it and writes its result back into it.
+      const capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      if (!capture.ok) {
+        reportCaptureFailure(capture.reason, captureMessages);
+        return;
+      }
+      const workingCtx = capture.ctx;
 
-      const stageCtx = stageCanvas.getContext("2d");
-      if (!stageCtx) return;
-
-      const sourceSnapshot = stageCtx.getImageData(0, 0, canvasSize.width, canvasSize.height);
-
-      // Create output canvas
+      // The stroke object starts fully transparent and only receives the pixels the
+      // brush touches. Seeding it with the whole snapshot stacked an opaque copy of
+      // the entire document on top of the image (#1038, same as #829).
       const canvas = document.createElement("canvas");
       canvas.width = canvasSize.width;
       canvas.height = canvasSize.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      const strokeCtx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!strokeCtx) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
-      ctx.putImageData(sourceSnapshot, 0, 0);
-
-      applyBrushDab(ctx, sourceSnapshot, x, y, canvasSize);
+      applyBrushDab(workingCtx, strokeCtx, x, y, canvasSize);
 
       const id = generateId();
-      const dataUrl = canvas.toDataURL();
+      const dataUrl = strokeToDataUrl(canvas);
+      if (!dataUrl) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       const obj: CanvasObject = {
         id,
@@ -151,9 +166,9 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
       };
 
       useEditorStore.getState().addObject(obj);
-      strokeRef.current = { objectId: id, canvas, ctx, sourceSnapshot };
+      strokeRef.current = { objectId: id, canvas, strokeCtx, workingCtx };
     },
-    [stageRef],
+    [stageRef, captureMessages],
   );
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -170,9 +185,9 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
     const x = Math.floor((pointer.x - panOffset.x) / zoom);
     const y = Math.floor((pointer.y - panOffset.y) / zoom);
 
-    const { ctx, sourceSnapshot, canvas, objectId } = strokeRef.current;
+    const { strokeCtx, workingCtx, canvas, objectId } = strokeRef.current;
 
-    applyBrushDab(ctx, sourceSnapshot, x, y, canvasSize);
+    applyBrushDab(workingCtx, strokeCtx, x, y, canvasSize);
 
     // Use canvas element directly as image source during the stroke instead of
     // converting to a data URL on every mouse move (major perf fix).
@@ -182,25 +197,20 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    if (strokeRef.current) {
-      const { canvas, objectId } = strokeRef.current;
-      const dataUrl = canvas.toDataURL();
-      useEditorStore
-        .getState()
-        .updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<
-          string,
-          unknown
-        >);
-    }
+    const stroke = strokeRef.current;
     strokeRef.current = null;
-  }, []);
+    if (stroke) finishStroke(stroke.objectId, stroke.canvas, captureMessages);
+  }, [captureMessages]);
 
   return { handleMouseDown, handleMouseMove, handleMouseUp };
 }
 
+// Applies one dab to the working buffer, then copies just the brushed circle onto
+// the stroke canvas. Every other stroke pixel keeps what it had: transparent unless
+// an earlier dab of the same stroke touched it.
 function applyBrushDab(
-  ctx: CanvasRenderingContext2D,
-  _source: ImageData,
+  workingCtx: CanvasRenderingContext2D,
+  strokeCtx: CanvasRenderingContext2D,
   centerX: number,
   centerY: number,
   canvasSize: { width: number; height: number },
@@ -212,15 +222,16 @@ function applyBrushDab(
   const exposure = dodgeBurnExposure / 100;
   const flow = spongeFlow / 100;
 
-  const imageData = ctx.getImageData(
-    Math.max(0, centerX - halfSize),
-    Math.max(0, centerY - halfSize),
-    Math.min(canvasSize.width, centerX + halfSize + 1) - Math.max(0, centerX - halfSize),
-    Math.min(canvasSize.height, centerY + halfSize + 1) - Math.max(0, centerY - halfSize),
-  );
-
   const startPx = Math.max(0, centerX - halfSize);
   const startPy = Math.max(0, centerY - halfSize);
+  const width = Math.min(canvasSize.width, centerX + halfSize + 1) - startPx;
+  const height = Math.min(canvasSize.height, centerY + halfSize + 1) - startPy;
+  // A dab centred beyond the document edge has no pixels to read. Without this,
+  // getImageData throws on an empty rect and, further out, flips it and reads
+  // transparent black (#2071).
+  if (width <= 0 || height <= 0) return;
+  const imageData = workingCtx.getImageData(startPx, startPy, width, height);
+  const patch = strokeCtx.getImageData(startPx, startPy, imageData.width, imageData.height);
 
   for (let py = 0; py < imageData.height; py++) {
     for (let px = 0; px < imageData.width; px++) {
@@ -263,8 +274,13 @@ function applyBrushDab(
       imageData.data[idx] = r;
       imageData.data[idx + 1] = g;
       imageData.data[idx + 2] = b;
+      patch.data[idx] = r;
+      patch.data[idx + 1] = g;
+      patch.data[idx + 2] = b;
+      patch.data[idx + 3] = imageData.data[idx + 3];
     }
   }
 
-  ctx.putImageData(imageData, startPx, startPy);
+  workingCtx.putImageData(imageData, startPx, startPy);
+  strokeCtx.putImageData(patch, startPx, startPy);
 }

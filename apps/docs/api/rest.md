@@ -176,7 +176,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 
 | Tool ID | Name | AI Model | Key settings |
 |---------|------|---------|-------------|
-| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | Phase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Phase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, and pipelines: `backgroundType` (transparent/color/gradient/blur, plus image on `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask sent as second file part (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Text Extraction | Tesseract (fast); RapidOCR + PP-OCR ONNX (balanced/best) | `quality` (fast/balanced/best), `language`, `enhance` |
@@ -240,7 +240,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 |---------|------|-------------|
 | `svg-to-raster` | SVG to Raster | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Image to SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF Tools | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), action-specific params |
+| `gif-tools` | GIF Tools | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP Converter | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Video Tools {#video-tools}
@@ -529,7 +529,7 @@ To auto-save a tool result to the library, include `fileId` as a multipart form 
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | List teams |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Create team |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Rename team |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Update team (at least one field required) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Delete team (cannot delete default team or teams with members) |
 
 ## Settings {#settings}

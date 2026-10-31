@@ -1,7 +1,7 @@
 ---
 description: "Extrahera text från skannade PDF-filer lokalt med inbyggd Tesseract eller den valfria RapidOCR-körtiden med hög precision."
 i18n_output_hash: 3c4cbee240b7
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -11,8 +11,8 @@ Extrahera text från skannade PDF-dokument sida för sida utan att skicka PDF ti
 
 
 <!-- korean-ocr-contract:start -->
-::: info Kompatibilitet för koreansk OCR
-Snabb OCR stöder `auto`, `en`, `de`, `es`, `fr`, `zh` och `ja`, men inte koreanska (`ko`). Koreanska kräver det exakta OCR-paketet och `balanced` eller `best`. Paketet fungerar i officiella Linux amd64- och arm64-containrar, även på NVIDIA-värdar där OCR fortsätter köras på CPU. System som inte stöds får ett uttryckligt kompatibilitetsfel och faller aldrig tyst tillbaka till `fast`. Koreanska med `fast` eller det äldre aliaset `tesseract` avvisas före köläggning med `FEATURE_INCOMPATIBLE` och `fast-korean-unsupported`.
+::: info Kompatibilitet för koreansk och arabisk OCR
+Snabb OCR stöder `auto`, `en`, `de`, `es`, `fr`, `zh` och `ja`, men inte koreanska (`ko`) eller arabiska (`ar`). Koreanska och arabiska kräver det exakta OCR-paketet och `balanced` eller `best`. Paketet fungerar i officiella Linux amd64- och arm64-containrar, även på NVIDIA-värdar där OCR fortsätter köras på CPU. System som inte stöds får ett uttryckligt kompatibilitetsfel och faller aldrig tyst tillbaka till `fast`. Koreanska eller arabiska med `fast` eller det äldre aliaset `tesseract` avvisas före köläggning med `FEATURE_INCOMPATIBLE` och `fast-korean-unsupported`.
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -27,12 +27,12 @@ Tar emot multipart-formulärdata med en PDF-fil och ett valfritt JSON-fält `set
 |-----------|------|----------|---------|-------------|
 | file | file | Ja | - | PDF-fil (flerpart), upp till 512 MiB-kodade; en lägre uppladdningsgräns för operatören gäller fortfarande |
 | quality | string | Inga | Dynamisk | OCR kvalitetsnivå: `fast`, `balanced` eller `best` |
-| language | string | Nej | `"auto"` | Dokumentspråk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | Nej | `"auto"` | Dokumentspråk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | pages | string | Nej | `"all"` | Sidval, t.ex. `"all"`, `"1-3"`, `"1,3,5"` |
 | enhance | boolean | Inga | Tierberoende | Förbättra den lokala kontrasten före igenkänning. Fast applicerar det direkt; Balanced och Best behåller varianten endast när kalibrerad poängsättning förbättrar resultatet. Standard är `true` för `best` och `false` för `fast`/`balanced` |
 | engine | string | Inga | - | Utfasat kompatibilitetsalias. Använd `quality` istället. `tesseract` mappar till `fast`; det äldre `paddleocr`-värdet mappas till `balanced` men laddar inte PaddlePaddle |
 
-När `quality` och `engine` utelämnas väljer SnapOtter den bästa tillgängliga nivån i ordningen `best`, `balanced`, `fast`. För koreanska väljs aldrig `fast`; `best`, sedan `balanced` används, annars returneras installations- eller kompatibilitetsfelet för den exakta körmiljön.
+När `quality` och `engine` utelämnas väljer SnapOtter den bästa tillgängliga nivån i ordningen `best`, `balanced`, `fast`. För koreanska och arabiska väljs aldrig `fast`; `best`, sedan `balanced` används, annars returneras installations- eller kompatibilitetsfelet för den exakta körmiljön.
 
 ## Example Request {#example-request}
 

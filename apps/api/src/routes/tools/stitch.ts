@@ -1,17 +1,27 @@
 import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+  noteDecoderFallback,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   direction: z.enum(["horizontal", "vertical", "grid"]).default("horizontal"),
@@ -68,10 +78,8 @@ export function registerStitch(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (files.length < 2) {
@@ -89,42 +97,66 @@ export function registerStitch(app: FastifyInstance) {
       if (validation.format === "heif") {
         try {
           file.buffer = await decodeHeic(file.buffer);
-        } catch (err) {
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       }
 
+      let fallbackFormat: string | undefined;
       if (needsCliDecode(validation.format)) {
-        const fileExt = file.filename.split(".").pop()?.toLowerCase();
+        const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
         try {
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-        } catch {
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
           try {
-            await sharp(file.buffer).metadata();
-          } catch (err) {
+            const meta = await sharp(file.buffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(file.buffer).resize(1).raw().toBuffer();
+            }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+            request.log?.warn({ err: decodeErr, toolId: "stitch" }, "Decode failed");
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(
+                decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+              ),
             });
           }
         }
       }
 
-      if (validation.format === "svg") {
+      if (validation.format === "svg" || fallbackFormat === "svg") {
         try {
           file.buffer = decompressSvgz(file.buffer);
           file.buffer = sanitizeSvg(file.buffer);
         } catch (err) {
-          return reply.status(400).send({
-            error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
-          });
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
+            });
+          }
+          throw asDecoderOutOfMemory(err);
         }
+      } else {
+        file.buffer = await autoOrient(file.buffer);
       }
-
-      file.buffer = await autoOrient(file.buffer);
     }
 
     let settings: z.infer<typeof settingsSchema>;
@@ -296,10 +328,13 @@ export function registerStitch(app: FastifyInstance) {
         originalSize: files.reduce((s, f) => s + f.buffer.length, 0),
         processedSize: result.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err)) throw err;
+      if (hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Stitch creation failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

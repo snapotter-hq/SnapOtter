@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToolFeedbackPrompt } from "@/components/feedback/tool-feedback-prompt";
 import { useAnalyticsStore } from "@/stores/analytics-store";
@@ -29,7 +29,8 @@ vi.mock("@/lib/feedback", async (importOriginal) => {
 beforeEach(() => {
   vi.stubGlobal("localStorage", localStorageMock);
   localStorage.clear();
-  submitFeedback.mockClear();
+  submitFeedback.mockReset();
+  submitFeedback.mockResolvedValue({ ok: true, accepted: true });
   localStorageMock.getItem.mockClear();
   localStorageMock.setItem.mockClear();
   localStorageMock.removeItem.mockClear();
@@ -41,6 +42,7 @@ beforeEach(() => {
       enabled: true,
       posthogApiKey: "phc_test",
       posthogHost: "https://us.i.posthog.com",
+      feedbackSink: true,
       sentryDsn: "",
       sentryDsnWeb: "",
       posthogSampleRate: 1,
@@ -63,6 +65,26 @@ describe("ToolFeedbackPrompt", () => {
     expect(screen.getByRole("button", { name: "Worked well" })).toBeDefined();
   });
 
+  it("does not render on a Sentry-only instance, where feedback can't be recorded (#2220)", () => {
+    useAnalyticsStore.setState({
+      configLoaded: true,
+      config: {
+        enabled: true,
+        posthogApiKey: "",
+        posthogHost: "",
+        feedbackSink: false,
+        sentryDsn: "https://key@sentry.example/1",
+        sentryDsnWeb: "https://key@sentry.example/1",
+        posthogSampleRate: 1,
+        instanceId: "instance",
+      },
+    });
+
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    expect(screen.queryByText("How did this tool work?")).toBeNull();
+  });
+
   it("does not render when analytics is disabled", () => {
     useAnalyticsStore.setState({
       configLoaded: true,
@@ -70,6 +92,7 @@ describe("ToolFeedbackPrompt", () => {
         enabled: false,
         posthogApiKey: "",
         posthogHost: "",
+        feedbackSink: false,
         sentryDsn: "",
         sentryDsnWeb: "",
         posthogSampleRate: 0,
@@ -99,9 +122,83 @@ describe("ToolFeedbackPrompt", () => {
       });
     });
 
-    expect(screen.getByText("Thanks for the signal.")).toBeDefined();
+    expect(await screen.findByText("Thanks for the signal.")).toBeDefined();
     expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeTruthy();
     expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeTruthy();
+  });
+
+  it("does not thank or arm cooldowns when the server declines the quick answer (#2252)", async () => {
+    submitFeedback.mockResolvedValueOnce({ ok: true, accepted: false });
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Worked well" }));
+
+    await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+    // A declined answer is not recorded, so the prompt must not claim it was,
+    // and the handled cooldowns must not be armed.
+    const dialog = await screen.findByRole("dialog");
+    const githubLink = await within(dialog).findByRole("link", {
+      name: "Open a GitHub issue",
+    });
+    const details =
+      new URL(githubLink.getAttribute("href") ?? "").searchParams.get("details") ?? "";
+    expect(details).toContain("resize");
+    expect(details).toContain("great");
+    expect(screen.queryByText("Thanks for the signal.")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeNull();
+  });
+
+  it("opens the form for a retry when the quick answer fails to send", async () => {
+    submitFeedback.mockRejectedValueOnce(new Error("network error"));
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Worked well" }));
+
+    await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+    const dialog = await screen.findByRole("dialog");
+    // A network failure is not a server decline, so the user gets the form to
+    // retry rather than the offline handoff.
+    expect(within(dialog).getByRole("button", { name: "Send feedback" })).toBeDefined();
+    expect(screen.queryByText("Thanks for the signal.")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeNull();
+  });
+
+  it("ignores a second quick click while the first is in flight", async () => {
+    let resolveSubmit: ((value: { ok: boolean; accepted: boolean }) => void) | undefined;
+    submitFeedback.mockImplementationOnce(
+      () =>
+        new Promise<{ ok: boolean; accepted: boolean }>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    const button = screen.getByRole("button", { name: "Worked well" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(submitFeedback).toHaveBeenCalledTimes(1);
+    resolveSubmit?.({ ok: true, accepted: true });
+    expect(await screen.findByText("Thanks for the signal.")).toBeDefined();
+  });
+
+  it("does not show quick thanks when a dialog submission is declined (#2252)", async () => {
+    submitFeedback.mockResolvedValueOnce({ ok: true, accepted: false });
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Had an issue" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), {
+      target: { value: "The output looked washed out" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Send feedback" }));
+
+    expect(await within(dialog).findByRole("link", { name: "Open a GitHub issue" })).toBeDefined();
+    expect(screen.queryByText("Thanks for the signal.")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeNull();
   });
 
   it("is suppressed during the 30-day global cooldown", () => {

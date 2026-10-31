@@ -7,12 +7,33 @@
  * network calls entirely.
  */
 
+import { gzipSync } from "node:zlib";
+import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import { decideExpiry } from "../../../apps/api/src/jobs/system-jobs.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const JPG = readFixture(fixtures.image.base.jpg100);
 const TIFF = readFixture(fixtures.image.formats("tiff"));
+const DIRTY_SVGZ = gzipSync(
+  Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><script>alert(1)</script><rect width="40" height="30"/></svg>',
+  ),
+);
+const DOCTYPE_SVG = Buffer.from(
+  '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50"><script>alert(2)</script><rect width="60" height="50"/></svg>',
+);
+const XXE_SVG = Buffer.from(
+  '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><text>&xxe;</text></svg>',
+);
+const CORRUPT_SVGZ = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff, 0xff]);
+const OVER_CAP_SVG = Buffer.from(
+  `<svg xmlns="http://www.w3.org/2000/svg">${"<rect/>".repeat(5001)}</svg>`,
+);
 // PSD is a CLI-decoded format (file-validation.ts skips the Sharp dimension
 // check for it). The route decodes it via decodeToSharpCompat() before
 // generating a preview, so this fixture exercises that decode path.
@@ -40,7 +61,7 @@ function mockResponse(
 ): Response {
   const status = init.status ?? 200;
   const buf = body ? (typeof body === "string" ? Buffer.from(body) : body) : Buffer.alloc(0);
-  return new Response(body === null || buf.length === 0 ? null : buf, {
+  return new Response(body === null || buf.length === 0 ? null : new Uint8Array(buf), {
     status,
     statusText: status === 200 ? "OK" : status === 404 ? "Not Found" : "Error",
     headers: new Headers(init.headers),
@@ -114,6 +135,44 @@ function createMockFetch() {
         return mockResponse("PLAIN NON IMAGE PAYLOAD", {
           headers: { "Content-Type": "application/pdf; charset=binary" },
         });
+      case "/notes.dng":
+      case "/notes.tga":
+      case "/.gitignore":
+        return mockResponse("hello", {
+          headers: { "Content-Type": "text/plain" },
+        });
+      case "/fake-image.jpg":
+        return mockResponse("not an image", {
+          headers: { "Content-Type": "image/jpeg" },
+        });
+      case "/fake-image.tga":
+        return mockResponse("not an image", {
+          headers: { "Content-Type": "image/x-tga" },
+        });
+      case "/fake-mixed-case.png":
+        return mockResponse("<html>error</html>", {
+          headers: { "Content-Type": "Image/PNG; charset=utf-8" },
+        });
+      case "/icon.svgz":
+        return mockResponse(DIRTY_SVGZ, {
+          headers: { "Content-Type": "application/gzip" },
+        });
+      case "/doctype.svg":
+        return mockResponse(DOCTYPE_SVG, {
+          headers: { "Content-Type": "image/svg+xml" },
+        });
+      case "/xxe.svg":
+        return mockResponse(XXE_SVG, {
+          headers: { "Content-Type": "image/svg+xml" },
+        });
+      case "/corrupt.svgz":
+        return mockResponse(CORRUPT_SVGZ, {
+          headers: { "Content-Type": "image/svg+xml" },
+        });
+      case "/over-cap.svg":
+        return mockResponse(OVER_CAP_SVG, {
+          headers: { "Content-Type": "image/svg+xml" },
+        });
       // 3xx redirect that omits the Location header -> safeFetch throws and the
       // route surfaces it as a failure result.
       case "/redirect-no-location":
@@ -135,11 +194,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 let mockFetch: ReturnType<typeof createMockFetch>;
 
@@ -762,5 +821,232 @@ describe("POST /api/v1/fetch-urls", () => {
     expect(body.results[4].error).toContain("500");
     expect(body.results[5].success).toBe(false);
     expect(body.results[5].error).toContain("Empty");
+  });
+
+  it("preserves non-image contentType and undefined dimensions for nameOnly image extensions and dotfile URLs (#3263)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        urls: [`${MOCK_ORIGIN}/notes.dng`, `${MOCK_ORIGIN}/notes.tga`, `${MOCK_ORIGIN}/.gitignore`],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(3);
+
+    expect(body.results[0]).toMatchObject({
+      success: true,
+      filename: "notes.dng",
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+    expect(body.results[0].width).toBeUndefined();
+    expect(body.results[0].height).toBeUndefined();
+
+    expect(body.results[1]).toMatchObject({
+      success: true,
+      filename: "notes.tga",
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+    expect(body.results[1].width).toBeUndefined();
+    expect(body.results[1].height).toBeUndefined();
+
+    expect(body.results[2]).toMatchObject({
+      success: true,
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+    expect(body.results[2].filename).toMatch(/^file-[0-9a-f]{8}$/);
+    expect(body.results[2].width).toBeUndefined();
+    expect(body.results[2].height).toBeUndefined();
+  });
+
+  it("decompresses .svgz, sanitizes SVG payloads before validation and storage, and rejects invalid/over-cap SVGs (#3543)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        urls: [
+          `${MOCK_ORIGIN}/icon.svgz`,
+          `${MOCK_ORIGIN}/doctype.svg`,
+          `${MOCK_ORIGIN}/xxe.svg`,
+          `${MOCK_ORIGIN}/corrupt.svgz`,
+          `${MOCK_ORIGIN}/over-cap.svg`,
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(5);
+
+    expect(body.results[0]).toMatchObject({
+      success: true,
+      filename: "icon.svg",
+      contentType: "image/svg+xml",
+      width: 40,
+      height: 30,
+      previewUrl: null,
+    });
+    const svgzDl = await app.inject({
+      method: "GET",
+      url: body.results[0].downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(svgzDl.statusCode).toBe(200);
+    expect(svgzDl.headers["content-type"]).toBe("image/svg+xml");
+    expect(svgzDl.body).toContain("<svg");
+    expect(svgzDl.body).not.toContain("<script");
+    expect(svgzDl.body).not.toContain("alert");
+    expect(body.results[0].size).toBe(svgzDl.rawPayload.length);
+
+    expect(body.results[1]).toMatchObject({
+      success: true,
+      filename: "doctype.svg",
+      contentType: "image/svg+xml",
+      width: 60,
+      height: 50,
+      previewUrl: null,
+    });
+    const doctypeDl = await app.inject({
+      method: "GET",
+      url: body.results[1].downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(doctypeDl.statusCode).toBe(200);
+    expect(doctypeDl.body).toContain("<svg");
+    expect(doctypeDl.body).not.toContain("DOCTYPE");
+    expect(doctypeDl.body).not.toContain("<script");
+
+    expect(body.results[2]).toMatchObject({
+      success: true,
+      filename: "xxe.svg",
+      contentType: "application/octet-stream",
+    });
+    const xxeDl = await app.inject({
+      method: "GET",
+      url: body.results[2].downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(xxeDl.statusCode).toBe(200);
+    expect(xxeDl.body).toContain("<svg");
+    expect(xxeDl.body).not.toContain("DOCTYPE");
+    expect(xxeDl.body).not.toContain("ENTITY");
+
+    expect(body.results[3]).toMatchObject({
+      success: false,
+      url: `${MOCK_ORIGIN}/corrupt.svgz`,
+    });
+    expect(body.results[3].error).toBeTruthy();
+
+    expect(body.results[4]).toMatchObject({
+      success: false,
+      url: `${MOCK_ORIGIN}/over-cap.svg`,
+      error: expect.stringMatching(/element count/i),
+    });
+  });
+
+  it("downgrades unverified image/* response Content-Type headers to application/octet-stream (#3544)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        urls: [
+          `${MOCK_ORIGIN}/fake-image.jpg`,
+          `${MOCK_ORIGIN}/fake-image.tga`,
+          `${MOCK_ORIGIN}/fake-mixed-case.png`,
+          `${MOCK_ORIGIN}/not-image.txt`,
+          `${MOCK_ORIGIN}/report.dat`,
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(5);
+
+    expect(body.results[0]).toMatchObject({
+      success: true,
+      filename: "fake-image.jpg",
+      contentType: "application/octet-stream",
+      previewUrl: null,
+    });
+    expect(body.results[0].width).toBeUndefined();
+    expect(body.results[0].height).toBeUndefined();
+
+    expect(body.results[1]).toMatchObject({
+      success: true,
+      filename: "fake-image.tga",
+      contentType: "application/octet-stream",
+      previewUrl: null,
+    });
+    expect(body.results[1].width).toBeUndefined();
+    expect(body.results[1].height).toBeUndefined();
+
+    expect(body.results[2]).toMatchObject({
+      success: true,
+      filename: "fake-mixed-case.png",
+      contentType: "application/octet-stream",
+      previewUrl: null,
+    });
+    expect(body.results[2].width).toBeUndefined();
+    expect(body.results[2].height).toBeUndefined();
+
+    expect(body.results[3]).toMatchObject({
+      success: true,
+      filename: "not-image.txt",
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+
+    expect(body.results[4]).toMatchObject({
+      success: true,
+      filename: "report.dat",
+      contentType: "application/pdf",
+      previewUrl: null,
+    });
+  });
+
+  it("records a completed jobs row for fetched URLs so the S3 TTL sweep expires the prefix (#3624)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/photo.jpg`, `${MOCK_ORIGIN}/not-image.txt`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      results: Array<{ success: boolean; downloadUrl?: string }>;
+    };
+    expect(body.results[0]?.success).toBe(true);
+    const downloadUrl = body.results[0]?.downloadUrl ?? "";
+    const match = downloadUrl.match(/^\/api\/v1\/download\/([^/]+)\//);
+    expect(match).not.toBeNull();
+    const jobId = match?.[1] ?? "";
+
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    expect(row).toBeDefined();
+    expect(row.status).toBe("completed");
+    expect(row.toolId).toBe("fetch-urls");
+    expect(row.userId).toBeTruthy();
+    expect(row.completedAt).toBeInstanceOf(Date);
+    expect(row.outputRefs).toHaveLength(1);
+    expect([`outputs/${jobId}/photo.jpg`, `outputs/${jobId}/not-image.txt`]).toContain(
+      row.outputRefs?.[0],
+    );
+
+    const rowsById = new Map([
+      [row.id, { createdAt: row.createdAt, completedAt: row.completedAt }],
+    ]);
+    expect(
+      decideExpiry({ key: `outputs/${jobId}`, size: 0, mtimeMs: 0 }, Date.now() + 60_000, rowsById),
+    ).toBe("expired");
   });
 });

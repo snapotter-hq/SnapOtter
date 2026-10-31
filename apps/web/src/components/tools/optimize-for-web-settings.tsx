@@ -1,12 +1,16 @@
+import { isSafeMessageError, MAX_RESIZE_OUTPUT_DIMENSION, SafeError } from "@snapotter/shared";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { captureHandledError } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
+import { isIgnoredError } from "@/lib/sentry-scrub";
+import type { ComparisonPreview } from "@/lib/tool-registry";
 import { useFileStore } from "@/stores/file-store";
 
 type WebFormat = "webp" | "jpeg" | "avif" | "png" | "jxl";
@@ -16,7 +20,20 @@ interface PreviewState {
   previewUrl: string | null;
   processedSize: number | null;
   originalSize: number | null;
+  /** Why the last attempt failed, shown in place of the size card (#2185). */
+  error: string | null;
 }
+
+const IDLE_PREVIEW: PreviewState = {
+  loading: false,
+  previewUrl: null,
+  processedSize: null,
+  originalSize: null,
+  error: null,
+};
+
+/** Answers about the file or the account: the panel shows them, Sentry does not. */
+const UNREPORTED_PREVIEW_STATUSES = new Set([401, 403, 413, 422]);
 
 const FORMAT_LABELS: Record<WebFormat, string> = {
   webp: "WebP",
@@ -26,13 +43,26 @@ const FORMAT_LABELS: Record<WebFormat, string> = {
   jxl: "JXL",
 };
 
+// The API rejects a max width or height above the ceiling (#1185), so stop the value at
+// the input. An empty or partly typed box is left alone.
+function clampDimension(raw: string): string {
+  const value = Number(raw);
+  return raw !== "" && value > MAX_RESIZE_OUTPUT_DIMENSION
+    ? String(MAX_RESIZE_OUTPUT_DIMENSION)
+    : raw;
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function OptimizeForWebSettings() {
+interface OptimizeForWebSettingsProps {
+  onComparisonPreview?: (preview: ComparisonPreview | null) => void;
+}
+
+export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSettingsProps = {}) {
   const { t } = useTranslation();
   const { files, entries, selectedIndex } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
@@ -47,31 +77,28 @@ export function OptimizeForWebSettings() {
   const [showDimensions, setShowDimensions] = useState(false);
 
   // Preview state
-  const [preview, setPreview] = useState<PreviewState>({
-    loading: false,
-    previewUrl: null,
-    processedSize: null,
-    originalSize: null,
-  });
+  const [preview, setPreview] = useState<PreviewState>(IDLE_PREVIEW);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevPreviewUrlRef = useRef<string | null>(null);
+  const settingsEditedAfterRunRef = useRef(false);
+  const onComparisonPreviewRef = useRef(onComparisonPreview);
+  onComparisonPreviewRef.current = onComparisonPreview;
+  // fetchPreview's dependencies are settings-only, so hold the catalog in a
+  // ref for the messages it builds on failure.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const hasFile = files.length > 0;
 
-  // Use a ref for the current file so fetchPreview doesn't depend on the
-  // reactive entry (which changes when we write processedUrl back to the store).
-  const fileRef = useRef<File | null>(null);
-  const fileSizeRef = useRef(0);
-  const selectedIndexRef = useRef(selectedIndex);
-  useEffect(() => {
-    const entry = entries[selectedIndex];
-    if (entry) {
-      fileRef.current = entry.file;
-      fileSizeRef.current = entry.file.size;
-    }
-    selectedIndexRef.current = selectedIndex;
-  }, [entries, selectedIndex]);
+  // Read the selected entry via ref so fetchPreview only re-binds when settings change.
+  const currentSelectedEntry = entries[selectedIndex];
+  const fileRef = useRef<File | null>(currentSelectedEntry?.file ?? null);
+  const fileSizeRef = useRef(currentSelectedEntry?.file.size ?? 0);
+  const entryIdRef = useRef<string | null>(currentSelectedEntry?.id ?? null);
+  fileRef.current = currentSelectedEntry?.file ?? null;
+  fileSizeRef.current = currentSelectedEntry?.file.size ?? 0;
+  entryIdRef.current = currentSelectedEntry?.id ?? null;
 
   // Build settings object
   const buildSettings = useCallback(() => {
@@ -81,15 +108,30 @@ export function OptimizeForWebSettings() {
       progressive: true,
       stripMetadata,
     };
-    const mw = Number(maxWidth);
-    const mh = Number(maxHeight);
+    // Whole pixels: the API rejects 800.5, and with the section collapsed the input's
+    // own step check isn't there to stop it.
+    const mw = Math.floor(Number(maxWidth));
+    const mh = Math.floor(Number(maxHeight));
     if (mw > 0) settings.maxWidth = mw;
     if (mh > 0) settings.maxHeight = mh;
     return settings;
   }, [format, quality, maxWidth, maxHeight, stripMetadata]);
 
+  const prevBuildSettingsRef = useRef(buildSettings);
+  if (prevBuildSettingsRef.current !== buildSettings) {
+    prevBuildSettingsRef.current = buildSettings;
+    if (
+      useFileStore
+        .getState()
+        .entries.some((e) => e.processedUrl !== null || e.status === "completed")
+    ) {
+      settingsEditedAfterRunRef.current = true;
+    }
+  }
+
   // Live preview - reads file from ref to avoid re-trigger loop
   const fetchPreview = useCallback(() => {
+    debounceRef.current = null;
     const file = fileRef.current;
     if (!file) return;
 
@@ -98,12 +140,17 @@ export function OptimizeForWebSettings() {
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setPreview((prev) => ({ ...prev, loading: true }));
+    setPreview((prev) => ({ ...prev, loading: true, error: null }));
 
-    const idx = selectedIndexRef.current;
+    const entryId = entryIdRef.current;
+    const settings = buildSettings();
+    const copy = tRef.current;
+    // Set by the non-OK branch so the catch can show the API's reason without
+    // handing a server-authored string to Sentry (#2185).
+    let failureMessage: string | null = null;
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("settings", JSON.stringify(buildSettings()));
+    formData.append("settings", JSON.stringify(settings));
 
     fetch(appUrl("/api/v1/tools/image/optimize-for-web/preview"), {
       method: "POST",
@@ -112,11 +159,44 @@ export function OptimizeForWebSettings() {
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`Preview failed: ${response.status}`);
+        if (!response.ok) {
+          const body = await response.json().catch((error: unknown) => {
+            // A proxy can answer with HTML; keep the reason the body was
+            // unreadable visible, like api.ts does (#4062). An abort while the
+            // body was being read is this preview being replaced, not a fault.
+            if (!controller.signal.aborted) {
+              console.warn(
+                `Failed to parse preview error response (status: ${response.status}):`,
+                error,
+              );
+            }
+            return null;
+          });
+          failureMessage = failedAnswerMessage(
+            copy,
+            body,
+            response.status,
+            copy.toolPage.previewFailed,
+          );
+          throw new SafeError("Optimize for Web preview request failed", {
+            code: "preview-request",
+            statusCode: response.status,
+          });
+        }
 
         const originalSize = Number(response.headers.get("X-Original-Size") ?? "0");
         const processedSize = Number(response.headers.get("X-Processed-Size") ?? "0");
         const blob = await response.blob();
+        if (abortRef.current === controller) abortRef.current = null;
+        if (controller.signal.aborted || entryIdRef.current !== entryId) return;
+        // A 200 is not proof of an image: a proxy or captive portal can answer
+        // with HTML. The route always sets an image Content-Type, so a missing
+        // or foreign one is a failed preview, not a broken <img> (#4107).
+        if (blob.size === 0 || !blob.type.startsWith("image/")) {
+          throw new SafeError("Optimize for Web preview returned a non-image body", {
+            code: "preview-not-image",
+          });
+        }
         const previewUrl = URL.createObjectURL(blob);
 
         // Revoke previous preview URL
@@ -125,26 +205,69 @@ export function OptimizeForWebSettings() {
         }
         prevPreviewUrlRef.current = previewUrl;
 
-        // Write the preview into the file store so BeforeAfterSlider picks it up
-        useFileStore.getState().updateEntry(idx, {
-          processedUrl: previewUrl,
-          processedPreviewUrl: null,
-          processedFilename: null,
-          status: "completed",
-          originalSize,
-          processedSize,
-        });
+        // Hand the preview to ToolPage's BeforeAfterSlider without writing it as a
+        // completed result on the file-store entry (#1112). Browsers cannot render
+        // image/jxl in <img> tags, so keep JXL size stats in the panel card without
+        // handing an unrenderable blob URL to BeforeAfterSlider.
+        if (entryId && settings.format !== "jxl") {
+          const targetEntry = useFileStore.getState().entries.find((e) => e.id === entryId);
+          const hasResult = Boolean(
+            targetEntry?.processedUrl || targetEntry?.status === "completed",
+          );
+          onComparisonPreviewRef.current?.({
+            entryId,
+            url: previewUrl,
+            originalSize,
+            processedSize,
+            supersedesResult: hasResult && settingsEditedAfterRunRef.current,
+          });
+        } else {
+          onComparisonPreviewRef.current?.(null);
+        }
 
         setPreview({
           loading: false,
           previewUrl,
           processedSize,
           originalSize,
+          error: null,
         });
       })
       .catch((err) => {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setPreview((prev) => ({ ...prev, loading: false }));
+        if (abortRef.current === controller) abortRef.current = null;
+        // An abort is this preview being replaced (new settings, another file,
+        // submit), not a failure to report.
+        if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError"))
+          return;
+        // A failure for a file the viewer has moved off says nothing about the
+        // one on screen.
+        if (entryIdRef.current !== entryId) return;
+        if (prevPreviewUrlRef.current) {
+          URL.revokeObjectURL(prevPreviewUrlRef.current);
+          prevPreviewUrlRef.current = null;
+        }
+        onComparisonPreviewRef.current?.(null);
+        setPreview({ ...IDLE_PREVIEW, error: failureMessage ?? copy.toolPage.previewFailed });
+
+        // A signed-out, denied, too-large, or undecodable answer is about this
+        // file or account, and the panel says so. Anything else (settings the
+        // API rejects, rate limit, 5xx) is a fault nobody would otherwise hear
+        // about. A dropped connection is already in Sentry's IGNORE_ERRORS, so
+        // wrapping one in a SafeError would defeat that filter.
+        const reportable = isSafeMessageError(err)
+          ? !UNREPORTED_PREVIEW_STATUSES.has(err.statusCode ?? 0)
+          : !isIgnoredError(err);
+        if (reportable) {
+          void captureHandledError(
+            isSafeMessageError(err)
+              ? err
+              : new SafeError("Optimize for Web preview request failed", {
+                  code: "preview-request",
+                  cause: err,
+                }),
+            { error_class: "operational", tool_id: "optimize-for-web" },
+          );
+        }
       });
   }, [buildSettings]);
 
@@ -159,18 +282,41 @@ export function OptimizeForWebSettings() {
     debounceRef.current = setTimeout(fetchPreview, debounceMs);
 
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
     };
   }, [hasFile, fetchPreview]);
 
-  // Re-preview when the user switches between files in batch mode
-  const prevSelectedIndex = useRef(selectedIndex);
+  // Re-preview when the user switches between files in batch mode. Keyed by
+  // entry id rather than selectedIndex so a reorder (which moves selectedIndex
+  // to follow the selected entry) does not abort an in-flight preview or
+  // re-fetch the same file (#1114).
+  const selectedEntryId = entries[selectedIndex]?.id ?? null;
+  const prevSelectedEntryId = useRef(selectedEntryId);
   useEffect(() => {
-    if (prevSelectedIndex.current !== selectedIndex && hasFile) {
-      prevSelectedIndex.current = selectedIndex;
-      fetchPreview();
+    if (prevSelectedEntryId.current !== selectedEntryId && prevSelectedEntryId.current !== null) {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      if (prevPreviewUrlRef.current) {
+        URL.revokeObjectURL(prevPreviewUrlRef.current);
+        prevPreviewUrlRef.current = null;
+      }
+      onComparisonPreviewRef.current?.(null);
+      setPreview(IDLE_PREVIEW);
+      if (selectedEntryId !== null && hasFile) {
+        fetchPreview();
+      }
     }
-  }, [selectedIndex, hasFile, fetchPreview]);
+    prevSelectedEntryId.current = selectedEntryId;
+  }, [selectedEntryId, hasFile, fetchPreview]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -178,11 +324,43 @@ export function OptimizeForWebSettings() {
       if (abortRef.current) abortRef.current.abort();
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (prevPreviewUrlRef.current) URL.revokeObjectURL(prevPreviewUrlRef.current);
+      onComparisonPreviewRef.current?.(null);
     };
   }, []);
 
   // Final process handler (creates workspace + download link)
   const handleProcess = () => {
+    // A failed preview's message describes the settings the run is replacing,
+    // so it clears with the rest of the preview state (#2185).
+    const hadPendingPreview =
+      debounceRef.current !== null || abortRef.current !== null || preview.error !== null;
+    settingsEditedAfterRunRef.current = false;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    if (hadPendingPreview) {
+      if (prevPreviewUrlRef.current) {
+        URL.revokeObjectURL(prevPreviewUrlRef.current);
+        prevPreviewUrlRef.current = null;
+      }
+      setPreview(IDLE_PREVIEW);
+      onComparisonPreviewRef.current?.(null);
+    } else if (preview.previewUrl && entryIdRef.current && format !== "jxl") {
+      onComparisonPreviewRef.current?.({
+        entryId: entryIdRef.current,
+        url: preview.previewUrl,
+        originalSize: preview.originalSize ?? 0,
+        processedSize: preview.processedSize ?? 0,
+        supersedesResult: false,
+      });
+    } else {
+      onComparisonPreviewRef.current?.(null);
+    }
     const settings = buildSettings();
     if (files.length > 1) {
       processAllFiles(files, settings);
@@ -275,8 +453,9 @@ export function OptimizeForWebSettings() {
                 id="max-width"
                 type="number"
                 value={maxWidth}
-                onChange={(e) => setMaxWidth(e.target.value)}
+                onChange={(e) => setMaxWidth(clampDimension(e.target.value))}
                 min={1}
+                max={MAX_RESIZE_OUTPUT_DIMENSION}
                 placeholder="px"
                 className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
               />
@@ -289,8 +468,9 @@ export function OptimizeForWebSettings() {
                 id="max-height"
                 type="number"
                 value={maxHeight}
-                onChange={(e) => setMaxHeight(e.target.value)}
+                onChange={(e) => setMaxHeight(clampDimension(e.target.value))}
                 min={1}
+                max={MAX_RESIZE_OUTPUT_DIMENSION}
                 placeholder="px"
                 className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
               />
@@ -321,6 +501,16 @@ export function OptimizeForWebSettings() {
           />
         </button>
       </div>
+
+      {/* The last preview failed: say why instead of leaving the panel silent (#2185). */}
+      {preview.error && (
+        <p
+          role="alert"
+          className="rounded-lg border border-border bg-muted/50 p-3 text-xs text-destructive-ink"
+        >
+          {preview.error}
+        </p>
+      )}
 
       {/* Size comparison card */}
       {(preview.originalSize || preview.loading) && (
@@ -387,7 +577,7 @@ export function OptimizeForWebSettings() {
         </button>
       )}
 
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} />}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} toolId="optimize-for-web" />}
     </form>
   );
 }

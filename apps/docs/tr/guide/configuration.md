@@ -1,8 +1,8 @@
 ---
 description: "Varsayılanlarıyla birlikte tüm SnapOtter ortam değişkenleri. Kimlik doğrulama, depolama, AI modelleri, analitik ve daha fazlasını yapılandırın."
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: da281dfbf919
+i18n_output_hash: 1dd5542590be
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ Tüm yapılandırma ortam değişkenleri aracılığıyla yapılır. Her değiş
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
 | `PORT` | `1349` | Sunucunun dinlediği port. |
+| `BASE_PATH` | (boş) | Herkese açık dağıtım yolu, ör. `/snapotter`. Boş veya `/` alan adı kökünde sunar. Çalışma zamanında uygulanır; imajın yeniden derlenmesi gerekmez. |
 | `RATE_LIMIT_PER_MIN` | `1000` | IP başına dakikada maksimum istek. Hız sınırlamayı devre dışı bırakmak için 0'a ayarlayın. |
 | `CORS_ORIGIN` | (boş) | CORS için virgülle ayrılmış izin verilen kökenler veya yalnızca aynı köken için boş. |
 | `LOG_LEVEL` | `info` | Günlük ayrıntı düzeyi. Şunlardan biri: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -40,7 +41,8 @@ Aşağıdaki iki mantıksal değişken yalnızca `true` ve `false` kabul eder. `
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` veya `s3`. S3 ve MinIO, s3_storage özelliğine sahip bir lisansın yanı sıra aşağıdaki `S3_*` değişkenlerini gerektirir. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL bağlantı dizesi. Compose yığını bunu kendi `postgres` servisine yönlendirir; gömülü modu elde etmek için (`REDIS_URL` ile birlikte) ayarlanmamış bırakın. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL bağlantı dizesi ve her isteğin sunulduğu bağlantı. 2.3.0 ve sonrasında `DATABASE_MIGRATION_URL` değerini de ayarlayın; o zaman bu, uygulamanın tablolarında yalnızca DML yetkisi olan en az ayrıcalıklı çalışma zamanı rolü olur. Compose yığını bunu kendi `postgres` servisine yönlendirir; gömülü modu elde etmek için (`REDIS_URL` ile birlikte) ayarlanmamış bırakın. |
+| `DATABASE_MIGRATION_URL` | (boş) | 2.3.0'dan itibaren kullanılabilir; 2.2.0 imajı bunu yok sayar ve `DATABASE_URL` değerinin veritabanı sahibini adlandırmasını gerektirir. Ayrıcalıklı bağlantı; yalnızca açılış sırasında migration'ları çalıştırmak ve çalışma zamanı rolüne yetki vermek için kullanılır, ardından ilk istekten önce kapatılır. Boş bırakırsanız SnapOtter tek rolle çalışır ve `DATABASE_URL` her iki işi de yapar. Bkz. [En az ayrıcalıklı roller](/tr/guide/database#least-privilege-roles). |
 | `REDIS_URL` | `redis://localhost:6379` | Redis bağlantı dizesi (BullMQ iş kuyrukları için kullanılır). Compose bunu kendi `redis` servisine yönlendirir. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | İşleme sırasında geçici dosyalar için dizin. Otomatik olarak temizlenir. İmaj bunu `/tmp/workspace` olarak ayarlar. |
 | `FILES_STORAGE_PATH` | `./data/files` | Kalıcı kullanıcı dosyaları (yüklenen görüntüler, kaydedilen sonuçlar) için dizin. İmaj bunu `/data/files` olarak ayarlar. |
@@ -74,6 +76,8 @@ Yalnızca `STORAGE_MODE=s3` olduğunda okunur. Zorunlu üç değişkenden birini
 |---|---|---|
 | `EMBEDDED` | `auto` | Hem `DATABASE_URL` hem de `REDIS_URL` ayarlanmadığında otomatik olarak etkinleştirilir. Devre dışı bırakmak için `0` olarak ayarlayın (uygulama, sessizce bir konteyner içi veritabanı başlatmak yerine, harici bir `DATABASE_URL`/`REDIS_URL` ayarlanmamışsa hızlı başarısız olur). |
 | `REDIS_MAXMEMORY` | `512mb` | Gömülü Redis için bellek üst sınırı (yalnızca gömülü mod). Raspberry Pi gibi bellek kısıtlı ana bilgisayarlarda düşürün. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Açılışın gömülü Redis'in `PING` yanıtı vermesini bekleme süresi, saniye cinsinden; bu süre dolunca vazgeçilir. Zaman aşımında konteyner takılı kalmak yerine durur ve nedenini günlüğe yazar. 1 ile 999999 arasında tam saniye; sınırsız değer yoktur, çünkü bu sınır tam da sonsuza kadar bekleme hatasını önlemek için vardır. Yalnızca yavaş bir ana bilgisayar bu sınıra takılıyorsa yükseltin. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Aynısı gömülü PostgreSQL için. Saat, ilk açılıştaki `initdb` bittikten sonra başlar; böylece ilk veritabanı oluşturmayı değil, sunucu başlangıcını ve çökme kurtarmayı kapsar. |
 
 1.x'ten yükseltme: eski `snapotter.db` dosyanızı birimde `/data/snapotter.db` konumuna koyun; gömülü mod bunu ilk açılışta gömülü PostgreSQL'e içe aktarır. İçe aktarma bir kez çalışır; sonraki açılışlar bunu atlar.
 
@@ -93,6 +97,23 @@ Telemetri notu: gömülü mod, diğer herhangi bir yapılandırma gibi imajın a
 | `MAX_CANVAS_PIXELS` | `0` (sınır yok) | Çıktı görüntüleri için piksel cinsinden maksimum tuval boyutu. Sınır olmaması için 0'a ayarlayın. |
 | `MAX_SVG_SIZE_MB` | `50` | Temizlemeden önce kabul edilen en büyük SVG, megabayt cinsinden. `0` burada çevresindeki satırlardan farklı davranır: sınırı yükseltmek yerine ayrıştırma öncesi boyut sınırını tamamen kaldırır, bu yüzden bunu ayarlı bırakın. |
 | `MAX_PDF_PAGES` | `0` (sınırsız) | PDF-to-image dönüşümü için maksimum PDF sayfası sayısı. Sınırsız için 0'a ayarlayın. |
+
+### Motorlar {#engines}
+
+SnapOtter, her işleme ikili dosyasını konteyner içindeki `$PATH` üzerinde arar; bu nedenle kendi derlemenizi bağlamadığınız sürece bunlar boş kalır.
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `FFMPEG_PATH` | (boş) | Video ve ses araçlarının arkasındaki `ffmpeg` ikili dosyasının yolu. |
+| `FFPROBE_PATH` | (boş) | Medya dosyalarını işlenmeden önce okuyan `ffprobe` yolu. `FFMPEG_PATH` ile aynı derlemeye işaret edin. |
+| `QPDF_PATH` | (boş) | PDF araçları tarafından ve yüklenen PDF'leri kontrol etmek için kullanılan `qpdf` yolu. |
+| `SOFFICE_PATH` | (boş) | Office belge dönüştürmelerinde kullanılan LibreOffice `soffice` yolu. |
+| `PDFCPU_PATH` | (boş) | Bazı PDF araçları tarafından kullanılan `pdfcpu` yolu. |
+| `SNAPOTTER_HW_ACCEL` | (boş) | Donanım video kodlayıcı ailesi: `nvenc` veya `vaapi`. Boşsa yazılımla kodlanır. |
+
+`SNAPOTTER_HW_ACCEL` için o kodlayıcı ailesiyle derlenmiş bir ffmpeg gerekir ve imgedeki ffmpeg ikisini de içermez. İmgenin kendi ikili dosyasıyla ayar yazılım kodlamasına geri döner ve bunu başlangıç günlüğünde belirtir. Kullanmak için kendi ffmpeg derlemenizi bağlayın, `FFMPEG_PATH` ve `FFPROBE_PATH` değişkenlerini ona yönlendirin ve konteynere GPU aygıtını verin. `nvenc` için ayrıca `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` ayarlayın: imge yalnızca `compute,utility` ister ve `video` olmadan NVIDIA çalışma zamanı kodlama kütüphanesini bağlamaz, bu yüzden kodlayıcı listelenir ama her kodlama başarısız olur. Var olmayan veya çalıştırılabilir olmayan bir yol geçersiz kılması da başlangıç günlüğünde adlandırılır ve yol düzeltilene ya da ayar kaldırılana kadar o ikili dosyaya ihtiyaç duyan her iş başarısız olur.
+
+Yayımlanan Compose dosyaları altısını da `.env` dosyasından geçirir, bu yüzden bunları orada ayarlamak yeterlidir.
 
 ### Temizleme {#cleanup}
 

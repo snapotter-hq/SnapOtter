@@ -1,6 +1,6 @@
 ---
 description: "Görüntü dosyası boyutunu kalite düzeyine göre veya hedef dosya boyutuna göre azaltın."
-i18n_source_hash: 342c5cf1f864
+i18n_source_hash: e1cc52597983
 i18n_provenance: human
 i18n_output_hash: abf4d9eb2451
 ---

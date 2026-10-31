@@ -3,7 +3,8 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  PointerSensor,
+  KeyboardSensor,
+  MouseSensor,
   TouchSensor,
   useDraggable,
   useDroppable,
@@ -24,10 +25,11 @@ import {
   X,
 } from "lucide-react";
 import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
-import { isImageFile } from "@/components/common/dropzone";
+import { expandAccept, isImageFile } from "@/components/common/dropzone";
 import { useTranslation } from "@/contexts/i18n-context";
 import { type CollageTemplate, getTemplateById } from "@/lib/collage-templates";
 import { format } from "@/lib/format";
+import { showIntakeIgnored, showUnsupportedFileType } from "@/lib/intake-notice";
 import { cn } from "@/lib/utils";
 import type { CellTransform, CollageImage } from "@/stores/collage-store";
 import { useCollageStore } from "@/stores/collage-store";
@@ -51,6 +53,14 @@ function getAspectMultiplier(ar: string): number | null {
 
 function displayUrl(img: CollageImage): string {
   return img.previewBlobUrl ?? img.blobUrl;
+}
+
+function allowCollageIntake(ignoredMessage: string): boolean {
+  if (useCollageStore.getState().phase === "processing") {
+    showIntakeIgnored(ignoredMessage);
+    return false;
+  }
+  return true;
 }
 
 export function CollagePreview() {
@@ -101,20 +111,34 @@ function UploadArea() {
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);
-      const files = Array.from(e.dataTransfer.files).filter(isImageFile);
-      if (files.length > 0) addImages(files);
+      const dropped = Array.from(e.dataTransfer.files);
+      const files = dropped.filter(isImageFile);
+      if (files.length > 0) {
+        if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
+        addImages(files);
+      } else if (dropped.length > 0) {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     },
-    [addImages],
+    [addImages, t],
   );
 
   const handleClick = () => {
+    if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = "image/*,.avif,.heic,.heif,.hif";
+    input.accept = expandAccept("image/*") ?? "image/*";
     input.onchange = (e) => {
-      const files = Array.from((e.target as HTMLInputElement).files || []);
-      if (files.length > 0) addImages(files);
+      const selected = Array.from((e.target as HTMLInputElement).files || []);
+      if (selected.length === 0) return;
+      const files = selected.filter(isImageFile);
+      if (files.length > 0) {
+        if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
+        addImages(files);
+      } else {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     };
     input.click();
   };
@@ -202,13 +226,18 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
   const [activeDragCell, setActiveDragCell] = useState<number | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const cellIndex = event.active.data.current?.cellIndex as number | undefined;
     if (cellIndex != null) setActiveDragCell(cellIndex);
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragCell(null);
   }, []);
 
   const handleDragEnd = useCallback(
@@ -220,15 +249,9 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
       const toCell = over.data.current?.cellIndex as number;
       if (fromCell == null || toCell == null || fromCell === toCell) return;
 
-      const toImgIdx = cellAssignments[toCell] ?? -1;
-      if (toImgIdx >= 0) {
-        store.swapCells(fromCell, toCell);
-      } else {
-        const fromImgIdx = cellAssignments[fromCell];
-        if (fromImgIdx == null || fromImgIdx < 0) return;
-        store.setCellAssignment(toCell, fromImgIdx);
-        store.setCellAssignment(fromCell, -1);
-      }
+      const fromImgIdx = cellAssignments[fromCell];
+      if (fromImgIdx == null || fromImgIdx < 0) return;
+      store.swapCells(fromCell, toCell);
     },
     [cellAssignments, store],
   );
@@ -249,7 +272,12 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
       onKeyDown={(e) => e.key === "Escape" && store.setSelectedCell(null)}
     >
       <div className="relative w-full max-w-[800px] max-h-full" style={aspectStyle}>
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
           <div
             className="w-full h-full rounded-lg overflow-hidden shadow-lg"
             style={{
@@ -264,14 +292,14 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
           >
             {template.cells.map((cell, i) => {
               const imgIndex = cellAssignments[i] ?? -1;
-              const img = imgIndex >= 0 ? images[imgIndex] : null;
+              const img = imgIndex >= 0 ? (images[imgIndex] ?? null) : null;
               const transform = cellTransforms[i] ?? {
                 panX: 0,
                 panY: 0,
                 zoom: 1,
                 objectFit: "cover" as const,
               };
-              const isSelected = selectedCell === i;
+              const isSelected = selectedCell === i && img !== null;
               const isDragSource = activeDragCell === i;
 
               return (
@@ -413,17 +441,19 @@ function CollageCell({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (!image) return;
       store.setSelectedCell(cellIndex);
     },
-    [cellIndex, store],
+    [cellIndex, image, store],
   );
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (!image) return;
       store.resetCellTransform(cellIndex);
     },
-    [cellIndex, store],
+    [cellIndex, image, store],
   );
 
   const handleZoomSlider = useCallback(
@@ -466,7 +496,8 @@ function CollageCell({
     <div
       ref={mergedRef}
       role="button"
-      tabIndex={0}
+      tabIndex={image ? 0 : -1}
+      aria-disabled={!image || undefined}
       aria-label={format(t.toolSettings.collage.collageCell, { index: cellIndex + 1 })}
       className={cn(
         "relative overflow-hidden transition-shadow",
@@ -488,7 +519,11 @@ function CollageCell({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") handleClick(e as unknown as React.MouseEvent);
+        if (!image || e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick(e as unknown as React.MouseEvent);
+        }
       }}
       {...(isSelected ? { ...bindDrag(), ...bindPinch() } : {})}
     >
@@ -525,7 +560,12 @@ function CollageCell({
           className="absolute top-1.5 right-1.5 flex items-center gap-1"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") e.stopPropagation();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <button
             type="button"
@@ -560,7 +600,8 @@ function CollageCell({
             {...listeners}
             {...attributes}
             aria-label={t.a11y.dragToReorder}
-            className="bg-black/50 backdrop-blur-sm text-white rounded p-1 cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors"
+            style={{ WebkitTouchCallout: "none" }}
+            className="bg-black/50 backdrop-blur-sm text-white rounded p-1 select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors"
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
@@ -578,8 +619,12 @@ function CollageCell({
           )}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") e.stopPropagation();
+          }}
           onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <input
             type="range"
@@ -609,20 +654,29 @@ function CollageCell({
 
 /** Thumbnail strip at the bottom for managing images. */
 function ImageStrip() {
+  const { t } = useTranslation();
   const store = useCollageStore();
   const { images } = store;
 
   const handleAddMore = useCallback(() => {
+    if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = "image/*,.avif,.heic,.heif,.hif";
+    input.accept = expandAccept("image/*") ?? "image/*";
     input.onchange = (e) => {
-      const files = Array.from((e.target as HTMLInputElement).files || []);
-      if (files.length > 0) store.addImages(files);
+      const selected = Array.from((e.target as HTMLInputElement).files || []);
+      if (selected.length === 0) return;
+      const files = selected.filter(isImageFile);
+      if (files.length > 0) {
+        if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
+        store.addImages(files);
+      } else {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     };
     input.click();
-  }, [store]);
+  }, [store, t]);
 
   return (
     <div className="shrink-0 border-t border-border bg-background px-3 py-2">
@@ -645,7 +699,11 @@ function ImageStrip() {
             )}
             <button
               type="button"
-              onClick={() => store.removeImage(i)}
+              aria-label={t.common.delete}
+              onClick={() => {
+                if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
+                store.removeImage(i);
+              }}
               className="absolute top-0 right-0 bg-black/60 text-white rounded-bl p-0.5 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity"
             >
               <X className="h-3 w-3" />
@@ -657,6 +715,7 @@ function ImageStrip() {
         ))}
         <button
           type="button"
+          aria-label={t.toolPage.addMore}
           onClick={handleAddMore}
           className="shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center transition-colors"
         >

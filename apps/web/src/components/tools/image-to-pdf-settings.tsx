@@ -1,12 +1,24 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
-import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
+import { parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
+
+interface ImageToPdfResult {
+  downloadUrl: string;
+  compression?: { targetMet: boolean; jpegQuality: number; targetRequested: number };
+}
 
 const PAGE_SIZES: Record<string, [number, number]> = {
   A4: [595.28, 841.89],
@@ -16,6 +28,16 @@ const PAGE_SIZES: Record<string, [number, number]> = {
 };
 
 const PREVIEW_HEIGHT = 220;
+
+function pdfResultFilenameFrom(downloadUrl: string): string | null {
+  const last = downloadUrl.split("/").pop();
+  if (!last) return null;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
+}
 
 function PdfPagePreview({
   pageSize,
@@ -140,21 +162,46 @@ export function ImageToPdfSettings() {
   });
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const processingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const watchdogRef = useRef<XhrWatchdog | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     return () => {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (processingTimerRef.current) clearInterval(processingTimerRef.current);
-      if (xhrRef.current) xhrRef.current.abort();
+      watchdogRef.current?.clear();
     };
   }, []);
 
-  const cleanup = () => {
+  const stopTimers = () => {
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+    watchdogRef.current?.clear();
     elapsedRef.current = null;
     processingTimerRef.current = null;
+    watchdogRef.current = null;
+  };
+
+  // An abort fires neither onload nor onerror, so a run the unmount cuts off has to
+  // be ended here, or `processing` stays set for good (#2304).
+  useSettleOnUnmount(
+    () => xhrRef.current !== null,
+    () => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      stopTimers();
+      const xhr = xhrRef.current;
+      xhrRef.current = null;
+      xhr?.abort();
+    },
+  );
+
+  const cleanup = () => {
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
+    stopTimers();
+    xhrRef.current = null;
     setBusy(false);
     setProcessing(false);
   };
@@ -163,95 +210,233 @@ export function ImageToPdfSettings() {
   const handleProcess = useCallback(() => {
     if (files.length === 0) return;
 
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "image-to-pdf",
+      is_batch: false,
+      file_count: files.length,
+    });
+
+    const { entries: startEntries, selectedIndex: capturedIndex } = useFileStore.getState();
+    const capturedEntryId = startEntries[capturedIndex]?.id ?? startEntries[0]?.id;
+
+    unsubscribeRef.current?.();
+    xhrRef.current?.abort();
+    stopTimers();
+
+    // The request is made, and the ref set, before the store flag goes up: a throw
+    // between the two would leave `processing` set with nothing for the unmount to
+    // end (#2304).
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+
     // flushSync forces React to paint the ProgressCard before the XHR starts,
     // so users always see feedback even if the request completes quickly.
     flushSync(() => {
-      setBusy(true);
-      setProcessing(true);
+      for (const entry of useFileStore.getState().entries) {
+        if (entry.processedUrl) {
+          useFileStore.getState().updateEntryById(entry.id, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            status: "pending",
+            error: null,
+          });
+        }
+      }
       setError(null);
       setDownloadUrl(null);
       setCompressionResult(null);
+      setBusy(true);
+      setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
     });
 
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
-    }, 1000);
-
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append("file", file);
-    }
-    const settings: Record<string, unknown> = { pageSize, orientation, margin, collate };
-    if (targetSizeValue.trim() !== "") {
-      const numVal = Number.parseFloat(targetSizeValue);
-      if (!Number.isNaN(numVal) && numVal > 0) {
-        settings.targetSize = { value: numVal, unit: targetSizeUnit };
-      }
-    }
-    formData.append("settings", JSON.stringify(settings));
-
-    const xhr = new XMLHttpRequest();
-    xhrRef.current = xhr;
-    xhr.timeout = 300_000;
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const uploadPercent = (event.loaded / event.total) * 40;
-        setProgress((prev) =>
-          prev.phase === "uploading" ? { ...prev, percent: uploadPercent } : prev,
-        );
-      }
-    };
-
-    xhr.upload.onload = () => {
-      setProgress((prev) => ({ ...prev, phase: "processing", percent: 40 }));
-      const step = (95 - 40) / 90;
-      processingTimerRef.current = setInterval(() => {
-        setProgress((prev) => {
-          if (prev.phase !== "processing") return prev;
-          return { ...prev, percent: Math.min(95, prev.percent + step) };
-        });
-      }, 500);
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const result = resolveServerUrls(JSON.parse(xhr.responseText));
-          setDownloadUrl(result.downloadUrl);
-          setCompressionResult(result.compression ?? null);
-          setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
-        } catch {
-          setError("Failed to parse server response");
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      const hasRunEntry =
+        startEntries.length > 0
+          ? startEntries.every((b) => state.entries.some((e) => e.id === b.id && e.file === b.file))
+          : state.entries.length > 0;
+      if (!state.processing || !hasRunEntry) {
+        storeReset = true;
+        if (xhrRef.current === xhr) xhrRef.current = null;
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
+        unsubscribe();
+        stopTimers();
+        setBusy(false);
+        if (state.processing) {
+          setProcessing(false);
         }
-      } else {
+        xhr.abort();
+      }
+    });
+    unsubscribeRef.current = unsubscribe;
+
+    const endSubscription = () => {
+      if (unsubscribeRef.current === unsubscribe) {
+        unsubscribeRef.current = null;
+      }
+      unsubscribe();
+    };
+
+    try {
+      const startTime = Date.now();
+      elapsedRef.current = setInterval(() => {
+        setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
+      }, 1000);
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("file", file);
+      }
+      const settings: Record<string, unknown> = { pageSize, orientation, margin, collate };
+      if (targetSizeValue.trim() !== "") {
+        const numVal = Number.parseFloat(targetSizeValue);
+        if (!Number.isNaN(numVal) && numVal > 0) {
+          settings.targetSize = { value: numVal, unit: targetSizeUnit };
+        }
+      }
+      formData.append("settings", JSON.stringify(settings));
+
+      const watchdog = createXhrWatchdog(xhr, 300_000, () => xhrRef.current === xhr && !storeReset);
+      watchdogRef.current = watchdog;
+
+      xhr.upload.onprogress = (event) => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadProgress(event);
+        if (event.lengthComputable) {
+          const uploadPercent = (event.loaded / event.total) * 40;
+          setProgress((prev) =>
+            prev.phase === "uploading" ? { ...prev, percent: uploadPercent } : prev,
+          );
+        }
+      };
+
+      xhr.upload.onload = () => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadLoad();
+        setProgress((prev) => ({ ...prev, phase: "processing", percent: 40 }));
+        const step = (95 - 40) / 90;
+        processingTimerRef.current = setInterval(() => {
+          setProgress((prev) => {
+            if (prev.phase !== "processing") return prev;
+            return { ...prev, percent: Math.min(95, prev.percent + step) };
+          });
+        }, 500);
+      };
+
+      xhr.onload = () => {
+        watchdog.clear();
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        stopTimers();
+        if (xhr.status >= 200 && xhr.status < 300) {
+          let result: ImageToPdfResult;
+          try {
+            result = parseResultBody<ImageToPdfResult>(xhr.responseText);
+          } catch (err) {
+            reportMalformedResult(err, { status: xhr.status, toolId: "image-to-pdf" });
+            const teardownError = runEndWrites([
+              () => setError(t.toolSettings["image-to-pdf"].parseResponseFailed),
+              cleanup,
+            ]);
+            if (teardownError) throw teardownError.cause;
+            return;
+          }
+          try {
+            if (capturedEntryId) {
+              useFileStore.getState().updateEntryById(capturedEntryId, {
+                processedUrl: result.downloadUrl,
+                processedFilename: pdfResultFilenameFrom(result.downloadUrl),
+                status: "completed",
+              });
+            }
+            setDownloadUrl(result.downloadUrl);
+            setCompressionResult(result.compression ?? null);
+            setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
+          } catch (err) {
+            const teardownError = runEndWrites([
+              () => setError(t.errors.jobTrackingFailed),
+              cleanup,
+            ]);
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending a sync tool run after a result handling error failed",
+                teardownError.cause,
+                "image-to-pdf",
+              );
+            }
+            throw err;
+          }
+          cleanup();
+          return;
+        }
+        let message: string;
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(body.error || `Failed: ${xhr.status}`);
+          message = failedAnswerMessage(
+            t,
+            body,
+            xhr.status,
+            format(t.errors.failedWithStatus, { status: xhr.status }),
+          );
         } catch {
-          setError(`PDF creation failed: ${xhr.status}`);
+          message = failedAnswerMessage(
+            t,
+            null,
+            xhr.status,
+            format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
+              status: xhr.status,
+            }),
+          );
         }
-      }
-      cleanup();
-    };
+        const teardownError = runEndWrites([() => setError(message), cleanup]);
+        if (teardownError) throw teardownError.cause;
+      };
 
-    xhr.onerror = () => {
-      setError("Network error during PDF creation");
-      cleanup();
-    };
+      xhr.onerror = () => {
+        watchdog.clear();
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        const teardownError = runEndWrites([
+          () => setError(t.toolSettings["image-to-pdf"].networkErrorCreation),
+          cleanup,
+        ]);
+        if (teardownError) throw teardownError.cause;
+      };
 
-    xhr.ontimeout = () => {
-      setError("Request timed out - the server may be overloaded");
-      cleanup();
-    };
+      xhr.ontimeout = () => {
+        watchdog.clear();
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        const teardownError = runEndWrites([
+          () => setError(t.toolSettings["image-to-pdf"].requestTimedOut),
+          cleanup,
+        ]);
+        if (teardownError) throw teardownError.cause;
+      };
 
-    xhr.open("POST", appUrl("/api/v1/tools/image/image-to-pdf"));
-    formatHeaders().forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    xhr.send(formData);
+      xhr.open("POST", appUrl("/api/v1/tools/image/image-to-pdf"));
+      formatHeaders().forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+      watchdog.send(formData);
+    } catch (err) {
+      endSubscription();
+      const teardownError = runEndWrites([
+        () => {
+          if (!storeReset) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : t.toolSettings["image-to-pdf"].networkErrorCreation,
+            );
+          }
+        },
+        cleanup,
+      ]);
+      if (teardownError) throw teardownError.cause;
+    }
   }, [
     files,
     pageSize,
@@ -262,6 +447,7 @@ export function ImageToPdfSettings() {
     targetSizeUnit,
     setProcessing,
     setError,
+    t,
   ]);
 
   const hasFiles = files.length > 0;

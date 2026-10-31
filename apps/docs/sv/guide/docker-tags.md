@@ -1,6 +1,6 @@
 ---
 description: "SnapOtters Docker-avbildningstaggar, GPU-benchmarks, versionslåsning och stöd för flera plattformar för AMD64 och ARM64."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: ce454ce73d46
 i18n_hash_version: 2

@@ -27,11 +27,11 @@ beforeAll(async () => {
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
   animatedGif = readFixture(fixtures.image.animated.gif);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makePayload(settings: Record<string, unknown>, buffer?: Buffer, filename?: string) {
   const { body, contentType } = createMultipartPayload([
@@ -44,6 +44,22 @@ function makePayload(settings: Record<string, unknown>, buffer?: Buffer, filenam
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return { body, contentType };
+}
+
+async function frameCentres(buffer: Buffer): Promise<string[]> {
+  const { data, info } = await sharp(buffer, { animated: true })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const meta = await sharp(buffer, { animated: true }).metadata();
+  const pages = meta.pages ?? 1;
+  const pageHeight = meta.pageHeight ?? info.height;
+  const width = info.width;
+
+  return Array.from({ length: pages }, (_, page) => {
+    const y = page * pageHeight + Math.floor(pageHeight / 2);
+    const offset = (y * width + Math.floor(width / 2)) * info.channels;
+    return `${data[offset]},${data[offset + 1]},${data[offset + 2]}`;
+  });
 }
 
 // ── Metadata endpoint ─────────────────────────────────────────────
@@ -273,13 +289,15 @@ describe("Reverse mode", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
 
-    // Download and verify it still has 3 frames
+    // Download and verify it still has 3 frames with reversed frame colours (#1221)
     const dlRes = await app.inject({
       method: "GET",
       url: result.downloadUrl,
     });
     const meta = await sharp(dlRes.rawPayload).metadata();
     expect(meta.pages).toBe(3);
+    const sourceCentres = await frameCentres(animatedGif);
+    expect(await frameCentres(dlRes.rawPayload)).toEqual([...sourceCentres].reverse());
   });
 });
 
@@ -376,6 +394,13 @@ describe("Rotate mode", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+    });
+    const sourceCentres = await frameCentres(animatedGif);
+    expect(await frameCentres(dlRes.rawPayload)).toEqual(sourceCentres);
   });
 
   it("rotates 180 degrees", async () => {
@@ -911,6 +936,69 @@ describe("Optimize mode parameter variations", () => {
     });
 
     expect(res.statusCode).toBe(200);
+  });
+
+  it("reduces a 256-color GIF across all four supported palette sizes and rejects intermediate counts (#1223)", async () => {
+    const sampleGif = readFixture(fixtures.image.formats("gif"));
+    const counts: number[] = [];
+    const sizes: number[] = [];
+
+    for (const colors of [2, 4, 16, 256] as const) {
+      const { body: okPayload, contentType: okContentType } = makePayload(
+        { mode: "optimize", colors },
+        sampleGif,
+        "sample.gif",
+      );
+
+      const okRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/gif-tools",
+        payload: okPayload,
+        headers: {
+          "content-type": okContentType,
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(okRes.statusCode).toBe(200);
+      const { downloadUrl, processedSize } = JSON.parse(okRes.body);
+      const dlRes = await app.inject({ method: "GET", url: downloadUrl });
+      const { data, info } = await sharp(dlRes.rawPayload, { animated: true })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const seen = new Set<number>();
+      for (let i = 0; i < data.length; i += info.channels) {
+        seen.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
+      }
+      expect(seen.size).toBeLessThanOrEqual(colors);
+      counts.push(seen.size);
+      sizes.push(processedSize);
+    }
+
+    expect(counts[0]).toBeLessThan(counts[1]);
+    expect(counts[1]).toBeLessThan(counts[2]);
+    expect(counts[2]).toBeLessThan(counts[3]);
+    expect(sizes[0]).toBeLessThan(sizes[1]);
+    expect(sizes[1]).toBeLessThan(sizes[2]);
+    expect(sizes[2]).toBeLessThan(sizes[3]);
+
+    for (const colors of [3, 8, 32, 64, 128]) {
+      const { body: badPayload, contentType: badContentType } = makePayload({
+        mode: "optimize",
+        colors,
+      });
+
+      const badRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/gif-tools",
+        payload: badPayload,
+        headers: {
+          "content-type": badContentType,
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(badRes.statusCode).toBe(400);
+      expect(badRes.json().details).toContain("Colors must be 2, 4, 16, or 256");
+    }
   });
 });
 

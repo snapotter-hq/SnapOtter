@@ -19,7 +19,12 @@
  * retried per the queue's attempts policy; canceled jobs get status
  * "canceled" and are never retried. Terminal DB writes and SSE frames
  * are deferred until the final attempt so intermediate retries stay
- * invisible to the client.
+ * invisible to the client. A user cancel is also recorded on its own
+ * signal (cancel.ts userCancelSignal): the streamed uploads after the
+ * handler combine that signal with a fresh upload timeout (#2295) and the
+ * buffered writes re-check wasUserCanceled, since a cancel that lands
+ * after the deadline can't re-abort the job's controller, and a deadline
+ * alone must not discard a result the handler went on to return (#2144).
  */
 import { createReadStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
@@ -27,48 +32,68 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
+import { configureSharpConcurrency } from "@snapotter/image-engine";
 import { HW_ACCEL_FAMILIES, hwAccelStatus, softwareEncoderStatus } from "@snapotter/media-engine";
 import {
   ANALYTICS_EVENTS,
   extractErrorCode,
   getBundleForTool,
   getOptionalBundleForTool,
+  hasServerErrorStatus,
+  IMAGE_EXT_TO_MIME,
   isSafeMessageError,
   isToolInputError,
   ONBOARDING_FIRST_PROCESSED_KEY,
   type PipelineExecutedProperties,
+  SafeError,
   TOOLS,
 } from "@snapotter/shared";
 import archiver from "archiver";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { and, eq, notInArray } from "drizzle-orm";
+import sharp from "sharp";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
+import { type BatchFileNotes, pickBatchFileNotes } from "../lib/batch-file-notes.js";
 import {
   binaryOverrideWarning,
   checkBinaryOverrides,
+  isBinarySpawnFailure,
   probeFailureLevel,
 } from "../lib/binary-overrides.js";
-import { resolveConcurrency } from "../lib/env.js";
+import { allFailedFault, allFailedInputCode, type BatchFault } from "../lib/engine-unavailable.js";
+import { resolveConcurrency, resolveWorkerThreads } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
-import { friendlyError, sharedFailureReason } from "../lib/errors.js";
+import { friendlyError, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
 import { createUniqueNamer } from "../lib/filename.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
+import { formatLimit } from "../lib/multipart-parts.js";
 import {
   copyObjectToFile,
+  deletePrefix,
   getObjectBuffer,
   getObjectSize,
   getObjectStream,
+  isMissingObjectError,
+  isStorageServiceFault,
+  normalizeS3ReadFault,
   putObject,
   putObjectStream,
+  verifyS3Bucket,
 } from "../lib/object-storage.js";
 import { OCR_MAX_ENCODED_INPUT_BYTES } from "../lib/ocr-limits.js";
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
+import { resolveCanonicalToolId } from "../lib/pool.js";
 import { setSettingIfAbsent } from "../lib/settings-helpers.js";
 import { timeoutMessage } from "../lib/timeout.js";
+import {
+  emitWorkerBatchAudit,
+  emitWorkerPipelineAudit,
+  emitWorkerToolAudit,
+} from "../lib/tool-audit.js";
 import { InputValidationError } from "../modality/contract.js";
 import {
   cancelBatchJob,
@@ -93,13 +118,34 @@ import {
   runAiToolJob,
 } from "./ai-handlers.js";
 import { isBatchCanceled, readBatchCounters, recordChildOutcome } from "./batch-progress.js";
-import { registerCancelable, unregisterCancelable } from "./cancel.js";
+import { batchChildDirs, reclaimBatchChildStorage } from "./batch-reclaim.js";
+import {
+  claimFinalize,
+  registerCancelable,
+  releaseFinalize,
+  unregisterCancelable,
+  userCancelSignal,
+  wasUserCanceled,
+} from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
-import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
-import { runSystemJob } from "./system-jobs.js";
-import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
+import {
+  type AutoSaveTx,
+  buildOutputName,
+  generatePreview,
+  type StagedAutoSave,
+  stageAutoSaveToLibrary,
+} from "./postprocess.js";
+import { runSystemJob, SYSTEM_JOBS } from "./system-jobs.js";
+import {
+  POOLS,
+  type Pool,
+  queueName,
+  resultPayloadKey,
+  type ToolJobData,
+  type ToolJobResult,
+} from "./types.js";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -109,8 +155,10 @@ function scratchRoot(): string {
   return env.SCRATCH_PATH || join(tmpdir(), "snapotter-scratch");
 }
 
-function timeoutMsFor(pool: Pool): number {
-  if (pool === "ai" || pool === "media") {
+export function timeoutMsFor(pool: Pool, toolId?: string): number {
+  const canonicalId = toolId ? resolveCanonicalToolId(toolId) : undefined;
+  const tool = canonicalId ? TOOLS.find((t) => t.id === canonicalId) : undefined;
+  if (pool === "ai" || pool === "media" || tool?.executionHint === "long") {
     return env.JOB_TIMEOUT_LONG_S * 1000;
   }
   return env.JOB_TIMEOUT_FAST_S * 1000;
@@ -126,15 +174,30 @@ export async function loadToolInputBuffer(toolId: string, ref: string): Promise<
     throw new Error("OCR PDF input must use the path-backed loader");
   }
   if (toolId === "ocr") {
-    const size = await getObjectSize(ref);
+    let size: number;
+    try {
+      size = await getObjectSize(ref);
+    } catch (err) {
+      if (isMissingObjectError(err)) {
+        await verifyS3Bucket();
+      } else if (isStorageServiceFault(err)) {
+        throw normalizeS3ReadFault(err);
+      }
+      throw err;
+    }
     if (size > OCR_MAX_ENCODED_INPUT_BYTES) {
       throw new InputValidationError(
-        `OCR input exceeds the ${OCR_MAX_ENCODED_INPUT_BYTES} byte safety limit`,
+        `OCR input exceeds the ${formatLimit(OCR_MAX_ENCODED_INPUT_BYTES)} safety limit`,
         413,
       );
     }
   }
-  return getObjectBuffer(ref);
+  try {
+    return await getObjectBuffer(ref);
+  } catch (err) {
+    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+    throw err;
+  }
 }
 
 export interface LoadedToolInputs {
@@ -144,8 +207,72 @@ export interface LoadedToolInputs {
   originalSize: number;
 }
 
-/** Load OCR PDFs to bounded scratch storage; all other tools remain Buffer-based. */
+/**
+ * Load a job's queued inputs. A queued input can legitimately be gone by the
+ * time the job runs (the TTL sweep behind a backed-up queue, a team
+ * deleteAfter deadline, a GDPR erase), and that is the environment, not our
+ * code: surface it as an operational failure with a message the user can act
+ * on, instead of a raw, stackless ENOENT that Sentry files as a bug (#901).
+ */
+/**
+ * Which body runs a job: the path-backed AI handler, the AI job handler, or the
+ * tool registry's process fn.
+ *
+ * Registering an AI job handler says the tool is AI-backed; it does not say the
+ * handler owns every job shape. The handler is the standalone path (for
+ * remove-background, Phase 1 of a two-phase flow), while the process fn owns
+ * the finished job. Letting the handler win every kind is how thirteen tools
+ * came to behave differently in a pipeline than on their own page (#2076).
+ * ocr-pdf keeps its path-backed handler contract either way.
+ */
+export function selectJobDispatch(toolId: string, kind: ToolJobData["kind"]): JobDispatch {
+  if (hasAiPathJobHandler(toolId)) return "ai-path";
+  if ((kind === "pipeline-step" || kind === "batch-child") && getToolConfig(toolId)?.processV2) {
+    return "registry";
+  }
+  return hasAiJobHandler(toolId) ? "ai-handler" : "registry";
+}
+
+export type JobDispatch = "ai-path" | "ai-handler" | "registry";
+
 export async function loadToolInputs(
+  toolId: string,
+  refs: string[],
+  filename: string,
+  scratchDir: string,
+  signal: AbortSignal,
+): Promise<LoadedToolInputs> {
+  try {
+    return await readToolInputs(toolId, refs, filename, scratchDir, signal);
+  } catch (err) {
+    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+    if (!isMissingObjectError(err)) throw err;
+    // The OCR PDF path also writes to scratch, where an ENOENT would be our
+    // own bug. Relabel only when storage confirms a queued input is gone.
+    const gone = await Promise.all(refs.map(isQueuedInputGone));
+    if (!gone.includes(true)) throw err;
+    await verifyS3Bucket();
+    throw new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      cause: err,
+    });
+  }
+}
+
+/** True only when storage says the object is missing; any other probe fault is not proof. */
+async function isQueuedInputGone(ref: string): Promise<boolean> {
+  try {
+    await getObjectSize(ref);
+    return false;
+  } catch (err) {
+    return isMissingObjectError(err);
+  }
+}
+
+/** Load OCR PDFs to bounded scratch storage; all other tools remain Buffer-based. */
+async function readToolInputs(
   toolId: string,
   refs: string[],
   filename: string,
@@ -173,7 +300,7 @@ export async function loadToolInputs(
         error.statusCode === 413
       ) {
         throw new InputValidationError(
-          `OCR input exceeds the ${OCR_MAX_ENCODED_INPUT_BYTES} byte safety limit`,
+          `OCR input exceeds the ${formatLimit(OCR_MAX_ENCODED_INPUT_BYTES)} safety limit`,
           413,
         );
       }
@@ -205,6 +332,7 @@ export interface LegacyResultPayload {
   originalSize: number;
   processedSize: number;
   savedFileId?: string;
+  autoSaveError?: string;
   [key: string]: unknown;
 }
 
@@ -226,6 +354,9 @@ export function buildLegacyResultPayload(
   if (jobResult.savedFileId) {
     payload.savedFileId = jobResult.savedFileId;
   }
+  if (jobResult.autoSaveError) {
+    payload.autoSaveError = jobResult.autoSaveError;
+  }
   if (jobResult.resultPayload) {
     Object.assign(payload, jobResult.resultPayload);
   }
@@ -242,17 +373,79 @@ export function buildLegacyResultPayload(
  * sync/async class.
  */
 function toolUsedBaseProps(data: ToolJobData, durationMs: number): Record<string, unknown> {
-  const tool = TOOLS.find((t) => t.id === data.toolId);
+  const canonicalId = resolveCanonicalToolId(data.toolId);
+  const tool = TOOLS.find((t) => t.id === canonicalId);
   return {
     tool_id: data.toolId,
     duration_ms: durationMs,
     category: tool?.category ?? "unknown",
     is_ai_tool:
-      getBundleForTool(data.toolId) !== null || getOptionalBundleForTool(data.toolId) !== null,
+      getBundleForTool(canonicalId) !== null || getOptionalBundleForTool(canonicalId) !== null,
     is_batch: data.kind === "batch-child",
     input_format: safeFormatTag(data.filename) ?? "unknown",
     execution_hint: tool?.executionHint ?? "fast",
   };
+}
+
+/**
+ * The machine-readable half of an InputValidationError, kept on the failed job
+ * row next to the message. An ENGINE_UNAVAILABLE raised inside the worker (qpdf
+ * breaking between enqueue and pickup, say) otherwise loses the code and the
+ * "Check QPDF_PATH" hint the route would have sent (#1403).
+ */
+function validationErrorFields(err: unknown): { code?: string; details?: string } {
+  // A storage fault raised as a SafeError (the workspace cap, a full or
+  // unwritable volume) keeps its code too, so a route reading the row answers
+  // it as the fault it is (#2210).
+  if (isSafeMessageError(err) && hasServerErrorStatus(err)) {
+    return typeof err.code === "string" ? { code: err.code } : {};
+  }
+  if (!(err instanceof Error) || err.name !== "InputValidationError") return {};
+  const { code, details } = err as { code?: unknown; details?: unknown };
+  return {
+    ...(typeof code === "string" && { code }),
+    ...(typeof details === "string" && { details }),
+  };
+}
+
+/**
+ * The HTTP status a failed job deserves, kept on the failed job row so a
+ * route waiting on the job answers it instead of a generic 422 (#1742). The
+ * error itself doesn't survive the queue, so the row is the only carrier, and
+ * the failed progress frame rewrites that row, so it has to carry it too.
+ */
+function failureStatus(err: unknown): { httpStatus?: number } {
+  if (err instanceof Error && err.name === "InputValidationError") {
+    const statusCode = (err as { statusCode?: unknown }).statusCode;
+    return { httpStatus: typeof statusCode === "number" ? statusCode : 400 };
+  }
+  // Any other error that already says it is the server's (a storage fault, a
+  // failed write) keeps its status instead of reading as a bad file (#2210).
+  if (hasServerErrorStatus(err)) return { httpStatus: err.statusCode };
+  return isToolInputError(err) ? { httpStatus: 400 } : {};
+}
+
+const ABORT_ERROR_MESSAGE =
+  /^(?:cancel+ed|aborted(?: by signal| before start)?|the operation was aborted|(?:job|python script|ffprobe|tesseract(?: ocr| language-pack preflight)?|pdf ocr) (?:was )?cancel+ed|accurate ocr runtime request was aborted|timeout)$/i;
+
+/**
+ * True when an error thrown after the job deadline is the abort signal itself
+ * rather than the handler's own failure (#2294). Handlers and engine runners
+ * surface a cooperative abort as an AbortError, AnimatedRemovalCanceledError,
+ * the raw "timeout" abort reason from signal.throwIfAborted(), or a short
+ * cancel/abort message ("Canceled", "Aborted by signal", ...).
+ */
+export function isTimeoutAbortError(err: unknown): boolean {
+  if (err === "timeout") return true;
+  if (err instanceof Error) {
+    if (err.name === "AbortError" || err.name === "AnimatedRemovalCanceledError") {
+      return true;
+    }
+    const code = (err as { code?: unknown }).code;
+    if (code === "ABORT_ERR" || code === "canceled") return true;
+  }
+  const message = err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  return ABORT_ERROR_MESSAGE.test(message.trim());
 }
 
 async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
@@ -290,14 +483,26 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     // Register for cooperative cancellation
     const ac = registerCancelable(jobId);
     const signal = ac.signal;
+    // Fires on a user cancel only, never on the deadline (#2144). The streamed
+    // uploads combine this with a fresh upload budget once the handler returns
+    // (#2295), and the library auto-save after the handler takes this signal (the
+    // other buffered writes re-check wasUserCanceled instead): a handler that
+    // ignored the signal and returned after the deadline has a finished result
+    // worth keeping, while a user cancel still has to stop the upload.
+    const userCancel = userCancelSignal(jobId);
 
     // Timeout guard (0 means unlimited; only arm when positive)
-    const timeoutMs = timeoutMsFor(data.pool);
+    const timeoutMs = timeoutMsFor(data.pool, data.toolId);
     const timeoutHandle =
       timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
 
     // Per-job scratch directory
     const scratchDir = join(scratchRoot(), jobId);
+
+    // Read by the catch below (#2144): once the handler has returned, the
+    // deadline can't be the cause of a later error.
+    let handlerReturned = false;
+    let finalizeClaimed = false;
 
     try {
       await mkdir(scratchDir, { recursive: true });
@@ -361,6 +566,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           phase: "processing",
           percent,
           stage,
+          ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
         });
         void job.updateProgress({ percent, stage });
       });
@@ -384,18 +590,22 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         | Array<{ name: string; buffer?: Buffer; scratchPath?: string; contentType: string }>
         | undefined;
 
-      if (hasAiPathJobHandler(data.toolId)) {
+      const dispatch = selectJobDispatch(data.toolId, data.kind);
+
+      if (dispatch === "ai-path") {
         if (!pathInput) throw new Error(`No path-backed input for ${data.toolId}`);
         const aiResult = await runAiPathToolJob(data, pathInput, ctx);
+        handlerReturned = true;
         resultBuffer = aiResult.buffer;
         resultSize = aiResult.buffer.length;
         resultFilename = aiResult.filename;
         resultContentType = aiResult.contentType;
         resultPayload = aiResult.resultPayload;
         extraOutputs = aiResult.extraOutputs;
-      } else if (hasAiJobHandler(data.toolId)) {
+      } else if (dispatch === "ai-handler") {
         if (!inputBuffer) throw new Error(`No buffered input for ${data.toolId}`);
         const aiResult = await runAiToolJob(data, inputBuffer, ctx);
+        handlerReturned = true;
         resultBuffer = aiResult.buffer;
         resultSize = aiResult.buffer.length;
         resultFilename = aiResult.filename;
@@ -415,6 +625,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           signal,
           report,
         });
+        handlerReturned = true;
 
         // Resolve buffer OR scratchPath for the primary output. Over-cap
         // scratch files stay on disk and stream to storage below.
@@ -460,17 +671,54 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         resultContentType,
       );
 
+      // A handler that never reads the signal can still finish after a user cancel
+      // landed. Settle it as canceled before metadata scrubbing or storage writes
+      // (#2092, #3254). A timeout abort alone is left be: that result is finished
+      // and good, and throwing here would retry the whole job.
+      if (wasUserCanceled(jobId)) throw new Error("Canceled");
+
       // Generated PDFs carry the conversion engine's name as Producer/Creator
       // (LibreOffice, Ghostscript, pdfcpu, ...); stamp SnapOtter instead.
-      // Best effort: a failed scrub keeps the original bytes.
+      // Best effort: a failed scrub keeps the original bytes. Pass userCancel
+      // (never the deadline signal) so a user cancel stops doc_scrub_meta
+      // without discarding a finished result on a deadline overrun (#2144, #3254).
       if (
         SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) &&
         outName.toLowerCase().endsWith(".pdf") &&
         resultBuffer
       ) {
-        resultBuffer = await scrubPdfProducer(resultBuffer);
+        resultBuffer = await scrubPdfProducer(resultBuffer, { signal: userCancel });
         resultSize = resultBuffer.length;
+        if (wasUserCanceled(jobId)) throw new Error("Canceled");
       }
+
+      // Persist the tool's own resultPayload before the primary output (#1389)
+      // so the deliverable artifact never exists on disk without its sidecar,
+      // and stranded-job reconciliation can restore resize and target-size notes
+      // when the terminal DB write is lost. orderArtifacts ignores the sidecar,
+      // so a crash between the two writes still reconciles as failed.
+      if (resultPayload) {
+        const payloadJson = JSON.stringify(resultPayload);
+        if (payloadJson !== "{}") {
+          await putObject(resultPayloadKey(jobId), Buffer.from(payloadJson, "utf8"));
+        }
+      }
+
+      // Give streamed output uploads a fresh budget from the moment the first
+      // streamed upload begins after the handler returned (#2295). Starting this
+      // before the handler would reintroduce #2144's discarded-result bug when
+      // the job deadline fires under a handler that finishes anyway, and lazy
+      // creation avoids arming an unused timer on buffered jobs. A tripped
+      // upload budget surfaces through putObjectStream as a storage fault
+      // (logged, reported, and retried).
+      let uploadSignal: AbortSignal | undefined;
+      const getUploadSignal = (): AbortSignal => {
+        uploadSignal ??=
+          timeoutMs > 0
+            ? AbortSignal.any([userCancel, AbortSignal.timeout(timeoutMs)])
+            : userCancel;
+        return uploadSignal;
+      };
 
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
@@ -478,7 +726,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         await putObject(primaryKey, resultBuffer);
       } else if (resultStreamPath) {
         resultSize = await putObjectStream(primaryKey, createReadStream(resultStreamPath), {
-          signal,
+          signal: getUploadSignal(),
         });
       }
       const outputRefs: string[] = [primaryKey];
@@ -486,17 +734,21 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Write extra outputs (AI tools may produce multiple files)
       if (extraOutputs) {
         for (const extra of extraOutputs) {
+          if (wasUserCanceled(jobId)) throw new Error("Canceled");
           const extraKey = `outputs/${jobId}/${extra.name}`;
           if (extra.buffer) {
             const body =
               SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) && extra.name.toLowerCase().endsWith(".pdf")
-                ? await scrubPdfProducer(extra.buffer)
+                ? await scrubPdfProducer(extra.buffer, { signal: userCancel })
                 : extra.buffer;
+            if (wasUserCanceled(jobId)) throw new Error("Canceled");
             await putObject(extraKey, body);
           } else if (extra.scratchPath) {
             // Over-cap extra: streamed as-is. The producer scrub needs bytes in
             // memory, and no real PDF reaches the buffering cap.
-            await putObjectStream(extraKey, createReadStream(extra.scratchPath), { signal });
+            await putObjectStream(extraKey, createReadStream(extra.scratchPath), {
+              signal: getUploadSignal(),
+            });
           }
           outputRefs.push(extraKey);
         }
@@ -506,7 +758,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // over-cap output ships without one: the poster pipeline needs the bytes
       // in memory, and no preview beats no result.
       const previewRef = resultBuffer
-        ? await generatePreview(resultBuffer, resultContentType, jobId)
+        ? await generatePreview(resultBuffer, resultContentType, jobId, data.toolId)
         : undefined;
 
       // Auto-save when the input came from the user's library (data.fileId is
@@ -514,9 +766,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // picks between an independent new file (default) and a superseding
       // version. Without a fileId this is a no-op, so tool-first uploads are
       // not auto-saved.
-      let savedFileId: string | undefined;
+      //
+      // Staged here (upload blob, probe dimensions, claim finalize) and
+      // committed inside updateSingleFileProgressAtomically below so a
+      // completion-commit fault rolls back the version row and storage charge
+      // with the job (#2350).
+      let stagedSave: StagedAutoSave = {};
       if (resultBuffer) {
-        savedFileId = await autoSaveToLibrary({
+        // Re-check just before the library overwrite, the one write a cancel is
+        // most costly to lose to (#2092). The save checks again up to its
+        // finalize claim (#2143, #2349).
+        if (wasUserCanceled(jobId)) throw new Error("Canceled");
+        stagedSave = await stageAutoSaveToLibrary({
           fileId: data.fileId,
           saveMode: data.saveMode,
           userId: data.userId,
@@ -524,7 +785,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           outName,
           contentType: resultContentType,
           toolId: data.toolId,
+          jobId,
+          userCancel,
         });
+        if (stagedSave.finalizeClaimed) {
+          finalizeClaimed = true;
+        }
       } else if (data.fileId) {
         logger.info(
           { jobId, toolId: data.toolId, bytes: resultSize },
@@ -542,41 +808,105 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         originalSize,
         processedSize: resultSize,
         previewRef,
-        savedFileId,
+        ...(stagedSave.fileId && { savedFileId: stagedSave.fileId }),
+        ...(stagedSave.error && { autoSaveError: stagedSave.error }),
         resultPayload,
       };
       const legacyResult = buildLegacyResultPayload(jobResult, jobId);
 
-      // Commit the authoritative artifact row and client replay alias in one
-      // transaction before terminal Redis publication. A crash can no longer
-      // leave `completed` durable state without the exact result payload.
-      await updateSingleFileProgressAtomically(
-        {
-          jobId: progressJobId,
-          phase: "complete",
-          percent: 100,
-          stage: "complete",
-          result: legacyResult,
-        },
-        async (tx) => {
-          await tx
-            .update(schema.jobs)
-            .set({
-              status: "completed",
-              completedAt: new Date(),
-              durationMs,
-              bytesIn: originalSize,
-              bytesOut: resultSize,
-              outputRefs,
-              progress: { percent: 100, stage: "complete", result: legacyResult },
-            })
-            .where(eq(schema.jobs.id, jobId));
-        },
-      );
+      // A library run that staged a save already claimed finalize before
+      // returning (#2349). Every other run claims finalize here, right before
+      // the completion commit.
+      if (!finalizeClaimed) {
+        if (wasUserCanceled(jobId) || !(await claimFinalize(jobId))) {
+          throw new Error("Canceled");
+        }
+        finalizeClaimed = true;
+      }
+
+      // Commit the authoritative artifact row, any staged library version row,
+      // and the client replay alias in one transaction before terminal Redis
+      // publication. A crash or commit fault can no longer leave `completed`
+      // durable state without the exact result payload or leave a version row
+      // behind an uncommitted job (#2350).
+      try {
+        await updateSingleFileProgressAtomically(
+          {
+            jobId: progressJobId,
+            phase: "complete",
+            percent: 100,
+            stage: "complete",
+            result: legacyResult,
+            ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
+          },
+          async (tx) => {
+            if (stagedSave.commit) {
+              const committed = await stagedSave.commit(tx as AutoSaveTx);
+              if (committed.fileId) {
+                jobResult.savedFileId = committed.fileId;
+                legacyResult.savedFileId = committed.fileId;
+              }
+              if (committed.error) {
+                jobResult.autoSaveError = committed.error;
+                legacyResult.autoSaveError = committed.error;
+              }
+            }
+            await tx
+              .update(schema.jobs)
+              .set({
+                status: "completed",
+                completedAt: new Date(),
+                durationMs,
+                bytesIn: originalSize,
+                bytesOut: resultSize,
+                outputRefs,
+                progress: { percent: 100, stage: "complete", result: legacyResult },
+              })
+              .where(eq(schema.jobs.id, jobId));
+          },
+        );
+      } catch (commitErr) {
+        await stagedSave.onAbort?.();
+        throw commitErr;
+      }
+      await stagedSave.afterCommit?.();
+
+      // The deadline fired under a handler that kept going, and the row now
+      // carries the result it returned. Nothing else records the overrun, so
+      // this line is what an operator tuning JOB_TIMEOUT_*_S has (#2144).
+      if (signal.aborted && signal.reason === "timeout") {
+        logger.warn(
+          { jobId, toolId: data.toolId, timeoutMs, durationMs },
+          "handler returned after the job deadline; result kept",
+        );
+      }
 
       // Record Prometheus metrics
       jobsTotal.inc({ pool: data.pool, status: "completed" });
       jobDuration.observe({ pool: data.pool }, durationMs / 1000);
+
+      if (data.kind === "tool" || data.kind === "ai-tool") {
+        const inputFileCount = inputs.length > 0 ? inputs.length : data.inputRefs.length;
+        const totalInputSize =
+          inputs.length > 0
+            ? inputs.reduce((sum, item) => sum + item.buffer.length, 0)
+            : originalSize;
+        const settingsObj =
+          typeof data.settings === "object" && data.settings !== null
+            ? (data.settings as Record<string, unknown>)
+            : null;
+        const outputFormat =
+          (settingsObj?.format as string | undefined) ??
+          (settingsObj?.outputFormat as string | undefined) ??
+          null;
+        jobResult.audited = await emitWorkerToolAudit({
+          data,
+          inputFileCount,
+          totalInputSize,
+          outputFormat,
+          durationMs,
+        });
+      }
 
       // Analytics: emit tool_used on success
       if (analyticsEnabled()) {
@@ -601,16 +931,34 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       }
 
       // Record queue wait time and completion on the OTel span
-      if (span && job.processedOn) {
-        span.setAttribute("snapotter.queue.wait_ms", job.processedOn - job.timestamp);
-      }
+      const waitedMs = jobAgeMs(job);
+      if (span && waitedMs !== undefined) span.setAttribute("snapotter.queue.wait_ms", waitedMs);
       if (span) span.addEvent("job.completed");
 
       return jobResult;
-    } catch (err) {
+    } catch (rawErr) {
       const durationMs = Date.now() - startTime;
-      const isTimeout = signal.aborted && signal.reason === "timeout";
-      const isCanceled = signal.aborted && !isTimeout;
+      // A user cancel wins over a deadline that fired first: abort() on an already
+      // aborted controller leaves the reason as "timeout".
+      const isCanceled = wasUserCanceled(jobId) || (signal.aborted && signal.reason !== "timeout");
+      // The deadline is the cause only while the handler was still running when
+      // it fired. A handler that ignored the signal and returned anyway is
+      // followed by storage and database writes whose faults carry their own
+      // message, error log and report (#2144).
+      const isTimeout =
+        !isCanceled && !handlerReturned && signal.aborted && signal.reason === "timeout";
+      const err =
+        !isCanceled && !isTimeout && isBinarySpawnFailure(rawErr)
+          ? new SafeError(
+              "Processing is unavailable on this server because a required engine binary could not be started.",
+              {
+                kind: "operational",
+                code: "ENGINE_UNAVAILABLE",
+                statusCode: 503,
+                cause: rawErr,
+              },
+            )
+          : rawErr;
       const errorMessage = err instanceof Error ? err.message : String(err);
       const finalError = isCanceled
         ? "Canceled"
@@ -621,22 +969,67 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Log genuine processing faults at error level (clients only ever see
       // friendlyError(finalError)). Expected validation rejections -- bad user
       // input, not a server fault -- would otherwise flood error logs, so skip
-      // them here; they still reach the OTel span recorded below.
+      // them here; they still reach the OTel span recorded below. A handler
+      // that ignored the signal and threw its own non-abort error after the
+      // deadline is still logged and handed to the failed listener with the
+      // timeout message attached as context (#2294).
+      const isAbort = isTimeout && isTimeoutAbortError(err);
       const isValidationError =
-        err instanceof Error && (err.name === "InputValidationError" || isToolInputError(err));
-      if (!isCanceled && !isTimeout && !isValidationError) {
-        logger.error({ err, jobId, toolId: data.toolId }, "tool job failed");
+        err instanceof Error &&
+        ((err.name === "InputValidationError" &&
+          ((err as { statusCode?: number }).statusCode ?? 400) < 500) ||
+          isToolInputError(err));
+      if (!isCanceled && !isAbort && !isValidationError) {
+        logger.error(
+          { err, jobId, toolId: data.toolId, ...(isTimeout && { timeoutMessage: finalError }) },
+          "tool job failed",
+        );
       }
 
-      // Record error on the OTel span
+      // Record error on the OTel span, with the job age the success path
+      // records too (#1414)
       if (span) {
+        const waitedMs = jobAgeMs(job);
+        if (waitedMs !== undefined) span.setAttribute("snapotter.queue.wait_ms", waitedMs);
         span.setStatus({ code: SpanStatusCode.ERROR, message: finalError });
         span.recordException(err instanceof Error ? err : String(err));
         span.addEvent("job.failed");
       }
 
+      const isInputMissing = isSafeMessageError(err) && err.code === "INPUT_MISSING";
+      const isEngineUnavailable =
+        (isSafeMessageError(err) ||
+          (err instanceof Error && err.name === "InputValidationError")) &&
+        (err as { code?: unknown }).code === "ENGINE_UNAVAILABLE";
+      const isUnrecoverable =
+        isCanceled || isValidationError || isInputMissing || isEngineUnavailable;
       const maxAttempts = job.opts.attempts ?? 1;
-      const willRetry = !isCanceled && job.attemptsMade + 1 < maxAttempts;
+      const willRetry = !isUnrecoverable && job.attemptsMade + 1 < maxAttempts;
+
+      // A canceled job may have written its output already, in this attempt or
+      // in an earlier one that lost its completion commit (output keys are per
+      // job, not per attempt). The row settles with no outputRefs, but the
+      // download route serves by key and job reconciliation adopts stray
+      // outputs, so take the prefix back on every cancel; for a job that wrote
+      // nothing it is one cheap no-op. Best effort: the terminal write below
+      // must land either way (#2144).
+      if (isCanceled) {
+        const prefix = `outputs/${jobId}/`;
+        try {
+          await deletePrefix(prefix);
+        } catch (cleanupErr) {
+          logger.error(
+            { err: cleanupErr, jobId, toolId: data.toolId, prefix },
+            "canceled job output cleanup failed; outputs stay downloadable until the storage sweep",
+          );
+          void reportError(cleanupErr, {
+            source: "worker",
+            pool: data.pool,
+            toolId: data.toolId,
+            jobId,
+          });
+        }
+      }
 
       const progressJobId = data.clientJobId ?? jobId;
 
@@ -648,27 +1041,36 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         jobsTotal.inc({ pool: data.pool, status: isCanceled ? "canceled" : "failed" });
         jobDuration.observe({ pool: data.pool }, durationMs / 1000);
 
-        // Swallowed so the rethrow below stays authoritative, but logged:
-        // for a canceled child or step this row is the only evidence the
-        // finalize reads when it labels the run (#809), so a dropped write
-        // here must be visible somewhere.
-        await db
-          .update(schema.jobs)
-          .set({
-            status: isCanceled ? "canceled" : "failed",
-            completedAt: new Date(),
-            durationMs,
-            error: { message: friendlyError(finalError) },
-          })
-          .where(eq(schema.jobs.id, jobId))
-          .catch((writeErr) => {
-            logger.error(
-              { err: writeErr, jobId, toolId: data.toolId },
-              "terminal status write failed",
-            );
-          });
-
         if (isCanceled) {
+          // Swallowed so the rethrow below stays authoritative, but logged:
+          // for a canceled child or step this row is the only evidence the
+          // finalize reads when it labels the run (#809), so a dropped write
+          // here must be visible somewhere.
+          await db
+            .update(schema.jobs)
+            .set({
+              status: "canceled",
+              completedAt: new Date(),
+              durationMs,
+              error: {
+                message: friendlyError(finalError),
+              },
+            })
+            .where(eq(schema.jobs.id, jobId))
+            .catch((writeErr) => {
+              logger.error(
+                { err: writeErr, jobId, toolId: data.toolId },
+                "terminal status write failed",
+              );
+              void reportError(writeErr, {
+                source: "worker",
+                pool: data.pool,
+                toolId: data.toolId,
+                jobId,
+              });
+            });
+
+          let aliasWriteFaulted = false;
           if (progressJobId !== jobId) {
             // Alias dual write (#808), the finalize's #766 pattern: a
             // reconnecting client replays from the alias row, so it needs
@@ -690,6 +1092,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
                 expectedArtifactJobId: jobId,
               });
             } catch (aliasErr) {
+              aliasWriteFaulted = true;
               logger.error(
                 { err: aliasErr, jobId, progressJobId },
                 "canceled alias terminal write failed",
@@ -703,27 +1106,80 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
               });
             }
           }
-          // Ephemeral terminal event for live SSE clients, published
-          // unconditionally: liveness must not depend on the durable write
-          // (which the guard also skips when a reused alias id is still
-          // terminal from an earlier run). publishEphemeral sets the
-          // replay key without overwriting the DB row (which stays
-          // "canceled").
-          publishEphemeral({
-            jobId: progressJobId,
-            type: "single",
-            phase: "failed",
-            percent: 0,
-            error: "Canceled",
-          });
+          // Ephemeral terminal event for live SSE clients, published when the
+          // run has no separate alias row or when the alias row's durable
+          // write faulted (#888, #3408). When a separate alias row settled
+          // cleanly via cancelSingleJobGuarded, that call already announced
+          // the frame if the pointer still matched and skipped announcement
+          // if a newer run re-pointed the channel.
+          if (progressJobId === jobId || aliasWriteFaulted) {
+            publishEphemeral({
+              jobId: progressJobId,
+              type: "single",
+              phase: "failed",
+              percent: 0,
+              error: "Canceled",
+              code: "CANCELED",
+            });
+          }
         } else {
-          await updateSingleFileProgress({
-            jobId: progressJobId,
-            phase: "failed",
-            percent: 0,
-            error: friendlyError(finalError),
+          // Commit the authoritative failure row and the client replay alias
+          // in one transaction before announcing (#2699). Swallowed so the
+          // rethrow below stays authoritative, and so a Postgres outage never
+          // caches a failed Redis replay frame over a finished output that
+          // stranded-job reconciliation will recover.
+          const errorFields = {
+            ...(!isTimeout && validationErrorFields(err)),
+            ...(!isTimeout && failureStatus(err)),
+          };
+          await updateSingleFileProgressAtomically(
+            {
+              jobId: progressJobId,
+              phase: "failed",
+              percent: 0,
+              error: friendlyError(finalError),
+              ...errorFields,
+              ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
+            },
+            async (tx) => {
+              await tx
+                .update(schema.jobs)
+                .set({
+                  status: "failed",
+                  completedAt: new Date(),
+                  durationMs,
+                  error: {
+                    message: friendlyError(finalError),
+                    // The fault's own code and status belong on a job that failed
+                    // on it; a timeout or a cancel that one raced is not that
+                    // failure, and its row says so (#2210).
+                    ...errorFields,
+                  },
+                })
+                .where(eq(schema.jobs.id, jobId));
+            },
+          ).catch((writeErr) => {
+            logger.error(
+              { err: writeErr, jobId, toolId: data.toolId },
+              "terminal status write failed",
+            );
+            void reportError(writeErr, {
+              source: "worker",
+              pool: data.pool,
+              toolId: data.toolId,
+              jobId,
+            });
           });
         }
+      }
+
+      if (willRetry && finalizeClaimed) {
+        await releaseFinalize(jobId).catch((releaseErr) => {
+          logger.warn(
+            { err: releaseErr, jobId, toolId: data.toolId },
+            "failed to release finalize claim after attempt error",
+          );
+        });
       }
 
       // Analytics: emit tool_used on failure
@@ -753,8 +1209,21 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       }
 
       if (isCanceled) throw new UnrecoverableError("Canceled");
-      if (isTimeout) throw new Error(finalError);
-      throw err;
+      if (isTimeout && isAbort) throw new Error(finalError);
+      const thrownErr = isTimeout
+        ? Object.assign(err instanceof Error ? err : new Error(errorMessage), {
+            timeoutMessage: finalError,
+          })
+        : err;
+      if (isUnrecoverable) {
+        const unrecoverable = new UnrecoverableError(errorMessage);
+        if (thrownErr instanceof Error && thrownErr.stack) unrecoverable.stack = thrownErr.stack;
+        throw Object.assign(unrecoverable, {
+          cause: thrownErr,
+          ...(isTimeout && { timeoutMessage: finalError }),
+        });
+      }
+      throw thrownErr;
     } finally {
       if (span) span.end();
       clearTimeout(timeoutHandle);
@@ -845,6 +1314,19 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
           ? ((prevRow.error as { message?: string } | null)?.message ?? "Processing failed")
           : "Previous step has no output",
       );
+      if (prevRow?.status !== "failed" && prevRow?.status !== "canceled") {
+        const err = new Error(prevError);
+        logger.error(
+          { err, jobId: data.jobId, prevJobId: data.prevJobId },
+          "pipeline step predecessor has no output",
+        );
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: job.id ?? data.jobId,
+        });
+      }
       await db
         .update(schema.jobs)
         .set({ status: "failed", completedAt: new Date(), error: { message: prevError } })
@@ -864,6 +1346,10 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
   // Report pipeline-level progress to the pipeline's SSE channel.
   const pipelineProgressId = data.clientJobId;
   if (pipelineProgressId) {
+    const stepSuffix = `-s${data.stepIndex ?? 0}`;
+    const flowId = data.jobId.endsWith(stepSuffix)
+      ? data.jobId.slice(0, -stepSuffix.length)
+      : data.jobId;
     const percent = Math.round(((data.stepIndex ?? 0) / (data.totalSteps ?? 1)) * 90);
     const stage = `Step ${(data.stepIndex ?? 0) + 1}/${data.totalSteps}: ${data.toolId}`;
     void updateSingleFileProgress({
@@ -871,6 +1357,7 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
       phase: "processing",
       percent,
       stage,
+      ...(pipelineProgressId !== flowId && { expectedPipelineFlowId: flowId }),
     });
   }
 
@@ -882,10 +1369,14 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
   try {
     return await processToolJob(job);
   } catch (err) {
+    reportToolJobFailure(job, err);
     // Step failed -- return failure marker. processToolJob already
     // updated the DB row to "failed" and emitted a terminal event
     // on the step's own progress channel.
-    const errorMsg = friendlyError(err instanceof Error ? err.message : String(err));
+    const rawError =
+      (err as { timeoutMessage?: string } | null)?.timeoutMessage ??
+      (err instanceof Error ? err.message : String(err));
+    const errorMsg = friendlyError(rawError);
     return {
       outputRefs: [],
       filename: data.filename,
@@ -910,35 +1401,61 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
  * child outcome for batch progress tracking.
  */
 /** Best-effort content type from a filename extension (for preview dispatch). */
-function contentTypeForFilename(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+export function contentTypeForFilename(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const ext = dot >= 0 ? name.slice(dot + 1).toLowerCase() : "";
   const map: Record<string, string> = {
     pdf: "application/pdf",
+    epub: "application/epub+zip",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    odt: "application/vnd.oasis.opendocument.text",
+    rtf: "application/rtf",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    odp: "application/vnd.oasis.opendocument.presentation",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ods: "application/vnd.oasis.opendocument.spreadsheet",
+    html: "text/html",
+    htm: "text/html",
+    md: "text/markdown",
+    markdown: "text/markdown",
+    txt: "text/plain",
+    csv: "text/csv",
+    tsv: "text/tab-separated-values",
+    json: "application/json",
+    xml: "application/xml",
+    yaml: "application/yaml",
+    yml: "application/yaml",
+    zip: "application/zip",
+    srt: "application/x-subrip",
+    vtt: "text/vtt",
     mp4: "video/mp4",
+    m4v: "video/mp4",
     webm: "video/webm",
     mov: "video/quicktime",
     mkv: "video/x-matroska",
     avi: "video/x-msvideo",
+    "3gp": "video/3gpp",
+    flv: "video/x-flv",
+    wmv: "video/x-ms-wmv",
+    mpg: "video/mpeg",
+    mpeg: "video/mpeg",
+    ts: "video/mp2t",
+    mts: "video/mp2t",
+    m2ts: "video/mp2t",
+    ogv: "video/ogg",
     mp3: "audio/mpeg",
     wav: "audio/wav",
     ogg: "audio/ogg",
     flac: "audio/flac",
     m4a: "audio/mp4",
     aac: "audio/aac",
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    webp: "image/webp",
-    avif: "image/avif",
-    svg: "image/svg+xml",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    heic: "image/heic",
-    heif: "image/heif",
-    txt: "text/plain",
+    opus: "audio/opus",
+    wma: "audio/x-ms-wma",
+    aiff: "audio/aiff",
+    amr: "audio/amr",
+    ac3: "audio/ac3",
   };
-  return map[ext] ?? "application/octet-stream";
+  return map[ext] ?? IMAGE_EXT_TO_MIME[ext] ?? "application/octet-stream";
 }
 
 /**
@@ -973,13 +1490,16 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   const startTime = Date.now();
   const totalSteps = data.totalSteps ?? 0;
 
-  const steps: Array<{ step: number; toolId: string; size: number }> = [];
+  const steps: Array<{ step: number; toolId: string; size: number; notes?: BatchFileNotes }> = [];
   let firstBytesIn = 0;
   let lastOutputRef = "";
   let lastBytesOut = 0;
   let failedAtStep: number | null = null;
   let failedStepCanceled = false;
   let failError = "";
+  // The failed step's status, code and hint, kept on this file's row so a
+  // pipeline batch can tell one engine fault behind every file (#1627).
+  let failFault: { code?: string; details?: string; httpStatus?: number } = {};
 
   for (let i = 0; i < totalSteps; i++) {
     const stepId = `${data.jobId}-s${i}`;
@@ -988,20 +1508,46 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     if (!row) {
       failedAtStep = i;
       failError = `Step ${i + 1} row not found`;
+      const err = new Error(failError);
+      logger.error({ err, jobId: data.jobId, stepId }, "pipeline step row not found");
+      void reportError(err, {
+        source: "worker",
+        pool: data.pool,
+        toolId: data.toolId,
+        jobId: job.id ?? data.jobId,
+      });
       break;
     }
 
     if (row.status !== "completed") {
       failedAtStep = i;
       failedStepCanceled = row.status === "canceled";
-      failError = (row.error as { message?: string } | null)?.message ?? `Step ${i + 1} failed`;
+      const stepError = row.error as {
+        message?: string;
+        code?: string;
+        details?: string;
+        httpStatus?: number;
+      } | null;
+      failError = stepError?.message ?? `Step ${i + 1} failed`;
+      failFault = {
+        ...(stepError?.code && { code: stepError.code }),
+        ...(stepError?.details && { details: stepError.details }),
+        ...(stepError?.httpStatus !== undefined && { httpStatus: stepError.httpStatus }),
+      };
       break;
     }
 
+    // What the step's own single run would have reported (#1303), such as a
+    // Deep Enhance that didn't run or a resize to fit, on the step record a
+    // single-file pipeline returns.
+    const notes = pickBatchFileNotes(
+      (row.progress as { result?: Record<string, unknown> } | null)?.result,
+    );
     steps.push({
       step: i + 1,
       toolId: row.toolId ?? "unknown",
       size: Number(row.bytesOut ?? 0),
+      ...(notes ? { notes } : {}),
     });
 
     if (i === 0) firstBytesIn = Number(row.bytesIn ?? 0);
@@ -1038,41 +1584,63 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     // write is the one failure a client may never recover from);
     // requestCancel's pipeline-alias heal converges the row on a later
     // cancel, off the canceled flow row this finalize still commits.
-    const settleGuarded = async (rowId: string) => {
+    const settleGuarded = async (
+      rowId: string,
+      expectedPipelineFlowId?: string,
+    ): Promise<boolean> => {
       try {
-        await cancelSingleJobGuarded({ jobId: rowId });
+        await cancelSingleJobGuarded({
+          jobId: rowId,
+          ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+        });
+        return false;
       } catch (err) {
         logger.error(
           { err, jobId: data.jobId, target: rowId },
           "canceled pipeline terminal write failed",
         );
         void reportError(err, { source: "worker", pool: data.pool, jobId: rowId });
+        return true;
       }
     };
-    await settleGuarded(data.jobId);
-    if (progressJobId !== data.jobId) {
-      await settleGuarded(progressJobId);
-    }
-    // Ephemeral terminal event for live SSE clients, published
-    // unconditionally for single-run pipelines: liveness must not depend
-    // on the durable write (which the guard also skips when a reused
-    // alias id is still terminal from an earlier run). Pipeline-batch
-    // per-file finalizes report through the parent batch channel instead.
-    if (!data.parentId) {
+    const flowWriteFaulted = await settleGuarded(data.jobId);
+    const progressWriteFaulted =
+      progressJobId !== data.jobId
+        ? await settleGuarded(progressJobId, data.jobId)
+        : flowWriteFaulted;
+    // Ephemeral terminal event for live SSE clients, published when the run has
+    // no separate alias row or when the alias row's durable write faulted
+    // (#888). When a separate alias row settled cleanly via
+    // cancelSingleJobGuarded, that call already announced the frame if the
+    // pointer still matched and skipped announcement if a newer run re-pointed
+    // the channel (#2741). Pipeline-batch per-file finalizes report through
+    // the parent batch channel instead.
+    if (!data.parentId && (progressJobId === data.jobId || progressWriteFaulted)) {
       publishEphemeral({
         jobId: progressJobId,
         type: "single",
         phase: "failed",
         percent: 0,
         error: "Canceled",
+        code: "CANCELED",
       });
     }
 
     // Batch progress (pipeline-batch only): the canceled file counts like a
     // failed one; batch-finalize turns the canceled rows into #767's
-    // partial-ZIP semantics.
+    // partial-ZIP semantics. Caught like settleGuarded (#836): a Redis blip
+    // on the batch counters after the terminal writes must not fail the
+    // finalize job or drop its canceled analytics and result payload.
     if (data.parentId && data.totalFiles !== undefined) {
-      await recordChildOutcome(data.parentId, data.totalFiles, data.filename, "Canceled");
+      try {
+        await recordChildOutcome(data.parentId, data.totalFiles, data.filename, "Canceled");
+      } catch (err) {
+        logger.error(
+          { err, jobId: data.jobId, parentId: data.parentId },
+          "canceled pipeline batch outcome write failed",
+        );
+        void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+      }
     }
 
     if (analyticsEnabled()) {
@@ -1103,21 +1671,55 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   if (failedAtStep !== null) {
     const errorMsg = `Step ${failedAtStep + 1}: ${friendlyError(failError)}`;
 
-    await db
-      .update(schema.jobs)
-      .set({ status: "failed", completedAt: new Date(), error: { message: errorMsg } })
-      .where(eq(schema.jobs.id, data.jobId));
+    // Commit the authoritative pipeline row and clientJobId replay row in one
+    // transaction before announcing (#3167). For a pipeline-batch child
+    // (parentId set), catch a terminal write fault so recordChildOutcome and
+    // the returned failure marker still complete for batch-finalize; a
+    // single-file pipeline rethrows so the worker failed-handler safety net can
+    // settle both rows.
+    try {
+      await updateSingleFileProgressAtomically(
+        {
+          jobId: progressJobId,
+          phase: "failed",
+          percent: 0,
+          error: errorMsg,
+          ...failFault,
+          ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
+        },
+        async (tx) => {
+          await tx
+            .update(schema.jobs)
+            .set({
+              status: "failed",
+              completedAt: new Date(),
+              error: { message: errorMsg, ...failFault },
+            })
+            .where(eq(schema.jobs.id, data.jobId));
+        },
+      );
+    } catch (err) {
+      if (!data.parentId) throw err;
+      logger.error(
+        { err, jobId: data.jobId, parentId: data.parentId },
+        "failed pipeline terminal write failed",
+      );
+      void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+    }
 
-    await updateSingleFileProgress({
-      jobId: progressJobId,
-      phase: "failed",
-      percent: 0,
-      error: errorMsg,
-    });
-
-    // Batch progress (pipeline-batch only)
+    // Batch progress (pipeline-batch only): guarded like the cancel branch
+    // (#836, #2620) so a Redis counter blip after the terminal write does not
+    // fail the finalize job or drop its analytics and result payload.
     if (data.parentId && data.totalFiles !== undefined) {
-      await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+      try {
+        await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+      } catch (err) {
+        logger.error(
+          { err, jobId: data.jobId, parentId: data.parentId },
+          "failed pipeline batch outcome write failed",
+        );
+        void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+      }
     }
 
     // Analytics: emit pipeline_executed on failure
@@ -1141,8 +1743,11 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       contentType: "",
       originalSize: firstBytesIn,
       processedSize: 0,
+      // The failed step's status, code and hint ride along so the sync route
+      // can answer a server fault with its own status (#2179).
       resultPayload: {
         error: errorMsg,
+        ...failFault,
         stepsCompleted: steps.length,
         steps,
       },
@@ -1154,16 +1759,102 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
 
   // Copy last step's output to outputs/<pipelineJobId>/<filename> so
   // the legacy download URL /api/v1/download/<pipelineJobId>/... works.
-  const lastOutputBuffer = await getObjectBuffer(lastOutputRef);
   const outFilename = lastOutputRef.split("/").pop() ?? "output";
   const parentKey = `outputs/${data.jobId}/${outFilename}`;
-  await putObject(parentKey, lastOutputBuffer);
+  let lastOutputBuffer: Buffer;
+  try {
+    try {
+      lastOutputBuffer = await getObjectBuffer(lastOutputRef);
+    } catch (err) {
+      if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+      throw err;
+    }
+    await putObject(
+      resultPayloadKey(data.jobId),
+      Buffer.from(JSON.stringify({ stepsCompleted: totalSteps, steps }), "utf8"),
+    );
+    await putObject(parentKey, lastOutputBuffer);
+  } catch (err) {
+    // Settle the durable row (and batch outcome for pipeline-batch children)
+    // before rethrowing so POST /api/v1/pipeline/execute and processBatchFinalize
+    // read the 503 storage status and code instead of falling back to 500 or a
+    // generic message (#3479).
+    const isServerSafeFault = isSafeMessageError(err) && hasServerErrorStatus(err);
+    const errorMsg = isServerSafeFault ? friendlyError(err.message) : "Pipeline processing failed";
+    const errorFields = isServerSafeFault
+      ? {
+          ...validationErrorFields(err),
+          ...failureStatus(err),
+        }
+      : {};
+    try {
+      await updateSingleFileProgressAtomically(
+        {
+          jobId: progressJobId,
+          phase: "failed",
+          percent: 0,
+          error: errorMsg,
+          ...errorFields,
+          ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
+        },
+        async (tx) => {
+          await tx
+            .update(schema.jobs)
+            .set({
+              status: "failed",
+              completedAt: new Date(),
+              error: { message: errorMsg, ...errorFields },
+            })
+            .where(eq(schema.jobs.id, data.jobId));
+        },
+      );
+    } catch (writeErr) {
+      logger.error(
+        { err: writeErr, jobId: data.jobId, ...(data.parentId && { parentId: data.parentId }) },
+        "failed pipeline terminal write failed",
+      );
+      void reportError(writeErr, { source: "worker", pool: data.pool, jobId: data.jobId });
+    }
+
+    if (data.parentId && data.totalFiles !== undefined) {
+      try {
+        await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+      } catch (outcomeErr) {
+        logger.error(
+          { err: outcomeErr, jobId: data.jobId, parentId: data.parentId },
+          "failed pipeline batch outcome write failed",
+        );
+        void reportError(outcomeErr, { source: "worker", pool: data.pool, jobId: data.jobId });
+      }
+    }
+
+    if (analyticsEnabled()) {
+      void trackEvent(
+        ANALYTICS_EVENTS.PIPELINE_EXECUTED,
+        pipelineExecutedProps(
+          data,
+          totalSteps,
+          steps.map((s) => s.toolId),
+          Date.now() - startTime,
+          "failed",
+        ),
+        data.analyticsDistinctId,
+      );
+    }
+
+    throw err;
+  }
 
   // Modality-aware preview of the final output (video poster / pdf first page /
   // image thumb) so the pipeline result carries a previewUrl like single-tool
   // results do. Content type is derived from the output extension.
   const contentType = contentTypeForFilename(outFilename);
-  const previewRef = await generatePreview(lastOutputBuffer, contentType, data.jobId);
+  const previewRef = await generatePreview(
+    lastOutputBuffer,
+    contentType,
+    data.jobId,
+    steps.at(-1)?.toolId ?? "pipeline",
+  );
 
   const result: ToolJobResult = {
     outputRefs: [parentKey],
@@ -1179,32 +1870,52 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   };
   const legacyResult = buildLegacyResultPayload(result, data.jobId);
 
-  await updateSingleFileProgressAtomically(
-    {
-      jobId: progressJobId,
-      phase: "complete",
-      percent: 100,
-      stage: "complete",
-      result: legacyResult,
-    },
-    async (tx) => {
-      await tx
-        .update(schema.jobs)
-        .set({
-          status: "completed",
-          completedAt: new Date(),
-          outputRefs: [parentKey],
-          bytesIn: firstBytesIn,
-          bytesOut: lastBytesOut,
-          progress: { percent: 100, stage: "complete", result: legacyResult },
-        })
-        .where(eq(schema.jobs.id, data.jobId));
-    },
-  );
+  try {
+    await updateSingleFileProgressAtomically(
+      {
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: legacyResult,
+        ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
+      },
+      async (tx) => {
+        await tx
+          .update(schema.jobs)
+          .set({
+            status: "completed",
+            completedAt: new Date(),
+            outputRefs: [parentKey],
+            bytesIn: firstBytesIn,
+            bytesOut: lastBytesOut,
+            progress: { percent: 100, stage: "complete", result: legacyResult },
+          })
+          .where(eq(schema.jobs.id, data.jobId));
+      },
+    );
+  } catch (err) {
+    if (!data.parentId) throw err;
+    logger.error(
+      { err, jobId: data.jobId, parentId: data.parentId },
+      "completed pipeline terminal write failed",
+    );
+    void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+  }
 
-  // Batch progress (pipeline-batch only)
+  // Batch progress (pipeline-batch only): guarded (#2620) so a Redis counter
+  // blip after the atomic completion write does not fail the finalize job or
+  // drop its completed analytics and result payload.
   if (data.parentId && data.totalFiles !== undefined) {
-    await recordChildOutcome(data.parentId, data.totalFiles, outFilename);
+    try {
+      await recordChildOutcome(data.parentId, data.totalFiles, outFilename);
+    } catch (err) {
+      logger.error(
+        { err, jobId: data.jobId, parentId: data.parentId },
+        "completed pipeline batch outcome write failed",
+      );
+      void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+    }
   }
 
   // Analytics: emit pipeline_executed on success
@@ -1220,6 +1931,17 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       ),
       data.analyticsDistinctId,
     );
+  }
+
+  if (!data.parentId) {
+    await emitWorkerPipelineAudit({
+      data,
+      totalSteps,
+      steps: steps.map((s) => s.toolId),
+      totalInputSize: firstBytesIn,
+      processedSize: lastBytesOut,
+      durationMs: Date.now() - startTime,
+    });
   }
 
   return result;
@@ -1247,11 +1969,16 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
   const totalFiles = job.data.totalFiles ?? 0;
   // Cooperative batch cancel (#767): children queued behind the cancel do no
   // work at all. Active children are aborted through the cancel channel and
-  // land in the catch below via processToolJob's own cancel handling. The
-  // guarded write cannot clobber a row another path already settled.
+  // land in the catch below via processToolJob's own cancel handling. Record
+  // the batch outcome before flipping the durable row or bumping jobsTotal
+  // (#1347): if the outcome write throws and falls through to normal
+  // processing, the row never transiently settles as canceled and the file is
+  // not counted twice. The guarded write cannot clobber a row another path
+  // already settled.
   if (parentId) {
     try {
       if (await isBatchCanceled(parentId)) {
+        await recordChildOutcome(parentId, totalFiles, job.data.filename, "Canceled");
         await db
           .update(schema.jobs)
           .set({ status: "canceled", completedAt: new Date(), error: { message: "Canceled" } })
@@ -1262,7 +1989,6 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
             ),
           );
         jobsTotal.inc({ pool: job.data.pool, status: "canceled" });
-        await recordChildOutcome(parentId, totalFiles, job.data.filename, "Canceled");
         return {
           outputRefs: [],
           filename: job.data.filename,
@@ -1283,13 +2009,29 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
       );
     }
   }
+  let result: ToolJobResult;
   try {
-    const result = await processToolJob(job);
-    await recordChildOutcome(parentId, totalFiles, job.data.filename);
-    return result;
+    result = await processToolJob(job);
   } catch (err) {
-    const error = friendlyError(err instanceof Error ? err.message : String(err));
-    await recordChildOutcome(parentId, totalFiles, job.data.filename, error);
+    reportToolJobFailure(job, err);
+    const rawError =
+      (err as { timeoutMessage?: string } | null)?.timeoutMessage ??
+      (err instanceof Error ? err.message : String(err));
+    const error = friendlyError(rawError);
+    try {
+      await recordChildOutcome(parentId, totalFiles, job.data.filename, error);
+    } catch (outcomeErr) {
+      logger.error(
+        { err: outcomeErr, jobId: job.data.jobId, parentId, toolId: job.data.toolId },
+        "batch child failure outcome write failed",
+      );
+      void reportError(outcomeErr, {
+        source: "worker",
+        pool: job.data.pool,
+        toolId: job.data.toolId,
+        jobId: job.data.jobId,
+      });
+    }
     // Return a completed job with a failure marker so the parent runs.
     return {
       outputRefs: [],
@@ -1300,6 +2042,24 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
       resultPayload: { failed: true, error },
     };
   }
+  // Recorded outside processToolJob's try/catch (#2620) so a counter fault
+  // after the child row settled as completed cannot enter the failure catch
+  // block, record the succeeded file as failed, or return failed: true.
+  try {
+    await recordChildOutcome(parentId, totalFiles, job.data.filename);
+  } catch (err) {
+    logger.error(
+      { err, jobId: job.data.jobId, parentId, toolId: job.data.toolId },
+      "batch child outcome write failed",
+    );
+    void reportError(err, {
+      source: "worker",
+      pool: job.data.pool,
+      toolId: job.data.toolId,
+      jobId: job.data.jobId,
+    });
+  }
+  return result;
 }
 
 // ── Batch finalize handler ────────────────────────────────────
@@ -1345,10 +2105,19 @@ async function buildBatchZip(
   archive.on("error", fail);
   archive.pipe(passthrough);
   const upload = putObjectStream(zipKey, passthrough);
+  const normalizeSourceError = (err: unknown): Error => {
+    const normalized = isStorageServiceFault(err) ? normalizeS3ReadFault(err) : err;
+    return normalized instanceof Error ? normalized : new Error(String(normalized));
+  };
   const feed = (async () => {
     for (const entry of entries) {
       if (failed) break;
-      const source = await getObjectStream(entry.outputRef);
+      let source: NodeJS.ReadableStream;
+      try {
+        source = await getObjectStream(entry.outputRef);
+      } catch (err) {
+        throw normalizeSourceError(err);
+      }
       if (failed) {
         // fail() ran while this open was in flight; its cleanup loop cannot
         // have seen this stream.
@@ -1363,7 +2132,7 @@ async function buildBatchZip(
       // for a complete archive.
       const entryStream = new PassThrough();
       source.on("error", (err: Error) => {
-        fail(err);
+        fail(normalizeSourceError(err));
         entryStream.end();
       });
       source.pipe(entryStream);
@@ -1393,6 +2162,102 @@ async function buildBatchZip(
   }
 }
 
+type JobErrorPayload = {
+  message?: string;
+  code?: string;
+  details?: string;
+  httpStatus?: number;
+};
+
+/**
+ * Reconstruct a pipeline-batch child's error and cancel state from its
+ * `${childId}-s<step>` rows when the child `pipeline-finalize` row's terminal
+ * DB write rolled back or never ran (#3189). Mirrors processPipelineFinalize's
+ * step scan so manifest, childFaults, and canceledChildren match a committed
+ * child finalize row.
+ */
+async function fallbackPipelineChildError(
+  childId: string,
+  stepCount?: number,
+): Promise<{
+  error: JobErrorPayload | null;
+  canceled: boolean;
+  step0InputRef?: string;
+  completedOutputRef?: string;
+  missingStep?: { stepId: string; message: string };
+}> {
+  const maxSteps =
+    typeof stepCount === "number" && stepCount > 0
+      ? stepCount
+      : env.MAX_PIPELINE_STEPS > 0
+        ? env.MAX_PIPELINE_STEPS
+        : 20;
+  let step0InputRef: string | undefined;
+  let lastStepOutputRef: string | undefined;
+  for (let s = 0; s < maxSteps; s++) {
+    const stepId = `${childId}-s${s}`;
+    const [stepRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, stepId));
+    if (!stepRow) {
+      if (typeof stepCount === "number" && stepCount > 0) {
+        return {
+          error: { message: `Step ${s + 1}: Step ${s + 1} row not found` },
+          canceled: false,
+          step0InputRef,
+          missingStep: {
+            stepId,
+            message: `Step ${s + 1} row not found`,
+          },
+        };
+      }
+      break;
+    }
+    if (s === 0) {
+      step0InputRef = stepRow.inputRefs?.[0];
+    }
+    if (stepRow.status !== "completed") {
+      if (stepRow.status === "canceled") {
+        return {
+          error: { message: "Canceled" },
+          canceled: true,
+          step0InputRef,
+        };
+      }
+      const stepError = stepRow.error as JobErrorPayload | null;
+      const failError = stepError?.message ?? `Step ${s + 1} failed`;
+      return {
+        error: {
+          message: `Step ${s + 1}: ${friendlyError(failError)}`,
+          ...(stepError?.code && { code: stepError.code }),
+          ...(stepError?.details && { details: stepError.details }),
+          ...(stepError?.httpStatus !== undefined && { httpStatus: stepError.httpStatus }),
+        },
+        canceled: false,
+        step0InputRef,
+      };
+    }
+    lastStepOutputRef = stepRow.outputRefs?.[0];
+  }
+  let completedOutputRef: string | undefined;
+  if (lastStepOutputRef) {
+    const outFilename = lastStepOutputRef.split("/").pop() ?? "output";
+    const parentKey = `outputs/${childId}/${outFilename}`;
+    try {
+      const size = await getObjectSize(parentKey);
+      if (typeof size === "number" && size > 0) {
+        completedOutputRef = parentKey;
+      }
+    } catch (err) {
+      if (!isMissingObjectError(err)) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
+      await verifyS3Bucket();
+      // Child finalize did not finish writing its output artifact before failing.
+    }
+  }
+  return { error: null, canceled: false, step0InputRef, completedOutputRef };
+}
+
 /**
  * Assembles the ordered manifest from child DB rows after all batch
  * children have completed, packages the successful outputs into a durable
@@ -1407,9 +2272,12 @@ async function buildBatchZip(
  */
 async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
+  const startTime = Date.now();
   const settings = (data.settings ?? {}) as {
     flowChildCount?: number;
     fileIndexMap?: number[];
+    stepCount?: number;
+    preFailureFaults?: unknown;
   };
   const flowChildCount = settings.flowChildCount ?? data.totalFiles ?? 0;
   // Flow index -> original upload index. Pre-failed uploads never became flow
@@ -1425,26 +2293,126 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     filename: string;
     outputRef?: string;
     error?: string;
+    code?: string;
+    notes?: BatchFileNotes;
   }> = [];
+  // Each failed child's status and code as its row kept them, so one engine
+  // fault behind every file can answer like the upload-time path (#1627).
+  const childFaults: BatchFault[] = [];
 
   let canceledChildren = 0;
+  let parentStepCount: number | undefined | null = null;
+  // Every key the child rows name, so the cleanup below finds step and flow
+  // directories without listing the workspace.
+  const childKeys: string[] = [];
   for (let i = 0; i < flowChildCount; i++) {
     const childId = `${data.jobId}-f${i}`;
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
+    if (row) childKeys.push(...(row.inputRefs ?? []), ...(row.outputRefs ?? []));
 
     if (!row) {
+      const err = new Error("Child job row not found");
+      logger.error({ err, jobId: data.jobId, childId }, "batch child job row not found");
+      void reportError(err, {
+        source: "worker",
+        pool: data.pool,
+        toolId: data.toolId,
+        jobId: job.id ?? data.jobId,
+      });
       manifest.push({ index: i, filename: `file-${i}`, error: "Child job row not found" });
+      // Counted without a code, so it can't be folded into a shared fault.
+      childFaults.push({ error: "Child job row not found" });
       continue;
     }
 
     if (row.status === "completed" && row.outputRefs?.[0]) {
       const outFilename = row.outputRefs[0].split("/").pop() ?? "output";
-      manifest.push({ index: i, filename: outFilename, outputRef: row.outputRefs[0] });
+      const notes = pickBatchFileNotes(
+        (row.progress as { result?: Record<string, unknown> } | null)?.result,
+      );
+      manifest.push({
+        index: i,
+        filename: outFilename,
+        outputRef: row.outputRefs[0],
+        ...(notes ? { notes } : {}),
+      });
     } else {
-      if (row.status === "canceled") canceledChildren++;
-      const errorMsg = (row.error as { message?: string } | null)?.message ?? "Processing failed";
-      const inputFilename = row.inputRefs?.[0]?.split("/").pop() ?? `file-${i}`;
-      manifest.push({ index: i, filename: inputFilename, error: friendlyError(errorMsg) });
+      let rowError = row.error as JobErrorPayload | null;
+      let stepFallback: Awaited<ReturnType<typeof fallbackPipelineChildError>> | null = null;
+      if (!rowError && row.type === "pipeline-finalize") {
+        let childStepCount =
+          (row.settings as { stepCount?: number } | null)?.stepCount ?? settings.stepCount;
+        if (childStepCount === undefined) {
+          if (parentStepCount === null) {
+            const [parentRow] = await db
+              .select({ settings: schema.jobs.settings })
+              .from(schema.jobs)
+              .where(eq(schema.jobs.id, data.jobId));
+            parentStepCount = (parentRow?.settings as { stepCount?: number } | null)?.stepCount;
+          }
+          childStepCount = parentStepCount;
+        }
+        stepFallback = await fallbackPipelineChildError(childId, childStepCount);
+        if (stepFallback.completedOutputRef) {
+          const outFilename = stepFallback.completedOutputRef.split("/").pop() ?? "output";
+          manifest.push({
+            index: i,
+            filename: outFilename,
+            outputRef: stepFallback.completedOutputRef,
+          });
+          continue;
+        }
+        rowError = stepFallback.error;
+      }
+      if (stepFallback?.missingStep) {
+        const err = new Error(stepFallback.missingStep.message);
+        logger.error(
+          { err, jobId: data.jobId, childId, stepId: stepFallback.missingStep.stepId },
+          "pipeline step row not found",
+        );
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: job.id ?? data.jobId,
+        });
+      } else if (row.status === "completed") {
+        const err = new Error("Completed child job has no output");
+        logger.error(
+          { err, jobId: data.jobId, childId },
+          "completed batch child job has no output",
+        );
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: job.id ?? data.jobId,
+        });
+      }
+      if (row.status === "canceled" || stepFallback?.canceled) canceledChildren++;
+      const errorMsg = rowError?.message ?? "Processing failed";
+      let inputRef = row.inputRefs?.[0] ?? stepFallback?.step0InputRef;
+      if (!inputRef && row.type === "pipeline-finalize" && !stepFallback) {
+        const [step0] = await db
+          .select({ inputRefs: schema.jobs.inputRefs })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, `${childId}-s0`));
+        inputRef = step0?.inputRefs?.[0];
+      }
+      const inputFilename = inputRef?.split("/").pop() ?? `file-${i}`;
+      const error = friendlyError(errorMsg);
+      manifest.push({
+        index: i,
+        filename: inputFilename,
+        error,
+        ...(rowError?.code && { code: rowError.code }),
+      });
+      childFaults.push({
+        error,
+        ...(rowError?.httpStatus !== undefined && { statusCode: rowError.httpStatus }),
+        ...(rowError?.code && { code: rowError.code }),
+        ...(rowError?.details && { details: rowError.details }),
+      });
     }
   }
 
@@ -1452,17 +2420,31 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   // frame's fileResults, and the route's X-File-Results header cannot drift.
   const getUniqueName = createUniqueNamer();
   const fileResults: Record<string, string> = {};
+  // Per-file notes a single run shows (#1292), keyed exactly like fileResults
+  // so they land on the same upload after the flow-to-upload remap.
+  const fileNotes: Record<string, BatchFileNotes> = {};
   const successEntries: Array<{ filename: string; outputRef: string }> = [];
   for (const entry of manifest) {
     if (!entry.outputRef) continue;
     const uniqueName = getUniqueName(entry.filename);
     entry.filename = uniqueName;
-    fileResults[String(fileIndexMap?.[entry.index] ?? entry.index)] = uniqueName;
+    const uploadIndex = String(fileIndexMap?.[entry.index] ?? entry.index);
+    fileResults[uploadIndex] = uniqueName;
+    if (entry.notes) fileNotes[uploadIndex] = entry.notes;
     successEntries.push({ filename: uniqueName, outputRef: entry.outputRef });
   }
 
   const counters = await readBatchCounters(data.jobId);
   const failedFiles = Math.max(0, totalFiles - successEntries.length);
+  const allErrors = resolveBatchErrors(
+    counters.errors,
+    manifest,
+    totalFiles,
+    flowChildCount,
+    fileIndexMap,
+    settings.preFailureFaults,
+  );
+  const batchErrors = allErrors.slice(0, 100);
 
   // A canceled child row is durable proof a user cancel landed (#809):
   // every writer of that status traces back to a user cancel somewhere in
@@ -1473,14 +2455,43 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   // file completed first, and that batch completes normally.
   const canceled = canceledChildren > 0;
 
+  // Once the batch is terminal nothing reads a child's input or output: the
+  // ZIP is what downloads serve. Freeing them here keeps one large batch from
+  // holding the workspace cap for FILE_MAX_AGE_HOURS (#1241).
+  const reclaimNow = async () => {
+    let stepCount = settings.stepCount ?? parentStepCount ?? undefined;
+    if (stepCount === undefined && data.toolId === "pipeline-batch") {
+      const [parentRow] = await db
+        .select({ settings: schema.jobs.settings })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, data.jobId))
+        .catch(() => []);
+      stepCount = (parentRow?.settings as { stepCount?: number } | null)?.stepCount;
+    }
+    await reclaimBatchChildStorage({
+      parentId: data.jobId,
+      userId: data.userId,
+      dirs: batchChildDirs(data.jobId, flowChildCount, stepCount, childKeys),
+    });
+  };
+  // Started, not awaited: the ZIP and the terminal frame are already settled,
+  // and a sync client or the single-slot system pool should not sit through
+  // thousands of deletes. A miss is left to the storage sweep (#4184).
+  const reclaimChildStorage = () => {
+    void reclaimNow().catch((err) => {
+      logger.warn({ err, jobId: data.jobId }, "batch child storage cleanup failed");
+    });
+  };
+
   if (canceled && successEntries.length === 0) {
     await cancelBatchJob({
       jobId: data.jobId,
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: [{ filename: "", error: "Canceled" }, ...counters.errors],
+      errors: [{ filename: "", error: "Canceled" }, ...batchErrors],
     });
+    reclaimChildStorage();
     return {
       outputRefs: [],
       filename: "",
@@ -1492,26 +2503,65 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   }
 
   if (successEntries.length === 0) {
-    // One shared reason (the workspace cap on every output write) becomes
-    // the batch's own message and a blank-name entry the client reads as
-    // the run's error, appended after the per-file entries like the
+    // Every file failing on one engine fault (the same 5xx code) is the
+    // batch's failure: its status, code and hint lead, the same answer the
+    // route gives when that fault strikes at upload time (#1432, #1627).
+    // The pre-failures count only when the route sent every one of them.
+    const fault = allFailedFault(
+      settings.preFailureFaults,
+      totalFiles - flowChildCount,
+      childFaults,
+      flowChildCount,
+    );
+    const inputCode = fault
+      ? undefined
+      : allFailedInputCode(
+          settings.preFailureFaults,
+          totalFiles - flowChildCount,
+          childFaults,
+          flowChildCount,
+        );
+    const batchCode = fault?.code ?? inputCode ?? undefined;
+    // Otherwise one shared reason (the workspace cap on every output write)
+    // becomes the batch's own message and a blank-name entry the client reads
+    // as the run's error, appended after the per-file entries like the
     // packaging failure's; a mixed bag keeps the generic summary (#1161).
-    const shared = sharedFailureReason(counters.errors);
-    await failBatchJob({
+    const shared = fault
+      ? fault.details
+        ? `${fault.error}: ${fault.details}`
+        : fault.error
+      : allErrors.length >= failedFiles
+        ? sharedFailureReason(allErrors)
+        : null;
+    const applied = await failBatchJob({
       jobId: data.jobId,
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: shared ? [...counters.errors, { filename: "", error: shared }] : counters.errors,
-      message: shared ?? "All files failed processing",
+      errors: shared ? [...batchErrors, { filename: "", error: shared }] : batchErrors,
+      message: fault?.error ?? shared ?? "All files failed processing",
+      ...(batchCode && { code: batchCode }),
+      ...(fault?.details && { details: fault.details }),
     });
+    if (!applied) {
+      logger.warn(
+        { jobId: data.jobId },
+        "batch-finalize progress row was missing or already terminal; no terminal frame announced",
+      );
+    }
+    reclaimChildStorage();
     return {
       outputRefs: [],
       filename: "",
       contentType: "application/json",
       originalSize: 0,
       processedSize: 0,
-      resultPayload: { manifest, allFailed: true },
+      resultPayload: {
+        manifest,
+        allFailed: true,
+        ...(fault && { fault }),
+        ...(inputCode && { sharedCode: inputCode }),
+      },
     };
   }
 
@@ -1523,6 +2573,21 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
   let zipSize: number;
   try {
+    await putObject(
+      resultPayloadKey(data.jobId),
+      Buffer.from(
+        JSON.stringify({
+          zipFilename,
+          fileResults,
+          fileNotes,
+          totalFiles,
+          completedFiles: totalFiles,
+          failedFiles,
+          errors: batchErrors,
+        }),
+        "utf8",
+      ),
+    );
     zipSize = await buildBatchZip(zipKey, successEntries);
   } catch (err) {
     // A SafeError's message names what to do (the workspace cap is the one
@@ -1541,15 +2606,27 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: [...counters.errors, { filename: "", error: packagingError }],
+      errors: [...batchErrors, { filename: "", error: packagingError }],
       message: packagingError,
       code: packagingCode,
-    }).catch((persistErr) => {
-      logger.error(
-        { err: persistErr, jobId: data.jobId },
-        "failed to record batch packaging failure",
-      );
-    });
+    })
+      .then((applied) => {
+        if (!applied) {
+          logger.warn(
+            { jobId: data.jobId },
+            "batch-finalize progress row was missing or already terminal; no terminal frame announced",
+          );
+        }
+      })
+      .catch((persistErr) => {
+        logger.error(
+          { err: persistErr, jobId: data.jobId },
+          "failed to record batch packaging failure",
+        );
+      });
+    // The failed batch has no ZIP, so its child outputs are unreachable;
+    // keeping them is what leaves the next request on a full workspace.
+    reclaimChildStorage();
     throw err instanceof Error ? err : new Error(String(err));
   }
 
@@ -1558,6 +2635,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     downloadUrl: `/api/v1/download/${data.jobId}/${encodeURIComponent(zipFilename)}`,
     zipFilename,
     fileResults,
+    fileNotes,
     processedSize: zipSize,
   };
 
@@ -1567,22 +2645,32 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: counters.errors,
+      errors: batchErrors,
       outputRefs: [zipKey],
       bytesOut: zipSize,
       result,
     });
+    reclaimChildStorage();
   } else {
     await completeBatchJob({
       jobId: data.jobId,
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: counters.errors,
+      errors: batchErrors,
       outputRefs: [zipKey],
       bytesOut: zipSize,
       result,
     });
+    await emitWorkerBatchAudit({
+      data,
+      totalFiles,
+      completedFiles: successEntries.length,
+      failedFiles,
+      processedSize: zipSize,
+      durationMs: Date.now() - startTime,
+    });
+    reclaimChildStorage();
   }
 
   return {
@@ -1594,16 +2682,162 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     resultPayload: {
       manifest,
       ...(canceled ? { canceled: true } : {}),
-      zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults },
+      zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults, fileNotes },
     },
   };
+}
+
+/**
+ * Reconcile the Redis outcome errors with the durable child manifest and any
+ * upload-time preFailureFaults (#2629). When `recordChildOutcome` missed a
+ * write (#836, #2620) or the 1-hour Redis counter TTL expired on a long batch,
+ * `counterErrors` has fewer entries than `expectedFailed`; backfilling from
+ * the durable rows and pre-failure faults keeps per-file errors and
+ * `sharedFailureReason` intact.
+ */
+function resolveBatchErrors(
+  counterErrors: Array<{ filename: string; error: string }>,
+  manifest: Array<{ index: number; filename: string; outputRef?: string; error?: string }>,
+  totalFiles: number,
+  flowChildCount: number,
+  fileIndexMap: number[] | null,
+  preFailureFaults: unknown,
+): Array<{ filename: string; error: string }> {
+  const manifestErrors = manifest
+    .filter((m) => !m.outputRef)
+    .map((m) => ({
+      filename: m.filename,
+      error: stripInternalPaths(m.error ?? "Processing failed"),
+    }));
+  const preFailedCount = Math.max(0, totalFiles - flowChildCount);
+  const expectedFailed = preFailedCount + manifestErrors.length;
+  if (expectedFailed <= 100 && counterErrors.length >= expectedFailed) {
+    return counterErrors;
+  }
+
+  const preFaults = Array.isArray(preFailureFaults) ? (preFailureFaults as BatchFault[]) : [];
+  const flowUploadSet = fileIndexMap ? new Set(fileIndexMap) : null;
+  const preFailedUploadIndices: number[] = [];
+  if (flowUploadSet) {
+    for (let i = 0; i < totalFiles; i++) {
+      if (!flowUploadSet.has(i)) preFailedUploadIndices.push(i);
+    }
+  }
+  const remainingPreErrors: Array<{ filename: string; error: string }> = [];
+  for (let k = 0; k < Math.min(preFailedCount, preFaults.length); k++) {
+    const pf = preFaults[k];
+    const fallbackIdx = preFailedUploadIndices[k] ?? k;
+    const filename =
+      typeof pf?.filename === "string" && pf.filename.length > 0
+        ? pf.filename
+        : `file-${fallbackIdx}`;
+    remainingPreErrors.push({
+      filename,
+      error: stripInternalPaths(pf?.error ?? "Processing failed"),
+    });
+  }
+
+  const remainingManifest = [...manifestErrors];
+  let unaccountedPreCount = Math.max(0, preFailedCount - remainingPreErrors.length);
+  for (const ce of counterErrors) {
+    const exactPreIdx = remainingPreErrors.findIndex(
+      (p) => p.filename === ce.filename && p.error === ce.error,
+    );
+    if (exactPreIdx !== -1) {
+      remainingPreErrors.splice(exactPreIdx, 1);
+      continue;
+    }
+    const exactManifestIdx = remainingManifest.findIndex(
+      (m) => m.filename === ce.filename && m.error === ce.error,
+    );
+    if (exactManifestIdx !== -1) {
+      remainingManifest.splice(exactManifestIdx, 1);
+      continue;
+    }
+    const preIdx = remainingPreErrors.findIndex(
+      (p) => p.error === ce.error && /^file-\d+$/.test(p.filename),
+    );
+    if (preIdx !== -1) {
+      remainingPreErrors.splice(preIdx, 1);
+      continue;
+    }
+    if (unaccountedPreCount > 0) {
+      unaccountedPreCount--;
+      continue;
+    }
+    const fallbackManifestIdx = remainingManifest.findIndex(
+      (m) => m.error === ce.error && /^file-\d+$/.test(m.filename),
+    );
+    if (fallbackManifestIdx !== -1) {
+      remainingManifest.splice(fallbackManifestIdx, 1);
+    }
+  }
+
+  return [...counterErrors, ...remainingPreErrors, ...remainingManifest];
 }
 
 // ── Worker pool management ─────────────────────────────────────
 
 const workers: Worker[] = [];
 
+/** Enqueue to latest-attempt start; undefined if the job never became active. */
+function jobAgeMs(job: Job): number | undefined {
+  return job.processedOn ? job.processedOn - job.timestamp : undefined;
+}
+
+/**
+ * Report a tool job failure to Sentry (and log Python sidecar frames when
+ * present). Shared by the worker's `failed` listener (single-file tool jobs
+ * and hard-failed finalizes) and by `processPipelineStep` / `processBatchChild`,
+ * which catch `processToolJob` rejections and return failure markers so their
+ * BullMQ parent flows still settle (#951).
+ */
+function reportToolJobFailure(job: Job<ToolJobData>, err: unknown, poolFallback?: string): void {
+  const data = job.data as ToolJobData | undefined;
+  const pool = poolFallback ?? data?.pool;
+  const jobId = job.id ?? data?.jobId;
+  const failedErr =
+    err instanceof Error && err.name === "UnrecoverableError" && err.cause instanceof Error
+      ? err.cause
+      : err;
+  const pf = (failedErr as { pythonFrames?: unknown } | null)?.pythonFrames;
+  if (Array.isArray(pf) && pf.length) {
+    logger.error({ pool, jobId, pythonFrames: pf }, "sidecar failure");
+  }
+  void reportError(failedErr, {
+    source: "worker",
+    pool,
+    toolId: data?.toolId,
+    jobId,
+    inputFormat: safeFormatTag(data?.inputRefs?.[0]) ?? safeFormatTag(data?.filename),
+    settings: data?.settings,
+    jobAgeMs: jobAgeMs(job),
+  });
+}
+
+/**
+ * Whether a pipeline flow's durable step rows show that the first
+ * non-completed step was canceled (#836). Mirrors processPipelineFinalize's
+ * own step scan so the failed-handler safety net and the finalize agree on
+ * #770's too-late rule without reading the expiring Redis cancel flag.
+ */
+async function isCanceledPipelineFlow(jobId: string, totalSteps: number): Promise<boolean> {
+  for (let i = 0; i < totalSteps; i++) {
+    const [row] = await db
+      .select({ status: schema.jobs.status })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, `${jobId}-s${i}`));
+    if (row?.status !== "completed") {
+      return row?.status === "canceled";
+    }
+  }
+  return false;
+}
+
 export function startWorkers(): void {
+  const workerThreads = resolveWorkerThreads(env);
+  sharp.concurrency(workerThreads);
+  configureSharpConcurrency(workerThreads);
   const concurrency = Math.max(1, Math.floor(resolveConcurrency(env) / 2));
 
   for (const pool of POOLS) {
@@ -1654,10 +2888,60 @@ export function startWorkers(): void {
             void reportError(netErr, { source: "worker", pool, jobId: data.jobId });
           });
         }
+        // When a GDPR export exhausts its retry budget, settle the durable row
+        // with the sanitized reason and log the full error (#1495). Waiting for
+        // the final attempt keeps the row non-terminal while a retry is still
+        // pending so isExportJobLive() does not mistake the first failure for a
+        // cancel. Stranded-job reconciliation stays as the backstop for stall
+        // eviction or a lost database write.
+        if (
+          job.name === SYSTEM_JOBS.gdprExport &&
+          (Boolean(job.finishedOn) || (job.attemptsMade ?? 1) >= (job.opts?.attempts ?? 1))
+        ) {
+          const exportData = job.data as { userId?: string; jobId?: string } | undefined;
+          const exportJobId = exportData?.jobId ?? job.id;
+          logger.error(
+            {
+              err,
+              jobId: exportJobId,
+              ...(exportData?.userId ? { userId: exportData.userId } : {}),
+            },
+            "gdpr export job failed",
+          );
+          if (exportJobId) {
+            const rawMessage = err instanceof Error ? err.message : String(err);
+            const message = friendlyError(rawMessage) || "Export failed";
+            void db
+              .update(schema.jobs)
+              .set({
+                status: "failed",
+                completedAt: new Date(),
+                error: { message },
+              })
+              .where(
+                and(
+                  eq(schema.jobs.id, exportJobId),
+                  notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+                ),
+              )
+              .catch((netErr) => {
+                logger.error(
+                  { err: netErr, jobId: exportJobId },
+                  "gdpr-export failure status write failed",
+                );
+                void reportError(netErr, {
+                  source: "worker",
+                  pool,
+                  toolId: "gdpr-export",
+                  jobId: exportJobId,
+                });
+              });
+          }
+        }
         void reportError(err, {
           source: "worker",
           pool,
-          toolId: data?.toolId,
+          toolId: data?.toolId ?? (job.name === SYSTEM_JOBS.gdprExport ? "gdpr-export" : undefined),
           jobId: job.id,
         });
       });
@@ -1694,31 +2978,56 @@ export function startWorkers(): void {
       // SSE channel (clientJobId) and the authoritative flow row can differ,
       // so both get the guarded write; a committed completion is never
       // downgraded, and the frame is announced only for a transition this
-      // call owned. Since #888 the cancel dual-write catches its own faults
-      // and the finalize survives them, so canceled runs no longer land
-      // here; this net covers crashes and stall evictions only.
-      if (data?.kind === "pipeline-finalize") {
-        const netFail = (jobId: string) =>
-          failSingleJobGuarded({ jobId, message: "Pipeline processing failed" }).catch((netErr) => {
-            logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
-            void reportError(netErr, { source: "worker", pool, jobId });
+      // call owned. Step rows decide the label (#836): if the first
+      // non-completed step is canceled, both ids settle through
+      // cancelSingleJobGuarded rather than failSingleJobGuarded, matching the
+      // finalize's own too-late rule. Pipeline-batch children (parentId set)
+      // report through batch-finalize instead of single-file progress (#3190).
+      const failedErr =
+        err.name === "UnrecoverableError" && err.cause instanceof Error ? err.cause : err;
+      if (data?.kind === "pipeline-finalize" && !data.parentId) {
+        const isServerSafeFault = isSafeMessageError(failedErr) && hasServerErrorStatus(failedErr);
+        const finalizeErrorMsg = isServerSafeFault
+          ? friendlyError(failedErr.message)
+          : "Pipeline processing failed";
+        const finalizeErrorFields = isServerSafeFault
+          ? {
+              ...validationErrorFields(failedErr),
+              ...failureStatus(failedErr),
+            }
+          : {};
+        void isCanceledPipelineFlow(data.jobId, data.totalSteps ?? 0)
+          .catch((probeErr) => {
+            logger.error(
+              { err: probeErr, jobId: data.jobId },
+              "pipeline-finalize safety net step probe failed; falling back to failed label",
+            );
+            void reportError(probeErr, { source: "worker", pool, jobId: data.jobId });
+            return false;
+          })
+          .then((canceled) => {
+            const netSettle = (jobId: string, expectedPipelineFlowId?: string) =>
+              (canceled
+                ? cancelSingleJobGuarded({
+                    jobId,
+                    ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+                  })
+                : failSingleJobGuarded({
+                    jobId,
+                    message: finalizeErrorMsg,
+                    ...finalizeErrorFields,
+                    ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+                  })
+              ).catch((netErr) => {
+                logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
+                void reportError(netErr, { source: "worker", pool, jobId });
+              });
+            const frameId = data.clientJobId ?? data.jobId;
+            void netSettle(frameId, frameId !== data.jobId ? data.jobId : undefined);
+            if (frameId !== data.jobId) void netSettle(data.jobId);
           });
-        const frameId = data.clientJobId ?? data.jobId;
-        void netFail(frameId);
-        if (frameId !== data.jobId) void netFail(data.jobId);
       }
-      const pf = (err as { pythonFrames?: unknown }).pythonFrames;
-      if (Array.isArray(pf) && pf.length) {
-        logger.error({ pool, jobId: job.id, pythonFrames: pf }, "sidecar failure");
-      }
-      void reportError(err, {
-        source: "worker",
-        pool,
-        toolId: data?.toolId,
-        jobId: job.id,
-        inputFormat: safeFormatTag(data?.filename),
-        settings: data?.settings,
-      });
+      reportToolJobFailure(job, failedErr, pool);
     });
 
     workers.push(worker);
@@ -1773,12 +3082,10 @@ function logMissingSoftwareEncoders(): void {
  * value is invisible: encoding silently stays on software and the only symptom
  * is that nothing got faster (#1054).
  *
- * Deliberately says "listed by" rather than "enabled": the probe reads
- * `ffmpeg -encoders`, which proves the encoder was compiled in, not that it
- * can run. A general-purpose ffmpeg lists h264_nvenc with or without an
- * NVIDIA device present (#1089).
+ * `hwAccelStatus` trial-encodes a frame per listed hardware encoder (#1089),
+ * so `active` only names encoders that actually ran on this host.
  */
-function logHwAccel(): void {
+export function logHwAccel(): void {
   const status = hwAccelStatus();
   if (!status.requested) return;
 
@@ -1794,29 +3101,44 @@ function logHwAccel(): void {
   }
 
   if (status.active.length === 0) {
-    const why = status.probeError ?? "this ffmpeg build lists none of them";
+    const why =
+      status.probeError ??
+      (status.unusable.length > 0
+        ? `trial encode failed for ${status.unusable.join(", ")}`
+        : "this ffmpeg build lists none of them");
     logger.warn(
-      { requested: status.requested, missing: status.missing, probeError: status.probeError },
+      {
+        requested: status.requested,
+        missing: status.missing,
+        unusable: status.unusable,
+        probeError: status.probeError,
+      },
       `SNAPOTTER_HW_ACCEL="${status.requested}" was requested but ${why}; using software encoders`,
     );
     return;
   }
 
-  if (status.missing.length > 0) {
+  const fallback = [...status.missing, ...status.unusable];
+  if (fallback.length > 0) {
     logger.warn(
-      { requested: status.requested, active: status.active, missing: status.missing },
-      `SNAPOTTER_HW_ACCEL="${status.requested}" is partly available; ${status.missing.join(", ")} fall back to software${softwareNote}`,
+      {
+        requested: status.requested,
+        active: status.active,
+        missing: status.missing,
+        unusable: status.unusable,
+      },
+      `SNAPOTTER_HW_ACCEL="${status.requested}" is partly available; ${fallback.join(", ")} fall back to software${softwareNote}`,
     );
     return;
   }
 
   logger.info(
     { requested: status.requested, active: status.active, unmapped: status.unmapped },
-    `Hardware encoders listed by this ffmpeg build: ${status.active.join(", ")}${softwareNote}`,
+    `Hardware encoders enabled: ${status.active.join(", ")}${softwareNote}`,
   );
 }
 
 export async function closeWorkers(): Promise<void> {
-  await Promise.all(workers.map((w) => w.close()));
-  workers.length = 0;
+  const entries = workers.splice(0);
+  await Promise.all(entries.map((w) => w.close()));
 }

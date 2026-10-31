@@ -1,6 +1,13 @@
+import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
-import { formatHeaders } from "@/lib/api";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { useFileStore } from "@/stores/file-store";
+
+export function isPdfFile(file: File): boolean {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
 
 export interface PageResult {
   page: number;
@@ -13,6 +20,72 @@ interface Thumbnail {
   dataUrl: string;
   width: number;
   height: number;
+}
+
+interface PreviewResponse {
+  pageCount: number;
+  thumbnails: Thumbnail[];
+}
+
+interface ConvertResponse {
+  pages: PageResult[];
+  zipUrl?: string | null;
+  zipSize?: number | null;
+}
+
+function isThumbnail(value: unknown): value is Thumbnail {
+  if (!value || typeof value !== "object") return false;
+  const thumb = value as Record<string, unknown>;
+  return (
+    typeof thumb.page === "number" &&
+    Number.isInteger(thumb.page) &&
+    thumb.page >= 1 &&
+    typeof thumb.dataUrl === "string" &&
+    thumb.dataUrl.length > 0
+  );
+}
+
+function isPreviewResponse(value: unknown): value is PreviewResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.pageCount === "number" &&
+    Number.isInteger(data.pageCount) &&
+    data.pageCount >= 1 &&
+    Array.isArray(data.thumbnails) &&
+    data.thumbnails.every(isThumbnail)
+  );
+}
+
+function isPageResult(value: unknown): value is PageResult {
+  if (!value || typeof value !== "object") return false;
+  const page = value as Record<string, unknown>;
+  return (
+    typeof page.page === "number" &&
+    Number.isInteger(page.page) &&
+    page.page >= 1 &&
+    typeof page.downloadUrl === "string" &&
+    page.downloadUrl.length > 0 &&
+    typeof page.size === "number" &&
+    Number.isFinite(page.size) &&
+    page.size >= 0
+  );
+}
+
+function isConvertResponse(value: unknown): value is ConvertResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    Array.isArray(data.pages) &&
+    data.pages.length > 0 &&
+    data.pages.every(isPageResult) &&
+    (data.zipUrl === undefined ||
+      data.zipUrl === null ||
+      (typeof data.zipUrl === "string" && data.zipUrl.length > 0)) &&
+    (data.zipSize === undefined ||
+      data.zipSize === null ||
+      (typeof data.zipSize === "number" && Number.isFinite(data.zipSize) && data.zipSize >= 0))
+  );
 }
 
 type ColorMode = "color" | "grayscale" | "bw";
@@ -44,8 +117,9 @@ interface PdfToImageState {
   togglePage: (page: number) => void;
   selectAllPages: () => void;
   deselectAllPages: () => void;
-  loadPreview: (file: File) => Promise<void>;
-  convert: () => Promise<void>;
+  /** `t` words a failed answer (#1915); the store has no locale of its own. */
+  loadPreview: (file: File, t?: TranslationKeys) => Promise<void>;
+  convert: (t?: TranslationKeys) => Promise<void>;
   reset: () => void;
 }
 
@@ -103,24 +177,73 @@ function parsePageRangeToSet(input: string, totalPages: number): Set<number> | n
   }
 }
 
+function emptyFileState() {
+  return {
+    file: null as File | null,
+    pageCount: null as number | null,
+    thumbnails: [] as Thumbnail[],
+    results: null as PageResult[] | null,
+    zipUrl: null as string | null,
+    zipSize: null as number | null,
+    error: null as string | null,
+    loadingPreview: false,
+    processing: false,
+    selectedPages: new Set<number>(),
+    pages: "",
+  };
+}
+
 const initialState = {
-  file: null as File | null,
-  pageCount: null as number | null,
-  thumbnails: [] as Thumbnail[],
+  ...emptyFileState(),
   format: "png",
   dpi: 150,
   customDpi: false,
   quality: 85,
   colorMode: "color" as ColorMode,
-  pages: "",
-  selectedPages: new Set<number>(),
-  processing: false,
-  loadingPreview: false,
-  error: null as string | null,
-  results: null as PageResult[] | null,
-  zipUrl: null as string | null,
-  zipSize: null as number | null,
 };
+
+/** Counts loadPreview and convert calls so only the newest one writes its outcome. */
+let latestPreviewRequest = 0;
+let previewController: AbortController | null = null;
+let latestConvertRequest = 0;
+let convertController: AbortController | null = null;
+let fileStoreUnsubscribe: (() => void) | null = null;
+
+function stopWatchingFileStore() {
+  const unsub = fileStoreUnsubscribe;
+  fileStoreUnsubscribe = null;
+  unsub?.();
+}
+
+function cancelActiveRequests() {
+  latestPreviewRequest++;
+  latestConvertRequest++;
+  const pCtrl = previewController;
+  const cCtrl = convertController;
+  previewController = null;
+  convertController = null;
+  pCtrl?.abort();
+  cCtrl?.abort();
+}
+
+function watchFileInStore(file: File, onLeavePdf: () => void, onSwitchPdf: () => void) {
+  stopWatchingFileStore();
+  const initial = useFileStore.getState();
+  if (initial.entries[initial.selectedIndex]?.file !== file) return;
+  let watchedFile: File = file;
+  fileStoreUnsubscribe = useFileStore.subscribe((state) => {
+    const current = state.entries[state.selectedIndex]?.file;
+    if (current === watchedFile) return;
+    cancelActiveRequests();
+    if (!current || !isPdfFile(current)) {
+      stopWatchingFileStore();
+      onLeavePdf();
+      return;
+    }
+    watchedFile = current;
+    onSwitchPdf();
+  });
+}
 
 export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   ...initialState,
@@ -141,20 +264,20 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   },
 
   setFile: (file) => {
+    cancelActiveRequests();
     if (!file) {
+      stopWatchingFileStore();
       set({ ...initialState });
       return;
     }
-    set({
+    watchFileInStore(
       file,
-      pageCount: null,
-      thumbnails: [],
-      results: null,
-      zipUrl: null,
-      zipSize: null,
-      error: null,
-      selectedPages: new Set<number>(),
-      pages: "",
+      () => get().reset(),
+      () => set(emptyFileState()),
+    );
+    set({
+      ...emptyFileState(),
+      file,
     });
   },
 
@@ -185,8 +308,21 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
     set({ selectedPages: new Set<number>(), pages: "none" });
   },
 
-  loadPreview: async (file) => {
+  loadPreview: async (file, t = en) => {
+    watchFileInStore(
+      file,
+      () => get().reset(),
+      () => set(emptyFileState()),
+    );
+    previewController?.abort();
+    const controller = new AbortController();
+    previewController = controller;
+    const request = ++latestPreviewRequest;
+    // A slower answer for a file the viewer has since moved off must not
+    // overwrite the newer request's pages, error, or spinner.
+    const isLatest = () => request === latestPreviewRequest && !controller.signal.aborted;
     set({ loadingPreview: true, error: null });
+    let data: PreviewResponse;
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -194,33 +330,66 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Failed: ${res.status}`);
+        const body = await res.json().catch(() => null);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
       }
-      const data = resolveServerUrls(await res.json());
-      set({
-        pageCount: data.pageCount,
-        thumbnails: data.thumbnails,
-        selectedPages: new Set(Array.from({ length: data.pageCount }, (_, i) => i + 1)),
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
       });
+      if (!isLatest()) return;
+      const resolved = resolveServerUrls(raw);
+      if (!isPreviewResponse(resolved)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+      data = resolved;
     } catch (err) {
+      if (!isLatest() || (err instanceof DOMException && err.name === "AbortError")) return;
+      // `file` stays: the panel asks for a preview whenever the selected file
+      // differs from it, so clearing it here asked again on every render
+      // (#1954). A null pageCount keeps Convert disabled.
       set({
         error: err instanceof Error ? err.message : "Failed to read PDF",
-        file: null,
         pageCount: null,
         thumbnails: [],
+        selectedPages: new Set(),
+        loadingPreview: false,
       });
+      return;
     } finally {
-      set({ loadingPreview: false });
+      if (previewController === controller) previewController = null;
     }
+    set({
+      pageCount: data.pageCount,
+      thumbnails: data.thumbnails,
+      selectedPages: new Set(Array.from({ length: data.pageCount }, (_, i) => i + 1)),
+      loadingPreview: false,
+    });
   },
 
-  convert: async () => {
+  convert: async (t = en) => {
     const { file, format, dpi, quality, colorMode, pages, selectedPages } = get();
     if (!file) return;
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "pdf-to-image",
+      is_batch: false,
+      file_count: 1,
+    });
+    watchFileInStore(
+      file,
+      () => get().reset(),
+      () => set(emptyFileState()),
+    );
+    convertController?.abort();
+    const controller = new AbortController();
+    convertController = controller;
+    const request = ++latestConvertRequest;
+    const isLatest = () => request === latestConvertRequest && !controller.signal.aborted;
     set({ processing: true, error: null, results: null, zipUrl: null, zipSize: null });
+    let data: ConvertResponse;
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -236,21 +405,45 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Conversion failed: ${res.status}`);
+        const body = await res.json().catch(() => null);
+        throw new Error(
+          failedAnswerMessage(t, body, res.status, `Conversion failed: ${res.status}`),
+        );
       }
-      const data = resolveServerUrls(await res.json());
-      set({ results: data.pages, zipUrl: data.zipUrl, zipSize: data.zipSize });
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
+      if (!isLatest()) return;
+      const resolved = resolveServerUrls(raw);
+      if (!isConvertResponse(resolved)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+      data = resolved;
     } catch (err) {
+      if (!isLatest() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         error: err instanceof Error ? err.message : "Conversion failed",
+        processing: false,
       });
+      return;
     } finally {
-      set({ processing: false });
+      if (convertController === controller) convertController = null;
     }
+    set({
+      results: data.pages,
+      zipUrl: data.zipUrl ?? null,
+      zipSize: data.zipSize ?? null,
+      processing: false,
+    });
   },
 
-  reset: () => set({ ...initialState }),
+  reset: () => {
+    stopWatchingFileStore();
+    cancelActiveRequests();
+    set({ ...initialState });
+  },
 }));

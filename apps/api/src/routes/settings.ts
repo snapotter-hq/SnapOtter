@@ -6,13 +6,15 @@
  * GET  /api/v1/settings/:key — Get a specific setting
  */
 
-import { eq } from "drizzle-orm";
+import { SafeError } from "@snapotter/shared";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
+import { decryptSettingWithRotation, encrypt } from "../lib/encryption.js";
+import { reportError } from "../lib/error-report.js";
 import {
   getSettingPolicy,
   prepareSetting,
@@ -25,9 +27,9 @@ import {
   requirePermission,
 } from "../permissions.js";
 
-const settingsBodySchema = z.record(z.string().min(1), z.unknown());
+export const settingsBodySchema = z.record(z.string().min(1), z.unknown());
 
-const HTML_TAG_PATTERN = /<[a-z/!?][^>]*>/i;
+export const HTML_TAG_PATTERN = /<[a-z/!?][^>]*>/i;
 
 async function encryptIfSensitive(key: string, value: string): Promise<string> {
   if (!env.DATA_ENCRYPTION_KEY || !getSettingPolicy(key)?.encrypted) return value;
@@ -44,16 +46,40 @@ function hasSettingAuthority(
   return effectivePermissions.has(authority);
 }
 
-async function decryptIfNeeded(value: string): Promise<string> {
-  if (!isEncrypted(value)) return value;
-  if (!env.DATA_ENCRYPTION_KEY) return value;
-  return (
-    (await decrypt(
-      value,
-      env.DATA_ENCRYPTION_KEY,
-      env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined,
-    )) ?? value
-  );
+async function decryptIfNeeded(
+  request: FastifyRequest,
+  key: string,
+  value: string,
+): Promise<string | null> {
+  const decrypted = await decryptSettingWithRotation(value);
+  if (decrypted === null) {
+    request.log.error(
+      { key },
+      "settings: stored setting could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+    );
+    void reportError(
+      new SafeError("Failed to decrypt setting", {
+        kind: "operational",
+        code: "SETTING_DECRYPTION_FAILED",
+        statusCode: 500,
+      }),
+      {
+        source: "http",
+        route: request.routeOptions?.url,
+        method: request.method,
+        statusCode: 500,
+        subsystem: "settings",
+      },
+    );
+    return null;
+  }
+  if (decrypted.reencrypted) {
+    await db
+      .update(schema.settings)
+      .set({ value: decrypted.reencrypted, updatedAt: new Date() })
+      .where(and(eq(schema.settings.key, key), eq(schema.settings.value, value)));
+  }
+  return decrypted.value;
 }
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
@@ -78,7 +104,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           settings[row.key] = "********";
           continue;
         }
-        settings[row.key] = await decryptIfNeeded(row.value);
+        const decrypted = await decryptIfNeeded(request, row.key, row.value);
+        if (decrypted === null) continue;
+        settings[row.key] = decrypted;
       }
 
       return reply.send({ settings });
@@ -104,6 +132,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     // Pass 1: validate all entries before writing any
     const entries: Array<{ key: string; strValue: string }> = [];
     const canonicalKeys = new Set<string>();
+    const maskedKeys = new Set<string>();
 
     for (const [requestedKey, value] of Object.entries(body)) {
       if (typeof requestedKey !== "string" || requestedKey.length === 0) continue;
@@ -121,6 +150,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({
           error: prepared.error,
           code: prepared.code,
+          // Which setting, so a client can name it in its own language (#1445).
+          setting: requestedKey,
           ...(prepared.details ? { details: prepared.details } : {}),
         });
       }
@@ -150,6 +181,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       // and persisting "********", which would destroy the real secret (e.g. the OIDC
       // client secret or SIEM webhook auth, neither of which is read-only).
       if (policy.redacted && strValue === "********") {
+        maskedKeys.add(key);
         continue;
       }
 
@@ -173,6 +205,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(runtimeValidation.statusCode).send({
         error: runtimeValidation.error,
         code: runtimeValidation.code,
+        setting: runtimeValidation.setting,
         ...(runtimeValidation.validationErrors
           ? { validationErrors: runtimeValidation.validationErrors }
           : {}),
@@ -180,33 +213,71 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Pass 2: write all entries now that all have passed validation
-    const now = new Date();
-
-    for (const { key, strValue } of entries) {
-      const storedValue = await encryptIfSensitive(key, strValue);
-
-      // Upsert: insert or update on conflict
-      const [existing] = await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, key));
-
-      if (existing) {
-        await db
-          .update(schema.settings)
-          .set({ value: storedValue, updatedAt: now })
-          .where(eq(schema.settings.key, key));
-      } else {
-        await db.insert(schema.settings).values({ key, value: storedValue });
-      }
-    }
-
     if (entries.length > 0) {
+      const sortedEntries = [...entries].sort((a, b) =>
+        a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+      );
+      const preparedWrites: Array<{ key: string; storedValue: string }> = [];
+      for (const { key, strValue } of sortedEntries) {
+        preparedWrites.push({
+          key,
+          storedValue: await encryptIfSensitive(key, strValue),
+        });
+      }
+
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        for (const { key, storedValue } of preparedWrites) {
+          await tx
+            .insert(schema.settings)
+            .values({ key, value: storedValue, updatedAt: now })
+            .onConflictDoUpdate({
+              target: schema.settings.key,
+              set: { value: storedValue, updatedAt: now },
+            });
+          if (key === "passwordRequireDigit") {
+            await tx
+              .delete(schema.settings)
+              .where(eq(schema.settings.key, "passwordRequireNumber"));
+          }
+        }
+      });
+
       await auditFromRequest(request)("SETTINGS_UPDATED", {
         adminId: admin.id,
         username: admin.username,
         keys: entries.map((e) => e.key),
       });
+    }
+
+    // When a redacted secret is preserved via its mask during key rotation,
+    // re-encrypt any existing DATA_ENCRYPTION_KEY_PREVIOUS ciphertext under
+    // DATA_ENCRYPTION_KEY (#2852).
+    if (maskedKeys.size > 0 && env.DATA_ENCRYPTION_KEY && env.DATA_ENCRYPTION_KEY_PREVIOUS) {
+      for (const maskedKey of maskedKeys) {
+        if (canonicalKeys.has(maskedKey)) continue;
+        const [existingRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, maskedKey));
+        if (!existingRow) continue;
+        const decrypted = await decryptSettingWithRotation(existingRow.value);
+        if (decrypted === null) {
+          request.log.warn(
+            { key: maskedKey },
+            "settings: preserved secret could not be decrypted for key rotation; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+          );
+          continue;
+        }
+        if (decrypted.reencrypted) {
+          await db
+            .update(schema.settings)
+            .set({ value: decrypted.reencrypted, updatedAt: new Date() })
+            .where(
+              and(eq(schema.settings.key, maskedKey), eq(schema.settings.value, existingRow.value)),
+            );
+        }
+      }
     }
 
     if (entries.some((e) => e.key === "analyticsEnabled")) {
@@ -266,9 +337,21 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      let value = "********";
+      if (!policy.redacted) {
+        const decrypted = await decryptIfNeeded(request, storageKey, row.value);
+        if (decrypted === null) {
+          return reply.status(500).send({
+            error: "Failed to decrypt setting",
+            code: "DECRYPTION_FAILED",
+          });
+        }
+        value = decrypted;
+      }
+
       return reply.send({
         key: storageKey,
-        value: policy.redacted ? "********" : await decryptIfNeeded(row.value),
+        value,
         updatedAt: row.updatedAt.toISOString(),
       });
     },

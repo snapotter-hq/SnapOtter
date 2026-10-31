@@ -65,4 +65,14 @@ describe("toolIdFromRoute", () => {
     if (!image) throw new Error("no image-section tool in the catalog");
     expect(toolIdFromRoute(`/api/v1/tools/video/${image.id}`)).toBeNull();
   });
+
+  it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+    "resolves adjust-colors legacy alias %s under the image section and rejects wrong sections (#2858)",
+    (aliasId) => {
+      expect(toolIdFromRoute(`/api/v1/tools/image/${aliasId}`)).toBe(aliasId);
+      expect(toolIdFromRoute(BATCH_PATTERN, { section: "image", toolId: aliasId })).toBe(aliasId);
+      expect(toolIdFromRoute(`/api/v1/tools/video/${aliasId}`)).toBeNull();
+      expect(toolIdFromRoute(BATCH_PATTERN, { section: "video", toolId: aliasId })).toBeNull();
+    },
+  );
 });

@@ -1,22 +1,50 @@
 import { randomUUID } from "node:crypto";
 import { inpaint, isGpuAvailable } from "@snapotter/ai";
-import { FEATURE_BUNDLES, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  FEATURE_BUNDLES,
+  getBundleForTool,
+  hasServerErrorStatus,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
-import { autoOrient } from "../../lib/auto-orient.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../../jobs/types.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { isFeatureInstalled, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import { createUniqueNamer } from "../../lib/filename.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
-import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { encodeHeic } from "../../lib/heic-converter.js";
 import { containerMemoryLimitBytes, hqCpuMemoryRefusal } from "../../lib/hq-memory-gate.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { asInputErrorIfUndecodable, withAiImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+} from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 
@@ -60,7 +88,9 @@ export function registerEraseObject(app: FastifyInstance) {
       let imageBuffer: Buffer | null = null;
       let maskBuffer: Buffer | null = null;
       let filename = "image";
+      let maskFilename = "mask.png";
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
       let fileId: string | null = null;
       let saveModeRaw: string | null = null;
       let format = "png";
@@ -68,178 +98,266 @@ export function registerEraseObject(app: FastifyInstance) {
       let qualityMode = "fast";
       let imageKey: string | null = null;
       let maskKey: string | null = null;
+      // The web client always names the mask part mask.png.
+      const uniqueName = createUniqueNamer();
+      const disconnect = trackClientDisconnect(request, reply);
+      let uploadsCleaned = false;
+      let enqueued = false;
+      let aliasStamped = false;
 
       try {
-        const parts = request.parts();
-        for await (const part of parts) {
-          if (part.type === "file") {
-            if (part.fieldname === "mask") {
-              const upload = await receiveUpload(part, jobId);
-              maskKey = upload.key;
-            } else {
-              const upload = await receiveUpload(part, jobId);
-              imageKey = upload.key;
-              filename = upload.filename;
+        try {
+          const parts = request.parts();
+          for await (const part of parts) {
+            if (part.type === "file") {
+              if (part.fieldname === "mask") {
+                const upload = await receiveUpload(part, jobId, { uniqueName });
+                maskKey = upload.key;
+                maskFilename = upload.filename;
+              } else {
+                const upload = await receiveUpload(part, jobId, { uniqueName });
+                imageKey = upload.key;
+                filename = upload.filename;
+              }
+            } else if (part.fieldname === "clientJobId") {
+              clientJobIdRaw = part.value as string;
+            } else if (part.fieldname === "fileId") {
+              fileId = part.value as string;
+            } else if (part.fieldname === "saveMode") {
+              saveModeRaw = part.value as string;
+            } else if (part.fieldname === "format") {
+              format = (part.value as string) || "png";
+            } else if (part.fieldname === "quality") {
+              quality = Number(part.value) || 95;
+            } else if (part.fieldname === "qualityMode") {
+              qualityMode = (part.value as string) || "fast";
             }
-          } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-              clientJobId = raw;
-            }
-          } else if (part.fieldname === "fileId") {
-            fileId = part.value as string;
-          } else if (part.fieldname === "saveMode") {
-            saveModeRaw = part.value as string;
-          } else if (part.fieldname === "format") {
-            format = (part.value as string) || "png";
-          } else if (part.fieldname === "quality") {
-            quality = Number(part.value) || 95;
-          } else if (part.fieldname === "qualityMode") {
-            qualityMode = (part.value as string) || "fast";
+          }
+        } catch (err) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          uploadsCleaned = true;
+          const failure = multipartFailure(err);
+          return reply.status(failure.status).send(failure.body);
+        }
+
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+        }
+        clientJobId = clientJobIdField ?? null;
+
+        // Stamp the client-facing alias before any pre-enqueue work (#892): a
+        // cancel landing between parse and enqueueToolJob needs a durable pointer
+        // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
+        }
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
+        }
+
+        if (!imageKey) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+        if (!maskKey) {
+          return reply.status(400).send({
+            error: "No mask image provided. Upload a mask as a second file with fieldname 'mask'",
+          });
+        }
+        const uploadedImageKey = imageKey;
+
+        if (disconnect.clientGone()) {
+          await disconnect.settleAbandoned({
+            jobId,
+            clientJobId,
+            uploadKeys: [uploadedImageKey, maskKey],
+            log: request.log,
+          });
+          uploadsCleaned = true;
+          return;
+        }
+
+        try {
+          imageBuffer = await getObjectBuffer(imageKey);
+          maskBuffer = await getObjectBuffer(maskKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
+
+        const imageValidation = await validateImageBuffer(imageBuffer, filename);
+        if (!imageValidation.valid) {
+          return reply.status(400).send({ error: `Invalid image: ${imageValidation.reason}` });
+        }
+        const maskValidation = await validateImageBuffer(maskBuffer, maskFilename);
+        if (!maskValidation.valid) {
+          return reply.status(400).send({ error: `Invalid mask: ${maskValidation.reason}` });
+        }
+
+        // Validate format, quality, and quality mode via Zod
+        const settingsResult = settingsSchema.safeParse({ format, quality, qualityMode });
+        if (!settingsResult.success) {
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: settingsResult.error.issues
+              .map((i) => (i.path.length > 0 ? `${i.path.join(".")}: ${i.message}` : i.message))
+              .join("; "),
+          });
+        }
+        format = settingsResult.data.format;
+        quality = settingsResult.data.quality;
+        qualityMode = settingsResult.data.qualityMode;
+
+        // High-Quality mode needs the optional diffusion bundle on top of the base
+        // (LaMa) bundle already checked above. Fail loud with the standard install
+        // contract; never silently downgrade HQ to the fast path.
+        if (qualityMode === "hq" && !isFeatureInstalled(HQ_BUNDLE_ID)) {
+          const hqBundle = FEATURE_BUNDLES[HQ_BUNDLE_ID];
+          return reply.status(501).send({
+            error: "Feature not installed",
+            code: "FEATURE_NOT_INSTALLED",
+            feature: HQ_BUNDLE_ID,
+            featureName: hqBundle?.name ?? "High-Quality Inpainting",
+            estimatedSize: hqBundle?.estimatedSize ?? "unknown",
+          });
+        }
+
+        // Refuse HQ up front on CPU hosts whose cgroup limit cannot fit SD1.5
+        // inference; the alternative is an OOM-killed dispatcher ~40s in and a
+        // "try a smaller image" hint that cannot help (#670).
+        if (qualityMode === "hq") {
+          const refusal = hqCpuMemoryRefusal(isGpuAvailable("torch"), containerMemoryLimitBytes());
+          if (refusal) {
+            return reply
+              .status(422)
+              .send({ error: "Not enough memory for HQ mode", details: refusal });
           }
         }
-      } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
-      }
 
-      // Stamp the client-facing alias before any pre-enqueue work (#892): a
-      // cancel landing between parse and enqueueToolJob needs a durable pointer
-      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-      }
+        if (format === "auto") {
+          const detected = await resolveOutputFormat(imageBuffer, filename);
+          format = detected.format === "jpeg" ? "jpg" : detected.format;
+          // detected.quality is undefined for PNG, whose encode path below never
+          // reads it anyway; keep the stored setting a plain number.
+          quality = detected.quality ?? quality;
+        }
 
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
+        try {
+          const preparedImage = await prepareRouteImage(
+            imageBuffer,
+            filename,
+            imageValidation.format,
+            {
+              log: request.log,
+              rewriteFilenameToPng: true,
+              rasterizeSvg: true,
+            },
+          );
+          imageBuffer = preparedImage.buffer;
+          filename = preparedImage.filename;
 
-      if (!imageKey) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-      if (!maskKey) {
-        return reply.status(400).send({
-          error: "No mask image provided. Upload a mask as a second file with fieldname 'mask'",
-        });
-      }
+          // The mask goes through the same CLI-decoded and SVG formats the main
+          // image does. Without this, a HEIC/RAW/SVG/etc. mask reaches the
+          // unguarded sharp() calls inside inpaint() and fails with a generic,
+          // misclassified error instead of the clear message the image gets.
+          const preparedMask = await prepareRouteImage(
+            maskBuffer,
+            maskFilename,
+            maskValidation.format,
+            {
+              log: request.log,
+              rasterizeSvg: true,
+            },
+          );
+          maskBuffer = preparedMask.buffer;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
+          }
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
+          }
+          return reply.status(422).send({
+            error: "Object erasing failed",
+            details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+          });
+        }
 
-      imageBuffer = await getObjectBuffer(imageKey);
-      maskBuffer = await getObjectBuffer(maskKey);
+        if (disconnect.clientGone()) {
+          await disconnect.settleAbandoned({
+            jobId,
+            clientJobId,
+            uploadKeys: [uploadedImageKey, imageKey, maskKey],
+            log: request.log,
+          });
+          uploadsCleaned = true;
+          return;
+        }
 
-      const imageValidation = await validateImageBuffer(imageBuffer, filename);
-      if (!imageValidation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${imageValidation.reason}` });
-      }
-      const maskValidation = await validateImageBuffer(maskBuffer, "mask.png");
-      if (!maskValidation.valid) {
-        return reply.status(400).send({ error: `Invalid mask: ${maskValidation.reason}` });
-      }
+        // Write decoded image for the worker
+        const decodedKey = `uploads/${jobId}/${filename}`;
+        if (decodedKey !== imageKey) {
+          await putObject(decodedKey, imageBuffer);
+          imageKey = decodedKey;
+        } else {
+          await putObject(imageKey, imageBuffer);
+        }
+        await putObject(maskKey, maskBuffer);
 
-      // Validate format, quality, and quality mode via Zod
-      const settingsResult = settingsSchema.safeParse({ format, quality, qualityMode });
-      if (!settingsResult.success) {
-        return reply.status(400).send({
-          error: "Invalid settings",
-          details: settingsResult.error.issues
-            .map((i) => (i.path.length > 0 ? `${i.path.join(".")}: ${i.message}` : i.message))
-            .join("; "),
-        });
-      }
-      format = settingsResult.data.format;
-      quality = settingsResult.data.quality;
-      qualityMode = settingsResult.data.qualityMode;
+        if (disconnect.clientGone()) {
+          await disconnect.settleAbandoned({
+            jobId,
+            clientJobId,
+            uploadKeys: [uploadedImageKey, imageKey, maskKey],
+            log: request.log,
+          });
+          uploadsCleaned = true;
+          return;
+        }
 
-      // High-Quality mode needs the optional diffusion bundle on top of the base
-      // (LaMa) bundle already checked above. Fail loud with the standard install
-      // contract; never silently downgrade HQ to the fast path.
-      if (qualityMode === "hq" && !isFeatureInstalled(HQ_BUNDLE_ID)) {
-        const hqBundle = FEATURE_BUNDLES[HQ_BUNDLE_ID];
-        return reply.status(501).send({
-          error: "Feature not installed",
-          code: "FEATURE_NOT_INSTALLED",
-          feature: HQ_BUNDLE_ID,
-          featureName: hqBundle?.name ?? "High-Quality Inpainting",
-          estimatedSize: hqBundle?.estimatedSize ?? "unknown",
-        });
-      }
+        // Enqueue with both image and mask as inputRefs; the worker handler
+        // reads them via getObjectBuffer.
+        enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [imageKey, maskKey],
+          filename,
+          settings: { format, quality, qualityMode },
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        };
+        try {
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
 
-      // Refuse HQ up front on CPU hosts whose cgroup limit cannot fit SD1.5
-      // inference; the alternative is an OOM-killed dispatcher ~40s in and a
-      // "try a smaller image" hint that cannot help (#670).
-      if (qualityMode === "hq") {
-        const refusal = hqCpuMemoryRefusal(isGpuAvailable(), containerMemoryLimitBytes());
-        if (refusal) {
-          return reply
-            .status(422)
-            .send({ error: "Not enough memory for HQ mode", details: refusal });
+        if (await disconnect.armCancelAfterEnqueue(jobId, request.log)) {
+          return;
+        }
+
+        return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      } finally {
+        disconnect.release();
+        if (!enqueued && !uploadsCleaned) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
         }
       }
-
-      if (format === "auto") {
-        const detected = await resolveOutputFormat(imageBuffer, filename);
-        format = detected.format === "jpeg" ? "jpg" : detected.format;
-        // detected.quality is undefined for PNG, whose encode path below never
-        // reads it anyway; keep the stored setting a plain number.
-        quality = detected.quality ?? quality;
-      }
-
-      try {
-        if (imageValidation.format === "heif") {
-          imageBuffer = await decodeHeic(imageBuffer);
-        }
-        if (needsCliDecode(imageValidation.format)) {
-          imageBuffer = await decodeToSharpCompat(imageBuffer, imageValidation.format);
-        }
-        imageBuffer = await autoOrient(imageBuffer);
-
-        // The mask goes through the same CLI-decoded formats the main image
-        // does. Without this, a HEIC/RAW/etc. mask reaches the unguarded
-        // sharp() calls inside inpaint() and fails with a generic, misclassified
-        // error instead of the clear message the image gets right above.
-        if (maskValidation.format === "heif") {
-          maskBuffer = await decodeHeic(maskBuffer);
-        }
-        if (needsCliDecode(maskValidation.format)) {
-          maskBuffer = await decodeToSharpCompat(maskBuffer, maskValidation.format);
-        }
-      } catch (err) {
-        request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
-        return reply.status(422).send({
-          error: "Object erasing failed",
-          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
-        });
-      }
-
-      // Write decoded image for the worker
-      const decodedKey = `uploads/${jobId}/${filename}`;
-      if (decodedKey !== imageKey) {
-        await putObject(decodedKey, imageBuffer);
-        imageKey = decodedKey;
-      } else {
-        await putObject(imageKey, imageBuffer);
-      }
-      await putObject(maskKey, maskBuffer);
-
-      // Enqueue with both image and mask as inputRefs; the worker handler
-      // reads them via getObjectBuffer.
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [imageKey, maskKey],
-        filename,
-        settings: { format, quality, qualityMode },
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-      });
-
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }
@@ -247,85 +365,108 @@ export function registerEraseObject(app: FastifyInstance) {
 // ── AI job handler (separate import for the worker) ───────────────
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 
-registerAiJobHandler("erase-object", async (input, data, ctx) => {
-  // Second inputRef is the mask
-  const maskBuffer = await getObjectBuffer(data.inputRefs[1]);
-  const settings = settingsSchema.parse(data.settings);
-  const format = settings.format;
-  const quality = settings.quality;
+registerAiJobHandler(
+  "erase-object",
+  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Object erasing failed",
+    (s) => s?.format ?? "auto",
+    async (input, data, ctx) => {
+      // Second inputRef is the mask
+      let maskBuffer: Buffer;
+      try {
+        maskBuffer = await getObjectBuffer(data.inputRefs[1]);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
+      const settings = settingsSchema.parse(data.settings);
+      const format = settings.format;
+      const quality = settings.quality;
 
-  const resultBuffer = await inpaint(
-    input,
-    maskBuffer,
-    ctx.scratchDir,
-    (percent, stage) => ctx.report(percent, stage),
-    settings.qualityMode,
-  );
+      let resultBuffer: Buffer;
+      try {
+        resultBuffer = await inpaint(
+          input,
+          maskBuffer,
+          ctx.scratchDir,
+          (percent, stage) => ctx.report(percent, stage),
+          settings.qualityMode,
+          { signal: ctx.signal },
+        );
+      } catch (err) {
+        const classifiedInput = await asInputErrorIfUndecodable(input, err);
+        if (isToolInputError(classifiedInput) || isDecoderUnavailable(classifiedInput)) {
+          throw classifiedInput;
+        }
+        throw await asInputErrorIfUndecodable(maskBuffer, err);
+      }
 
-  // Convert to requested output format
-  const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
-  let outputBuffer: Buffer;
-  let finalFormat = format;
+      // Convert to requested output format
+      const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
+      let outputBuffer: Buffer;
+      let finalFormat = format;
 
-  if (needsNodeConversion) {
-    if (format === "heic" || format === "heif") {
-      outputBuffer = await encodeHeic(resultBuffer, quality);
-      finalFormat = format;
-    } else if (format === "jxl") {
-      outputBuffer = await encodeJxl(resultBuffer, quality);
-      finalFormat = "jxl";
-    } else {
-      outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
-      finalFormat = "avif";
-    }
-  } else if (format === "jpg" || format === "jpeg") {
-    outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
-    finalFormat = "jpg";
-  } else if (format === "webp") {
-    outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
-    finalFormat = "webp";
-  } else if (format === "tiff") {
-    outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
-    finalFormat = "tiff";
-  } else if (format === "gif") {
-    outputBuffer = await sharp(resultBuffer).gif().toBuffer();
-    finalFormat = "gif";
-  } else {
-    outputBuffer = resultBuffer;
-    finalFormat = "png";
-  }
+      if (needsNodeConversion) {
+        if (format === "heic" || format === "heif") {
+          outputBuffer = await encodeHeic(resultBuffer, quality);
+          finalFormat = format;
+        } else if (format === "jxl") {
+          outputBuffer = await encodeJxl(resultBuffer, quality);
+          finalFormat = "jxl";
+        } else {
+          outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
+          finalFormat = "avif";
+        }
+      } else if (format === "jpg" || format === "jpeg") {
+        outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
+        finalFormat = "jpg";
+      } else if (format === "webp") {
+        outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
+        finalFormat = "webp";
+      } else if (format === "tiff") {
+        outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
+        finalFormat = "tiff";
+      } else if (format === "gif") {
+        outputBuffer = await sharp(resultBuffer).gif().toBuffer();
+        finalFormat = "gif";
+      } else {
+        outputBuffer = resultBuffer;
+        finalFormat = "png";
+      }
 
-  const EXT_MAP: Record<string, string> = {
-    jpeg: "jpg",
-    jpg: "jpg",
-    png: "png",
-    webp: "webp",
-    tiff: "tiff",
-    gif: "gif",
-    avif: "avif",
-    heic: "heic",
-    heif: "heif",
-    jxl: "jxl",
-  };
-  const ext = EXT_MAP[finalFormat] || "png";
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_erased.${ext}`;
+      const EXT_MAP: Record<string, string> = {
+        jpeg: "jpg",
+        jpg: "jpg",
+        png: "png",
+        webp: "webp",
+        tiff: "tiff",
+        gif: "gif",
+        avif: "avif",
+        heic: "heic",
+        heif: "heif",
+        jxl: "jxl",
+      };
+      const ext = EXT_MAP[finalFormat] || "png";
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_erased.${ext}`;
 
-  const CONTENT_TYPES: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    tiff: "image/tiff",
-    gif: "image/gif",
-    avif: "image/avif",
-    heic: "image/heic",
-    heif: "image/heif",
-    jxl: "image/jxl",
-  };
+      const CONTENT_TYPES: Record<string, string> = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        tiff: "image/tiff",
+        gif: "image/gif",
+        avif: "image/avif",
+        heic: "image/heic",
+        heif: "image/heif",
+        jxl: "image/jxl",
+      };
 
-  return {
-    buffer: outputBuffer,
-    filename: outputFilename,
-    contentType: CONTENT_TYPES[finalFormat] || "image/png",
-  };
-});
+      return {
+        buffer: outputBuffer,
+        filename: outputFilename,
+        contentType: CONTENT_TYPES[finalFormat] || "image/png",
+      };
+    },
+  ),
+);

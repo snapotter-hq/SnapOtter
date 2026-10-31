@@ -314,4 +314,30 @@ describe("the deep pass encodes the output format once (#1302)", () => {
     expect(mean).toBeGreaterThan(120);
     expect(mean).toBeLessThan(135);
   });
+
+  it("keeps partial transparency on a 4-channel TIFF through the post-sidecar re-encode (#2586)", async () => {
+    sidecarReturnsPng();
+    const tiffWithAlpha = await sharp({
+      create: {
+        width: 8,
+        height: 8,
+        channels: 4,
+        background: { r: 10, g: 200, b: 30, alpha: 0.5 },
+      },
+    })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+
+    const result = await processImageEnhancement(tiffWithAlpha, settings, "clear.tiff");
+
+    expect(result.contentType).toBe("image/tiff");
+    const meta = await sharp(result.buffer).metadata();
+    expect(meta.format).toBe("tiff");
+    expect(meta.channels).toBe(4);
+    expect(meta.hasAlpha).toBe(true);
+    const alpha = await sharp(result.buffer).extractChannel(3).raw().toBuffer();
+    const mean = alpha.reduce((sum, v) => sum + v, 0) / alpha.length;
+    expect(mean).toBeGreaterThan(120);
+    expect(mean).toBeLessThan(135);
+  });
 });

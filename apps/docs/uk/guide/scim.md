@@ -1,8 +1,8 @@
 ---
 description: "Налаштуйте провізіонінг SCIM 2.0 для синхронізації користувачів і груп з вашого постачальника ідентифікації до SnapOtter. Охоплює Okta, Azure AD / Entra ID та власні інтеграції."
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 40fd5043d957
+i18n_output_hash: 623b58eae288
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP надсилає понад 1000 запитів за хвилину. Заз�
 ### Користувачів деповізіоновано, але не видалено з інтерфейсу {#users-deprovisioned-but-not-removed-from-the-ui}
 
 DELETE у SCIM є м'якою деактивацією. Деактивовані користувачі й далі відображаються у списку користувачів адміністратора зі статусом «вимкнено». Це зроблено навмисно, щоб зберегти їхні дані. Їхня роль відображається як `disabled:<original-role>`.
+
+### Фільтр `externalId` не знаходить користувача, який входить через OIDC або SAML {#recover-scim-ids-in-oidc-or-saml-users}
+
+До того як `externalId` у SCIM отримав окремий стовпець (`users.scim_external_id`), запит SCIM `PUT` або `PATCH` для користувача, якого вже пов'язав вхід через OIDC або SAML, записував ідентифікатор SCIM в ідентичність цього користувача для входу. Міграція оновлення не може відрізнити це значення від справжнього суб'єкта OIDC чи NameID SAML, тому таких користувачів вона не чіпає. Для них `filter=externalId eq "..."` нічого не повертає, доки IdP не надішле чергове оновлення з `externalId`.
+
+Якщо ви не хочете чекати на IdP, журнал аудиту може підтвердити цей ідентифікатор. SCIM записує рядок `SCIM_USER_PROVISIONED` з `externalId`, з яким він створив кожного користувача. Коли ви вже на випуску зі стовпцем `scim_external_id`, відкрийте `psql` до бази даних SnapOtter (у [посібнику з відновлення облікового запису](./account-recovery.md#older-images-and-fallbacks) показано, як це зробити для обох варіантів розгортання) і перегляньте користувачів, чия ідентичність для входу все ще дорівнює цьому ідентифікатору:
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+Якщо список виглядає правильно, скопіюйте ідентифікатор у стовпець SCIM. Виконайте це всередині `BEGIN;` і перевірте повернені рядки, перш ніж робити `COMMIT;`:
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+Повторний запуск нічого не знайде. Оновлення залишає `external_id` без змін, бо деякі IdP (серед них Okta) надсилають той самий ідентифікатор і як OIDC `sub`, і як SCIM `externalId`, і для них його очищення зламало б вхід через OIDC. Користувач, чий `external_id` справді є зайвим ідентифікатором SCIM, уже не проходить зіставлення суб'єкта. З увімкненим `OIDC_AUTO_LINK_USERS` (або `SAML_AUTO_LINK_USERS`) їхній наступний вхід із підтвердженою електронною поштою повторно пов'яже їх у будь-якому разі.
+
+Деякі користувачі залишаються поза зоною досяжності й підхоплюють ідентифікатор з наступного оновлення IdP:
+
+- користувачі, чиє посилання для входу замінило ідентифікатор SCIM і які не отримали після цього жодного запису SCIM, оскільки їхній `external_id` більше не збігається з рядком аудиту
+- користувачі, чий рядок провізіонінгу вже видалено згідно з терміном зберігання журналу аудиту
+- користувачі, чий `externalId` IdP змінив після їх створення (рядки оновлень фіксують, які поля змінилися, а не їхні значення)
+- два користувачі з однаковим ідентифікатором, яких запит пропускає, щоб не зірвати унікальний індекс; попередній перегляд без останньої умови показує їх, і вирішувати, кому належить ідентифікатор, вам

@@ -26,6 +26,8 @@ const mockBrowserTracingIntegration = vi.fn(() => ({ name: "BrowserTracing" }));
 vi.mock("@sentry/react", () => ({
   init: mockSentryInit,
   browserTracingIntegration: mockBrowserTracingIntegration,
+  getIsolationScope: () => ({ clearBreadcrumbs: vi.fn() }),
+  getCurrentScope: () => ({ clearBreadcrumbs: vi.fn() }),
 }));
 
 const noop = () => {};
@@ -46,6 +48,7 @@ const enabledConfig = {
   enabled: true,
   posthogApiKey: "phc_test",
   posthogHost: "https://ph.test",
+  feedbackSink: true,
   sentryDsn: "https://sentry.test/123",
   sentryDsnWeb: "https://sentry.test/web/456",
   posthogSampleRate: 1,
@@ -56,6 +59,7 @@ const disabledConfig = {
   enabled: false,
   posthogApiKey: "",
   posthogHost: "",
+  feedbackSink: false,
   sentryDsn: "",
   sentryDsnWeb: "",
   posthogSampleRate: 0,
@@ -172,6 +176,30 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
       // bake; the event must survive (scrubbed to type-only).
       expect(result).not.toBeNull();
       expect(result.exception.values[0].value).toBe("TypeError");
+    });
+
+    // #1115: with no PostHog, "analytics active" is false while Sentry is live,
+    // so a check on it mistook a live Sentry for no telemetry at all.
+    it("reports telemetry on while PostHog analytics is off", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      expect(mod.isAnalyticsActive()).toBe(false);
+      expect(mod.isTelemetryEnabled()).toBe(true);
+    });
+
+    it("an instance-wide opt-out seen after init stops Sentry", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      const beforeSend = mockSentryInit.mock.calls[0]?.[0]?.beforeSend;
+
+      await mod.applyInstanceAnalytics({ ...sentryOnlyConfig, enabled: false });
+
+      expect(mod.isTelemetryEnabled()).toBe(false);
+      expect(beforeSend({ exception: { values: [{ type: "TypeError", value: "x" }] } })).toBeNull();
+    });
+
+    it("an analytics setting that failed to load stops telemetry too", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      await mod.applyInstanceAnalytics(null);
+      expect(mod.isTelemetryEnabled()).toBe(false);
     });
   });
 

@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import {
   decrypt,
+  decryptSetting,
+  decryptSettingWithRotation,
   deriveAuditHmacKey,
   encrypt,
   isEncrypted,
@@ -121,5 +124,117 @@ describe("encryption", () => {
     expect(encA).not.toBe(encB);
     expect(await decrypt(encA, testKey)).toBe(plaintext);
     expect(await decrypt(encB, testKey)).toBe(plaintext);
+  });
+
+  describe("decryptSetting", () => {
+    const originalKey = env.DATA_ENCRYPTION_KEY;
+    const originalPrevKey = env.DATA_ENCRYPTION_KEY_PREVIOUS;
+    const keyA = "a".repeat(64);
+    const keyB = "b".repeat(64);
+
+    afterEach(() => {
+      env.DATA_ENCRYPTION_KEY = originalKey;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = originalPrevKey;
+    });
+
+    it("decrypts an encrypted value with DATA_ENCRYPTION_KEY", async () => {
+      const encrypted = await encrypt("Bearer secret", keyA);
+      env.DATA_ENCRYPTION_KEY = keyA;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      expect(await decryptSetting(encrypted)).toBe("Bearer secret");
+    });
+
+    it("falls back to DATA_ENCRYPTION_KEY_PREVIOUS during key rotation", async () => {
+      const encrypted = await encrypt("Bearer rotated", keyA);
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+      expect(await decryptSetting(encrypted)).toBe("Bearer rotated");
+    });
+
+    it("returns null for an encrypted value when DATA_ENCRYPTION_KEY is unset", async () => {
+      const encrypted = await encrypt("Bearer secret", keyA);
+      env.DATA_ENCRYPTION_KEY = "";
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+      expect(await decryptSetting(encrypted)).toBeNull();
+    });
+
+    it("returns null when neither current nor previous key matches", async () => {
+      const encrypted = await encrypt("Bearer secret", keyA);
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "c".repeat(64);
+      expect(await decryptSetting(encrypted)).toBeNull();
+    });
+
+    it("passes through plaintext values whether or not a key is configured", async () => {
+      env.DATA_ENCRYPTION_KEY = "";
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      expect(await decryptSetting("Bearer plain")).toBe("Bearer plain");
+      expect(await decryptSetting("")).toBe("");
+
+      env.DATA_ENCRYPTION_KEY = keyA;
+      expect(await decryptSetting("Bearer plain")).toBe("Bearer plain");
+    });
+  });
+
+  describe("decryptSettingWithRotation (#2843)", () => {
+    const originalKey = env.DATA_ENCRYPTION_KEY;
+    const originalPrevKey = env.DATA_ENCRYPTION_KEY_PREVIOUS;
+    const keyA = "a".repeat(64);
+    const keyB = "b".repeat(64);
+
+    afterEach(() => {
+      env.DATA_ENCRYPTION_KEY = originalKey;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = originalPrevKey;
+    });
+
+    it("decrypts with DATA_ENCRYPTION_KEY without producing a re-encrypted ciphertext", async () => {
+      const encrypted = await encrypt("Bearer current", keyB);
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+
+      const result = await decryptSettingWithRotation(encrypted);
+      expect(result).toEqual({ value: "Bearer current" });
+      expect(result?.reencrypted).toBeUndefined();
+    });
+
+    it("re-encrypts under DATA_ENCRYPTION_KEY when opened via DATA_ENCRYPTION_KEY_PREVIOUS", async () => {
+      const encrypted = await encrypt("Bearer rotated", keyA);
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+
+      const result = await decryptSettingWithRotation(encrypted);
+      expect(result?.value).toBe("Bearer rotated");
+      expect(result?.reencrypted).toBeDefined();
+      expect(await decrypt(result?.reencrypted ?? "", keyB)).toBe("Bearer rotated");
+      expect(await decrypt(result?.reencrypted ?? "", keyA)).toBeNull();
+
+      const emptyEncrypted = await encrypt("", keyA);
+      const emptyResult = await decryptSettingWithRotation(emptyEncrypted);
+      expect(emptyResult?.value).toBe("");
+      expect(emptyResult?.reencrypted).toBeDefined();
+      expect(await decrypt(emptyResult?.reencrypted ?? "", keyB)).toBe("");
+    });
+
+    it("returns null when DATA_ENCRYPTION_KEY is unset or neither key matches", async () => {
+      const encrypted = await encrypt("Bearer secret", keyA);
+      env.DATA_ENCRYPTION_KEY = "";
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+      expect(await decryptSettingWithRotation(encrypted)).toBeNull();
+
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      expect(await decryptSettingWithRotation(encrypted)).toBeNull();
+
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "c".repeat(64);
+      expect(await decryptSettingWithRotation(encrypted)).toBeNull();
+    });
+
+    it("passes plaintext values through without re-encrypting", async () => {
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+      expect(await decryptSettingWithRotation("Bearer plain")).toEqual({ value: "Bearer plain" });
+      expect(await decryptSettingWithRotation("")).toEqual({ value: "" });
+    });
   });
 });

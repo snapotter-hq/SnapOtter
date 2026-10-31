@@ -32,6 +32,8 @@ interface FeaturesState {
   bundles: FeatureBundleState[];
   loaded: boolean;
   loadError: boolean;
+  /** A background refresh has failed repeatedly, so `bundles` may not match the server. */
+  bundlesStale: boolean;
   installing: Record<string, BundleProgress>;
   errors: Record<string, string>;
   queued: string[];
@@ -62,12 +64,36 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
   // Preserves the old one-shot retry-on-failure behavior now that the server
   // serializes installs and we no longer drive the queue from the client.
   const installAllRetried = new Set<string>();
+  let refreshSeq = 0;
+  let resetSeq = 0;
 
-  const refreshBundles = async () => {
+  // Consecutive failed refreshes before the list is flagged stale. The poller
+  // ticks every 3s, so one failure would flap the notice on a single blip.
+  const STALE_AFTER_FAILED_REFRESHES = 2;
+  let refreshFailureStreak = 0;
+
+  /**
+   * Returns false when the refresh failed or was superseded. The last known
+   * bundles stay in place either way, and callers must not settle installs
+   * from them.
+   */
+  const refreshBundles = async (): Promise<boolean> => {
+    const seq = ++refreshSeq;
     try {
       const data = await apiGet<{ bundles: FeatureBundleState[] }>("/v1/features");
-      set({ bundles: data.bundles, loaded: true });
-    } catch {}
+      if (seq !== refreshSeq) return false;
+      refreshFailureStreak = 0;
+      set({ bundles: data.bundles, loaded: true, bundlesStale: false });
+      return true;
+    } catch {
+      if (seq === refreshSeq) {
+        refreshFailureStreak += 1;
+        if (refreshFailureStreak >= STALE_AFTER_FAILED_REFRESHES) {
+          set({ bundlesStale: true });
+        }
+      }
+      return false;
+    }
   };
 
   /** Drop a bundle from both the installing map and the queued pill. */
@@ -119,49 +145,52 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
 
   const startPolling = (bundleId: string) => {
     if (pollRefs[bundleId]) return;
-    pollRefs[bundleId] = setInterval(async () => {
-      try {
-        await refreshBundles();
-        const updated = get().bundles.find((b) => b.id === bundleId);
+    const timer = setInterval(async () => {
+      // A failed refresh leaves the last known bundles in place, and reading
+      // them would settle a live install as finished. Skip this tick instead.
+      // Only the refresh is guarded: an error from the settle logic below
+      // should surface, not be swallowed.
+      if (!(await refreshBundles())) return;
+      if (pollRefs[bundleId] !== timer) return;
+      const updated = get().bundles.find((b) => b.id === bundleId);
 
-        if (updated?.status === "queued") {
-          // Still waiting behind another install on the server; keep the pill.
-          if (!get().queued.includes(bundleId)) {
-            set({ queued: [...get().queued, bundleId] });
-          }
-          return;
+      if (updated?.status === "queued") {
+        // Still waiting behind another install on the server; keep the pill.
+        if (!get().queued.includes(bundleId)) {
+          set({ queued: [...get().queued, bundleId] });
         }
+        return;
+      }
 
-        if (updated?.status === "installing") {
-          // Now the active install: move queued -> installing and track progress.
-          const current = get().installing[bundleId];
-          const percent = Math.max(updated.progress?.percent ?? 0, current?.percent ?? 0);
-          // The ETA clock starts when the install starts, not when it was
-          // queued: dividing the first real percent by the whole queue wait
-          // read as an ETA of hundreds of minutes (#871).
-          const startTimes = current
-            ? get().startTimes
-            : { ...get().startTimes, [bundleId]: Date.now() };
-          set({
-            installing: {
-              ...get().installing,
-              [bundleId]: { percent, stage: updated.progress?.stage ?? current?.stage ?? "" },
-            },
-            queued: get().queued.filter((id) => id !== bundleId),
-            startTimes,
-          });
-          return;
-        }
+      if (updated?.status === "installing") {
+        // Now the active install: move queued -> installing and track progress.
+        const current = get().installing[bundleId];
+        const percent = Math.max(updated.progress?.percent ?? 0, current?.percent ?? 0);
+        // The ETA clock starts when the install starts, not when it was
+        // queued: dividing the first real percent by the whole queue wait
+        // read as an ETA of hundreds of minutes (#871).
+        const startTimes = current
+          ? get().startTimes
+          : { ...get().startTimes, [bundleId]: Date.now() };
+        set({
+          installing: {
+            ...get().installing,
+            [bundleId]: { percent, stage: updated.progress?.stage ?? current?.stage ?? "" },
+          },
+          queued: get().queued.filter((id) => id !== bundleId),
+          startTimes,
+        });
+        return;
+      }
 
-        // Terminal: installed / error / not_installed.
-        stopPolling(bundleId);
-        stopTracking(bundleId);
-        onInstallSettled(
-          bundleId,
-          updated?.status === "error" ? (updated.error ?? "Installation failed") : null,
-        );
-      } catch {}
+      // Terminal: installed, or a failure. A bundle that is missing or back to
+      // not_installed means the job vanished before it finished.
+      stopPolling(bundleId);
+      stopTracking(bundleId);
+      const failed = !updated || updated.status === "not_installed" || updated.status === "error";
+      onInstallSettled(bundleId, failed ? (updated?.error ?? "Installation failed") : null);
     }, 3000);
+    pollRefs[bundleId] = timer;
   };
 
   const listenToProgress = (bundleId: string, jobId: string) => {
@@ -176,6 +205,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     esRefs[bundleId] = es;
 
     es.onmessage = (event) => {
+      if (esRefs[bundleId] !== es) return;
       // Only an unparseable frame is ignorable. A throw past the parse is our
       // own handling failing, and must not vanish (#1287).
       let data: {
@@ -187,14 +217,19 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       };
       try {
         data = JSON.parse(event.data);
-      } catch {
+      } catch (err) {
+        console.warn("Ignoring an unparseable install progress frame.", {
+          bundleId,
+          raw: event.data,
+          error: err,
+        });
         return;
       }
       try {
         if (data.type === "heartbeat") return;
         if (data.phase === "complete") {
           es.close();
-          delete esRefs[bundleId];
+          if (esRefs[bundleId] === es) delete esRefs[bundleId];
           stopTracking(bundleId);
           refreshBundles();
           onInstallSettled(bundleId, null);
@@ -202,7 +237,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         }
         if (data.phase === "failed") {
           es.close();
-          delete esRefs[bundleId];
+          if (esRefs[bundleId] === es) delete esRefs[bundleId];
           stopTracking(bundleId);
           onInstallSettled(bundleId, data.error ?? "Installation failed");
           return;
@@ -230,6 +265,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     };
 
     es.onerror = () => {
+      if (esRefs[bundleId] !== es) return;
       es.close();
       delete esRefs[bundleId];
       startPolling(bundleId);
@@ -281,6 +317,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     bundles: [],
     loaded: false,
     loadError: false,
+    bundlesStale: false,
     installing: {},
     errors: {},
     queued: [],
@@ -297,16 +334,23 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         refreshBundles();
         return;
       }
+      const epoch = resetSeq;
+      const seq = ++refreshSeq;
       try {
         const data = await apiGet<{ bundles: FeatureBundleState[] }>("/v1/features");
-        set({ bundles: data.bundles, loaded: true, loadError: false });
+        if (epoch !== resetSeq || seq !== refreshSeq) return;
+        refreshFailureStreak = 0;
+        set({ bundles: data.bundles, loaded: true, loadError: false, bundlesStale: false });
         recoverActiveInstalls();
       } catch {
+        if (epoch !== resetSeq || seq !== refreshSeq) return;
         set({ loaded: true, loadError: true });
       }
     },
 
-    refresh: refreshBundles,
+    refresh: async () => {
+      await refreshBundles();
+    },
 
     isToolInstalled: (toolId: string) => {
       const required = requiredBundlesForTool(toolId);
@@ -333,6 +377,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       // Always POST immediately: the server owns the queue now, so a POST is
       // durable even if this tab closes. Optimistically show "installing"; the
       // response tells us whether it actually started or got queued.
+      const epoch = resetSeq;
       const errors = { ...get().errors };
       delete errors[bundleId];
       set({
@@ -346,6 +391,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           `/v1/admin/features/${bundleId}/install`,
           {},
         );
+        if (epoch !== resetSeq) return;
         if (result.queued) {
           // Server queued it behind an active install; show the pill and poll
           // for the transition instead of holding an SSE connection open. An
@@ -363,6 +409,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           listenToProgress(bundleId, result.jobId);
         }
       } catch (err) {
+        if (epoch !== resetSeq) return;
         stopTracking(bundleId);
 
         const message = err instanceof Error ? err.message : "Failed to start installation";
@@ -375,6 +422,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           delete errors[bundleId];
           set({ errors });
           await refreshBundles();
+          if (epoch !== resetSeq) return;
           onInstallSettled(bundleId, null);
         } else {
           onInstallSettled(bundleId, message);
@@ -389,6 +437,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       );
       if (targets.length === 0) return;
 
+      const epoch = resetSeq;
       const errors = { ...get().errors };
       const installing = { ...get().installing };
       const startTimes = { ...get().startTimes };
@@ -408,6 +457,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           `/v1/admin/tools/${toolId}/features/install`,
           {},
         );
+        if (epoch !== resetSeq) return;
 
         for (const item of result.bundles) {
           if (item.skipped) {
@@ -437,6 +487,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           await refreshBundles();
         }
       } catch (err) {
+        if (epoch !== resetSeq) return;
         const message = err instanceof Error ? err.message : "Failed to start installation";
         const nextErrors = { ...get().errors };
 
@@ -516,10 +567,21 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           "/v1/admin/features/reset",
           {},
         );
+        resetSeq++;
+        refreshSeq++;
+        installAllRetried.clear();
+        for (const [bundleId, es] of Object.entries(esRefs)) {
+          es.close();
+          delete esRefs[bundleId];
+        }
+        for (const bundleId of Object.keys(pollRefs)) {
+          stopPolling(bundleId);
+        }
         set({
           installing: {},
           errors: {},
           queued: [],
+          installAllActive: false,
           startTimes: {},
           // Older servers omit the flag; assume the reset was complete rather
           // than warning about a venv this build knows nothing about.

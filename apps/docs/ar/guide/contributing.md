@@ -1,6 +1,6 @@
 ---
 description: "كيفية المساهمة في SnapOtter. تقارير الأخطاء، طلبات الميزات، طلبات السحب، ومتطلبات اتفاقية ترخيص المساهم (CLA)."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: ec01b666560b
 i18n_hash_version: 2

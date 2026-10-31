@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter 的 PostgreSQL 資料庫結構、資料表、遷移，以及備份程序。"
-i18n_source_hash: a68264552836
+i18n_source_hash: 331b11cd21d1
 i18n_provenance: machine
 i18n_output_hash: 867212c1ca88
 i18n_hash_version: 2

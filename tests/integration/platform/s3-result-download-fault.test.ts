@@ -92,7 +92,7 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
 
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     (env as Record<string, unknown>).STORAGE_MODE = originalStorageMode;
@@ -106,7 +106,7 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
       // Best-effort cleanup
     }
     await testApp?.cleanup();
-  }, 15_000);
+  });
 
   it("downloads a stored result and 404s a genuinely missing one", async () => {
     const ok = await testApp.app.inject({
@@ -127,10 +127,11 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
     expect(missing.statusCode).toBe(404);
   });
 
-  // #974: an S3 service fault while resolving the object is a storage
-  // outage, not a missing result. It must reach the error handler as a 500
-  // instead of presenting every job result as deleted.
-  it("returns 500, not 404, when S3 rejects the size probe with an auth fault", async () => {
+  // #974, #2808: an S3 service fault while resolving the object is a storage
+  // outage, not a missing result. It must reach the error handler as a 503
+  // storage-unavailable SafeError instead of presenting every job result as
+  // deleted.
+  it("returns 503, not 404, when S3 rejects the size probe with an auth fault", async () => {
     s3Storage.configureS3(s3Config({ secretAccessKey: "rotated-away" }));
 
     try {
@@ -140,10 +141,34 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
         headers: { authorization: `Bearer ${adminToken}` },
       });
 
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(503);
       expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
     } finally {
       s3Storage.configureS3(s3Config());
     }
+  });
+
+  // #996: HeadObject responses have no body, so a vanished bucket and a missing
+  // key both arrive from getObjectSize as NotFound (HTTP 404). Disambiguating
+  // on the double-miss path with HeadBucket must surface the bucket outage as
+  // 503 rather than folding every job result into 404 "File not found". Kept
+  // last in the file because it destroys the bucket; afterAll tolerates it.
+  it("returns 503, not 404, when the whole bucket is gone (#996)", async () => {
+    const objects = await s3Client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
+    for (const obj of objects.Contents ?? []) {
+      if (obj.Key) {
+        await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }));
+      }
+    }
+    await s3Client.send(new DeleteBucketCommand({ Bucket: BUCKET }));
+
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/download/${jobId}/result.png`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
   });
 });

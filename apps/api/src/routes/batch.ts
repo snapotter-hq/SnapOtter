@@ -9,8 +9,15 @@
  * Returns a ZIP file containing all processed images.
  */
 import { randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
-import { FEATURE_BUNDLES, isSafeMessageError, TOOLS, toolSection } from "@snapotter/shared";
+import { readFile, rm } from "node:fs/promises";
+import { extname } from "node:path";
+import {
+  FEATURE_BUNDLES,
+  hasServerErrorStatus,
+  isSafeMessageError,
+  TOOLS,
+  toolSection,
+} from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { eq, inArray } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -19,18 +26,45 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
-import { type Pool, queueName, type ToolJobData, type ToolJobResult } from "../jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  type Pool,
+  parseClientJobIdField,
+  queueName,
+  type ToolJobData,
+  type ToolJobResult,
+} from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
+import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
 import { getSecurityHeaders } from "../lib/csp.js";
-import { formatZodErrors, friendlyError, sharedFailureReason } from "../lib/errors.js";
+import {
+  type BatchFault,
+  preFailureFaultFields,
+  reportEngineUnavailable,
+  sharedServerFault,
+} from "../lib/engine-unavailable.js";
+import { markQueueEventsJobFailure, markUpstreamError } from "../lib/error-report.js";
+import {
+  formatZodErrors,
+  friendlyError,
+  sharedFailureReason,
+  stripInternalPaths,
+} from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { sanitizeFilename } from "../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
 import {
   deleteObject,
   getObjectStream,
+  normalizeOperationalWriteError,
   putObject,
   workspaceHeadroomBytes,
 } from "../lib/object-storage.js";
@@ -42,51 +76,25 @@ import {
   resolveOcrUploadLimits,
 } from "../lib/ocr-limits.js";
 import {
+  configuredUploadLimit,
   type SpooledMultipartFile,
   spoolMultipartFile,
   storeValidatedOcrPdf,
 } from "../lib/ocr-pdf-ingress.js";
-import { resolveToolPool } from "../lib/pool.js";
+import { isUniqueViolation } from "../lib/pg-errors.js";
+import { resolveCanonicalToolId, resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
+import { settledFailureResponse } from "../lib/settled-failure.js";
+import { toStorableJson } from "../lib/storable-json.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
+import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
 import { failBatchJob, updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
 
-type ParsedFile =
-  | { kind: "buffer"; buffer: Buffer; filename: string; size: number }
-  | ({ kind: "path" } & SpooledMultipartFile);
-
 const formatMb = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-
-// Storage capacity failures answer 503 wherever they surface, so a client
-// keys on one status and code for "the instance is full" (#1161).
-const CAPACITY_CODES = new Set(["workspace-cap", "disk-free-floor"]);
-
-/**
- * The failure a finalize committed to the parent row before it rethrew, or
- * null when the row is not settled as failed. The rejection that reaches the
- * route through BullMQ is a plain Error, so the row is the only carrier of
- * the user-facing reason and code.
- */
-async function settledFailure(jobId: string): Promise<{
-  message: string;
-  code?: string;
-  errors: Array<{ filename: string; error: string }>;
-} | null> {
-  const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-  if (row?.status !== "failed") return null;
-  const error = row.error as { message?: string; code?: string; details?: unknown } | null;
-  if (!error?.message) return null;
-  return {
-    message: error.message,
-    ...(typeof error.code === "string" ? { code: error.code } : {}),
-    errors: Array.isArray(error.details)
-      ? (error.details as Array<{ filename: string; error: string }>)
-      : [],
-  };
-}
 
 /** Recursively inject OTel trace context into every node of a FlowJob tree. */
 function injectTraceContextIntoFlow(node: FlowJob): void {
@@ -107,7 +115,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const { section, toolId } = request.params;
-      const tool = TOOLS.find((t) => t.id === toolId);
+      const canonicalId = resolveCanonicalToolId(toolId);
+      const tool = TOOLS.find((t) => t.id === canonicalId);
       if (!tool || toolSection(tool) !== section) {
         return reply.status(404).send({ error: "Not found", code: "NOT_FOUND" });
       }
@@ -161,18 +170,26 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         // The rows this request inserted, until the flow owns them. Set once
         // the parent row exists, cleared once the flow is enqueued; an
         // ingress failure in between settles them (see the catch below).
-        let stagedBatch: { parentId: string; totalFiles: number; childIds: string[] } | null = null;
+        let stagedBatch: {
+          parentId: string;
+          totalFiles: number;
+          childIds: string[];
+          preFailures: Array<{ filename: string; error: string }>;
+        } | null = null;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
-          // Parse multipart: collect all files and the settings field
-          const files: ParsedFile[] = [];
+          // Parse multipart: spool all files to scratch and collect the settings field
+          const files: SpooledMultipartFile[] = [];
           let settingsRaw: string | null = null;
           let clientJobId: string | null = null;
+          let clientJobIdRaw: string | null = null;
           const ocrUploadLimits =
             toolId === "ocr" || toolId === "ocr-pdf"
               ? resolveOcrUploadLimits(env.MAX_UPLOAD_SIZE_MB)
               : undefined;
+          const fileMaxBytes =
+            ocrUploadLimits?.fileBytes ?? configuredUploadLimit(env.MAX_UPLOAD_SIZE_MB);
           let totalEncodedBytes = 0;
           let filePartIndex = 0;
 
@@ -184,71 +201,77 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             );
             for await (const part of parts) {
               if (part.type === "file") {
-                if (toolId === "ocr-pdf") {
-                  const remainingAggregate =
-                    (ocrUploadLimits?.aggregateBytes ?? Number.MAX_SAFE_INTEGER) -
-                    totalEncodedBytes;
-                  const file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
-                    maxBytes: Math.min(
-                      ocrUploadLimits?.fileBytes ?? Number.MAX_SAFE_INTEGER,
-                      Math.max(0, remainingAggregate),
-                    ),
+                const remainingAggregate =
+                  ocrUploadLimits !== undefined
+                    ? Math.max(0, ocrUploadLimits.aggregateBytes - totalEncodedBytes)
+                    : undefined;
+                const partMaxBytes =
+                  fileMaxBytes !== undefined && remainingAggregate !== undefined
+                    ? Math.min(fileMaxBytes, remainingAggregate)
+                    : (fileMaxBytes ?? remainingAggregate);
+                let file: SpooledMultipartFile;
+                try {
+                  file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
+                    maxBytes: partMaxBytes,
                     signal: ingressAbort.signal,
                   });
-                  totalEncodedBytes += file.size;
+                } catch (spoolErr) {
                   if (
                     ocrUploadLimits !== undefined &&
-                    totalEncodedBytes > ocrUploadLimits.aggregateBytes
+                    remainingAggregate !== undefined &&
+                    (fileMaxBytes === undefined || remainingAggregate < fileMaxBytes) &&
+                    (spoolErr as { statusCode?: unknown })?.statusCode === 413 &&
+                    (spoolErr as { limitBytes?: unknown })?.limitBytes === remainingAggregate
                   ) {
                     throw new InputValidationError(
-                      `OCR batch input exceeds the ${ocrUploadLimits.aggregateBytes} byte aggregate safety limit`,
+                      `OCR batch input exceeds the ${formatLimit(ocrUploadLimits.aggregateBytes)} aggregate safety limit`,
                       413,
                     );
                   }
-                  // Empty parts keep their slot: the client maps results back
-                  // onto its own file list by index, so dropping one here
-                  // would label a converted file with a different file's name
-                  // (issue #645). They fail in place in the loop below.
-                  files.push({ kind: "path", ...file });
-                } else {
-                  const chunks: Buffer[] = [];
-                  for await (const chunk of part.file) {
-                    if (ocrUploadLimits !== undefined) {
-                      totalEncodedBytes += chunk.length;
-                      if (totalEncodedBytes > ocrUploadLimits.aggregateBytes) {
-                        throw new InputValidationError(
-                          `OCR batch input exceeds the ${ocrUploadLimits.aggregateBytes} byte aggregate safety limit`,
-                          413,
-                        );
-                      }
-                    }
-                    chunks.push(chunk);
-                  }
-                  const buffer = Buffer.concat(chunks);
-                  files.push({
-                    kind: "buffer",
-                    buffer,
-                    filename: sanitizeFilename(part.filename ?? "file"),
-                    size: buffer.length,
-                  });
+                  throw spoolErr;
                 }
+                totalEncodedBytes += file.size;
+                if (
+                  ocrUploadLimits !== undefined &&
+                  totalEncodedBytes > ocrUploadLimits.aggregateBytes
+                ) {
+                  throw new InputValidationError(
+                    `OCR batch input exceeds the ${formatLimit(ocrUploadLimits.aggregateBytes)} aggregate safety limit`,
+                    413,
+                  );
+                }
+                // Empty parts keep their slot: the client maps results back
+                // onto its own file list by index, so dropping one here
+                // would label a converted file with a different file's name
+                // (issue #645). They fail in place in the loop below.
+                files.push(file);
                 filePartIndex++;
               } else if (part.fieldname === "settings") {
                 settingsRaw = part.value as string;
               } else if (part.fieldname === "clientJobId") {
-                const raw = part.value as string;
-                if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-                  clientJobId = raw;
-                }
+                clientJobIdRaw = part.value as string;
               }
             }
           } catch (err) {
+            if (err instanceof InputValidationError) {
+              return reply.status(err.statusCode).send({ error: err.message });
+            }
             const statusCode = ocrUploadErrorStatus(err);
+            if (statusCode === 413) {
+              const failure = multipartFailure(err);
+              return reply.status(failure.status).send(failure.body);
+            }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
+
+          const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+          if (clientJobIdField === null) {
+            return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+          }
+          clientJobId = clientJobIdField ?? null;
 
           if (files.length === 0) {
             return reply.status(400).send({ error: "No files provided" });
@@ -262,10 +285,34 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           }
 
           // Parse and validate settings
-          let settings: unknown;
-          let requestedSettings: unknown;
+          let parsed: unknown;
           try {
-            const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+            parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          } catch {
+            return reply.status(400).send({ error: "Settings must be valid JSON" });
+          }
+
+          let settingsList: unknown[] = [];
+          let requestedSettingsList: unknown[] = [];
+
+          if (Array.isArray(parsed)) {
+            if (parsed.length !== files.length) {
+              return reply
+                .status(400)
+                .send({ error: "Array of settings must match number of files" });
+            }
+            for (const p of parsed) {
+              const result = toolConfig.settingsSchema.safeParse(p);
+              if (!result.success) {
+                return reply.status(400).send({
+                  error: "Invalid settings in array",
+                  details: formatZodErrors(result.error.issues),
+                });
+              }
+              requestedSettingsList.push(p);
+              settingsList.push(result.data);
+            }
+          } else {
             const result = toolConfig.settingsSchema.safeParse(parsed);
             if (!result.success) {
               return reply.status(400).send({
@@ -273,30 +320,33 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 details: formatZodErrors(result.error.issues),
               });
             }
-            requestedSettings = parsed;
-            settings = result.data;
-          } catch {
-            return reply.status(400).send({ error: "Settings must be valid JSON" });
+            requestedSettingsList = files.map(() => parsed);
+            settingsList = files.map(() => result.data);
           }
 
-          const ocrResolution = resolveOcrIngressSettings(toolId, settings, { requestedSettings });
-          if (!ocrResolution.ok) {
-            const bundle = FEATURE_BUNDLES.ocr;
-            return reply.status(501).send({
-              error:
-                ocrResolution.code === "FEATURE_INCOMPATIBLE"
-                  ? "Feature incompatible"
-                  : "Feature not installed",
-              code: ocrResolution.code,
-              feature: "ocr",
-              featureName: bundle?.name ?? toolId,
-              estimatedSize: bundle?.estimatedSize ?? "unknown",
-              requestedQuality: ocrResolution.requestedQuality,
-              compatibilityReason: ocrResolution.reason,
-              ...(ocrResolution.guidance && { guidance: ocrResolution.guidance }),
+          const resolvedSettingsList: unknown[] = [];
+          for (let i = 0; i < settingsList.length; i++) {
+            const ocrResolution = resolveOcrIngressSettings(toolId, settingsList[i], {
+              requestedSettings: requestedSettingsList[i],
             });
+            if (!ocrResolution.ok) {
+              const bundle = FEATURE_BUNDLES.ocr;
+              return reply.status(501).send({
+                error:
+                  ocrResolution.code === "FEATURE_INCOMPATIBLE"
+                    ? "Feature incompatible"
+                    : "Feature not installed",
+                code: ocrResolution.code,
+                feature: "ocr",
+                featureName: bundle?.name ?? toolId,
+                estimatedSize: bundle?.estimatedSize ?? "unknown",
+                requestedQuality: ocrResolution.requestedQuality,
+                compatibilityReason: ocrResolution.reason,
+                ...(ocrResolution.guidance && { guidance: ocrResolution.guidance }),
+              });
+            }
+            resolvedSettingsList.push(ocrResolution.settings);
           }
-          settings = ocrResolution.settings;
 
           // Settings errors take precedence over feature availability. This keeps
           // unavailable installations from masking invalid client input.
@@ -319,18 +369,58 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           // Insert the parent row BEFORE updateJobProgress, because the
           // progress persist layer does a check-then-insert that races
-          // with our explicit insert below.
-          await db.insert(schema.jobs).values({
-            id: parentId,
-            userId,
-            toolId,
-            pool: "system",
-            type: "batch",
-            status: "queued",
-            inputRefs: [],
-            settings: { flowChildCount: 0 },
-          });
-          stagedBatch = { parentId, totalFiles: files.length, childIds: [] };
+          // with our explicit insert below. A clientJobId that is already
+          // taken fails on the primary key: that is the client's mistake,
+          // not a server fault, and nothing is staged yet to clean up (#1687).
+          try {
+            await db.insert(schema.jobs).values({
+              id: parentId,
+              userId,
+              toolId,
+              pool: "system",
+              type: "batch",
+              status: "queued",
+              inputRefs: [],
+              settings: { flowChildCount: 0 },
+            });
+          } catch (err) {
+            if (isUniqueViolation(err)) {
+              // The owner resending the same batch (a browser retrying a POST
+              // whose response it gave up on) attaches to the batch already
+              // running. The XHR reports whichever answer arrives, so a 409
+              // here would fail a batch that finishes fine; 202 sends the
+              // client to the SSE, whose terminal frame carries the durable
+              // result (#2015). Another user's id stays a conflict.
+              const [existing] = await db
+                .select({
+                  userId: schema.jobs.userId,
+                  toolId: schema.jobs.toolId,
+                  type: schema.jobs.type,
+                })
+                .from(schema.jobs)
+                .where(eq(schema.jobs.id, parentId))
+                .limit(1);
+              if (
+                existing &&
+                existing.type === "batch" &&
+                existing.toolId === toolId &&
+                existing.userId === userId
+              ) {
+                return reply.status(202).send({ jobId: parentId, async: true });
+              }
+              return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+            }
+            throw err;
+          }
+          const preFailures: Array<{
+            originalIndex: number;
+            filename: string;
+            error: string;
+            statusCode?: number;
+            code?: string;
+            details?: string;
+          }> = [];
+          stagedBatch = { parentId, totalFiles: files.length, childIds: [], preFailures };
 
           updateJobProgress({
             jobId: parentId,
@@ -343,7 +433,6 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           // ── Validate, decode, and upload each file ────────────────────
           const flowChildren: FlowJob[] = [];
-          const preFailures: Array<{ originalIndex: number; filename: string; error: string }> = [];
           // Flow index -> original upload index, consumed by batch-finalize so
           // fileResults keeps #645's index alignment across pre-failures.
           const fileIndexMap: number[] = [];
@@ -366,23 +455,44 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 filename: file.filename,
                 error: "File is empty",
               });
-              if (file.kind === "path") await rm(file.path, { force: true }).catch(() => {});
+              await rm(file.path, { force: true }).catch(() => {});
               continue;
             }
 
-            if (file.kind === "path") {
+            // Insert the child row before writing the object so a child-id
+            // collision never overwrites or deletes an existing job's upload (#1724).
+            const insertChildRow = async (inputKey: string) => {
+              await db.insert(schema.jobs).values({
+                id: childId,
+                userId,
+                toolId,
+                pool,
+                type: "batch-child",
+                status: "queued",
+                inputRefs: [inputKey],
+                settings: toStorableJson(resolvedSettingsList[i] as Record<string, unknown>),
+              });
+              stagedBatch?.childIds.push(childId);
+            };
+
+            if (toolId === "ocr-pdf") {
               try {
                 await storeValidatedOcrPdf(file, key, {
                   maxBytes: ocrUploadLimits?.fileBytes ?? file.size,
                   signal: ingressAbort.signal,
+                  beforeStore: async () => {
+                    await insertChildRow(key);
+                  },
                 });
                 uncommittedKeys.add(key);
               } catch (err) {
                 if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(err, toolId, request.log);
                   preFailures.push({
                     originalIndex: i,
                     filename: file.filename,
                     error: err.message,
+                    ...preFailureFaultFields(err),
                   });
                   continue;
                 }
@@ -391,7 +501,14 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 await rm(file.path, { force: true }).catch(() => {});
               }
             } else {
-              let processBuffer = file.buffer;
+              let processBuffer: Buffer;
+              try {
+                processBuffer = await readFile(file.path).catch((err: unknown) => {
+                  throw asDecoderOutOfMemory(err);
+                });
+              } finally {
+                await rm(file.path, { force: true }).catch(() => {});
+              }
               if (modality === "image" && toolId === "ocr") {
                 try {
                   const prepared = await prepareOcrIngressImage(
@@ -403,17 +520,36 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(err, toolId, request.log);
                     preFailures.push({
                       originalIndex: i,
                       filename: file.filename,
                       error: err.message,
+                      ...preFailureFaultFields(err),
                     });
                     continue;
                   }
                   throw err;
                 }
               } else if (modality === "image") {
-                const validation = await validateImageBuffer(processBuffer, processFilename);
+                let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+                try {
+                  validation = await validateImageBuffer(processBuffer, processFilename);
+                } catch (rawErr) {
+                  const err = asDecoderOutOfMemory(rawErr);
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                    const unavailable = engineUnavailable(err);
+                    reportEngineUnavailable(unavailable, toolId, request.log);
+                    preFailures.push({
+                      originalIndex: i,
+                      filename: file.filename,
+                      error: unavailable.message,
+                      ...preFailureFaultFields(unavailable),
+                    });
+                    continue;
+                  }
+                  throw rawErr;
+                }
                 if (!validation.valid) {
                   preFailures.push({
                     originalIndex: i,
@@ -431,7 +567,19 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     processBuffer = await decodeHeic(processBuffer);
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch {
+                  } catch (rawErr) {
+                    const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                      const unavailable = engineUnavailable(err);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
                     preFailures.push({
                       originalIndex: i,
                       filename: file.filename,
@@ -441,27 +589,116 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   }
                 }
 
+                let fallbackFormat: string | undefined;
                 if (!skipPreprocess && needsCliDecode(validation.format)) {
                   try {
-                    const fileExt = processFilename.split(".").pop()?.toLowerCase();
+                    const fileExt =
+                      extname(processFilename).toLowerCase().replace(/^\./, "") || undefined;
                     processBuffer = await decodeToSharpCompat(
                       processBuffer,
                       validation.format,
                       fileExt,
                     );
-                  } catch {
+                    const ext = processFilename.match(/\.[^.]+$/)?.[0];
+                    if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+                  } catch (rawDecodeErr) {
+                    const decodeErr = normalizeOperationalWriteError(
+                      asDecoderOutOfMemory(rawDecodeErr),
+                    );
+                    if (
+                      decodeErr instanceof DecoderOutOfMemoryError ||
+                      (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                    ) {
+                      const unavailable = engineUnavailable(decodeErr);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
                     try {
-                      await sharp(processBuffer).metadata();
-                    } catch {
+                      const meta = await sharp(processBuffer).metadata();
+                      fallbackFormat = meta.format;
+                      if (fallbackFormat !== "svg") {
+                        await sharp(processBuffer).resize(1).raw().toBuffer();
+                      }
+                    } catch (rawProbeErr) {
+                      const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                      if (probeErr instanceof DecoderOutOfMemoryError) {
+                        const unavailable = engineUnavailable(probeErr);
+                        reportEngineUnavailable(unavailable, toolId, request.log);
+                        preFailures.push({
+                          originalIndex: i,
+                          filename: file.filename,
+                          error: unavailable.message,
+                          ...preFailureFaultFields(unavailable),
+                        });
+                        continue;
+                      }
+                      if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                        const unavailable = engineUnavailable(decodeErr);
+                        reportEngineUnavailable(unavailable, toolId, request.log);
+                        preFailures.push({
+                          originalIndex: i,
+                          filename: file.filename,
+                          error: unavailable.message,
+                          ...preFailureFaultFields(unavailable),
+                        });
+                        continue;
+                      }
                       // Neither CLI decode nor Sharp can handle it; upload raw
                     }
                   }
-                  const ext = processFilename.match(/\.[^.]+$/)?.[0];
-                  if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
                 }
 
-                if (!skipPreprocess) {
-                  processBuffer = await autoOrient(processBuffer);
+                if (validation.format === "svg" || fallbackFormat === "svg") {
+                  try {
+                    processBuffer = decompressSvgz(processBuffer);
+                    processBuffer = sanitizeSvg(processBuffer);
+                  } catch (err) {
+                    if (isSvgClientError(err)) {
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: err instanceof Error ? err.message : "Invalid SVG",
+                      });
+                      continue;
+                    }
+                    const oom = asDecoderOutOfMemory(err);
+                    if (oom instanceof DecoderOutOfMemoryError) {
+                      const unavailable = engineUnavailable(oom);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
+                    throw err;
+                  }
+                } else if (!skipPreprocess) {
+                  try {
+                    processBuffer = await autoOrient(processBuffer);
+                  } catch (rawErr) {
+                    const err = asDecoderOutOfMemory(rawErr);
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                      const unavailable = engineUnavailable(err);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
+                    throw rawErr;
+                  }
                 }
               } else {
                 // Non-image modalities (audio/video/document/file) keep their buffered contract.
@@ -478,10 +715,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(err, toolId, request.log);
                     preFailures.push({
                       originalIndex: i,
                       filename: file.filename,
                       error: err.message,
+                      ...preFailureFaultFields(err),
                     });
                     continue;
                   }
@@ -490,24 +729,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               }
 
               key = `uploads/${childId}/${processFilename}`;
+              await insertChildRow(key);
               // Tracked before the write so a store that fails part-way is
               // cleaned up too; deleting a key that was never written is a no-op.
               uncommittedKeys.add(key);
               await putObject(key, processBuffer);
             }
-
-            // Insert child row
-            await db.insert(schema.jobs).values({
-              id: childId,
-              userId,
-              toolId,
-              pool,
-              type: "batch-child",
-              status: "queued",
-              inputRefs: [key],
-              settings: settings as Record<string, unknown>,
-            });
-            stagedBatch?.childIds.push(childId);
 
             // Build flow child node
             flowChildren.push({
@@ -524,7 +751,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 fileIndex: i,
                 inputRefs: [key],
                 filename: processFilename,
-                settings,
+                settings: resolvedSettingsList[i] as Record<string, unknown>,
                 analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
               } satisfies ToolJobData,
               // Children swallow failures via return markers, so a retry
@@ -550,20 +777,52 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // All files failed validation. There is no flow to run, so no
             // finalize will ever publish a terminal frame; publish it here
             // (awaited and guarded, like the finalize's own writes) so a
-            // client that lost this response settles from SSE (#750).
+            // client that lost this response settles from SSE (#750). When
+            // they all failed on the same missing engine, that is the
+            // batch's failure: its status, code, and hint lead (#1432).
+            const shared = sharedServerFault(preFailures);
+            const errors = preFailures.map((f) => ({
+              filename: f.filename,
+              error: f.error,
+              ...(f.code && { code: f.code }),
+            }));
             await failBatchJob({
               jobId: parentId,
               totalFiles: files.length,
               completedFiles: files.length,
               failedFiles: files.length,
-              errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
-              message: "All files failed processing",
-            }).catch((err) => {
-              request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
-            });
-            return reply.status(422).send({
-              error: "All files failed processing",
-              errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+              // A blank-name entry is the run's own error to an SSE client
+              // (the worker finalize's #1161 convention), so one that lost
+              // this reply still sees the fault and its hint.
+              errors: shared
+                ? [
+                    ...errors,
+                    {
+                      filename: "",
+                      error: shared.details ? `${shared.error}: ${shared.details}` : shared.error,
+                    },
+                  ]
+                : errors,
+              message: shared?.error ?? "All files failed processing",
+              ...(shared && { code: shared.code }),
+              ...(shared?.details && { details: shared.details }),
+            })
+              .then((applied) => {
+                if (!applied) {
+                  request.log.warn(
+                    { jobId: parentId },
+                    "all-prefail batch progress row was missing or already terminal; no terminal frame announced",
+                  );
+                }
+              })
+              .catch((err) => {
+                request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
+              });
+            return reply.status(shared?.statusCode ?? 422).send({
+              error: shared?.error ?? "All files failed processing",
+              ...(shared && { code: shared.code }),
+              ...(shared?.details && { details: shared.details }),
+              errors,
             });
           }
 
@@ -576,11 +835,28 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               jobId: parentId,
               toolId,
               userId,
+              username: authUser.username,
+              requestIp: request.ip,
+              requestId: request.id,
               pool: "system" as Pool,
               totalFiles: files.length,
               inputRefs: [],
               filename: "",
-              settings: { flowChildCount: flowChildren.length, fileIndexMap },
+              settings: {
+                flowChildCount: flowChildren.length,
+                fileIndexMap,
+                // So the finalize weighs every file when deciding whether one
+                // engine fault failed them all (#1627).
+                preFailureFaults: preFailures.map(
+                  ({ filename, error, statusCode, code, details }): BatchFault => ({
+                    filename,
+                    error,
+                    ...(statusCode !== undefined && { statusCode }),
+                    ...(code && { code }),
+                    ...(details && { details }),
+                  }),
+                ),
+              },
               analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
             } satisfies ToolJobData,
             opts: { jobId: parentId, attempts: 1 },
@@ -596,7 +872,11 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           // Inject OTel trace context into every node of the batch flow tree
           injectTraceContextIntoFlow(batchTree);
 
-          await getFlowProducer().add(batchTree);
+          try {
+            await getFlowProducer().add(batchTree);
+          } catch (err) {
+            throw markUpstreamError(err);
+          }
           uncommittedKeys.clear();
           stagedBatch = null;
 
@@ -606,18 +886,11 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             batchResult = await waitForJob("system", parentId, 30 * 60_000);
           } catch (err) {
             // A failed finalize settles the parent row with its reason (the
-            // workspace cap's message, for one) before it rethrows, but the
-            // rejection that reaches this side is BullMQ's plain Error, which
-            // the error handler would mask as "Internal server error". The
-            // row is what the sync client and API consumers must see (#1161).
-            const failure = await settledFailure(parentId);
-            if (!failure) throw err;
-            const status = failure.code && CAPACITY_CODES.has(failure.code) ? 503 : 500;
-            return reply.status(status).send({
-              error: failure.message,
-              ...(failure.code ? { code: failure.code } : {}),
-              errors: failure.errors,
-            });
+            // workspace cap's message, for one); answer with that instead of
+            // the plain Error BullMQ rejects with (#1161).
+            const failure = await settledFailureResponse(parentId, request.log);
+            if (!failure) throw markQueueEventsJobFailure(err);
+            return reply.status(failure.status).send(failure.body);
           }
 
           if (!batchResult) {
@@ -635,13 +908,18 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   filename: string;
                   outputRef?: string;
                   error?: string;
+                  code?: string;
                 }>;
                 canceled?: boolean;
+                fault?: { statusCode: number; code: string; error: string; details?: string };
+                /** Every file failed on this one 4xx input code (#4143). */
+                sharedCode?: string;
                 zip?: {
                   key: string;
                   filename: string;
                   size: number;
                   fileResults: Record<string, string>;
+                  fileNotes?: Record<string, unknown>;
                 };
               }
             | undefined;
@@ -654,12 +932,29 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // honest for API consumers that never see the SSE (#767).
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
             const errors = [
-              ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+              ...preFailures.map((f) => ({
+                filename: f.filename,
+                error: f.error,
+                ...(f.code && { code: f.code }),
+              })),
               ...manifestFailures.map((f) => ({
                 filename: f.filename,
                 error: f.error ?? "Failed",
+                ...(f.code && { code: f.code }),
               })),
             ];
+            // One engine fault behind every file, wherever it struck, answers
+            // with its status, code and hint, as the upload-time path does
+            // (#1432, #1627). The finalize decided it with every file in view.
+            const fault = payload?.canceled ? undefined : payload?.fault;
+            if (fault) {
+              return reply.status(fault.statusCode).send({
+                error: fault.error,
+                code: fault.code,
+                ...(fault.details && { details: fault.details }),
+                errors,
+              });
+            }
             // When every file failed for the same reason (the workspace cap
             // tripping on the children's output writes), that reason is the
             // batch's error; the generic summary would hide the one thing
@@ -669,6 +964,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               error: payload?.canceled
                 ? "Batch canceled"
                 : (shared ?? "All files failed processing"),
+              ...(payload?.sharedCode && { code: payload.sharedCode }),
               // Structured so clients key on the outcome instead of matching
               // the message string.
               ...(payload?.canceled ? { canceled: true } : {}),
@@ -686,6 +982,18 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             "Content-Length": String(zip.size),
             "X-Job-Id": parentId,
             "X-File-Results": encodeURIComponent(JSON.stringify(zip.fileResults)),
+            // Per-file notes (resizedTo, targetKb, targetMet, deepEnhanceSkipped),
+            // keyed like X-File-Results, so a batch can say what a single run
+            // says (#1292, #1303). Compacted to one entry when every file
+            // shares its note, to keep the header small.
+            "X-File-Notes": encodeURIComponent(
+              JSON.stringify(
+                compactFileNotes(
+                  (zip.fileNotes ?? {}) as Record<string, BatchFileNotes>,
+                  zip.fileResults,
+                ),
+              ),
+            ),
             ...getSecurityHeaders(),
           });
 
@@ -715,25 +1023,48 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         } catch (err) {
           // Ingress died after the parent row existed but before the flow
           // was enqueued (a store refused by the workspace cap, a decoder
-          // crash). Settle the rows and publish the terminal frame so job
-          // history and a client watching the SSE see the reason instead
-          // of "processing" forever; the finally removes the uploads (#1161).
+          // crash, a child id that collides with an existing job). Settle
+          // the rows and publish the terminal frame so job history and a
+          // client watching the SSE see the reason instead of "processing"
+          // forever; the finally removes the uploads (#1161, #1724).
+          const conflict = isUniqueViolation(err);
           if (stagedBatch) {
-            const { parentId, totalFiles, childIds } = stagedBatch;
-            const message = friendlyError(err instanceof Error ? err.message : String(err));
+            const { parentId, totalFiles, childIds, preFailures } = stagedBatch;
+            const statusCode =
+              typeof (err as { statusCode?: unknown })?.statusCode === "number"
+                ? (err as { statusCode: number }).statusCode
+                : 500;
+            const safe = isSafeMessageError(err) && err.statusCode !== undefined;
+            const message = conflict
+              ? "Job ID already in use"
+              : statusCode >= 500 && !safe
+                ? "Internal server error"
+                : friendlyError(err instanceof Error ? err.message : String(err));
             try {
               if (childIds.length > 0) {
                 await db.delete(schema.jobs).where(inArray(schema.jobs.id, childIds));
               }
-              await failBatchJob({
+              const applied = await failBatchJob({
                 jobId: parentId,
                 totalFiles,
                 completedFiles: totalFiles,
                 failedFiles: totalFiles,
-                errors: [{ filename: "", error: message }],
+                errors: [
+                  ...preFailures.map(({ filename, error }) => ({ filename, error })),
+                  { filename: "", error: message },
+                ],
                 message,
-                ...(isSafeMessageError(err) && err.code ? { code: err.code } : {}),
+                ...(conflict ? { code: "CONFLICT" } : safe && err.code ? { code: err.code } : {}),
               });
+              if (!applied) {
+                request.log.warn(
+                  { jobId: parentId },
+                  "faulted batch progress row was missing or already terminal; no terminal frame announced",
+                );
+              }
+              if (conflict) {
+                return reply.status(409).send({ error: message, code: "CONFLICT" });
+              }
             } catch (settleErr) {
               request.log.error(
                 { err: settleErr, jobId: parentId },

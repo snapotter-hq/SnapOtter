@@ -4,20 +4,17 @@ import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
+import type { EyedropperSampleSize } from "@/types/editor";
 import { ColorSwatch } from "../common/color-swatch";
 
-export type SampleSize = 1 | 3 | 5;
+export type SampleSize = EyedropperSampleSize;
 
-const SAMPLE_SIZES: { label: string; value: SampleSize }[] = [
-  { label: "Point (1x1)", value: 1 },
-  { label: "3x3 Average", value: 3 },
-  { label: "5x5 Average", value: 5 },
-];
+const SAMPLE_SIZES: SampleSize[] = [1, 3, 5];
 
 interface EyedropperOptionsProps {
   sampleSize: SampleSize;
   onSampleSizeChange: (size: SampleSize) => void;
-  sampledColor: string | null;
+  sampledColor?: string | null;
 }
 
 export function EyedropperOptions({
@@ -28,6 +25,11 @@ export function EyedropperOptions({
   const { t } = useTranslation();
   const foregroundColor = useEditorStore((s) => s.foregroundColor);
   const [open, setOpen] = useState(false);
+  const sampleSizeLabels: Record<SampleSize, string> = {
+    1: t.editor.options.eyedropper.samplePoint,
+    3: t.editor.options.eyedropper.sampleAverage3,
+    5: t.editor.options.eyedropper.sampleAverage5,
+  };
 
   const displayColor = sampledColor ?? foregroundColor;
 
@@ -48,7 +50,7 @@ export function EyedropperOptions({
           )}
           data-testid="sample-size-dropdown"
         >
-          {SAMPLE_SIZES.find((s) => s.value === sampleSize)?.label}
+          {sampleSizeLabels[sampleSize]}
           <svg
             width="10"
             height="6"
@@ -79,22 +81,22 @@ export function EyedropperOptions({
                 "bg-card border border-border min-w-[140px]",
               )}
             >
-              {SAMPLE_SIZES.map((s) => (
+              {SAMPLE_SIZES.map((size) => (
                 <button
-                  key={s.value}
+                  key={size}
                   type="button"
                   onClick={() => {
-                    onSampleSizeChange(s.value);
+                    onSampleSizeChange(size);
                     setOpen(false);
                   }}
                   className={cn(
                     "w-full text-start px-3 py-1.5 text-xs transition-colors",
-                    s.value === sampleSize
+                    size === sampleSize
                       ? "bg-primary text-primary-foreground"
                       : "text-foreground hover:bg-muted",
                   )}
                 >
-                  {s.label}
+                  {sampleSizeLabels[size]}
                 </button>
               ))}
             </div>

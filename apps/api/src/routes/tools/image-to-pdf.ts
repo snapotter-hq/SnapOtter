@@ -1,18 +1,35 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath, kbToBytes } from "@snapotter/shared";
+import { extname } from "node:path";
+import { apiToolPath, hasServerErrorStatus, kbToBytes } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PDFDocument from "pdfkit";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+  noteDecoderFallback,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  deletePrefix,
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+} from "../../lib/object-storage.js";
+import { scrubPdfProducer } from "../../lib/pdf-producer.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const targetSizeSchema = z.object({
   value: z.number().positive(),
@@ -107,6 +124,24 @@ export async function flattenAlpha(buf: Buffer): Promise<Buffer> {
   return buf;
 }
 
+/**
+ * Read back an output this route wrote a moment ago. A failure here is never
+ * the client's: an error without a 5xx status is tagged 500 so it reaches the
+ * error handler instead of the route's 422 catch-all (#2120).
+ */
+async function readOwnOutput(key: string): Promise<Buffer> {
+  try {
+    return await getObjectBuffer(key);
+  } catch (rawErr) {
+    const s3Normalized = isStorageServiceFault(rawErr) ? normalizeS3ReadFault(rawErr) : rawErr;
+    const err = normalizeOperationalWriteError(s3Normalized);
+    if (hasServerErrorStatus(err)) throw err;
+    throw Object.assign(new Error("Could not read back a stored output", { cause: rawErr }), {
+      statusCode: 500,
+    });
+  }
+}
+
 export function registerImageToPdfRoute(
   app: FastifyInstance,
   opts: { toolId: string; accept?: string[] },
@@ -135,10 +170,8 @@ export function registerImageToPdfRoute(
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (files.length === 0) {
@@ -179,6 +212,99 @@ export function registerImageToPdfRoute(
       }
     }
 
+    const preparedBuffers: Buffer[] = [];
+    for (const file of files) {
+      let buf = file.buffer;
+
+      const validation = await validateImageBuffer(buf, file.filename);
+      if (!validation.valid) {
+        return reply.status(400).send({
+          error: `Invalid image "${file.filename}": ${validation.reason}`,
+        });
+      }
+
+      let fallbackFormat: string | undefined;
+      if (validation.format === "heif") {
+        try {
+          buf = await decodeHeic(buf);
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          request.log?.warn(
+            { err, filename: file.filename, toolId: opts.toolId },
+            "HEIC decode failed",
+          );
+          return reply.status(422).send({
+            error: `Failed to decode HEIC file "${file.filename}"`,
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+          });
+        }
+      } else if (needsCliDecode(validation.format)) {
+        try {
+          const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
+          buf = await decodeToSharpCompat(buf, validation.format, fileExt);
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
+          try {
+            const meta = await sharp(buf).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(buf).resize(1).raw().toBuffer();
+            }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+              throw decodeErr;
+            }
+            request.log?.warn(
+              {
+                err: decodeErr,
+                probeErr: rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+                filename: file.filename,
+                toolId: opts.toolId,
+              },
+              "CLI decode failed",
+            );
+            return reply.status(422).send({
+              error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
+              details: stripInternalPaths(
+                decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+              ),
+            });
+          }
+        }
+      }
+
+      if (validation.format === "svg" || fallbackFormat === "svg") {
+        try {
+          buf = decompressSvgz(buf);
+          buf = sanitizeSvg(buf);
+        } catch (err) {
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "unknown error"}`,
+            });
+          }
+          throw asDecoderOutOfMemory(err);
+        }
+        preparedBuffers.push(buf);
+      } else {
+        preparedBuffers.push(await autoOrient(buf));
+      }
+    }
+
+    const jobId = randomUUID();
+    let wroteOutput = false;
     try {
       let [pageW, pageH] = PAGE_SIZES[settings.pageSize] ?? PAGE_SIZES.A4;
 
@@ -190,54 +316,6 @@ export function registerImageToPdfRoute(
       const contentW = pageW - margin * 2;
       const contentH = pageH - margin * 2;
 
-      const preparedBuffers: Buffer[] = [];
-      for (const file of files) {
-        let buf = file.buffer;
-
-        const validation = await validateImageBuffer(buf, file.filename);
-        if (!validation.valid) {
-          return reply.status(400).send({
-            error: `Invalid image "${file.filename}": ${validation.reason}`,
-          });
-        }
-
-        if (validation.format === "heif") {
-          try {
-            buf = await decodeHeic(buf);
-          } catch (err) {
-            return reply.status(422).send({
-              error: `Failed to decode HEIC file "${file.filename}"`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        } else if (needsCliDecode(validation.format)) {
-          try {
-            const fileExt = file.filename.split(".").pop()?.toLowerCase();
-            buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch {
-            try {
-              await sharp(buf).metadata();
-            } catch (err) {
-              return reply.status(422).send({
-                error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
-                details: err instanceof Error ? err.message : String(err),
-              });
-            }
-          }
-        } else if (validation.format === "svg") {
-          try {
-            buf = decompressSvgz(buf);
-            buf = sanitizeSvg(buf);
-          } catch (err) {
-            return reply.status(400).send({
-              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "unknown error"}`,
-            });
-          }
-        }
-
-        preparedBuffers.push(await autoOrient(buf));
-      }
-
       let imageBuffers: Buffer[];
       let compression:
         | { targetRequested: number; targetMet: boolean; jpegQuality: number }
@@ -245,7 +323,7 @@ export function registerImageToPdfRoute(
 
       if (targetBytes !== null) {
         const flattened = await Promise.all(preparedBuffers.map(flattenAlpha));
-        const pdfOverhead = 2048 + files.length * 500;
+        const pdfOverhead = settings.collate ? 2048 + files.length * 500 : files.length * 2548;
         const result = await compressImagesForTarget(flattened, targetBytes, pdfOverhead);
         imageBuffers = result.buffers;
         compression = {
@@ -289,10 +367,9 @@ export function registerImageToPdfRoute(
         }
 
         doc.end();
-        return pdfDone;
+        return scrubPdfProducer(await pdfDone);
       }
 
-      const jobId = randomUUID();
       const originalSize = files.reduce((s, f) => s + f.buffer.length, 0);
 
       if (settings.collate) {
@@ -303,6 +380,7 @@ export function registerImageToPdfRoute(
         }
 
         const filename = "images.pdf";
+        wroteOutput = true;
         await putObject(`outputs/${jobId}/${filename}`, pdfBuffer);
 
         return reply.send({
@@ -317,14 +395,20 @@ export function registerImageToPdfRoute(
 
       let totalProcessedSize = 0;
       const pdfNames: string[] = [];
+      const uniquePdfName = createUniqueNamer();
 
       for (let i = 0; i < imageBuffers.length; i++) {
         const pdfBuffer = await buildPdf([imageBuffers[i]]);
-        const baseName = files[i].filename.replace(/\.[^.]+$/, "");
-        const pdfName = `${baseName}.pdf`;
+        const baseName = files[i].filename.replace(/\.[^.]+$/, "") || "image";
+        const pdfName = uniquePdfName(`${baseName}.pdf`);
+        wroteOutput = true;
         await putObject(`outputs/${jobId}/${pdfName}`, pdfBuffer);
         pdfNames.push(pdfName);
         totalProcessedSize += pdfBuffer.length;
+      }
+
+      if (compression && targetBytes !== null) {
+        compression.targetMet = totalProcessedSize <= targetBytes;
       }
 
       // Build ZIP by streaming each entry from object storage (O(1-entry) peak)
@@ -337,7 +421,7 @@ export function registerImageToPdfRoute(
         archive.on("error", reject);
       });
       for (const name of pdfNames) {
-        const buf = await getObjectBuffer(`outputs/${jobId}/${name}`);
+        const buf = await readOwnOutput(`outputs/${jobId}/${name}`);
         archive.append(buf, { name });
       }
       await archive.finalize();
@@ -354,10 +438,22 @@ export function registerImageToPdfRoute(
         collated: false,
         ...(compression ? { compression } : {}),
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (wroteOutput) {
+        await deletePrefix(`outputs/${jobId}`).catch((cleanupErr) =>
+          request.log.warn(
+            { err: cleanupErr, jobId, toolId: opts.toolId },
+            "cleanup of a failed PDF creation failed",
+          ),
+        );
+      }
+      if (isDecoderUnavailable(err)) throw err;
+      if (hasServerErrorStatus(err)) throw err;
+      request.log.error({ err, toolId: opts.toolId }, "PDF creation failed");
       return reply.status(422).send({
         error: "PDF creation failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

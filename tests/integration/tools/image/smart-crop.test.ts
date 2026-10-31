@@ -34,11 +34,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Smart Crop", () => {
   // ── Processing ───────────────────────────────────────────────────
@@ -388,6 +388,60 @@ describe("Smart Crop", () => {
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/invalid settings/i);
+  });
+
+  // Sharp throws a bare Error or allocates unbounded memory for these, which
+  // used to reach the worker as a server fault instead of a 400 (#2064, #2203).
+  it.each([
+    ["a width past Sharp's own limit", { width: 100_000_001, height: 10 }],
+    ["a targetSize past the square ceiling", { mode: "trim", padToSquare: true, targetSize: 8193 }],
+    ["an unpadded pair over the 64 MP output pixel limit", { width: 8192, height: 8193 }],
+    ["a padded pair over the 64 MP pixel limit", { width: 8000, height: 8000, padding: 10 }],
+  ])("answers 400 for %s", async (_label, settings) => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/smart-crop",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
+  });
+
+  // padColor went to Sharp as three hex slices with nothing in front of them,
+  // so "#fff" became NaN and failed in the worker instead of here (#2201).
+  it("answers 400 naming padColor for a colour that is not #rrggbb", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ mode: "trim", padToSquare: true, padColor: "#fff" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/smart-crop",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid settings/i);
+    expect(result.details).toMatch(/^padColor: Use a six-digit hex color/);
   });
 
   it("rejects unauthenticated requests", async () => {

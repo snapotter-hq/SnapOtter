@@ -20,6 +20,7 @@ import type { PostHog } from "posthog-node";
 import { db, schema } from "../db/index.js";
 import { sanitizeEventProperties } from "./analytics-allowlist.js";
 import { analyticsEnabled, bakedEnabled } from "./analytics-gate.js";
+import { logger } from "./logger.js";
 
 let posthogClient: PostHog | null = null;
 
@@ -60,8 +61,11 @@ export async function initAnalytics(): Promise<void> {
         flushAt: 20,
         flushInterval: 30000,
       });
-    } catch {
-      // posthog-node not available
+    } catch (err) {
+      // Telemetry must never stop the server, so this doesn't rethrow. It does
+      // say so: without a client every feedback submit is declined (#2198),
+      // and nothing else on the server would explain why (#2221).
+      logger.warn({ err }, "PostHog failed to start; product events and feedback are off");
     }
   }
 }
@@ -156,6 +160,16 @@ function cleanFeedbackProperties(properties: FeedbackEventProperties): Record<st
   }
 
   return out;
+}
+
+/**
+ * Whether feedback has anywhere to go. It lives only in PostHog events, so an
+ * instance with analytics on but no PostHog client (a Sentry-only bake) would
+ * accept feedback and drop it. The feedback route answers `accepted: false`
+ * there, which gives the user the GitHub and email handoff instead (#2198).
+ */
+export function hasFeedbackSink(): boolean {
+  return posthogClient !== null;
 }
 
 export async function captureFeedback(

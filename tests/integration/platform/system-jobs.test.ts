@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Job } from "bullmq";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -18,6 +18,7 @@ import {
   SYSTEM_JOBS,
   scheduleSystemJobs,
 } from "../../../apps/api/src/jobs/system-jobs.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import type { ObjectInfo } from "../../../apps/api/src/lib/object-storage.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 
@@ -131,6 +132,99 @@ describe("runSystemJob", () => {
     await rm(freshDir, { recursive: true, force: true }).catch(() => {});
   });
 
+  it("storageTtl skips the global sweep instead of falling back to FILE_MAX_AGE_HOURS when reading tempFileMaxAgeHours fails (#1525)", async () => {
+    const protectedJobId = `protected-${randomUUID().slice(0, 8)}`;
+    const protectedDir = join(env.WORKSPACE_PATH, "uploads", protectedJobId);
+
+    mkdirSync(protectedDir, { recursive: true });
+    writeFileSync(join(protectedDir, "f.txt"), "protected");
+    // Older than FILE_MAX_AGE_HOURS (1h in test env), younger than the admin's 168h setting
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    utimesSync(join(protectedDir, "f.txt"), twoHoursAgo, twoHoursAgo);
+    utimesSync(protectedDir, twoHoursAgo, twoHoursAgo);
+
+    await db
+      .insert(schema.settings)
+      .values({ key: "tempFileMaxAgeHours", value: "168" })
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value: "168", updatedAt: new Date() },
+      });
+
+    const readError = new Error("connection terminated unexpectedly");
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      const builder = (originalSelect as any)(...args);
+      const originalFrom = builder.from.bind(builder);
+      builder.from = (table: unknown) => {
+        if (table === schema.settings) {
+          throw readError;
+        }
+        return originalFrom(table);
+      };
+      return builder;
+    });
+    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+    try {
+      const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+      expect((result as { removed: number }).removed).toBe(0);
+      expect(existsSync(protectedDir)).toBe(true);
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: readError },
+        "Storage TTL: tempFileMaxAgeHours read failed; skipping global sweep",
+      );
+
+      // Corrupt or non-positive setting values also skip the global sweep rather than falling back to FILE_MAX_AGE_HOURS (#2752)
+      selectSpy.mockRestore();
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      try {
+        for (const invalid of ["corrupt", "", "0", "-5", "Infinity", "1abc"]) {
+          warnSpy.mockClear();
+          await db
+            .update(schema.settings)
+            .set({ value: invalid, updatedAt: new Date() })
+            .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
+
+          const corruptResult = await runSystemJob({
+            name: SYSTEM_JOBS.storageTtl,
+          } as unknown as Job);
+          expect((corruptResult as { removed: number }).removed).toBe(0);
+          expect(existsSync(protectedDir)).toBe(true);
+          expect(warnSpy).toHaveBeenCalledWith(
+            { key: "tempFileMaxAgeHours", value: invalid },
+            "invalid numeric setting, using default",
+          );
+        }
+
+        // Restoring a valid 168h setting continues protecting the 2-hour-old directory without warnings
+        warnSpy.mockClear();
+        await db
+          .update(schema.settings)
+          .set({ value: "168", updatedAt: new Date() })
+          .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
+
+        const recoveredResult = await runSystemJob({
+          name: SYSTEM_JOBS.storageTtl,
+        } as unknown as Job);
+        expect((recoveredResult as { removed: number }).removed).toBe(0);
+        expect(existsSync(protectedDir)).toBe(true);
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    } finally {
+      selectSpy.mockRestore();
+      errSpy.mockRestore();
+      await rm(protectedDir, { recursive: true, force: true }).catch(() => {});
+      await db
+        .delete(schema.settings)
+        .where(eq(schema.settings.key, "tempFileMaxAgeHours"))
+        .catch(() => {});
+    }
+  });
+
   it("sessionPurge deletes expired sessions", async () => {
     const sessionId = `sess-${randomUUID().slice(0, 8)}`;
     await db.insert(schema.sessions).values({
@@ -193,6 +287,282 @@ describe("runSystemJob", () => {
     }
   });
 
+  it("retention skips pruning jobs and audit_log when reading retention settings fails (#2718)", async () => {
+    const protectedJobId = `prot-j-${randomUUID().slice(0, 8)}`;
+    const protectedAuditId = `prot-a-${randomUUID().slice(0, 8)}`;
+
+    // Aged 60 days: older than env defaults (30d), younger than the admin's 365d setting
+    await db.execute(
+      sql`INSERT INTO jobs (id, type, status, created_at) VALUES (${protectedJobId}, 'tool', 'completed', now() - interval '60 days')`,
+    );
+    await db.execute(
+      sql`INSERT INTO audit_log (id, actor_username, action, created_at) VALUES (${protectedAuditId}, 'test', 'test', now() - interval '60 days')`,
+    );
+
+    await db
+      .insert(schema.settings)
+      .values([
+        { key: "jobsRetentionDays", value: "365" },
+        { key: "auditRetentionDays", value: "365" },
+      ])
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value: "365", updatedAt: new Date() },
+      });
+
+    const origJobsRetention = env.JOBS_RETENTION_DAYS;
+    const origAuditRetention = env.AUDIT_RETENTION_DAYS;
+    (env as Record<string, unknown>).JOBS_RETENTION_DAYS = 30;
+    (env as Record<string, unknown>).AUDIT_RETENTION_DAYS = 30;
+
+    const readError = new Error("connection terminated unexpectedly");
+    const originalSelect = db.select.bind(db);
+    let settingsSelectCount = 0;
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      const builder = (originalSelect as any)(...args);
+      const originalFrom = builder.from.bind(builder);
+      builder.from = (table: unknown) => {
+        if (table === schema.settings && settingsSelectCount < 2) {
+          settingsSelectCount++;
+          throw readError;
+        }
+        return originalFrom(table);
+      };
+      return builder;
+    });
+    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    try {
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId));
+      expect(jobRow).toBeDefined();
+
+      const [auditRow] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId));
+      expect(auditRow).toBeDefined();
+
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: readError },
+        "Retention: jobsRetentionDays read failed; skipping jobs sweep",
+      );
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: readError },
+        "Retention: auditRetentionDays read failed; skipping audit_log sweep",
+      );
+
+      // Corrupt setting values also skip pruning rather than falling back to 30d
+      selectSpy.mockRestore();
+      await db
+        .update(schema.settings)
+        .set({ value: "corrupt", updatedAt: new Date() })
+        .where(inArray(schema.settings.key, ["jobsRetentionDays", "auditRetentionDays"]));
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobRowAfterCorrupt] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId));
+      expect(jobRowAfterCorrupt).toBeDefined();
+
+      const [auditRowAfterCorrupt] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId));
+      expect(auditRowAfterCorrupt).toBeDefined();
+
+      // Restoring valid 365d settings continues protecting the 60-day-old rows
+      await db
+        .update(schema.settings)
+        .set({ value: "365", updatedAt: new Date() })
+        .where(inArray(schema.settings.key, ["jobsRetentionDays", "auditRetentionDays"]));
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobRowAfterRecovery] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId));
+      expect(jobRowAfterRecovery).toBeDefined();
+
+      const [auditRowAfterRecovery] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId));
+      expect(auditRowAfterRecovery).toBeDefined();
+    } finally {
+      selectSpy.mockRestore();
+      errSpy.mockRestore();
+      warnSpy.mockRestore();
+      (env as Record<string, unknown>).JOBS_RETENTION_DAYS = origJobsRetention;
+      (env as Record<string, unknown>).AUDIT_RETENTION_DAYS = origAuditRetention;
+      await db
+        .delete(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId))
+        .catch(() => {});
+      await db
+        .delete(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId))
+        .catch(() => {});
+      await db
+        .delete(schema.settings)
+        .where(inArray(schema.settings.key, ["jobsRetentionDays", "auditRetentionDays"]))
+        .catch(() => {});
+    }
+  });
+
+  it("retention fails closed on corrupt or unreadable tamperResistantAudit and isolates jobs delete errors (#2736)", async () => {
+    const oldJobId = `iso-j-${randomUUID().slice(0, 8)}`;
+    const oldAuditId = `iso-a-${randomUUID().slice(0, 8)}`;
+
+    await db.execute(
+      sql`INSERT INTO jobs (id, type, status, created_at) VALUES (${oldJobId}, 'tool', 'completed', now() - interval '60 days')`,
+    );
+    await db.execute(
+      sql`INSERT INTO audit_log (id, actor_username, action, created_at) VALUES (${oldAuditId}, 'test', 'test', now() - interval '60 days')`,
+    );
+
+    await db
+      .insert(schema.settings)
+      .values([
+        { key: "jobsRetentionDays", value: "30" },
+        { key: "auditRetentionDays", value: "30" },
+        { key: "tamperResistantAudit", value: "TRUE" },
+      ])
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value: sql`excluded.value`, updatedAt: new Date() },
+      });
+
+    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    let selectSpy: { mockRestore(): void } | undefined;
+    let executeSpy: { mockRestore(): void } | undefined;
+
+    try {
+      // 1. Corrupt non-"false" tamperResistantAudit ("TRUE") fails closed:
+      //    old jobs row is pruned, old audit_log row is preserved with a warning.
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobAfterCorruptTamper] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, oldJobId));
+      expect(jobAfterCorruptTamper).toBeUndefined();
+
+      const [auditAfterCorruptTamper] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId));
+      expect(auditAfterCorruptTamper).toBeDefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key: "tamperResistantAudit", value: "TRUE" },
+        "invalid boolean setting, treating tamperResistantAudit as enabled",
+      );
+
+      // 2. Unreadable tamperResistantAudit also fails closed:
+      await db
+        .update(schema.settings)
+        .set({ value: "false", updatedAt: new Date() })
+        .where(eq(schema.settings.key, "tamperResistantAudit"));
+
+      const tamperReadErr = new Error("tamperResistantAudit query failed");
+      const originalSelect = db.select.bind(db);
+      let settingsSelectCount = 0;
+      selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+        // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+        const builder = (originalSelect as any)(...args);
+        const originalFrom = builder.from.bind(builder);
+        builder.from = (table: unknown) => {
+          if (table === schema.settings) {
+            settingsSelectCount++;
+            if (settingsSelectCount === 3) {
+              throw tamperReadErr;
+            }
+          }
+          return originalFrom(table);
+        };
+        return builder;
+      });
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+      selectSpy.mockRestore();
+
+      const [auditAfterReadErr] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId));
+      expect(auditAfterReadErr).toBeDefined();
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: tamperReadErr },
+        "Retention: tamperResistantAudit read failed; skipping audit_log sweep",
+      );
+
+      // 3. When DELETE FROM jobs fails, retentionSweep logs the error and still
+      //    prunes audit_log when tamperResistantAudit is "false":
+      await db.execute(
+        sql`INSERT INTO jobs (id, type, status, created_at) VALUES (${oldJobId}, 'tool', 'completed', now() - interval '60 days')`,
+      );
+      const jobsDeleteErr = new Error("canceling statement due to lock timeout");
+      const originalExecute = db.execute.bind(db);
+      let executeCount = 0;
+      executeSpy = vi.spyOn(db, "execute").mockImplementation(((query: unknown) => {
+        executeCount++;
+        if (executeCount === 1) {
+          return Promise.reject(jobsDeleteErr);
+        }
+        return originalExecute(query as Parameters<typeof db.execute>[0]);
+      }) as typeof db.execute);
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+      executeSpy.mockRestore();
+
+      expect(errSpy).toHaveBeenCalledWith({ err: jobsDeleteErr }, "Retention: jobs sweep failed");
+      const [jobStillPresent] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, oldJobId));
+      expect(jobStillPresent).toBeDefined();
+
+      const [auditNowPruned] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId));
+      expect(auditNowPruned).toBeUndefined();
+    } finally {
+      selectSpy?.mockRestore();
+      executeSpy?.mockRestore();
+      errSpy.mockRestore();
+      warnSpy.mockRestore();
+      await db
+        .delete(schema.jobs)
+        .where(eq(schema.jobs.id, oldJobId))
+        .catch(() => {});
+      await db
+        .delete(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId))
+        .catch(() => {});
+      await db
+        .delete(schema.settings)
+        .where(
+          inArray(schema.settings.key, [
+            "jobsRetentionDays",
+            "auditRetentionDays",
+            "tamperResistantAudit",
+          ]),
+        )
+        .catch(() => {});
+    }
+  });
+
   it("throws on unknown system job name", async () => {
     await expect(runSystemJob({ name: "system:bogus" } as unknown as Job)).rejects.toThrow(
       "Unknown system job: system:bogus",
@@ -242,6 +612,175 @@ describe("runSystemJob", () => {
       await rm(failDir, { recursive: true, force: true }).catch(() => {});
       await rm(okDir, { recursive: true, force: true }).catch(() => {});
     }
+  });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "counts and logs a permission fault on uploads/ while still sweeping expired dirs under outputs/ (#1498)",
+    async () => {
+      const staleOutId = `stale-out-${randomUUID().slice(0, 8)}`;
+      const staleOutDir = join(env.WORKSPACE_PATH, "outputs", staleOutId);
+      const uploadsRoot = join(env.WORKSPACE_PATH, "uploads");
+
+      mkdirSync(uploadsRoot, { recursive: true });
+      mkdirSync(staleOutDir, { recursive: true });
+      writeFileSync(join(staleOutDir, "out.txt"), "stale");
+      const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      utimesSync(join(staleOutDir, "out.txt"), past, past);
+      utimesSync(staleOutDir, past, past);
+
+      const { chmod } = await import("node:fs/promises");
+      await chmod(uploadsRoot, 0o000);
+      const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      try {
+        const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+        const typed = result as { removed: number; failed: number };
+        expect(typed.removed).toBeGreaterThanOrEqual(1);
+        expect(typed.failed).toBe(1);
+        expect(existsSync(staleOutDir)).toBe(false);
+        const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(logged).toMatch(/uploads: EACCES|uploads: EPERM/);
+      } finally {
+        errSpy.mockRestore();
+        await chmod(uploadsRoot, 0o755).catch(() => {});
+        await rm(staleOutDir, { recursive: true, force: true }).catch(() => {});
+      }
+    },
+  );
+
+  // #1412: the sweep expired dirs by age alone, so a job that waited in the
+  // queue past FILE_MAX_AGE_HOURS lost its input before the worker ran it.
+  describe("in-flight jobs (#1412)", () => {
+    const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const createdIds: string[] = [];
+    const createdDirs: string[] = [];
+
+    afterAll(async () => {
+      for (const d of createdDirs) await rm(d, { recursive: true, force: true }).catch(() => {});
+      if (createdIds.length > 0) {
+        await db.delete(schema.jobs).where(inArray(schema.jobs.id, createdIds));
+      }
+    });
+
+    async function insertJob(
+      id: string,
+      type: string,
+      status: "queued" | "processing" | "completed" | "failed" | "canceled",
+      extra: { deleteAfter?: Date; toolId?: string | null } = {},
+    ): Promise<void> {
+      createdIds.push(id);
+      await db.insert(schema.jobs).values({
+        id,
+        userId: testUserId,
+        toolId: "resize",
+        type,
+        status,
+        createdAt: past,
+        ...extra,
+      });
+    }
+
+    /** A job dir with one file, both backdated past the TTL cutoff. */
+    function staleDir(prefix: "uploads" | "outputs", dirId: string): string {
+      const dir = join(env.WORKSPACE_PATH, prefix, dirId);
+      createdDirs.push(dir);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "f.bin"), "x");
+      utimesSync(join(dir, "f.bin"), past, past);
+      utimesSync(dir, past, past);
+      return dir;
+    }
+
+    it("keeps a queued or processing job's stale input and still expires a finished job's", async () => {
+      const queuedId = `q-${randomUUID()}`;
+      const processingId = `p-${randomUUID()}`;
+      const doneId = `d-${randomUUID()}`;
+      const failedId = `f-${randomUUID()}`;
+      const canceledId = `c-${randomUUID()}`;
+      await insertJob(queuedId, "single", "queued");
+      await insertJob(processingId, "single", "processing");
+      await insertJob(doneId, "single", "completed");
+      await insertJob(failedId, "single", "failed");
+      await insertJob(canceledId, "single", "canceled");
+      const queuedDir = staleDir("uploads", queuedId);
+      const processingDir = staleDir("uploads", processingId);
+      const finishedDirs = [doneId, failedId, canceledId].map((id) => staleDir("uploads", id));
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(queuedDir)).toBe(true);
+      expect(existsSync(processingDir)).toBe(true);
+      for (const dir of finishedDirs) expect(existsSync(dir)).toBe(false);
+    });
+
+    it("does not let a progress placeholder, which reconciliation never settles, pin a stale dir", async () => {
+      // A placeholder (no tool id) can stay non-terminal until the next boot,
+      // so it does not count as in flight.
+      const placeholderId = `ph-${randomUUID()}`;
+      await insertJob(placeholderId, "batch", "processing", { toolId: null });
+      const placeholderChildDir = staleDir("outputs", `${placeholderId}-f0`);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(placeholderChildDir)).toBe(false);
+    });
+
+    it("keeps a queued GDPR export's dir, since reconciliation now settles those rows (#1441)", async () => {
+      const systemId = `sys-${randomUUID()}`;
+      await insertJob(systemId, "system", "queued", { toolId: "gdpr-export" });
+      const systemDir = staleDir("outputs", systemId);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(systemDir)).toBe(true);
+    });
+
+    it("keeps a finished pipeline step's output while its pipeline is still running", async () => {
+      // The next step reads outputs/<pipelineId>-s0 after step 0's row is
+      // already completed, so the pipeline row is what says it is in use.
+      const pipelineId = randomUUID();
+      await insertJob(pipelineId, "pipeline", "processing");
+      await insertJob(`${pipelineId}-s0`, "pipeline-step", "completed");
+      const inputDir = staleDir("uploads", pipelineId);
+      const stepOutputDir = staleDir("outputs", `${pipelineId}-s0`);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(inputDir)).toBe(true);
+      expect(existsSync(stepOutputDir)).toBe(true);
+    });
+
+    it("keeps batch child and per-file pipeline dirs while the batch parent is queued", async () => {
+      const parentId = randomUUID();
+      await insertJob(parentId, "batch", "queued");
+      const childDir = staleDir("uploads", `${parentId}-f0`);
+      const perFileStepDir = staleDir("uploads", `${parentId}-f1-s0`);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(childDir)).toBe(true);
+      expect(existsSync(perFileStepDir)).toBe(true);
+    });
+
+    it("waits for a queued job to finish before honoring its passed deleteAfter deadline", async () => {
+      const id = `da-${randomUUID()}`;
+      await insertJob(id, "single", "queued", { deleteAfter: new Date(Date.now() - 60_000) });
+      // Fresh mtime, so only the deleteAfter sweep could remove it.
+      const dir = join(env.WORKSPACE_PATH, "uploads", id);
+      createdDirs.push(dir);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "f.bin"), "x");
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+      expect(existsSync(dir)).toBe(true);
+
+      await db
+        .update(schema.jobs)
+        .set({ status: "completed", completedAt: new Date() })
+        .where(eq(schema.jobs.id, id));
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+      expect(existsSync(dir)).toBe(false);
+    });
   });
 });
 

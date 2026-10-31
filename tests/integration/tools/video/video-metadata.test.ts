@@ -19,11 +19,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("video-metadata (requires ffmpeg)", () => {
   it("strips metadata and returns probe data in the envelope", async () => {

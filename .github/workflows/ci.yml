@@ -12,9 +12,14 @@ on:
   pull_request:
     branches: [main]
 
+# PR branches cancel superseded runs. Main never does: a later merge would
+# otherwise cancel the run on the commit before it, and no commit on main
+# would get a completed post-merge signal (#4190, #2457). Main also needs a
+# group per commit: a group holds one running and one pending run, and a
+# third merge replaces the pending one, so the middle commit is never tested.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -41,7 +46,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       aipython: ${{ steps.filter.outputs.aipython }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: filter
         name: Diff against the base commit
         env:
@@ -110,7 +115,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: pnpm lint
       - name: License boundary check (D15)
@@ -124,21 +129,30 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: pnpm typecheck
+      - name: Typecheck tests/ (ratcheted scope, see typecheck.tests.json)
+        run: pnpm typecheck:tests
 
   test-unit:
-    name: Unit Tests
+    name: Unit (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
-    # Headroom for a degraded-apt-mirror day: the full bounded recovery
-    # ladder (~27m worst case) plus the tests still fit (#876). A 15m cap
-    # killed this job mid-recovery on a real degraded day.
-    timeout-minutes: 35
+    # Headroom for a degraded-apt-mirror day (#876, #2007). The apt-install
+    # ladder's worst case is ~34m since #1971 (120s update, two 360s
+    # post-swap updates, three 300s installs, a shared 300s dpkg wait), plus
+    # up to 3m of KILL grace if apt ignores TERM, plus the rest of the job,
+    # which took up to ~11m on main. A 15m cap killed this job mid-recovery
+    # on a real degraded day. Re-derive this if the ladder's budgets change.
+    timeout-minutes: 50
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system dependencies (HEIC + ExifTool + ImageMagick + exotic format tools)
         uses: ./.github/actions/apt-install
@@ -148,9 +162,9 @@ jobs:
       - name: Install the ImageMagick EXR coder and verify
         run: |
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
           else
             echo "No supported ImageMagick EXR coder package found" >&2
             exit 1
@@ -169,22 +183,43 @@ jobs:
             done
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
-      - run: pnpm vitest run tests/unit/ --reporter=verbose
+      - run: pnpm vitest run tests/unit/ --reporter=verbose --shard=${{ matrix.shard }}/2
+
+  test-unit-result:
+    # Keeps the required "Unit Tests" context stable across shard counts, the
+    # same way test-integration-result does for Integration.
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test-unit
+    if: always()
+    steps:
+      - name: Check all unit shards
+        env:
+          RESULT: ${{ needs.test-unit.result }}
+        run: |
+          echo "test-unit: $RESULT"
+          case "$RESULT" in
+            success | skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
 
   test-integration:
-    name: Integration (${{ matrix.shard }}/4)
+    name: Integration (${{ matrix.shard }}/6)
     runs-on: ubuntu-latest
-    # Headroom for a degraded-apt-mirror day: both bounded install attempts
-    # plus the tests still fit (#876).
-    timeout-minutes: 40
+    # Headroom for a degraded-apt-mirror day (#876, #2007). Same apt-install
+    # ladder as test-unit (~34m worst case since #1971, plus up to 3m of KILL
+    # grace), plus the rest of a shard, which took up to ~8m on main. Re-derive
+    # this if the ladder's budgets change.
+    timeout-minutes: 45
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system dependencies (image formats + docs + Fast OCR)
         uses: ./.github/actions/apt-install
@@ -201,9 +236,9 @@ jobs:
       - name: Install the ImageMagick EXR coder and verify the format toolchain
         run: |
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
           else
             echo "No supported ImageMagick EXR coder package found" >&2
             exit 1
@@ -220,18 +255,7 @@ jobs:
             exit 1
           }
 
-      - name: Install Pandoc 3.10 (sandboxed DOCX/EPUB)
-        run: |
-          curl -fsSL https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-1-amd64.deb -o /tmp/pandoc.deb
-          sudo apt-get install -y --no-install-recommends /tmp/pandoc.deb
-          pandoc --version
-
-      - name: Install pdfcpu (doc-engine PDF layout binary; matches docker/Dockerfile v0.13.0)
-        run: |
-          curl -fsSL https://github.com/pdfcpu/pdfcpu/releases/download/v0.13.0/pdfcpu_0.13.0_Linux_x86_64.tar.xz -o /tmp/pdfcpu.tar.xz
-          tar -xJf /tmp/pdfcpu.tar.xz -C /tmp
-          sudo install "$(find /tmp -type f -name pdfcpu | head -1)" /usr/local/bin/pdfcpu
-          pdfcpu version
+      - uses: ./.github/actions/doc-binaries
 
       - name: Allow ImageMagick to read EPS/PS via Ghostscript delegate
         run: |
@@ -253,7 +277,28 @@ jobs:
             done
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
-      - run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/4
+      - run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/6
+
+  test-integration-result:
+    # Single gate job for branch protection so changing the shard count (or
+    # skipping the matrix on a docs/landing-only PR, where GitHub reports the
+    # unexpanded name "Integration (${{ matrix.shard }}/6)") never leaves
+    # required shard contexts stuck as expected.
+    name: Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test-integration
+    if: always()
+    steps:
+      - name: Check all integration shards
+        env:
+          RESULT: ${{ needs.test-integration.result }}
+        run: |
+          echo "test-integration: $RESULT"
+          case "$RESULT" in
+            success | skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
 
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
@@ -287,7 +332,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -308,7 +353,7 @@ jobs:
         env:
           PW_WORKERS: "2"
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-smoke-report
@@ -347,7 +392,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -364,7 +409,7 @@ jobs:
         env:
           PW_WORKERS: "2"
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-mobile-smoke-report
@@ -380,7 +425,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.landing == 'true'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -402,7 +447,7 @@ jobs:
           # failure either way, so this only keeps the run quiet, not correct.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-landing-report
@@ -419,7 +464,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -441,7 +486,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-docs-report
@@ -454,9 +499,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11"
 
@@ -468,24 +513,37 @@ jobs:
         # (all last_affected at or below 2.10.0, resolves to 2.13.0), joblib
         # (not in the closure), markdown (last_affected 3.8, resolves 3.10.2).
         # PYSEC-2025-194 was a duplicate of CVE-2025-3000, which is itself now
-        # dead. Re-check the three below whenever requirements.txt moves.
+        # dead. Re-check the four below whenever requirements.txt moves.
         #
         # CVE-2024-27763: basicsr, no fixed release exists in any channel.
         # CVE-2026-40086 + GHSA-55v6-g8pm-pw4c: rembg 2.0.69. The fix is
         #   rembg 2.0.75, held back by the numpy 1.26.4 pin (see the rationale
         #   in packages/ai/python/requirements.txt).
+        # CVE-2026-115924: rembg 2.0.69, fixed only in 2.0.82, which requires
+        #   numpy 2.x and holds back the same pin. The vulnerable surface is the
+        #   `rembg s` HTTP command, which this repo never runs (the sidecar
+        #   imports rembg as a library).
         run: >-
           pip-audit -r packages/ai/python/requirements.txt
           --ignore-vuln CVE-2024-27763
           --ignore-vuln CVE-2026-40086
           --ignore-vuln GHSA-55v6-g8pm-pw4c
+          --ignore-vuln CVE-2026-115924
+          --strict
 
-      - name: Audit exact OCR runtime dependency locks
+      # hf-release-requirements.txt is the tooling the ai-bundles publish job
+      # installs with the HuggingFace write token in scope (#1761). Like the OCR
+      # locks it is fully pinned and hashed, so --no-deps --disable-pip reads it
+      # as is. --strict here and above (#1950): without it pip-audit skips an
+      # entry it can't check (a URL pin, a package PyPI no longer lists) and
+      # still exits 0, and pip's --require-hashes installs a hashed URL pin.
+      - name: Audit exact OCR runtime and HF release dependency locks
         run: |
           for requirements in \
             docker/ocr-runtime-requirements-amd64.txt \
-            docker/ocr-runtime-requirements-arm64.txt; do
-            pip-audit -r "${requirements}" --no-deps --disable-pip --aliases
+            docker/ocr-runtime-requirements-arm64.txt \
+            docker/hf-release-requirements.txt; do
+            pip-audit -r "${requirements}" --no-deps --disable-pip --aliases --strict
           done
 
   ai-sidecar-rembg:
@@ -507,10 +565,10 @@ jobs:
       matrix:
         pins: [bundle, requirements]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11"
 
@@ -580,7 +638,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: pnpm build
 

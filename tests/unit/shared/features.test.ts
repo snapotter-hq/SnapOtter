@@ -87,9 +87,14 @@ describe("Feature bundle edge cases", () => {
     }
   });
 
-  it("every bundle has a non-empty estimated size", () => {
+  // Every web render site wraps this value in its own "~" and wording
+  // (features.requiresDownload, the Settings card), so it must be a bare
+  // size: digits and a unit, nothing to translate, no "~" (#1409).
+  it("every bundle's estimated size is a bare, locale-neutral size", () => {
     for (const bundle of Object.values(FEATURE_BUNDLES)) {
-      expect(bundle.estimatedSize.length).toBeGreaterThan(0);
+      expect(bundle.estimatedSize, bundle.id).toMatch(
+        /^\d+(\.\d+)?(-\d+(\.\d+)?)? (MB|GB|MiB|GiB)$/,
+      );
     }
   });
 
@@ -127,6 +132,22 @@ describe("Feature bundle edge cases", () => {
   it("every bundle has at least one tool", () => {
     for (const [id, bundle] of Object.entries(FEATURE_BUNDLES)) {
       expect(bundle.enablesTools.length, `Bundle ${id} has no tools`).toBeGreaterThan(0);
+    }
+  });
+
+  it("every bundle declares a non-empty smokeImports list of valid Python module names (#1237)", () => {
+    for (const [id, bundle] of Object.entries(FEATURE_BUNDLES)) {
+      const smokeImports = (bundle as { smokeImports?: unknown }).smokeImports;
+      expect(Array.isArray(smokeImports), `Bundle ${id} missing smokeImports`).toBe(true);
+      expect(
+        (smokeImports as string[]).length,
+        `Bundle ${id} has empty smokeImports`,
+      ).toBeGreaterThan(0);
+      for (const mod of smokeImports as string[]) {
+        expect(mod, `Bundle ${id} has invalid smokeImport "${mod}"`).toMatch(
+          /^[A-Za-z_][A-Za-z0-9_.]*$/,
+        );
+      }
     }
   });
 });

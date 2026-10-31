@@ -15,9 +15,12 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
+import { getActiveAndQueuedInstalls } from "../lib/feature-install-queue.js";
+import { logger } from "../lib/logger.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
-import { getSettingNumber } from "../lib/settings-helpers.js";
+import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
 import { runAuditArchive } from "./audit-archive.js";
+import { reconcilableJobRows } from "./job-reconciliation.js";
 import { getQueue } from "./queues.js";
 import { runSiemForward } from "./siem-forward.js";
 
@@ -45,7 +48,9 @@ export async function scheduleSystemJobs(): Promise<void> {
   } else {
     // A scheduler registered by a previous boot survives in Redis; remove it
     // so setting CLEANUP_INTERVAL_MINUTES=0 actually disables the sweep.
-    await q.removeJobScheduler(SYSTEM_JOBS.storageTtl).catch(() => {});
+    await q.removeJobScheduler(SYSTEM_JOBS.storageTtl).catch((err) => {
+      logger.warn({ err }, "Failed to remove orphaned storageTtl scheduler from Redis");
+    });
   }
   await q.upsertJobScheduler(SYSTEM_JOBS.sessionPurge, { every: 60 * 60_000 });
   await q.upsertJobScheduler(SYSTEM_JOBS.retention, { every: 6 * 60 * 60_000 });
@@ -134,16 +139,26 @@ function cronMonitorsEnabled(): boolean {
 async function withCronMonitor(name: string, fn: () => Promise<unknown>): Promise<unknown> {
   const cfg = MONITOR_CONFIG[name];
   if (!cfg || !cronMonitorsEnabled()) return fn();
+
+  let jobStarted = false;
   try {
     const Sentry = await import("@sentry/node");
     // Monitor slugs cannot contain ":".
     return await Sentry.withMonitor(
       name.replace(/:/g, "-"),
-      fn,
+      () => {
+        jobStarted = true;
+        return fn();
+      },
       cfg as Parameters<typeof Sentry.withMonitor>[2],
     );
-  } catch {
+  } catch (err) {
+    if (jobStarted) throw err;
     // Monitoring must never break the actual job.
+    logger.error(
+      { err, jobName: name },
+      "Failed to import Sentry for cron monitoring; falling back to unmonitored execution",
+    );
     return fn();
   }
 }
@@ -173,21 +188,105 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
     case SYSTEM_JOBS.jobReconciliation: {
       const { reconcileStrandedJobs } = await import("./job-reconciliation.js");
       const { outcomes, ...counts } = await reconcileStrandedJobs();
-      return counts;
+      // Inline batch routes (pdf-to-image, svg-to-raster) and SSE progress
+      // placeholders reserve rows with no tool_id, so reconcileStrandedJobs
+      // leaves them alone. Settle any that are still non-terminal after an hour
+      // so a lost terminal write cannot hold a user's concurrency slot until
+      // the next restart (#1726), while skipping single-file clientJobId alias
+      // rows whose target artifact or pipeline flow row is still non-terminal
+      // (#2807) and featureInstall stream rows that are still active or queued
+      // in feature-install-queue.ts (#2819).
+      const liveFeatureInstalls = JSON.stringify(getActiveAndQueuedInstalls());
+      const orphanResult = await db.execute(
+        sql`UPDATE jobs
+          SET status = 'failed',
+              error = '{"message":"Orphaned job reconciled"}'::jsonb,
+              completed_at = now()
+          WHERE status IN ('processing', 'queued')
+            AND (tool_id IS NULL OR tool_id = '')
+            AND created_at < now() - interval '1 hour'
+            AND NOT (
+              type = 'single'
+              AND (
+                EXISTS (
+                  SELECT 1
+                  FROM jobs AS target
+                  WHERE target.id IN (
+                    jobs.settings->>'artifactJobId',
+                    jobs.settings->>'pipelineFlowId'
+                  )
+                    AND target.status IN ('processing', 'queued')
+                    AND target.tool_id IS NOT NULL
+                    AND target.tool_id <> ''
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM jsonb_to_recordset(${liveFeatureInstalls}::jsonb)
+                    AS active_install("jobId" text, "bundleId" text)
+                  WHERE active_install."jobId" = jobs.id
+                    AND active_install."bundleId" = jobs.settings->>'featureInstall'
+                )
+              )
+            )`,
+      );
+      const orphaned = (orphanResult as { rowCount?: number }).rowCount ?? 0;
+      if (orphaned > 0) {
+        logger.info({ count: orphaned }, "Reconciled orphaned job rows");
+      }
+      return { ...counts, orphaned };
     }
     case SYSTEM_JOBS.gdprExport: {
       const { gdprExportJob } = await import("./gdpr-export.js");
       const exportData = job.data as unknown as { userId: string; jobId: string };
       const { outputRef } = await gdprExportJob(exportData.userId, exportData.jobId);
-      // Update the job row with the output reference
-      await db
-        .update(schema.jobs)
-        .set({
-          status: "completed",
-          completedAt: new Date(),
-          outputRefs: [outputRef],
-        })
-        .where(eq(schema.jobs.id, exportData.jobId));
+      if (!outputRef) {
+        await db
+          .update(schema.jobs)
+          .set({
+            status: "canceled",
+            completedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.jobs.id, exportData.jobId),
+              inArray(schema.jobs.status, ["queued", "processing"]),
+            ),
+          );
+        return { outputRef: null };
+      }
+      // Update the job row with the output reference, guarded on the row still
+      // being non-terminal (#1496). If a purge or cancel landed between
+      // gdprExportJob's post-write check and this update, or if the update
+      // faults, remove the archive so it cannot outlive a deleted row.
+      let completed: Array<{ id: string }>;
+      try {
+        completed = await db
+          .update(schema.jobs)
+          .set({
+            status: "completed",
+            completedAt: new Date(),
+            outputRefs: [outputRef],
+          })
+          .where(
+            and(
+              eq(schema.jobs.id, exportData.jobId),
+              inArray(schema.jobs.status, ["queued", "processing"]),
+            ),
+          )
+          .returning({ id: schema.jobs.id });
+      } catch (err) {
+        await deletePrefix(`outputs/${exportData.jobId}/`).catch((cleanupErr) => {
+          logger.error(
+            { err: cleanupErr, jobId: exportData.jobId },
+            "Failed to clean up gdprExport outputs after DB update error",
+          );
+        });
+        throw err;
+      }
+      if (completed.length === 0) {
+        await deletePrefix(`outputs/${exportData.jobId}/`);
+        return { outputRef: null };
+      }
       return { outputRef };
     }
     case SYSTEM_JOBS.alertEvaluator: {
@@ -234,6 +333,32 @@ export function decideExpiry(
   return ageMs < cutoffMs ? "expired" : "keep";
 }
 
+/**
+ * The job rows whose liveness keeps a storage dir: the dir's own job, plus the
+ * pipeline or batch it belongs to. Pipeline steps are `<pipelineId>-s<i>` and
+ * the next step reads a finished step's output, so the pipeline row is what
+ * says it is still needed. Batch children and per-file pipeline flows are
+ * `<parentId>-f<i>`, per-file steps `<parentId>-f<i>-s<j>`.
+ */
+export function owningJobIds(dirJobId: string): string[] {
+  const ids = new Set([
+    dirJobId,
+    dirJobId.replace(/-s\d+$/, ""),
+    dirJobId.replace(/-f\d+(?:-s\d+)?$/, ""),
+  ]);
+  return [...ids];
+}
+
+const FINISHED_STATUSES = ["completed", "failed", "canceled"] as const;
+const SWEEP_ERRORS_LOGGED = 20;
+
+/** A store-wide fault fails every dir, every sweep, so list only the first few. */
+function listSweepErrors(errors: string[]): string {
+  const shown = errors.slice(0, SWEEP_ERRORS_LOGGED);
+  const more = errors.length - shown.length;
+  return `${shown.join("\n")}${more > 0 ? `\n...and ${more} more` : ""}`;
+}
+
 async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // Build set of user IDs under legal hold (direct or via team) once per sweep
   const heldUserRows = await db
@@ -260,42 +385,91 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   }
 
   // --- Per-job deleteAfter sweep (team retention overrides) ---
-  // Runs regardless of the global TTL; deleteAfter is an absolute deadline.
+  // Runs regardless of the global TTL; deleteAfter is an absolute deadline,
+  // but only for a finished job: one still queued or running needs its input
+  // (#1412), and the next sweep after it finishes honors the deadline.
   let deleteAfterCleaned = 0;
+  // A failed deadline deletion is a retention promise not kept, so it is
+  // counted and logged like the global sweep's failures, never dropped (#1442).
+  const deleteAfterErrors: string[] = [];
   try {
     const expiredJobs = await db
       .select({ id: schema.jobs.id, userId: schema.jobs.userId })
       .from(schema.jobs)
-      .where(and(isNotNull(schema.jobs.deleteAfter), lt(schema.jobs.deleteAfter, new Date())));
+      .where(
+        and(
+          isNotNull(schema.jobs.deleteAfter),
+          lt(schema.jobs.deleteAfter, new Date()),
+          inArray(schema.jobs.status, [...FINISHED_STATUSES]),
+        ),
+      );
 
     for (const job of expiredJobs) {
       // Skip jobs belonging to users under legal hold
       if (job.userId && heldUserIds.has(job.userId)) continue;
-      try {
-        await deletePrefix(`uploads/${job.id}`);
-        await deletePrefix(`outputs/${job.id}`);
-        deleteAfterCleaned++;
-      } catch {
-        // Directory may not exist
+      // deletePrefix already tolerates a missing dir, so anything thrown here
+      // is a real fault. Each prefix is tried on its own, so a failed uploads/
+      // delete doesn't also leave outputs/ behind.
+      let cleaned = true;
+      for (const prefix of [`uploads/${job.id}`, `outputs/${job.id}`]) {
+        try {
+          await deletePrefix(prefix);
+        } catch (err) {
+          cleaned = false;
+          const message = err instanceof Error ? err.message : String(err);
+          deleteAfterErrors.push(`${prefix}: ${message}`);
+        }
       }
+      if (cleaned) deleteAfterCleaned++;
     }
 
     if (deleteAfterCleaned > 0) {
-      console.log(`Storage TTL: cleaned up ${deleteAfterCleaned} jobs by deleteAfter`);
+      logger.info(`Storage TTL: cleaned up ${deleteAfterCleaned} jobs by deleteAfter`);
     }
-  } catch {
-    // deleteAfter sweep is best-effort
+  } catch (err) {
+    // Best-effort: the global sweep below still runs, but say why the
+    // deadline sweep didn't. The whole error goes to the log, not its message:
+    // drizzle's DrizzleQueryError message is only the SQL, and the reason (a
+    // dropped connection, a missing column) is on its cause.
+    logger.error({ err }, "Storage TTL: deleteAfter sweep failed");
+  }
+  if (deleteAfterErrors.length > 0) {
+    logger.error(
+      `Storage TTL: ${deleteAfterErrors.length} deleteAfter dir(s) failed to delete:\n${listSweepErrors(deleteAfterErrors)}`,
+    );
   }
 
   // --- Global TTL sweep ---
-  const maxAgeMs = await getMaxAgeMs();
-  if (maxAgeMs <= 0) return { removed: deleteAfterCleaned, failed: 0 };
+  let maxAgeMs: number;
+  try {
+    maxAgeMs = await getMaxAgeMs();
+  } catch (err) {
+    // A failed read must not fall back to FILE_MAX_AGE_HOURS, which would
+    // shorten a longer retention the admin configured in Settings (#1525).
+    logger.error({ err }, "Storage TTL: tempFileMaxAgeHours read failed; skipping global sweep");
+    return { removed: deleteAfterCleaned, failed: deleteAfterErrors.length };
+  }
+  if (maxAgeMs <= 0) return { removed: deleteAfterCleaned, failed: deleteAfterErrors.length };
 
   const cutoffMs = Date.now() - maxAgeMs;
-  const uploadDirs = await listJobDirs("uploads");
-  const outputDirs = await listJobDirs("outputs");
-  const allDirs = [...uploadDirs, ...outputDirs];
-  if (allDirs.length === 0) return { removed: 0, failed: 0 };
+  const errors: string[] = [];
+  const allDirs: ObjectInfo[] = [];
+  for (const prefix of ["uploads", "outputs"] as const) {
+    try {
+      allDirs.push(...(await listJobDirs(prefix)));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${prefix}: ${message}`);
+    }
+  }
+  if (allDirs.length === 0) {
+    if (errors.length > 0) {
+      logger.error(
+        `Storage TTL: ${errors.length} dir(s) failed to delete:\n${listSweepErrors(errors)}`,
+      );
+    }
+    return { removed: 0, failed: errors.length + deleteAfterErrors.length };
+  }
 
   // Batch-lookup job rows for dirs with unknown mtime (S3 backend)
   const unknownIds = [
@@ -329,31 +503,58 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     }
   }
 
-  let removed = 0;
-  const errors: string[] = [];
-  for (const dir of allDirs) {
-    if (decideExpiry(dir, cutoffMs, rowsById) === "expired") {
-      // Skip deletion if the job's user is under legal hold
-      const jobId = dir.key.split("/")[1];
-      const userId = jobUserMap.get(jobId);
-      if (userId && heldUserIds.has(userId)) continue;
+  const expiredDirs = allDirs.filter((dir) => decideExpiry(dir, cutoffMs, rowsById) === "expired");
 
-      try {
-        await deletePrefix(dir.key);
-        removed++;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        errors.push(`${dir.key}: ${message}`);
-      }
+  // Age alone would delete the input of a job still waiting behind a backed-up
+  // queue, so an expired dir survives while any job that owns it is in flight
+  // (#1412). Only rows job-reconciliation settles count, through its own
+  // predicate: a stranded one goes terminal within a minute, so a stuck row
+  // cannot pin a dir forever. Selected by status, not by an id list, so a huge
+  // backlog of expired dirs cannot overflow the bind-parameter limit.
+  const inFlightIds = new Set<string>();
+  if (expiredDirs.length > 0) {
+    const rows = await db
+      .select({ id: schema.jobs.id })
+      .from(schema.jobs)
+      .where(reconcilableJobRows());
+    for (const r of rows) inFlightIds.add(r.id);
+  }
+
+  let removed = 0;
+  let kept = 0;
+  for (const dir of expiredDirs) {
+    const jobId = dir.key.split("/")[1];
+    if (owningJobIds(jobId).some((id) => inFlightIds.has(id))) {
+      kept++;
+      continue;
+    }
+    // Skip deletion if the job's user is under legal hold
+    const userId = jobUserMap.get(jobId);
+    if (userId && heldUserIds.has(userId)) continue;
+
+    try {
+      await deletePrefix(dir.key);
+      removed++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${dir.key}: ${message}`);
     }
   }
   if (errors.length > 0) {
-    console.error(`Storage TTL: ${errors.length} dir(s) failed to delete:\n${errors.join("\n")}`);
+    logger.error(
+      `Storage TTL: ${errors.length} dir(s) failed to delete:\n${listSweepErrors(errors)}`,
+    );
   }
   if (removed > 0) {
-    console.log(`Storage TTL: removed ${removed} expired job dirs`);
+    logger.info(`Storage TTL: removed ${removed} expired job dirs`);
   }
-  return { removed: removed + deleteAfterCleaned, failed: errors.length };
+  if (kept > 0) {
+    logger.info(`Storage TTL: kept ${kept} expired job dirs whose jobs are still in flight`);
+  }
+  return {
+    removed: removed + deleteAfterCleaned,
+    failed: errors.length + deleteAfterErrors.length,
+  };
 }
 
 // -- Retention sweep ----------------------------------------------------------
@@ -369,32 +570,69 @@ async function retentionSweep(): Promise<void> {
   // The Data Retention settings UI writes jobsRetentionDays / auditRetentionDays to
   // the DB. Honor those (the env vars are the fallback default), mirroring how the
   // temp-file sweep reads tempFileMaxAgeHours; otherwise the UI controls are no-ops.
-  const jobsRetentionDays = await getSettingNumber("jobsRetentionDays", env.JOBS_RETENTION_DAYS);
-  if (jobsRetentionDays > 0) {
-    await db.execute(
-      sql`DELETE FROM jobs
-        WHERE created_at < now() - ${jobsRetentionDays} * interval '1 day'
-        AND status IN ('completed', 'failed', 'canceled')
-        AND (user_id IS NULL OR user_id NOT IN ${heldUsersSubquery})`,
-    );
+  // A failed read or corrupt row must not fall back to the env default, which
+  // would shorten a longer retention the admin configured in Settings (#2718).
+  let jobsRetentionDays = 0;
+  try {
+    const rawJobsRetention = await getSettingStrict("jobsRetentionDays");
+    jobsRetentionDays =
+      rawJobsRetention === undefined
+        ? env.JOBS_RETENTION_DAYS
+        : parseNumericSettingValue("jobsRetentionDays", rawJobsRetention, 0);
+  } catch (err) {
+    logger.error({ err }, "Retention: jobsRetentionDays read failed; skipping jobs sweep");
   }
-  const auditRetentionDays = await getSettingNumber("auditRetentionDays", env.AUDIT_RETENTION_DAYS);
+  if (jobsRetentionDays > 0) {
+    try {
+      await db.execute(
+        sql`DELETE FROM jobs
+          WHERE created_at < now() - ${jobsRetentionDays} * interval '1 day'
+          AND status IN ('completed', 'failed', 'canceled')
+          AND (user_id IS NULL OR user_id NOT IN ${heldUsersSubquery})`,
+      );
+    } catch (err) {
+      logger.error({ err }, "Retention: jobs sweep failed");
+    }
+  }
+  let auditRetentionDays = 0;
+  try {
+    const rawAuditRetention = await getSettingStrict("auditRetentionDays");
+    auditRetentionDays =
+      rawAuditRetention === undefined
+        ? env.AUDIT_RETENTION_DAYS
+        : parseNumericSettingValue("auditRetentionDays", rawAuditRetention, 0);
+  } catch (err) {
+    logger.error({ err }, "Retention: auditRetentionDays read failed; skipping audit_log sweep");
+  }
   if (auditRetentionDays > 0) {
-    const tamperResult = await db
-      .select({ value: schema.settings.value })
-      .from(schema.settings)
-      .where(eq(schema.settings.key, "tamperResistantAudit"))
-      .limit(1);
-
-    const isTamperResistant = tamperResult.length > 0 && tamperResult[0].value === "true";
+    let isTamperResistant = true;
+    try {
+      const rawTamper = await getSettingStrict("tamperResistantAudit");
+      if (rawTamper !== undefined && rawTamper !== "false" && rawTamper !== "true") {
+        logger.warn(
+          { key: "tamperResistantAudit", value: rawTamper },
+          "invalid boolean setting, treating tamperResistantAudit as enabled",
+        );
+      }
+      isTamperResistant = rawTamper !== undefined && rawTamper !== "false";
+    } catch (err) {
+      logger.error(
+        { err },
+        "Retention: tamperResistantAudit read failed; skipping audit_log sweep",
+      );
+    }
 
     // Only delete audit logs if tamper-resistant mode is OFF
     if (!isTamperResistant) {
-      await db.execute(
-        sql`DELETE FROM audit_log
-          WHERE created_at < now() - ${auditRetentionDays} * interval '1 day'
-          AND (actor_id IS NULL OR actor_id NOT IN ${heldUsersSubquery})`,
-      );
+      try {
+        await db.execute(
+          sql`DELETE FROM audit_log
+            WHERE created_at < now() - ${auditRetentionDays} * interval '1 day'
+            AND (actor_id IS NULL OR actor_id NOT IN ${heldUsersSubquery})`,
+        );
+      } catch (err) {
+        logger.error({ err }, "Retention: audit_log sweep failed");
+      }
     }
   }
 }

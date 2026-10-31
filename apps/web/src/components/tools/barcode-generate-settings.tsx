@@ -1,8 +1,13 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { format } from "@/lib/format";
+import { useFileStore } from "@/stores/file-store";
 
 const BARCODE_TYPES = [
   { value: "code128", label: "Code 128" },
@@ -16,25 +21,66 @@ const BARCODE_TYPES = [
 const INPUT_CLASS =
   "w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground";
 
+interface BarcodeGenerateResponse {
+  downloadUrl: string;
+}
+
+function isBarcodeGenerateResponse(value: unknown): value is BarcodeGenerateResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return typeof data.downloadUrl === "string" && data.downloadUrl.length > 0;
+}
+
 export function BarcodeGenerateSettings() {
   const { t } = useTranslation();
   const ts = t.toolSettings["barcode-generate"];
+  const { processing, error, setProcessing, setError } = useFileStore();
 
   const [text, setText] = useState("");
   const [type, setType] = useState("code128");
   const [scale, setScale] = useState(3);
   const [includeText, setIncludeText] = useState(true);
 
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const canGenerate = text.trim().length > 0 && !generating;
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
+
+  const canGenerate = text.trim().length > 0 && !processing;
 
   const handleGenerate = useCallback(async () => {
-    setGenerating(true);
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "barcode-generate",
+      is_batch: false,
+      file_count: 1,
+    });
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setProcessing(true);
     setError(null);
     setResultUrl(null);
+
+    let storeReset = false;
+    const startStopCount = useFileStore.getState().stopCount;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.stopCount !== startStopCount) {
+        storeReset = true;
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
+        unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
+        controller.abort();
+      }
+    });
+    controller.signal.addEventListener("abort", unsubscribe, { once: true });
 
     try {
       const res = await fetch(appUrl("/api/v1/tools/image/barcode-generate"), {
@@ -44,23 +90,51 @@ export function BarcodeGenerateSettings() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ text: text.trim(), type, scale, includeText }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Request failed: ${res.status}`);
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.errors.requestFailedWithStatus, { status: res.status }),
+          ),
+        );
       }
 
-      const data = resolveServerUrls(await res.json());
-      if (data.downloadUrl) {
-        setResultUrl(data.downloadUrl);
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
+      if (controller.signal.aborted || storeReset) return;
+      const data = resolveServerUrls(raw);
+      if (!isBarcodeGenerateResponse(data)) {
+        throw new Error(t.errors.invalidServerResponse);
       }
+      setResultUrl(data.downloadUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate barcode");
+      if (
+        controller.signal.aborted ||
+        storeReset ||
+        (err instanceof DOMException && err.name === "AbortError")
+      ) {
+        return;
+      }
+      unsubscribe();
+      setError(err instanceof Error ? err.message : ts.generateFailed);
     } finally {
-      setGenerating(false);
+      unsubscribe();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      if (!controller.signal.aborted && !storeReset) {
+        setProcessing(false);
+      }
     }
-  }, [text, type, scale, includeText]);
+  }, [text, type, scale, includeText, setProcessing, setError, t, ts]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +222,9 @@ export function BarcodeGenerateSettings() {
             href={resultUrl}
             download="barcode.png"
             data-testid="barcode-generate-download"
+            onClick={() =>
+              track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "barcode-generate" })
+            }
             className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
           >
             <Download className="h-4 w-4" />
@@ -163,7 +240,7 @@ export function BarcodeGenerateSettings() {
         disabled={!canGenerate}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {generating && <Loader2 className="h-4 w-4 animate-spin" />}
+        {processing && <Loader2 className="h-4 w-4 animate-spin" />}
         {ts.submit}
       </button>
     </form>

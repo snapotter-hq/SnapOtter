@@ -4,7 +4,16 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const apiGet = vi.hoisted(() => vi.fn().mockResolvedValue({ settings: {} }));
+// Settle the settings load on a later macrotask, like a real response, so a
+// test that reads the form before it renders fails every run, not just on a
+// loaded CI runner (#1785).
+const apiGet = vi.hoisted(() =>
+  vi
+    .fn()
+    .mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ settings: {} }), 20)),
+    ),
+);
 const apiPut = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -12,7 +21,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return { ...actual, apiGet, apiPut };
 });
 
+import { en } from "@snapotter/shared";
 import { AdminSecuritySettings } from "@/components/settings/settings-dialog";
+import { ApiError } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
@@ -21,24 +32,73 @@ afterEach(() => {
 });
 
 describe("AdminSecuritySettings save errors", () => {
-  it("shows the server's specific error message when a save is rejected", async () => {
-    apiPut.mockRejectedValue(new Error("MFA requires an enterprise license"));
+  it("names the missing licence when a save is rejected for it (#1445)", async () => {
+    apiPut.mockRejectedValue(
+      new ApiError("MFA requires an enterprise license", 403, "FEATURE_NOT_LICENSED", {}),
+    );
 
     render(<AdminSecuritySettings />);
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
     fireEvent.click(await screen.findByRole("button", { name: /save/i }));
 
-    const message = await screen.findByText("MFA requires an enterprise license");
+    const message = await screen.findByText(en.errors.featureNotLicensed);
     expect(message).toHaveClass("text-destructive");
   });
 
-  it("enforces the API minimum password length of 8", async () => {
+  it("matches the API minimum password length of 1 (#1028)", async () => {
     render(<AdminSecuritySettings />);
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-    const input = screen.getByLabelText("Minimum Password Length");
-    expect(input).toHaveAttribute("min", "8");
+    // The form renders only after the settings load settles, so wait for it
+    // rather than reading it as soon as the request is sent (#1785).
+    const input = await screen.findByLabelText("Minimum Password Length");
+    expect(input).toHaveAttribute("min", "1");
+  });
+
+  it("lets an admin switch the lowercase rule off and saves it (#1028)", async () => {
+    apiPut.mockResolvedValue({});
+
+    render(<AdminSecuritySettings />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    const toggle = await screen.findByRole("switch", {
+      name: en.settings.security.passwordRequireLowercase,
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(await screen.findByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith(
+        "/v1/settings",
+        expect.objectContaining({ passwordRequireLowercase: "false" }),
+      ),
+    );
+  });
+
+  it("puts a refused setting back where it was, so the tab stops showing a value the server never took (#2339)", async () => {
+    apiPut.mockRejectedValue(
+      new ApiError("SSO enforcement requires an enterprise license", 403, "FEATURE_NOT_LICENSED", {
+        setting: "ssoEnforcement",
+      }),
+    );
+
+    render(<AdminSecuritySettings />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    const toggle = await screen.findByRole("switch", {
+      name: en.settings.security.ssoEnforcement,
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(await screen.findByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "false"));
+    expect(await screen.findByText(en.errors.featureNotLicensed)).toHaveClass("text-destructive");
   });
 
   it("falls back to a generic message when the save rejects with a non-Error value", async () => {
@@ -51,5 +111,52 @@ describe("AdminSecuritySettings save errors", () => {
 
     const message = await screen.findByText("Failed to save security settings");
     expect(message).toHaveClass("text-destructive");
+  });
+
+  it("reads non-canonical stored password-rule values through the shared helper (#2036)", async () => {
+    apiGet.mockResolvedValueOnce({
+      settings: {
+        passwordRequireUppercase: "TRUE",
+        passwordRequireLowercase: "false",
+        passwordRequireDigit: "0",
+        passwordRequireSpecial: "1",
+      },
+    });
+    apiPut.mockResolvedValue({});
+
+    render(<AdminSecuritySettings />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    const upper = await screen.findByRole("switch", {
+      name: en.settings.security.passwordRequireUppercase,
+    });
+    const lower = screen.getByRole("switch", {
+      name: en.settings.security.passwordRequireLowercase,
+    });
+    const digit = screen.getByRole("switch", {
+      name: en.settings.security.passwordRequireNumber,
+    });
+    const special = screen.getByRole("switch", {
+      name: en.settings.security.passwordRequireSpecial,
+    });
+
+    expect(upper).toHaveAttribute("aria-checked", "true");
+    expect(lower).toHaveAttribute("aria-checked", "false");
+    expect(digit).toHaveAttribute("aria-checked", "true");
+    expect(special).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(upper);
+    fireEvent.click(special);
+
+    expect(upper).toHaveAttribute("aria-checked", "false");
+    expect(special).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(await screen.findByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith("/v1/settings", {
+        passwordRequireUppercase: "false",
+        passwordRequireSpecial: "true",
+      }),
+    );
   });
 });

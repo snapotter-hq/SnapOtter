@@ -35,6 +35,20 @@ describe("pdfPageCountPy", () => {
     ).rejects.toThrow("doc_pagecount failed: corrupt xref");
   });
 
+  it("throws a non-empty failure reason when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfPageCountPy("/x.pdf")),
+    ).rejects.toThrow('doc_pagecount failed: {"error": ""}');
+  });
+
+  it("throws when error is an empty string even if pages is a number", async () => {
+    runDocsScript.mockResolvedValueOnce('{"pages": 3, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfPageCountPy("/x.pdf")),
+    ).rejects.toThrow('doc_pagecount failed: {"pages": 3, "error": ""}');
+  });
+
   it("throws when pages is not a number", async () => {
     runDocsScript.mockResolvedValueOnce('{"pages": "seven"}');
     await expect(
@@ -47,6 +61,34 @@ describe("pdfPageCountPy", () => {
     await expect(
       import("../src/python-docs.js").then((m) => m.pdfPageCountPy("/x.pdf")),
     ).resolves.toBe(0);
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"pages": 4}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfPageCountPy("/x.pdf", { signal: ac.signal, timeoutMs: 15_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_pagecount",
+      { path: "/x.pdf" },
+      { signal: ac.signal, timeoutMs: 15_000 },
+    ]);
+  });
+
+  it("omits options when opts is empty", async () => {
+    runDocsScript.mockResolvedValueOnce('{"pages": 4}');
+    await import("../src/python-docs.js").then((m) => m.pdfPageCountPy("/x.pdf", {}));
+    expect(firstCall()).toEqual(["doc_pagecount", { path: "/x.pdf" }, undefined]);
+  });
+
+  it("forwards signal without a timeoutMs key when only signal is provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"pages": 4}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfPageCountPy("/x.pdf", { signal: ac.signal }),
+    );
+    expect(firstCall()).toEqual(["doc_pagecount", { path: "/x.pdf" }, { signal: ac.signal }]);
   });
 });
 
@@ -105,6 +147,26 @@ describe("parseDocsJson (via pdfFlattenPy non-JSON)", () => {
       import("../src/python-docs.js").then((m) => m.pdfFlattenPy("/in.pdf", "/out.pdf")),
     ).rejects.toThrow("doc_flatten failed: flatten blew up");
   });
+
+  it("rejects when error is an empty string instead of treating it as success", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfFlattenPy("/in.pdf", "/out.pdf")),
+    ).rejects.toThrow('doc_flatten failed: {"error": ""}');
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfFlattenPy("/in.pdf", "/out.pdf", { signal: ac.signal, timeoutMs: 30_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_flatten",
+      { path: "/in.pdf", out: "/out.pdf" },
+      { signal: ac.signal, timeoutMs: 30_000 },
+    ]);
+  });
 });
 
 describe("pdfScrubProducerPy", () => {
@@ -123,6 +185,26 @@ describe("pdfScrubProducerPy", () => {
     await expect(
       import("../src/python-docs.js").then((m) => m.pdfScrubProducerPy("/in.pdf", "/out.pdf")),
     ).rejects.toThrow("doc_scrub_meta failed: scrub failed");
+  });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfScrubProducerPy("/in.pdf", "/out.pdf")),
+    ).rejects.toThrow('doc_scrub_meta failed: {"error": ""}');
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfScrubProducerPy("/in.pdf", "/out.pdf", { signal: ac.signal, timeoutMs: 20_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_scrub_meta",
+      { path: "/in.pdf", out: "/out.pdf" },
+      { signal: ac.signal, timeoutMs: 20_000 },
+    ]);
   });
 });
 
@@ -166,6 +248,15 @@ describe("pdfRedactPy", () => {
     ).rejects.toThrow("doc_redact failed: redaction verify failed");
   });
 
+  it("rejects when error is an empty string even if found is present", async () => {
+    runDocsScript.mockResolvedValueOnce('{"found": 0, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) =>
+        m.pdfRedactPy("/in.pdf", "/out.pdf", ["x"], true),
+      ),
+    ).rejects.toThrow('doc_redact failed: {"found": 0, "error": ""}');
+  });
+
   it("throws when found is missing but no error field is present", async () => {
     runDocsScript.mockResolvedValueOnce('{"verified": true}');
     await expect(
@@ -173,6 +264,22 @@ describe("pdfRedactPy", () => {
         m.pdfRedactPy("/in.pdf", "/out.pdf", ["x"], true),
       ),
     ).rejects.toThrow("doc_redact failed:");
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"found": 1, "verified": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfRedactPy("/in.pdf", "/out.pdf", ["ssn"], false, {
+        signal: ac.signal,
+        timeoutMs: 60_000,
+      }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_redact",
+      { path: "/in.pdf", out: "/out.pdf", terms: ["ssn"], caseSensitive: false },
+      { signal: ac.signal, timeoutMs: 60_000 },
+    ]);
   });
 });
 
@@ -214,11 +321,31 @@ describe("pdfTextPy", () => {
     ).rejects.toThrow("doc_text failed: text extract failed");
   });
 
+  it("rejects when error is an empty string even if chars is present", async () => {
+    runDocsScript.mockResolvedValueOnce('{"chars": 0, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfTextPy("/in.pdf", "/out.txt")),
+    ).rejects.toThrow('doc_text failed: {"chars": 0, "error": ""}');
+  });
+
   it("throws when chars is not a number and no error field is present", async () => {
     runDocsScript.mockResolvedValueOnce('{"hasText": true}');
     await expect(
       import("../src/python-docs.js").then((m) => m.pdfTextPy("/in.pdf", "/out.txt")),
     ).rejects.toThrow("doc_text failed:");
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"chars": 10, "hasText": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfTextPy("/in.pdf", "/out.txt", { signal: ac.signal, timeoutMs: 45_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_text",
+      { path: "/in.pdf", out: "/out.txt" },
+      { signal: ac.signal, timeoutMs: 45_000 },
+    ]);
   });
 });
 
@@ -239,6 +366,37 @@ describe("pdfToWordPy", () => {
       import("../src/python-docs.js").then((m) => m.pdfToWordPy("/in.pdf", "/out.docx")),
     ).rejects.toThrow("doc_to_word failed: pdf2docx failed");
   });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfToWordPy("/in.pdf", "/out.docx")),
+    ).rejects.toThrow('doc_to_word failed: {"error": ""}');
+  });
+
+  it("forwards signal alongside the default 5-minute timeout and allows custom timeoutMs", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfToWordPy("/in.pdf", "/out.docx", { signal: ac.signal }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_to_word",
+      { path: "/in.pdf", out: "/out.docx" },
+      { timeoutMs: 300_000, signal: ac.signal },
+    ]);
+
+    runDocsScript.mockReset();
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfToWordPy("/in.pdf", "/out.docx", { timeoutMs: 180_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_to_word",
+      { path: "/in.pdf", out: "/out.docx" },
+      { timeoutMs: 180_000 },
+    ]);
+  });
 });
 
 describe("pdfMetadataGetPy", () => {
@@ -256,11 +414,31 @@ describe("pdfMetadataGetPy", () => {
     ).rejects.toThrow("doc_metadata get failed: docinfo read failed");
   });
 
+  it("rejects when error is an empty string even if metadata is an object", async () => {
+    runDocsScript.mockResolvedValueOnce('{"metadata": {}, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfMetadataGetPy("/in.pdf")),
+    ).rejects.toThrow('doc_metadata get failed: {"metadata": {}, "error": ""}');
+  });
+
   it("throws when metadata is missing/not an object", async () => {
     runDocsScript.mockResolvedValueOnce('{"metadata": "not-an-object"}');
     await expect(
       import("../src/python-docs.js").then((m) => m.pdfMetadataGetPy("/in.pdf")),
     ).rejects.toThrow("doc_metadata get failed:");
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"metadata": {"Title": "Report"}}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfMetadataGetPy("/in.pdf", { signal: ac.signal, timeoutMs: 15_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_metadata",
+      { path: "/in.pdf", mode: "get" },
+      { signal: ac.signal, timeoutMs: 15_000 },
+    ]);
   });
 });
 
@@ -284,6 +462,33 @@ describe("pdfMetadataSetPy", () => {
         m.pdfMetadataSetPy("/in.pdf", "/out.pdf", { Title: "X" }),
       ),
     ).rejects.toThrow("doc_metadata set failed: docinfo write failed");
+  });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) =>
+        m.pdfMetadataSetPy("/in.pdf", "/out.pdf", { Title: "X" }),
+      ),
+    ).rejects.toThrow('doc_metadata set failed: {"error": ""}');
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfMetadataSetPy(
+        "/in.pdf",
+        "/out.pdf",
+        { Title: "New Title" },
+        { signal: ac.signal, timeoutMs: 25_000 },
+      ),
+    );
+    expect(firstCall()).toEqual([
+      "doc_metadata",
+      { path: "/in.pdf", out: "/out.pdf", mode: "set", metadata: { Title: "New Title" } },
+      { signal: ac.signal, timeoutMs: 25_000 },
+    ]);
   });
 });
 
@@ -313,6 +518,51 @@ describe("htmlToPdfPy", () => {
     await expect(
       import("../src/python-docs.js").then((m) => m.htmlToPdfPy("/in.html", "/out.pdf", "html")),
     ).rejects.toThrow("doc_html_pdf failed: weasyprint failed");
+  });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.htmlToPdfPy("/in.html", "/out.pdf", "html")),
+    ).rejects.toThrow('doc_html_pdf failed: {"error": ""}');
+  });
+
+  it("forwards signal and custom timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.htmlToPdfPy("/in.html", "/out.pdf", "html", { signal: ac.signal, timeoutMs: 300_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_html_pdf",
+      { path: "/in.html", out: "/out.pdf", mode: "html" },
+      { timeoutMs: 300_000, signal: ac.signal },
+    ]);
+  });
+
+  it("omits the signal key when opts has only timeoutMs", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    await import("../src/python-docs.js").then((m) =>
+      m.htmlToPdfPy("/in.html", "/out.pdf", "html", { timeoutMs: 300_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_html_pdf",
+      { path: "/in.html", out: "/out.pdf", mode: "html" },
+      { timeoutMs: 300_000 },
+    ]);
+  });
+
+  it("preserves the 2-minute default timeoutMs when opts has only signal", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.htmlToPdfPy("/in.html", "/out.pdf", "html", { signal: ac.signal }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_html_pdf",
+      { path: "/in.html", out: "/out.pdf", mode: "html" },
+      { timeoutMs: 120_000, signal: ac.signal },
+    ]);
   });
 });
 
@@ -355,6 +605,15 @@ describe("pdfSignPy", () => {
     ).rejects.toThrow("doc_sign failed: sign failed");
   });
 
+  it("rejects when error is an empty string even if placed is present", async () => {
+    runDocsScript.mockResolvedValueOnce('{"placed": 1, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) =>
+        m.pdfSignPy("/in.pdf", "/out.pdf", ["s.png"], placements),
+      ),
+    ).rejects.toThrow('doc_sign failed: {"placed": 1, "error": ""}');
+  });
+
   it("throws when placed is missing but no error field is present", async () => {
     runDocsScript.mockResolvedValueOnce('{"ok": true}');
     await expect(
@@ -362,5 +621,26 @@ describe("pdfSignPy", () => {
         m.pdfSignPy("/in.pdf", "/out.pdf", ["s.png"], placements),
       ),
     ).rejects.toThrow("doc_sign failed:");
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"placed": 1, "ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfSignPy("/in.pdf", "/out.pdf", ["s.png"], placements, {
+        signal: ac.signal,
+        timeoutMs: 90_000,
+      }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_sign",
+      {
+        input: "/in.pdf",
+        output: "/out.pdf",
+        signatures: ["s.png"],
+        placements,
+      },
+      { signal: ac.signal, timeoutMs: 90_000 },
+    ]);
   });
 });

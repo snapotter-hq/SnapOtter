@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import {
+  isPasswordRuleSettingKey,
+  normalizePasswordRuleSetting,
+  normalizeRoleName,
+  ROLE_NAME_MAX_LENGTH,
+  ROLE_NAME_MIN_LENGTH,
+  ROLE_NAME_PATTERN,
+} from "@snapotter/shared";
+import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
@@ -18,14 +26,14 @@ const POSTGRES_INTEGER_MAX = 2_147_483_647;
 
 const roleNameField = z
   .string()
-  .transform((value) => value.trim().toLowerCase())
+  .transform(normalizeRoleName)
   .pipe(
     z
       .string()
-      .min(2, "Role name must be 2-30 characters")
-      .max(30, "Role name must be 2-30 characters")
+      .min(ROLE_NAME_MIN_LENGTH, "Role name must be 2-30 characters")
+      .max(ROLE_NAME_MAX_LENGTH, "Role name must be 2-30 characters")
       .regex(
-        /^[a-z0-9_-]+$/,
+        ROLE_NAME_PATTERN,
         "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
       ),
   );
@@ -131,7 +139,14 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       const settingsMap = config.settings as Record<string, string>;
       for (const s of allSettings) {
         if (isConfigExportableSetting(s.key)) {
-          settingsMap[s.key] = s.value;
+          settingsMap[s.key] = isPasswordRuleSettingKey(s.key)
+            ? normalizePasswordRuleSetting(s.key, s.value)
+            : s.value;
+        }
+      }
+      for (const s of allSettings) {
+        if (s.key === "passwordRequireNumber" && !("passwordRequireDigit" in settingsMap)) {
+          settingsMap.passwordRequireDigit = normalizePasswordRuleSetting(s.key, s.value);
         }
       }
 
@@ -248,7 +263,10 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
           // redaction placeholder. Preserve the established skip behavior.
           if (policy.redacted) continue;
 
-          const prepared = prepareSetting(requestedKey, value);
+          const normalizedValue = isPasswordRuleSettingKey(requestedKey)
+            ? normalizePasswordRuleSetting(requestedKey, value)
+            : value;
+          const prepared = prepareSetting(requestedKey, normalizedValue);
           if (!prepared.success) {
             return reply.status(400).send({
               error: prepared.error,
@@ -297,7 +315,11 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         for (const { key } of preparedSettings) {
           settingsToUpdate.push({
             key,
-            action: existingKeys.has(key) ? "update" : "create",
+            action:
+              existingKeys.has(key) ||
+              (key === "passwordRequireDigit" && existingKeys.has("passwordRequireNumber"))
+                ? "update"
+                : "create",
           });
         }
         changes.settings = settingsToUpdate.length;
@@ -351,79 +373,75 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         // Keep settings, roles, and teams in one transaction so any database
         // conflict rolls back the complete imported configuration.
         if (preparedSettings.length > 0) {
-          const existingSettings = await tx.select().from(schema.settings);
-          const existingKeys = new Set(existingSettings.map((setting) => setting.key));
+          const sortedSettings = [...preparedSettings].sort((a, b) =>
+            a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+          );
 
-          for (const { key, value } of preparedSettings) {
-            if (existingKeys.has(key)) {
+          for (const { key, value } of sortedSettings) {
+            await tx
+              .insert(schema.settings)
+              .values({ key, value, updatedAt: now })
+              .onConflictDoUpdate({
+                target: schema.settings.key,
+                set: { value, updatedAt: now },
+              });
+            if (key === "passwordRequireDigit") {
               await tx
-                .update(schema.settings)
-                .set({ value, updatedAt: now })
-                .where(eq(schema.settings.key, key));
-            } else {
-              await tx.insert(schema.settings).values({ key, value });
+                .delete(schema.settings)
+                .where(eq(schema.settings.key, "passwordRequireNumber"));
             }
           }
         }
 
-        if (config.roles) {
-          const existingRoles = await tx
-            .select()
-            .from(schema.roles)
-            .where(eq(schema.roles.isBuiltin, false));
-          const existingRoleMap = new Map(existingRoles.map((role) => [role.name, role]));
+        if (config.roles && config.roles.length > 0) {
+          const sortedRoles = [...config.roles].sort((a, b) =>
+            a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+          );
 
-          for (const role of config.roles) {
-            const existing = existingRoleMap.get(role.name);
-            if (existing) {
-              await tx
-                .update(schema.roles)
-                .set({
-                  description: role.description ?? "",
-                  permissions: role.permissions,
-                  toolPermissions: role.toolPermissions ?? null,
-                  updatedAt: now,
-                })
-                .where(eq(schema.roles.id, existing.id));
-            } else {
-              await tx.insert(schema.roles).values({
+          for (const role of sortedRoles) {
+            const description = role.description ?? "";
+            const toolPermissions = role.toolPermissions ?? null;
+            await tx
+              .insert(schema.roles)
+              .values({
                 id: randomUUID(),
                 name: role.name,
-                description: role.description ?? "",
+                description,
                 permissions: role.permissions,
-                toolPermissions: role.toolPermissions ?? null,
+                toolPermissions,
                 isBuiltin: false,
                 createdAt: now,
                 updatedAt: now,
+              })
+              .onConflictDoUpdate({
+                target: schema.roles.name,
+                set: {
+                  description,
+                  permissions: role.permissions,
+                  toolPermissions,
+                  updatedAt: now,
+                },
               });
-            }
           }
         }
 
-        if (config.teams) {
-          const existingTeams = await tx.select().from(schema.teams);
-          const existingTeamMap = new Map(
-            existingTeams.map((team) => [team.name.toLowerCase(), team]),
-          );
+        if (config.teams && config.teams.length > 0) {
+          const sortedTeams = [...config.teams].sort((a, b) => {
+            const aKey = a.name.toLowerCase();
+            const bKey = b.name.toLowerCase();
+            return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+          });
 
-          for (const team of config.teams) {
-            const existing = existingTeamMap.get(team.name.toLowerCase());
-            if (existing) {
-              await tx
-                .update(schema.teams)
-                .set({
-                  storageQuota: team.storageQuota ?? null,
-                  retentionHours: team.retentionHours ?? null,
-                })
-                .where(eq(schema.teams.id, existing.id));
-            } else {
-              await tx.insert(schema.teams).values({
-                id: randomUUID(),
-                name: team.name,
-                storageQuota: team.storageQuota ?? null,
-                retentionHours: team.retentionHours ?? null,
-              });
-            }
+          for (const team of sortedTeams) {
+            const storageQuota = team.storageQuota ?? null;
+            const retentionHours = team.retentionHours ?? null;
+            await tx.execute(sql`
+              INSERT INTO ${schema.teams} ("id", "name", "storage_quota", "retention_hours", "created_at")
+              VALUES (${randomUUID()}, ${team.name}, ${storageQuota}, ${retentionHours}, ${now})
+              ON CONFLICT (lower(${schema.teams.name})) DO UPDATE SET
+                "storage_quota" = EXCLUDED."storage_quota",
+                "retention_hours" = EXCLUDED."retention_hours"
+            `);
           }
         }
       });
@@ -434,6 +452,20 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         dryRun: false,
         changes,
       });
+
+      if (preparedSettings.some((s) => s.key === "analyticsEnabled")) {
+        // The setting is already persisted. A Redis hiccup here must not turn a
+        // successful import into a 500; the TTL refresh converges replicas anyway.
+        try {
+          const { refreshAnalyticsGate, publishAnalyticsGateInvalidation } = await import(
+            "../../lib/analytics-gate.js"
+          );
+          await refreshAnalyticsGate();
+          await publishAnalyticsGateInvalidation();
+        } catch (err) {
+          request.log.warn({ err }, "analytics gate invalidation failed (import still applied)");
+        }
+      }
 
       return reply.send({ applied: true, changes });
     },

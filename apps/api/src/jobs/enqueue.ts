@@ -12,6 +12,11 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { markQueueEventsJobFailure, markUpstreamError } from "../lib/error-report.js";
+import { logger } from "../lib/logger.js";
+import { toStorableJson } from "../lib/storable-json.js";
+import { bindJobAuditMetadata } from "../lib/tool-audit.js";
+import { clearTerminalReplayKey } from "../routes/progress.js";
 import { createBullMQConnection } from "./connection.js";
 import { getQueue } from "./queues.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -19,23 +24,6 @@ import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } fro
 // ── QueueEvents (one per pool, lazy) ────────────────────────────
 
 const queueEventsMap = new Map<Pool, QueueEvents>();
-
-/**
- * Recursively strip NUL (U+0000) bytes from a value. Postgres rejects NUL in
- * text/jsonb ("invalid byte sequence for encoding UTF8: 0x00"), so a tool whose
- * settings contain a NUL (e.g. a fuzzed string field) would 500 on the jobs
- * insert. NUL is never meaningful in tool settings, so drop it.
- */
-function stripNulBytes<T>(value: T): T {
-  if (typeof value === "string") return value.replace(/\0/g, "") as T;
-  if (Array.isArray(value)) return value.map(stripNulBytes) as T;
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = stripNulBytes(v);
-    return out as T;
-  }
-  return value;
-}
 
 /** Delay before a stopped consumer loop is started again. */
 const QUEUE_EVENTS_RESTART_DELAY_MS = 1000;
@@ -51,7 +39,7 @@ function getQueueEvents(pool: Pool): QueueEvents {
     // into a bare console.error of the raw object. A named line is worth more
     // when a consumer is misbehaving.
     qe.on("error", (err) => {
-      console.error(`[queue-events] ${queueName(pool)} consumer error`, err);
+      logger.error({ err }, `[queue-events] ${queueName(pool)} consumer error`);
     });
     queueEventsMap.set(pool, qe);
     void superviseQueueEvents(pool, qe);
@@ -78,7 +66,7 @@ async function superviseQueueEvents(pool: Pool, qe: QueueEvents): Promise<void> 
       await qe.run();
       return;
     } catch (err) {
-      console.error(`[queue-events] ${queueName(pool)} consumer stopped; restarting`, err);
+      logger.error({ err }, `[queue-events] ${queueName(pool)} consumer stopped; restarting`);
       await new Promise<void>((resolve) => {
         setTimeout(resolve, QUEUE_EVENTS_RESTART_DELAY_MS).unref();
       });
@@ -87,9 +75,9 @@ async function superviseQueueEvents(pool: Pool, qe: QueueEvents): Promise<void> 
 }
 
 export async function closeQueueEvents(): Promise<void> {
-  const promises = [...queueEventsMap.values()].map((qe) => qe.close());
-  await Promise.all(promises);
+  const entries = [...queueEventsMap.values()];
   queueEventsMap.clear();
+  await Promise.all(entries.map((qe) => qe.close()));
 }
 
 /**
@@ -115,17 +103,31 @@ let _flowProducer: FlowProducer | null = null;
 
 export function getFlowProducer(): FlowProducer {
   if (!_flowProducer) {
-    _flowProducer = new FlowProducer({
+    const fp = new FlowProducer({
       connection: createBullMQConnection(),
     });
+    const rawAdd = fp.add.bind(fp);
+    fp.add = async (...args: Parameters<FlowProducer["add"]>) => {
+      bindJobAuditMetadata(args[0]?.data as ToolJobData | undefined);
+      try {
+        return await rawAdd(...args);
+      } catch (err: unknown) {
+        throw markUpstreamError(err);
+      }
+    };
+    fp.on("error", (err) => {
+      logger.error({ err }, "[flow-producer] connection error");
+    });
+    _flowProducer = fp;
   }
   return _flowProducer;
 }
 
 export async function closeFlowProducer(): Promise<void> {
-  if (_flowProducer) {
-    await _flowProducer.close();
-    _flowProducer = null;
+  const fp = _flowProducer;
+  _flowProducer = null;
+  if (fp) {
+    await fp.close();
   }
 }
 
@@ -167,8 +169,8 @@ export async function insertToolJobAlias(args: {
   clientJobId: string;
   userId: string | null;
   pool: Pool;
-}): Promise<void> {
-  await db
+}): Promise<boolean> {
+  const res = await db
     .insert(schema.jobs)
     .values({
       id: args.clientJobId,
@@ -180,6 +182,7 @@ export async function insertToolJobAlias(args: {
       settings: { artifactJobId: args.jobId },
     })
     .onConflictDoNothing();
+  return ((res as { rowCount?: number | null })?.rowCount ?? 0) > 0;
 }
 
 /**
@@ -212,13 +215,13 @@ export async function upsertToolJobAlias(args: {
   clientJobId: string;
   userId: string | null;
   pool: Pool;
-}): Promise<void> {
+}): Promise<boolean> {
   const aliasSettings = { artifactJobId: args.jobId };
   const claimableOwner = args.userId
     ? or(isNull(schema.jobs.userId), eq(schema.jobs.userId, args.userId))
     : isNull(schema.jobs.userId);
   const isRepoint = sql`${schema.jobs.settings}->>'artifactJobId' is distinct from ${args.jobId}`;
-  const res = await db
+  const rows = await db
     .insert(schema.jobs)
     .values({
       id: args.clientJobId,
@@ -234,21 +237,32 @@ export async function upsertToolJobAlias(args: {
       set: {
         settings: aliasSettings,
         userId: args.userId,
+        pool: args.pool,
+        createdAt: sql`CASE WHEN ${isRepoint} THEN now() ELSE ${schema.jobs.createdAt} END`,
         status: sql`CASE WHEN ${isRepoint} THEN 'queued' ELSE ${schema.jobs.status} END`,
         completedAt: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.completedAt} END`,
         error: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.error} END`,
         progress: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.progress} END`,
       },
       setWhere: and(eq(schema.jobs.type, "single"), claimableOwner),
-    });
-  if (((res as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
+    })
+    .returning({ status: schema.jobs.status });
+  if (rows.length === 0) {
     // The claim was skipped (foreign owner or non-alias collision). The
-    // run proceeds, but its starter cannot cancel through this id; make
-    // that debuggable instead of a silent 404 months later.
-    console.warn(
-      `alias claim skipped for clientJobId ${args.clientJobId} (job ${args.jobId}); cancel by this id will not resolve`,
+    // run falls back to the server jobId, so neither SSE progress nor
+    // cancel by clientJobId resolves here; log the refusal instead of
+    // leaving a silent 404 later (#808, #895).
+    logger.warn(
+      `alias claim skipped for clientJobId ${args.clientJobId} (job ${args.jobId}); progress and cancel fell back to the server job id`,
     );
+    return false;
   }
+  if (rows[0].status === "queued" || rows[0].status === "processing") {
+    await clearTerminalReplayKey(args.clientJobId).catch((err) => {
+      logger.warn({ err, clientJobId: args.clientJobId }, "terminal replay key clear failed");
+    });
+  }
+  return true;
 }
 
 /**
@@ -256,6 +270,8 @@ export async function upsertToolJobAlias(args: {
  * Returns the BullMQ Job instance.
  */
 export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData, ToolJobResult>> {
+  bindJobAuditMetadata(data);
+
   // Per-user concurrency cap for single-file AI jobs (kind "ai-tool"). Checked
   // before the row insert so a rejected request leaves no job behind. Batch and
   // pipeline AI use other kinds and are intentionally not capped here.
@@ -276,7 +292,7 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     type: data.kind,
     status: "queued",
     inputRefs: data.inputRefs,
-    settings: stripNulBytes((data.dbSettings ?? data.settings) as Record<string, unknown>),
+    settings: toStorableJson((data.dbSettings ?? data.settings) as Record<string, unknown>),
   });
 
   // Client-facing SSE alias row (#808), re-stamped here as the catch-all
@@ -285,12 +301,17 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
   // parse (#886), so for factory runs this second upsert is an idempotent
   // re-point of the same values.
   if (data.clientJobId && data.clientJobId !== data.jobId) {
-    await upsertToolJobAlias({
+    const claimed = await upsertToolJobAlias({
       jobId: data.jobId,
       clientJobId: data.clientJobId,
       userId: data.userId,
       pool: data.pool,
     });
+    if (!claimed) {
+      // Refused claim (#895): fall back to the server jobId so the worker
+      // never publishes or persists on a channel this run does not own.
+      data.clientJobId = undefined;
+    }
   }
 
   // Fire-and-forget: compute deleteAfter from team retention override
@@ -301,8 +322,12 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
   injectTraceContext(data);
 
   const queue = getQueue(data.pool);
-  const job = await queue.add(data.toolId, { ...data, jobId: data.jobId }, { jobId: data.jobId });
-  return job;
+  try {
+    const job = await queue.add(data.toolId, { ...data, jobId: data.jobId }, { jobId: data.jobId });
+    return job;
+  } catch (err: unknown) {
+    throw markUpstreamError(err);
+  }
 }
 
 /**
@@ -318,10 +343,11 @@ export async function waitForJob(
 ): Promise<ToolJobResult | null> {
   const queueEvents = getQueueEvents(pool);
   const queue = getQueue(pool);
-  const job = (await queue.getJob(jobId)) as Job<ToolJobData, ToolJobResult> | undefined;
-  if (!job) return null;
 
   try {
+    const job = (await queue.getJob(jobId)) as Job<ToolJobData, ToolJobResult> | undefined;
+    if (!job) return null;
+
     const result = await job.waitUntilFinished(queueEvents, windowMs);
     return result;
   } catch (err: unknown) {
@@ -329,7 +355,7 @@ export async function waitForJob(
     if (/timed out before finishing/i.test(msg)) {
       return null; // sync-wait window expired; fall back to SSE
     }
-    throw err; // real failure
+    throw markQueueEventsJobFailure(err); // real failure
   }
 }
 

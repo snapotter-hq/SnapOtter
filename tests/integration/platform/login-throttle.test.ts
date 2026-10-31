@@ -22,12 +22,12 @@ const uid = () => `throttle_${Date.now().toString(36)}_${randomUUID().slice(0, 8
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "loginThrottleMaxFailures"));
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function createUser(): Promise<{ username: string; password: string }> {
   const username = uid();

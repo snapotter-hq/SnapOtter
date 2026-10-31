@@ -17,8 +17,9 @@ const FORK_DIR = /^SnapOtter-test-(\d+)_[0-9a-f]{8}$/;
 
 /**
  * A sweep only removes directories created at least this long ago (the top
- * directory's mtime is set when its one entry, `workspace/`, is made). A pid
- * means something only inside its own namespace, so a run in a container
+ * directory's mtime moves each time an entry is added: `workspace/` at setup,
+ * `files/` and others on first use, which only makes a live one look younger).
+ * A pid means something only inside its own namespace, so a run in a container
  * sharing this temp dir can look dead from here; no worker, which lives for a
  * single test file, runs this long.
  */
@@ -26,6 +27,18 @@ export const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 export function forkDirName(pid: number): string {
   return `SnapOtter-test-${pid}_${crypto.randomUUID().slice(0, 8)}`;
+}
+
+/**
+ * The DATA_DIR a worker uses: its own `<forkDir>/data`, so forks don't share
+ * AI bundle state, install markers or a stray 1.x database (#1649). The one
+ * exception is the strict installed-AI lane (REQUIRE_AI_FEATURES=1), which
+ * exists to run against bundles the caller already installed, so it keeps an
+ * exported DATA_DIR.
+ */
+export function forkDataDir(forkDir: string, env: NodeJS.ProcessEnv): string {
+  if (env.REQUIRE_AI_FEATURES === "1" && env.DATA_DIR) return env.DATA_DIR;
+  return path.join(forkDir, "data");
 }
 
 /** The pid a per-fork workspace was made for, or null if `name` isn't one. */

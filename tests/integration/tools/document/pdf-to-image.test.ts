@@ -18,11 +18,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("POST /api/v1/tools/pdf/pdf-to-image/info", () => {
   it("returns page count for a valid PDF", async () => {

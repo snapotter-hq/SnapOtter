@@ -96,6 +96,21 @@ export interface EditorToolUsedProperties {
 
 export interface EditorExportedProperties {
   output_format?: string;
+  /** Sent once per attempt, when the outcome is known; a click alone is not an export (#2174). */
+  status: "completed" | "failed";
+  /** Why a failed attempt made no file, absent on completed ones: a canvas the browser
+   * could not back or read back (`no-context`, `tainted`), no stage to capture, a
+   * server conversion that was refused, failed, or unreachable (`server-convert`) or
+   * timed out / was closed before a queued conversion finished (`server-pending`,
+   * #2171), the download of the encoded file, or an unexpected error (`bug`). */
+  reason?:
+    | "no-context"
+    | "tainted"
+    | "no-stage"
+    | "server-convert"
+    | "server-pending"
+    | "download"
+    | "bug";
 }
 
 export interface PipelineStepAddedProperties {

@@ -51,7 +51,10 @@ export function sanitizeValue(v: unknown): unknown {
 /**
  * Parse an EXIF buffer into sanitized sections.
  */
-export function parseExif(exifBuffer: Buffer): {
+export function parseExif(
+  exifBuffer: Buffer,
+  options?: { throwOnError?: boolean },
+): {
   image: Record<string, unknown>;
   photo: Record<string, unknown>;
   iop: Record<string, unknown>;
@@ -68,6 +71,14 @@ export function parseExif(exifBuffer: Buffer): {
 
   try {
     const parsed = exifReader(exifBuffer);
+    if (
+      parsed.Image === null ||
+      parsed.Photo === null ||
+      parsed.Iop === null ||
+      parsed.GPSInfo === null
+    ) {
+      throw new Error("Invalid EXIF data: truncated IFD");
+    }
 
     if (parsed.Image) {
       for (const [k, v] of Object.entries(parsed.Image)) {
@@ -89,7 +100,13 @@ export function parseExif(exifBuffer: Buffer): {
         result.gps[k] = sanitizeValue(v);
       }
     }
-  } catch {
+  } catch (err) {
+    if (
+      options?.throwOnError ||
+      (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed"))
+    ) {
+      throw err;
+    }
     // Return empty sections on parse failure
   }
 

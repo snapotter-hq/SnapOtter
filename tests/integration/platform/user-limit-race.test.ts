@@ -30,14 +30,14 @@ const origMaxUsers = env.MAX_USERS;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   (env as Record<string, unknown>).MAX_USERS = origMaxUsers;
   // Optional chaining so a beforeAll boot failure surfaces instead of being
   // buried under a TypeError from the cleanup.
   await testApp?.cleanup();
-}, 10_000);
+});
 
 describe("MAX_USERS under concurrency (issue #928)", () => {
   it("concurrent registers get one 201 and one 403, never overshoot the cap", async () => {

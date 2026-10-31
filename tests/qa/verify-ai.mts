@@ -107,7 +107,7 @@ console.log(
   o.out ? `text="${o.out.toString("utf8").slice(0, 200)}"` : JSON.stringify(o).slice(0, 300),
 );
 
-const r = await run("remove-background", `${IMG}/portrait-color.jpg`, { outputFormat: "png" });
+const r = await run("remove-background", `${IMG}/portrait-color.jpg`, {});
 if (r.out) {
   fs.writeFileSync("/tmp/rembg-out.png", r.out);
   let probe = "";

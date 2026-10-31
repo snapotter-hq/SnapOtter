@@ -53,9 +53,15 @@ function findFirstRecord(node: unknown): Record<string, unknown> | null {
 
 /**
  * Flatten one level: nested objects and arrays become JSON strings in the cell.
+ * Rows are null-prototype objects: on a `{}` literal an attribute named
+ * __proto__ hits the prototype setter and the column silently vanishes, and a
+ * row missing a column like toString reads the inherited function into its
+ * cell. The parser rejects an element with either name, but an attribute gets
+ * through because it arrives prefixed with "@_" and the prefix is stripped
+ * below (#2098). Same fix as csv-json (#2062).
  */
 function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = Object.create(null);
   const original = new Set(Object.keys(row));
   for (const [key, val] of Object.entries(row)) {
     // Strip fast-xml-parser's internal markers from column names: "@_" on

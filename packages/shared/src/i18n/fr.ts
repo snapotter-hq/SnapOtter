@@ -31,6 +31,7 @@ export const fr: TranslationKeys = {
     clear: "Effacer",
     copy: "Copier",
     copied: "Copié !",
+    copyFailed: "Échec de la copie",
     noResults: "Aucun résultat trouvé",
     showLess: "Afficher moins",
     showMore: "Afficher {count} de plus",
@@ -1108,6 +1109,11 @@ export const fr: TranslationKeys = {
       name: "Organiser un PDF",
       description: "Réordonnez les pages selon un ordre explicite",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Réordonnez, pivotez, supprimez des pages et reprenez des pages d'autres PDF dans un seul éditeur",
+    },
     "protect-pdf": {
       name: "Protéger un PDF",
       description: "Ajoutez une protection par mot de passe (chiffrement AES-256)",
@@ -1246,7 +1252,13 @@ export const fr: TranslationKeys = {
       name: "Constructeur de Pipeline",
       description: "Enchaînez plusieurs outils dans un flux de travail",
     },
-    processing: { canceled: "Traitement annulé" },
+    processing: {
+      canceled: "Traitement annulé",
+      cancelUnavailable: "Ce traitement ne peut pas être annulé pour l'instant. Il continue.",
+      cancelNotAllowed:
+        "Annulation impossible : vous êtes déconnecté ou n'êtes pas autorisé à arrêter ce traitement. Il continue.",
+      cancelFailed: "Impossible d'annuler le traitement. Il continue, réessayez.",
+    },
     mediaPlayer: {
       unsupported: "Votre navigateur ne prend pas en charge ce format multimédia.",
     },
@@ -1272,7 +1284,6 @@ export const fr: TranslationKeys = {
       paintOverObjectsToErase: "Peignez sur les objets à effacer",
     },
     "crop-canvas": {
-      original: "Original :",
       cropPreview: "Aperçu du recadrage",
       cropRegionSize: "Zone de recadrage : {width} x {height}",
       originalSize: "Original : {width} x {height}",
@@ -1306,7 +1317,6 @@ export const fr: TranslationKeys = {
       infoBar: "{width} x {height}px . grille {cols}x{rows} . {count} tuiles",
     },
     "remove-bg": {
-      original: "Original :",
       transparent: "Transparent",
       color: "Couleur",
       gradient: "Dégradé",
@@ -1333,7 +1343,6 @@ export const fr: TranslationKeys = {
       theExtractedTextWillAppear: "Le texte extrait apparaîtra ici après l'exécution de l'OCR.",
     },
     "image-enhancement": {
-      original: "Original :",
       removesNoiseAndArtifactsUsing: "Supprime le bruit et les artefacts avec l'AI",
       analyzingImage: "Analyse de l'image...",
       imageLooksGoodFineTune: "L'image semble bonne. Ajustez avec le curseur d'intensité.",
@@ -1345,8 +1354,6 @@ export const fr: TranslationKeys = {
       enhancedSizeKb: "Amélioré : {size} KB",
     },
     "find-duplicates-results": {
-      all: "Tout",
-      group: "Groupe",
       dimensions: "Dimensions",
       format: "Format",
       scanned: "Analysées :",
@@ -1381,7 +1388,6 @@ export const fr: TranslationKeys = {
       pageSize: "Taille de page",
     },
     color: {
-      original: "Original :",
       light: "Lumière",
       brightness: "Luminosité",
       contrast: "Contraste",
@@ -1419,6 +1425,7 @@ export const fr: TranslationKeys = {
       submitBatch: "Compresser ({count} fichiers)",
       submitTarget: "Compresser à {size} KB",
       resizedToFit: "Redimensionnée en {width} × {height} pour tenir dans {size} KB",
+      batchResized: "{count} images sur {total} ont été réduites pour tenir dans {size} KB.",
       progressLabel: "Compression en cours",
       original: "Original : {size} KB",
       processed: "Traité : {size} KB",
@@ -1450,6 +1457,8 @@ export const fr: TranslationKeys = {
       submit: "Redimensionner",
       submitBatch: "Redimensionner ({count} fichiers)",
       progressLabel: "Redimensionnement en cours",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      maxPercentageExceeded: "Utilisez une échelle de 1 à {max} %.",
     },
     crop: {
       width: "Largeur",
@@ -1473,6 +1482,7 @@ export const fr: TranslationKeys = {
       submit: "Recadrer",
       submitBatch: "Recadrer ({count} fichiers)",
       progressLabel: "Recadrage en cours",
+      free: "Libre",
     },
     rotate: {
       rotate90CounterClockwise: "Rotation de 90° dans le sens antihoraire",
@@ -1492,7 +1502,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Application en cours",
     },
     convert: {
-      original: "Original :",
       originalSizeKb: "Original : {size} KB",
       processedSizeKb: "Traité : {size} KB",
       targetFormat: "Format cible",
@@ -1522,7 +1531,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Optimisation en cours",
     },
     "strip-metadata": {
-      original: "Original :",
       iccProfile: "ICC",
       originalSize: "Original : {size} KB",
       processedSize: "Traité : {size} KB",
@@ -1546,9 +1554,9 @@ export const fr: TranslationKeys = {
       metadataRemoved: "Métadonnées supprimées : {size} KB",
       submit: "Supprimer les métadonnées",
       progressLabel: "Suppression des métadonnées",
+      inspectFailed: "Impossible d'analyser les métadonnées",
     },
     "edit-metadata": {
-      original: "Original :",
       imageDescription: "Description de l'image",
       photographerCreatorName: "Nom du photographe ou du créateur",
       imageTitle: "Titre de l'image",
@@ -1609,6 +1617,7 @@ export const fr: TranslationKeys = {
       datesShifted: "dates décalées",
       submit: "Appliquer les métadonnées",
       progressLabel: "Écriture des métadonnées",
+      inspectFailed: "Impossible d'analyser le fichier",
     },
     "bulk-rename": {
       pattern: "Motif",
@@ -1619,6 +1628,7 @@ export const fr: TranslationKeys = {
       renaming: "Renommage en cours...",
       submit: "Renommer {count} fichiers",
       zipDownloaded: "ZIP téléchargé avec succès",
+      renameFailed: "Échec du renommage",
     },
     "image-to-pdf": {
       preview: "Aperçu",
@@ -1649,10 +1659,12 @@ export const fr: TranslationKeys = {
       progressLabel: "Création du PDF",
       uploadingImages: "Import des images...",
       processingPages: "Traitement de {count} pages...",
+      parseResponseFailed: "Impossible de lire la réponse du serveur",
+      creationFailedWithStatus: "Impossible de créer le PDF. Vérifiez vos images et réessayez.",
+      networkErrorCreation: "Erreur réseau lors de la création du PDF",
+      requestTimedOut: "Délai d'attente dépassé : le serveur est peut-être surchargé",
     },
     "pdf-to-image": {
-      converting2: "Conversion en cours",
-      page: "page",
       custom: "Personnalisé",
       uploadAPdfToGet: "Importez un PDF pour commencer",
       generatingPagePreviews: "Génération des aperçus de pages...",
@@ -1709,6 +1721,12 @@ export const fr: TranslationKeys = {
       submitPlural: "Générer les Favicons ({count} images)",
       downloadZip: "Télécharger le ZIP des Favicons",
       progressLabel: "Génération des Favicons",
+      generationFailed: "Impossible de générer le favicon. Essayez avec une autre image.",
+      networkError: "Erreur réseau lors de la génération du favicon",
+      timeout: "Délai d'attente dépassé : le serveur est peut-être surchargé",
+      uploadingImages: "Import des images...",
+      processingImagesOne: "Traitement de {count} image...",
+      processingImagesOther: "Traitement de {count} images...",
     },
     "adjust-colors": {
       light: "Lumière",
@@ -1740,7 +1758,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Ajustement des couleurs",
     },
     sharpening: {
-      original: "Original :",
       originalSize: "Original : {size} KB",
       processedSize: "Traité : {size} KB",
       method: "Méthode",
@@ -1767,9 +1784,17 @@ export const fr: TranslationKeys = {
       submit: "Accentuer",
       submitBatch: "Accentuer ({count} fichiers)",
       progressLabel: "Accentuation en cours",
+      presetNames: {
+        light: "Léger",
+        medium: "Moyen",
+        strong: "Fort",
+        portrait: "Portrait",
+        landscape: "Paysage",
+        detail: "Détail",
+        print: "Impression",
+      },
     },
     "replace-color": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       sourceColor: "Couleur source (à remplacer)",
@@ -1783,7 +1808,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Remplacement de la couleur",
     },
     "color-blindness": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       simulationType: "Type de simulation",
@@ -1793,6 +1817,40 @@ export const fr: TranslationKeys = {
       submit: "Simuler",
       submitBatch: "Simuler ({count} fichiers)",
       progressLabel: "Simulation du daltonisme",
+      types: {
+        protanopia: {
+          label: "Protanopie",
+          description: "Aucun cône rouge. Les rouges paraissent sombres. ~1% des hommes.",
+        },
+        protanomaly: {
+          label: "Protanomalie",
+          description: "Sensibilité réduite au rouge. ~1% des hommes.",
+        },
+        deuteranopia: {
+          label: "Deutéranopie",
+          description: "Aucun cône vert. Les rouges et les verts se ressemblent. ~1% des hommes.",
+        },
+        deuteranomaly: {
+          label: "Deutéranomalie",
+          description: "Sensibilité réduite au vert. Type le plus courant. ~5% des hommes.",
+        },
+        tritanopia: {
+          label: "Tritanopie",
+          description: "Aucun cône bleu. Les bleus et les verts se ressemblent. Très rare.",
+        },
+        tritanomaly: {
+          label: "Tritanomalie",
+          description: "Sensibilité réduite au bleu. Très rare.",
+        },
+        achromatopsia: {
+          label: "Achromatopsie",
+          description: "Daltonisme total. Ne perçoit que la luminance. Très rare.",
+        },
+        blueConeMonochromacy: {
+          label: "Monochromatisme à cônes bleus",
+          description: "Seuls les cônes bleus fonctionnent. Couleurs très limitées. Très rare.",
+        },
+      },
     },
     "remove-background": {
       subject: "Sujet",
@@ -1830,6 +1888,28 @@ export const fr: TranslationKeys = {
       submitBatch: "Supprimer l'arrière-plan ({count} fichiers)",
       progressLabel: "Suppression de l'arrière-plan",
       cpuNote: "Utilise un modèle d'IA. Sans GPU, une grande image peut prendre un moment.",
+      colorPresets: {
+        white: "Blanc",
+        black: "Noir",
+        red: "Rouge",
+        green: "Vert",
+        blue: "Bleu",
+      },
+      gradientPresets: {
+        purple: "Violet",
+        pink: "Rose",
+        blue: "Bleu",
+        green: "Vert",
+        sunset: "Coucher de soleil",
+        lavender: "Lavande",
+      },
+      effectsProcessingFailed: "Échec du traitement des effets",
+      effectsExpired:
+        "La suppression d'arrière-plan précédente a expiré, elle est donc relancée. Appliquez les effets une fois qu'elle est terminée.",
+      refineChanged:
+        "Le sujet, la qualité, le lissage des contours et la décontamination des couleurs s'appliquent lors de la suppression de l'arrière-plan. Relancez-la pour utiliser les nouveaux réglages.",
+      backgroundImageRequired: "Choisissez une image d'arrière-plan pour continuer.",
+      invalidHexColor: "Utilisez une couleur hexadécimale telle que #FF5500 ou #F50.",
     },
     "remove-gif-background": {
       quality: "Qualité",
@@ -1870,7 +1950,6 @@ export const fr: TranslationKeys = {
       download: "Télécharger",
     },
     upscale: {
-      original: "Original :",
       off: "Désactivé",
       originalKb: "Original : {size} KB",
       upscaledKb: "Agrandi : {size} KB",
@@ -1887,9 +1966,11 @@ export const fr: TranslationKeys = {
       progressLabelBatch: "Agrandissement de {count} images",
       cpuNote:
         "L'agrandissement par IA demande beaucoup de calcul. Sans GPU, une grande image peut prendre plusieurs minutes.",
+      qualityFast: "Rapide",
+      qualityBalanced: "Équilibré",
+      qualityBest: "Meilleure",
     },
     "erase-object": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       qualityFast: "Rapide",
@@ -1906,12 +1987,17 @@ export const fr: TranslationKeys = {
       outputFormat: "Format de sortie",
       quality: "Qualité",
       paintHint:
-        "Peignez sur les objets que vous souhaitez supprimer. Utilisez Ctrl+Z pour annuler.",
+        "Peignez sur les objets que vous souhaitez supprimer. Utilisez {shortcut} pour annuler.",
       lassoHint:
-        "Tracez une boucle autour de l'objet que vous souhaitez supprimer. Utilisez Ctrl+Z pour annuler.",
+        "Tracez une boucle autour de l'objet que vous souhaitez supprimer. Utilisez {shortcut} pour annuler.",
       submit: "Effacer l'objet",
       submitBatch: "Tout effacer ({count})",
       progressLabel: "Effacement de l'objet",
+      stall: "Délai de traitement dépassé sans progression. Veuillez réessayer.",
+      stallBatch: "Délai de traitement dépassé. Veuillez réessayer.",
+      timeoutOverloaded:
+        "Délai d'attente dépassé. Le serveur est peut-être surchargé. Veuillez réessayer.",
+      erasingProgress: "Effacement {current}/{total}",
     },
     ocr: {
       copied: "Copié",
@@ -1921,6 +2007,8 @@ export const fr: TranslationKeys = {
         "Améliore le contraste local avant la reconnaissance. Rapide l’applique directement ; Équilibré et Optimal ne conservent la variante que si le score étalonné améliore le résultat.",
       fastKoreanUnsupported:
         "L’OCR rapide ne prend pas en charge le coréen. Installez le pack d’OCR précis et choisissez Équilibré ou Optimal.",
+      fastArabicUnsupported:
+        "L’OCR rapide ne prend pas en charge l’arabe. Installez le pack d’OCR précis et choisissez Équilibré ou Optimal.",
       language: "Langue",
       autoDetect: "Détection automatique",
       extractedText: "Texte extrait",
@@ -1929,6 +2017,9 @@ export const fr: TranslationKeys = {
       submit: "Extraire le texte",
       submitBatch: "Extraire le texte ({count} fichiers)",
       progressLabel: "Extraction du texte",
+      filesFailed: "Échec pour {failed} fichiers sur {total}",
+      noTextDetectedInline: "(aucun texte détecté)",
+      fileErrorInline: "(erreur : {message})",
     },
     "ocr-pdf": {
       quality: "Qualité",
@@ -1942,7 +2033,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Extraction du texte du PDF",
     },
     "blur-faces": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       blurRadius: "Rayon du flou",
@@ -1955,7 +2045,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Floutage des visages",
     },
     "enhance-faces": {
-      original: "Original :",
       subtle: "Subtil",
       maximum: "Maximum",
       fewerFaces: "Moins de visages",
@@ -2016,6 +2105,9 @@ export const fr: TranslationKeys = {
       submitSubject: "Recadrage intelligent",
       submitFace: "Recadrage par visage",
       submitTrim: "Rogner les bordures",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      cropAreaExceeded:
+        "Ce recadrage dépasse la limite de {max} pixels. Réduisez la largeur, la hauteur ou la marge intérieure.",
     },
     imageEnhancement: {
       enhancementMode: "Mode d'amélioration",
@@ -2051,6 +2143,14 @@ export const fr: TranslationKeys = {
         "L'amélioration profonde nécessite le pack Agrandissement et amélioration, qui n'est pas installé : vous obtenez donc l'amélioration standard.",
       deepEnhanceSkippedAnimated:
         "L'amélioration profonde ne fonctionne pas sur les images animées : chaque image a reçu l'amélioration standard.",
+      batchDeepEnhanceSkipped:
+        "L'amélioration profonde ne s'est pas exécutée sur {count} images sur {total} : elles ont reçu l'amélioration standard.",
+      batchDeepEnhanceSkippedFailed:
+        "L'amélioration profonde a échoué sur {count} images sur {total} : elles ont reçu l'amélioration standard.",
+      batchDeepEnhanceSkippedUnavailable:
+        "L'amélioration profonde ne s'est pas exécutée sur {count} images sur {total}, car le pack Agrandissement et amélioration n'est pas installé.",
+      batchDeepEnhanceSkippedAnimated:
+        "L'amélioration profonde a ignoré {count} images sur {total}, car elles sont animées.",
     },
     "noise-removal": {
       off: "Désactivé",
@@ -2082,7 +2182,6 @@ export const fr: TranslationKeys = {
       progressLabelBatch: "Suppression du bruit de {count} images",
     },
     "red-eye-removal": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       fixedKb: "Corrigé : {size} KB",
       sensitivity: "Sensibilité",
@@ -2099,7 +2198,6 @@ export const fr: TranslationKeys = {
       progressLabelBatch: "Correction des yeux rouges dans {count} images",
     },
     "restore-photo": {
-      original: "Original :",
       subtle: "Subtil",
       strong: "Fort",
       originalKb: "Original : {size} KB",
@@ -2136,6 +2234,9 @@ export const fr: TranslationKeys = {
       submit: "Redimensionner",
       submitBatch: "Redimensionner ({count} fichiers)",
       progressLabel: "Redimensionnement intelligent",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
+      areaExceeded:
+        "Le redimensionnement sensible au contenu est limité à {max} pixels au total. Réduisez la largeur ou la hauteur.",
     },
     "ai-canvas-expand": {
       quality: "Qualité",
@@ -2157,7 +2258,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Extension du canevas",
     },
     colorize: {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       colorizedKb: "Colorisé : {size} KB",
       aiModel: "Modèle AI",
@@ -2303,6 +2403,13 @@ export const fr: TranslationKeys = {
       dragToAdjust: "Glissez pour ajuster",
       scrollToZoom: "Faites défiler pour zoomer",
       photoGenerated: "Photo générée. Téléchargez-la depuis le panneau de gauche.",
+      analysisFailedWithStatus:
+        "Impossible d'analyser cette photo. Essayez avec une photo plus nette.",
+      faceAnalysisFailed: "Échec de l'analyse du visage",
+      generationFailedWithStatus: "Impossible de générer la photo d'identité. Veuillez réessayer.",
+      photoGenerationFailed: "Échec de la génération de la photo",
+      analysisExpired:
+        "L'analyse a expiré, la photo est donc analysée à nouveau. Générez-la une fois l'analyse terminée.",
     },
     "transcribe-audio": {
       language: "Langue",
@@ -2361,7 +2468,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Floutage du fond",
     },
     "watermark-text": {
-      original: "Original :",
       applyWatermark: "Appliquer le filigrane",
       tiledRepeating: "Mosaïque (répétée)",
       originalKb: "Original : {size} KB",
@@ -2384,7 +2490,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Ajout du filigrane",
     },
     "watermark-image": {
-      original: "Original :",
       center: "Centre",
       topLeft: "Haut gauche",
       topRight: "Haut droite",
@@ -2403,7 +2508,6 @@ export const fr: TranslationKeys = {
       submitBatch: "Appliquer le filigrane ({count} fichiers)",
     },
     "text-overlay": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       text: "Texte",
@@ -2423,7 +2527,6 @@ export const fr: TranslationKeys = {
       defaultText: "Votre texte ici",
     },
     compose: {
-      original: "Original :",
       screen: "Écran",
       processing: "Traitement en cours...",
       overlayImage: "Image de superposition",
@@ -2479,9 +2582,6 @@ export const fr: TranslationKeys = {
       backToGallery: "Retour à la galerie",
     },
     info: {
-      min: "min :",
-      max: "max :",
-      mean: "moyenne :",
       minValue: "min : {value}",
       maxValue: "max : {value}",
       meanValue: "moyenne : {value}",
@@ -2518,6 +2618,7 @@ export const fr: TranslationKeys = {
       similarity: "Similarité : {percent}%",
       submit: "Comparer",
       downloadDiff: "Télécharger la différence",
+      comparisonFailed: "Échec de la comparaison",
     },
     "find-duplicates": {
       sensitivity: "Sensibilité",
@@ -2547,6 +2648,10 @@ export const fr: TranslationKeys = {
       threshold: "Seuil",
       submit: "Rechercher les doublons",
       scanning: "Analyse en cours...",
+      parseResultsFailed: "Impossible de lire les résultats de l'analyse",
+      networkErrorUpload:
+        "Erreur réseau lors de l'envoi. Essayez avec moins de fichiers ou vérifiez votre connexion.",
+      requestTimedOut: "Délai d'attente dépassé. Essayez avec moins de fichiers.",
     },
     "color-palette": {
       colors: "Couleurs",
@@ -2617,6 +2722,26 @@ export const fr: TranslationKeys = {
       downloadFormat: "Format de téléchargement",
       submit: "Générer le code QR",
       download: "Télécharger le code QR",
+      styleSquare: "Carré",
+      styleRounded: "Arrondi",
+      styleDots: "Points",
+      styleClassy: "Élégant",
+      styleClassyRounded: "Élégant arr.",
+      styleExtraRounded: "Très arr.",
+      styleDot: "Point",
+      formatDescPng: "Idéal pour le numérique",
+      formatDescSvg: "Idéal pour l'impression",
+      formatDescJpeg: "Fichier plus léger",
+      formatDescWebp: "Format moderne",
+      vcardFirstName: "Prénom",
+      vcardFirstNamePlaceholder: "Jean",
+      vcardLastName: "Nom",
+      vcardLastNamePlaceholder: "Dupont",
+      vcardOrganization: "Organisation",
+      vcardOrganizationPlaceholder: "Entreprise",
+      vcardJobTitle: "Poste",
+      vcardJobTitlePlaceholder: "Développeur",
+      vcardWebsite: "Site web",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2666,6 +2791,9 @@ export const fr: TranslationKeys = {
       noBarcodesFound: "Aucun code-barres trouvé",
       barcodesFound: "{count} code-barres trouvé",
       barcodesFoundPlural: "{count} codes-barres trouvés",
+      scanningFile: "Analyse de {name}...",
+      scanningFailedWithStatus: "Impossible d'analyser cette image. Essayez avec une autre image.",
+      filesFailed: "Échec pour {count} fichiers sur {total}",
     },
     collage: {
       sideBySide: "Côte à côte",
@@ -2686,9 +2814,6 @@ export const fr: TranslationKeys = {
       mosaic: "Mosaïque",
       uploadingImages: "Import des images en cours...",
       processingCollage: "Traitement du collage...",
-      loaded: "chargées",
-      images: "images",
-      collage: "Collage :",
       snapotter: "SnapOtter",
       background: "Arrière-plan",
       format: "Format",
@@ -2724,6 +2849,12 @@ export const fr: TranslationKeys = {
       quality: "Qualité",
       submit: "Créer le collage",
       downloadCollage: "Télécharger le collage",
+      ratioFree: "Libre",
+      bgWhite: "Blanc",
+      bgBlack: "Noir",
+      bgNone: "Aucun",
+      bgCustom: "Personnalisé",
+      collageFailed: "Échec de la création du collage",
     },
     stitch: {
       format: "Format",
@@ -2753,6 +2884,7 @@ export const fr: TranslationKeys = {
       outputFormat: "Format de sortie",
       quality: "Qualité",
       submit: "Assembler les images",
+      stitchFailed: "Échec de l'assemblage",
     },
     split: {
       splitMode: "Mode de découpe",
@@ -2781,6 +2913,21 @@ export const fr: TranslationKeys = {
       submit: "Découper l'image",
       downloadAll: "Tout télécharger (ZIP)",
       tileWarningSmall: "Les tuiles seront très petites ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Moitié horizontale",
+        verticalHalf: "Moitié verticale",
+        quarters: "Quarts",
+        horizontalStrip: "Bande horizontale",
+        verticalStrip: "Bande verticale",
+        grid9: "Grille de 9 tuiles",
+        portrait6: "6 tuiles en portrait",
+        landscape6: "6 tuiles en paysage",
+        grid16: "Grille de 16 tuiles",
+      },
+      keepOriginal: "Conserver l'original",
+      auto: "Automatique",
+      splitFailed: "Échec du découpage",
+      failedToSplit: "Impossible de découper {name} : {detail}",
     },
     border: {
       blur: "Flou",
@@ -2806,6 +2953,16 @@ export const fr: TranslationKeys = {
       submit: "Ajouter la bordure",
       submitBatch: "Ajouter la bordure ({count} fichiers)",
       progressLabel: "Ajout de la bordure",
+      presetNames: {
+        cleanWhite: "Blanc pur",
+        galleryBlack: "Noir galerie",
+        shadow: "Ombre",
+        rounded: "Arrondi",
+        polaroid: "Polaroid",
+        vintage: "Vintage",
+        minimal: "Minimaliste",
+        cinematic: "Cinématique",
+      },
     },
     beautify: {
       background: "Arrière-plan",
@@ -2822,7 +2979,6 @@ export const fr: TranslationKeys = {
       text: "Texte",
       position: "Position",
       newTab: "Nouvel onglet",
-      frame: "Cadre",
       quickPresets: "Préréglages rapides",
       linear: "Linéaire",
       radial: "Radial",
@@ -2850,6 +3006,33 @@ export const fr: TranslationKeys = {
       submit: "Embellir",
       submitBatch: "Embellir ({count} fichiers)",
       progressLabel: "Embellissement de la capture d'écran",
+      presetPurpleHaze: "Brume violette",
+      presetFlamingo: "Flamant rose",
+      presetOcean: "Océan",
+      presetMidnight: "Minuit",
+      presetMint: "Menthe",
+      presetSunset: "Coucher de soleil",
+      presetCleanWhite: "Blanc pur",
+      presetNoBackground: "Sans arrière-plan",
+      bgGradient: "Dégradé",
+      bgSolid: "Uni",
+      bgImage: "Image",
+      none: "Aucun",
+      frameBrowser: "Navigateur",
+      shadowSubtle: "Subtil",
+      shadowMedium: "Moyen",
+      shadowDramatic: "Dramatique",
+      shadowCustom: "Personnalisé",
+      socialOriginal: "Original",
+      socialIgSquare: "IG carré",
+      socialIgStory: "Story IG",
+      positionTopLeft: "Haut gauche",
+      positionTopRight: "Haut droite",
+      positionCenter: "Centre",
+      positionBottomLeft: "Bas gauche",
+      positionBottomRight: "Bas droite",
+      processingFailed: "Échec du traitement",
+      processingFailedStatus: "Impossible de traiter cette image. Veuillez réessayer.",
     },
     "circle-crop": {
       border: "Bordure",
@@ -2888,6 +3071,16 @@ export const fr: TranslationKeys = {
       submit: "Appliquer la bichromie",
       submitBatch: "Appliquer la bichromie ({count} fichiers)",
       progressLabel: "Application de la bichromie",
+      presetNames: {
+        classic: "Classique",
+        noir: "Noir",
+        sepia: "Sépia",
+        midnight: "Minuit",
+        sunset: "Coucher de soleil",
+        cyber: "Cyber",
+        ocean: "Océan",
+        forest: "Forêt",
+      },
     },
     "image-pad": {
       background: "Arrière-plan",
@@ -2900,6 +3093,7 @@ export const fr: TranslationKeys = {
       submit: "Ajouter des marges",
       submitBatch: "Ajouter des marges ({count} fichiers)",
       progressLabel: "Ajout de marges",
+      custom: "Personnalisé",
     },
     pixelate: {
       blockSize: "Taille des blocs",
@@ -3002,7 +3196,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Conversion du SVG",
     },
     vectorize: {
-      original: "Original :",
       detail: "Détail",
       smoothing: "Lissage",
       blackWhite: "Noir et blanc",
@@ -3039,7 +3232,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Vectorisation en cours",
     },
     "gif-tools": {
-      original: "Original :",
       widthPx: "Largeur (px)",
       auto: "Automatique",
       heightPx: "Hauteur (px)",
@@ -3096,6 +3288,7 @@ export const fr: TranslationKeys = {
       submit: "Traiter le GIF",
       submitBatch: "Traiter ({count} fichiers)",
       progressLabel: "Traitement du GIF",
+      maxDimensionExceeded: "Utilisez une taille comprise entre 1 et {max} px.",
     },
     "image-to-base64": {
       converting: "Conversion en cours...",
@@ -3130,6 +3323,7 @@ export const fr: TranslationKeys = {
       includeText: "Inclure le texte",
       submit: "Générer le code-barres",
       download: "Télécharger le code-barres",
+      generateFailed: "Impossible de générer le code-barres",
     },
     "chart-maker": {
       optionalChartTitle: "Titre du graphique (optionnel)",
@@ -3140,6 +3334,11 @@ export const fr: TranslationKeys = {
       submit: "Créer le graphique",
       submitBatch: "Créer le graphique ({count} fichiers)",
       progressLabel: "Création du graphique",
+      kindBar: "Barres",
+      kindLine: "Ligne",
+      kindPie: "Secteurs",
+      rowsSkipped:
+        "Lignes représentées : {charted}. Ignorées car la colonne des valeurs ne contenait pas de nombre : {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modèle",
@@ -3530,12 +3729,12 @@ export const fr: TranslationKeys = {
       submit: "Compresser",
       submitBatch: "Compresser ({count} fichiers)",
       submitTarget: "Compresser à {size}",
+      batchMissed: "{count} fichiers sur {total} ne sont pas descendus sous {target}.",
       progressLabel: "Compression",
       bestEffortHint:
         "Maximum au mieux. Les PDF composés d'images s'en approchent ; les PDF uniquement texte peuvent ne pas atteindre cette taille.",
       targetReached: "Objectif de {target} atteint (résultat : {size}).",
-      targetMissed:
-        "Impossible d'atteindre {target}. La plus petite taille possible était {size}, car ce PDF est principalement composé de texte ou de vecteurs, que la compression d'images ne peut pas réduire.",
+      targetMissed: "Impossible d'atteindre {target}. La plus petite taille possible était {size}.",
     },
     "rotate-pdf": {
       angle: "Angle de rotation",
@@ -3604,6 +3803,31 @@ export const fr: TranslationKeys = {
       pageLabel: "Page {n}",
       orderTooLong:
         "Trop de déplacements distincts à envoyer. Réinitialisez et essayez avec moins de modifications.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maximum {docs} PDF et {pages} pages en sortie.",
+      addDocument: "Ajouter un PDF",
+      addAll: "Ajouter toutes les pages",
+      allPages: "Toutes dans le plan",
+      addPage: "Ajouter la page {n}",
+      dragHint:
+        "Faites glisser pour réordonner, faire pivoter ou supprimer des pages. Ajoutez des PDF pour reprendre leurs pages.",
+      reset: "Réinitialiser le plan",
+      emptyPlan:
+        "Aucune page dans le plan pour l'instant. Ajoutez des pages depuis les documents ci-dessus.",
+      docFailed: "Un document n'a pas pu être lu.",
+      skippedNotPdf: "{count} fichier(s) ignoré(s) : seuls les PDF peuvent être ajoutés.",
+      skippedOverLimit: "{count} PDF non ajouté(s) : l'éditeur accepte au maximum {docs} PDF.",
+      pageLabel: "Position {n}",
+      planSummary: "{pages} page(s) de {docs} document(s) seront assemblées.",
+      submit: "Créer le PDF ({pages} pages)",
+      progressLabel: "Assemblage",
+      rotateLeft: "Pivoter à gauche",
+      rotateRight: "Pivoter à droite",
+      removePage: "Retirer la page",
+      removeDoc: "Retirer le PDF",
+      zoomIn: "Agrandir",
+      zoomOut: "Réduire",
     },
     "protect-pdf": {
       userPassword: "Mot de passe utilisateur",
@@ -3725,6 +3949,9 @@ export const fr: TranslationKeys = {
         uploadHint:
           "Déposez un PNG / JPG ou cliquez pour choisir. Un PNG transparent fonctionne le mieux.",
       },
+      exportFailed: "Impossible de lire les signatures placées. Veuillez réessayer.",
+      stall: "Délai de traitement dépassé. Veuillez réessayer.",
+      timeout: "Délai d'attente dépassé. Veuillez réessayer.",
     },
     "redact-pdf": {
       terms: "Termes à masquer",
@@ -3738,6 +3965,9 @@ export const fr: TranslationKeys = {
       submit: "Extraire le texte",
       submitBatch: "Extraire le texte ({count} fichiers)",
       progressLabel: "Extraction",
+      scannedHint:
+        "Ce PDF est numérisé, il n'y a donc pas de texte à extraire. L'OCR peut le lire, mais c'est plus long et cela demande que le pack d'IA OCR soit installé.",
+      runOcr: "Lancer l'OCR sur ce PDF",
     },
     "pdf-to-word": {
       hint: "Idéal pour les PDF textuels ; les pages numérisées nécessitent l'OCR",
@@ -3894,6 +4124,8 @@ export const fr: TranslationKeys = {
     importFromFiles: "Importer depuis Fichiers",
     saveToFiles: "Enregistrer dans Fichiers",
     savedToFiles: "Enregistré dans Fichiers",
+    resultExpired: "Ce résultat a expiré. Relancez l'outil.",
+    libraryFull: "Votre espace de stockage est plein. Supprimez quelques fichiers, puis réessayez.",
     librarySaveTitle: "Ce fichier provient de vos Fichiers",
     librarySaveAsNew: "Enregistrer le résultat comme nouveau fichier",
     librarySaveAsNewHint: "Conserve l'original dans vos Fichiers",
@@ -4115,7 +4347,7 @@ export const fr: TranslationKeys = {
       dropDescription: "Déposez une image ici pour commencer",
       openImageButton: "Ouvrir une image",
       newDocumentButton: "Nouveau document",
-      pasteHint: "Ou collez depuis le presse-papiers (Ctrl+V)",
+      pasteHint: "Ou collez depuis le presse-papiers ({shortcut})",
     },
     mobile: {
       heading: "Bureau recommandé",
@@ -4168,6 +4400,7 @@ export const fr: TranslationKeys = {
         ratioLabel: "Ratio :",
         applyTitle: "Appliquer le recadrage (Entrée)",
         cancelTitle: "Annuler le recadrage (Échap)",
+        free: "Libre",
       },
       dodgeBurn: {
         dodge: "Éclaircir",
@@ -4184,6 +4417,9 @@ export const fr: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Échantillon :",
         toggleDropdown: "Ouvrir le menu déroulant",
+        samplePoint: "Point (1x1)",
+        sampleAverage3: "Moyenne 3x3",
+        sampleAverage5: "Moyenne 5x5",
       },
       fill: {
         tolerance: "Tolérance",
@@ -4280,6 +4516,68 @@ export const fr: TranslationKeys = {
         grain: "Grain",
         resetAll: "Tout réinitialiser",
         apply: "Appliquer",
+        autoButtons: {
+          autoTone: "Tons auto",
+          autoContrast: "Contraste auto",
+          autoColor: "Couleur auto",
+          autoEnhance: "Amélioration auto",
+        },
+        sliders: {
+          brightness: "Luminosité",
+          contrast: "Contraste",
+          hue: "Teinte chromatique",
+          saturation: "Saturation",
+          luminance: "Luminance",
+          exposure: "Exposition",
+          vibrance: "Vibrance",
+          warmth: "Chaleur",
+        },
+        filters: {
+          grayscale: "Niveaux de gris",
+          sepia: "Sépia",
+          invert: "Inverser",
+          solarize: "Solariser",
+          blur: "Flou",
+          sharpen: "Netteté",
+          noise: "Bruit",
+          pixelate: "Pixelisation",
+          emboss: "Relief",
+          posterize: "Postériser",
+          threshold: "Seuil",
+          kaleidoscope: "Kaléidoscope",
+          motionBlur: "Flou de mouvement",
+          radialBlur: "Flou radial",
+          surfaceBlur: "Flou de surface",
+        },
+        params: {
+          radius: "Rayon",
+          amount: "Quantité",
+          size: "Taille",
+          strength: "Intensité",
+          levels: "Niveaux",
+          level: "Niveau",
+          power: "Puissance",
+          angle: "Angle",
+          distance: "Distance",
+          centerX: "Centre X",
+          centerY: "Centre Y",
+          threshold: "Seuil",
+          midpoint: "Point médian",
+          roundness: "Rondeur",
+          feather: "Contour progressif",
+          roughness: "Rugosité",
+        },
+        curvePresets: {
+          linear: "Linéaire",
+          darken: "Obscurcir",
+          lighten: "Éclaircir",
+          increaseContrast: "Augmenter le contraste",
+          decreaseContrast: "Réduire le contraste",
+          mediumContrast: "Contraste moyen",
+          strongContrast: "Contraste fort",
+          crossProcess: "Traitement croisé",
+          negative: "Négatif",
+        },
       },
       color: {
         channelAriaLabel: "Canal de couleur {channel}",
@@ -4295,12 +4593,64 @@ export const fr: TranslationKeys = {
         median: "Médiane",
       },
       history: {
-        undoTitle: "Annuler (Ctrl+Z)",
-        redoTitle: "Rétablir (Ctrl+Maj+Z)",
+        undoTitle: "Annuler ({shortcut})",
+        redoTitle: "Rétablir ({shortcut})",
         empty: "Aucun historique pour le moment",
+        unknown: "Inconnu",
+        actions: {
+          initialState: "État initial",
+          loadImage: "Charger l'image",
+          loadProject: "Charger le projet",
+          restoreAutosave: "Restaurer la sauvegarde automatique",
+          resizeCanvas: "Redimensionner le canevas",
+          resizeImage: "Redimensionner l'image",
+          rotateCanvas: "Faire pivoter le canevas {degrees}",
+          flipHorizontal: "Miroir horizontal",
+          flipVertical: "Miroir vertical",
+          trimCanvas: "Rogner le canevas",
+          addObject: "Ajouter {type}",
+          layerEffect: "Effet de calque",
+          delete: "Supprimer",
+          bringToFront: "Mettre au premier plan",
+          bringForward: "Avancer",
+          sendBackward: "Reculer",
+          sendToBack: "Mettre en arrière-plan",
+          addLayer: "Ajouter un calque",
+          deleteLayer: "Supprimer le calque",
+          duplicateLayer: "Dupliquer le calque",
+          reorderLayers: "Réorganiser les calques",
+          mergeDown: "Fusionner vers le bas",
+          flattenAll: "Tout aplatir",
+          adjust: "Ajuster {name}",
+          resetAdjustments: "Réinitialiser les réglages",
+          levels: "Niveaux",
+          curves: "Courbes",
+          resetLevels: "Réinitialiser les niveaux",
+          resetCurves: "Réinitialiser les courbes",
+          resetAll: "Tout réinitialiser",
+          toggleFilter: "Activer/désactiver le filtre {name}",
+          setFilterParam: "Définir {filter} {param}",
+          crop: "Recadrer",
+          cut: "Couper",
+          paste: "Coller",
+          pasteInPlace: "Coller sur place",
+          nudge: "Décaler",
+          brushStroke: "Coup de pinceau",
+          eraserStroke: "Coup de gomme",
+        },
+        objectTypes: {
+          line: "Ligne",
+          rect: "Rectangle",
+          ellipse: "Ellipse",
+          text: "Texte",
+          image: "Image",
+          arrow: "Flèche",
+          polygon: "Polygone",
+          star: "Étoile",
+        },
       },
       layers: {
-        newLayerTitle: "Nouveau calque (Ctrl+Maj+N)",
+        newLayerTitle: "Nouveau calque ({shortcut})",
         blend: "Fusion",
         opacity: "Opacité",
         hideLayer: "Masquer le calque",
@@ -4328,9 +4678,34 @@ export const fr: TranslationKeys = {
           positionCenter: "Centre",
           positionOutside: "Extérieur",
         },
+        blendModes: {
+          normal: "Normal",
+          multiply: "Produit",
+          screen: "Écran",
+          overlay: "Incrustation",
+          darken: "Obscurcir",
+          lighten: "Éclaircir",
+          colorDodge: "Densité couleur -",
+          colorBurn: "Densité couleur +",
+          hardLight: "Lumière crue",
+          softLight: "Lumière tamisée",
+          difference: "Différence",
+          exclusion: "Exclusion",
+          hue: "Teinte",
+          saturation: "Saturation",
+          color: "Couleur",
+          luminosity: "Luminosité",
+        },
+        duplicate: "Dupliquer",
+        flattenAll: "Tout aplatir",
       },
       navigator: {
         noImageLoaded: "Aucune image chargée",
+      },
+      tabs: {
+        layers: "Calques",
+        adjustments: "Réglages",
+        history: "Historique",
       },
     },
     ui: {
@@ -4346,6 +4721,7 @@ export const fr: TranslationKeys = {
         anchorLabel: "Ancrage :",
         anchorAriaLabel: "Ancrage {position}",
         backgroundLabel: "Arrière-plan :",
+        transparent: "Transparent",
         anchors: {
           topLeft: "en haut à gauche",
           topCenter: "en haut au centre",
@@ -4363,6 +4739,14 @@ export const fr: TranslationKeys = {
         original: "Taille d'origine : {width} x {height} px",
         note: "Met à l'échelle tous les objets proportionnellement aux nouvelles dimensions.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Cette image est trop grande pour que le navigateur la modifie avec cet outil. Essayez une taille de canevas plus petite.",
+        crossOriginBlocked:
+          "L'éditeur ne peut pas lire les pixels d'une image chargée depuis un autre site. Téléchargez-la, puis ouvrez le fichier.",
+        sourceImageFailed:
+          "Impossible de charger l'image. Si elle est hébergée sur un autre site, celui-ci doit autoriser l'accès entre origines.",
+      },
       exportDialog: {
         heading: "Exporter l'image",
         previewAlt: "Aperçu de l'export",
@@ -4376,13 +4760,19 @@ export const fr: TranslationKeys = {
         exportButton: "Exporter",
         copied: "Copié",
         copyFailed: "Échec de la copie",
+        exportFailed: "Échec de l'exportation. Réessayez ou choisissez un autre format.",
+        tooLarge:
+          "Cet export est trop grand pour que le navigateur puisse le générer. Essayez des dimensions plus petites.",
         saveProject: "Enregistrer le projet",
         loadProject: "Charger le projet",
+        invalidProject: "Ce fichier n'est pas un projet SnapOtter valide.",
       },
       autosaveRecovery: {
         message: "Travail non enregistré récupéré ({time}).",
         restore: "Restaurer",
         discard: "Abandonner",
+        saveFailed:
+          "Impossible d'enregistrer votre travail dans ce navigateur. Exportez-le ou utilisez Enregistrer le projet pour en garder une copie.",
       },
       fillDialog: {
         heading: "Remplissage",
@@ -4408,6 +4798,7 @@ export const fr: TranslationKeys = {
           black: "Noir",
           transparent: "Transparent",
         },
+        presetCustom: "Personnalisé",
       },
       colorSwatch: {
         ariaLabel: "Couleur {color}",
@@ -4417,6 +4808,25 @@ export const fr: TranslationKeys = {
         noneSelected: "{label} : Aucun",
         setNone: "Aucun {label}",
       },
+      contextMenu: {
+        duplicate: "Dupliquer",
+        selectAll: "Tout sélectionner",
+      },
+    },
+    toolbar: {
+      move: "Déplacer",
+      marquee: "Sélection rectangulaire",
+      crop: "Recadrer",
+      eyedropper: "Pipette",
+      brush: "Pinceau",
+      pencil: "Crayon",
+      cloneStamp: "Tampon de duplication",
+      eraser: "Gomme",
+      paintBucket: "Pot de peinture",
+      gradient: "Dégradé",
+      text: "Texte",
+      hand: "Main",
+      zoom: "Zoom",
     },
   },
   settings: {
@@ -4449,6 +4859,7 @@ export const fr: TranslationKeys = {
       saveButton: "Enregistrer les paramètres",
       saveSuccess: "Paramètres enregistrés.",
       saveFailed: "Échec de l'enregistrement des paramètres.",
+      loadFailed: "Impossible de charger vos préférences.",
       roleUnknown: "inconnu",
     },
     system: {
@@ -4475,6 +4886,7 @@ export const fr: TranslationKeys = {
       saveButton: "Enregistrer les paramètres",
       saveSuccess: "Paramètres enregistrés.",
       saveFailed: "Échec de l'enregistrement des paramètres.",
+      loadFailed: "Impossible de charger les paramètres système.",
       limitsAndResources: "Limites et ressources",
       maxFileSize: "Taille de fichier maximale",
       maxBatchSize: "Taille de lot maximale",
@@ -4512,10 +4924,10 @@ export const fr: TranslationKeys = {
       newPasswordPlaceholder: "Nouveau mot de passe",
       confirmPasswordPlaceholder: "Confirmer le nouveau mot de passe",
       passwordsMismatch: "Les mots de passe ne correspondent pas",
-      passwordTooShort: "Le mot de passe doit contenir au moins 4 caractères",
       changeSuccess: "Mot de passe modifié avec succès",
       changeFailed: "Échec de la modification du mot de passe",
       currentPasswordIncorrect: "Le mot de passe actuel est incorrect",
+      passwordChangedElsewhere: "Votre mot de passe a été modifié ailleurs. Reconnectez-vous.",
       changePasswordButton: "Changer le mot de passe",
       loginAttemptLimitNote:
         "Les limites de tentatives de connexion peuvent être configurées dans les Paramètres système.",
@@ -4567,6 +4979,8 @@ export const fr: TranslationKeys = {
       passwordMinLengthDesc: "Nombre minimal de caractères requis pour les mots de passe.",
       passwordRequireUppercase: "Majuscule requise",
       passwordRequireUppercaseDesc: "Exiger au moins une lettre majuscule.",
+      passwordRequireLowercase: "Minuscule requise",
+      passwordRequireLowercaseDesc: "Exiger au moins une lettre minuscule.",
       passwordRequireNumber: "Chiffre requis",
       passwordRequireNumberDesc: "Exiger au moins un chiffre.",
       passwordRequireSpecial: "Caractère spécial requis",
@@ -4574,6 +4988,13 @@ export const fr: TranslationKeys = {
       passwordPolicyHeading: "Politique de mots de passe",
       securitySettingsSaved: "Paramètres de sécurité enregistrés",
       securitySettingsFailed: "Échec de l'enregistrement des paramètres de sécurité",
+      adminSettingsLoadFailed: "Impossible de charger les paramètres de sécurité.",
+      twoFactorStateChanged:
+        "L'authentification à deux facteurs a été modifiée dans une autre fenêtre. Rechargez la page et réessayez.",
+      twoFactorUnreadable:
+        "Le serveur ne parvient pas à lire vos paramètres d'authentification à deux facteurs. Contactez un administrateur.",
+      ssoNeedsProvider:
+        "Pour l'application du SSO, configurez d'abord un fournisseur OIDC ou SAML.",
     },
     people: {
       heading: "Personnes",
@@ -4606,7 +5027,7 @@ export const fr: TranslationKeys = {
       updateFailed: "Échec de la mise à jour de l'utilisateur",
       cannotRemoveOwnAdmin: "Vous ne pouvez pas supprimer votre propre rôle administrateur",
       resetPasswordHeading: "Réinitialiser le mot de passe de {username}",
-      newPasswordLabel: "Nouveau mot de passe (min. 8 caractères)",
+      newPasswordLabel: "Nouveau mot de passe",
       resetPasswordButton: "Réinitialiser le mot de passe",
       resetPasswordWarning: "Cela invalidera toutes les sessions et clés API de cet utilisateur.",
       resetSuccess: "Mot de passe réinitialisé avec succès",
@@ -4616,6 +5037,7 @@ export const fr: TranslationKeys = {
       tableHeaderTeam: "Équipe",
       noSearchResults: "Aucun membre ne correspond à votre recherche.",
       noUsersFound: "Aucun utilisateur trouvé.",
+      loadFailed: "Impossible de charger les utilisateurs.",
       authBadgeLocalOidc: "Local + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Modifier le rôle / l'équipe",
@@ -4628,6 +5050,13 @@ export const fr: TranslationKeys = {
         "Copiez ce mot de passe maintenant. Vous ne pourrez plus le voir après la création de l'utilisateur.",
       memberCount: "{count} membre",
       memberCountPlural: "{count} membres",
+      usernameTaken: "Ce nom d'utilisateur est déjà pris",
+      lastAdmin: "Il doit toujours y avoir au moins un administrateur",
+      cannotDeleteSelf: "Vous ne pouvez pas supprimer votre propre compte",
+      usernameInvalid:
+        "Le nom d'utilisateur doit compter de 3 à 50 caractères et n'utiliser que a-z, A-Z, 0-9, points, tirets et traits de soulignement",
+      roleNotFound: "Ce rôle n'existe plus",
+      teamNotFound: "Cette équipe n'existe plus",
     },
     teams: {
       heading: "Équipes",
@@ -4650,6 +5079,7 @@ export const fr: TranslationKeys = {
       tableHeaderTeamName: "Nom de l'équipe",
       tableHeaderMembers: "Membres",
       emptyState: "Aucune équipe trouvée.",
+      loadFailed: "Impossible de charger les équipes.",
       renameSaveButton: "Enregistrer",
       renameCancelButton: "Annuler",
       renameAction: "Renommer",
@@ -4665,6 +5095,7 @@ export const fr: TranslationKeys = {
       teamRetentionHoursDesc:
         "Rétention des fichiers traités pour cette équipe. Laisser vide pour la valeur par défaut.",
       quotaSaved: "Paramètres d'équipe enregistrés",
+      quotaSaveFailed: "Échec de l'enregistrement des paramètres d'équipe",
     },
     roles: {
       heading: "Rôles",
@@ -4690,6 +5121,7 @@ export const fr: TranslationKeys = {
       deleteSuccess: 'Rôle "{name}" supprimé',
       deleteFailed: "Échec de la suppression du rôle",
       emptyState: "Aucun rôle trouvé.",
+      loadFailed: "Impossible de charger les rôles.",
       builtInBadge: "Prédéfini",
       userCountBadge: "{count} utilisateur(s)",
       editRoleTitle: "Modifier le rôle",
@@ -4703,12 +5135,17 @@ export const fr: TranslationKeys = {
         users: "Utilisateurs",
         teams: "Équipes",
         system: "Système",
+        enterpriseAdmin: "Administration Enterprise",
       },
+      nameInvalid:
+        "Le nom du rôle doit compter de 2 à 30 caractères et n'utiliser que a-z, 0-9, tirets et traits de soulignement",
+      permissionsRequired: "Choisissez au moins une permission",
     },
     auditLog: {
       heading: "Journal d'audit",
       allActionsFilter: "Toutes les actions",
       emptyState: "Aucune entrée dans le journal d'audit.",
+      loadFailed: "Impossible de charger le journal d'audit.",
       tableHeaderTime: "Heure",
       tableHeaderUser: "Utilisateur",
       tableHeaderAction: "Action",
@@ -4751,6 +5188,7 @@ export const fr: TranslationKeys = {
       teamColumn: "Équipe",
       storageColumn: "Stockage",
       usersColumn: "Utilisateurs",
+      loadFailed: "Impossible de charger les données d'utilisation.",
     },
     apiKeys: {
       heading: "Clés API",
@@ -4760,6 +5198,7 @@ export const fr: TranslationKeys = {
       removeScopingLabel: "Supprimer la restriction de permissions",
       restrictPermissionsLabel: "Restreindre les permissions (optionnel)",
       expiresLabel: "Expire :",
+      expiresInPast: "La date d'expiration doit être dans le futur.",
       clearButton: "Effacer",
       copyTitle: "Copier",
       keyWarning: "Conservez cette clé en lieu sûr. Elle ne sera plus affichée.",
@@ -4771,6 +5210,7 @@ export const fr: TranslationKeys = {
       deleteConfirm:
         "Supprimer cette clé API ? Les intégrations qui l'utilisent cesseront de fonctionner.",
       emptyState: "Aucune clé API pour le moment. Générez-en une pour commencer.",
+      loadFailed: "Impossible de charger les clés API.",
     },
     tools: {
       heading: "Outils",
@@ -4814,6 +5254,8 @@ export const fr: TranslationKeys = {
       description: "Gérez les paquets de modèles AI pour le traitement avancé de fichiers.",
       installAll: "Tout installer",
       diskUsage: "Utilisation du disque : {size}",
+      statusStale:
+        "Impossible d’actualiser l’état des bundles. La liste ci-dessous est peut-être obsolète.",
       sizeOnDisk: "{size} sur le disque",
       installed: "Installé",
       notInstalled: "Non installé",
@@ -4843,6 +5285,9 @@ export const fr: TranslationKeys = {
       resetFailed: "Échec de la réinitialisation : {error}",
       resetVenvKept:
         "L'environnement Python partagé a été conservé : cette installation ne dispose d'aucune base fournie permettant de le reconstruire. Les modèles, le cache de téléchargement et les enregistrements d'installation ont été effacés. Recréez cet environnement vous-même si un paquet obsolète qu'il contient est à l'origine du problème.",
+      importBusy:
+        "Une autre installation ou importation est déjà en cours. Réessayez une fois qu'elle sera terminée.",
+      importNoSpace: "Le serveur n'a pas assez d'espace disque pour ce bundle.",
     },
     about: {
       heading: "À propos",
@@ -4862,6 +5307,9 @@ export const fr: TranslationKeys = {
   auth: {
     login: "Connexion",
     logout: "Se déconnecter",
+    logoutFailed: "Impossible de vous déconnecter. Réessayez.",
+    idpLogoutFailed:
+      "Vous êtes déconnecté de SnapOtter, mais votre session auprès du fournisseur SSO est peut-être encore ouverte. Déconnectez-vous-en également.",
     username: "Nom d'utilisateur",
     password: "Mot de passe",
     loginButton: "Se connecter",
@@ -4892,11 +5340,25 @@ export const fr: TranslationKeys = {
     verify: "Vérifier",
     verifying: "Vérification...",
     mfaInvalidCode: "Code invalide. Veuillez réessayer.",
+    mfaAttemptsExhausted: "Trop de codes invalides. Veuillez vous reconnecter.",
+    mfaEnrollmentAttemptsExhausted:
+      "Trop de codes invalides. Reconnectez-vous pour obtenir un nouveau code QR et de nouveaux codes de récupération ; ceux affichés précédemment ne fonctionneront plus.",
+    mfaExpired: "Votre session de vérification a expiré. Veuillez vous reconnecter.",
+    mfaEnrollmentExpired:
+      "Votre session de configuration a expiré. Reconnectez-vous pour obtenir un nouveau code QR et de nouveaux codes de récupération ; ceux affichés précédemment ne fonctionneront plus.",
+    mfaNotConfigured:
+      "L'authentification à deux facteurs n'est pas configurée. Veuillez vous reconnecter.",
+    mfaAlreadyEnabled:
+      "L'authentification à deux facteurs est déjà activée. Veuillez vous reconnecter.",
+    mfaUnreadable:
+      "Le serveur ne parvient pas à lire vos données d'authentification à deux facteurs. Contactez un administrateur.",
     mfaEnrollmentHeading: "Configurez l'authentification à deux facteurs pour continuer",
     mfaEnrollmentRequired:
       "Votre organisation exige l'authentification multifacteur. Veuillez configurer le MFA dans les paramètres de votre compte.",
     mfaPolicyUnavailable:
       "Impossible de vérifier la politique MFA. Veuillez réessayer dans un instant.",
+    accountDisabled: "Ce compte est désactivé. Contactez un administrateur.",
+    ipNotAllowed: "Votre adresse IP n'est pas autorisée. Contactez un administrateur.",
     loginThrottled: "Trop de tentatives de connexion. Réessayez dans {minutes} minute.",
     loginThrottledPlural: "Trop de tentatives de connexion. Réessayez dans {minutes} minutes.",
     loginThrottledUnknownWait:
@@ -4941,14 +5403,13 @@ export const fr: TranslationKeys = {
   },
   changePassword: {
     title: "Changez votre mot de passe",
-    description:
-      "Vous devez définir un nouveau mot de passe avant de continuer. Votre mot de passe doit contenir au moins 8 caractères avec des majuscules, des minuscules et un chiffre.",
+    description: "Vous devez définir un nouveau mot de passe avant de continuer.",
     usernameLabel: "Nom d'utilisateur",
     currentPasswordLabel: "Mot de passe actuel",
     currentPasswordPlaceholder: "Saisissez le mot de passe actuel",
     newPasswordLabel: "Nouveau mot de passe",
     generateButton: "Générer un mot de passe fort",
-    newPasswordPlaceholder: "Au moins 8 caractères",
+    newPasswordPlaceholder: "Saisissez le nouveau mot de passe",
     confirmPasswordLabel: "Confirmer le nouveau mot de passe",
     confirmPasswordPlaceholder: "Répétez le nouveau mot de passe",
     passwordsMismatch: "Les mots de passe ne correspondent pas",
@@ -4959,6 +5420,7 @@ export const fr: TranslationKeys = {
     sidebarTitle: "Presque fini",
     sidebarDescription:
       "Définissez un mot de passe fort pour sécuriser votre compte, puis vous serez prêt.",
+    sessionEnded: "Votre session a expiré. Reconnectez-vous pour changer votre mot de passe.",
   },
   automate: {
     title: "Automatiser",
@@ -4968,6 +5430,15 @@ export const fr: TranslationKeys = {
     noSteps: "Le fichier Pipeline n'a aucune étape",
     importFailed: "Échec de l'importation",
     couldNotRead: "Impossible de lire le fichier Pipeline",
+    importListRefreshFailed:
+      "Pipeline importé, mais la liste enregistrée ne s'est pas actualisée. Rechargez la page pour le voir.",
+    saveFailed: "Échec de l'enregistrement du Pipeline",
+    deleteFailed: "Échec de la suppression du Pipeline",
+    loadFailed: "Impossible de charger les Pipelines enregistrés.",
+    saveListRefreshFailed:
+      "Pipeline enregistré, mais la liste enregistrée ne s'est pas actualisée. Rechargez la page pour le voir.",
+    deleteListRefreshFailed:
+      "Pipeline supprimé, mais la liste enregistrée ne s'est pas actualisée. Rechargez la page pour voir le changement.",
     fileCount: "{count} fichier",
     fileCountPlural: "{count} fichiers",
     importFromLibrary: "Importer depuis la bibliothèque",
@@ -5053,6 +5524,7 @@ export const fr: TranslationKeys = {
     fileCount: "{count} fichiers",
     fileCountSingular: "{count} fichier",
     noFilesFound: "Aucun fichier trouvé",
+    loadFailed: "Impossible de charger vos fichiers.",
     selectFilePrompt: "Sélectionnez un fichier pour voir les détails",
     openFile: "Ouvrir le fichier",
     selectFile: "Sélectionner le fichier",
@@ -5071,6 +5543,7 @@ export const fr: TranslationKeys = {
     download: "Télécharger",
     details: {
       previewFailedRetry: "Échec de la génération de l'aperçu. Réessayez.",
+      loadFailed: "Impossible de charger ce fichier.",
     },
   },
   dropzone: {
@@ -5090,6 +5563,8 @@ export const fr: TranslationKeys = {
     filesSelected: "{count} fichiers sélectionnés",
     dropToAdd: "Déposer pour ajouter des fichiers",
     dropToReplace: "Déposer pour remplacer le fichier",
+    ignoredWhileRunning:
+      "Une exécution est en cours. Attendez qu'elle se termine avant d'ajouter des fichiers.",
     reorderHint:
       "Faites glisser les miniatures pour les réorganiser, ou inversez l'ordre, avant de lancer.",
   },
@@ -5122,6 +5597,8 @@ export const fr: TranslationKeys = {
     lessThanMinute: "Moins d'une minute restante",
     oneMinuteLeft: "~1 minute restante",
     minutesLeft: "~{mins} minutes restantes",
+    minutesLeftFew: "~{mins} minutes restantes",
+    minutesLeftTwo: "~{mins} minutes restantes",
     progressMessages: [
       "Presque fini... sans doute...",
       "Les bonnes choses prennent du temps...",
@@ -5198,6 +5675,59 @@ export const fr: TranslationKeys = {
     networkError: "Erreur réseau. Vérifiez votre connexion.",
     invalidCredentials: "Nom d'utilisateur ou mot de passe invalide",
     connectionError: "Erreur de connexion",
+    fileTooLarge:
+      "Ce fichier est trop volumineux pour être envoyé. Essayez avec un fichier plus léger ou demandez à l'administrateur du serveur d'augmenter la limite d'envoi.",
+    featureNotInstalledForTool:
+      "{tool} nécessite la fonctionnalité « {feature} ». Activez-la dans Paramètres → Fonctionnalités AI.",
+    featureNotInstalled:
+      "La fonctionnalité « {feature} » n'est pas installée. Activez-la dans Paramètres → Fonctionnalités AI.",
+    featureIncompatible:
+      "La fonctionnalité « {feature} » ne peut pas s'exécuter sur le matériel de ce serveur.",
+    passwordTooShort: "Le mot de passe doit contenir au moins {minLength} caractères.",
+    passwordNeedsUppercase: "Le mot de passe doit contenir une lettre majuscule.",
+    passwordNeedsLowercase: "Le mot de passe doit contenir une lettre minuscule.",
+    passwordNeedsDigit: "Le mot de passe doit contenir un chiffre.",
+    passwordNeedsSpecial: "Le mot de passe doit contenir un caractère spécial.",
+    passwordNoControlCharacters: "Le mot de passe ne doit pas contenir de caractères de contrôle.",
+    passwordTooLong: "Le mot de passe ne doit pas dépasser {maxLength} caractères.",
+    passwordTooLongAdminReset:
+      "Le mot de passe est trop long (max {maxLength} caractères). Un administrateur doit le réinitialiser.",
+    passwordNoInvalidCharacters: "Le mot de passe ne doit pas contenir de caractères non valides.",
+    tooManyRequests: "Trop de tentatives. Patientez une minute puis réessayez.",
+    escalationDenied: "Cette action demande plus de droits que n'en a votre rôle.",
+    featureNotLicensed: "Cette fonction nécessite une licence entreprise.",
+    sessionEnded: "Votre session a expiré. Reconnectez-vous.",
+    forbidden: "Vous n'avez pas l'autorisation de faire cela.",
+    invalidSetting: "Valeur non valide pour {setting}.",
+    network: "Erreur réseau",
+    invalidResponse: "Réponse invalide",
+    staleVersionReload: "L'application a été mise à jour. Rechargez la page et réessayez.",
+    failedWithStatus: "Impossible de terminer cette requête. Veuillez réessayer.",
+    processingFailedWithStatus:
+      "Impossible de traiter ce fichier. Vérifiez qu'il n'est pas endommagé et réessayez.",
+    processingFailedNoDetail: "Échec du traitement",
+    canceled: "Traitement annulé",
+    jobTrackingFailed: "Un problème est survenu lors du suivi de cette tâche. Réessayez.",
+    requestTimedOut: "Délai d'attente dépassé",
+    runInterrupted: "Le traitement a été interrompu. Relancez-le.",
+    requestFailedWithStatus: "Impossible de terminer cette requête. Veuillez réessayer.",
+    invalidServerResponse: "Réponse invalide du serveur",
+    batchFailed: "Le traitement par lots a échoué",
+    batchFailedWithStatus:
+      "Impossible de terminer le traitement par lots. Veuillez relancer le lot.",
+    allFilesFailed: "Le traitement de tous les fichiers a échoué",
+    filesFailedSuffix_one: " (1 fichier a échoué)",
+    filesFailedSuffix_other: " ({count} fichiers ont échoué)",
+    uploadTimeout:
+      "Le téléversement a expiré. Vérifiez votre connexion ou essayez avec un fichier plus petit.",
+    processingInterrupted: "Le traitement a été interrompu. Réessayez une fois reconnecté.",
+    processingInterruptedUnconfirmed:
+      "Le traitement a été interrompu et le serveur n'a jamais confirmé la tâche. Réessayez une fois reconnecté.",
+    resultNoLongerAvailable:
+      "Le résultat terminé n'est plus disponible. Exécutez à nouveau la tâche.",
+    batchDownloadFailed: "Le lot terminé n'a pas pu être téléchargé. Actualisez et réessayez.",
+    fileNotFoundInBatch: "Fichier introuvable dans les résultats du lot",
+    noFilesSelected: "Aucun fichier sélectionné",
   },
   sidebar: {
     sponsor: "Soutenez-nous",
@@ -5233,6 +5763,7 @@ export const fr: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Soutenir SnapOtter sur GitHub Sponsors",
     skipToContent: "Aller au contenu principal",
     openSidebar: "Ouvrir le panneau latéral",
@@ -5255,6 +5786,8 @@ export const fr: TranslationKeys = {
     imageControls: "Contrôles d'aperçu",
     zoomControls: "Contrôles de zoom",
     dragToReorder: "Glisser pour réorganiser",
+    resultResizedToFit: "Réduite pour tenir dans la taille cible",
+    resultMissedTarget: "Taille cible non atteinte",
     reverseOrder: "Inverser l'ordre",
     whiteBackground: "Arrière-plan blanc",
     blackBackground: "Arrière-plan noir",
@@ -5338,11 +5871,47 @@ export const fr: TranslationKeys = {
       description: "Répare, colorise et agrandit une photo ancienne ou abîmée avec l'IA.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Suppression d'arrière-plan",
+      description: "Supprime l'arrière-plan des images avec l'IA",
+    },
+    "face-detection": {
+      name: "Détection des visages",
+      description: "Détecte et floute les visages, corrige les yeux rouges, recadrage intelligent",
+    },
+    "object-eraser-colorize": {
+      name: "Effaceur d'objets et colorisation",
+      description: "Efface des objets des photos et colorise les images en noir et blanc",
+    },
+    "inpaint-hq": {
+      name: "Inpainting haute qualité",
+      description:
+        "Suppression d'objets par diffusion pour les grands objets, les textures détaillées et les arrière-plans structurés",
+    },
+    "upscale-enhance": {
+      name: "Agrandissement et amélioration",
+      description: "Agrandissement par IA, amélioration des visages et suppression du bruit",
+    },
+    "photo-restoration": {
+      name: "Restauration de photos",
+      description: "Restaure les photos anciennes ou abîmées",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Extrait le texte des images et des PDF",
+    },
+    transcription: {
+      name: "Transcription",
+      description: "Parole en texte pour l'audio et la vidéo (sous-titres)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importation...",
       importCount: "Importer ({count})",
       import: "Importer",
+      importFailed: "Impossible d'importer {failed} fichiers sur {total}.",
     },
     metadataGrid: {
       noData: "Aucune donnée",
@@ -5355,6 +5924,19 @@ export const fr: TranslationKeys = {
     waveform: {
       play: "Lecture",
       pause: "Pause",
+    },
+    languageNames: {
+      en: "Anglais",
+      de: "Allemand",
+      fr: "Français",
+      es: "Espagnol",
+      zh: "Chinois",
+      ja: "Japonais",
+      ko: "Coréen",
+      ar: "Arabe",
+      id: "Indonésien",
+      th: "Thaï",
+      vi: "Vietnamien",
     },
   },
   privacyPolicy: {

@@ -1,12 +1,15 @@
 // tests/unit/api/openapi-i18n.test.ts
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import {
   generateLocaleLlmsTxt,
   resolveSpecFile,
 } from "../../../apps/api/src/routes/openapi-i18n.js";
+import { proseFields } from "../../../scripts/i18n/adapters/api-spec.mjs";
+import { hash } from "../../../scripts/i18n/lib/hash.mjs";
 
 describe("resolveSpecFile", () => {
   let dir: string;
@@ -72,5 +75,116 @@ describe("generateLocaleLlmsTxt", () => {
     });
     // Still lists the tool by id with the sync mode, never crashes.
     expect(out).toContain("(resize, sync)");
+  });
+});
+
+describe("openapi.zh-TW.yaml auth, roles, and features descriptions (#3585, #3597)", () => {
+  const specDir = resolve(import.meta.dirname, "../../../apps/api/src");
+  const english = load(readFileSync(join(specDir, "openapi.yaml"), "utf8")) as {
+    paths: Record<string, Record<string, { description?: string }>>;
+  };
+  const zhtw = load(readFileSync(join(specDir, "openapi.zh-TW.yaml"), "utf8")) as {
+    paths: Record<string, Record<string, { description?: string }>>;
+    "x-i18n": {
+      entries: Record<string, { sourceHash: string; outputHash: string; stale?: boolean }>;
+    };
+  };
+
+  const simplifiedOnlyChars = /[户码创权义给该将认无删备踪]/;
+
+  const expectedDescriptions: Array<{
+    path: string;
+    method: string;
+    expected: string;
+  }> = [
+    {
+      path: "/api/auth/users/{id}/reset-password",
+      method: "post",
+      expected:
+        "重設本機使用者的密碼。需要對目標目前角色的 users:manage 權限和權限，包括層次結構、權限、工具存取權限和任何 API-key 範圍。\n",
+    },
+    {
+      path: "/api/v1/admin/features/{bundleId}/install",
+      method: "post",
+      expected:
+        "開始非同步安裝 AI 功能套件。下載模型並設定 Python sidecar。回傳可透過 SSE 端點進行進度追蹤的 jobId。需要 features:manage 權限。\n\n對於 bundleId=ocr，支援在官方 Linux amd64 與 arm64 容器中安裝。系統會下載為此主機選擇的目標，驗證版本索引的 Ed25519 簽章與 artifact/模型摘要，對暫存的不可變世代執行冒煙測試，並以原子方式啟用它。即使容器具有 NVIDIA GPU 存取權限，OCR 執行階段仍會使用 CPU。高精準度執行階段需要至少 4 GiB 的有效記憶體（已設定的容器 cgroup 限制，否則為主機記憶體）。低於該已簽章相容性下限的系統會在下載前被拒絕，並回傳 compatibilityReason=insufficient-memory。快速 Tesseract OCR 不受此要求限制。\n\n安裝會在伺服器端依序執行：在另一個安裝正在執行時發出的請求會進入佇列（queued=true）而非被拒絕，並在執行中的安裝完成時自動啟動。對同一個執行中套件的重複請求會進行去重，並回傳相同的 jobId。",
+    },
+    {
+      path: "/api/v1/roles",
+      method: "post",
+      expected:
+        "建立具有指定權限的新自訂角色。角色名稱必須是\n2-30 字符，帶有連字符和下劃線的小寫字母數字。\n需要 security:manage 權限。新角色的權限與工具\n存取必須包含在行為者的有效權限內。\n",
+    },
+    {
+      path: "/api/v1/roles/{id}",
+      method: "delete",
+      expected:
+        '刪除自訂角色。指派給該角色的使用者將重新指派為\n預設的 "user" 角色。內建角色無法刪除。需要\nsecurity:manage 權限、對目前角色的權限，以及\n指派後備角色的權限。\n',
+    },
+  ];
+
+  it.each(expectedDescriptions)(
+    "uses Traditional Chinese and valid x-i18n hashes for $method $path",
+    ({ path, method, expected }) => {
+      const id = `paths.${path}.${method}.description`;
+      const sourceText = english.paths[path]?.[method]?.description ?? "";
+      const translatedText = zhtw.paths[path]?.[method]?.description ?? "";
+      const stamp = zhtw["x-i18n"].entries[id];
+
+      expect(sourceText).not.toBe("");
+      expect(translatedText).not.toMatch(simplifiedOnlyChars);
+      expect(translatedText).toBe(expected);
+      expect(stamp).toBeDefined();
+      expect(stamp.sourceHash).toBe(hash(sourceText));
+      expect(stamp.outputHash).toBe(hash(translatedText));
+      expect(stamp.stale).toBeUndefined();
+    },
+  );
+
+  it("contains none of the leaked Simplified-only characters across any prose field in openapi.zh-TW.yaml", () => {
+    const offending = proseFields(zhtw)
+      .filter(([, text]) => simplifiedOnlyChars.test(text))
+      .map(([id]) => id);
+    expect(offending).toEqual([]);
+  });
+});
+
+describe("openapi.sv.yaml Swedish diacritics (#2047)", () => {
+  const specDir = resolve(import.meta.dirname, "../../../apps/api/src");
+  const sv = load(readFileSync(join(specDir, "openapi.sv.yaml"), "utf8")) as {
+    tags?: Array<{ name: string; description?: string }>;
+    paths: Record<string, Record<string, { summary?: string; description?: string }>>;
+    "x-i18n": {
+      entries: Record<string, { sourceHash: string; outputHash: string; stale?: boolean }>;
+    };
+  };
+
+  const foldedPattern =
+    /\b(haalsokontroll|haalsokontroller|haamta|installningar|aateranvandbara|arbetsfloden|innehaall|storleksandring|behorigheter|spaarning|aatgarder|haalsodiagnostik)\b/i;
+
+  it("preserves Swedish characters å, ä, and ö in key endpoints and tags", () => {
+    expect(sv.paths["/api/v1/health"]?.get?.summary).toBe("Hälsokontroll");
+    expect(sv.paths["/api/v1/tools/image/content-aware-resize"]?.post?.summary).toBe(
+      "Innehållsmedveten storleksändring",
+    );
+    expect(sv.paths["/api/v1/settings"]?.get?.summary).toBe("Hämta alla inställningar");
+    expect(sv.paths["/api/v1/pipeline/list"]?.get?.description).toContain(
+      "Hämta alla sparade pipeline-definitioner för den aktuella användaren",
+    );
+
+    const systemTag = sv.tags?.find((t) => t.name === "System");
+    expect(systemTag?.description).toBe("Hälsokontroller, konfiguration och jobbframsteg.");
+
+    const pipelinesTag = sv.tags?.find((t) => t.name === "Pipelines");
+    expect(pipelinesTag?.description).toBe(
+      "Kedja ihop flera verktyg till återanvändbara arbetsflöden.",
+    );
+  });
+
+  it("contains no ASCII-folded Swedish placeholder words in openapi.sv.yaml", () => {
+    const offending = proseFields(sv)
+      .filter(([, text]) => foldedPattern.test(text))
+      .map(([id, text]) => ({ id, text }));
+    expect(offending).toEqual([]);
   });
 });

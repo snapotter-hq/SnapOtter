@@ -21,14 +21,23 @@ import { mkdirSync } from "node:fs";
 import { truncate, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { ANALYTICS_EVENTS, ONBOARDING_FIRST_PROCESSED_KEY, TOOLS } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  ONBOARDING_FIRST_PROCESSED_KEY,
+  TOOLS,
+  ToolInputError,
+} from "@snapotter/shared";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Makes the finalize die before its own failure handling (readBatchCounters
 // runs outside the packaging try/catch), so the worker failed-handler safety
 // net is the only thing standing between a crash and a hung degraded client.
-const batchProgressMock = vi.hoisted(() => ({ failCountersForParentId: null as string | null }));
+const batchProgressMock = vi.hoisted(() => ({
+  failCountersForParentId: null as string | null,
+  failRecordOutcomeForParentId: null as string | null,
+  recordOutcomeCalls: [] as Array<{ parentId: string; filename: string; error?: string }>,
+}));
 
 vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) => {
   const actual =
@@ -40,6 +49,79 @@ vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) =
         throw new Error("injected counters outage");
       }
       return actual.readBatchCounters(parentId);
+    },
+    recordChildOutcome: async (
+      parentId: string,
+      totalFiles: number,
+      filename: string,
+      error?: string,
+    ) => {
+      batchProgressMock.recordOutcomeCalls.push({ parentId, filename, error });
+      if (batchProgressMock.failRecordOutcomeForParentId === parentId) {
+        throw new Error("injected record outcome outage");
+      }
+      return actual.recordChildOutcome(parentId, totalFiles, filename, error);
+    },
+  };
+});
+
+const progressMock = vi.hoisted(() => ({
+  failCancelGuardedOnceFor: new Set<string>(),
+  failPublishEphemeralFor: null as string | null,
+  failUpdateSingleFor: null as string | null,
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
+  return {
+    ...actual,
+    cancelSingleJobGuarded: async (args: Parameters<typeof actual.cancelSingleJobGuarded>[0]) => {
+      if (progressMock.failCancelGuardedOnceFor.delete(args.jobId)) {
+        throw new Error("injected cancel guarded outage");
+      }
+      return actual.cancelSingleJobGuarded(args);
+    },
+    publishEphemeral: (payload: Parameters<typeof actual.publishEphemeral>[0]) => {
+      if (progressMock.failPublishEphemeralFor === payload.jobId) {
+        throw new Error("injected ephemeral publish outage");
+      }
+      return actual.publishEphemeral(payload);
+    },
+    updateSingleFileProgress: async (
+      progress: Parameters<typeof actual.updateSingleFileProgress>[0],
+    ) => {
+      if (progressMock.failUpdateSingleFor === progress.jobId) {
+        throw new Error("injected update single progress outage");
+      }
+      return actual.updateSingleFileProgress(progress);
+    },
+    updateSingleFileProgressAtomically: async (
+      progress: Parameters<typeof actual.updateSingleFileProgressAtomically>[0],
+      mutateAuthoritative: Parameters<typeof actual.updateSingleFileProgressAtomically>[1],
+    ) => {
+      if (progressMock.failUpdateSingleFor === progress.jobId) {
+        return actual.updateSingleFileProgressAtomically(progress, async (tx) => {
+          await mutateAuthoritative(tx);
+          throw new Error("injected update single progress outage");
+        });
+      }
+      return actual.updateSingleFileProgressAtomically(progress, mutateAuthoritative);
+    },
+  };
+});
+
+const reported = vi.hoisted(() => ({ errors: [] as unknown[] }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (
+      err: unknown,
+      ctx: Parameters<typeof actual.reportError>[1],
+    ): Promise<void> => {
+      reported.errors.push(err);
+      return actual.reportError(err, ctx);
     },
   };
 });
@@ -63,6 +145,7 @@ const { requestCancel, startCancelListener, stopCancelListener } = await import(
   "../../../apps/api/src/jobs/cancel.js"
 );
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+const { registerAiJobHandler } = await import("../../../apps/api/src/jobs/ai-handlers.js");
 const { enqueueToolJob } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
@@ -74,6 +157,7 @@ const { __resetGateForTests, __setReaderForTests, refreshAnalyticsGate } = await
 const { getObjectBuffer, getObjectSize, putObject } = await import(
   "../../../apps/api/src/lib/object-storage.js"
 );
+const { logger } = await import("../../../apps/api/src/lib/logger.js");
 const { InputValidationError } = await import("../../../apps/api/src/modality/contract.js");
 const { MAX_BUFFERED_OUTPUT_BYTES } = await import("../../../apps/api/src/jobs/output-resolve.js");
 const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
@@ -169,6 +253,17 @@ registerToolProcessFn({
   process: unusedLegacyProcess,
   processV2: async () => {
     throw new InputValidationError("That file looks wrong", 422);
+  },
+});
+
+let toolInputRuns = 0;
+registerToolProcessFn({
+  toolId: "wt-tool-input",
+  settingsSchema: passthroughSchema,
+  process: unusedLegacyProcess,
+  processV2: async () => {
+    toolInputRuns++;
+    throw new ToolInputError("remote resources are disabled: http://127.0.0.1:9/x.png");
   },
 });
 
@@ -273,6 +368,40 @@ async function batchOutcome(
   }, 10_000);
 }
 
+/**
+ * Re-reads the BullMQ job hash after getState() reports a terminal ZSET
+ * membership (#2900). BullMQ's moveToFailed / moveToCompleted Lua script
+ * updates attemptsMade, failedReason, and returnvalue atomically with the
+ * state transition, so a getJob() call that ran before getState() can hold a
+ * pre-transition snapshot if the script lands between the two Redis calls.
+ */
+async function failedQueueJob(
+  pool: Parameters<typeof getQueue>[0],
+  jobId: string,
+  timeoutMs = 10_000,
+) {
+  return waitFor(async () => {
+    const queueJob = await getQueue(pool).getJob(jobId);
+    if (!queueJob || (await queueJob.getState()) !== "failed") return undefined;
+    return await getQueue(pool).getJob(jobId);
+  }, timeoutMs);
+}
+
+async function settledQueueJob(
+  pool: Parameters<typeof getQueue>[0],
+  jobId: string,
+  timeoutMs = 20_000,
+) {
+  return waitFor(async () => {
+    const job = await getQueue(pool).getJob(jobId);
+    if (!job) return undefined;
+    const state = await job.getState();
+    if (state !== "completed" && state !== "failed") return undefined;
+    const settled = await getQueue(pool).getJob(jobId);
+    return settled ? { state, returnvalue: settled.returnvalue } : undefined;
+  }, timeoutMs);
+}
+
 /** Poll the mocked trackEvent until minCount events for this distinctId exist. */
 async function emittedEvents(
   event: string,
@@ -333,7 +462,7 @@ beforeAll(async () => {
 
   await startCancelListener();
   startWorkers();
-}, 30_000);
+});
 
 afterAll(async () => {
   await closeWorkers();
@@ -341,7 +470,7 @@ afterAll(async () => {
   await closeQueues();
   __resetGateForTests();
   vi.unstubAllEnvs();
-}, 20_000);
+});
 
 beforeEach(() => {
   trackEventMock.mockClear();
@@ -492,11 +621,7 @@ describe("tool job failure paths", () => {
     // failed-handler on the final attempt). Poll for it: the durable row and
     // analytics flip inside the processor's failure handling, before the
     // rejection propagates into BullMQ's own active -> failed move.
-    await waitFor(async () => {
-      const queueJob = await getQueue("image").getJob(jobId);
-      if (!queueJob) return undefined;
-      return (await queueJob.getState()) === "failed" ? queueJob : undefined;
-    }, 10_000);
+    await failedQueueJob("image", jobId);
   }, 30_000);
 
   it("fails when an extra output has neither buffer nor scratchPath", async () => {
@@ -520,29 +645,170 @@ describe("tool job failure paths", () => {
     expect(row.error?.message).toBe('Extra output "bad.bin" has neither buffer nor scratchPath');
   });
 
-  it("classifies a worker-side InputValidationError as user input, not a bug", async () => {
+  it("classifies a worker-side InputValidationError as user input, not a bug, and does not retry it (#1176)", async () => {
     const jobId = randomUUID();
     const inputRef = await seedInput(jobId, "in.png", Buffer.from("x"));
+    const errorSpy = vi.spyOn(logger, "error");
+
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "wt-invalid",
+          // Image pool enqueues with attempts: 2; validation errors must settle on attempt 1.
+          pool: "image",
+          inputRefs: [inputRef],
+          filename: "in.png",
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("failed");
+      expect(row.attempts).toBe(1);
+      expect(row.error).toMatchObject({ message: "That file looks wrong", httpStatus: 422 });
+
+      const failedJob = await failedQueueJob("image", jobId);
+      expect(failedJob.attemptsMade).toBe(1);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
+      expect(events).toHaveLength(1);
+      const props = events[0];
+      expect(props.status).toBe("failed");
+      expect(props.error_kind).toBe("input");
+      expect(props.error_code).toBe("processing");
+
+      expect(
+        errorSpy.mock.calls.some(
+          ([ctx, msg]) =>
+            msg === "tool job failed" && (ctx as { jobId?: string } | undefined)?.jobId === jobId,
+        ),
+      ).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("does not retry a worker-side ToolInputError or log it as a server fault (#1176)", async () => {
+    const jobId = randomUUID();
+    const inputRef = await seedInput(
+      jobId,
+      "in.html",
+      Buffer.from("<img src='http://127.0.0.1:9/x.png'>"),
+    );
+    const errorSpy = vi.spyOn(logger, "error");
+    toolInputRuns = 0;
+    reported.errors.length = 0;
+
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "wt-tool-input",
+          // Docs pool enqueues with attempts: 2.
+          pool: "docs",
+          inputRefs: [inputRef],
+          filename: "in.html",
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("failed");
+      expect(row.attempts).toBe(1);
+      expect(toolInputRuns).toBe(1);
+      expect(row.error).toMatchObject({
+        message: "remote resources are disabled: http://127.0.0.1:9/x.png",
+        httpStatus: 400,
+      });
+
+      // Pin #2900: if moveToFailed lands between getJob() and getState(), the
+      // Job instance on which getState() was called still holds the pre-script
+      // attemptsMade=0 snapshot. failedQueueJob must re-read getJob() after
+      // getState() reports "failed".
+      const docsQueue = getQueue("docs");
+      const realGetJob = docsQueue.getJob.bind(docsQueue);
+      let injectedSplitRead = false;
+      const getJobSpy = vi.spyOn(docsQueue, "getJob").mockImplementation(async (id) => {
+        const job = await realGetJob(id);
+        if (job && id === jobId && !injectedSplitRead) {
+          const realGetState = job.getState.bind(job);
+          job.getState = async () => {
+            const state = await realGetState();
+            if (state === "failed" && !injectedSplitRead) {
+              injectedSplitRead = true;
+              job.attemptsMade = 0;
+            }
+            return state;
+          };
+        }
+        return job;
+      });
+      const failedJob = await failedQueueJob("docs", jobId).finally(() => {
+        getJobSpy.mockRestore();
+      });
+      expect(failedJob.attemptsMade).toBe(1);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        status: "failed",
+        error_kind: "input",
+        error_code: "processing",
+      });
+
+      expect(
+        errorSpy.mock.calls.some(
+          ([ctx, msg]) =>
+            msg === "tool job failed" && (ctx as { jobId?: string } | undefined)?.jobId === jobId,
+        ),
+      ).toBe(false);
+      expect(
+        reported.errors.some(
+          (e) =>
+            (e as { isToolInputError?: boolean; message?: string } | null)?.isToolInputError ===
+              true &&
+            (e as Error).message === "remote resources are disabled: http://127.0.0.1:9/x.png",
+        ),
+      ).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("does not retry INPUT_MISSING when a queued input has vanished (#1176)", async () => {
+    const jobId = randomUUID();
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
         jobId,
-        toolId: "wt-invalid",
-        pool: "ai",
-        inputRefs: [inputRef],
-        filename: "in.png",
+        toolId: "wt-echo",
+        // Image pool enqueues with attempts: 2; a missing input stays missing.
+        pool: "image",
+        inputRefs: [`uploads/${jobId}/vanished.png`],
+        filename: "vanished.png",
       }),
     );
 
     const row = await terminalRow(jobId);
     expect(row.status).toBe("failed");
-    expect(row.error?.message).toBe("That file looks wrong");
+    expect(row.attempts).toBe(1);
+    expect(row.error?.message).toBe("Input file is no longer available. Upload it again.");
 
     const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
-    const props = events[0];
-    expect(props.status).toBe("failed");
-    expect(props.error_kind).toBe("input");
-    expect(props.error_code).toBe("processing");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      status: "failed",
+      error_code: "INPUT_MISSING",
+      error_kind: "operational",
+    });
+
+    const failedJob = await failedQueueJob("image", jobId);
+    expect(failedJob.attemptsMade).toBe(1);
+
+    const missingReports = reported.errors.filter(
+      (e) => (e as { code?: string } | null)?.code === "INPUT_MISSING",
+    );
+    expect(missingReports).toHaveLength(1);
   });
 
   it("cancels an active job: canceled row, ephemeral terminal frame, cancelled analytics", async () => {
@@ -607,8 +873,47 @@ describe("tool job failure paths", () => {
 });
 
 describe("pipeline finalize", () => {
+  it("reports a failed pipeline step through reportError while returning a failure marker (#951)", async () => {
+    const flowId = `pf-step-${randomUUID()}`;
+    const stepId = `${flowId}-s0`;
+    const inputRef = await seedInput(stepId, "step.png", Buffer.from("step-bytes"));
+    await db.insert(schema.jobs).values({
+      id: stepId,
+      type: "pipeline-step",
+      toolId: "wt-boom",
+      pool: "image",
+      status: "queued",
+      inputRefs: [inputRef],
+    });
+
+    reported.errors.length = 0;
+    await getQueue("image").add(
+      "wt-boom",
+      toolJob({
+        jobId: stepId,
+        toolId: "wt-boom",
+        kind: "pipeline-step",
+        stepIndex: 0,
+        totalSteps: 1,
+        inputRefs: [inputRef],
+        filename: "step.png",
+      }),
+      { jobId: stepId, attempts: 1 },
+    );
+
+    const row = await terminalRow(stepId);
+    expect(row.status).toBe("failed");
+    expect(row.error?.message).toBe("boom");
+
+    const settled = await settledQueueJob("image", stepId);
+    expect(settled.state).toBe("completed");
+    expect(settled.returnvalue?.resultPayload).toEqual({ failed: true, error: "boom" });
+    expect(reported.errors.some((e) => e instanceof Error && e.message === "boom")).toBe(true);
+  });
+
   it("fails the pipeline when a step row is missing", async () => {
     const jobId = `pf-${randomUUID()}`;
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
@@ -627,6 +932,9 @@ describe("pipeline finalize", () => {
     const frame = await terminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Step 1: Step 1 row not found");
+    expect(
+      reported.errors.some((e) => e instanceof Error && e.message === "Step 1 row not found"),
+    ).toBe(true);
 
     const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
     const props = events[0];
@@ -868,26 +1176,38 @@ describe("pipeline finalize", () => {
   it("hard-fails the finalize job when the last step has no output ref", async () => {
     const jobId = `pf-${randomUUID()}`;
     const clientJobId = `pfc-${randomUUID()}`;
-    await db.insert(schema.jobs).values({
-      id: `${jobId}-s0`,
-      type: "pipeline-step",
-      status: "completed",
-      toolId: "noop",
-      pool: "image",
-      inputRefs: [],
-      outputRefs: [],
-    });
-    // The client-facing row the SSE replays, as the route's first progress
-    // publish would have created it.
-    await db.insert(schema.jobs).values({
-      id: clientJobId,
-      type: "single",
-      status: "processing",
-      inputRefs: [],
-      progress: { percent: 0, stage: "Preparing pipeline..." },
-    });
+    await db.insert(schema.jobs).values([
+      {
+        id: `${jobId}-s0`,
+        type: "pipeline-step",
+        status: "completed",
+        toolId: "noop",
+        pool: "image",
+        inputRefs: [],
+        outputRefs: [],
+      },
+      {
+        id: jobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      // The client-facing row the SSE replays, stamped with the flow pointer as
+      // routes/pipeline.ts creates it (#771, #2741).
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: jobId },
+      },
+    ]);
 
-    await enqueueToolJob(
+    await getQueue("image").add(
+      "pipeline-finalize",
       toolJob({
         jobId,
         toolId: "pipeline",
@@ -896,15 +1216,12 @@ describe("pipeline finalize", () => {
         filename: "chain.png",
         clientJobId,
       }),
+      { jobId, attempts: 1 },
     );
 
     // This branch throws instead of writing a failure row, so the BullMQ job
     // itself fails after the pool's retry budget.
-    const failedJob = await waitFor(async () => {
-      const job = await getQueue("image").getJob(jobId);
-      if (!job) return undefined;
-      return (await job.getState()) === "failed" ? job : undefined;
-    }, 25_000);
+    const failedJob = await failedQueueJob("image", jobId, 25_000);
     expect(failedJob.failedReason).toContain("Last step has no output");
 
     // A degraded or 202 client is riding the SSE under clientJobId; without
@@ -923,6 +1240,573 @@ describe("pipeline finalize", () => {
     });
     expect(clientRow.completedAt).not.toBeNull();
   }, 30_000);
+
+  it("the failed-handler safety net settles a crashed canceled finalize as canceled (#836)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const clientJobId = `pfc-${randomUUID()}`;
+    await db.insert(schema.jobs).values([
+      {
+        id: `${jobId}-s0`,
+        type: "pipeline-step",
+        status: "completed",
+        toolId: "resize",
+        pool: "image",
+        inputRefs: [],
+        outputRefs: ["outputs/seed/mid.png"],
+        bytesIn: 10,
+        bytesOut: 8,
+      },
+      {
+        id: `${jobId}-s1`,
+        type: "pipeline-step",
+        status: "canceled",
+        toolId: "compress",
+        pool: "image",
+        inputRefs: [],
+        error: { message: "Canceled" },
+      },
+      {
+        id: jobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: jobId },
+      },
+    ]);
+    await markBatchCanceled(clientJobId);
+
+    // Fault both guarded writes inside the finalize and throw from the
+    // ephemeral publish so the finalize job hard-fails with neither row
+    // settled; the failed-handler safety net must consult the step rows and
+    // settle both as canceled rather than "Pipeline processing failed".
+    progressMock.failCancelGuardedOnceFor.add(jobId);
+    progressMock.failCancelGuardedOnceFor.add(clientJobId);
+    progressMock.failPublishEphemeralFor = clientJobId;
+    try {
+      await getQueue("image").add(
+        "pipeline-finalize",
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 2,
+          filename: "chain.png",
+          clientJobId,
+        }),
+        { jobId, attempts: 1 },
+      );
+
+      const frame = await terminalFrame(clientJobId);
+      expect(frame.type).toBe("single");
+      expect(frame.phase).toBe("failed");
+      expect(frame.error).toBe("Canceled");
+
+      const flowRow = await terminalRow(jobId);
+      expect(flowRow.status).toBe("canceled");
+      expect(flowRow.error?.message).toBe("Canceled");
+
+      const aliasRow = await terminalRow(clientJobId);
+      expect(aliasRow.status).toBe("canceled");
+      expect(aliasRow.error?.message).toBe("Canceled");
+    } finally {
+      progressMock.failCancelGuardedOnceFor.clear();
+      progressMock.failPublishEphemeralFor = null;
+    }
+  }, 30_000);
+
+  it("the failed-handler safety net keeps the failed label when an earlier step failed before a canceled step (#836)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const clientJobId = `pfc-${randomUUID()}`;
+    await db.insert(schema.jobs).values([
+      {
+        id: `${jobId}-s0`,
+        type: "pipeline-step",
+        status: "failed",
+        toolId: "resize",
+        pool: "image",
+        inputRefs: [],
+        error: { message: "boom" },
+      },
+      {
+        id: `${jobId}-s1`,
+        type: "pipeline-step",
+        status: "canceled",
+        toolId: "compress",
+        pool: "image",
+        inputRefs: [],
+        error: { message: "Canceled" },
+      },
+      {
+        id: jobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: jobId },
+      },
+    ]);
+
+    progressMock.failUpdateSingleFor = clientJobId;
+    try {
+      await getQueue("image").add(
+        "pipeline-finalize",
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 2,
+          filename: "chain.png",
+          clientJobId,
+        }),
+        { jobId, attempts: 1 },
+      );
+
+      const frame = await terminalFrame(clientJobId);
+      expect(frame.phase).toBe("failed");
+      expect(frame.error).toBe("Pipeline processing failed");
+
+      const flowRow = await terminalRow(jobId);
+      expect(flowRow.status).toBe("failed");
+      expect(flowRow.error?.message).toBe("Pipeline processing failed");
+
+      const aliasRow = await terminalRow(clientJobId);
+      expect(aliasRow.status).toBe("failed");
+      expect(aliasRow.error?.message).toBe("Pipeline processing failed");
+    } finally {
+      progressMock.failUpdateSingleFor = null;
+    }
+  }, 30_000);
+
+  it("commits the failed pipeline row and clientJobId alias row atomically and survives a terminal write fault on a pipeline-batch child (#3167)", async () => {
+    const singleJobId = `pf-${randomUUID()}`;
+    const clientJobId = `pfc-${randomUUID()}`;
+    await db.insert(schema.jobs).values([
+      {
+        id: `${singleJobId}-s0`,
+        type: "pipeline-step",
+        status: "failed",
+        toolId: "pdf-compress",
+        pool: "image",
+        inputRefs: [],
+        error: {
+          message: "qpdf is not installed",
+          code: "ENGINE_UNAVAILABLE",
+          details: "Check QPDF_PATH",
+          httpStatus: 503,
+        },
+      },
+      {
+        id: singleJobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: singleJobId },
+      },
+    ]);
+
+    await getQueue("image").add(
+      "pipeline-finalize",
+      toolJob({
+        jobId: singleJobId,
+        toolId: "pipeline",
+        kind: "pipeline-finalize",
+        totalSteps: 1,
+        filename: "doc.pdf",
+        clientJobId,
+      }),
+      { jobId: singleJobId, attempts: 1 },
+    );
+
+    const frame = await terminalFrame(clientJobId);
+    expect(frame).toMatchObject({
+      jobId: clientJobId,
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Step 1: qpdf is not installed",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+      httpStatus: 503,
+    });
+
+    const flowRow = await terminalRow(singleJobId);
+    expect(flowRow.status).toBe("failed");
+    expect(flowRow.error).toEqual({
+      message: "Step 1: qpdf is not installed",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+      httpStatus: 503,
+    });
+
+    const aliasRow = await terminalRow(clientJobId);
+    expect(aliasRow.status).toBe("failed");
+    expect(aliasRow.error).toEqual({
+      message: "Step 1: qpdf is not installed",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+      httpStatus: 503,
+    });
+
+    // Pipeline-batch child: a terminal DB write fault rolls back the transaction
+    // without aborting recordChildOutcome, analytics, or the returned failure
+    // marker that lets batch-finalize run.
+    const batchChildId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${batchChildId}-s0`,
+      type: "pipeline-step",
+      status: "failed",
+      toolId: "pdf-compress",
+      pool: "image",
+      inputRefs: [],
+      error: {
+        message: "qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+      },
+    });
+
+    progressMock.failUpdateSingleFor = batchChildId;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId: batchChildId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "doc.pdf",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const settledJob = await settledQueueJob("image", batchChildId);
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.resultPayload).toMatchObject({
+        error: "Step 1: qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+        stepsCompleted: 0,
+        steps: [],
+      });
+
+      const outcome = await batchOutcome(batchParent, "failed");
+      expect(outcome.count).toBe("1");
+      expect(outcome.errors).toEqual([
+        { filename: "doc.pdf", error: "Step 1: qpdf is not installed" },
+      ]);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, batchChildId);
+      expect(events[0].status).toBe("failed");
+
+      const childRow = await jobRow(batchChildId);
+      expect(childRow?.status).toBe("queued");
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${batchChildId}`)).toBeNull();
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected update single progress outage",
+        ),
+      ).toBe(true);
+    } finally {
+      progressMock.failUpdateSingleFor = null;
+    }
+  }, 30_000);
+
+  it("survives a batch counter fault after settling a canceled pipeline-batch file (#836)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "canceled",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      error: { message: "Canceled" },
+    });
+
+    batchProgressMock.failRecordOutcomeForParentId = batchParent;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "chain.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.error?.message).toBe("Canceled");
+
+      const returned = await waitFor(async () => {
+        const job = await getQueue("image").getJob(jobId);
+        return job?.returnvalue ?? undefined;
+      });
+      expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+      expect(events[0].status).toBe("canceled");
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ),
+      ).toBe(true);
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
+  }, 30_000);
+
+  it("survives a batch counter fault after settling a failed pipeline-batch file (#2620)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "failed",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      error: { message: "kaboom" },
+    });
+
+    batchProgressMock.failRecordOutcomeForParentId = batchParent;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "chain.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("failed");
+      expect(row.error?.message).toBe("Step 1: kaboom");
+
+      const settledJob = await settledQueueJob("image", jobId);
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.resultPayload).toMatchObject({
+        error: "Step 1: kaboom",
+        stepsCompleted: 0,
+        steps: [],
+      });
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+      expect(events[0].status).toBe("failed");
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ),
+      ).toBe(true);
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
+  }, 30_000);
+
+  it("survives a batch counter fault after settling a completed pipeline-batch file (#2620)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await putObject("outputs/seed-2620/final.png", Buffer.from("final-2620"));
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "completed",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      outputRefs: ["outputs/seed-2620/final.png"],
+      bytesIn: 10,
+      bytesOut: 10,
+    });
+
+    batchProgressMock.failRecordOutcomeForParentId = batchParent;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "chain.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.outputRefs).toEqual([`outputs/${jobId}/final.png`]);
+
+      const settledJob = await settledQueueJob("image", jobId);
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.outputRefs).toEqual([`outputs/${jobId}/final.png`]);
+      expect(settledJob.returnvalue?.resultPayload).toMatchObject({
+        stepsCompleted: 1,
+        steps: [{ step: 1, toolId: "resize", size: 10 }],
+      });
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+      expect(events[0].status).toBe("completed");
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ),
+      ).toBe(true);
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
+  }, 30_000);
+
+  it("survives a completion DB write fault on a pipeline-batch child without running the single-file safety net and recovers the artifact in batch-finalize (#3190)", async () => {
+    const batchParent = `bp-${randomUUID()}`;
+    const batchChildId = `${batchParent}-f0`;
+    await putObject("outputs/seed-3190/final.png", Buffer.from("final-3190"));
+    await db.insert(schema.jobs).values([
+      {
+        id: batchParent,
+        type: "batch",
+        toolId: "pipeline-batch",
+        pool: "system",
+        status: "queued",
+        inputRefs: [],
+        settings: { flowChildCount: 1, stepCount: 1 },
+      },
+      {
+        id: `${batchChildId}-s0`,
+        type: "pipeline-step",
+        status: "completed",
+        toolId: "resize",
+        pool: "image",
+        inputRefs: ["uploads/seed-3190/in.png"],
+        outputRefs: ["outputs/seed-3190/final.png"],
+        bytesIn: 10,
+        bytesOut: 10,
+      },
+      {
+        id: batchChildId,
+        type: "pipeline-finalize",
+        status: "queued",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: ["uploads/seed-3190/in.png"],
+        settings: {},
+      },
+    ]);
+
+    progressMock.failUpdateSingleFor = batchChildId;
+    reported.errors.length = 0;
+    try {
+      await getQueue("image").add(
+        "pipeline-finalize",
+        toolJob({
+          jobId: batchChildId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "in.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+        { jobId: batchChildId, attempts: 1 },
+      );
+
+      const settledJob = await settledQueueJob("image", batchChildId);
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.outputRefs).toEqual([`outputs/${batchChildId}/final.png`]);
+
+      const outcome = await batchOutcome(batchParent, "done");
+      expect(outcome.count).toBe("1");
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, batchChildId);
+      expect(events[0].status).toBe("completed");
+
+      const childRow = await jobRow(batchChildId);
+      expect(childRow?.status).toBe("queued");
+      expect(childRow?.error).toBeNull();
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${batchChildId}`)).toBeNull();
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected update single progress outage",
+        ),
+      ).toBe(true);
+    } finally {
+      progressMock.failUpdateSingleFor = null;
+    }
+
+    await getQueue("system").add(
+      "batch-finalize",
+      toolJob({
+        jobId: batchParent,
+        toolId: "pipeline-batch",
+        kind: "batch-finalize",
+        pool: "system",
+        totalFiles: 1,
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+        filename: "",
+      }),
+      { jobId: batchParent, attempts: 1 },
+    );
+
+    const parentFrame = await terminalFrame(batchParent);
+    expect(parentFrame.status).toBe("completed");
+    expect(parentFrame.failedFiles).toBe(0);
+    const frameResult = (parentFrame.result ?? {}) as Record<string, unknown>;
+    expect(frameResult.fileResults).toEqual({ "0": "final.png" });
+
+    const parentRow = await terminalRow(batchParent);
+    expect(parentRow.status).toBe("completed");
+    const zipKey = (parentRow.outputRefs ?? [])[0];
+    const zipBytes = await getObjectBuffer(zipKey);
+    const entries = new AdmZip(zipBytes).getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual(["final.png"]);
+    expect(entries[0].getData().toString("utf8")).toBe("final-3190");
+  }, 30_000);
 });
 
 describe("batch children and finalize", () => {
@@ -932,6 +1816,7 @@ describe("batch children and finalize", () => {
     const boomId = `${parentId}-f1`;
     const okRef = await seedInput(okId, "a.png", Buffer.from("aaa"));
     const boomRef = await seedInput(boomId, "b.png", Buffer.from("bbb"));
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
@@ -966,12 +1851,13 @@ describe("batch children and finalize", () => {
     expect(okEvents[0].status).toBe("completed");
 
     // The failed child resolves with a failure marker instead of throwing so
-    // the parent flow still advances.
+    // the parent flow still advances, while still reporting the error (#951).
     const boomResult = await waitFor(async () => {
       const job = await getQueue("image").getJob(boomId);
       return job?.returnvalue ?? undefined;
     });
     expect(boomResult.resultPayload).toEqual({ failed: true, error: "boom" });
+    expect(reported.errors.some((e) => e instanceof Error && e.message === "boom")).toBe(true);
 
     // Child outcomes alone stay nonterminal since #750; only the finalize
     // publishes the terminal frame, once the durable ZIP exists. The ok
@@ -1024,6 +1910,214 @@ describe("batch children and finalize", () => {
     const entries = new AdmZip(zipBytes).getEntries();
     expect(entries.map((e) => e.entryName)).toEqual(["a_wt-echo.png"]);
     expect(entries[0].getData().toString("utf8")).toBe("aaa");
+  }, 30_000);
+
+  it("survives a batch counter fault in batch-child without corrupting a succeeded child or hard-failing a failed child (#2620)", async () => {
+    const parentId = `bparent-fault-${randomUUID()}`;
+    const okId = `${parentId}-f0`;
+    const boomId = `${parentId}-f1`;
+    const okRef = await seedInput(okId, "a.png", Buffer.from("aaa"));
+    const boomRef = await seedInput(boomId, "b.png", Buffer.from("bbb"));
+
+    batchProgressMock.failRecordOutcomeForParentId = parentId;
+    batchProgressMock.recordOutcomeCalls.length = 0;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId: okId,
+          toolId: "wt-echo",
+          kind: "batch-child",
+          parentId,
+          totalFiles: 2,
+          inputRefs: [okRef],
+          filename: "a.png",
+        }),
+      );
+      // Flow children run with attempts: 1 in production (batch.ts:587) so the
+      // first failure is final and processToolJob commits the failed DB row.
+      await db.insert(schema.jobs).values({
+        id: boomId,
+        type: "batch-child",
+        toolId: "wt-boom",
+        pool: "image",
+        status: "queued",
+        inputRefs: [boomRef],
+      });
+      await getQueue("image").add(
+        "wt-boom",
+        toolJob({
+          jobId: boomId,
+          toolId: "wt-boom",
+          kind: "batch-child",
+          parentId,
+          totalFiles: 2,
+          inputRefs: [boomRef],
+          filename: "b.png",
+        }),
+        { jobId: boomId, attempts: 1 },
+      );
+
+      const okRow = await terminalRow(okId);
+      expect(okRow.status).toBe("completed");
+      expect(okRow.outputRefs).toEqual([`outputs/${okId}/a_wt-echo.png`]);
+
+      // Pin #2900: if moveToCompleted lands between getJob() and getState(),
+      // the Job instance on which getState() was called still holds the
+      // pre-script returnvalue=null snapshot.
+      const imageQueue = getQueue("image");
+      const realGetJob = imageQueue.getJob.bind(imageQueue);
+      let injectedSplitRead = false;
+      const getJobSpy = vi.spyOn(imageQueue, "getJob").mockImplementation(async (id) => {
+        const job = await realGetJob(id);
+        if (job && id === okId && !injectedSplitRead) {
+          const realGetState = job.getState.bind(job);
+          job.getState = async () => {
+            const state = await realGetState();
+            if (state === "completed" && !injectedSplitRead) {
+              injectedSplitRead = true;
+              job.returnvalue = null as never;
+            }
+            return state;
+          };
+        }
+        return job;
+      });
+      const okSettled = await settledQueueJob("image", okId).finally(() => {
+        getJobSpy.mockRestore();
+      });
+      expect(okSettled.state).toBe("completed");
+      expect(okSettled.returnvalue?.outputRefs).toEqual([`outputs/${okId}/a_wt-echo.png`]);
+      expect(okSettled.returnvalue?.resultPayload).toBeUndefined();
+
+      const boomRow = await terminalRow(boomId);
+      expect(boomRow.status).toBe("failed");
+      expect(boomRow.error?.message).toBe("boom");
+
+      const boomSettled = await settledQueueJob("image", boomId);
+      expect(boomSettled.state).toBe("completed");
+      expect(boomSettled.returnvalue?.resultPayload).toEqual({ failed: true, error: "boom" });
+
+      const callsForParent = batchProgressMock.recordOutcomeCalls.filter(
+        (c) => c.parentId === parentId,
+      );
+      expect(callsForParent.filter((c) => c.filename === "a.png")).toEqual([
+        { parentId, filename: "a.png", error: undefined },
+      ]);
+      expect(callsForParent.filter((c) => c.filename === "b.png")).toEqual([
+        { parentId, filename: "b.png", error: "boom" },
+      ]);
+
+      expect(
+        reported.errors.filter(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ).length,
+      ).toBe(2);
+
+      // Once Redis recovers, batch-finalize builds the ZIP manifest from the
+      // durable child DB rows rather than the missed Redis counters (#2620).
+      batchProgressMock.failRecordOutcomeForParentId = null;
+      await enqueueToolJob(
+        toolJob({
+          jobId: parentId,
+          toolId: "wt-echo",
+          kind: "batch-finalize",
+          pool: "system",
+          totalFiles: 2,
+          settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+          filename: "",
+        }),
+      );
+      const parentRow = await terminalRow(parentId);
+      expect(parentRow.status).toBe("completed");
+      expect(parentRow.error).toEqual({
+        message: "1 file(s) failed",
+        details: [{ filename: "b.png", error: "boom" }],
+      });
+      const parentFrame = await terminalFrame(parentId);
+      expect(parentFrame.errors).toEqual([{ filename: "b.png", error: "boom" }]);
+      const zipKey = (parentRow.outputRefs ?? [])[0];
+      const entries = new AdmZip(await getObjectBuffer(zipKey)).getEntries();
+      expect(entries.map((e) => e.entryName)).toEqual(["a_wt-echo.png"]);
+      expect(entries[0].getData().toString("utf8")).toBe("aaa");
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
+  }, 30_000);
+
+  it("retains per-file errors and sharedFailureReason when all children fail and Redis outcome writes failed (#2629)", async () => {
+    const parentId = `bparent-allfail-${randomUUID()}`;
+    const boom0Id = `${parentId}-f0`;
+    const boom1Id = `${parentId}-f1`;
+    const boom0Ref = await seedInput(boom0Id, "a.png", Buffer.from("aaa"));
+    const boom1Ref = await seedInput(boom1Id, "b.png", Buffer.from("bbb"));
+
+    batchProgressMock.failRecordOutcomeForParentId = parentId;
+    try {
+      for (const [id, ref, filename] of [
+        [boom0Id, boom0Ref, "a.png"],
+        [boom1Id, boom1Ref, "b.png"],
+      ] as const) {
+        await db.insert(schema.jobs).values({
+          id,
+          type: "batch-child",
+          toolId: "wt-boom",
+          pool: "image",
+          status: "queued",
+          inputRefs: [ref],
+        });
+        await getQueue("image").add(
+          "wt-boom",
+          toolJob({
+            jobId: id,
+            toolId: "wt-boom",
+            kind: "batch-child",
+            parentId,
+            totalFiles: 2,
+            inputRefs: [ref],
+            filename,
+          }),
+          { jobId: id, attempts: 1 },
+        );
+      }
+
+      expect((await terminalRow(boom0Id)).status).toBe("failed");
+      expect((await terminalRow(boom1Id)).status).toBe("failed");
+
+      batchProgressMock.failRecordOutcomeForParentId = null;
+      await enqueueToolJob(
+        toolJob({
+          jobId: parentId,
+          toolId: "wt-boom",
+          kind: "batch-finalize",
+          pool: "system",
+          totalFiles: 2,
+          settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+          filename: "",
+        }),
+      );
+
+      const parentRow = await terminalRow(parentId);
+      expect(parentRow.status).toBe("failed");
+      expect(parentRow.error).toEqual({
+        message: "boom",
+        details: [
+          { filename: "a.png", error: "boom" },
+          { filename: "b.png", error: "boom" },
+          { filename: "", error: "boom" },
+        ],
+      });
+
+      const parentFrame = await terminalFrame(parentId);
+      expect(parentFrame.status).toBe("failed");
+      expect(parentFrame.errors).toEqual([
+        { filename: "a.png", error: "boom" },
+        { filename: "b.png", error: "boom" },
+        { filename: "", error: "boom" },
+      ]);
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
   }, 30_000);
 
   it("the failed-handler safety net publishes a terminal failed frame when the finalize crashes", async () => {
@@ -1107,6 +2201,25 @@ describe("batch children and finalize", () => {
       error: { message: "child died" },
     });
     // No -f2 row: reported as "Child job row not found".
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-f3`,
+      type: "batch-child",
+      status: "completed",
+      toolId: "wt-echo",
+      pool: "image",
+      inputRefs: ["uploads/seed/empty-out.png"],
+      outputRefs: [],
+    });
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-f4`,
+      type: "pipeline-finalize",
+      status: "queued",
+      toolId: "pipeline",
+      pool: "image",
+      inputRefs: ["uploads/seed/pipe-in.png"],
+      settings: { stepCount: 1 },
+    });
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
@@ -1114,7 +2227,7 @@ describe("batch children and finalize", () => {
         toolId: "batch",
         kind: "batch-finalize",
         pool: "system",
-        settings: { flowChildCount: 3 },
+        settings: { flowChildCount: 5 },
         filename: "batch.zip",
       }),
     );
@@ -1136,7 +2249,20 @@ describe("batch children and finalize", () => {
       { index: 0, filename: "ok.png", outputRef: "outputs/seed/ok.png" },
       { index: 1, filename: "orig.png", error: "child died" },
       { index: 2, filename: "file-2", error: "Child job row not found" },
+      { index: 3, filename: "empty-out.png", error: "Processing failed" },
+      { index: 4, filename: "pipe-in.png", error: "Step 1: Step 1 row not found" },
     ]);
+    expect(
+      reported.errors.some((e) => e instanceof Error && e.message === "Child job row not found"),
+    ).toBe(true);
+    expect(
+      reported.errors.some(
+        (e) => e instanceof Error && e.message === "Completed child job has no output",
+      ),
+    ).toBe(true);
+    expect(
+      reported.errors.some((e) => e instanceof Error && e.message === "Step 1 row not found"),
+    ).toBe(true);
   });
 
   it("settles an all-canceled batch as canceled when the cancel flag expired (#809)", async () => {
@@ -1248,11 +2374,67 @@ describe("batch children and finalize", () => {
       toolJob({ jobId, toolId: "wt-not-a-system-job", pool: "system", filename: "none" }),
     );
 
-    const failedJob = await waitFor(async () => {
-      const job = await getQueue("system").getJob(jobId);
-      if (!job) return undefined;
-      return (await job.getState()) === "failed" ? job : undefined;
-    }, 25_000);
+    const failedJob = await failedQueueJob("system", jobId, 25_000);
     expect(failedJob.failedReason).toContain("Unknown system job: wt-not-a-system-job");
+  }, 30_000);
+});
+
+// ── AI handler vs registry process fn dispatch (#2076) ──────────
+
+// The shape all thirteen AI tools register: an AI job handler plus a registry
+// process fn. A pipeline step or batch child has no second phase, so it must
+// run the process fn that owns the whole job; only the standalone ai-tool kind
+// takes the handler. Before #2076 the handler won every kind, which is how the
+// pipeline behaviour of those tools drifted from their tool page.
+registerAiJobHandler("wt-ai-both", async () => ({
+  buffer: Buffer.from("from-the-ai-handler"),
+  filename: "handler.png",
+  contentType: "image/png",
+}));
+
+registerToolProcessFn({
+  toolId: "wt-ai-both",
+  settingsSchema: passthroughSchema,
+  process: unusedLegacyProcess,
+  processV2: async () => ({
+    buffer: Buffer.from("from-the-process-fn"),
+    filename: "process.png",
+    contentType: "image/png",
+  }),
+});
+
+describe("AI handler vs registry process fn (#2076)", () => {
+  it.each(["pipeline-step", "batch-child"] as const)(
+    "runs the process fn for a %s job",
+    async (kind) => {
+      const jobId = randomUUID();
+      const inputRef = await seedInput(jobId, "photo.png", Buffer.from("fake-png-input"));
+
+      await enqueueToolJob(toolJob({ jobId, toolId: "wt-ai-both", inputRefs: [inputRef], kind }));
+
+      const row = await terminalRow(jobId, 25_000);
+      expect(row.status).toBe("completed");
+      expect(row.outputRefs).toEqual([`outputs/${jobId}/process.png`]);
+      expect((await getObjectBuffer(`outputs/${jobId}/process.png`)).toString("utf8")).toBe(
+        "from-the-process-fn",
+      );
+    },
+    30_000,
+  );
+
+  it("runs the AI handler for the standalone ai-tool kind", async () => {
+    const jobId = randomUUID();
+    const inputRef = await seedInput(jobId, "photo.png", Buffer.from("fake-png-input"));
+
+    await enqueueToolJob(
+      toolJob({ jobId, toolId: "wt-ai-both", inputRefs: [inputRef], kind: "ai-tool", pool: "ai" }),
+    );
+
+    const row = await terminalRow(jobId, 25_000);
+    expect(row.status).toBe("completed");
+    expect(row.outputRefs).toEqual([`outputs/${jobId}/handler.png`]);
+    expect((await getObjectBuffer(`outputs/${jobId}/handler.png`)).toString("utf8")).toBe(
+      "from-the-ai-handler",
+    );
   }, 30_000);
 });

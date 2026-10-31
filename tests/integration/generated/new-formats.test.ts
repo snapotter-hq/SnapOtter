@@ -27,11 +27,11 @@ describe("New format support", () => {
     testApp = await buildTestApp();
     app = testApp.app;
     adminToken = await loginAsAdmin(app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp?.cleanup();
-  }, 10_000);
+  });
 
   // ---------------------------------------------------------------------------
   // New output format conversions

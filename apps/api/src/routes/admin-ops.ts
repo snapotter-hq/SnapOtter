@@ -15,7 +15,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { formatZodErrors } from "../lib/errors.js";
+import { logger } from "../lib/logger.js";
 import { metricsText } from "../lib/metrics.js";
+import { upsertSetting } from "../lib/settings-helpers.js";
 import { buildSupportBundle } from "../lib/support-bundle.js";
 import { requirePermission } from "../permissions.js";
 
@@ -131,15 +133,19 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
       sql`SELECT coalesce(sum(size), 0)::text AS bytes, count(*)::int AS files FROM user_files`,
     );
 
-    // Per-team storage breakdown from pre-computed user counters
+    // Per-team storage breakdown from pre-computed user counters. users.team
+    // holds a team id (#1474): label by the team's name, falling back to the
+    // raw value for a user whose team row is gone.
+    const teamName = sql<string>`coalesce(${schema.teams.name}, ${schema.users.team})`;
     const teamStorageRows = await db
       .select({
-        teamName: schema.users.team,
+        teamName,
         totalBytes: sql<string>`coalesce(sum(${schema.users.storageUsed}), 0)::text`,
-        userCount: sql<number>`count(*)::int`,
+        userCount: sql<number>`count(*) filter (where ${schema.users.id} <> 'anonymous')::int`,
       })
       .from(schema.users)
-      .groupBy(schema.users.team);
+      .leftJoin(schema.teams, eq(schema.teams.id, schema.users.team))
+      .groupBy(teamName);
 
     const jobsPerDay = (jobsPerDayResult.rows as Array<Record<string, unknown>>).map((r) => ({
       day: String(r.day),
@@ -197,11 +203,51 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
 
   const backupStatusSchema = z.object({
     type: z.string().min(1),
-    sizeBytes: z.number().optional(),
+    sizeBytes: z.number().int().nonnegative().optional(),
     notes: z.string().optional(),
   });
 
   const BACKUP_KEY = "backup_last_completed";
+
+  function parseBackupRecord(
+    raw: string,
+  ): { record: Record<string, unknown>; timestampMs: number } | null {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      logger.warn(
+        { err, key: BACKUP_KEY },
+        "admin-ops: failed to parse stored backup_last_completed JSON",
+      );
+      return null;
+    }
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed) ||
+      typeof (parsed as Record<string, unknown>).timestamp !== "string"
+    ) {
+      logger.warn(
+        { key: BACKUP_KEY },
+        "admin-ops: stored backup_last_completed is not a valid backup record",
+      );
+      return null;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const timestampMs = new Date(record.timestamp as string).getTime();
+    if (!Number.isFinite(timestampMs)) {
+      logger.warn(
+        { key: BACKUP_KEY },
+        "admin-ops: stored backup_last_completed is not a valid backup record",
+      );
+      return null;
+    }
+
+    return { record, timestampMs };
+  }
 
   // POST /api/v1/admin/backup-status -- record backup completion
   app.post("/api/v1/admin/backup-status", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -225,19 +271,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
       notes: parsed.data.notes ?? "",
     });
 
-    const [existing] = await db
-      .select()
-      .from(schema.settings)
-      .where(eq(schema.settings.key, BACKUP_KEY));
-
-    if (existing) {
-      await db
-        .update(schema.settings)
-        .set({ value: payload, updatedAt: new Date() })
-        .where(eq(schema.settings.key, BACKUP_KEY));
-    } else {
-      await db.insert(schema.settings).values({ key: BACKUP_KEY, value: payload });
-    }
+    await upsertSetting(BACKUP_KEY, payload);
 
     return { success: true, timestamp };
   });
@@ -253,19 +287,13 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
       .where(eq(schema.settings.key, BACKUP_KEY))
       .limit(1);
 
-    if (result.length === 0) {
+    const parsedBackup = result.length > 0 ? parseBackupRecord(result[0].value) : null;
+    if (!parsedBackup) {
       return { lastBackup: null, status: "critical", ageHours: null };
     }
 
-    let lastBackup: Record<string, unknown>;
-    try {
-      lastBackup = JSON.parse(result[0].value);
-    } catch {
-      return { lastBackup: null, status: "critical", ageHours: null };
-    }
-
-    const ts = new Date(lastBackup.timestamp as string);
-    const ageMs = Date.now() - ts.getTime();
+    const { record: lastBackup, timestampMs } = parsedBackup;
+    const ageMs = Date.now() - timestampMs;
     const ageHours = Math.round((ageMs / 3_600_000) * 10) / 10;
 
     let status: "ok" | "warning" | "critical";

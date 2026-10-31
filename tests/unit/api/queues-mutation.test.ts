@@ -12,6 +12,7 @@ interface FakeQueue {
   name: string;
   options: Record<string, unknown>;
   close: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
   getJobCounts: ReturnType<typeof vi.fn>;
   getJobs: ReturnType<typeof vi.fn>;
 }
@@ -28,6 +29,7 @@ async function loadQueuesModule() {
       name,
       options,
       close: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
       getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, failed: 0 }),
       getJobs: vi.fn().mockResolvedValue([]),
     };
@@ -143,6 +145,22 @@ describe("queues.ts mutation coverage", () => {
 
       expect(second).toBe(first);
       expect(queueCtor).toHaveBeenCalledTimes(1);
+    });
+
+    it("attaches an error listener once per created queue that logs the pool error", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { getQueue } = await loadQueuesModule();
+      const { queueName } = await import("../../../apps/api/src/jobs/types.js");
+
+      getQueue("image");
+      getQueue("image");
+
+      expect(queueInstances[0].on).toHaveBeenCalledTimes(1);
+      expect(queueInstances[0].on).toHaveBeenCalledWith("error", expect.any(Function));
+      const handler = queueInstances[0].on.mock.calls[0][1] as (err: Error) => void;
+      const boom = new Error("redis blip");
+      handler(boom);
+      expect(errorSpy).toHaveBeenCalledWith(`[queue] ${queueName("image")} error`, boom);
     });
   });
 

@@ -23,6 +23,7 @@ export async function inpaint(
   outputDir: string,
   onProgress?: ProgressCallback,
   quality: InpaintQuality = "fast",
+  options: { signal?: AbortSignal } = {},
 ): Promise<Buffer> {
   const inputPath = join(outputDir, "input_inpaint.png");
   const maskPath = join(outputDir, "mask_inpaint.png");
@@ -36,6 +37,7 @@ export async function inpaint(
   const script = quality === "hq" ? "inpaint_hq.py" : "inpaint.py";
   const { stdout } = await runPythonWithProgress(script, [inputPath, maskPath, outputPath], {
     onProgress,
+    signal: options.signal,
   });
 
   const result = parseStdoutJson(stdout);

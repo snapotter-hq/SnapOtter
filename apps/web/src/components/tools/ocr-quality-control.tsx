@@ -1,11 +1,17 @@
+import { FEATURE_BUNDLES, OCR_FAST_UNSUPPORTED_LANGUAGES } from "@snapotter/shared";
 import { Download, Loader2 } from "lucide-react";
 import { useCallback, useId, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { bundleName, featureIncompatibleMessage } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
 export type OcrQuality = "fast" | "balanced" | "best";
+
+function requiresAccurateTier(language: string): boolean {
+  return (OCR_FAST_UNSUPPORTED_LANGUAGES as readonly string[]).includes(language);
+}
 
 export function useOcrQuality(language = "auto"): {
   quality: OcrQuality;
@@ -19,7 +25,7 @@ export function useOcrQuality(language = "auto"): {
   const bundle = useFeaturesStore((state) => state.bundles.find((item) => item.id === "ocr"));
   const bestAvailable = bundle?.availableQualities?.includes("best") ?? false;
   const balancedAvailable = bundle?.availableQualities?.includes("balanced") ?? false;
-  const korean = language === "ko";
+  const accurateOnly = requiresAccurateTier(language);
   const selected = selection?.language === language ? selection.quality : null;
   const accurateDefault: OcrQuality = bestAvailable
     ? "best"
@@ -31,20 +37,20 @@ export function useOcrQuality(language = "auto"): {
     : balancedAvailable
       ? "balanced"
       : "fast";
-  const quality = korean
+  const quality = accurateOnly
     ? selected && selected !== "fast"
       ? selected
       : accurateDefault
     : (selected ?? ordinaryDefault);
   const canRun =
-    (!korean || quality !== "fast") &&
+    (!accurateOnly || quality !== "fast") &&
     (quality === "fast" || (bundle?.availableQualities?.includes(quality) ?? false));
   const setQuality = useCallback(
     (nextQuality: OcrQuality) => {
-      if (korean && nextQuality === "fast") return;
+      if (accurateOnly && nextQuality === "fast") return;
       setSelection({ language, quality: nextQuality });
     },
-    [korean, language],
+    [accurateOnly, language],
   );
   return { quality, setQuality, canRun };
 }
@@ -66,17 +72,22 @@ export function OcrQualityControl({
   const queued = useFeaturesStore((state) => state.queued.includes("ocr"));
   const installError = useFeaturesStore((state) => state.errors.ocr);
   const helpId = useId();
-  const korean = language === "ko";
+  const accurateOnly = requiresAccurateTier(language);
   const accurateSelected = quality !== "fast";
   const accurateAvailable = bundle?.availableQualities?.includes(quality) ?? false;
   const needsPack = accurateSelected && !accurateAvailable;
   const isAdmin = hasPermission("features:manage");
   const incompatible = bundle?.compatibility === "incompatible";
+  const displayedError = installError ?? (!incompatible ? bundle?.error : null);
   const bytes = bundle?.missingDownloadBytes ?? bundle?.downloadBytes;
   const size = bytes
     ? formatFileSize(bytes)
-    : (bundle?.estimatedSize ?? "~208-234 MiB download / ~409-488 MiB installed");
+    : (bundle?.estimatedSize ?? FEATURE_BUNDLES.ocr.estimatedSize);
   const qualityTranslations = t.toolSettings["remove-gif-background"];
+  const fastUnsupportedMessage =
+    language === "ar"
+      ? t.toolSettings.ocr.fastArabicUnsupported
+      : t.toolSettings.ocr.fastKoreanUnsupported;
   const qualityOptions: { value: OcrQuality; label: string }[] = [
     { value: "fast", label: qualityTranslations.qualityFast },
     { value: "balanced", label: qualityTranslations.qualityBalanced },
@@ -87,7 +98,7 @@ export function OcrQualityControl({
     <div className="space-y-2">
       <div className="grid grid-cols-3 gap-1.5">
         {qualityOptions.map((option) => {
-          const fastUnsupported = korean && option.value === "fast";
+          const fastUnsupported = accurateOnly && option.value === "fast";
           return (
             <button
               key={option.value}
@@ -108,9 +119,9 @@ export function OcrQualityControl({
         })}
       </div>
 
-      {korean && (
+      {accurateOnly && (
         <p id={helpId} className="text-xs text-muted-foreground">
-          {t.toolSettings.ocr.fastKoreanUnsupported}
+          {fastUnsupportedMessage}
         </p>
       )}
 
@@ -118,7 +129,12 @@ export function OcrQualityControl({
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-start">
           <p className="text-xs text-muted-foreground">
             {incompatible
-              ? (bundle?.error ?? bundle?.compatibilityReason ?? t.features.notEnabledDescription)
+              ? (bundle?.error ??
+                featureIncompatibleMessage(t, {
+                  feature: bundle?.id ?? "ocr",
+                  featureName: bundle?.name ?? t.tools.ocr.name,
+                  compatibilityReason: bundle?.compatibilityReason ?? undefined,
+                }))
               : format(t.features.requiresDownload, { size })}
           </p>
           {!incompatible && isAdmin && (
@@ -135,13 +151,15 @@ export function OcrQualityControl({
               )}
               {installing || queued
                 ? t.settings.aiFeatures.installing
-                : format(t.features.enableButton, { name: bundle?.name ?? t.tools.ocr.name })}
+                : format(t.features.enableButton, {
+                    name: bundle ? bundleName(t, bundle) : t.tools.ocr.name,
+                  })}
             </button>
           )}
           {!incompatible && !isAdmin && (
             <p className="mt-1 text-xs text-muted-foreground">{t.features.notEnabledDescription}</p>
           )}
-          {installError && <p className="mt-1 text-xs text-destructive">{installError}</p>}
+          {displayedError && <p className="mt-1 text-xs text-destructive">{displayedError}</p>}
         </div>
       )}
     </div>

@@ -31,34 +31,41 @@ function localizedDocsRateLimit() {
   };
 }
 
-interface PathOperation {
+export interface PathOperation {
   tags?: string[];
   summary?: string;
   description?: string;
   security?: Array<Record<string, string[]>>;
   parameters?: Array<{ name: string; in: string; required?: boolean; schema?: { type: string } }>;
   requestBody?: { content: Record<string, { schema?: SchemaObject }> };
-  responses?: Record<string, { description?: string }>;
+  responses?: Record<string, ResponseObject>;
 }
 
-interface SchemaObject {
+/** Either a response or a `$ref` to one under components.responses. */
+export interface ResponseObject {
+  description?: string;
+  $ref?: string;
+}
+
+export interface SchemaObject {
   type?: string;
   properties?: Record<string, SchemaObject>;
   required?: string[];
   description?: string;
 }
 
-interface OpenAPISpec {
+export interface OpenAPISpec {
   info: { title: string; version: string; description?: string };
   tags?: Array<{ name: string; description?: string }>;
   paths: Record<string, Record<string, PathOperation>>;
+  components?: { responses?: Record<string, ResponseObject> };
 }
 
-function isPublic(op: PathOperation): boolean {
+export function isPublic(op: PathOperation): boolean {
   return Array.isArray(op.security) && op.security.length === 0;
 }
 
-function generateLlmsTxt(spec: OpenAPISpec): string {
+export function generateLlmsTxt(spec: OpenAPISpec): string {
   const lines: string[] = [];
   const customModes: Record<string, string> = {
     "content-aware-resize": "sync",
@@ -144,7 +151,7 @@ function generateLlmsTxt(spec: OpenAPISpec): string {
   return lines.join("\n");
 }
 
-function generateLlmsFullTxt(spec: OpenAPISpec): string {
+export function generateLlmsFullTxt(spec: OpenAPISpec): string {
   const lines: string[] = [];
   lines.push(`# ${spec.info.title} v${spec.info.version}`);
   lines.push("");
@@ -209,7 +216,10 @@ function generateLlmsFullTxt(spec: OpenAPISpec): string {
       if (op.responses) {
         lines.push("**Responses:**");
         for (const [code, res] of Object.entries(op.responses)) {
-          lines.push(`- \`${code}\` — ${res.description || ""}`);
+          // A shared response is a $ref; its text lives under components.responses.
+          const shared = res.$ref?.match(/^#\/components\/responses\/(.+)$/)?.[1];
+          const resolved = shared ? spec.components?.responses?.[shared] : res;
+          lines.push(`- \`${code}\` — ${resolved?.description || ""}`);
         }
         lines.push("");
       }

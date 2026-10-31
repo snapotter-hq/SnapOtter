@@ -35,9 +35,9 @@ export const SUPPORTED_LOCALES: SupportedLocale[] = [
   { code: "th", name: "Thai", nativeName: "ไทย", dir: "ltr" },
 ];
 
-type TranslationLoader = () => Promise<TranslationKeys>;
+export type TranslationLoader = () => Promise<TranslationKeys>;
 
-const TRANSLATION_LOADERS: Record<string, TranslationLoader> = {
+export const TRANSLATION_LOADERS: Record<string, TranslationLoader> = {
   ar: async () => (await import("./ar.js")).ar,
   de: async () => (await import("./de.js")).de,
   es: async () => (await import("./es.js")).es,
@@ -66,7 +66,8 @@ export async function loadTranslations(locale: string): Promise<TranslationKeys>
   if (!loadTranslation) return en;
   try {
     return await loadTranslation();
-  } catch {
+  } catch (error) {
+    console.error("Failed to load translations", { locale, error });
     return en;
   }
 }

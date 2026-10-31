@@ -187,7 +187,7 @@
   "faq.q3.q": "Apakah saya memerlukan koneksi internet?",
   "faq.q4.a": "Tidak ada batasan buatan. Anda bisa memproses file sebanyak yang Anda mau, dengan ukuran berapa pun. Satu-satunya kendala adalah sumber daya perangkat keras server Anda.",
   "faq.q4.q": "Apakah ada batasan ukuran file atau penggunaan?",
-  "faq.q5.a": "SnapOtter menyertakan 19 alat AI lokal untuk penghapusan latar belakang, peningkatan resolusi, OCR, transkripsi, deteksi wajah, pewarnaan, penghilangan noise, restorasi foto, dan banyak lagi. Semua model berjalan di perangkat keras Anda.",
+  "faq.q5.a": "SnapOtter menyertakan 19 alat AI lokal untuk penghapusan latar belakang, peningkatan skala, OCR, transkripsi, deteksi wajah, pewarnaan, penghapusan noise, restorasi foto, dan lainnya. Semua model berjalan di perangkat keras Anda (RAM 2 GB menjalankan alat non-AI, Fast OCR, dan deteksi wajah; paket AI CPU memerlukan RAM 4 GB+, atau 8 GB untuk inpainting HQ).",
   "faq.q5.q": "Fitur AI apa saja yang termasuk?",
   "faq.q6.a": "Analitik produk anonim aktif secara default dan tidak pernah menyertakan file Anda atau isinya. Matikan kapan saja dengan tombol admin sekali klik di Pengaturan > Sistem > Privasi.",
   "faq.q6.q": "Apakah SnapOtter mengumpulkan analitik?",

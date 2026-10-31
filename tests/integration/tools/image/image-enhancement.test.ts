@@ -38,11 +38,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makePayload(
   settings: Record<string, unknown>,
@@ -885,6 +885,52 @@ describe("Output format for different input formats", () => {
     const meta = await sharp(dlRes.rawPayload).metadata();
     expect(meta.format).toBe("png");
   });
+
+  it("preserves TIFF format and 4-channel alpha for transparent LZW/Deflate TIFF input (#2586)", async () => {
+    const size = 20;
+    const raw = Buffer.alloc(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4;
+        raw[i] = 200;
+        raw[i + 1] = 40;
+        raw[i + 2] = 40;
+        raw[i + 3] = x < 8 && y < 8 ? 0 : 255;
+      }
+    }
+    for (const compression of ["lzw", "deflate"] as const) {
+      const rgbaTiff = await sharp(raw, { raw: { width: size, height: size, channels: 4 } })
+        .tiff({ compression })
+        .toBuffer();
+
+      const res = await postTool(
+        { mode: "auto" },
+        rgbaTiff,
+        `alpha-${compression}.tiff`,
+        "image/tiff",
+      );
+      if (await settleAsyncFallback(res)) continue;
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+
+      const dlRes = await app.inject({
+        method: "GET",
+        url: result.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const meta = await sharp(dlRes.rawPayload).metadata();
+      expect(meta.format).toBe("tiff");
+      expect(meta.channels).toBe(4);
+      expect(meta.hasAlpha).toBe(true);
+
+      const { data, info } = await sharp(dlRes.rawPayload)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      expect(data[(2 * info.width + 2) * info.channels + 3]).toBe(0);
+      expect(data[(14 * info.width + 14) * info.channels + 3]).toBe(255);
+    }
+  });
 });
 
 // ── Output dimension verification ───────────────────────────────
@@ -1362,9 +1408,9 @@ describe("Undecodable input", () => {
     // fails the full pixel decode that analyzeImage() forces via .stats().
     const truncated = readFixture(fixtures.image.hostile.truncated);
     const res = await postTool({}, truncated, "truncated.jpg", "image/jpeg");
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    expect(body.error).toBe(UNDECODABLE_IMAGE_MESSAGE);
   });
 });
 

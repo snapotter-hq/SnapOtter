@@ -164,11 +164,37 @@ describe("AI Bridge - isGpuAvailable", () => {
   it("returns true when dispatcher reports GPU", async () => {
     await spawnReadyDispatcher({ gpu: true });
     expect(bridge.isGpuAvailable()).toBe(true);
+    expect(bridge.isGpuAvailable("torch")).toBe(true);
+    expect(bridge.isGpuAvailable("onnx")).toBe(true);
+    expect(bridge.isGpuAvailable("ctranslate2")).toBe(true);
   });
 
   it("returns false when dispatcher reports no GPU", async () => {
     await spawnReadyDispatcher({ gpu: false });
     expect(bridge.isGpuAvailable()).toBe(false);
+    expect(bridge.isGpuAvailable("torch")).toBe(false);
+    expect(bridge.isGpuAvailable("onnx")).toBe(false);
+    expect(bridge.isGpuAvailable("ctranslate2")).toBe(false);
+  });
+
+  it("returns per-framework GPU status when gpuFrameworks is reported and falls back to gpuAvail otherwise (issue #2576)", async () => {
+    const proc = createMockProcess();
+    spawnMock.mockReturnValue(proc as unknown as ChildProcess);
+
+    const initPromise = bridge.initDispatcher(5_000);
+    proc._pushStderr(
+      `${JSON.stringify({
+        ready: true,
+        gpu: true,
+        gpuFrameworks: { torch: false, onnx: true, ctranslate2: false },
+      })}\n`,
+    );
+    await initPromise;
+
+    expect(bridge.isGpuAvailable()).toBe(true);
+    expect(bridge.isGpuAvailable("torch")).toBe(false);
+    expect(bridge.isGpuAvailable("onnx")).toBe(true);
+    expect(bridge.isGpuAvailable("ctranslate2")).toBe(false);
   });
 });
 
@@ -181,6 +207,8 @@ describe("AI Bridge - getDispatcherStatus", () => {
     expect(status.gpu).toBe(false);
     expect(status.pid).toBeNull();
     expect(status.consecutiveCrashes).toBe(0);
+    expect(status.consecutiveScriptFailures).toBe(0);
+    expect(status.lastRecycleReason).toBeNull();
   });
 
   it("reports running after init", async () => {
@@ -281,7 +309,11 @@ describe("AI Bridge - runPythonWithProgress (dispatcher path)", () => {
   it("strips .py from script name in dispatcher request", async () => {
     const proc = await spawnReadyDispatcher();
 
-    bridge.runPythonWithProgress("remove_bg.py", []);
+    void bridge
+      .runPythonWithProgress("remove_bg.py", [], {
+        memoryOptions: { availableMemoryBytes: 8 * 1024 ** 3 },
+      })
+      .catch(() => {});
 
     const request = JSON.parse(proc.stdin._written[0].trim());
     expect(request.script).toBe("remove_bg");

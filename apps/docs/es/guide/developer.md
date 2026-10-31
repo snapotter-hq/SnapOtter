@@ -1,8 +1,8 @@
 ---
 description: "Configuración del entorno de desarrollo local, comandos, convenciones de código y cómo añadir una nueva herramienta a SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 334c91e72b73
+i18n_output_hash: da0c06167904
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ Añade a `packages/shared/src/i18n/en.ts`:
 ### 4. Pruebas {#_4-tests}
 
 Añade un atributo `data-testid` a tu botón de acción (como se muestra arriba) para que las pruebas e2e puedan localizarlo de forma fiable.
+
+### 5. Baselines visuales {#_5-visual-baselines}
+
+Las pruebas de capturas de pantalla no permiten ningún píxel cambiado, y una herramienta nueva cambia lo que renderizan: los recuentos de herramientas en la página de inicio y el catálogo, una tarjeta nueva en la cuadrícula y una página propia en la que `tests/e2e/gui-visual-tools.spec.ts` falla con "snapshot doesn't exist" hasta que tenga una baseline. Actualiza las baselines en el mismo PR que la herramienta para que la comparación visual nocturna siga en verde.
+
+La CI genera tanto las baselines de `linux` (`ubuntu-latest`) como las de `darwin` (`macos-latest`). Sube tu rama y lanza la actualización sobre ella:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Cada job por sistema operativo sube un artefacto `visual-baselines-linux-<run-id>-<attempt>` o `visual-baselines-darwin-<run-id>-<attempt>` y abre un PR en borrador (`chore/visual-baselines-linux-...` y `chore/visual-baselines-darwin-...`) contra `main` con los PNG regenerados. La descripción de cada PR en borrador incluye un comando `gh run download`; ejecuta ambos desde la raíz de tu checkout para traer los PNG a tu rama, haz commit y cierra los PR en borrador. Usa `update_snapshots=all` si `changed` se salta una captura que esperabas que cambiara. Lanzarlo requiere permiso de escritura en el repositorio, así que si tu rama está en un fork, indica en el PR que necesita una actualización de baselines y un maintainer la lanzará.
+
+En un Mac, también puedes actualizar localmente las baselines de `darwin` para iterar más rápido:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+En cualquier caso, abre cada PNG nuevo o modificado antes de hacer commit: una baseline guarda lo que se renderizó, esté roto o no.
+
+Una versión nueva no necesita nada de esto. La versión de la app está enmascarada en todas las capturas que la muestran, así que subirla no cambia ninguna baseline.
 
 ## Construcciones de Docker {#docker-builds}
 

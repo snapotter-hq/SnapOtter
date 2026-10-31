@@ -136,8 +136,12 @@ describe("useToolProcessor batch job-evidence timeout settle (#929)", () => {
       status: "failed",
       error:
         "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+      errorCategory: "upload_error",
     });
-    expect(entries[1].status).toBe("failed");
+    expect(entries[1]).toMatchObject({
+      status: "failed",
+      errorCategory: "upload_error",
+    });
     expect(useFileStore.getState().processing).toBe(false);
 
     hook.unmount();

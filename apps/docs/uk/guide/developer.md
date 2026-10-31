@@ -1,8 +1,8 @@
 ---
 description: "Локальне налаштування розробки, команди, конвенції коду та як додати новий інструмент до SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 7be8e7403bd6
+i18n_output_hash: 77f58b989cd8
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ const MyToolSettings = lazy(() =>
 ### 4. Тести {#_4-tests}
 
 Додайте атрибут `data-testid` до вашої кнопки дії (як показано вище), щоб e2e-тести могли надійно на неї націлюватися.
+
+### 5. Візуальні еталони {#_5-visual-baselines}
+
+Скриншот-тести не допускають жодного зміненого пікселя, а новий інструмент змінює те, що вони відмальовують: кількість інструментів на головній сторінці й у каталозі, нову картку в сітці та власну сторінку, на якій `tests/e2e/gui-visual-tools.spec.ts` падає з "snapshot doesn't exist", доки в неї немає еталона. Оновіть еталони в тому ж PR, що й інструмент, щоб нічне візуальне порівняння залишалося зеленим.
+
+CI генерує еталони як для `linux` (`ubuntu-latest`), так і для `darwin` (`macos-latest`). Надішліть свою гілку та запустіть на ній оновлення:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Кожне завдання ОС завантажує артефакт `visual-baselines-linux-<run-id>-<attempt>` або `visual-baselines-darwin-<run-id>-<attempt>` і відкриває чернетку PR (`chore/visual-baselines-linux-...` та `chore/visual-baselines-darwin-...`) у `main` з перегенерованими PNG. В описі кожної чернетки PR є команда `gh run download`; виконайте обидві з кореня вашого checkout, щоб покласти PNG у свою гілку, закомітьте їх і закрийте чернетки PR. Використайте `update_snapshots=all`, якщо `changed` пропускає скриншот, який мав змінитися. Для запуску потрібен доступ на запис до репозиторію, тож якщо ваша гілка у форку, напишіть у PR, що потрібне оновлення еталонів, і мейнтейнер його запустить.
+
+На Mac ви також можете оновити еталони `darwin` локально для швидшої ітерації:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+У будь-якому разі відкрийте кожен новий або змінений PNG перед комітом: еталон фіксує те, що відмалювалося, зламане чи ні.
+
+Релізу нічого з цього не потрібно. Версію застосунку замасковано на кожному скриншоті, де вона видна, тож її підвищення не змінює жодного еталона.
 
 ## Збірки Docker {#docker-builds}
 

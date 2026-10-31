@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -35,67 +36,76 @@ export function registerCircleCrop(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "circle-crop",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const meta = await sharp(inputBuffer).metadata();
-      const W = meta.width ?? 1;
-      const H = meta.height ?? 1;
+    process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
+      "Circle crop failed",
+      () => "circle-crop",
+      async (inputBuffer, settings, filename) => {
+        const meta = await sharp(inputBuffer).metadata();
+        const W = meta.width ?? 1;
+        const H = meta.height ?? 1;
 
-      // The circle's bounding square, derived from zoom + offsets.
-      let d = Math.round(Math.min(W, H) / settings.zoom);
-      d = Math.max(8, Math.min(d, W, H));
-      let left = Math.round((W - d) * settings.offsetX);
-      let top = Math.round((H - d) * settings.offsetY);
-      left = Math.max(0, Math.min(left, W - d));
-      top = Math.max(0, Math.min(top, H - d));
+        // The circle's bounding square, derived from zoom + offsets.
+        let d = Math.round(Math.min(W, H) / settings.zoom);
+        d = Math.max(8, Math.min(d, W, H));
+        let left = Math.round((W - d) * settings.offsetX);
+        let top = Math.round((H - d) * settings.offsetY);
+        left = Math.max(0, Math.min(left, W - d));
+        top = Math.max(0, Math.min(top, H - d));
 
-      const bw = Math.min(settings.borderWidth, Math.floor(d / 2));
-      const canvas = d + 2 * bw;
+        const bw = Math.min(settings.borderWidth, Math.floor(d / 2));
+        const canvas = d + 2 * bw;
 
-      // Extract the square, mask it to a circle. PNG, so a JPEG source does not
-      // pay a second generation at Sharp's default quality here (#1190).
-      const squareBuf = await sharp(inputBuffer)
-        .extract({ left, top, width: d, height: d })
-        .png()
-        .toBuffer();
-      const circleMask = Buffer.from(
-        `<svg width="${d}" height="${d}"><circle cx="${d / 2}" cy="${d / 2}" r="${d / 2}" fill="#fff"/></svg>`,
-      );
-      const imgCircle = await sharp(squareBuf)
-        .ensureAlpha()
-        .composite([{ input: circleMask, blend: "dest-in" }])
-        .png()
-        .toBuffer();
-
-      // Compose: background, optional border ring, then the circular image.
-      const bg =
-        settings.background === "transparent"
-          ? { r: 0, g: 0, b: 0, alpha: 0 }
-          : { ...hexToRgb(settings.background), alpha: 1 };
-      const layers: OverlayOptions[] = [];
-      if (bw > 0) {
-        const ring = Buffer.from(
-          `<svg width="${canvas}" height="${canvas}"><circle cx="${canvas / 2}" cy="${canvas / 2}" r="${d / 2 + bw}" fill="${settings.borderColor}"/></svg>`,
+        // Extract the square, mask it to a circle. PNG, so a JPEG source does not
+        // pay a second generation at Sharp's default quality here (#1190).
+        let squareBuf: Buffer;
+        try {
+          squareBuf = await sharp(inputBuffer)
+            .extract({ left, top, width: d, height: d })
+            .png()
+            .toBuffer();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
+        }
+        const circleMask = Buffer.from(
+          `<svg width="${d}" height="${d}"><circle cx="${d / 2}" cy="${d / 2}" r="${d / 2}" fill="#fff"/></svg>`,
         );
-        layers.push({ input: ring, left: 0, top: 0 });
-      }
-      layers.push({ input: imgCircle, left: bw, top: bw });
-
-      let out = await sharp({
-        create: { width: canvas, height: canvas, channels: 4, background: bg },
-      })
-        .composite(layers)
-        .png()
-        .toBuffer();
-
-      if (settings.outputSize) {
-        out = await sharp(out)
-          .resize(settings.outputSize, settings.outputSize, { fit: "fill" })
+        const imgCircle = await sharp(squareBuf)
+          .ensureAlpha()
+          .composite([{ input: circleMask, blend: "dest-in" }])
           .png()
           .toBuffer();
-      }
 
-      const base = filename.replace(/\.[^.]+$/, "");
-      return { buffer: out, filename: `${base}_circle.png`, contentType: "image/png" };
-    },
+        // Compose: background, optional border ring, then the circular image.
+        const bg =
+          settings.background === "transparent"
+            ? { r: 0, g: 0, b: 0, alpha: 0 }
+            : { ...hexToRgb(settings.background), alpha: 1 };
+        const layers: OverlayOptions[] = [];
+        if (bw > 0) {
+          const ring = Buffer.from(
+            `<svg width="${canvas}" height="${canvas}"><circle cx="${canvas / 2}" cy="${canvas / 2}" r="${d / 2 + bw}" fill="${settings.borderColor}"/></svg>`,
+          );
+          layers.push({ input: ring, left: 0, top: 0 });
+        }
+        layers.push({ input: imgCircle, left: bw, top: bw });
+
+        let out = await sharp({
+          create: { width: canvas, height: canvas, channels: 4, background: bg },
+        })
+          .composite(layers)
+          .png()
+          .toBuffer();
+
+        if (settings.outputSize) {
+          out = await sharp(out)
+            .resize(settings.outputSize, settings.outputSize, { fit: "fill" })
+            .png()
+            .toBuffer();
+        }
+
+        const base = filename.replace(/\.[^.]+$/, "");
+        return { buffer: out, filename: `${base}_circle.png`, contentType: "image/png" };
+      },
+    ),
   });
 }

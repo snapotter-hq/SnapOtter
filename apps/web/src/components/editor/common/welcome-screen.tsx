@@ -1,41 +1,70 @@
 // apps/web/src/components/editor/common/welcome-screen.tsx
 
 import { FilePlus, ImagePlus } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { format } from "@/lib/format";
 import { useEditorStore } from "@/stores/editor-store";
 import { NewDocumentDialog } from "./new-document-dialog";
 
-const ACCEPTED_TYPES = ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tiff,.svg,.avif,.svgz";
+const ACCEPTED_TYPES = ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tiff,.svg,.avif,.svgz,.psd,.tga,.exr,.hdr";
 
-export function WelcomeScreen() {
+interface WelcomeScreenProps {
+  onOpenFile?: (file: File) => void | Promise<void>;
+  onNewDocument?: () => void;
+}
+
+export function WelcomeScreen({ onOpenFile, onNewDocument }: WelcomeScreenProps = {}) {
   const { t } = useTranslation();
+  const sourceImageFailed = useRef(t.editor.ui.captureFailure.sourceImageFailed);
+  sourceImageFailed.current = t.editor.ui.captureFailure.sourceImageFailed;
   const [showNewDoc, setShowNewDoc] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const loadImage = useEditorStore((s) => s.loadImage);
+  const openRunRef = useRef(0);
+
+  useEffect(
+    () => () => {
+      openRunRef.current += 1;
+    },
+    [],
+  );
 
   const handleFile = useCallback(
-    (file: File) => {
-      if (!file.type.startsWith("image/")) {
+    async (file: File) => {
+      if (onOpenFile) {
+        await onOpenFile(file);
         return;
       }
+      const runId = ++openRunRef.current;
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
+        if (openRunRef.current !== runId) {
+          URL.revokeObjectURL(url);
+          return;
+        }
         loadImage(url, img.naturalWidth, img.naturalHeight);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        if (openRunRef.current !== runId) return;
+        toast.error(sourceImageFailed.current, { id: "editor-source-image-failed" });
       };
       img.src = url;
     },
-    [loadImage],
+    [loadImage, onOpenFile],
   );
 
   const handleOpenFile = () => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ACCEPTED_TYPES;
-    input.onchange = () => {
+    input.onchange = async () => {
       const file = input.files?.[0];
-      if (file) handleFile(file);
+      if (file) await handleFile(file);
     };
     input.click();
   };
@@ -45,7 +74,7 @@ export function WelcomeScreen() {
       e.preventDefault();
       setIsDragOver(false);
       const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+      if (file) void handleFile(file);
     },
     [handleFile],
   );
@@ -93,7 +122,7 @@ export function WelcomeScreen() {
 
             <button
               type="button"
-              onClick={() => setShowNewDoc(true)}
+              onClick={() => (onNewDocument ? onNewDocument() : setShowNewDoc(true))}
               className="flex items-center gap-3 w-full px-4 py-3 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
             >
               <FilePlus size={20} />
@@ -101,11 +130,17 @@ export function WelcomeScreen() {
             </button>
           </div>
 
-          <p className="text-xs text-muted-foreground">{t.editor.welcome.pasteHint}</p>
+          <p className="text-xs text-muted-foreground">
+            {/* The system paste event, not a react-hotkeys-hook binding, so the OS
+              picks the modifier: formatShortcut's default rule. */}
+            {format(t.editor.welcome.pasteHint, { shortcut: formatShortcut("mod+v") })}
+          </p>
         </div>
       </section>
 
-      <NewDocumentDialog open={showNewDoc} onClose={() => setShowNewDoc(false)} />
+      {!onNewDocument && (
+        <NewDocumentDialog open={showNewDoc} onClose={() => setShowNewDoc(false)} />
+      )}
     </>
   );
 }

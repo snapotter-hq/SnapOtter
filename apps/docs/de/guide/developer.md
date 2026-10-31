@@ -1,8 +1,8 @@
 ---
 description: "Lokales Entwicklungs-Setup, Befehle, Code-Konventionen und wie man ein neues Tool zu SnapOtter hinzufügt."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 1aff0a0fd957
+i18n_output_hash: e89fef861a60
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ Füge zu `packages/shared/src/i18n/en.ts` hinzu:
 ### 4. Tests {#_4-tests}
 
 Füge deinem Aktions-Button ein `data-testid`-Attribut hinzu (wie oben gezeigt), damit e2e-Tests ihn zuverlässig ansteuern können.
+
+### 5. Visuelle Baselines {#_5-visual-baselines}
+
+Die Screenshot-Tests erlauben null geänderte Pixel, und ein neues Tool ändert, was sie rendern: die Tool-Zahlen auf der Startseite und im Katalog, eine neue Karte im Raster und eine eigene Seite, an der `tests/e2e/gui-visual-tools.spec.ts` mit "snapshot doesn't exist" scheitert, bis sie eine Baseline hat. Aktualisiere die Baselines im selben PR wie das Tool, damit der nächtliche visuelle Vergleich grün bleibt.
+
+Die CI erzeugt sowohl die `linux`- (`ubuntu-latest`) als auch die `darwin`-Baselines (`macos-latest`). Pushe deinen Branch und starte die Aktualisierung darauf:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Jeder Betriebssystem-Zweig lädt ein Artefakt `visual-baselines-linux-<run-id>-<attempt>` bzw. `visual-baselines-darwin-<run-id>-<attempt>` hoch und öffnet einen Draft-PR (`chore/visual-baselines-linux-...` und `chore/visual-baselines-darwin-...`) gegen `main` mit den neu erzeugten PNGs. In der Beschreibung jedes Draft-PRs steht ein `gh run download`-Befehl; führe beide im Wurzelverzeichnis deines Checkouts aus, um die PNGs in deinen Branch zu holen, committe sie und schließe die Draft-PRs. Nimm stattdessen `update_snapshots=all`, wenn `changed` einen Screenshot verpasst, der sich deiner Erwartung nach ändern sollte. Zum Starten brauchst du Schreibrechte am Repository; liegt dein Branch in einem Fork, schreib in den PR, dass er eine Baseline-Aktualisierung braucht, und ein Maintainer startet sie.
+
+Auf einem Mac kannst du die `darwin`-Baselines für schnelleres Iterieren auch lokal aktualisieren:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Öffne in jedem Fall jedes neue oder geänderte PNG, bevor du es committest: Eine Baseline hält fest, was gerendert wurde, kaputt oder nicht.
+
+Ein Release braucht nichts davon. Die App-Version ist in jedem Screenshot, der sie zeigt, maskiert, daher ändert ein Versionssprung keine Baseline.
 
 ## Docker-Builds {#docker-builds}
 

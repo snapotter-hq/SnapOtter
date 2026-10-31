@@ -1,7 +1,7 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 4b25a4ffd694
-i18n_source_hash: 899149b272e4
+i18n_output_hash: a086ba746be3
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -64,16 +64,16 @@ Klucze są poprzedzone przedrostkiem `si_` i przechowywane jako skróty scrypt -
 | `GET` | `/api/auth/session` | Uwierzytelniony | Weryfikacja bieżącej sesji |
 | `POST` | `/api/auth/change-password` | Uwierzytelniony | Zmiana własnego hasła (unieważnia wszystkie inne sesje + klucze API) |
 | `GET` | `/api/auth/users` | Administrator | Lista wszystkich użytkowników |
-| `POST` | `/api/auth/register` | Administrator | Utworzenie nowego użytkownika |
-| `PUT` | `/api/auth/users/:id` | Administrator | Aktualizacja roli lub zespołu użytkownika |
-| `POST` | `/api/auth/users/:id/reset-password` | Administrator | Zresetowanie hasła użytkownika |
-| `DELETE` | `/api/auth/users/:id` | Administrator | Usunięcie użytkownika |
+| `POST` | `/api/auth/register` | Administrator (`users:manage`; uprawnienia do proponowanej roli) | Utworzenie nowego użytkownika |
+| `PUT` | `/api/auth/users/:id` | Administrator (`users:manage`; uprawnienia wobec celu) | Aktualizacja roli lub zespołu użytkownika |
+| `POST` | `/api/auth/users/:id/reset-password` | Administrator (`users:manage`; uprawnienia wobec celu) | Zresetowanie hasła użytkownika |
+| `DELETE` | `/api/auth/users/:id` | Administrator (`users:manage`; uprawnienia wobec celu) | Usunięcie użytkownika |
 | `GET` | `/api/v1/config/auth` | Publiczny | Sprawdzenie, czy uwierzytelnianie jest włączone (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Uwierzytelniony | Rozpoczęcie rejestracji TOTP MFA. Wymaga funkcji enterprise `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Uwierzytelniony | Potwierdzenie rejestracji MFA kodem TOTP |
 | `POST` | `/api/auth/mfa/complete` | Publiczny | Zakończenie oczekującego wyzwania logowania MFA |
 | `POST` | `/api/auth/mfa/disable` | Uwierzytelniony | Wyłączenie MFA dla bieżącego użytkownika |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Administrator (`users:manage`) | Zresetowanie MFA dla użytkownika |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Administrator (`users:manage`; uprawnienia wobec celu) | Zresetowanie MFA dla użytkownika |
 | `GET` | `/api/auth/oidc/login` | Publiczny | Rozpoczęcie logowania OIDC, gdy OIDC jest włączony |
 | `GET` | `/api/auth/oidc/callback` | Publiczny | Wywołanie zwrotne autoryzacji OIDC |
 | `GET` | `/api/auth/saml/metadata` | Publiczny | Metadane XML SAML SP, gdy SAML jest włączony |
@@ -179,7 +179,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 
 | ID narzędzia | Nazwa | Model AI | Kluczowe ustawienia |
 |---------|------|---------|-------------|
-| `remove-background` | Usuwanie tła | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Usuwanie tła | rembg (BiRefNet / U2-Net) | Etap 1: `model`, `edgeRefine` (0-3), `decontaminate`. Etap 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` i potoki: `backgroundType` (transparent/color/gradient/blur oraz image na `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Powiększanie obrazu | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Wymazywanie obiektów | LaMa (ONNX) | Maska wysyłana jako druga część pliku (nazwa pola `mask`), `format`, `quality` |
 | `ocr` | OCR / Ekstrakcja tekstu | Tesseract (szybki); RapidOCR + PP-OCR ONNX (zrównoważony/najlepszy) | `quality` (szybki/zrównoważony/najlepszy), `language`, `enhance` |
@@ -243,7 +243,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 |---------|------|-------------|
 | `svg-to-raster` | SVG do rastra | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Obraz do SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | Narzędzia GIF | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), parametry specyficzne dla akcji |
+| `gif-tools` | Narzędzia GIF | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | Konwerter GIF/WebP | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Narzędzia wideo {#video-tools}
@@ -532,7 +532,7 @@ Aby automatycznie zapisać wynik narzędzia w bibliotece, dołącz `fileId` jako
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Administrator (`teams:manage`) | Lista zespołów |
 | `POST` | `/api/v1/teams` | Administrator (`teams:manage`) | Utwórz zespół |
-| `PUT` | `/api/v1/teams/:id` | Administrator (`teams:manage`) | Zmień nazwę zespołu |
+| `PUT` | `/api/v1/teams/:id` | Administrator (`teams:manage`) | Zaktualizuj zespół (wymagane co najmniej jedno pole) |
 | `DELETE` | `/api/v1/teams/:id` | Administrator (`teams:manage`) | Usuń zespół (nie można usunąć domyślnego zespołu ani zespołów z członkami) |
 
 ## Ustawienia {#settings}
@@ -559,6 +559,8 @@ Preferencje poszczególnych użytkowników są oddzielone od ustawień instancji
 ## Role {#roles}
 
 Zarządzanie niestandardowymi rolami z granularnymi uprawnieniami.
+
+Tworzenie i modyfikowanie ról podlega ograniczeniu zawierania uprawnień: proponowana lub obecna rola nie może przewyższać rangą wykonawcy, wykraczać poza jego efektywne uprawnienia ani rozszerzać jego zakresu narzędzi. Zakresy kluczy API są uwzględniane w tym sprawdzeniu. Usunięcie niestandardowej roli wymaga również uprawnień do przypisania wbudowanej roli zapasowej `user` używanej dla jej członków.
 
 | Metoda | Ścieżka | Dostęp | Opis |
 |--------|------|--------|-------------|
@@ -651,8 +653,8 @@ Te trasy są bramkowane licencją przez powiązaną z nimi funkcję enterprise. 
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Administrator (`security:manage`) | Zaktualizuj listę dozwolonych CIDR z ochroną przed zablokowaniem samego siebie |
 | `GET` | `/api/v1/enterprise/legal-hold` | Administrator (`compliance:manage`) | Lista blokad prawnych użytkowników i zespołów |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Administrator (`compliance:manage`) | Zastosuj lub zwolnij blokadę prawną dla użytkownika lub zespołu |
-| `POST` | `/api/v1/enterprise/scim/token` | Administrator (`users:manage`) | Wygeneruj token bearer SCIM, zwracany raz |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Administrator (`users:manage`) | Unieważnij bieżący token bearer SCIM |
+| `POST` | `/api/v1/enterprise/scim/token` | Wbudowany administrator z pełnymi uprawnieniami | Wygeneruj token bearer SCIM, zwracany raz |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Wbudowany administrator z pełnymi uprawnieniami | Unieważnij bieżący token bearer SCIM |
 | `GET` | `/api/v1/enterprise/siem/config` | Administrator (`webhooks:manage`) | Odczytaj konfigurację przekazywania SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Administrator (`webhooks:manage`) | Zaktualizuj konfigurację przekazywania SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Administrator (`webhooks:manage`) | Lista miejsc docelowych webhooków |
@@ -662,15 +664,15 @@ Te trasy są bramkowane licencją przez powiązaną z nimi funkcję enterprise. 
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Administrator (`webhooks:manage`) | Wyślij testowy ładunek webhooka |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Administrator (`compliance:manage`) | Rozpocznij zadanie eksportu użytkownika RODO |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Administrator (`compliance:manage`) | Odczytaj status eksportu RODO i adres URL pobierania |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Administrator (`compliance:manage`) | Trwale usuń dane użytkownika po potwierdzeniu |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Administrator (`compliance:manage`) | Trwale usuń dane zespołu po potwierdzeniu |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Administrator (`compliance:manage`; uprawnienia wobec celu) | Trwale usuń dane użytkownika po potwierdzeniu |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Administrator (`compliance:manage`; uprawnienia wobec wszystkich członków) | Trwale usuń dane zespołu po potwierdzeniu |
 | `GET` | `/api/v1/admin/version` | Administrator (`system:health`) | Odczytaj metadane wersji aplikacji, kompilacji, Node i schematu |
 | `GET` | `/api/v1/admin/migrations/pending` | Administrator (`system:health`) | Porównaj spakowane migracje z zastosowanymi migracjami |
 | `GET` | `/api/v1/admin/upgrade-check` | Administrator (`system:health`) | Uruchom kontrole gotowości do aktualizacji |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Punkty końcowe wykrywania SCIM są publiczne. Punkty końcowe użytkowników i grup wymagają tokena bearer SCIM wygenerowanego powyżej.
+Punkty końcowe wykrywania SCIM są publiczne. Punkty końcowe użytkowników i grup wymagają tokena bearer SCIM wygenerowanego powyżej. Starsze, niewersjonowane tokeny są nieprawidłowe i muszą zostać ponownie wystawione jako tokeny `so_scim_v2_...` przez wbudowanego administratora z pełnymi uprawnieniami.
 
 | Metoda | Ścieżka | Dostęp | Opis |
 |--------|------|--------|-------------|

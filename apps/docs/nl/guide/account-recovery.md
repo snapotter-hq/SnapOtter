@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 334a4ca733f0
+i18n_output_hash: 8e8e5779f979
 i18n_hash_version: 2
 ---
 # Accountherstel {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Als het beleid nog steeds MFA vereist voor die gebruiker, loopt die vervolgens tegen de
 inschrijvingsmuur aan, dus voer ook `reset-mfa-policy` uit, log in en schrijf je opnieuw in vanuit Instellingen.
 
+## Stel een vergeten wachtwoord opnieuw in {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Laat `[password]` weg en de CLI toont een gegenereerd tijdelijk wachtwoord. In beide gevallen worden de actieve sessies, API-sleutels en het blokkadevenster na mislukte aanmeldingen van de gebruiker gewist, en vereist SnapOtter een wachtwoordwijziging bij de volgende login.
+
+## Maak een nieuw beheerdersaccount aan {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Gebruik dit wanneer geen enkel bestaand beheerdersaccount kan inloggen. `[username]` gebruikt standaard `DEFAULT_USERNAME` (`admin`), en het weglaten van `[password]` toont een tijdelijk wachtwoord dat bij de eerste login moet worden gewijzigd.
+
+## Deblokkeer een beperkte of uitgeschakelde gebruiker {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Dit wist het `LOGIN_THROTTLED`-venster in Redis en herstelt de rol van het account als de gebruiker was uitgeschakeld.
+
 ## Oudere images en fallbacks {#older-images-and-fallbacks}
 
 Op een image die is gebouwd vóórdat de `snapotter-admin`-wrapper bestond, roep je het script
@@ -51,7 +75,7 @@ rechtstreeks aan:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Als laatste redmiddel op elke versie stel je het beleid in de database in. Op de

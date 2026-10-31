@@ -1,6 +1,6 @@
 ---
 description: "Reduce el tamaño de un archivo PDF comprimiendo las imágenes incrustadas."
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: 4af7513b61bc
 ---

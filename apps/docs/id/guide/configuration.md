@@ -1,8 +1,8 @@
 ---
 description: "Semua variabel lingkungan SnapOtter dengan default-nya. Konfigurasi auth, penyimpanan, model AI, analitik, dan lainnya."
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: 9c349ff65524
+i18n_output_hash: 754abaca8330
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ Semua konfigurasi dilakukan melalui variabel lingkungan. Setiap variabel memilik
 | Variabel | Default | Deskripsi |
 |---|---|---|
 | `PORT` | `1349` | Port tempat server mendengarkan. |
+| `BASE_PATH` | (kosong) | Jalur deployment publik, mis. `/snapotter`. Kosong atau `/` menyajikan di akar domain. Diterapkan saat runtime; tidak perlu build ulang image. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Permintaan maksimum per menit per IP. Setel ke 0 untuk menonaktifkan pembatasan laju. |
 | `CORS_ORIGIN` | (kosong) | Origin yang diizinkan dipisahkan koma untuk CORS, atau kosong untuk hanya same-origin. |
 | `LOG_LEVEL` | `info` | Verbositas log. Salah satu dari: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -40,7 +41,8 @@ Dua boolean di bawah ini hanya menerima `true` dan `false`. Apa pun selain itu, 
 | Variabel | Default | Deskripsi |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` atau `s3`. S3 dan MinIO memerlukan lisensi dengan fitur s3_storage plus variabel `S3_*` di bawah. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | String koneksi PostgreSQL. Stack Compose mengarahkan ini ke layanan `postgres` miliknya; biarkan tidak diatur (bersama `REDIS_URL`) untuk mendapatkan mode tertanam. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | String koneksi PostgreSQL, dan koneksi yang melayani setiap permintaan. Pada 2.3.0 dan yang lebih baru, setel juga `DATABASE_MIGRATION_URL` dan ini menjadi peran runtime dengan hak paling rendah, hanya memegang DML pada tabel aplikasi dan tidak lebih. Stack Compose mengarahkannya ke layanan `postgres` miliknya; biarkan tidak diatur (bersama `REDIS_URL`) untuk mendapatkan mode tertanam. |
+| `DATABASE_MIGRATION_URL` | (kosong) | Tersedia mulai 2.3.0; image 2.2.0 mengabaikannya dan memerlukan `DATABASE_URL` untuk menamai pemilik basis data. Koneksi dengan hak istimewa, hanya digunakan selama boot untuk menjalankan migrasi dan memberikan peran runtime, lalu ditutup sebelum permintaan pertama. Biarkan kosong dan SnapOtter berjalan dengan satu peran, dengan `DATABASE_URL` melakukan kedua tugas. Lihat [Peran hak akses minimal](/id/guide/database#least-privilege-roles). |
 | `REDIS_URL` | `redis://localhost:6379` | String koneksi Redis (digunakan untuk antrean job BullMQ). Compose mengarahkan ini ke layanan `redis` miliknya. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Direktori untuk file sementara selama pemrosesan. Dibersihkan secara otomatis. Image menyetelnya ke `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Direktori untuk file pengguna persisten (gambar yang diunggah, hasil yang disimpan). Image menyetelnya ke `/data/files`. |
@@ -74,6 +76,8 @@ Jalankan image tanpa `DATABASE_URL` dan tanpa `REDIS_URL` dan ia memulai Postgre
 |---|---|---|
 | `EMBEDDED` | `auto` | Diaktifkan otomatis saat `DATABASE_URL` dan `REDIS_URL` keduanya tidak diatur. Setel ke `0` untuk menonaktifkannya (aplikasi kemudian gagal cepat jika tidak ada `DATABASE_URL`/`REDIS_URL` eksternal yang diatur, alih-alih diam-diam memulai basis data dalam kontainer). |
 | `REDIS_MAXMEMORY` | `512mb` | Batas memori untuk Redis tertanam (hanya mode tertanam). Turunkan pada host dengan memori terbatas seperti Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Jumlah detik boot menunggu Redis tertanam menjawab `PING` sebelum menyerah. Saat timeout, kontainer berhenti dan mencatat alasannya, bukan menggantung. Bilangan bulat detik dari 1 hingga 999999; tidak ada nilai tak terbatas, karena menunggu selamanya adalah kegagalan yang ingin dicegah oleh batas ini. Naikkan hanya jika host yang lambat memicunya. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Sama, untuk PostgreSQL tertanam. Hitungan dimulai setelah `initdb` boot pertama selesai, jadi mencakup start server dan pemulihan setelah crash, bukan pembuatan basis data awal. |
 
 Upgrade dari 1.x: letakkan `snapotter.db` lama Anda di `/data/snapotter.db` dalam volume dan mode tertanam mengimpornya ke PostgreSQL tertanam pada boot pertama. Impor berjalan sekali; boot berikutnya melewatinya.
 
@@ -93,6 +97,23 @@ Catatan telemetri: mode tertanam mewarisi default analitik image seperti konfigu
 | `MAX_CANVAS_PIXELS` | `0` (tanpa batas) | Ukuran kanvas maksimum dalam piksel untuk gambar keluaran. Setel ke 0 untuk tanpa batas. |
 | `MAX_SVG_SIZE_MB` | `50` | SVG terbesar yang diterima sebelum disanitasi, dalam megabyte. `0` berperilaku berbeda di sini dibanding baris-baris di sekitarnya. Ia menghapus batas ukuran pra-parse sepenuhnya alih-alih menaikkannya, jadi biarkan yang satu ini tetap disetel. |
 | `MAX_PDF_PAGES` | `0` (tak terbatas) | Jumlah maksimum halaman PDF untuk konversi PDF-ke-image. Setel ke 0 untuk tak terbatas. |
+
+### Mesin {#engines}
+
+SnapOtter mencari setiap biner pemrosesan di `$PATH` di dalam kontainer, jadi biarkan kosong kecuali Anda memasang build Anda sendiri.
+
+| Variabel | Default | Deskripsi |
+|---|---|---|
+| `FFMPEG_PATH` | (kosong) | Jalur ke biner `ffmpeg` di balik alat video dan audio. |
+| `FFPROBE_PATH` | (kosong) | Jalur ke `ffprobe`, yang membaca file media sebelum diproses. Arahkan ke build yang sama dengan `FFMPEG_PATH`. |
+| `QPDF_PATH` | (kosong) | Jalur ke `qpdf`, digunakan oleh alat PDF dan untuk memeriksa PDF yang diunggah. |
+| `SOFFICE_PATH` | (kosong) | Jalur ke `soffice` milik LibreOffice, digunakan untuk konversi dokumen kantor. |
+| `PDFCPU_PATH` | (kosong) | Jalur ke `pdfcpu`, digunakan oleh beberapa alat PDF. |
+| `SNAPOTTER_HW_ACCEL` | (kosong) | Keluarga encoder video perangkat keras, `nvenc` atau `vaapi`. Kosong berarti encoding perangkat lunak. |
+
+`SNAPOTTER_HW_ACCEL` memerlukan ffmpeg yang dibangun dengan keluarga encoder tersebut, dan ffmpeg di dalam image tidak memiliki keduanya. Dengan biner bawaan image, pengaturan ini kembali ke encoding perangkat lunak dan menyatakannya di log startup. Untuk menggunakannya, pasang build ffmpeg Anda sendiri, arahkan `FFMPEG_PATH` dan `FFPROBE_PATH` ke sana, dan berikan perangkat GPU ke kontainer. Untuk `nvenc`, atur juga `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: image hanya meminta `compute,utility`, dan tanpa `video` runtime NVIDIA tidak memasang pustaka encoder, sehingga encoder terdaftar tetapi setiap encode gagal. Penggantian jalur yang tidak ada atau tidak dapat dieksekusi juga disebutkan di log startup, dan setiap job yang membutuhkan biner tersebut gagal hingga Anda memperbaiki jalurnya atau menghapus pengaturannya.
+
+File Compose yang diterbitkan meneruskan keenamnya dari `.env`, jadi mengaturnya di sana sudah cukup.
 
 ### Pembersihan {#cleanup}
 

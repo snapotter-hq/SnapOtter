@@ -14,6 +14,7 @@ import {
   primeAnalyticsGate,
 } from "../../../apps/api/src/lib/analytics-gate.js";
 import { reportError, resetThrottleForTests } from "../../../apps/api/src/lib/error-report.js";
+import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
 import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
 
 interface Cap {
@@ -106,6 +107,23 @@ describe("real @sentry/node integration", () => {
     // reportError flattens frame objects to strings so they survive normalizeDepth.
     expect(py?.frames).toEqual(["remove_bg.py:88 run"]);
     expect(lastValue(c)).toBe("Background removal failed");
+  });
+
+  it("ships the SSO username-race error as a constant with its code and class (#1866)", async () => {
+    const c = await capture(new UsernameRaceExhaustedError(), {
+      source: "http",
+      route: "/api/auth/oidc/callback",
+      method: "GET",
+      subsystem: "external-auth",
+    });
+    expect(c.threw).toBeNull();
+    expect(lastValue(c)).toBe("SSO auto-create lost the username race on every retry");
+    const tags = (c.output as { tags: Record<string, string> }).tags;
+    expect(tags.error_code).toBe("USERNAME_RACE_EXHAUSTED");
+    // Same class (and so the same level and grouping) the plain Error had.
+    expect(tags.error_class).toBe("bug");
+    expect(tags.route).toBe("/api/auth/oidc/callback");
+    expect(tags.subsystem).toBe("external-auth");
   });
 
   it("rebuilds a pg error and redacts an IP in the message", async () => {

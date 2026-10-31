@@ -29,7 +29,9 @@ export function buildTracesSampler(httpRate: number): (ctx: SamplingContext) => 
     // polls). The exact incident source: zero them outright.
     const op = String(attrs["sentry.op"] ?? "");
     if (op.startsWith("db")) return 0;
-    if (attrs["db.system"] === "redis") return 0;
+    // @sentry/node 10.66 sends the current semantic-convention key,
+    // db.system.name; db.system is the legacy spelling (#4154).
+    if (attrs["db.system.name"] === "redis" || attrs["db.system"] === "redis") return 0;
 
     // Any queue root span: only sample a real job execution we explicitly named
     // "job <name>" (see worker.ts); drop the continuous poll transactions.
@@ -44,7 +46,11 @@ export function buildTracesSampler(httpRate: number): (ctx: SamplingContext) => 
     if (/\/(healthz|readyz|metrics)\b/.test(name)) return 0;
 
     // Real inbound HTTP: sample at the configured rate, honoring parent traces.
-    if (attrs["http.request.method"] !== undefined) return inherit(httpRate);
+    // @sentry/node 10.66 marks the server span with sentry.op and the old
+    // http.method key, not http.request.method. Key on the op: outgoing client
+    // spans carry http.method too, and they must not count as inbound.
+    const isInboundHttp = op === "http.server" || attrs["http.request.method"] !== undefined;
+    if (isInboundHttp) return inherit(httpRate);
 
     // Anything else: follow the parent decision, else drop.
     return inherit(0);

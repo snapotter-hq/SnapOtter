@@ -31,6 +31,7 @@ export const uk: TranslationKeys = {
     clear: "Очистити",
     copy: "Копіювати",
     copied: "Скопійовано!",
+    copyFailed: "Не вдалося скопіювати",
     noResults: "Нічого не знайдено",
     showLess: "Показати менше",
     showMore: "Показати ще {count}",
@@ -1103,6 +1104,11 @@ export const uk: TranslationKeys = {
       name: "Впорядкування PDF",
       description: "Змінити порядок сторінок за вказаною послідовністю",
     },
+    "multi-tool-pdf": {
+      name: "PDF-мультиінструмент",
+      description:
+        "Зміна порядку, поворот, вилучення сторінок і перенесення сторінок з інших PDF в одному редакторі",
+    },
     "protect-pdf": {
       name: "Захист PDF",
       description: "Додати захист паролем (шифрування AES-256)",
@@ -1239,7 +1245,13 @@ export const uk: TranslationKeys = {
       name: "Конструктор Pipeline",
       description: "Об'єднання кількох інструментів у робочий процес",
     },
-    processing: { canceled: "Обробку скасовано" },
+    processing: {
+      canceled: "Обробку скасовано",
+      cancelUnavailable: "Цю обробку зараз не можна скасувати. Вона триває.",
+      cancelNotAllowed:
+        "Не вдалося скасувати: ви вийшли із системи або вам не можна зупиняти цю обробку. Вона триває.",
+      cancelFailed: "Не вдалося скасувати обробку. Вона триває, спробуйте ще раз.",
+    },
     mediaPlayer: {
       unsupported: "Ваш браузер не підтримує цей медіаформат.",
     },
@@ -1264,7 +1276,6 @@ export const uk: TranslationKeys = {
       paintOverObjectsToErase: "Замалюйте об'єкти, які хочете видалити",
     },
     "crop-canvas": {
-      original: "Оригінал:",
       cropPreview: "Попередній перегляд обрізки",
       cropRegionSize: "Область обрізки: {width} x {height}",
       originalSize: "Оригінал: {width} x {height}",
@@ -1297,7 +1308,6 @@ export const uk: TranslationKeys = {
       infoBar: "{width} x {height}px . сітка {cols}x{rows} . {count} плиток",
     },
     "remove-bg": {
-      original: "Оригінал:",
       transparent: "Прозорий",
       color: "Кольоровий",
       gradient: "Градієнт",
@@ -1324,7 +1334,6 @@ export const uk: TranslationKeys = {
       theExtractedTextWillAppear: "Витягнутий текст з'явиться тут після запуску OCR.",
     },
     "image-enhancement": {
-      original: "Оригінал:",
       removesNoiseAndArtifactsUsing: "Видаляє шум та артефакти за допомогою AI",
       analyzingImage: "Аналіз зображення...",
       imageLooksGoodFineTune:
@@ -1337,8 +1346,6 @@ export const uk: TranslationKeys = {
       enhancedSizeKb: "Поліпшено: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Усі",
-      group: "Група",
       dimensions: "Розміри",
       format: "Формат",
       scanned: "Проскановано:",
@@ -1373,7 +1380,6 @@ export const uk: TranslationKeys = {
       pageSize: "Розмір сторінки",
     },
     color: {
-      original: "Оригінал:",
       light: "Світло",
       brightness: "Яскравість",
       contrast: "Контраст",
@@ -1411,6 +1417,7 @@ export const uk: TranslationKeys = {
       submitBatch: "Стиснути ({count} файлів)",
       submitTarget: "Стиснути до {size} KB",
       resizedToFit: "Зменшено до {width} × {height}, щоб вміститися в {size} KB",
+      batchResized: "Зменшено зображень: {count} з {total}, щоб уміститися в {size} KB.",
       progressLabel: "Стиснення",
       original: "Оригінал: {size} KB",
       processed: "Оброблено: {size} KB",
@@ -1442,6 +1449,8 @@ export const uk: TranslationKeys = {
       submit: "Змінити розмір",
       submitBatch: "Змінити розмір ({count} файлів)",
       progressLabel: "Зміна розміру",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      maxPercentageExceeded: "Використовуйте масштаб від 1 до {max}%.",
     },
     crop: {
       width: "Ширина",
@@ -1465,6 +1474,7 @@ export const uk: TranslationKeys = {
       submit: "Обрізати",
       submitBatch: "Обрізати ({count} файлів)",
       progressLabel: "Обрізка",
+      free: "Вільно",
     },
     rotate: {
       rotate90CounterClockwise: "Обернути на 90° проти годинникової стрілки",
@@ -1484,7 +1494,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Застосування",
     },
     convert: {
-      original: "Оригінал:",
       originalSizeKb: "Оригінал: {size} KB",
       processedSizeKb: "Оброблено: {size} KB",
       targetFormat: "Цільовий формат",
@@ -1514,7 +1523,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Оптимізація",
     },
     "strip-metadata": {
-      original: "Оригінал:",
       iccProfile: "ICC",
       originalSize: "Оригінал: {size} KB",
       processedSize: "Оброблено: {size} KB",
@@ -1538,9 +1546,9 @@ export const uk: TranslationKeys = {
       metadataRemoved: "Метадані видалено: {size} KB",
       submit: "Видалити метадані",
       progressLabel: "Видалення метаданих",
+      inspectFailed: "Не вдалося прочитати метадані",
     },
     "edit-metadata": {
-      original: "Оригінал:",
       imageDescription: "Опис зображення",
       photographerCreatorName: "Ім'я фотографа / автора",
       imageTitle: "Назва зображення",
@@ -1600,6 +1608,7 @@ export const uk: TranslationKeys = {
       datesShifted: "дати зсунуто",
       submit: "Застосувати метадані",
       progressLabel: "Запис метаданих",
+      inspectFailed: "Не вдалося проаналізувати файл",
     },
     "bulk-rename": {
       pattern: "Шаблон",
@@ -1610,6 +1619,7 @@ export const uk: TranslationKeys = {
       renaming: "Перейменування...",
       submit: "Перейменувати {count} файлів",
       zipDownloaded: "ZIP-архів успішно завантажено",
+      renameFailed: "Перейменування не вдалося",
     },
     "image-to-pdf": {
       preview: "Попередній перегляд",
@@ -1640,10 +1650,13 @@ export const uk: TranslationKeys = {
       progressLabel: "Створення PDF",
       uploadingImages: "Завантаження зображень...",
       processingPages: "Обробка {count} сторінок...",
+      parseResponseFailed: "Не вдалося розібрати відповідь сервера",
+      creationFailedWithStatus:
+        "Не вдалося створити PDF. Перевірте зображення та спробуйте ще раз.",
+      networkErrorCreation: "Помилка мережі під час створення PDF",
+      requestTimedOut: "Час очікування вичерпано: сервер може бути перевантажений",
     },
     "pdf-to-image": {
-      converting2: "Конвертація",
-      page: "сторінка",
       custom: "Власне",
       uploadAPdfToGet: "Завантажте PDF, щоб почати",
       generatingPagePreviews: "Створення попередніх переглядів сторінок...",
@@ -1700,6 +1713,12 @@ export const uk: TranslationKeys = {
       submitPlural: "Згенерувати Favicon ({count} зображень)",
       downloadZip: "Завантажити ZIP з Favicon",
       progressLabel: "Генерація Favicon",
+      generationFailed: "Не вдалося згенерувати Favicon. Спробуйте інше зображення.",
+      networkError: "Помилка мережі під час генерації Favicon",
+      timeout: "Час очікування вичерпано: сервер може бути перевантажений",
+      uploadingImages: "Завантаження зображень...",
+      processingImagesOne: "Обробка {count} зображення...",
+      processingImagesOther: "Обробка зображень: {count}...",
     },
     "adjust-colors": {
       light: "Світло",
@@ -1731,7 +1750,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Налаштування кольорів",
     },
     sharpening: {
-      original: "Оригінал:",
       originalSize: "Оригінал: {size} KB",
       processedSize: "Оброблено: {size} KB",
       method: "Метод",
@@ -1758,9 +1776,17 @@ export const uk: TranslationKeys = {
       submit: "Підвищити різкість",
       submitBatch: "Підвищити різкість ({count} файлів)",
       progressLabel: "Підвищення різкості",
+      presetNames: {
+        light: "Легка",
+        medium: "Середня",
+        strong: "Сильна",
+        portrait: "Портрет",
+        landscape: "Пейзаж",
+        detail: "Деталізація",
+        print: "Друк",
+      },
     },
     "replace-color": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       sourceColor: "Вихідний колір (для заміни)",
@@ -1774,7 +1800,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Заміна кольору",
     },
     "color-blindness": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       simulationType: "Тип симуляції",
@@ -1784,6 +1809,45 @@ export const uk: TranslationKeys = {
       submit: "Симулювати",
       submitBatch: "Симулювати ({count} файлів)",
       progressLabel: "Симуляція дальтонізму",
+      types: {
+        protanopia: {
+          label: "Протанопія",
+          description:
+            "Немає червоних колбочок. Червоні кольори виглядають темними. ~1% чоловіків.",
+        },
+        protanomaly: {
+          label: "Протаномалія",
+          description: "Знижена чутливість до червоного. ~1% чоловіків.",
+        },
+        deuteranopia: {
+          label: "Дейтеранопія",
+          description:
+            "Немає зелених колбочок. Червоний і зелений виглядають схоже. ~1% чоловіків.",
+        },
+        deuteranomaly: {
+          label: "Дейтераномалія",
+          description: "Знижена чутливість до зеленого. Найпоширеніший тип. ~5% чоловіків.",
+        },
+        tritanopia: {
+          label: "Тританопія",
+          description:
+            "Немає синіх колбочок. Синій і зелений виглядають схоже. Трапляється дуже рідко.",
+        },
+        tritanomaly: {
+          label: "Тританомалія",
+          description: "Знижена чутливість до синього. Трапляється дуже рідко.",
+        },
+        achromatopsia: {
+          label: "Ахроматопсія",
+          description:
+            "Повна колірна сліпота. Сприймається лише яскравість. Трапляється дуже рідко.",
+        },
+        blueConeMonochromacy: {
+          label: "Монохромазія синіх колбочок",
+          description:
+            "Працюють лише сині колбочки. Сприйняття кольору дуже обмежене. Трапляється дуже рідко.",
+        },
+      },
     },
     "remove-background": {
       subject: "Об'єкт",
@@ -1821,6 +1885,28 @@ export const uk: TranslationKeys = {
       submitBatch: "Видалити фон ({count} файлів)",
       progressLabel: "Видалення фону",
       cpuNote: "Використовує модель ШІ. Без GPU обробка великого зображення може зайняти час.",
+      colorPresets: {
+        white: "Білий",
+        black: "Чорний",
+        red: "Червоний",
+        green: "Зелений",
+        blue: "Синій",
+      },
+      gradientPresets: {
+        purple: "Фіолетовий",
+        pink: "Рожевий",
+        blue: "Синій",
+        green: "Зелений",
+        sunset: "Захід сонця",
+        lavender: "Лаванда",
+      },
+      effectsProcessingFailed: "Не вдалося застосувати ефекти",
+      effectsExpired:
+        "Термін попереднього видалення фону минув, тому воно запускається знову. Застосуйте ефекти, коли воно завершиться.",
+      refineChanged:
+        "Об'єкт, якість, згладжування країв і очищення кольору застосовуються під час видалення тла. Запустіть видалення знову, щоб використати нові налаштування.",
+      backgroundImageRequired: "Виберіть фонове зображення, щоб продовжити.",
+      invalidHexColor: "Використовуйте шістнадцятковий колір, наприклад #FF5500 або #F50.",
     },
     "remove-gif-background": {
       quality: "Якість",
@@ -1859,7 +1945,6 @@ export const uk: TranslationKeys = {
       download: "Завантажити",
     },
     upscale: {
-      original: "Оригінал:",
       off: "Вимкнено",
       originalKb: "Оригінал: {size} KB",
       upscaledKb: "Збільшено: {size} KB",
@@ -1876,9 +1961,11 @@ export const uk: TranslationKeys = {
       progressLabelBatch: "Збільшення {count} зображень",
       cpuNote:
         "Масштабування ШІ потребує багато обчислень. Без GPU обробка великого зображення може зайняти кілька хвилин.",
+      qualityFast: "Швидко",
+      qualityBalanced: "Збалансовано",
+      qualityBest: "Найкраще",
     },
     "erase-object": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       qualityFast: "Швидко",
@@ -1894,11 +1981,17 @@ export const uk: TranslationKeys = {
       clear: "Очистити",
       outputFormat: "Формат виводу",
       quality: "Якість",
-      paintHint: "Замалюйте об'єкти, які хочете видалити. Натисніть Ctrl+Z для скасування.",
-      lassoHint: "Обведіть петлею об'єкт, який хочете видалити. Натисніть Ctrl+Z для скасування.",
+      paintHint: "Замалюйте об'єкти, які хочете видалити. Натисніть {shortcut} для скасування.",
+      lassoHint:
+        "Обведіть петлею об'єкт, який хочете видалити. Натисніть {shortcut} для скасування.",
       submit: "Видалити об'єкт",
       submitBatch: "Видалити все ({count})",
       progressLabel: "Видалення об'єкта",
+      stall: "Час обробки вичерпано без прогресу. Спробуйте знову.",
+      stallBatch: "Час обробки вичерпано. Спробуйте знову.",
+      timeoutOverloaded:
+        "Час очікування вичерпано: сервер може бути перевантажений. Спробуйте знову.",
+      erasingProgress: "Видалення {current}/{total}",
     },
     ocr: {
       copied: "Скопійовано",
@@ -1908,6 +2001,8 @@ export const uk: TranslationKeys = {
         "Покращує локальний контраст перед розпізнаванням. Швидкий режим застосовує його одразу; Збалансований і Найкращий зберігають варіант лише за покращення каліброваної оцінки.",
       fastKoreanUnsupported:
         "Швидкий OCR не підтримує корейську мову. Установіть пакет точного OCR і виберіть «Збалансований» або «Найкращий».",
+      fastArabicUnsupported:
+        "Швидкий OCR не підтримує арабську мову. Установіть пакет точного OCR і виберіть «Збалансований» або «Найкращий».",
       language: "Мова",
       autoDetect: "Автовизначення",
       extractedText: "Витягнутий текст",
@@ -1916,6 +2011,9 @@ export const uk: TranslationKeys = {
       submit: "Витягнути текст",
       submitBatch: "Витягнути текст ({count} файлів)",
       progressLabel: "Витягування тексту",
+      filesFailed: "Не вдалося обробити файлів: {failed} з {total}",
+      noTextDetectedInline: "(текст не виявлено)",
+      fileErrorInline: "(помилка: {message})",
     },
     "ocr-pdf": {
       quality: "Якiсть",
@@ -1929,7 +2027,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Витягування тексту з PDF",
     },
     "blur-faces": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       blurRadius: "Радіус розмиття",
@@ -1942,7 +2039,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Розмиття облич",
     },
     "enhance-faces": {
-      original: "Оригінал:",
       subtle: "Легка",
       maximum: "Максимальний",
       fewerFaces: "Менше облич",
@@ -2003,6 +2099,9 @@ export const uk: TranslationKeys = {
       submitSubject: "Розумна обрізка",
       submitFace: "Обрізка по обличчю",
       submitTrim: "Обрізати поля",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      cropAreaExceeded:
+        "Цей фрагмент перевищує ліміт у {max} пікселів. Зменште ширину, висоту або відступ.",
     },
     imageEnhancement: {
       enhancementMode: "Режим поліпшення",
@@ -2038,6 +2137,14 @@ export const uk: TranslationKeys = {
         "Для глибокого поліпшення потрібен пакет збільшення й поліпшення, але його не встановлено, тому застосовано стандартне поліпшення.",
       deepEnhanceSkippedAnimated:
         "Глибоке поліпшення не працює з анімованими зображеннями, тому до кожного кадру застосовано стандартне поліпшення.",
+      batchDeepEnhanceSkipped:
+        "Глибоке поліпшення не спрацювало для {count} з {total} зображень, до них застосовано стандартне поліпшення.",
+      batchDeepEnhanceSkippedFailed:
+        "Глибоке поліпшення завершилося помилкою для {count} з {total} зображень, до них застосовано стандартне поліпшення.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Глибоке поліпшення не спрацювало для {count} з {total} зображень: пакет збільшення й поліпшення не встановлено.",
+      batchDeepEnhanceSkippedAnimated:
+        "Глибоке поліпшення пропустило {count} з {total} зображень, бо вони анімовані.",
     },
     "noise-removal": {
       off: "Вимкнено",
@@ -2069,7 +2176,6 @@ export const uk: TranslationKeys = {
       progressLabelBatch: "Видалення шуму з {count} зображень",
     },
     "red-eye-removal": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       fixedKb: "Виправлено: {size} KB",
       sensitivity: "Чутливість",
@@ -2086,7 +2192,6 @@ export const uk: TranslationKeys = {
       progressLabelBatch: "Виправлення червоних очей на {count} зображеннях",
     },
     "restore-photo": {
-      original: "Оригінал:",
       subtle: "Легка",
       strong: "Сильне",
       originalKb: "Оригінал: {size} KB",
@@ -2123,6 +2228,9 @@ export const uk: TranslationKeys = {
       submit: "Змінити розмір",
       submitBatch: "Змінити розмір ({count} файлів)",
       progressLabel: "Контентно-залежне масштабування",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
+      areaExceeded:
+        "Зміна розміру з урахуванням вмісту обмежена {max} пікселями загалом. Зменште ширину або висоту.",
     },
     "ai-canvas-expand": {
       quality: "Якість",
@@ -2144,7 +2252,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Розширення полотна",
     },
     colorize: {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       colorizedKb: "Колоризовано: {size} KB",
       aiModel: "AI-модель",
@@ -2289,6 +2396,12 @@ export const uk: TranslationKeys = {
       dragToAdjust: "Перетягніть для налаштування",
       scrollToZoom: "Прокрутіть для масштабування",
       photoGenerated: "Фото створено. Завантажте з лівої панелі.",
+      analysisFailedWithStatus: "Не вдалося проаналізувати це фото. Спробуйте чіткіший знімок.",
+      faceAnalysisFailed: "Аналіз обличчя не вдався",
+      generationFailedWithStatus: "Не вдалося створити фото на документи. Спробуйте ще раз.",
+      photoGenerationFailed: "Не вдалося створити фото",
+      analysisExpired:
+        "Термін аналізу минув, тому фото аналізується знову. Створіть його, коли аналіз завершиться.",
     },
     "transcribe-audio": {
       language: "Мова",
@@ -2346,7 +2459,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Розмиття фону",
     },
     "watermark-text": {
-      original: "Оригінал:",
       applyWatermark: "Застосувати водяний знак",
       tiledRepeating: "Плиткою (з повторенням)",
       originalKb: "Оригінал: {size} KB",
@@ -2369,7 +2481,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Додавання водяного знаку",
     },
     "watermark-image": {
-      original: "Оригінал:",
       center: "Центр",
       topLeft: "Зверху ліворуч",
       topRight: "Зверху праворуч",
@@ -2388,7 +2499,6 @@ export const uk: TranslationKeys = {
       submitBatch: "Застосувати водяний знак ({count} файлів)",
     },
     "text-overlay": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       text: "Текст",
@@ -2408,7 +2518,6 @@ export const uk: TranslationKeys = {
       defaultText: "Ваш текст тут",
     },
     compose: {
-      original: "Оригінал:",
       screen: "Екран",
       processing: "Обробка...",
       overlayImage: "Зображення для накладання",
@@ -2463,9 +2572,6 @@ export const uk: TranslationKeys = {
       backToGallery: "Назад до галереї",
     },
     info: {
-      min: "мін:",
-      max: "макс:",
-      mean: "середнє:",
       minValue: "мін:{value}",
       maxValue: "макс:{value}",
       meanValue: "середнє:{value}",
@@ -2502,6 +2608,7 @@ export const uk: TranslationKeys = {
       similarity: "Подібність: {percent}%",
       submit: "Порівняти",
       downloadDiff: "Завантажити різницю",
+      comparisonFailed: "Порівняння не вдалося",
     },
     "find-duplicates": {
       sensitivity: "Чутливість",
@@ -2531,6 +2638,10 @@ export const uk: TranslationKeys = {
       threshold: "Поріг",
       submit: "Шукати дублікати",
       scanning: "Сканування...",
+      parseResultsFailed: "Не вдалося розібрати результати сканування",
+      networkErrorUpload:
+        "Помилка мережі під час завантаження. Спробуйте менше файлів або перевірте з'єднання.",
+      requestTimedOut: "Час очікування вичерпано. Спробуйте менше файлів.",
     },
     "color-palette": {
       colors: "Кольори",
@@ -2601,6 +2712,26 @@ export const uk: TranslationKeys = {
       downloadFormat: "Формат завантаження",
       submit: "Згенерувати QR-код",
       download: "Завантажити QR-код",
+      styleSquare: "Квадрат",
+      styleRounded: "Заокруглений",
+      styleDots: "Точки",
+      styleClassy: "Елегантний",
+      styleClassyRounded: "Елег. заокр.",
+      styleExtraRounded: "Дуже заокр.",
+      styleDot: "Точка",
+      formatDescPng: "Для екрана",
+      formatDescSvg: "Для друку",
+      formatDescJpeg: "Менший файл",
+      formatDescWebp: "Сучасний формат",
+      vcardFirstName: "Ім'я",
+      vcardFirstNamePlaceholder: "Іван",
+      vcardLastName: "Прізвище",
+      vcardLastNamePlaceholder: "Петренко",
+      vcardOrganization: "Організація",
+      vcardOrganizationPlaceholder: "Компанія",
+      vcardJobTitle: "Посада",
+      vcardJobTitlePlaceholder: "Розробник",
+      vcardWebsite: "Вебсайт",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2650,6 +2781,9 @@ export const uk: TranslationKeys = {
       noBarcodesFound: "Штрихкоди не знайдено",
       barcodesFound: "Знайдено {count} штрихкод",
       barcodesFoundPlural: "Знайдено {count} штрихкодів",
+      scanningFile: "Сканування {name}...",
+      scanningFailedWithStatus: "Не вдалося відсканувати це зображення. Спробуйте інше зображення.",
+      filesFailed: "Не вдалося обробити файлів: {count} з {total}",
     },
     collage: {
       sideBySide: "Поруч",
@@ -2670,9 +2804,6 @@ export const uk: TranslationKeys = {
       mosaic: "Мозаїка",
       uploadingImages: "Завантаження зображень...",
       processingCollage: "Обробка колажу...",
-      loaded: "завантажено",
-      images: "зображень",
-      collage: "Колаж:",
       snapotter: "SnapOtter",
       background: "Фон",
       format: "Формат",
@@ -2708,6 +2839,12 @@ export const uk: TranslationKeys = {
       quality: "Якість",
       submit: "Створити колаж",
       downloadCollage: "Завантажити колаж",
+      ratioFree: "Вільно",
+      bgWhite: "Білий",
+      bgBlack: "Чорний",
+      bgNone: "Немає",
+      bgCustom: "Власний",
+      collageFailed: "Не вдалося створити колаж",
     },
     stitch: {
       format: "Формат",
@@ -2737,6 +2874,7 @@ export const uk: TranslationKeys = {
       outputFormat: "Формат виводу",
       quality: "Якість",
       submit: "Об'єднати зображення",
+      stitchFailed: "Об'єднання не вдалося",
     },
     split: {
       splitMode: "Режим розділення",
@@ -2765,6 +2903,21 @@ export const uk: TranslationKeys = {
       submit: "Розділити зображення",
       downloadAll: "Завантажити все (ZIP)",
       tileWarningSmall: "Плитки будуть дуже малими ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Навпіл горизонтально",
+        verticalHalf: "Навпіл вертикально",
+        quarters: "Чверті",
+        horizontalStrip: "Горизонтальна смуга",
+        verticalStrip: "Вертикальна смуга",
+        grid9: "Сітка з 9 плиток",
+        portrait6: "6 плиток, книжкова",
+        landscape6: "6 плиток, альбомна",
+        grid16: "Сітка з 16 плиток",
+      },
+      keepOriginal: "Зберегти оригінал",
+      auto: "Авто",
+      splitFailed: "Розділення не вдалося",
+      failedToSplit: "Не вдалося розділити {name}: {detail}",
     },
     border: {
       blur: "Розмиття",
@@ -2790,6 +2943,16 @@ export const uk: TranslationKeys = {
       submit: "Додати рамку",
       submitBatch: "Додати рамку ({count} файлів)",
       progressLabel: "Додавання рамки",
+      presetNames: {
+        cleanWhite: "Чистий білий",
+        galleryBlack: "Галерейний чорний",
+        shadow: "Тінь",
+        rounded: "Заокруглена",
+        polaroid: "Полароїд",
+        vintage: "Вінтаж",
+        minimal: "Мінімалізм",
+        cinematic: "Кінематографічна",
+      },
     },
     beautify: {
       background: "Фон",
@@ -2806,7 +2969,6 @@ export const uk: TranslationKeys = {
       text: "Текст",
       position: "Позиція",
       newTab: "Нова вкладка",
-      frame: "Рамка",
       quickPresets: "Швидкі шаблони",
       linear: "Лінійний",
       radial: "Радіальний",
@@ -2834,6 +2996,33 @@ export const uk: TranslationKeys = {
       submit: "Прикрасити",
       submitBatch: "Прикрасити ({count} файлів)",
       progressLabel: "Прикрашання знімку екрана",
+      presetPurpleHaze: "Фіолетовий серпанок",
+      presetFlamingo: "Фламінго",
+      presetOcean: "Океан",
+      presetMidnight: "Північ",
+      presetMint: "М'ята",
+      presetSunset: "Захід сонця",
+      presetCleanWhite: "Чистий білий",
+      presetNoBackground: "Без фону",
+      bgGradient: "Градієнт",
+      bgSolid: "Суцільний",
+      bgImage: "Зображення",
+      none: "Немає",
+      frameBrowser: "Браузер",
+      shadowSubtle: "Легка",
+      shadowMedium: "Середня",
+      shadowDramatic: "Драматична",
+      shadowCustom: "Власна",
+      socialOriginal: "Оригінал",
+      socialIgSquare: "IG квадрат",
+      socialIgStory: "IG сторіз",
+      positionTopLeft: "Зверху ліворуч",
+      positionTopRight: "Зверху праворуч",
+      positionCenter: "Центр",
+      positionBottomLeft: "Знизу ліворуч",
+      positionBottomRight: "Знизу праворуч",
+      processingFailed: "Обробка не вдалася",
+      processingFailedStatus: "Не вдалося обробити це зображення. Спробуйте ще раз.",
     },
     "circle-crop": {
       border: "Рамка",
@@ -2872,6 +3061,16 @@ export const uk: TranslationKeys = {
       submit: "Застосувати двотон",
       submitBatch: "Застосувати двотон ({count} файлів)",
       progressLabel: "Застосування двотону",
+      presetNames: {
+        classic: "Класика",
+        noir: "Нуар",
+        sepia: "Сепія",
+        midnight: "Північ",
+        sunset: "Захід сонця",
+        cyber: "Кібер",
+        ocean: "Океан",
+        forest: "Ліс",
+      },
     },
     "image-pad": {
       background: "Фон",
@@ -2884,6 +3083,7 @@ export const uk: TranslationKeys = {
       submit: "Додати поля",
       submitBatch: "Додати поля ({count} файлів)",
       progressLabel: "Додавання полів",
+      custom: "Власне",
     },
     pixelate: {
       blockSize: "Розмір блоку",
@@ -2986,7 +3186,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Конвертація SVG",
     },
     vectorize: {
-      original: "Оригінал:",
       detail: "Деталізація",
       smoothing: "Згладжування",
       blackWhite: "Чорно-білий",
@@ -3023,7 +3222,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Векторизація",
     },
     "gif-tools": {
-      original: "Оригінал:",
       widthPx: "Ширина (px)",
       auto: "Авто",
       heightPx: "Висота (px)",
@@ -3080,6 +3278,7 @@ export const uk: TranslationKeys = {
       submit: "Обробити GIF",
       submitBatch: "Обробити ({count} файлів)",
       progressLabel: "Обробка GIF",
+      maxDimensionExceeded: "Використовуйте розмір від 1 до {max} px.",
     },
     "image-to-base64": {
       converting: "Конвертація...",
@@ -3114,6 +3313,7 @@ export const uk: TranslationKeys = {
       includeText: "Додати текст",
       submit: "Створити штрихкод",
       download: "Завантажити штрихкод",
+      generateFailed: "Не вдалося згенерувати штрихкод",
     },
     "chart-maker": {
       optionalChartTitle: "Заголовок діаграми (необов'язково)",
@@ -3124,6 +3324,11 @@ export const uk: TranslationKeys = {
       submit: "Створити діаграму",
       submitBatch: "Створити діаграму ({count} файлів)",
       progressLabel: "Створення діаграми",
+      kindBar: "Стовпці",
+      kindLine: "Лінія",
+      kindPie: "Кругова",
+      rowsSkipped:
+        "Рядків на діаграмі: {charted}. Пропущено, бо в стовпці значень не було числа: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Модель",
@@ -3514,12 +3719,12 @@ export const uk: TranslationKeys = {
       submit: "Стиснути",
       submitBatch: "Стиснути ({count} файлів)",
       submitTarget: "Стиснути до {size}",
+      batchMissed: "Файлів, що не вмістилися в {target}: {count} з {total}.",
       progressLabel: "Стиснення",
       bestEffortHint:
         "Максимум за можливості. PDF на основі зображень наближаються до цього розміру; PDF лише з текстом можуть не зменшитися до нього.",
       targetReached: "Досягнуто цільового розміру {target} (результат: {size}).",
-      targetMissed:
-        "Не вдалося досягти {target}. Найменший можливий розмір становив {size}, оскільки цей PDF складається переважно з тексту або векторної графіки, які стиснення зображень не може зменшити.",
+      targetMissed: "Не вдалося досягти {target}. Найменший можливий розмір становив {size}.",
     },
     "rotate-pdf": {
       angle: "Кут повороту",
@@ -3588,6 +3793,30 @@ export const uk: TranslationKeys = {
       pageLabel: "Сторінка {n}",
       orderTooLong:
         "Забагато окремих переміщень для надсилання. Скиньте порядок і спробуйте внести менше змін.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Не більше {docs} PDF і {pages} сторінок у результаті.",
+      addDocument: "Додати PDF",
+      addAll: "Додати всі сторінки",
+      allPages: "Усі в плані",
+      addPage: "Додати сторінку {n}",
+      dragHint:
+        "Перетягуйте, щоб змінити порядок, повернути або вилучити сторінки. Додайте PDF, щоб узяти їхні сторінки.",
+      reset: "Скинути план",
+      emptyPlan: "У плані поки немає сторінок. Додайте сторінки з документів вище.",
+      docFailed: "Не вдалося прочитати документ.",
+      skippedNotPdf: "Пропущено файлів: {count}. Можна додавати лише PDF.",
+      skippedOverLimit: "Не додано PDF: {count}. У редакторі може бути не більше {docs} PDF.",
+      pageLabel: "Позиція {n}",
+      planSummary: "Буде зібрано сторінок: {pages} з {docs} документ(ів).",
+      submit: "Зібрати PDF ({pages} стор.)",
+      progressLabel: "Збирання",
+      rotateLeft: "Повернути вліво",
+      rotateRight: "Повернути вправо",
+      removePage: "Вилучити сторінку",
+      removeDoc: "Вилучити PDF",
+      zoomIn: "Збільшити",
+      zoomOut: "Зменшити",
     },
     "protect-pdf": {
       userPassword: "Пароль користувача",
@@ -3708,6 +3937,9 @@ export const uk: TranslationKeys = {
         uploadHint:
           "Перетягніть PNG / JPG або натисніть, щоб вибрати. Прозорий PNG працює найкраще.",
       },
+      exportFailed: "Не вдалося прочитати розміщені підписи. Спробуйте знову.",
+      stall: "Час обробки вичерпано. Спробуйте знову.",
+      timeout: "Час очікування вичерпано. Спробуйте знову.",
     },
     "redact-pdf": {
       terms: "Терміни для зачернення",
@@ -3721,6 +3953,9 @@ export const uk: TranslationKeys = {
       submit: "Витягти текст",
       submitBatch: "Витягти текст ({count} файлів)",
       progressLabel: "Витягнення",
+      scannedHint:
+        "Цей PDF відсканований, тож тексту для вилучення немає. OCR може його прочитати, але це довше й потребує встановленого ШІ-пакета OCR.",
+      runOcr: "Запустити OCR для цього PDF",
     },
     "pdf-to-word": {
       hint: "Найкраще для текстових PDF; скановані сторінки потребують OCR",
@@ -3877,6 +4112,8 @@ export const uk: TranslationKeys = {
     importFromFiles: "Імпортувати з файлів",
     saveToFiles: "Зберегти у файли",
     savedToFiles: "Збережено у файли",
+    resultExpired: "Термін дії цього результату минув. Запустіть інструмент ще раз.",
+    libraryFull: "Сховище ваших файлів заповнене. Видаліть кілька файлів і спробуйте ще раз.",
     librarySaveTitle: "Цей файл із ваших файлів",
     librarySaveAsNew: "Зберегти результат як новий файл",
     librarySaveAsNewHint: "Оригінал залишиться у ваших файлах",
@@ -4098,7 +4335,7 @@ export const uk: TranslationKeys = {
       dropDescription: "Перетягніть зображення сюди для початку роботи",
       openImageButton: "Відкрити зображення",
       newDocumentButton: "Новий документ",
-      pasteHint: "Або вставте з буфера обміну (Ctrl+V)",
+      pasteHint: "Або вставте з буфера обміну ({shortcut})",
     },
     mobile: {
       heading: "Рекомендовано настільний ПК",
@@ -4151,6 +4388,7 @@ export const uk: TranslationKeys = {
         ratioLabel: "Пропорції:",
         applyTitle: "Застосувати обрізання (Enter)",
         cancelTitle: "Скасувати обрізання (Escape)",
+        free: "Вільно",
       },
       dodgeBurn: {
         dodge: "Освітлювач",
@@ -4167,6 +4405,9 @@ export const uk: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Зразок:",
         toggleDropdown: "Розгорнути список",
+        samplePoint: "Точка (1x1)",
+        sampleAverage3: "Середнє 3x3",
+        sampleAverage5: "Середнє 5x5",
       },
       fill: {
         tolerance: "Допуск",
@@ -4263,6 +4504,68 @@ export const uk: TranslationKeys = {
         grain: "Зернистість",
         resetAll: "Скинути все",
         apply: "Застосувати",
+        autoButtons: {
+          autoTone: "Автотон",
+          autoContrast: "Автоконтраст",
+          autoColor: "Автоколір",
+          autoEnhance: "Автополіпшення",
+        },
+        sliders: {
+          brightness: "Яскравість",
+          contrast: "Контраст",
+          hue: "Тон",
+          saturation: "Насиченість",
+          luminance: "Світлість",
+          exposure: "Експозиція",
+          vibrance: "Соковитість",
+          warmth: "Теплота",
+        },
+        filters: {
+          grayscale: "Відтінки сірого",
+          sepia: "Сепія",
+          invert: "Інверсія",
+          solarize: "Соляризація",
+          blur: "Розмиття",
+          sharpen: "Різкість",
+          noise: "Шум",
+          pixelate: "Пікселізація",
+          emboss: "Тиснення",
+          posterize: "Постеризація",
+          threshold: "Поріг",
+          kaleidoscope: "Калейдоскоп",
+          motionBlur: "Розмиття руху",
+          radialBlur: "Радіальне розмиття",
+          surfaceBlur: "Поверхневе розмиття",
+        },
+        params: {
+          radius: "Радіус",
+          amount: "Кількість",
+          size: "Розмір",
+          strength: "Сила",
+          levels: "Рівні",
+          level: "Рівень",
+          power: "Потужність",
+          angle: "Кут",
+          distance: "Відстань",
+          centerX: "Центр X",
+          centerY: "Центр Y",
+          threshold: "Поріг",
+          midpoint: "Середня точка",
+          roundness: "Округлість",
+          feather: "Розтушовування",
+          roughness: "Шорсткість",
+        },
+        curvePresets: {
+          linear: "Лінійний",
+          darken: "Затемнення",
+          lighten: "Освітлення",
+          increaseContrast: "Більше контрасту",
+          decreaseContrast: "Менше контрасту",
+          mediumContrast: "Середній контраст",
+          strongContrast: "Сильний контраст",
+          crossProcess: "Крос-процес",
+          negative: "Негатив",
+        },
       },
       color: {
         channelAriaLabel: "Колірний канал {channel}",
@@ -4278,12 +4581,64 @@ export const uk: TranslationKeys = {
         median: "Медіана",
       },
       history: {
-        undoTitle: "Скасувати (Ctrl+Z)",
-        redoTitle: "Повторити (Ctrl+Shift+Z)",
+        undoTitle: "Скасувати ({shortcut})",
+        redoTitle: "Повторити ({shortcut})",
         empty: "Історія поки порожня",
+        unknown: "Невідомо",
+        actions: {
+          initialState: "Початковий стан",
+          loadImage: "Завантажити зображення",
+          loadProject: "Відкрити проєкт",
+          restoreAutosave: "Відновити автозбереження",
+          resizeCanvas: "Змінити розмір полотна",
+          resizeImage: "Змінити розмір зображення",
+          rotateCanvas: "Обернути полотно {degrees}",
+          flipHorizontal: "Відобразити горизонтально",
+          flipVertical: "Відобразити вертикально",
+          trimCanvas: "Обрізати полотно",
+          addObject: "Додати: {type}",
+          layerEffect: "Ефект шару",
+          delete: "Видалити",
+          bringToFront: "На передній план",
+          bringForward: "Перемістити вперед",
+          sendBackward: "Перемістити назад",
+          sendToBack: "На задній план",
+          addLayer: "Додати шар",
+          deleteLayer: "Видалити шар",
+          duplicateLayer: "Дублювати шар",
+          reorderLayers: "Змінити порядок шарів",
+          mergeDown: "Об'єднати з нижнім",
+          flattenAll: "Звести все",
+          adjust: "Корекція: {name}",
+          resetAdjustments: "Скинути корекцію",
+          levels: "Рівні",
+          curves: "Криві",
+          resetLevels: "Скинути рівні",
+          resetCurves: "Скинути криві",
+          resetAll: "Скинути все",
+          toggleFilter: "Перемкнути фільтр {name}",
+          setFilterParam: "{filter}: змінити {param}",
+          crop: "Обрізання",
+          cut: "Вирізати",
+          paste: "Вставити",
+          pasteInPlace: "Вставити на місце",
+          nudge: "Зсув",
+          brushStroke: "Мазок пензля",
+          eraserStroke: "Мазок гумки",
+        },
+        objectTypes: {
+          line: "Лінія",
+          rect: "Прямокутник",
+          ellipse: "Еліпс",
+          text: "Текст",
+          image: "Зображення",
+          arrow: "Стрілка",
+          polygon: "Багатокутник",
+          star: "Зірка",
+        },
       },
       layers: {
-        newLayerTitle: "Новий шар (Ctrl+Shift+N)",
+        newLayerTitle: "Новий шар ({shortcut})",
         blend: "Накладання",
         opacity: "Непрозорість",
         hideLayer: "Сховати шар",
@@ -4311,9 +4666,34 @@ export const uk: TranslationKeys = {
           positionCenter: "По центру",
           positionOutside: "Ззовні",
         },
+        blendModes: {
+          normal: "Звичайний",
+          multiply: "Множення",
+          screen: "Екран",
+          overlay: "Перекриття",
+          darken: "Затемнення",
+          lighten: "Освітлення",
+          colorDodge: "Освітлення основи",
+          colorBurn: "Затемнення основи",
+          hardLight: "Жорстке світло",
+          softLight: "М'яке світло",
+          difference: "Різниця",
+          exclusion: "Виключення",
+          hue: "Тон",
+          saturation: "Насиченість",
+          color: "Колірність",
+          luminosity: "Яскравість",
+        },
+        duplicate: "Дублювати",
+        flattenAll: "Звести все",
       },
       navigator: {
         noImageLoaded: "Зображення не завантажено",
+      },
+      tabs: {
+        layers: "Шари",
+        adjustments: "Корекція",
+        history: "Історія",
       },
     },
     ui: {
@@ -4329,6 +4709,7 @@ export const uk: TranslationKeys = {
         anchorLabel: "Прив'язка:",
         anchorAriaLabel: "Прив'язка {position}",
         backgroundLabel: "Фон:",
+        transparent: "Прозорий",
         anchors: {
           topLeft: "вгорі ліворуч",
           topCenter: "вгорі по центру",
@@ -4346,6 +4727,14 @@ export const uk: TranslationKeys = {
         original: "Оригінал: {width} x {height} px",
         note: "Масштабує всі об'єкти пропорційно до нових розмірів.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Це зображення завелике, щоб браузер міг редагувати його цим інструментом. Спробуйте зменшити розмір полотна.",
+        crossOriginBlocked:
+          "Редактор не може зчитати пікселі зображення, завантаженого з іншого сайту. Завантажте зображення та відкрийте файл.",
+        sourceImageFailed:
+          "Не вдалося завантажити зображення. Якщо воно розміщене на іншому сайті, цей сайт має дозволити міждоменний доступ.",
+      },
       exportDialog: {
         heading: "Експорт зображення",
         previewAlt: "Попередній перегляд експорту",
@@ -4359,13 +4748,19 @@ export const uk: TranslationKeys = {
         exportButton: "Експортувати",
         copied: "Скопійовано",
         copyFailed: "Не вдалося скопіювати",
+        exportFailed: "Помилка експорту. Спробуйте ще раз або виберіть інший формат.",
+        tooLarge:
+          "Цей експорт завеликий, щоб браузер міг його створити. Спробуйте зменшити розміри.",
         saveProject: "Зберегти проєкт",
         loadProject: "Відкрити проєкт",
+        invalidProject: "Цей файл не є дійсним проєктом SnapOtter.",
       },
       autosaveRecovery: {
         message: "Відновлено незбережену роботу від {time}.",
         restore: "Відновити",
         discard: "Відкинути",
+        saveFailed:
+          "Не вдалося зберегти роботу в цьому браузері. Експортуйте її або скористайтеся опцією «Зберегти проєкт», щоб залишити копію.",
       },
       fillDialog: {
         heading: "Заливка",
@@ -4391,6 +4786,7 @@ export const uk: TranslationKeys = {
           black: "Чорний",
           transparent: "Прозорий",
         },
+        presetCustom: "Власне",
       },
       colorSwatch: {
         ariaLabel: "Колір {color}",
@@ -4400,6 +4796,25 @@ export const uk: TranslationKeys = {
         noneSelected: "{label}: немає",
         setNone: "{label}: прибрати",
       },
+      contextMenu: {
+        duplicate: "Дублювати",
+        selectAll: "Виділити все",
+      },
+    },
+    toolbar: {
+      move: "Переміщення",
+      marquee: "Виділення",
+      crop: "Обрізання",
+      eyedropper: "Піпетка",
+      brush: "Пензель",
+      pencil: "Олівець",
+      cloneStamp: "Штамп",
+      eraser: "Гумка",
+      paintBucket: "Заливка",
+      gradient: "Градієнт",
+      text: "Текст",
+      hand: "Рука",
+      zoom: "Масштаб",
     },
   },
   settings: {
@@ -4432,6 +4847,7 @@ export const uk: TranslationKeys = {
       saveButton: "Зберегти налаштування",
       saveSuccess: "Налаштування збережено.",
       saveFailed: "Не вдалося зберегти налаштування.",
+      loadFailed: "Не вдалося завантажити налаштування користувача.",
       roleUnknown: "невідома",
     },
     system: {
@@ -4456,6 +4872,7 @@ export const uk: TranslationKeys = {
       saveButton: "Зберегти налаштування",
       saveSuccess: "Налаштування збережено.",
       saveFailed: "Не вдалося зберегти налаштування.",
+      loadFailed: "Не вдалося завантажити системні налаштування.",
       limitsAndResources: "Обмеження та ресурси",
       maxFileSize: "Макс. розмір файлу",
       maxBatchSize: "Макс. розмір пакета",
@@ -4493,10 +4910,10 @@ export const uk: TranslationKeys = {
       newPasswordPlaceholder: "Новий пароль",
       confirmPasswordPlaceholder: "Підтвердіть новий пароль",
       passwordsMismatch: "Паролі не збігаються",
-      passwordTooShort: "Пароль має містити щонайменше 4 символи",
       changeSuccess: "Пароль успішно змінено",
       changeFailed: "Не вдалося змінити пароль",
       currentPasswordIncorrect: "Поточний пароль невірний",
+      passwordChangedElsewhere: "Ваш пароль було змінено в іншому місці. Увійдіть знову.",
       changePasswordButton: "Змінити пароль",
       loginAttemptLimitNote: "Ліміти спроб входу можна налаштувати в Системних налаштуваннях.",
       twoFactorHeading: "Двофакторна автентифікація",
@@ -4545,6 +4962,8 @@ export const uk: TranslationKeys = {
       passwordMinLengthDesc: "Мінімальна кількість символів для паролів.",
       passwordRequireUppercase: "Вимагати великі літери",
       passwordRequireUppercaseDesc: "Вимагати принаймні одну велику літеру.",
+      passwordRequireLowercase: "Вимагати малі літери",
+      passwordRequireLowercaseDesc: "Вимагати принаймні одну малу літеру.",
       passwordRequireNumber: "Вимагати цифру",
       passwordRequireNumberDesc: "Вимагати принаймні одну цифру.",
       passwordRequireSpecial: "Вимагати спеціальний символ",
@@ -4552,6 +4971,12 @@ export const uk: TranslationKeys = {
       passwordPolicyHeading: "Політика паролів",
       securitySettingsSaved: "Налаштування безпеки збережено",
       securitySettingsFailed: "Не вдалося зберегти налаштування безпеки",
+      adminSettingsLoadFailed: "Не вдалося завантажити налаштування безпеки.",
+      twoFactorStateChanged:
+        "Двофакторну автентифікацію змінено в іншому вікні. Оновіть сторінку й спробуйте ще раз.",
+      twoFactorUnreadable:
+        "Сервер не може прочитати налаштування двофакторної автентифікації. Зверніться до адміністратора.",
+      ssoNeedsProvider: "Щоб увімкнути примусове SSO, спершу налаштуйте провайдера OIDC або SAML.",
     },
     people: {
       heading: "Користувачі",
@@ -4584,7 +5009,7 @@ export const uk: TranslationKeys = {
       updateFailed: "Не вдалося оновити користувача",
       cannotRemoveOwnAdmin: "Неможливо зняти з себе роль адміністратора",
       resetPasswordHeading: "Скидання пароля для {username}",
-      newPasswordLabel: "Новий пароль (мін. 8 символів)",
+      newPasswordLabel: "Новий пароль",
       resetPasswordButton: "Скинути пароль",
       resetPasswordWarning: "Це анулює всі сесії та API-ключі цього користувача.",
       resetSuccess: "Пароль успішно скинуто",
@@ -4594,6 +5019,7 @@ export const uk: TranslationKeys = {
       tableHeaderTeam: "Команда",
       noSearchResults: "Учасників не знайдено.",
       noUsersFound: "Користувачів не знайдено.",
+      loadFailed: "Не вдалося завантажити користувачів.",
       authBadgeLocalOidc: "Локальний + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Змінити роль / команду",
@@ -4606,6 +5032,13 @@ export const uk: TranslationKeys = {
         "Скопіюйте цей пароль зараз. Після створення користувача ви не зможете його побачити.",
       memberCount: "{count} учасник",
       memberCountPlural: "{count} учасників",
+      usernameTaken: "Це ім'я користувача вже зайняте",
+      lastAdmin: "Завжди має залишатися щонайменше один адміністратор",
+      cannotDeleteSelf: "Неможливо видалити власний обліковий запис",
+      usernameInvalid:
+        "Ім'я користувача має містити від 3 до 50 символів і лише a-z, A-Z, 0-9, крапки, дефіси та підкреслення",
+      roleNotFound: "Ця роль більше не існує",
+      teamNotFound: "Ця команда більше не існує",
     },
     teams: {
       heading: "Команди",
@@ -4627,6 +5060,7 @@ export const uk: TranslationKeys = {
       tableHeaderTeamName: "Назва команди",
       tableHeaderMembers: "Учасники",
       emptyState: "Команд не знайдено.",
+      loadFailed: "Не вдалося завантажити команди.",
       renameSaveButton: "Зберегти",
       renameCancelButton: "Скасувати",
       renameAction: "Перейменувати",
@@ -4642,6 +5076,7 @@ export const uk: TranslationKeys = {
       teamRetentionHoursDesc:
         "Час зберігання файлів обробки для цієї команди. Залиште порожнім для глобального значення.",
       quotaSaved: "Налаштування команди збережено",
+      quotaSaveFailed: "Не вдалося зберегти налаштування команди",
     },
     roles: {
       heading: "Ролі",
@@ -4666,6 +5101,7 @@ export const uk: TranslationKeys = {
       deleteSuccess: 'Роль "{name}" видалено',
       deleteFailed: "Не вдалося видалити роль",
       emptyState: "Ролей не знайдено.",
+      loadFailed: "Не вдалося завантажити ролі.",
       builtInBadge: "Вбудована",
       userCountBadge: "{count} користувач(ів)",
       editRoleTitle: "Редагувати роль",
@@ -4679,12 +5115,17 @@ export const uk: TranslationKeys = {
         users: "Користувачі",
         teams: "Команди",
         system: "Система",
+        enterpriseAdmin: "Корпоративне адміністрування",
       },
+      nameInvalid:
+        "Назва ролі має містити від 2 до 30 символів і лише a-z, 0-9, дефіси та підкреслення",
+      permissionsRequired: "Виберіть принаймні одне право доступу",
     },
     auditLog: {
       heading: "Журнал аудиту",
       allActionsFilter: "Усі дії",
       emptyState: "Записів у журналі аудиту немає.",
+      loadFailed: "Не вдалося завантажити журнал аудиту.",
       tableHeaderTime: "Час",
       tableHeaderUser: "Користувач",
       tableHeaderAction: "Дія",
@@ -4727,6 +5168,7 @@ export const uk: TranslationKeys = {
       teamColumn: "Команда",
       storageColumn: "Сховище",
       usersColumn: "Користувачі",
+      loadFailed: "Не вдалося завантажити дані про використання.",
     },
     apiKeys: {
       heading: "API-ключі",
@@ -4736,6 +5178,7 @@ export const uk: TranslationKeys = {
       removeScopingLabel: "Прибрати обмеження прав",
       restrictPermissionsLabel: "Обмежити права (необов'язково)",
       expiresLabel: "Спливає:",
+      expiresInPast: "Дата закінчення дії має бути в майбутньому.",
       clearButton: "Очистити",
       copyTitle: "Копіювати",
       keyWarning: "Збережіть цей ключ у безпечному місці. Він більше не буде показаний.",
@@ -4747,6 +5190,7 @@ export const uk: TranslationKeys = {
       deleteConfirm:
         "Видалити цей API-ключ? Усі інтеграції, що його використовують, перестануть працювати.",
       emptyState: "API-ключів поки немає. Згенеруйте один для початку.",
+      loadFailed: "Не вдалося завантажити API-ключі.",
     },
     tools: {
       heading: "Інструменти",
@@ -4789,6 +5233,7 @@ export const uk: TranslationKeys = {
       description: "Керування пакетами AI-моделей для розширеної обробки файлів.",
       installAll: "Встановити все",
       diskUsage: "Використання диска: {size}",
+      statusStale: "Не вдалося оновити стан пакетів. Список нижче може бути застарілим.",
       sizeOnDisk: "{size} на диску",
       installed: "Встановлено",
       notInstalled: "Не встановлено",
@@ -4819,6 +5264,9 @@ export const uk: TranslationKeys = {
       resetFailed: "Не вдалося скинути: {error}",
       resetVenvKept:
         "Спільне середовище Python залишено без змін: ця інсталяція не має вбудованої основи, з якої його можна відтворити. Моделі, кеш завантажень і записи про встановлення очищено. Відтворіть це середовище самостійно, якщо проблема в застарілому пакеті всередині нього.",
+      importBusy:
+        "Уже виконується інше встановлення або імпорт. Спробуйте ще раз після завершення.",
+      importNoSpace: "На сервері недостатньо місця на диску для цього пакета.",
     },
     about: {
       heading: "Про програму",
@@ -4838,6 +5286,9 @@ export const uk: TranslationKeys = {
   auth: {
     login: "Вхід",
     logout: "Вийти",
+    logoutFailed: "Не вдалося вийти. Спробуйте ще раз.",
+    idpLogoutFailed:
+      "Ви вийшли зі SnapOtter, але сесія у постачальника SSO може залишатися відкритою. Вийдіть і звідти.",
     username: "Ім'я користувача",
     password: "Пароль",
     loginButton: "Увійти",
@@ -4868,10 +5319,22 @@ export const uk: TranslationKeys = {
     verify: "Перевірити",
     verifying: "Перевірка...",
     mfaInvalidCode: "Невірний код. Спробуйте ще раз.",
+    mfaAttemptsExhausted: "Забагато невірних кодів. Увійдіть знову.",
+    mfaEnrollmentAttemptsExhausted:
+      "Забагато невірних кодів. Увійдіть знову, щоб отримати новий QR-код і нові коди відновлення; показані раніше працювати не будуть.",
+    mfaExpired: "Сеанс перевірки закінчився. Увійдіть знову.",
+    mfaEnrollmentExpired:
+      "Сеанс налаштування закінчився. Увійдіть знову, щоб отримати новий QR-код і нові коди відновлення; показані раніше працювати не будуть.",
+    mfaNotConfigured: "Двофакторну автентифікацію не налаштовано. Увійдіть знову.",
+    mfaAlreadyEnabled: "Двофакторну автентифікацію вже ввімкнено. Увійдіть знову.",
+    mfaUnreadable:
+      "Сервер не може прочитати дані двофакторної автентифікації. Зверніться до адміністратора.",
     mfaEnrollmentHeading: "Налаштуйте двофакторну автентифікацію, щоб продовжити",
     mfaEnrollmentRequired:
       "Ваша організація вимагає багатофакторну автентифікацію. Налаштуйте MFA в параметрах облікового запису.",
     mfaPolicyUnavailable: "Не вдалося перевірити політику MFA. Повторіть спробу трохи пізніше.",
+    accountDisabled: "Цей обліковий запис вимкнено. Зверніться до адміністратора.",
+    ipNotAllowed: "Вашу IP-адресу не дозволено. Зверніться до адміністратора.",
     loginThrottled: "Забагато спроб входу. Повторіть спробу через {minutes} хв.",
     loginThrottledPlural: "Забагато спроб входу. Повторіть спробу через {minutes} хв.",
     loginThrottledUnknownWait: "Забагато спроб входу. Зачекайте, перш ніж повторювати спробу.",
@@ -4914,14 +5377,13 @@ export const uk: TranslationKeys = {
   },
   changePassword: {
     title: "Зміна пароля",
-    description:
-      "Необхідно встановити новий пароль перед продовженням. Пароль має містити щонайменше 8 символів, включно з великими, малими літерами та цифрою.",
+    description: "Необхідно встановити новий пароль перед продовженням.",
     usernameLabel: "Ім'я користувача",
     currentPasswordLabel: "Поточний пароль",
     currentPasswordPlaceholder: "Введіть поточний пароль",
     newPasswordLabel: "Новий пароль",
     generateButton: "Згенерувати надійний пароль",
-    newPasswordPlaceholder: "Щонайменше 8 символів",
+    newPasswordPlaceholder: "Введіть новий пароль",
     confirmPasswordLabel: "Підтвердіть новий пароль",
     confirmPasswordPlaceholder: "Повторіть новий пароль",
     passwordsMismatch: "Паролі не збігаються",
@@ -4932,6 +5394,7 @@ export const uk: TranslationKeys = {
     sidebarTitle: "Майже готово",
     sidebarDescription:
       "Встановіть надійний пароль для захисту Вашого облікового запису, і можна починати.",
+    sessionEnded: "Сеанс завершено. Увійдіть знову, щоб змінити пароль.",
   },
   automate: {
     title: "Автоматизація",
@@ -4941,6 +5404,15 @@ export const uk: TranslationKeys = {
     noSteps: "У файлі Pipeline немає кроків",
     importFailed: "Імпорт не вдався",
     couldNotRead: "Не вдалося прочитати файл Pipeline",
+    importListRefreshFailed:
+      "Pipeline імпортовано, але список збережених не оновився. Оновіть сторінку, щоб його побачити.",
+    saveFailed: "Не вдалося зберегти Pipeline",
+    deleteFailed: "Не вдалося видалити Pipeline",
+    loadFailed: "Не вдалося завантажити збережені Pipeline.",
+    saveListRefreshFailed:
+      "Pipeline збережено, але список збережених не оновився. Оновіть сторінку, щоб його побачити.",
+    deleteListRefreshFailed:
+      "Pipeline видалено, але список збережених не оновився. Оновіть сторінку, щоб побачити зміни.",
     fileCount: "{count} файл",
     fileCountPlural: "{count} файлів",
     importFromLibrary: "Імпорт із бібліотеки",
@@ -5026,6 +5498,7 @@ export const uk: TranslationKeys = {
     fileCount: "{count} файлів",
     fileCountSingular: "{count} файл",
     noFilesFound: "Файлів не знайдено",
+    loadFailed: "Не вдалося завантажити ваші файли.",
     selectFilePrompt: "Виберіть файл для перегляду деталей",
     openFile: "Відкрити файл",
     selectFile: "Вибрати файл",
@@ -5044,6 +5517,7 @@ export const uk: TranslationKeys = {
     download: "Завантажити",
     details: {
       previewFailedRetry: "Не вдалося створити попередній перегляд. Спробуйте ще раз.",
+      loadFailed: "Не вдалося завантажити цей файл.",
     },
   },
   dropzone: {
@@ -5063,6 +5537,7 @@ export const uk: TranslationKeys = {
     filesSelected: "Обрано файлів: {count}",
     dropToAdd: "Відпустіть, щоб додати файли",
     dropToReplace: "Відпустіть, щоб замінити файл",
+    ignoredWhileRunning: "Триває обробка. Дочекайтеся її завершення, перш ніж додавати файли.",
     reorderHint:
       "Перетягніть мініатюри, щоб змінити порядок, або змініть його на зворотний, перед запуском.",
   },
@@ -5093,8 +5568,10 @@ export const uk: TranslationKeys = {
       "Деякі файли моделей відсутні або пошкоджені. Відновлення завантажить їх повторно.",
     repairButton: "Відновити {name}",
     lessThanMinute: "Залишилось менше хвилини",
-    oneMinuteLeft: "Залишилась ~1 хвилина",
+    oneMinuteLeft: "Залишилась ~{mins} хвилина",
     minutesLeft: "Залишилось ~{mins} хвилин",
+    minutesLeftFew: "Залишилось ~{mins} хвилини",
+    minutesLeftTwo: "Залишилось ~{mins} хвилин",
     progressMessages: [
       "Майже готово... мабуть...",
       "Гарні речі потребують часу...",
@@ -5171,6 +5648,57 @@ export const uk: TranslationKeys = {
     networkError: "Помилка мережі. Перевірте з'єднання.",
     invalidCredentials: "Невірне ім'я користувача або пароль",
     connectionError: "Помилка з'єднання",
+    fileTooLarge:
+      "Цей файл занадто великий для завантаження. Спробуйте менший файл або попросіть адміністратора сервера збільшити ліміт завантаження.",
+    featureNotInstalledForTool:
+      "Для «{tool}» потрібна функція «{feature}». Увімкніть її в Налаштування → AI-функції.",
+    featureNotInstalled:
+      "Функцію «{feature}» не встановлено. Увімкніть її в Налаштування → AI-функції.",
+    featureIncompatible: "Функція «{feature}» не може працювати на обладнанні цього сервера.",
+    passwordTooShort: "Пароль закороткий (мінімум: {minLength}).",
+    passwordNeedsUppercase: "Пароль має містити велику літеру.",
+    passwordNeedsLowercase: "Пароль має містити малу літеру.",
+    passwordNeedsDigit: "Пароль має містити цифру.",
+    passwordNeedsSpecial: "Пароль має містити спеціальний символ.",
+    passwordNoControlCharacters: "Пароль не має містити керувальні символи.",
+    passwordTooLong: "Пароль задовгий (максимум: {maxLength}).",
+    passwordTooLongAdminReset:
+      "Пароль занадто довгий (максимум {maxLength} символів). Адміністратор повинен його скинути.",
+    passwordNoInvalidCharacters: "Пароль не має містити недопустимі символи.",
+    tooManyRequests: "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
+    escalationDenied: "Для цього потрібно більше прав, ніж має ваша роль.",
+    featureNotLicensed: "Для цього потрібна корпоративна ліцензія.",
+    sessionEnded: "Ваш сеанс завершився. Увійдіть знову.",
+    forbidden: "У вас немає дозволу на цю дію.",
+    invalidSetting: "Неприпустиме значення параметра «{setting}».",
+    network: "Помилка мережі",
+    invalidResponse: "Некоректна відповідь",
+    staleVersionReload: "Застосунок оновлено. Перезавантажте сторінку й спробуйте ще раз.",
+    failedWithStatus: "Не вдалося виконати цей запит. Спробуйте ще раз.",
+    processingFailedWithStatus:
+      "Не вдалося обробити цей файл. Перевірте, чи файл не пошкоджений, і спробуйте ще раз.",
+    processingFailedNoDetail: "Обробка не вдалася",
+    canceled: "Обробку скасовано",
+    jobTrackingFailed: "Під час відстеження цього завдання сталася помилка. Спробуйте ще раз.",
+    requestTimedOut: "Час очікування вичерпано",
+    runInterrupted: "Обробку було перервано. Запустіть її знову.",
+    requestFailedWithStatus: "Не вдалося виконати цей запит. Спробуйте ще раз.",
+    invalidServerResponse: "Некоректна відповідь від сервера",
+    batchFailed: "Помилка пакетної обробки",
+    batchFailedWithStatus: "Не вдалося завершити пакетну обробку. Спробуйте запустити її ще раз.",
+    allFilesFailed: "Не вдалося обробити всі файли",
+    filesFailedSuffix_one: " (1 файл з помилкою)",
+    filesFailedSuffix_other: " (файлів з помилкою: {count})",
+    uploadTimeout:
+      "Час очікування завантаження минув. Перевірте з'єднання або спробуйте менший файл.",
+    processingInterrupted: "Обробку було перервано. Повторіть спробу після відновлення з'єднання.",
+    processingInterruptedUnconfirmed:
+      "Обробку було перервано, і сервер так і не підтвердив завдання. Повторіть спробу після відновлення з'єднання.",
+    resultNoLongerAvailable: "Готовий результат більше недоступний. Запустіть завдання ще раз.",
+    batchDownloadFailed:
+      "Не вдалося завантажити завершений пакет. Оновіть сторінку та спробуйте ще раз.",
+    fileNotFoundInBatch: "Файл не знайдено в результатах пакетної обробки",
+    noFilesSelected: "Файли не вибрано",
   },
   sidebar: {
     sponsor: "Підтримайте нас",
@@ -5206,6 +5734,7 @@ export const uk: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Підтримати SnapOtter на GitHub Sponsors",
     skipToContent: "Перейти до основного вмісту",
     openSidebar: "Відкрити бічну панель",
@@ -5228,6 +5757,8 @@ export const uk: TranslationKeys = {
     imageControls: "Елементи керування переглядом",
     zoomControls: "Керування масштабом",
     dragToReorder: "Перетягніть для зміни порядку",
+    resultResizedToFit: "Зменшено, щоб уміститися в цільовий розмір",
+    resultMissedTarget: "Цільовий розмір не досягнуто",
     reverseOrder: "Змінити порядок на зворотний",
     whiteBackground: "Біле тло",
     blackBackground: "Чорне тло",
@@ -5310,11 +5841,47 @@ export const uk: TranslationKeys = {
         "Відремонтуйте, розфарбуйте та збільште старе чи пошкоджене фото за допомогою ШІ.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Видалення фону",
+      description: "Видалення фону із зображень за допомогою ШІ",
+    },
+    "face-detection": {
+      name: "Виявлення облич",
+      description: "Пошук і розмиття облич, видалення червоних очей, розумна обрізка",
+    },
+    "object-eraser-colorize": {
+      name: "Видалення об'єктів і колоризація",
+      description: "Видалення об'єктів із фото та колоризація чорно-білих зображень",
+    },
+    "inpaint-hq": {
+      name: "Високоякісний інпейнтинг",
+      description:
+        "Видалення об'єктів на основі дифузії для великих об'єктів, детальних текстур і складних фонів",
+    },
+    "upscale-enhance": {
+      name: "Збільшення та поліпшення",
+      description: "Збільшення за допомогою ШІ, поліпшення облич і видалення шуму",
+    },
+    "photo-restoration": {
+      name: "Відновлення фотографій",
+      description: "Відновлення старих або пошкоджених фотографій",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Витягування тексту із зображень і PDF",
+    },
+    transcription: {
+      name: "Транскрипція",
+      description: "Мовлення в текст для аудіо та відео (субтитри)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Імпортування...",
       importCount: "Імпорт ({count})",
       import: "Імпорт",
+      importFailed: "Не вдалося імпортувати {failed} з {total} файлів.",
     },
     metadataGrid: {
       noData: "Немає даних",
@@ -5327,6 +5894,19 @@ export const uk: TranslationKeys = {
     waveform: {
       play: "Відтворити",
       pause: "Пауза",
+    },
+    languageNames: {
+      en: "Англійська",
+      de: "Німецька",
+      fr: "Французька",
+      es: "Іспанська",
+      zh: "Китайська",
+      ja: "Японська",
+      ko: "Корейська",
+      ar: "Арабська",
+      id: "Індонезійська",
+      th: "Тайська",
+      vi: "В'єтнамська",
     },
   },
   privacyPolicy: {

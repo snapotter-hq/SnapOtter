@@ -1,9 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { putObject } from "../../lib/object-storage.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 
@@ -36,10 +41,8 @@ export function registerCompare(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!bufferA || !bufferB) {
@@ -56,11 +59,18 @@ export function registerCompare(app: FastifyInstance) {
         try {
           return (await imageHandler.prepare(buffer, filename, { scratchDir: tmpdir() })).buffer;
         } catch (err) {
-          if (err instanceof InputValidationError) {
+          if (err instanceof InputValidationError && err.statusCode < 500) {
             const message = err.message.startsWith("Invalid image")
               ? err.message.replace("Invalid image", `Invalid ${which} image`)
               : `${err.message} (${which} image)`;
-            throw new InputValidationError(message, err.statusCode, err.details);
+            const rewrapped = new InputValidationError(
+              message,
+              err.statusCode,
+              err.details,
+              err.code,
+            );
+            if (err.cause !== undefined) rewrapped.cause = err.cause;
+            throw rewrapped;
           }
           throw err;
         }
@@ -132,13 +142,16 @@ export function registerCompare(app: FastifyInstance) {
         originalSize: bufferA.length + bufferB.length,
         processedSize: diffBuffer.length,
       });
-    } catch (err) {
-      if (err instanceof InputValidationError) {
-        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+    } catch (rawErr) {
+      if (rawErr instanceof InputValidationError) {
+        return sendInputValidationError(reply, rawErr, "compare", request.log);
       }
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "compare" }, "Comparison failed");
       return reply.status(422).send({
         error: "Comparison failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

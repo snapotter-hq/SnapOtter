@@ -1,15 +1,23 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { type Permission, SafeError } from "@snapotter/shared";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as OTPAuth from "otpauth";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
+import { isAnonymousUserId } from "../lib/anonymous-user.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { decrypt, encrypt } from "../lib/encryption.js";
+import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
+import {
+  evictExcessUserSessions,
+  readMaxSessionsPerUser,
+  setSessionCookie,
+} from "../lib/session-cookie.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 import {
   canManageTargetRole,
@@ -27,6 +35,117 @@ const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
 const MFA_MAX_FAILED_ATTEMPTS = 5;
 /** Mirrors the 300s TTL set on `mfa:<token>` at login (auth/oidc/saml). */
 const MFA_CHALLENGE_TTL_SECONDS = 300;
+
+/**
+ * Atomically reads and deletes a pending MFA challenge key along with its
+ * remaining millisecond TTL so concurrent requests with the same token cannot
+ * both verify a code, spend two recovery codes, or check guesses past the
+ * failed-attempt budget (#2328).
+ */
+const CLAIM_MFA_CHALLENGE_LUA = `
+local val = redis.call('GET', KEYS[1])
+if not val then
+  return nil
+end
+local ttl = redis.call('PTTL', KEYS[1])
+redis.call('DEL', KEYS[1])
+return { val, tostring(ttl) }
+`;
+
+/**
+ * Atomically increments the failed-attempt counter and either burns the
+ * challenge once the budget is reached or puts the challenge back for the
+ * remainder of its original TTL.
+ */
+const FAIL_OR_RESTORE_MFA_CHALLENGE_LUA = `
+local challengeKey = KEYS[1]
+local attemptsKey = KEYS[2]
+local payload = ARGV[1]
+local ttlMs = tonumber(ARGV[2])
+local maxAttempts = tonumber(ARGV[3])
+local attemptsTtlSec = tonumber(ARGV[4])
+
+local attempts = redis.call('INCR', attemptsKey)
+if attempts == 1 then
+  redis.call('EXPIRE', attemptsKey, attemptsTtlSec)
+end
+if attempts >= maxAttempts or ttlMs <= 0 then
+  redis.call('DEL', challengeKey, attemptsKey)
+  return attempts
+end
+redis.call('SET', challengeKey, payload, 'PX', ttlMs)
+return attempts
+`;
+
+async function claimMfaChallenge(
+  redis: ReturnType<typeof sharedRedis>,
+  challengeKey: string,
+): Promise<{ payload: string; ttlMs: number; claimedAt: number } | null> {
+  const claimedAt = Date.now();
+  const claimed = (await redis.eval(CLAIM_MFA_CHALLENGE_LUA, 1, challengeKey)) as
+    | [string, string]
+    | null;
+  if (!claimed) return null;
+  const [payload, ttlRaw] = claimed;
+  const parsedTtl = Number(ttlRaw);
+  const ttlMs = parsedTtl === -1 ? MFA_CHALLENGE_TTL_SECONDS * 1000 : Math.max(0, parsedTtl);
+  return { payload, ttlMs, claimedAt };
+}
+
+async function restoreMfaChallenge(
+  redis: ReturnType<typeof sharedRedis>,
+  challengeKey: string,
+  claimed: { payload: string; ttlMs: number; claimedAt: number },
+): Promise<void> {
+  const remainingTtlMs = claimed.ttlMs - (Date.now() - claimed.claimedAt);
+  if (remainingTtlMs > 0) {
+    try {
+      await redis.set(challengeKey, claimed.payload, "PX", remainingTtlMs);
+    } catch (rollbackErr) {
+      logger.warn(
+        { err: rollbackErr, challengeKey },
+        "mfa: failed to restore challenge key after error",
+      );
+    }
+  }
+}
+
+async function clearMfaAttempts(
+  redis: ReturnType<typeof sharedRedis>,
+  attemptsKey: string,
+): Promise<void> {
+  try {
+    await redis.del(attemptsKey);
+  } catch (err) {
+    logger.warn({ err, attemptsKey }, "mfa: failed to delete attempts key");
+  }
+}
+
+type FailedMfaAttemptOutcome = "restored" | "exhausted" | "expired";
+
+async function recordFailedMfaAttempt(
+  redis: ReturnType<typeof sharedRedis>,
+  challengeKey: string,
+  attemptsKey: string,
+  claimed: { payload: string; ttlMs: number; claimedAt: number },
+): Promise<FailedMfaAttemptOutcome> {
+  const remainingTtlMs = claimed.ttlMs - (Date.now() - claimed.claimedAt);
+  const attempts = Number(
+    await redis.eval(
+      FAIL_OR_RESTORE_MFA_CHALLENGE_LUA,
+      2,
+      challengeKey,
+      attemptsKey,
+      claimed.payload,
+      String(remainingTtlMs),
+      String(MFA_MAX_FAILED_ATTEMPTS),
+      String(MFA_CHALLENGE_TTL_SECONDS),
+    ),
+  );
+  if (attempts >= MFA_MAX_FAILED_ATTEMPTS) return "exhausted";
+  if (remainingTtlMs <= 0) return "expired";
+  return "restored";
+}
 
 // ── Zod schemas ───────────────────────────────────────────────────
 
@@ -50,8 +169,17 @@ const disableSchema = z.object({
 
 // ── Recovery code helpers ─────────────────────────────────────────
 
+/**
+ * What a person types for a TOTP or recovery code, reduced to what is stored:
+ * lowercase, no spaces or dashes. Used on both sides of the hash so a code
+ * copied down as "A3F9-C01B" matches the stored "a3f9c01b" (#2050).
+ */
+export function normalizeMfaCode(code: string): string {
+  return code.toLowerCase().replace(/[\s-]/g, "");
+}
+
 export function hashRecoveryCodes(codes: string[]): string {
-  return codes.map((c) => createHash("sha256").update(c).digest("hex")).join(",");
+  return codes.map((c) => createHash("sha256").update(normalizeMfaCode(c)).digest("hex")).join(",");
 }
 
 export function verifyRecoveryCode(
@@ -59,11 +187,57 @@ export function verifyRecoveryCode(
   hashList: string,
 ): { valid: boolean; remaining: string } {
   const hashes = hashList.split(",");
-  const codeHash = createHash("sha256").update(code).digest("hex");
+  const codeHash = createHash("sha256").update(normalizeMfaCode(code)).digest("hex");
   const idx = hashes.indexOf(codeHash);
   if (idx === -1) return { valid: false, remaining: hashList };
   hashes.splice(idx, 1);
   return { valid: true, remaining: hashes.join(",") };
+}
+
+/** What happened when a recovery code was offered at login. */
+type RecoveryOutcome = "consumed" | "invalid" | "spent_concurrently";
+type RecoveryCodeStore = Pick<typeof db, "update" | "select">;
+
+/**
+ * Spends a recovery code. "consumed" only if this call removed it from the
+ * stored list: the write is conditional on the list that was read, so two logins
+ * at once can't both spend the same code or write back a list that revives one
+ * the other just spent (#2275).
+ *
+ * Losing the race re-reads the list and tries again. Each lost round means a
+ * different code was spent, so the list shrinks by at least one and as many
+ * rounds as there are hashes can't run out while the code is still spendable:
+ * contention never refuses a valid code. "spent_concurrently" is the case where
+ * the code was valid when read and gone when re-read, i.e. someone else used
+ * this exact code in the same moment. It reads as a wrong code to the caller,
+ * but is audited and logged apart, since two people holding one code is worth
+ * seeing. The conditional update assumes READ COMMITTED, Postgres's default.
+ */
+export async function consumeRecoveryCode(
+  userId: string,
+  code: string,
+  storedList: string,
+  store: RecoveryCodeStore = db,
+): Promise<RecoveryOutcome> {
+  let list = storedList;
+  const rounds = storedList.split(",").length;
+  for (let round = 0; round < rounds; round++) {
+    const result = verifyRecoveryCode(code, list);
+    if (!result.valid) return round === 0 ? "invalid" : "spent_concurrently";
+    const updated = await store
+      .update(schema.users)
+      .set({ recoveryCodesHash: result.remaining || null, updatedAt: new Date() })
+      .where(and(eq(schema.users.id, userId), eq(schema.users.recoveryCodesHash, list)))
+      .returning({ id: schema.users.id });
+    if (updated.length > 0) return "consumed";
+    const [fresh] = await store
+      .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+    if (!fresh?.recoveryCodesHash) return "spent_concurrently";
+    list = fresh.recoveryCodesHash;
+  }
+  return "spent_concurrently";
 }
 
 function generateRecoveryCodes(): string[] {
@@ -85,11 +259,159 @@ export function createTotp(username: string, secretBase32?: string): OTPAuth.TOT
   });
 }
 
-export function verifyTotpCode(secretBase32: string, code: string): boolean {
+/**
+ * Window in which a matched TOTP time step (counter + delta, with window=1 and
+ * 30s period) could still fall inside a future validate() check: a step at
+ * counter+1 remains in [counter'-1, counter'+1] until counter' passes counter+2
+ * (up to 3 periods = 90s; 120s adds one full period of margin).
+ */
+const TOTP_REPLAY_WINDOW_SECONDS = 120;
+
+const CONSUME_TOTP_STEP_LUA = `
+local last = redis.call('GET', KEYS[1])
+local step = tonumber(ARGV[1])
+local ttlSec = tonumber(ARGV[2])
+if last and step <= tonumber(last) then
+  return nil
+end
+local prevTtl = -2
+if last then
+  prevTtl = redis.call('PTTL', KEYS[1])
+end
+redis.call('SET', KEYS[1], tostring(step), 'EX', ttlSec)
+return { last or '', tostring(prevTtl) }
+`;
+
+const RESTORE_TOTP_STEP_LUA = `
+local current = redis.call('GET', KEYS[1])
+if current ~= ARGV[1] then
+  return 0
+end
+local prevStep = ARGV[2]
+local remainingTtlMs = tonumber(ARGV[3])
+if prevStep ~= '' and remainingTtlMs > 0 then
+  redis.call('SET', KEYS[1], prevStep, 'PX', remainingTtlMs)
+else
+  redis.call('DEL', KEYS[1])
+end
+return 1
+`;
+
+export function matchTotpStep(
+  secretBase32: string,
+  code: string,
+  timestamp = Date.now(),
+): number | null {
   const totp = createTotp("verify", secretBase32);
   // Allow 1-step window in either direction for clock drift
-  const delta = totp.validate({ token: code, window: 1 });
-  return delta !== null;
+  const delta = totp.validate({ token: code, window: 1, timestamp });
+  if (delta === null) return null;
+  return totp.counter({ timestamp }) + delta;
+}
+
+export function verifyTotpCode(
+  secretBase32: string,
+  code: string,
+  lastAcceptedStep?: number | null,
+  timestamp = Date.now(),
+): boolean {
+  const step = matchTotpStep(secretBase32, code, timestamp);
+  if (step === null) return false;
+  if (lastAcceptedStep !== undefined && lastAcceptedStep !== null && step <= lastAcceptedStep) {
+    return false;
+  }
+  return true;
+}
+
+function totpStepKey(userId: string, secretBase32: string): string {
+  const secretFingerprint = createHash("sha256").update(secretBase32).digest("hex").slice(0, 16);
+  return `mfa:totp-step:${userId}:${secretFingerprint}`;
+}
+
+interface ClaimedTotpStep {
+  key: string;
+  step: string;
+  previousStep: string | null;
+  previousTtlMs: number;
+  claimedAt: number;
+}
+
+async function claimTotpStep(
+  redis: ReturnType<typeof sharedRedis>,
+  userId: string,
+  secretBase32: string,
+  code: string,
+  timestamp = Date.now(),
+): Promise<ClaimedTotpStep | null> {
+  const step = matchTotpStep(secretBase32, code, timestamp);
+  if (step === null) return null;
+  const key = totpStepKey(userId, secretBase32);
+  const stepStr = String(step);
+  const claimedAt = Date.now();
+  const claimed = (await redis.eval(
+    CONSUME_TOTP_STEP_LUA,
+    1,
+    key,
+    stepStr,
+    String(TOTP_REPLAY_WINDOW_SECONDS),
+  )) as [string, string] | null;
+  if (!claimed) return null;
+  const [prevRaw, prevTtlRaw] = claimed;
+  const previousStep = prevRaw || null;
+  const parsedTtl = Number(prevTtlRaw);
+  const previousTtlMs =
+    previousStep === null
+      ? 0
+      : parsedTtl === -1
+        ? TOTP_REPLAY_WINDOW_SECONDS * 1000
+        : Math.max(0, parsedTtl);
+  return {
+    key,
+    step: stepStr,
+    previousStep,
+    previousTtlMs,
+    claimedAt,
+  };
+}
+
+async function restoreTotpStep(
+  redis: ReturnType<typeof sharedRedis>,
+  claimed: ClaimedTotpStep,
+): Promise<void> {
+  const remainingTtlMs =
+    claimed.previousStep !== null
+      ? Math.max(0, claimed.previousTtlMs - (Date.now() - claimed.claimedAt))
+      : 0;
+  try {
+    await redis.eval(
+      RESTORE_TOTP_STEP_LUA,
+      1,
+      claimed.key,
+      claimed.step,
+      claimed.previousStep ?? "",
+      String(remainingTtlMs),
+    );
+  } catch (rollbackErr) {
+    logger.warn(
+      { err: rollbackErr, key: claimed.key },
+      "mfa: failed to restore TOTP step key after error",
+    );
+  }
+}
+
+/**
+ * Validates a TOTP code and atomically records its time step per user so the
+ * same step (or any earlier step still inside the drift window) cannot be
+ * replayed across challenges or routes (RFC 6238 section 5.2, #2327).
+ */
+export async function consumeTotpCode(
+  userId: string,
+  secretBase32: string,
+  code: string,
+  timestamp = Date.now(),
+): Promise<boolean> {
+  const claimed = await claimTotpStep(sharedRedis(), userId, secretBase32, code, timestamp);
+  return claimed !== null;
 }
 
 async function encryptSecret(secretBase32: string): Promise<string> {
@@ -99,11 +421,61 @@ async function encryptSecret(secretBase32: string): Promise<string> {
   return secretBase32;
 }
 
-async function decryptSecret(stored: string): Promise<string | null> {
-  if (env.DATA_ENCRYPTION_KEY) {
-    return decrypt(stored, env.DATA_ENCRYPTION_KEY, env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined);
-  }
-  return stored;
+/**
+ * Decrypt a user's stored TOTP secret. When the ciphertext only opens with
+ * DATA_ENCRYPTION_KEY_PREVIOUS (mid-rotation), re-encrypt and persist it under
+ * DATA_ENCRYPTION_KEY so dropping the previous key later does not lock the user
+ * out (#2033).
+ */
+export async function decryptSecret(userId: string, stored: string): Promise<string | null> {
+  if (!isEncrypted(stored)) return stored;
+  if (!env.DATA_ENCRYPTION_KEY) return null;
+
+  const current = await decrypt(stored, env.DATA_ENCRYPTION_KEY);
+  if (current !== null) return current;
+
+  if (!env.DATA_ENCRYPTION_KEY_PREVIOUS) return null;
+  const rotated = await decrypt(stored, env.DATA_ENCRYPTION_KEY_PREVIOUS);
+  if (!rotated) return rotated;
+
+  const reencrypted = await encryptSecret(rotated);
+  await db
+    .update(schema.users)
+    .set({ totpSecret: reencrypted, updatedAt: new Date() })
+    .where(and(eq(schema.users.id, userId), eq(schema.users.totpSecret, stored)));
+  return rotated;
+}
+
+/**
+ * A stored TOTP secret that won't decrypt means DATA_ENCRYPTION_KEY (and its
+ * PREVIOUS key) no longer matches what enrolled it, so every enrolled user hits
+ * this at once. The 500 body alone is invisible to an operator: log it and
+ * report it as operational (#2020). request.log has no Sentry bridge, and the
+ * reply is sent here rather than thrown, so the global handler never sees it.
+ */
+function replyDecryptionFailed(request: FastifyRequest, reply: FastifyReply, userId: string) {
+  request.log.error(
+    { userId },
+    "mfa: stored TOTP secret could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+  );
+  void reportError(
+    new SafeError("Failed to decrypt TOTP secret", {
+      kind: "operational",
+      code: "MFA_DECRYPTION_FAILED",
+      statusCode: 500,
+    }),
+    {
+      source: "http",
+      route: request.routeOptions?.url,
+      method: request.method,
+      statusCode: 500,
+      subsystem: "mfa-secret",
+    },
+  );
+  return reply.status(500).send({
+    error: "Failed to decrypt TOTP secret",
+    code: "DECRYPTION_FAILED",
+  });
 }
 
 // ── MFA policy helpers ────────────────────────────────────────────
@@ -205,6 +577,7 @@ export function resolveExternalLoginMfaOutcome(
 export async function beginForcedEnrollment(user: {
   id: string;
   username: string;
+  passwordHash: string | null;
 }): Promise<{ enrollmentToken: string; uri: string; recoveryCodes: string[] } | null> {
   const mfaLicensed = await isEnterpriseFeatureEnabled("mfa");
   if (!mfaLicensed) return null;
@@ -224,7 +597,16 @@ export async function beginForcedEnrollment(user: {
     .where(eq(schema.users.id, user.id));
 
   const enrollmentToken = randomUUID();
-  await sharedRedis().setex(`mfa:enroll:${enrollmentToken}`, MFA_CHALLENGE_TTL_SECONDS, user.id);
+  let payload = user.id;
+  if (user.passwordHash) {
+    const { createHash } = await import("node:crypto");
+    const hashFingerprint = createHash("sha256")
+      .update(user.passwordHash)
+      .digest("hex")
+      .substring(0, 16);
+    payload = `${user.id}:${hashFingerprint}`;
+  }
+  await sharedRedis().setex(`mfa:enroll:${enrollmentToken}`, MFA_CHALLENGE_TTL_SECONDS, payload);
   return { enrollmentToken, uri: totp.toString(), recoveryCodes };
 }
 
@@ -310,7 +692,13 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { code } = parsed.data;
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "A valid TOTP code is required",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, user.id));
       if (!dbUser?.totpSecret) {
@@ -327,29 +715,34 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       // Decrypt the stored secret
-      const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
-      }
+      const secretBase32 = await decryptSecret(user.id, dbUser.totpSecret);
+      if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
-      // Validate the code
-      if (!verifyTotpCode(secretBase32, code)) {
+      const audit = auditFromRequest(request);
+
+      // Validate the code and record its time step so it cannot be replayed (#2574)
+      const redis = sharedRedis();
+      const claimedStep = await claimTotpStep(redis, user.id, secretBase32, code);
+      if (!claimedStep) {
+        await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",
           code: "INVALID_CODE",
         });
       }
 
-      // Activate MFA
-      await db
-        .update(schema.users)
-        .set({ totpEnabled: true, updatedAt: new Date() })
-        .where(eq(schema.users.id, user.id));
+      // Activate MFA (if the DB write fails, release the consumed step so a retry
+      // within the same 30s window is not rejected as a replay)
+      try {
+        await db
+          .update(schema.users)
+          .set({ totpEnabled: true, updatedAt: new Date() })
+          .where(eq(schema.users.id, user.id));
+      } catch (err) {
+        await restoreTotpStep(redis, claimedStep);
+        throw err;
+      }
 
-      const audit = auditFromRequest(request);
       await audit("MFA_ENROLLED", { userId: user.id, username: user.username });
 
       return reply.send({ ok: true });
@@ -370,108 +763,328 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { mfaToken, code } = parsed.data;
+      const { mfaToken } = parsed.data;
+      // One normalization for both kinds of code, so "123 456" and "A3F9-C01B"
+      // behave the same as what the form sends. A code that is empty once
+      // cleaned up can't be valid, so it is refused without costing an attempt.
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "MFA token and code are required",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
-      // Look up the pending MFA challenge in Redis
+      // Atomically claim the pending MFA challenge in Redis so concurrent
+      // requests with the same token cannot both verify or exceed the attempt cap.
       const redis = sharedRedis();
-      const userId = await redis.get(`mfa:${mfaToken}`);
-      if (!userId) {
+      const challengeKey = `mfa:${mfaToken}`;
+      const attemptsKey = `mfa:attempts:${mfaToken}`;
+      const claimed = await claimMfaChallenge(redis, challengeKey);
+      if (!claimed) {
         return reply.status(401).send({
           error: "MFA challenge expired or invalid",
           code: "MFA_EXPIRED",
         });
       }
 
-      // Load user
-      const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
-      if (!dbUser?.totpSecret || isDisabledRole(dbUser.role)) {
-        return reply.status(401).send({
-          error: "User not found or MFA not configured",
-          code: "MFA_NOT_CONFIGURED",
-        });
-      }
+      const [userId, hashFingerprint] = claimed.payload.split(":");
 
-      // Decrypt the stored secret
-      const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
+      let dbUser: typeof schema.users.$inferSelect | undefined;
+      let secretBase32: string | null = null;
+      let claimedStep: ClaimedTotpStep | null = null;
+      let maxSessions = 0;
+      let verified = false;
+      let recoveryCandidate: string | null = null;
+
+      try {
+        // Load user
+        [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+
+        if (!dbUser) {
+          await clearMfaAttempts(redis, attemptsKey);
+          return reply.status(401).send({
+            error: "MFA challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+
+        if (hashFingerprint && dbUser.passwordHash) {
+          const { createHash } = await import("node:crypto");
+          const currentFingerprint = createHash("sha256")
+            .update(dbUser.passwordHash)
+            .digest("hex")
+            .substring(0, 16);
+          if (currentFingerprint !== hashFingerprint) {
+            await clearMfaAttempts(redis, attemptsKey);
+            const audit = auditFromRequest(request);
+            await audit("MFA_VERIFY_FAILED", {
+              userId: dbUser.id,
+              username: dbUser.username,
+              reason: "password_changed",
+            });
+            return reply.status(401).send({
+              error: "MFA challenge expired or invalid",
+              code: "MFA_EXPIRED",
+            });
+          }
+        }
+        if (isDisabledRole(dbUser.role)) {
+          await clearMfaAttempts(redis, attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
+        }
+        if (hashFingerprint && !dbUser.passwordHash) {
+          await clearMfaAttempts(redis, attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_removed",
+          });
+          return reply.status(401).send({
+            error: "MFA challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+        if (!dbUser.totpSecret) {
+          await clearMfaAttempts(redis, attemptsKey);
+          return reply.status(401).send({
+            error: "User not found or MFA not configured",
+            code: "MFA_NOT_CONFIGURED",
+          });
+        }
+
+        // Read before consuming a recovery code or TOTP step so a failed
+        // settings query restores the challenge without burning one-time
+        // credentials (#2540).
+        maxSessions = await readMaxSessionsPerUser();
+
+        // Check recovery code first so a user can still sign in when the stored
+        // TOTP secret cannot be decrypted (#2034). The database write that spends
+        // the recovery code runs inside the session transaction below so a failed
+        // or aborted transaction rolls it back (#2602).
+        if (dbUser.recoveryCodesHash && verifyRecoveryCode(code, dbUser.recoveryCodesHash).valid) {
+          recoveryCandidate = dbUser.recoveryCodesHash;
+          verified = true;
+        }
+
+        if (!verified) {
+          // Decrypt the stored secret
+          secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
+          if (!secretBase32) {
+            await restoreMfaChallenge(redis, challengeKey, claimed);
+            return replyDecryptionFailed(request, reply, userId);
+          }
+
+          // Try TOTP code (atomically refusing a replayed or earlier time step)
+          claimedStep = await claimTotpStep(redis, userId, secretBase32, code);
+          if (claimedStep) {
+            verified = true;
+          }
+        }
+      } catch (err) {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
+        await restoreMfaChallenge(redis, challengeKey, claimed);
+        throw err;
       }
 
       const audit = auditFromRequest(request);
-      let verified = false;
-      let recoveryUsed = false;
+      const verifiedUser = dbUser;
 
-      // Try TOTP code first
-      if (verifyTotpCode(secretBase32, code)) {
-        verified = true;
-      }
-
-      // Try recovery code if TOTP failed
-      if (!verified && dbUser.recoveryCodesHash) {
-        const result = verifyRecoveryCode(code, dbUser.recoveryCodesHash);
-        if (result.valid) {
-          verified = true;
-          recoveryUsed = true;
-          // Consume the recovery code
-          await db
-            .update(schema.users)
-            .set({ recoveryCodesHash: result.remaining || null, updatedAt: new Date() })
-            .where(eq(schema.users.id, userId));
-        }
-      }
-
-      if (!verified) {
+      const replyInvalidMfaCode = async (recoveryRace: boolean) => {
         // Burn the challenge after a few wrong codes so an attacker who already
         // holds valid credentials cannot grind TOTP guesses within the challenge
-        // window. The counter shares the challenge's lifetime.
-        const attemptsKey = `mfa:attempts:${mfaToken}`;
-        const attempts = await redis.incr(attemptsKey);
-        if (attempts === 1) await redis.expire(attemptsKey, MFA_CHALLENGE_TTL_SECONDS);
-        if (attempts >= MFA_MAX_FAILED_ATTEMPTS) {
-          await redis.del(`mfa:${mfaToken}`, attemptsKey);
+        // window, or put the challenge back if attempts remain.
+        const attemptOutcome = await recordFailedMfaAttempt(
+          redis,
+          challengeKey,
+          attemptsKey,
+          claimed,
+        );
+        await audit("MFA_VERIFY_FAILED", {
+          userId,
+          username: verifiedUser.username,
+          ...(recoveryRace && { reason: "recovery_code_spent_concurrently" }),
+        });
+        if (attemptOutcome === "exhausted") {
+          return reply.status(401).send({
+            error: "Too many invalid codes; MFA challenge expired",
+            code: "MFA_ATTEMPTS_EXHAUSTED",
+          });
         }
-        await audit("MFA_VERIFY_FAILED", { userId, username: dbUser.username });
+        if (attemptOutcome === "expired") {
+          return reply.status(401).send({
+            error: "MFA challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
         return reply.status(401).send({
           error: "Invalid TOTP or recovery code",
           code: "INVALID_CODE",
         });
-      }
+      };
 
-      // Delete the challenge token and any failed-attempt counter
-      await redis.del(`mfa:${mfaToken}`, `mfa:attempts:${mfaToken}`);
+      if (!verified) {
+        return replyInvalidMfaCode(false);
+      }
 
       // Create session (same as normal login completion)
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: dbUser.id,
-        expiresAt,
+      let inserted:
+        | {
+            status: "success";
+            role: string;
+            permissions: Permission[];
+            teamName: string;
+          }
+        | {
+            status:
+              | "password_changed"
+              | "password_removed"
+              | "user_disabled"
+              | "user_deleted"
+              | "recovery_spent_concurrently";
+          };
+      try {
+        inserted = await db.transaction(async (tx) => {
+          const [lockedUser] = await tx
+            .select({
+              passwordHash: schema.users.passwordHash,
+              role: schema.users.role,
+              team: schema.users.team,
+            })
+            .from(schema.users)
+            .where(eq(schema.users.id, verifiedUser.id))
+            .for(recoveryCandidate ? "no key update" : "share");
+
+          if (!lockedUser) {
+            return { status: "user_deleted" as const };
+          }
+
+          const passwordMismatch = hashFingerprint
+            ? (lockedUser.passwordHash
+                ? createHash("sha256")
+                    .update(lockedUser.passwordHash)
+                    .digest("hex")
+                    .substring(0, 16)
+                : null) !== hashFingerprint
+            : lockedUser.passwordHash !== verifiedUser.passwordHash;
+          if (passwordMismatch) {
+            return {
+              status: lockedUser.passwordHash
+                ? ("password_changed" as const)
+                : isDisabledRole(lockedUser.role)
+                  ? ("user_disabled" as const)
+                  : ("password_removed" as const),
+            };
+          }
+
+          if (isDisabledRole(lockedUser.role)) {
+            return { status: "user_disabled" as const };
+          }
+
+          if (recoveryCandidate) {
+            const outcome = await consumeRecoveryCode(verifiedUser.id, code, recoveryCandidate, tx);
+            if (outcome !== "consumed") {
+              return { status: "recovery_spent_concurrently" as const };
+            }
+          }
+
+          await tx.insert(schema.sessions).values({
+            id: token,
+            userId: verifiedUser.id,
+            expiresAt,
+          });
+
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
+
+          const [teamRow] = await tx
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, lockedUser.team));
+          const permissions = await getPermissions(lockedUser.role, tx);
+
+          return {
+            status: "success" as const,
+            role: lockedUser.role,
+            permissions,
+            teamName: teamRow?.name ?? lockedUser.team,
+          };
+        });
+      } catch (err) {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
+        await restoreMfaChallenge(redis, challengeKey, claimed);
+        throw err;
+      }
+
+      if (inserted.status === "recovery_spent_concurrently") {
+        logger.warn({ userId }, "A recovery code was used by two logins at once; refusing one");
+        return replyInvalidMfaCode(true);
+      }
+
+      // Clear any failed-attempt counter once the transaction finishes (the
+      // challenge key was deleted on claim).
+      await clearMfaAttempts(redis, attemptsKey);
+
+      if (inserted.status !== "success") {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
+        if (inserted.status === "user_disabled") {
+          await audit("MFA_VERIFY_FAILED", {
+            userId: verifiedUser.id,
+            username: verifiedUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
+        }
+        await audit("MFA_VERIFY_FAILED", {
+          userId: verifiedUser.id,
+          username: verifiedUser.username,
+          reason: inserted.status,
+        });
+        return reply.status(401).send({
+          error: "MFA challenge expired or invalid",
+          code: "MFA_EXPIRED",
+        });
+      }
+
+      await audit(recoveryCandidate ? "MFA_RECOVERY_USED" : "MFA_VERIFIED", {
+        userId: verifiedUser.id,
+        username: verifiedUser.username,
       });
 
-      await audit(recoveryUsed ? "MFA_RECOVERY_USED" : "MFA_VERIFIED", {
-        userId: dbUser.id,
-        username: dbUser.username,
-      });
-
-      const [teamRow] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.id, dbUser.team));
+      setSessionCookie(request, reply, token);
 
       return reply.send({
         token,
         user: {
-          id: dbUser.id,
-          username: dbUser.username,
-          role: dbUser.role,
-          mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : dbUser.mustChangePassword,
-          permissions: await getPermissions(dbUser.role),
-          teamName: teamRow?.name ?? dbUser.team,
+          id: verifiedUser.id,
+          username: verifiedUser.username,
+          role: inserted.role,
+          mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD
+            ? false
+            : verifiedUser.mustChangePassword,
+          permissions: inserted.permissions,
+          teamName: inserted.teamName,
         },
         expiresAt: expiresAt.toISOString(),
       });
@@ -496,92 +1109,281 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { enrollmentToken, code } = parsed.data;
+      const { enrollmentToken } = parsed.data;
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "Enrollment token and code are required",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       const redis = sharedRedis();
-      const userId = await redis.get(`mfa:enroll:${enrollmentToken}`);
-      if (!userId) {
+      const challengeKey = `mfa:enroll:${enrollmentToken}`;
+      const attemptsKey = `mfa:enroll:attempts:${enrollmentToken}`;
+      const claimed = await claimMfaChallenge(redis, challengeKey);
+      if (!claimed) {
         return reply.status(401).send({
           error: "Enrollment challenge expired or invalid",
           code: "MFA_EXPIRED",
         });
       }
 
-      const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
-      if (!dbUser?.totpSecret || isDisabledRole(dbUser.role)) {
-        return reply.status(401).send({
-          error: "User not found or MFA not configured",
-          code: "MFA_NOT_CONFIGURED",
-        });
-      }
-      if (dbUser.totpEnabled) {
-        // Defensive: the pending secret should be inactive at this point.
-        return reply.status(409).send({
-          error: "MFA is already verified and active",
-          code: "MFA_ALREADY_ENABLED",
-        });
-      }
+      const [userId, hashFingerprint] = claimed.payload.split(":");
 
-      const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
+      let dbUser: typeof schema.users.$inferSelect | undefined;
+      let secretBase32: string | null = null;
+      let claimedStep: ClaimedTotpStep | null = null;
+      let maxSessions = 0;
+
+      try {
+        [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+
+        if (!dbUser) {
+          await clearMfaAttempts(redis, attemptsKey);
+          return reply.status(401).send({
+            error: "Enrollment challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+
+        if (hashFingerprint && dbUser.passwordHash) {
+          const { createHash } = await import("node:crypto");
+          const currentFingerprint = createHash("sha256")
+            .update(dbUser.passwordHash)
+            .digest("hex")
+            .substring(0, 16);
+          if (currentFingerprint !== hashFingerprint) {
+            await clearMfaAttempts(redis, attemptsKey);
+            const audit = auditFromRequest(request);
+            await audit("MFA_VERIFY_FAILED", {
+              userId: dbUser.id,
+              username: dbUser.username,
+              reason: "password_changed",
+            });
+            return reply.status(401).send({
+              error: "Enrollment challenge expired or invalid",
+              code: "MFA_EXPIRED",
+            });
+          }
+        }
+        if (isDisabledRole(dbUser.role)) {
+          await clearMfaAttempts(redis, attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
+        }
+        if (hashFingerprint && !dbUser.passwordHash) {
+          await clearMfaAttempts(redis, attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_removed",
+          });
+          return reply.status(401).send({
+            error: "Enrollment challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+        if (!dbUser.totpSecret) {
+          await clearMfaAttempts(redis, attemptsKey);
+          return reply.status(401).send({
+            error: "User not found or MFA not configured",
+            code: "MFA_NOT_CONFIGURED",
+          });
+        }
+        if (dbUser.totpEnabled) {
+          await clearMfaAttempts(redis, attemptsKey);
+          // Defensive: the pending secret should be inactive at this point.
+          return reply.status(409).send({
+            error: "MFA is already verified and active",
+            code: "MFA_ALREADY_ENABLED",
+          });
+        }
+
+        maxSessions = await readMaxSessionsPerUser();
+
+        secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
+        if (!secretBase32) {
+          await restoreMfaChallenge(redis, challengeKey, claimed);
+          return replyDecryptionFailed(request, reply, userId);
+        }
+
+        claimedStep = await claimTotpStep(redis, userId, secretBase32, code);
+      } catch (err) {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
+        await restoreMfaChallenge(redis, challengeKey, claimed);
+        throw err;
       }
 
       const audit = auditFromRequest(request);
 
-      if (!verifyTotpCode(secretBase32, code)) {
+      if (!claimedStep) {
         // Burn the enrollment after a few wrong codes so an attacker who already
-        // holds valid credentials cannot grind TOTP guesses within the window.
-        // The counter shares the enrollment token's lifetime.
-        const attemptsKey = `mfa:enroll:attempts:${enrollmentToken}`;
-        const attempts = await redis.incr(attemptsKey);
-        if (attempts === 1) await redis.expire(attemptsKey, MFA_CHALLENGE_TTL_SECONDS);
-        if (attempts >= MFA_MAX_FAILED_ATTEMPTS) {
-          await redis.del(`mfa:enroll:${enrollmentToken}`, attemptsKey);
-        }
+        // holds valid credentials cannot grind TOTP guesses within the window,
+        // or put the challenge back if attempts remain.
+        const attemptOutcome = await recordFailedMfaAttempt(
+          redis,
+          challengeKey,
+          attemptsKey,
+          claimed,
+        );
         await audit("MFA_VERIFY_FAILED", { userId, username: dbUser.username });
+        if (attemptOutcome === "exhausted") {
+          return reply.status(401).send({
+            error: "Too many invalid codes; enrollment challenge expired",
+            code: "MFA_ATTEMPTS_EXHAUSTED",
+          });
+        }
+        if (attemptOutcome === "expired") {
+          return reply.status(401).send({
+            error: "Enrollment challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
         return reply.status(401).send({
           error: "Invalid TOTP code",
           code: "INVALID_CODE",
         });
       }
 
-      // Activate MFA and clear the enrollment token + any failed-attempt counter.
-      await db
-        .update(schema.users)
-        .set({ totpEnabled: true, updatedAt: new Date() })
-        .where(eq(schema.users.id, userId));
-      await redis.del(`mfa:enroll:${enrollmentToken}`, `mfa:enroll:attempts:${enrollmentToken}`);
-
-      // Create a session, same as the complete route's login completion.
+      // Activate MFA and create a session atomically inside the password-check transaction.
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: dbUser.id,
-        expiresAt,
-      });
+      const verifiedUser = dbUser;
 
-      await audit("MFA_ENROLLED", { userId: dbUser.id, username: dbUser.username });
-      await audit("LOGIN_SUCCESS", { userId: dbUser.id, username: dbUser.username });
+      let inserted:
+        | {
+            status: "success";
+            role: string;
+            permissions: Permission[];
+            teamName: string;
+          }
+        | { status: "password_changed" | "password_removed" | "user_disabled" | "user_deleted" };
+      try {
+        inserted = await db.transaction(async (tx) => {
+          const [lockedUser] = await tx
+            .select({
+              passwordHash: schema.users.passwordHash,
+              role: schema.users.role,
+              team: schema.users.team,
+            })
+            .from(schema.users)
+            .where(eq(schema.users.id, verifiedUser.id))
+            .for("share");
 
-      const [teamRow] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.id, dbUser.team));
+          if (!lockedUser) {
+            return { status: "user_deleted" as const };
+          }
+
+          const passwordMismatch = hashFingerprint
+            ? (lockedUser.passwordHash
+                ? createHash("sha256")
+                    .update(lockedUser.passwordHash)
+                    .digest("hex")
+                    .substring(0, 16)
+                : null) !== hashFingerprint
+            : lockedUser.passwordHash !== verifiedUser.passwordHash;
+          if (passwordMismatch) {
+            return {
+              status: lockedUser.passwordHash
+                ? ("password_changed" as const)
+                : isDisabledRole(lockedUser.role)
+                  ? ("user_disabled" as const)
+                  : ("password_removed" as const),
+            };
+          }
+
+          if (isDisabledRole(lockedUser.role)) {
+            return { status: "user_disabled" as const };
+          }
+
+          await tx
+            .update(schema.users)
+            .set({ totpEnabled: true, updatedAt: new Date() })
+            .where(eq(schema.users.id, verifiedUser.id));
+
+          await tx.insert(schema.sessions).values({
+            id: token,
+            userId: verifiedUser.id,
+            expiresAt,
+          });
+
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
+
+          const [teamRow] = await tx
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, lockedUser.team));
+          const permissions = await getPermissions(lockedUser.role, tx);
+
+          return {
+            status: "success" as const,
+            role: lockedUser.role,
+            permissions,
+            teamName: teamRow?.name ?? lockedUser.team,
+          };
+        });
+      } catch (err) {
+        await restoreTotpStep(redis, claimedStep);
+        await restoreMfaChallenge(redis, challengeKey, claimed);
+        throw err;
+      }
+
+      // Clear any failed-attempt counter once the transaction finishes (the
+      // challenge key was deleted on claim).
+      await clearMfaAttempts(redis, attemptsKey);
+
+      if (inserted.status !== "success") {
+        await restoreTotpStep(redis, claimedStep);
+        if (inserted.status === "user_disabled") {
+          await audit("MFA_VERIFY_FAILED", {
+            userId: verifiedUser.id,
+            username: verifiedUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
+        }
+        await audit("MFA_VERIFY_FAILED", {
+          userId: verifiedUser.id,
+          username: verifiedUser.username,
+          reason: inserted.status,
+        });
+        return reply.status(401).send({
+          error: "Enrollment challenge expired or invalid",
+          code: "MFA_EXPIRED",
+        });
+      }
+
+      await audit("MFA_ENROLLED", { userId: verifiedUser.id, username: verifiedUser.username });
+      await audit("LOGIN_SUCCESS", { userId: verifiedUser.id, username: verifiedUser.username });
+
+      setSessionCookie(request, reply, token);
 
       return reply.send({
         token,
         user: {
-          id: dbUser.id,
-          username: dbUser.username,
-          role: dbUser.role,
-          mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : dbUser.mustChangePassword,
-          permissions: await getPermissions(dbUser.role),
-          teamName: teamRow?.name ?? dbUser.team,
+          id: verifiedUser.id,
+          username: verifiedUser.username,
+          role: inserted.role,
+          mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD
+            ? false
+            : verifiedUser.mustChangePassword,
+          permissions: inserted.permissions,
+          teamName: inserted.teamName,
         },
         expiresAt: expiresAt.toISOString(),
       });
@@ -605,7 +1407,13 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { code } = parsed.data;
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "Current TOTP code is required to disable MFA",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, user.id));
       if (!dbUser?.totpEnabled || !dbUser.totpSecret) {
@@ -616,24 +1424,28 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       // Decrypt and verify the code
-      const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
-      }
+      const secretBase32 = await decryptSecret(user.id, dbUser.totpSecret);
+      if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
-      if (!verifyTotpCode(secretBase32, code)) {
+      const audit = auditFromRequest(request);
+
+      const redis = sharedRedis();
+      const claimedStep = await claimTotpStep(redis, user.id, secretBase32, code);
+      if (!claimedStep) {
+        await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",
           code: "INVALID_CODE",
         });
       }
 
-      await clearUserMfa(user.id);
+      try {
+        await clearUserMfa(user.id);
+      } catch (err) {
+        await restoreTotpStep(redis, claimedStep);
+        throw err;
+      }
 
-      const audit = auditFromRequest(request);
       await audit("MFA_DISABLED", { userId: user.id, username: user.username });
 
       return reply.send({ ok: true });
@@ -648,6 +1460,10 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
+
+      if (isAnonymousUserId(id)) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
 
       const [targetUser] = await db.select().from(schema.users).where(eq(schema.users.id, id));
       if (!targetUser) {
@@ -673,6 +1489,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const audit = auditFromRequest(request);
       await audit("MFA_RESET", {
         adminId: admin.id,
+        username: admin.username,
         targetUserId: id,
         targetUsername: targetUser.username,
       });

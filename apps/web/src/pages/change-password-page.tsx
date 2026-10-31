@@ -1,8 +1,11 @@
 import { Sparkles } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
+import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
+import { passwordErrorMessages } from "@/lib/password-errors";
 
 /**
  * Trigger the browser's "Save Password" prompt by submitting a real form
@@ -13,7 +16,8 @@ import { appUrl } from "@/lib/app-url";
  *   2. Visible input fields with autocomplete="username" + "new-password"
  *   3. An actual page navigation following the submission
  *
- * We POST to "/" which the SPA serves as index.html. The browser sees the
+ * We POST to "/", which the API answers with a 303 back to the app (static.ts,
+ * #2088; a plain 404 there would end the flow on "Not found"). The browser sees the
  * form submission + navigation and prompts to save.
  */
 function triggerBrowserPasswordSave(username: string, password: string) {
@@ -42,42 +46,67 @@ function triggerBrowserPasswordSave(username: string, password: string) {
   // The form.submit() causes a full page navigation to "/", so no cleanup needed.
 }
 
-function secureRandom(max: number): number {
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-  return array[0] % max;
+/** The name an earlier login left in storage, if storage can be read at all. */
+function storedUsername(): string | null {
+  try {
+    return localStorage.getItem("snapotter-username");
+  } catch {
+    // Storage blocked (a private window with site data blocked).
+    return null;
+  }
 }
 
-function generatePassword(): string {
-  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const lower = "abcdefghijklmnopqrstuvwxyz";
-  const digits = "0123456789";
-  const all = upper + lower + digits;
-  const required = [
-    upper[secureRandom(upper.length)],
-    lower[secureRandom(lower.length)],
-    digits[secureRandom(digits.length)],
-  ];
-  const rest = Array.from({ length: 13 }, () => all[secureRandom(all.length)]);
-  const chars = [...required, ...rest];
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = secureRandom(i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
+/** Drop the stored token without letting a blocked-storage throw hide the refusal. */
+function forgetToken(): void {
+  try {
+    clearToken();
+  } catch {
+    // Storage blocked: the session cookie still governs auth state.
   }
-  return chars.join("");
+}
+
+/**
+ * What happens once the server has changed the password. None of it may be
+ * reported as a failed change: the password is already different, so telling
+ * the user it failed sends their next attempt in with a wrong current
+ * password (#1569). Blocked storage is ignored; a form the browser won't
+ * submit falls back to a plain navigation to the app.
+ */
+function finishPasswordChange(username: string, newPassword: string) {
+  try {
+    localStorage.setItem("snapotter-welcome", "1");
+  } catch {
+    // Storage blocked or full (private window): the welcome flag is a nicety.
+  }
+  try {
+    // Trigger browser password save prompt via real form submission + navigation
+    triggerBrowserPasswordSave(username, newPassword);
+  } catch (err) {
+    console.warn("Save-password form failed; navigating to the app instead", err);
+    window.location.assign(appUrl("/"));
+  }
 }
 
 export function ChangePasswordPage() {
   const { t } = useTranslation();
+  // The session knows who is signed in; storage is only what an earlier login
+  // left behind, which can be another account's name or nothing at all (#2317).
+  const { username: sessionUsername } = useAuth();
+  const username = sessionUsername || storedUsername() || "admin";
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<string[]>([]);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showGenerated, setShowGenerated] = useState(false);
+  // The minimum length from the server's last refusal. This page can't read the
+  // policy, so Generate starts at the default and meets the minimum once the
+  // server has named it (#2027).
+  const [minLength, setMinLength] = useState<number | null>(null);
 
   const handleGenerate = () => {
-    const pw = generatePassword();
+    const pw = generatePassword(passwordLengthFor(minLength));
     setNewPassword(pw);
     setConfirmPassword(pw);
     setShowGenerated(true);
@@ -85,14 +114,16 @@ export function ChangePasswordPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
+    setErrors([]);
+    setSessionEnded(false);
 
     if (newPassword !== confirmPassword) {
-      setError(t.changePassword.passwordsMismatch);
+      setErrors([t.changePassword.passwordsMismatch]);
       return;
     }
 
     setLoading(true);
+    let changed = false;
     try {
       const res = await fetch(appUrl("/api/auth/change-password"), {
         method: "POST",
@@ -102,20 +133,40 @@ export function ChangePasswordPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || t.changePassword.failedError);
+        // A 401 that isn't a wrong current password means the session is
+        // gone (expired, idle, or ended by an admin's password reset).
+        // Retrying here can't work, so point back to sign-in.
+        if (res.status === 401 && data.code !== "INVALID_PASSWORD") {
+          forgetToken();
+          setSessionEnded(true);
+          setErrors([t.changePassword.sessionEnded]);
+          return;
+        }
+        // Another change won (another tab, an admin reset, or SCIM): the old
+        // password will never verify again, so drop the token and link to sign-in (#2236).
+        if (data.code === "PASSWORD_CHANGED") {
+          forgetToken();
+          setSessionEnded(true);
+        }
+        if (typeof data.minLength === "number") setMinLength(data.minLength);
+        const messages = passwordErrorMessages(t, res.status, data);
+        if (messages.length === 0) {
+          console.warn("Password change failed", { status: res.status, code: data.code });
+        }
+        setErrors(messages.length > 0 ? messages : [t.changePassword.failedError]);
         return;
       }
-
-      localStorage.setItem("snapotter-welcome", "1");
-      // Trigger browser password save prompt via real form submission + navigation
-      const username = localStorage.getItem("snapotter-username") || "admin";
-      triggerBrowserPasswordSave(username, newPassword);
-      return; // navigation happens inside triggerBrowserPasswordSave
+      changed = true;
     } catch {
-      setError(t.changePassword.failedError);
+      setErrors([t.changePassword.failedError]);
+      return;
     } finally {
-      setLoading(false);
+      // After a success the page is about to navigate; a live button would let a
+      // second click resend the old current password.
+      if (!changed) setLoading(false);
     }
+
+    finishPasswordChange(username, newPassword); // navigates away
   };
 
   return (
@@ -139,7 +190,7 @@ export function ChangePasswordPage() {
                 type="text"
                 name="username"
                 autoComplete="username"
-                value={localStorage.getItem("snapotter-username") || "admin"}
+                value={username}
                 readOnly
                 className="w-full px-4 py-3 rounded-lg border border-border bg-muted text-muted-foreground cursor-not-allowed"
               />
@@ -188,7 +239,6 @@ export function ChangePasswordPage() {
                 placeholder={t.changePassword.newPasswordPlaceholder}
                 className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${showGenerated ? "font-mono text-sm" : ""}`}
                 required
-                minLength={8}
               />
             </div>
             <div>
@@ -210,10 +260,30 @@ export function ChangePasswordPage() {
                 placeholder={t.changePassword.confirmPasswordPlaceholder}
                 className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${showGenerated ? "font-mono text-sm" : ""}`}
                 required
-                minLength={8}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {errors.length === 1 && (
+              <p role="alert" className="text-sm text-destructive">
+                {errors[0]}
+                {sessionEnded && (
+                  <>
+                    {" "}
+                    <a href={appUrl("/login")} className="underline">
+                      {t.auth.loginButton}
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
+            {errors.length > 1 && (
+              <div role="alert" className="text-sm text-destructive">
+                <ul className="list-disc ps-5 space-y-1">
+                  {errors.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <button
               type="submit"
               disabled={loading || !currentPassword || !newPassword || !confirmPassword}

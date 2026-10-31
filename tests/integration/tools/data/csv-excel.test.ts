@@ -18,11 +18,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(filename: string, content: Buffer, settings: Record<string, unknown> = {}) {
   const { body, contentType } = createMultipartPayload([
@@ -64,6 +64,30 @@ describe("csv-excel (pure JS, no skipIf)", () => {
     expect(sst).toBeDefined();
     const sstXml = sst?.getData().toString("utf8") ?? "";
     expect(sstXml).toContain("name");
+  }, 30_000);
+
+  it("converts a single-column CSV to XLSX instead of refusing it (#2099)", async () => {
+    const res = await runTool("emails.csv", Buffer.from("email\r\na@x.io\r\nb@x.io"));
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    const zip = new AdmZip(Buffer.from(dl.rawPayload));
+    const sst = zip.getEntry("xl/sharedStrings.xml")?.getData().toString("utf8") ?? "";
+    expect(sst).toContain("a@x.io");
+    expect(sst).toContain("b@x.io");
+  }, 30_000);
+
+  it("still refuses data the comma fallback would split (#2099)", async () => {
+    // "sales / 1,200 / 2,400" would otherwise become a sheet of 1 | 200.
+    const res = await runTool("sales.csv", Buffer.from("sales\n1,200\n2,400\n3,600\n"));
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
+  it("refuses a file with no rows (#2099)", async () => {
+    const res = await runTool("blank.csv", Buffer.from("\r\n\r\n"));
+    expect(res.statusCode).toBe(400);
   }, 30_000);
 
   it("converts TSV to XLSX with PK magic", async () => {

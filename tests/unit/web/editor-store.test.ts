@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Bypass zustand persist middleware
 vi.mock("zustand/middleware", async (importOriginal) => {
@@ -11,8 +11,18 @@ vi.mock("zustand/middleware", async (importOriginal) => {
 // Imports
 // ---------------------------------------------------------------------------
 
-import { useEditorStore } from "@/stores/editor-store";
+import { defaultCurvesState, defaultLevelsState } from "@/components/editor/adjustment-lut";
+import {
+  createDefaultAdjustments,
+  createDefaultFilters,
+  createDefaultLayers,
+  jumpEditorToHistoryState,
+  redoEditor,
+  undoEditor,
+  useEditorStore,
+} from "@/stores/editor-store";
 import type { CanvasObject, CropState, SelectionState } from "@/types/editor";
+import { stubRaster } from "../../helpers/editor-raster-stub.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -100,7 +110,22 @@ function makeText(
 const INITIAL = useEditorStore.getState();
 
 beforeEach(() => {
-  useEditorStore.setState({ ...INITIAL }, true);
+  useEditorStore.setState(
+    {
+      ...INITIAL,
+      layers: createDefaultLayers(),
+      adjustments: createDefaultAdjustments(),
+      filters: createDefaultFilters(),
+    },
+    true,
+  );
+  // Rotate, flip and crop rebuild the source bitmap before committing (#2070).
+  stubRaster();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 // ===========================================================================
@@ -137,6 +162,32 @@ describe("Tool Management", () => {
 
   it("previousTool starts as null", () => {
     expect(state().previousTool).toBeNull();
+  });
+
+  it("createDefaultAdjustments, createDefaultFilters, and createDefaultLayers return fresh copies of clean document defaults (#2676)", () => {
+    const adj1 = createDefaultAdjustments();
+    const adj2 = createDefaultAdjustments();
+    expect(adj1).toEqual(INITIAL.adjustments);
+    expect(adj1).not.toBe(adj2);
+    adj1.brightness = 50;
+    expect(adj2.brightness).toBe(0);
+
+    const filters1 = createDefaultFilters();
+    const filters2 = createDefaultFilters();
+    expect(filters1).toEqual(INITIAL.filters);
+    expect(filters1).not.toBe(filters2);
+    filters1[0].enabled = true;
+    filters1[0].params.radius = 99;
+    expect(filters2[0].enabled).toBe(false);
+    expect(filters2[0].params.radius).toBe(0);
+
+    const layers1 = createDefaultLayers();
+    const layers2 = createDefaultLayers();
+    expect(layers1).toEqual(INITIAL.layers);
+    expect(layers1).not.toBe(layers2);
+    expect(layers1[0]).not.toBe(INITIAL.layers[0]);
+    layers1[0].name = "Mutated";
+    expect(layers2[0].name).toBe("Layer 1");
   });
 });
 
@@ -883,37 +934,37 @@ describe("Crop", () => {
     expect(state().isCropping).toBe(false);
   });
 
-  it("applyCrop updates canvasSize to crop dimensions", () => {
+  it("applyCrop updates canvasSize to crop dimensions", async () => {
     act((s) => s.setCropState({ x: 10, y: 20, width: 300, height: 200, aspectRatio: null }));
-    act((s) => s.applyCrop());
+    await act((s) => s.applyCrop());
     expect(state().canvasSize).toEqual({ width: 300, height: 200 });
   });
 
-  it("applyCrop offsets objects by crop origin", () => {
+  it("applyCrop offsets objects by crop origin", async () => {
     act((s) => s.addObject(makeRect({ id: "r1", x: 50, y: 60 })));
     act((s) => s.setCropState({ x: 10, y: 20, width: 300, height: 200, aspectRatio: null }));
-    act((s) => s.applyCrop());
+    await act((s) => s.applyCrop());
     const obj = state().objects[0];
     expect(obj.type === "rect" && obj.attrs.x).toBe(40); // 50 - 10
     expect(obj.type === "rect" && obj.attrs.y).toBe(40); // 60 - 20
   });
 
-  it("applyCrop clears cropState and isCropping", () => {
+  it("applyCrop clears cropState and isCropping", async () => {
     act((s) => s.setCropState({ x: 0, y: 0, width: 100, height: 100, aspectRatio: null }));
-    act((s) => s.applyCrop());
+    await act((s) => s.applyCrop());
     expect(state().cropState).toBeNull();
     expect(state().isCropping).toBe(false);
   });
 
-  it("applyCrop marks dirty", () => {
+  it("applyCrop marks dirty", async () => {
     act((s) => s.setCropState({ x: 0, y: 0, width: 100, height: 100, aspectRatio: null }));
-    act((s) => s.applyCrop());
+    await act((s) => s.applyCrop());
     expect(state().isDirty).toBe(true);
   });
 
-  it("applyCrop is a no-op without cropState", () => {
+  it("applyCrop is a no-op without cropState", async () => {
     const canvasBefore = state().canvasSize;
-    act((s) => s.applyCrop());
+    await act((s) => s.applyCrop());
     expect(state().canvasSize).toEqual(canvasBefore);
   });
 });
@@ -1129,9 +1180,9 @@ describe("Document State", () => {
     expect(state().isDirty).toBe(true);
   });
 
-  it("applyCrop sets isDirty", () => {
+  it("applyCrop sets isDirty", async () => {
     act((s) => s.setCropState({ x: 0, y: 0, width: 100, height: 100, aspectRatio: null }));
-    act((s) => s.applyCrop());
+    await act((s) => s.applyCrop());
     expect(state().isDirty).toBe(true);
   });
 
@@ -1161,58 +1212,58 @@ describe("Document State", () => {
 // ===========================================================================
 
 describe("Canvas Transforms", () => {
-  it("rotateCanvas 90 swaps dimensions", () => {
+  it("rotateCanvas 90 swaps dimensions", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
-    act((s) => s.rotateCanvas(90));
+    await act((s) => s.rotateCanvas(90));
     expect(state().canvasSize).toEqual({ width: 600, height: 800 });
   });
 
-  it("rotateCanvas 180 keeps dimensions", () => {
+  it("rotateCanvas 180 keeps dimensions", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
-    act((s) => s.rotateCanvas(180));
+    await act((s) => s.rotateCanvas(180));
     expect(state().canvasSize).toEqual({ width: 800, height: 600 });
   });
 
-  it("rotateCanvas 270 swaps dimensions", () => {
+  it("rotateCanvas 270 swaps dimensions", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
-    act((s) => s.rotateCanvas(270));
+    await act((s) => s.rotateCanvas(270));
     expect(state().canvasSize).toEqual({ width: 600, height: 800 });
   });
 
-  it("rotateCanvas 90 transforms object positions", () => {
+  it("rotateCanvas 90 transforms object positions", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeRect({ id: "r1", x: 100, y: 200 })));
-    act((s) => s.rotateCanvas(90));
+    await act((s) => s.rotateCanvas(90));
     const obj = state().objects[0];
     // After 90 rotation: newX = canvasHeight - y - height = 600 - 200 - 50, newY = x = 100
     expect(obj.type === "rect" && obj.attrs.x).toBe(350);
     expect(obj.type === "rect" && obj.attrs.y).toBe(100);
   });
 
-  it("flipCanvasHorizontal flips object x positions", () => {
+  it("flipCanvasHorizontal flips object x positions", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeRect({ id: "r1", x: 100, y: 200 })));
-    act((s) => s.flipCanvasHorizontal());
+    await act((s) => s.flipCanvasHorizontal());
     const obj = state().objects[0];
     // 800 - 100 - width(100) = 600
     expect(obj.type === "rect" && obj.attrs.x).toBe(600);
     expect(obj.type === "rect" && obj.attrs.y).toBe(200);
   });
 
-  it("flipCanvasVertical flips object y positions", () => {
+  it("flipCanvasVertical flips object y positions", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeRect({ id: "r1", x: 100, y: 200 })));
-    act((s) => s.flipCanvasVertical());
+    await act((s) => s.flipCanvasVertical());
     const obj = state().objects[0];
     expect(obj.type === "rect" && obj.attrs.x).toBe(100);
     // 600 - 200 - height(50) = 350
     expect(obj.type === "rect" && obj.attrs.y).toBe(350);
   });
 
-  it("trimCanvas trims to object bounds", () => {
+  it("trimCanvas trims to object bounds", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeRect({ id: "r1", x: 100, y: 200 })));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     expect(state().isDirty).toBe(true);
     // Trim now includes strokeWidth (1px / 2 = 0.5px per side -> 1px extra per axis)
     expect(state().canvasSize).toEqual({ width: 102, height: 52 });
@@ -1223,9 +1274,9 @@ describe("Canvas Transforms", () => {
     expect(obj.type === "rect" && obj.attrs.y).toBe(1);
   });
 
-  it("trimCanvas no-ops when no objects exist", () => {
+  it("trimCanvas no-ops when no objects exist", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     expect(state().isDirty).toBe(false);
     expect(state().canvasSize).toEqual({ width: 800, height: 600 });
   });
@@ -1401,11 +1452,11 @@ describe("resizeImage object scaling", () => {
 // ===========================================================================
 
 describe("rotateCanvas with line objects", () => {
-  it("rotates line points 90 degrees clockwise", () => {
+  it("rotates line points 90 degrees clockwise", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     // line with points [0, 0, 100, 100]
     act((s) => s.addObject(makeLine({ id: "l1" })));
-    act((s) => s.rotateCanvas(90));
+    await act((s) => s.rotateCanvas(90));
     const obj = state().objects[0];
     if (obj.type === "line") {
       // 90 deg CW: newX = canvasHeight - py, newY = px
@@ -1417,10 +1468,10 @@ describe("rotateCanvas with line objects", () => {
     }
   });
 
-  it("rotates line points 270 degrees clockwise", () => {
+  it("rotates line points 270 degrees clockwise", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeLine({ id: "l1" })));
-    act((s) => s.rotateCanvas(270));
+    await act((s) => s.rotateCanvas(270));
     const obj = state().objects[0];
     if (obj.type === "line") {
       // 270 deg CW: newX = py, newY = canvasWidth - px
@@ -1432,10 +1483,10 @@ describe("rotateCanvas with line objects", () => {
     }
   });
 
-  it("rotates line points 180 degrees", () => {
+  it("rotates line points 180 degrees", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeLine({ id: "l1" })));
-    act((s) => s.rotateCanvas(180));
+    await act((s) => s.rotateCanvas(180));
     const obj = state().objects[0];
     if (obj.type === "line") {
       // 180 deg: newX = canvasWidth - px, newY = canvasHeight - py
@@ -1452,10 +1503,10 @@ describe("rotateCanvas with line objects", () => {
 // ===========================================================================
 
 describe("flipCanvas with line objects", () => {
-  it("flipCanvasHorizontal flips line points x-coordinates", () => {
+  it("flipCanvasHorizontal flips line points x-coordinates", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeLine({ id: "l1" })));
-    act((s) => s.flipCanvasHorizontal());
+    await act((s) => s.flipCanvasHorizontal());
     const obj = state().objects[0];
     if (obj.type === "line") {
       // Flip horizontal: newX = canvasWidth - px, y unchanged
@@ -1466,10 +1517,10 @@ describe("flipCanvas with line objects", () => {
     }
   });
 
-  it("flipCanvasVertical flips line points y-coordinates", () => {
+  it("flipCanvasVertical flips line points y-coordinates", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeLine({ id: "l1" })));
-    act((s) => s.flipCanvasVertical());
+    await act((s) => s.flipCanvasVertical());
     const obj = state().objects[0];
     if (obj.type === "line") {
       // Flip vertical: x unchanged, newY = canvasHeight - py
@@ -1486,10 +1537,10 @@ describe("flipCanvas with line objects", () => {
 // ===========================================================================
 
 describe("transform with center-based objects", () => {
-  it("flipCanvasHorizontal correctly flips ellipse center position (no width subtraction)", () => {
+  it("flipCanvasHorizontal correctly flips ellipse center position (no width subtraction)", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeEllipse({ id: "e1", x: 200, y: 150 })));
-    act((s) => s.flipCanvasHorizontal());
+    await act((s) => s.flipCanvasHorizontal());
     const obj = state().objects[0];
     if (obj.type === "ellipse") {
       // Center-based: newX = canvasWidth - x (no width subtraction)
@@ -1498,10 +1549,10 @@ describe("transform with center-based objects", () => {
     }
   });
 
-  it("rotateCanvas 90 correctly rotates ellipse center position", () => {
+  it("rotateCanvas 90 correctly rotates ellipse center position", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeEllipse({ id: "e1", x: 200, y: 150 })));
-    act((s) => s.rotateCanvas(90));
+    await act((s) => s.rotateCanvas(90));
     const obj = state().objects[0];
     if (obj.type === "ellipse") {
       // Center-based 90 deg: newX = canvasHeight - y (no height subtraction), newY = x
@@ -1519,7 +1570,7 @@ describe("transform with center-based objects", () => {
 // ===========================================================================
 
 describe("trimCanvas with line objects", () => {
-  it("computes correct bounds from line points", () => {
+  it("computes correct bounds from line points", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     // Line with points [50, 100, 250, 300], strokeWidth = 2
     const lineObj: CanvasObject = {
@@ -1538,13 +1589,13 @@ describe("trimCanvas with line objects", () => {
       },
     };
     act((s) => s.addObject(lineObj));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     // Bounds: minX = 50-1=49, minY = 100-1=99, maxX = 250+1=251, maxY = 300+1=301
     // Trimmed size = ceil(251) - floor(49) = 251-49 = 202, ceil(301) - floor(99) = 301-99 = 202
     expect(state().canvasSize).toEqual({ width: 202, height: 202 });
   });
 
-  it("offsets line points after trim", () => {
+  it("offsets line points after trim", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     const lineObj: CanvasObject = {
       id: "l1",
@@ -1562,7 +1613,7 @@ describe("trimCanvas with line objects", () => {
       },
     };
     act((s) => s.addObject(lineObj));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     const obj = state().objects[0];
     if (obj.type === "line") {
       // minX = floor(49) = 49, minY = floor(99) = 99
@@ -1579,12 +1630,12 @@ describe("trimCanvas with line objects", () => {
 // ===========================================================================
 
 describe("applyCrop with line objects", () => {
-  it("shifts line points by crop offset", () => {
+  it("shifts line points by crop offset", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeLine({ id: "l1" })));
     // line points: [0, 0, 100, 100]
     act((s) => s.setCropState({ x: 20, y: 30, width: 400, height: 300, aspectRatio: null }));
-    act((s) => s.applyCrop());
+    await act((s) => s.applyCrop());
     const obj = state().objects[0];
     if (obj.type === "line") {
       expect(obj.attrs.points[0]).toBe(-20); // 0 - 20
@@ -1669,7 +1720,7 @@ describe("cutObjects atomic", () => {
     act((s) => s.setSelectedObjects(["r1"]));
     const versionBefore = state()._historyVersion;
     act((s) => s.cutObjects());
-    expect(state().lastAction).toBe("Cut");
+    expect(state().lastAction).toEqual({ id: "cut" });
     expect(state()._historyVersion).toBe(versionBefore + 1);
   });
 
@@ -1765,7 +1816,7 @@ describe("batchNudge", () => {
     act((s) => s.addObject(makeRect({ id: "r1", x: 10, y: 20 })));
     const versionBefore = state()._historyVersion;
     act((s) => s.batchNudge(["r1"], 1, 1));
-    expect(state().lastAction).toBe("Nudge");
+    expect(state().lastAction).toEqual({ id: "nudge" });
     expect(state()._historyVersion).toBe(versionBefore + 1);
   });
 });
@@ -1777,13 +1828,13 @@ describe("batchNudge", () => {
 describe("commitHistory", () => {
   it("increments _historyVersion", () => {
     const versionBefore = state()._historyVersion;
-    act((s) => s.commitHistory("Test Action"));
+    act((s) => s.commitHistory({ id: "nudge" }));
     expect(state()._historyVersion).toBe(versionBefore + 1);
   });
 
-  it("sets lastAction to provided string", () => {
-    act((s) => s.commitHistory("My Custom Action"));
-    expect(state().lastAction).toBe("My Custom Action");
+  it("sets lastAction to the provided action", () => {
+    act((s) => s.commitHistory({ id: "rotateCanvas", degrees: 90 }));
+    expect(state().lastAction).toEqual({ id: "rotateCanvas", degrees: 90 });
   });
 });
 
@@ -1813,20 +1864,20 @@ describe("updateLayerThumbnail", () => {
 // ===========================================================================
 
 describe("canvas transforms update rotation attribute", () => {
-  it("rotateCanvas 90 adds 90 to existing rotation", () => {
+  it("rotateCanvas 90 adds 90 to existing rotation", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeRect({ id: "r1", x: 100, y: 100 })));
     const before = state().objects[0];
     expect(before.type === "rect" && before.attrs.rotation).toBe(0);
 
-    act((s) => s.rotateCanvas(90));
+    await act((s) => s.rotateCanvas(90));
     const after = state().objects[0];
     if (after.type === "rect") {
       expect(after.attrs.rotation).toBe(90);
     }
   });
 
-  it("rotateCanvas 90 compounds with existing rotation", () => {
+  it("rotateCanvas 90 compounds with existing rotation", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     const rect: CanvasObject = {
       id: "r2",
@@ -1846,14 +1897,14 @@ describe("canvas transforms update rotation attribute", () => {
       },
     };
     act((s) => s.addObject(rect));
-    act((s) => s.rotateCanvas(90));
+    await act((s) => s.rotateCanvas(90));
     const after = state().objects[0];
     if (after.type === "rect") {
       expect(after.attrs.rotation).toBe(135);
     }
   });
 
-  it("flipCanvasHorizontal negates rotation", () => {
+  it("flipCanvasHorizontal negates rotation", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     const rect: CanvasObject = {
       id: "r3",
@@ -1873,14 +1924,14 @@ describe("canvas transforms update rotation attribute", () => {
       },
     };
     act((s) => s.addObject(rect));
-    act((s) => s.flipCanvasHorizontal());
+    await act((s) => s.flipCanvasHorizontal());
     const after = state().objects[0];
     if (after.type === "rect") {
       expect(after.attrs.rotation).toBe(330); // (360 - 30) % 360
     }
   });
 
-  it("flipCanvasVertical negates rotation", () => {
+  it("flipCanvasVertical negates rotation", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     const rect: CanvasObject = {
       id: "r4",
@@ -1900,10 +1951,150 @@ describe("canvas transforms update rotation attribute", () => {
       },
     };
     act((s) => s.addObject(rect));
-    act((s) => s.flipCanvasVertical());
+    await act((s) => s.flipCanvasVertical());
     const after = state().objects[0];
     if (after.type === "rect") {
       expect(after.attrs.rotation).toBe(300); // (360 - 60) % 360
     }
+  });
+});
+
+// ===========================================================================
+// Levels and Curves undo/redo (#2654)
+// ===========================================================================
+
+describe("Levels and Curves undo/redo (#2654)", () => {
+  beforeEach(() => {
+    useEditorStore.temporal.getState().clear();
+  });
+
+  it("undoes and redoes setLevels and resetLevels across channels", async () => {
+    act((s) => s.setLevels("rgb", { blackPoint: 20, whitePoint: 230, gamma: 1.5 }));
+    act((s) => s.setLevels("red", { outBlack: 15, outWhite: 240 }));
+    expect(state().levels.rgb).toEqual({
+      blackPoint: 20,
+      whitePoint: 230,
+      gamma: 1.5,
+      outBlack: 0,
+      outWhite: 255,
+    });
+    expect(state().levels.red).toEqual({
+      blackPoint: 0,
+      whitePoint: 255,
+      gamma: 1,
+      outBlack: 15,
+      outWhite: 240,
+    });
+
+    act((s) => s.resetLevels());
+    expect(state().levels).toEqual(defaultLevelsState());
+
+    await undoEditor();
+    expect(state().levels.rgb.blackPoint).toBe(20);
+    expect(state().levels.red.outBlack).toBe(15);
+
+    await undoEditor();
+    expect(state().levels.rgb.blackPoint).toBe(20);
+    expect(state().levels.red).toEqual(defaultLevelsState().red);
+
+    await undoEditor();
+    expect(state().levels).toEqual(defaultLevelsState());
+
+    await redoEditor(3);
+    expect(state().levels).toEqual(defaultLevelsState());
+  });
+
+  it("undoes and redoes setCurves, resetCurves, and resetAllAdjustments", async () => {
+    const customCurve = [
+      { x: 0, y: 10 },
+      { x: 128, y: 180 },
+      { x: 255, y: 245 },
+    ];
+    act((s) => s.setCurves("green", customCurve));
+    expect(state().curves.green).toEqual(customCurve);
+
+    act((s) => s.resetCurves());
+    expect(state().curves).toEqual(defaultCurvesState());
+
+    await undoEditor();
+    expect(state().curves.green).toEqual(customCurve);
+
+    await redoEditor();
+    expect(state().curves).toEqual(defaultCurvesState());
+
+    await undoEditor();
+    expect(state().curves.green).toEqual(customCurve);
+
+    act((s) => s.setLevels("blue", { blackPoint: 30 }));
+    const beforeBrightnessTarget = useEditorStore.temporal.getState().pastStates.at(-1);
+    act((s) => s.setAdjustment("brightness", 40));
+    act((s) => s.resetAllAdjustments());
+    expect(state().levels).toEqual(defaultLevelsState());
+    expect(state().curves).toEqual(defaultCurvesState());
+    expect(state().adjustments.brightness).toBe(0);
+
+    await undoEditor();
+    expect(state().levels.blue.blackPoint).toBe(30);
+    expect(state().curves.green).toEqual(customCurve);
+    expect(state().adjustments.brightness).toBe(40);
+
+    await redoEditor();
+    expect(state().levels).toEqual(defaultLevelsState());
+    expect(state().curves).toEqual(defaultCurvesState());
+    expect(state().adjustments.brightness).toBe(0);
+
+    await jumpEditorToHistoryState(beforeBrightnessTarget);
+    expect(state().curves.green).toEqual(customCurve);
+    expect(state().levels).toEqual(defaultLevelsState());
+  });
+
+  it("clamps setLevels values and normalizes setCurves points", () => {
+    act((s) =>
+      s.setLevels("rgb", {
+        blackPoint: 300,
+        whitePoint: 100,
+        gamma: 0,
+        outBlack: 220,
+        outWhite: 180,
+      }),
+    );
+    expect(state().levels.rgb).toEqual({
+      blackPoint: 99,
+      whitePoint: 100,
+      gamma: 0.01,
+      outBlack: 180,
+      outWhite: 180,
+    });
+
+    // Lowering whitePoint below an already-high blackPoint clamps blackPoint down
+    act((s) => s.setLevels("rgb", { whitePoint: 50, outWhite: 120 }));
+    expect(state().levels.rgb.whitePoint).toBe(50);
+    expect(state().levels.rgb.blackPoint).toBe(49);
+    expect(state().levels.rgb.outWhite).toBe(120);
+    expect(state().levels.rgb.outBlack).toBe(120);
+
+    // Duplicate x coordinates keep the last point, and out-of-range coordinates clamp to 0..255
+    act((s) =>
+      s.setCurves("rgb", [
+        { x: 255, y: 260 },
+        { x: 0, y: -10 },
+        { x: 100, y: 80 },
+        { x: 100, y: 140 },
+      ]),
+    );
+    expect(state().curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 140 },
+      { x: 255, y: 255 },
+    ]);
+
+    // Fewer than 2 distinct x coordinates fall back to identity
+    act((s) =>
+      s.setCurves("rgb", [
+        { x: 128, y: 50 },
+        { x: 128, y: 200 },
+      ]),
+    );
+    expect(state().curves.rgb).toEqual(defaultCurvesState().rgb);
   });
 });

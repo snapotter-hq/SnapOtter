@@ -18,6 +18,7 @@ import {
   readSync,
   realpathSync,
   renameSync,
+  rmdirSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -41,6 +42,7 @@ import {
 } from "@snapotter/shared";
 import * as tar from "tar";
 import { getQueuedBundleIds } from "./feature-install-queue.js";
+import { logger } from "./logger.js";
 
 // ── Paths ───────────────────────────────────────────────────────────────
 
@@ -85,6 +87,17 @@ export function getInstallScriptPath(): string {
   return join(PROJECT_ROOT, "packages/ai/python/install_feature.py");
 }
 
+// Startup recovery retries a failed sweep every few seconds, so each stuck
+// path is warned about once per errno rather than on every attempt (#1565).
+const importSweepWarnings = new Map<string, string>();
+
+function warnImportSweepFailure(key: string, message: string, error: unknown): void {
+  const code = (error as NodeJS.ErrnoException).code ?? "unknown";
+  if (importSweepWarnings.get(key) === code) return;
+  importSweepWarnings.set(key, code);
+  logger.warn({ err: error }, `${message} (${code})`);
+}
+
 /**
  * Remove upload/extraction staging only while this process owns install.flock.
  * New v2 uploads are always lock-owned. Pre-v2 upload directories are age
@@ -98,8 +111,14 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
     entries = readdirSync(AI_DIR, { withFileTypes: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    warnImportSweepFailure(
+      AI_DIR,
+      `[feature-status] Cannot list ${AI_DIR} to sweep interrupted import staging`,
+      error,
+    );
     return false;
   }
+  importSweepWarnings.delete(AI_DIR);
 
   let complete = true;
   for (const entry of entries) {
@@ -118,9 +137,17 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
       }
       if (info.isSymbolicLink()) unlinkSync(path);
       else rmSync(path, { recursive: true, force: true });
-      console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
+      logger.info(`[feature-status] Deleted orphaned ${entry.name}/`);
+      importSweepWarnings.delete(path);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") complete = false;
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        complete = false;
+        warnImportSweepFailure(
+          path,
+          `[feature-status] Cannot remove orphaned ${entry.name}/`,
+          error,
+        );
+      }
     }
   }
   return complete;
@@ -138,7 +165,7 @@ export function ensureAiDirs(): void {
     // Never refuse to boot over the AI data dir. AI tools simply report as not
     // installed until DATA_DIR points somewhere writable.
     const code = (err as NodeJS.ErrnoException).code;
-    console.error(
+    logger.error(
       `WARNING: Cannot create AI directories under "${AI_DIR}" (${code}). AI features will be unavailable. Set DATA_DIR to a writable path (or check volume permissions / PUID / PGID in Docker).`,
     );
   }
@@ -227,7 +254,7 @@ function readInstalled(): InstalledData {
     const raw = readFileSync(INSTALLED_PATH, "utf-8");
     installedCache = normalizeInstalled(JSON.parse(raw));
   } catch {
-    console.warn("[feature-status] installed.json is corrupt or unreadable, treating as empty");
+    logger.warn("[feature-status] installed.json is corrupt or unreadable, treating as empty");
     installedCache = { bundles: {} };
   }
 
@@ -422,7 +449,11 @@ function openKernelInstallLockFile(): number {
     }
     return fd;
   } catch (error) {
-    closeSync(fd);
+    try {
+      closeSync(fd);
+    } catch {
+      // Preserve the lock file validation failure.
+    }
     throw error;
   }
 }
@@ -493,7 +524,11 @@ function openInstallMarker(): InstallMarkerSnapshot {
       lock,
     };
   } catch (error) {
-    closeSync(fd);
+    try {
+      closeSync(fd);
+    } catch {
+      // Preserve the marker validation failure.
+    }
     throw error;
   }
 }
@@ -541,13 +576,17 @@ function createInstallMarker(lock: LockData): InstallMarkerSnapshot {
       lock,
     };
   } catch (error) {
-    const opened = fstatSync(fd);
     try {
+      const opened = fstatSync(fd);
       removeInstallMarker({ dev: opened.dev, ino: opened.ino });
     } catch {
       // Preserve the marker creation failure.
     }
-    closeSync(fd);
+    try {
+      closeSync(fd);
+    } catch {
+      // Preserve the marker creation failure.
+    }
     throw error;
   }
 }
@@ -577,7 +616,7 @@ function claimInstallMarker(lock: LockData): InstallMarkerSnapshot | null {
       if (belongsToNewReplica || ageMs > LEGACY_LOCK_STALE_MS) {
         if (removeInstallMarker(existing)) {
           if (!belongsToNewReplica) {
-            console.warn(
+            logger.warn(
               `[feature-status] Removed stale legacy install lock (age: ${Math.round(ageMs / 1000)}s)`,
             );
           }
@@ -586,7 +625,11 @@ function claimInstallMarker(lock: LockData): InstallMarkerSnapshot | null {
       }
       return null;
     } finally {
-      closeSync(existing.fd);
+      try {
+        closeSync(existing.fd);
+      } catch {
+        // Preserve the marker claim result or primary failure.
+      }
     }
   }
   return null;
@@ -624,7 +667,9 @@ export function acquireInstallLock(bundleId: string): boolean {
   try {
     kernelFd = openKernelInstallLockFile();
     if (!acquireKernelInstallLock(kernelFd)) {
-      closeSync(kernelFd);
+      const closingKernelFd = kernelFd;
+      kernelFd = null;
+      closeSync(closingKernelFd);
       return false;
     }
     const ownerToken = randomUUID();
@@ -636,7 +681,9 @@ export function acquireInstallLock(bundleId: string): boolean {
     };
     marker = claimInstallMarker(lock);
     if (!marker) {
-      closeSync(kernelFd);
+      const closingKernelFd = kernelFd;
+      kernelFd = null;
+      closeSync(closingKernelFd);
       return false;
     }
     ownedInstallLockFd = kernelFd;
@@ -691,7 +738,7 @@ export function releaseInstallLock(): void {
     // The permanent kernel lease is authoritative. A leftover token-bearing
     // marker is safe and will be removed by the next new acquirer once it
     // proves the flock is free; teardown must never strand in-memory state.
-    console.warn("[feature-status] Unable to remove install marker during release:", error);
+    logger.warn({ err: error }, "[feature-status] Unable to remove install marker during release");
   } finally {
     if (markerFd !== null) {
       try {
@@ -754,10 +801,20 @@ export function getInstallingBundle(): {
       // marker is abandoned. Install paths surface the operational error.
       return observed;
     } finally {
-      if (kernelFd !== null) closeSync(kernelFd);
+      if (kernelFd !== null) {
+        try {
+          closeSync(kernelFd);
+        } catch {
+          // Preserve the observed install status.
+        }
+      }
     }
   } finally {
-    closeSync(marker.fd);
+    try {
+      closeSync(marker.fd);
+    } catch {
+      // Preserve the observed install status.
+    }
   }
 }
 
@@ -791,7 +848,13 @@ export function getAiMutationEpoch(): string {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return INITIAL_AI_MUTATION_EPOCH;
       throw error;
     } finally {
-      if (fd !== null) closeSync(fd);
+      if (fd !== null) {
+        try {
+          closeSync(fd);
+        } catch {
+          // Preserve the read result or primary failure.
+        }
+      }
     }
   }
   throw new Error("Unable to read a stable AI mutation epoch snapshot");
@@ -814,8 +877,9 @@ export function advanceAiMutationEpoch(): string {
     applyGroupSharedMode(fd);
     writeFileSync(fd, `${next}\n`, "utf8");
     fsyncSync(fd);
-    closeSync(fd);
+    const closingFd = fd;
     fd = null;
+    closeSync(closingFd);
     renameSync(tempPath, MUTATION_EPOCH_PATH);
     return next;
   } catch (error) {
@@ -886,7 +950,7 @@ export function resetAiEnvironment(
       // stays. Deleting one we cannot rebuild is strictly worse than keeping a
       // stale one, because the next install spawns <venv>/bin/python3 and dies
       // with ENOENT (#796). Clear what we can and let the operator decide.
-      console.warn(
+      logger.warn(
         `[feature-status] No base venv at ${BAKED_BASE_VENV} to reseed from; left the shared AI venv at ${sharedVenvPath()} untouched. Models, the pip cache and the install ledger were cleared. Recreate that venv yourself if a stale package in it is the problem.`,
       );
     }
@@ -962,9 +1026,11 @@ interface ManifestBundle {
   models: ManifestModel[];
   archives?: Record<string, ManifestArchive>;
   targets?: Record<string, ManifestTarget>;
+  smokeImports?: string[];
 }
 
 interface Manifest {
+  bundleRepo?: string;
   bundles: Record<string, ManifestBundle>;
 }
 
@@ -978,11 +1044,26 @@ function bundleArchKey(): string {
   return process.arch === "arm64" ? "arm64-cpu" : "amd64-gpu";
 }
 
-function readManifest(): Manifest | null {
-  if (!existsSync(MANIFEST_PATH)) return null;
+// A manifest that exists but can't be read or parsed is a broken image or a bad
+// FEATURE_MANIFEST_PATH, so it's logged. Feature states are polled, so the same
+// failure is logged once, and again only after a read has worked in between.
+let lastLoggedManifestFailure: string | null = null;
+
+export function readManifest(manifestPath = getManifestPath()): Manifest | null {
+  if (!existsSync(manifestPath)) return null;
   try {
-    return JSON.parse(readFileSync(MANIFEST_PATH, "utf-8")) as Manifest;
-  } catch {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
+    lastLoggedManifestFailure = null;
+    return manifest;
+  } catch (error) {
+    const failure = `${manifestPath}: ${causeChain(error)}`;
+    if (failure !== lastLoggedManifestFailure) {
+      lastLoggedManifestFailure = failure;
+      logger.warn(
+        { err: error, path: manifestPath },
+        "Feature manifest couldn't be read or parsed; treating it as absent",
+      );
+    }
     return null;
   }
 }
@@ -997,7 +1078,7 @@ function deleteDownloadingFiles(dir: string): void {
       const fullPath = join(entry.parentPath ?? entry.path, entry.name);
       try {
         unlinkSync(fullPath);
-        console.info(`[feature-status] Deleted partial download: ${fullPath}`);
+        logger.info(`[feature-status] Deleted partial download: ${fullPath}`);
       } catch {
         // best-effort
       }
@@ -1016,7 +1097,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
   // A second API replica can start while the first is actively mutating this
   // shared volume. Never erase its lock, downloads, staging, or venv marker.
   if (!acquireInstallLock("__recovery__")) {
-    console.info("[feature-status] Another replica owns the install lease; recovery deferred");
+    logger.info("[feature-status] Another replica owns the install lease; recovery deferred");
     return "deferred";
   }
 
@@ -1029,7 +1110,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
     if (existsSync(INSTALLED_TMP_PATH)) {
       try {
         unlinkSync(INSTALLED_TMP_PATH);
-        console.info("[feature-status] Deleted stale installed.json.tmp");
+        logger.info("[feature-status] Deleted stale installed.json.tmp");
       } catch {
         // best-effort
       }
@@ -1040,7 +1121,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
     if (existsSync(bootstrappingDir)) {
       try {
         rmSync(bootstrappingDir, { recursive: true, force: true });
-        console.info("[feature-status] Deleted stale venv.bootstrapping/");
+        logger.info("[feature-status] Deleted stale venv.bootstrapping/");
       } catch {
         // best-effort
       }
@@ -1057,7 +1138,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
     if (existsSync(VENV_WRITING_MARKER)) {
       let consumeMarker = false;
       if (canReseedFromBakedBase()) {
-        console.warn(
+        logger.warn(
           "[feature-status] An install was interrupted mid venv-write; reseeding the AI venv to a clean state and clearing installed bundles (reinstall to restore).",
         );
         try {
@@ -1069,9 +1150,9 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           consumeMarker = true;
         } catch (err) {
           recoveryIncomplete = true;
-          console.error(
-            "[feature-status] Failed to reseed AI venv after interrupted install; retaining venv.writing for retry:",
-            err,
+          logger.error(
+            { err },
+            "[feature-status] Failed to reseed AI venv after interrupted install; retaining venv.writing for retry",
           );
         }
       } else {
@@ -1080,7 +1161,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
         // every few seconds forever while holding back the rest of startup
         // recovery, so surface the risk once and let the operator repair or
         // reinstall the affected environment themselves.
-        console.warn(
+        logger.warn(
           `[feature-status] An install was interrupted mid venv-write and there is no base venv at ${BAKED_BASE_VENV} to restore from; the AI venv at ${sharedVenvPath()} may be inconsistent. Reinstall the affected bundle.`,
         );
         consumeMarker = true;
@@ -1090,9 +1171,9 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           unlinkSync(VENV_WRITING_MARKER);
         } catch (error) {
           recoveryIncomplete = true;
-          console.error(
-            "[feature-status] AI venv recovery completed but venv.writing could not be cleared; retaining recovery retry:",
-            error,
+          logger.error(
+            { err: error },
+            "[feature-status] AI venv recovery completed but venv.writing could not be cleared; retaining recovery retry",
           );
         }
       }
@@ -1110,7 +1191,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           if (model.path) {
             const modelPath = join(MODELS_DIR, model.path);
             if (!existsSync(modelPath)) {
-              console.warn(
+              logger.warn(
                 `[feature-status] Bundle "${bundleId}" missing model file: ${model.path}`,
               );
               break;
@@ -1119,13 +1200,13 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
               try {
                 const st = statSync(modelPath);
                 if (st.size < model.minSize) {
-                  console.warn(
+                  logger.warn(
                     `[feature-status] Bundle "${bundleId}" model "${model.path}" is undersized (${st.size} < ${model.minSize})`,
                   );
                   break;
                 }
               } catch {
-                console.warn(
+                logger.warn(
                   `[feature-status] Bundle "${bundleId}" cannot stat model: ${model.path}`,
                 );
                 break;
@@ -1134,7 +1215,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           } else if (model.downloadFn === "rembg_session" && model.args?.[0]) {
             const filePath = join(MODELS_DIR, "rembg", `${model.args[0]}.onnx`);
             if (!existsSync(filePath)) {
-              console.warn(
+              logger.warn(
                 `[feature-status] Bundle "${bundleId}" missing rembg model: ${model.args[0]}`,
               );
               break;
@@ -1142,7 +1223,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           } else if (model.downloadFn === "hf_snapshot" && model.args?.[1]) {
             const dirPath = join(MODELS_DIR, model.args[1]);
             if (!existsSync(dirPath)) {
-              console.warn(
+              logger.warn(
                 `[feature-status] Bundle "${bundleId}" missing model directory: ${model.args[1]}`,
               );
               break;
@@ -1163,7 +1244,7 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
         if (entry.isDirectory() && entry.name.startsWith("staging-")) {
           const stagingPath = join(AI_DIR, entry.name);
           rmSync(stagingPath, { recursive: true, force: true });
-          console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
+          logger.info(`[feature-status] Deleted orphaned ${entry.name}/`);
         }
       }
     } catch {
@@ -1179,10 +1260,10 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           const filePath = join(downloadStaging, file);
           if (file.endsWith(".partial") || file.endsWith(".meta")) {
             unlinkSync(filePath);
-            console.info(`[feature-status] Deleted stale download file: ${file}`);
+            logger.info(`[feature-status] Deleted stale download file: ${file}`);
           } else if (file.endsWith(".tar.gz")) {
             unlinkSync(filePath);
-            console.info(`[feature-status] Deleted orphaned archive: ${file}`);
+            logger.info(`[feature-status] Deleted orphaned archive: ${file}`);
           }
         }
       } catch {
@@ -1248,7 +1329,7 @@ export function startInterruptedInstallRecovery(
     try {
       recoveryResult = recoverInterruptedInstallsWithResult();
     } catch (error) {
-      console.warn(
+      logger.warn(
         `[feature-status] Interrupted-install recovery failed; retrying: ${(error as Error).message}`,
       );
     }
@@ -1266,7 +1347,7 @@ export function startInterruptedInstallRecovery(
       try {
         postRecovery = options.onRecovered();
       } catch (error) {
-        console.warn(
+        logger.warn(
           `[feature-status] Post-recovery startup cleanup failed: ${(error as Error).message}`,
         );
         scheduleRetry();
@@ -1277,7 +1358,7 @@ export function startInterruptedInstallRecovery(
           if (completed === false) scheduleRetry();
         })
         .catch((error) => {
-          console.warn(
+          logger.warn(
             `[feature-status] Post-recovery startup cleanup failed: ${(error as Error).message}`,
           );
           scheduleRetry();
@@ -1331,6 +1412,20 @@ export function verifyBundleModels(bundleId: string): string | null {
   return null;
 }
 
+// Feature states are polled, so a memory read that keeps failing is logged once
+// per distinct error, and again only after a read has worked in between (#1501).
+let lastLoggedOcrMemoryFailure: string | null = null;
+
+/** An error's message and its causes' messages, as one string to compare. */
+function causeChain(error: unknown): string {
+  const messages: string[] = [];
+  for (let e: unknown = error, depth = 0; e !== undefined && depth < 5; depth++) {
+    messages.push(e instanceof Error ? e.message : String(e));
+    e = e instanceof Error ? e.cause : undefined;
+  }
+  return messages.join(": ");
+}
+
 export function getFeatureStates(): FeatureBundleState[] {
   const installed = readInstalled();
   const lock = getInstallingBundle();
@@ -1353,8 +1448,22 @@ export function getFeatureStates(): FeatureBundleState[] {
   if (selectedOcrTarget) {
     try {
       effectiveOcrMemoryBytes = getOcrRuntimeEffectiveMemoryBytes();
-    } catch {
+      lastLoggedOcrMemoryFailure = null;
+    } catch (error) {
       ocrMemoryCapacityUnknown = true;
+      // The UI only says the limit couldn't be determined; the log says why.
+      // Only for a missing runtime, the one case where this read decides what
+      // the UI shows: an installed runtime's own check has already logged it.
+      const failure = causeChain(error);
+      const runtimeMissing =
+        !ocrCapability.available && ocrCapability.reason === "descriptor-missing";
+      if (runtimeMissing && failure !== lastLoggedOcrMemoryFailure) {
+        lastLoggedOcrMemoryFailure = failure;
+        logger.warn(
+          { err: error },
+          "[ocr-runtime] Accurate OCR can't be offered: this container's memory limit couldn't be read",
+        );
+      }
     }
   }
   const ocrMemoryCompatible =
@@ -1688,53 +1797,211 @@ export async function importBundleArchive(
       );
     }
 
-    // Resolve where site-packages must land, before moving anything: a
-    // rejected import must not leave models half-applied on disk (#1139).
+    // Resolve where site-packages and fixup wheels must land before moving
+    // anything: a rejected import must not leave models or site-packages
+    // half-applied on disk (#1139, #1237).
     const stagingSitePackages = join(stagingDir, "site-packages");
-    const sitePackagesDir = existsSync(stagingSitePackages)
-      ? resolveVenvSitePackages(sharedVenvPath())
-      : "";
-
-    // Move models/* into MODELS_DIR
-    const stagingModels = join(stagingDir, "models");
-    if (existsSync(stagingModels)) {
-      mkdirSync(MODELS_DIR, { recursive: true });
-      moveTreeRecursive(stagingModels, MODELS_DIR);
-    }
-
-    // Move site-packages/* into venv site-packages
-    if (sitePackagesDir) {
-      moveTreeRecursive(stagingSitePackages, sitePackagesDir);
-    }
-
-    // Apply fixups (NCCL wheel) if present
     const stagingFixups = join(stagingDir, "fixups");
-    if (existsSync(stagingFixups)) {
-      const wheels = readdirSync(stagingFixups).filter((f) => f.endsWith(".whl"));
-      if (wheels.length > 0) {
-        const venvPython = join(sharedVenvPath(), "bin", "python3");
-        for (const wheel of wheels) {
-          try {
-            execFileSync(
-              venvPython,
-              [
-                "-m",
-                "pip",
-                "install",
-                "--no-index",
-                `--find-links=${stagingFixups}`,
-                wheel.split("-")[0],
-              ],
-              {
-                stdio: ["ignore", "ignore", "ignore", installLockFd],
-                timeout: 30_000,
-              },
+    const stagingModels = join(stagingDir, "models");
+    const hasSitePackages = assertOptionalDirectory(stagingSitePackages, "site-packages");
+    const hasFixupsDir = assertOptionalDirectory(stagingFixups, "fixups");
+    const hasModels = assertOptionalDirectory(stagingModels, "models");
+    const fixupWheels = hasFixupsDir
+      ? readdirSync(stagingFixups)
+          .filter((f) => f.endsWith(".whl") && !f.startsWith("."))
+          .sort()
+      : [];
+    const hasFixups = fixupWheels.length > 0;
+    const touchesVenv = hasSitePackages || hasFixups;
+    const venvPath = sharedVenvPath();
+    const sitePackagesDir = touchesVenv ? resolveVenvSitePackages(venvPath) : "";
+    const venvPython = join(venvPath, "bin", "python3");
+
+    const venvRollbackActions: Array<() => void> = [];
+    const modelsRollbackActions: Array<() => void> = [];
+    const installedFixupPackages: string[] = [];
+    let venvTornDuringMove = false;
+    try {
+      // Move site-packages/* into venv site-packages
+      if (hasSitePackages && sitePackagesDir) {
+        markVenvWriting(descriptor.bundleId);
+        try {
+          const spRollback = moveTreeWithRollback(
+            stagingSitePackages,
+            sitePackagesDir,
+            join(stagingDir, ".rollback-site-packages"),
+          );
+          venvRollbackActions.push(spRollback);
+        } catch (moveErr) {
+          if ((moveErr as { rollbackError?: Error })?.rollbackError) {
+            venvTornDuringMove = true;
+          }
+          throw moveErr;
+        }
+        clearVenvWriting();
+      }
+
+      // Apply fixups (NCCL wheel) if present
+      if (hasFixups) {
+        for (const wheel of fixupWheels) {
+          const pkgName = wheel.split("-")[0];
+          if (!pkgName || !/^[A-Za-z0-9][A-Za-z0-9._]*$/.test(pkgName)) {
+            throw new ImportValidationError(
+              `Invalid fixup wheel filename "${wheel}": package name is malformed.`,
             );
-          } catch {
-            // Non-fatal
           }
         }
+        markVenvWriting(descriptor.bundleId);
+        for (const wheel of fixupWheels) {
+          const pkgName = wheel.split("-")[0];
+          const wasPresent =
+            Boolean(sitePackagesDir) && isDistributionInstalled(sitePackagesDir, pkgName);
+          try {
+            installFixupWheel(venvPython, stagingFixups, wheel, pkgName, installLockFd);
+            if (!wasPresent) {
+              installedFixupPackages.push(pkgName);
+            }
+          } catch (fixupErr) {
+            if (
+              !wasPresent &&
+              sitePackagesDir &&
+              isDistributionInstalled(sitePackagesDir, pkgName)
+            ) {
+              installedFixupPackages.push(pkgName);
+            }
+            throw fixupErr;
+          }
+        }
+        clearVenvWriting();
       }
+
+      // Verify the bundle's Python modules actually import in the venv before
+      // placing models or recording the install (#1237).
+      if (touchesVenv && process.env.SNAPOTTER_SKIP_INSTALL_SMOKE !== "1") {
+        const manifestBundle = manifest.bundles[descriptor.bundleId];
+        const smokeImports =
+          manifestBundle?.smokeImports ?? FEATURE_BUNDLES[descriptor.bundleId]?.smokeImports ?? [];
+        verifyBundleSmokeImports(venvPath, descriptor.bundleId, smokeImports);
+      }
+
+      // Move models/* into MODELS_DIR only after Python package installation
+      // and smoke verification succeed.
+      if (hasModels) {
+        mkdirSync(MODELS_DIR, { recursive: true });
+        const modelsRollback = moveTreeWithRollback(
+          stagingModels,
+          MODELS_DIR,
+          join(stagingDir, ".rollback-models"),
+        );
+        modelsRollbackActions.push(modelsRollback);
+      }
+    } catch (err) {
+      const rollbackErrors: string[] = [];
+      const partialRollbackErr = (err as { rollbackError?: Error })?.rollbackError;
+      if (partialRollbackErr) {
+        rollbackErrors.push(partialRollbackErr.message);
+      }
+      let venvRollbackFailed = venvTornDuringMove;
+      const hasVenvRollbackWork =
+        installedFixupPackages.length > 0 || venvRollbackActions.length > 0;
+      if (hasVenvRollbackWork) {
+        try {
+          markVenvWriting(descriptor.bundleId);
+        } catch (markErr) {
+          venvRollbackFailed = true;
+          logger.error(
+            { err: markErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to record venv.writing before offline import rollback",
+          );
+          rollbackErrors.push(
+            `could not record venv.writing (${markErr instanceof Error ? markErr.message : String(markErr)})`,
+          );
+        }
+      }
+      if (installedFixupPackages.length > 0) {
+        try {
+          const uninst = spawnSync(
+            venvPython,
+            ["-m", "pip", "uninstall", "-y", ...installedFixupPackages],
+            {
+              stdio: ["ignore", "pipe", "pipe", installLockFd],
+              timeout: 30_000,
+              encoding: "utf-8",
+            },
+          );
+          if (uninst.error || uninst.status !== 0) {
+            venvRollbackFailed = true;
+            const detail =
+              uninst.stderr?.trim() ||
+              uninst.stdout?.trim() ||
+              uninst.error?.message ||
+              `pip uninstall exited with status ${String(uninst.status)}`;
+            logger.error(
+              {
+                err: uninst.error,
+                bundleId: descriptor.bundleId,
+                packages: installedFixupPackages,
+                detail,
+              },
+              "[feature-status] Failed to roll back fixup wheels after failed offline import",
+            );
+            rollbackErrors.push(`fixup wheel rollback failed (${detail})`);
+          }
+        } catch (uninstErr) {
+          venvRollbackFailed = true;
+          logger.error(
+            {
+              err: uninstErr,
+              bundleId: descriptor.bundleId,
+              packages: installedFixupPackages,
+            },
+            "[feature-status] Failed to spawn pip uninstall during offline import rollback",
+          );
+          rollbackErrors.push(
+            `fixup wheel rollback failed (${uninstErr instanceof Error ? uninstErr.message : String(uninstErr)})`,
+          );
+        }
+      }
+      for (let i = venvRollbackActions.length - 1; i >= 0; i--) {
+        try {
+          venvRollbackActions[i]();
+        } catch (rbErr) {
+          venvRollbackFailed = true;
+          logger.error(
+            { err: rbErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to roll back files after failed offline import",
+          );
+          rollbackErrors.push(rbErr instanceof Error ? rbErr.message : String(rbErr));
+        }
+      }
+      if (touchesVenv && !venvRollbackFailed) {
+        try {
+          clearVenvWriting();
+        } catch (clearErr) {
+          logger.error(
+            { err: clearErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to clear venv.writing after offline import rollback",
+          );
+          rollbackErrors.push(
+            `could not clear venv.writing (${clearErr instanceof Error ? clearErr.message : String(clearErr)})`,
+          );
+        }
+      }
+      for (let i = modelsRollbackActions.length - 1; i >= 0; i--) {
+        try {
+          modelsRollbackActions[i]();
+        } catch (rbErr) {
+          logger.error(
+            { err: rbErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to roll back files after failed offline import",
+          );
+          rollbackErrors.push(rbErr instanceof Error ? rbErr.message : String(rbErr));
+        }
+      }
+      if (rollbackErrors.length > 0 && err instanceof Error) {
+        err.message = `${err.message} (rollback warnings: ${rollbackErrors.join("; ")})`;
+      }
+      throw err;
     }
 
     markInstalled(descriptor.bundleId, descriptor.version, descriptor.models);
@@ -1813,31 +2080,295 @@ function resolveVenvSitePackages(venvPath: string): string {
   return sitePackagesDir;
 }
 
-/** Recursively move entries from src into dest, merging directories. */
-function moveTreeRecursive(src: string, dest: string): void {
-  const entries = readdirSync(src, { withFileTypes: true });
-  for (const entry of entries) {
-    const srcPath = join(src, entry.name);
-    const destPath = join(dest, entry.name);
-    if (entry.isDirectory()) {
-      mkdirSync(destPath, { recursive: true });
-      moveTreeRecursive(srcPath, destPath);
+function assertOptionalDirectory(path: string, entryName: string): boolean {
+  let info: ReturnType<typeof lstatSync>;
+  try {
+    info = lstatSync(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw err;
+  }
+  if (!info.isDirectory()) {
+    throw new ImportValidationError(`Archive entry "${entryName}" must be a directory.`);
+  }
+  return true;
+}
+
+function isDistributionInstalled(sitePackagesDir: string, pkgName: string): boolean {
+  const normalizedPkg = pkgName.toLowerCase().replace(/[-_.]+/g, "_");
+  try {
+    return readdirSync(sitePackagesDir).some((name) => {
+      if (!name.endsWith(".dist-info")) return false;
+      const distName = name.slice(0, -".dist-info".length).split("-")[0] ?? "";
+      return distName.toLowerCase().replace(/[-_.]+/g, "_") === normalizedPkg;
+    });
+  } catch {
+    return false;
+  }
+}
+
+function throwStorageOrValidationError(message: string, detail: string, error?: Error): never {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  if (
+    code === "ENOSPC" ||
+    code === "EDQUOT" ||
+    /no space left on device|disk quota exceeded|insufficient (disk|storage) space/i.test(detail)
+  ) {
+    throw Object.assign(new Error(message, error ? { cause: error } : undefined), {
+      code: code === "EDQUOT" ? "EDQUOT" : "ENOSPC",
+    });
+  }
+  throw new ImportValidationError(message);
+}
+
+/**
+ * Install one local wheel from the bundle's fixups/ directory into the shared
+ * venv without network access. Throws ImportValidationError naming the wheel
+ * and pip's stderr/stdout or timeout reason if installation fails (#1237).
+ */
+function installFixupWheel(
+  venvPython: string,
+  fixupsDir: string,
+  wheel: string,
+  pkgName: string,
+  installLockFd: number,
+): void {
+  if (!pkgName || !/^[A-Za-z0-9][A-Za-z0-9._]*$/.test(pkgName)) {
+    throw new ImportValidationError(
+      `Invalid fixup wheel filename "${wheel}": package name is malformed.`,
+    );
+  }
+  const result = spawnSync(
+    venvPython,
+    ["-m", "pip", "install", "--no-index", `--find-links=${fixupsDir}`, pkgName],
+    {
+      stdio: ["ignore", "pipe", "pipe", installLockFd],
+      timeout: 30_000,
+      encoding: "utf-8",
+    },
+  );
+  if (result.error || result.status !== 0) {
+    const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";
+    const detail =
+      result.stderr?.trim() ||
+      result.stdout?.trim() ||
+      result.error?.message ||
+      `pip exited with status ${String(result.status)}`;
+    const message = timedOut
+      ? `Timed out while installing fixup wheel "${wheel}" (${pkgName}): ${detail}`
+      : `Failed to install fixup wheel "${wheel}" (${pkgName}): ${detail}`;
+    throwStorageOrValidationError(message, detail, result.error);
+  }
+}
+
+/**
+ * Verify that each of the bundle's smokeImports entries can be imported by the
+ * venv's Python interpreter before marking the bundle installed (#1237).
+ */
+function verifyBundleSmokeImports(
+  venvPath: string,
+  bundleId: string,
+  smokeImports: string[],
+): void {
+  const venvPython = join(venvPath, "bin", "python3");
+  for (const mod of smokeImports) {
+    if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(mod)) {
+      throw new ImportValidationError(
+        `Bundle "${bundleId}" declares an invalid smokeImport module name "${mod}".`,
+      );
+    }
+    const result = spawnSync(venvPython, ["-B", "-s", "-c", `import ${mod}`], {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PYTHONDONTWRITEBYTECODE: "1",
+        PYTHONNOUSERSITE: "1",
+        HF_HUB_OFFLINE: "1",
+        TRANSFORMERS_OFFLINE: "1",
+      },
+    });
+    if (result.error || result.status !== 0) {
+      const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";
+      const detail =
+        result.stderr?.trim() ||
+        result.stdout?.trim() ||
+        result.error?.message ||
+        `python3 exited with status ${String(result.status)}`;
+      const message = timedOut
+        ? `Bundle "${bundleId}" timed out during post-import verification while importing "${mod}" (${detail}).`
+        : `Bundle "${bundleId}" failed post-import verification while importing "${mod}" (${detail}).`;
+      throwStorageOrValidationError(message, detail, result.error);
+    }
+  }
+}
+
+function moveEntryAcrossDevices(srcPath: string, destPath: string): void {
+  mkdirSync(dirname(destPath), { recursive: true });
+  try {
+    renameSync(srcPath, destPath);
+  } catch (err: unknown) {
+    // EXDEV: cross-device link (staging on different fs than dest).
+    // Staging is under AI_DIR so same-fs is expected, but fall back to
+    // copy+unlink for robustness (e.g. /tmp overlay mounts).
+    if ((err as NodeJS.ErrnoException).code === "EXDEV") {
+      copyFileSync(srcPath, destPath);
+      unlinkSync(srcPath);
     } else {
-      mkdirSync(dirname(destPath), { recursive: true });
+      throw err;
+    }
+  }
+}
+
+function lstatOrNull(path: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+function markVenvWriting(bundleId: string): void {
+  writeFileSync(
+    VENV_WRITING_MARKER,
+    JSON.stringify({ bundleId, startedAt: new Date().toISOString() }),
+    "utf-8",
+  );
+}
+
+function clearVenvWriting(): void {
+  try {
+    unlinkSync(VENV_WRITING_MARKER);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+}
+
+/**
+ * Recursively move entries from src into dest, merging directories while
+ * backing up any overwritten entries into backupDir so the caller can undo the
+ * move if a later verification step fails (#1237).
+ */
+function moveTreeWithRollback(src: string, dest: string, backupDir: string): () => void {
+  const placedFiles: string[] = [];
+  const backedUpEntries: Array<{ destPath: string; backupPath: string }> = [];
+  const createdDirs: string[] = [];
+
+  const ensureDirTracked = (dirPath: string): void => {
+    const missing: string[] = [];
+    let cur = resolve(dirPath);
+    while (true) {
+      const existing = lstatOrNull(cur);
+      if (existing) break;
+      missing.push(cur);
+      const parent = dirname(cur);
+      if (parent === cur) break;
+      cur = parent;
+    }
+    for (let i = missing.length - 1; i >= 0; i--) {
+      mkdirSync(missing[i]);
+      createdDirs.push(missing[i]);
+    }
+  };
+
+  const walk = (curSrc: string, curDest: string, curBackup: string): void => {
+    const entries = readdirSync(curSrc, { withFileTypes: true });
+    for (const entry of entries) {
+      const srcPath = join(curSrc, entry.name);
+      const destPath = join(curDest, entry.name);
+      const backupPath = join(curBackup, entry.name);
+      const existingDest = lstatOrNull(destPath);
+      if (entry.isDirectory()) {
+        if (existingDest && !existingDest.isDirectory()) {
+          mkdirSync(dirname(backupPath), { recursive: true });
+          renameSync(destPath, backupPath);
+          backedUpEntries.push({ destPath, backupPath });
+        }
+        ensureDirTracked(destPath);
+        walk(srcPath, destPath, backupPath);
+      } else {
+        ensureDirTracked(dirname(destPath));
+        if (existingDest) {
+          if (existingDest.isDirectory()) {
+            mkdirSync(dirname(backupPath), { recursive: true });
+            renameSync(destPath, backupPath);
+          } else {
+            moveEntryAcrossDevices(destPath, backupPath);
+          }
+          backedUpEntries.push({ destPath, backupPath });
+        }
+        moveEntryAcrossDevices(srcPath, destPath);
+        placedFiles.push(destPath);
+      }
+    }
+  };
+
+  const rollback = (): void => {
+    const errors: string[] = [];
+    for (let i = placedFiles.length - 1; i >= 0; i--) {
       try {
-        renameSync(srcPath, destPath);
-      } catch (err: unknown) {
-        // EXDEV: cross-device link (staging on different fs than MODELS_DIR).
-        // Staging is under AI_DIR so same-fs is expected, but fall back to
-        // copy+unlink for robustness (e.g. /tmp overlay mounts).
-        if ((err as NodeJS.ErrnoException).code === "EXDEV") {
-          copyFileSync(srcPath, destPath);
-          unlinkSync(srcPath);
-        } else {
-          throw err;
+        rmSync(placedFiles[i], { force: true });
+      } catch (err) {
+        errors.push(
+          `could not remove ${placedFiles[i]} (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+    }
+    for (let i = backedUpEntries.length - 1; i >= 0; i--) {
+      const { destPath, backupPath } = backedUpEntries[i];
+      try {
+        const backupStat = lstatOrNull(backupPath);
+        if (backupStat) {
+          if (backupStat.isDirectory()) {
+            rmSync(destPath, { recursive: true, force: true });
+            mkdirSync(dirname(destPath), { recursive: true });
+            renameSync(backupPath, destPath);
+          } else {
+            moveEntryAcrossDevices(backupPath, destPath);
+          }
+        }
+      } catch (err) {
+        errors.push(
+          `could not restore ${destPath} (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+    }
+    for (let i = createdDirs.length - 1; i >= 0; i--) {
+      try {
+        rmdirSync(createdDirs[i]);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") {
+          errors.push(
+            `could not remove directory ${createdDirs[i]} (${err instanceof Error ? err.message : String(err)})`,
+          );
         }
       }
     }
+    if (errors.length > 0) {
+      throw new Error(errors.join("; "));
+    }
+  };
+
+  try {
+    walk(src, dest, backupDir);
+    return rollback;
+  } catch (err) {
+    try {
+      rollback();
+    } catch (rbErr) {
+      logger.error(
+        { err: rbErr, src, dest },
+        "[feature-status] Rollback after partial tree move failed",
+      );
+      if (err instanceof Error) {
+        (err as Error & { rollbackError?: Error }).rollbackError =
+          rbErr instanceof Error ? rbErr : new Error(String(rbErr));
+      }
+    }
+    throw err;
   }
 }
 

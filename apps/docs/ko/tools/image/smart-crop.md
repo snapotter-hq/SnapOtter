@@ -1,6 +1,6 @@
 ---
 description: "Sharp와 AI 얼굴 인식을 사용해 이미지를 지능적으로 구성하는 피사체, 얼굴, 엔트로피 인식 자르기입니다."
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: e879f88e0fda
 ---

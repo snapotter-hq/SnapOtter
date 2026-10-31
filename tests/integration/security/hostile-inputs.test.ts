@@ -57,11 +57,11 @@ describe("hostile input matrix", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   async function postFile(toolId: string, fixtureName: string) {
     const content = readFileSync(join(fixtureDir.hostile, fixtureName));

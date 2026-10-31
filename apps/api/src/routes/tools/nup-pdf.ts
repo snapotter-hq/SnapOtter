@@ -36,7 +36,7 @@ export function registerNupPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_nup.pdf`);
       ctx.report(10, "Arranging pages");
-      await pdfcpuNup(inPath, settings.perSheet as NupValue, outPath);
+      await pdfcpuNup(inPath, settings.perSheet as NupValue, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

@@ -1,9 +1,14 @@
-import { ToolInputError } from "@snapotter/shared";
+import {
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_OUTPUT_PIXELS,
+  MAX_RESIZE_PERCENTAGE,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { ResizeOptions, Sharp } from "../types.js";
 
-export const MAX_RESIZE_PERCENTAGE = 1000;
-export const MAX_RESIZE_OUTPUT_DIMENSION = 16383;
-export const MAX_RESIZE_OUTPUT_PIXELS = 67_108_864;
+// The limits live in @snapotter/shared so the web panels can bound their inputs
+// with them; re-exported here because the API imports them from the engine.
+export { MAX_RESIZE_OUTPUT_DIMENSION, MAX_RESIZE_OUTPUT_PIXELS, MAX_RESIZE_PERCENTAGE };
 
 function outputDimensions(
   sourceWidth: number,

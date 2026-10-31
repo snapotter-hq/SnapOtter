@@ -9,6 +9,24 @@ import { resolveSoffice } from "./binaries.js";
 
 export interface ConvertOptions {
   timeoutMs?: number; // default 120s, spec 4.7 hard kill
+  signal?: AbortSignal;
+}
+
+function libreofficeSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `LibreOffice exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
 }
 
 /**
@@ -42,6 +60,9 @@ export async function convertDocument(
   target: string,
   opts: ConvertOptions = {},
 ): Promise<string> {
+  if (opts.signal?.aborted) {
+    throw new Error("Canceled");
+  }
   const bin = resolveSoffice();
   if (!bin) throw new Error("soffice binary not found (set SOFFICE_PATH or install LibreOffice)");
   const timeoutMs = opts.timeoutMs ?? 120_000;
@@ -64,9 +85,18 @@ export async function convertDocument(
       const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
       let err = "";
       let settled = false;
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        opts.signal?.removeEventListener("abort", onAbort);
+        child.kill("SIGKILL");
+        reject(new Error("Canceled"));
+      };
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
+        opts.signal?.removeEventListener("abort", onAbort);
         child.kill("SIGKILL");
         reject(new Error(`LibreOffice timed out after ${Math.round(timeoutMs / 1000)}s`));
       }, timeoutMs);
@@ -77,15 +107,25 @@ export async function convertDocument(
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        opts.signal?.removeEventListener("abort", onAbort);
         reject(e);
       });
       child.on("close", (code, signal) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        if (code === 0) resolvePromise();
-        else reject(new Error(`LibreOffice exited ${code ?? signal}: ${err.slice(-1000)}`));
+        opts.signal?.removeEventListener("abort", onAbort);
+        if (code === 0) {
+          resolvePromise();
+          return;
+        }
+        if (code === null || code === 126 || code === 127) {
+          reject(libreofficeSpawnFailure(bin, code, signal, err));
+          return;
+        }
+        reject(new Error(`LibreOffice exited ${code}: ${err.slice(-1000)}`));
       });
+      opts.signal?.addEventListener("abort", onAbort, { once: true });
     });
     const expected = `${basename(inputPath, extname(inputPath))}.${ext}`;
     const produced = (await readdir(outDir)).find((f) => f === expected);

@@ -1,8 +1,8 @@
 ---
 description: "Настройка локальной среды разработки, команды, соглашения по коду и как добавить новый инструмент в SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 41a3694a72a5
+i18n_output_hash: 8091800358a0
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ const MyToolSettings = lazy(() =>
 ### 4. Тесты {#_4-tests}
 
 Добавьте атрибут `data-testid` к кнопке действия (как показано выше), чтобы e2e-тесты могли надёжно нацеливаться на неё.
+
+### 5. Визуальные эталоны {#_5-visual-baselines}
+
+Скриншот-тесты не допускают ни одного изменённого пикселя, а новый инструмент меняет то, что они отрисовывают: число инструментов на главной странице и в каталоге, новую карточку в сетке и собственную страницу, на которой `tests/e2e/gui-visual-tools.spec.ts` падает с "snapshot doesn't exist", пока у неё нет эталона. Обновите эталоны в том же PR, что и инструмент, чтобы ночное визуальное сравнение оставалось зелёным.
+
+CI генерирует эталоны как для `linux` (`ubuntu-latest`), так и для `darwin` (`macos-latest`). Отправьте свою ветку и запустите на ней обновление:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Каждая задача ОС загружает артефакт `visual-baselines-linux-<run-id>-<attempt>` или `visual-baselines-darwin-<run-id>-<attempt>` и открывает черновой PR (`chore/visual-baselines-linux-...` и `chore/visual-baselines-darwin-...`) в `main` с перегенерированными PNG. В описании каждого чернового PR есть команда `gh run download`; выполните обе из корня вашего checkout, чтобы положить PNG в свою ветку, закоммитьте их и закройте черновые PR. Используйте `update_snapshots=all`, если `changed` пропускает скриншот, который должен был измениться. Для запуска нужен доступ на запись в репозиторий, поэтому если ваша ветка в форке, напишите в PR, что нужно обновить эталоны, и мейнтейнер запустит обновление.
+
+На Mac вы также можете обновить эталоны `darwin` локально для более быстрой отладки:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+В любом случае откройте каждый новый или изменённый PNG перед коммитом: эталон фиксирует то, что отрисовалось, сломанное или нет.
+
+Релизу ничего из этого не нужно. Версия приложения замаскирована на каждом скриншоте, где она видна, поэтому её повышение не меняет ни одного эталона.
 
 ## Сборки Docker {#docker-builds}
 

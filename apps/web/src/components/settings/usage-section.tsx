@@ -29,12 +29,12 @@ export function UsageSection() {
       const result = await apiGet<UsageData>(`/v1/admin/usage?days=${days}`);
       setData(result);
     } catch {
-      setError("Failed to load usage data.");
+      setError(t.settings.usage.loadFailed);
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [days]);
+  }, [days, t.settings.usage.loadFailed]);
 
   useEffect(() => {
     fetchData();

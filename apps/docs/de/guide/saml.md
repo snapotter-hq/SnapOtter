@@ -1,8 +1,9 @@
 ---
 description: "Richten Sie SAML-2.0-Single-Sign-On für SnapOtter ein. Schritt-für-Schritt-Anleitungen für Okta, Azure AD / Entra ID, Google Workspace und andere SAML-Identitätsanbieter."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 29cf0d9ed663
+i18n_output_hash: be53f052e71e
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Wenn Sie verlangen möchten, dass sich alle Benutzer per SAML (oder OIDC) anmeld
 2. Schalten Sie unter **Admin-Einstellungen > Sicherheit** die **SSO-Erzwingung** ein.
 3. Legen Sie einen **Break-Glass-Benutzernamen** fest: Dies ist das eine lokale Konto, das sich bei Notfallzugriff weiterhin mit einem Passwort anmelden kann, falls der IdP nicht erreichbar ist.
 
-Wenn die SSO-Erzwingung aktiv ist, gibt jeder lokale Anmeldeversuch (außer für den Break-Glass-Benutzer) einen 403-Fehler mit der Meldung "Local password login is disabled. Please use SSO." zurück.
+Wenn die SSO-Erzwingung aktiv ist, kann sich nur der Break-Glass-Benutzer mit einem lokalen Passwort anmelden. Jeder andere lokale Anmeldeversuch wird mit demselben 401 "Invalid credentials" abgelehnt, das auch ein falsches Passwort erhält, selbst wenn das Passwort korrekt ist, und zählt zur Anmeldedrosselung.
 
 ::: tip 
 Konfigurieren Sie immer einen Break-Glass-Benutzernamen, bevor Sie die SSO-Erzwingung aktivieren. Andernfalls könnten Sie aus SnapOtter ausgesperrt werden, falls Ihr IdP ausfällt.

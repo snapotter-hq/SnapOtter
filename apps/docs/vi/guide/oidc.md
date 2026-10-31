@@ -1,6 +1,6 @@
 ---
 description: "Thiết lập Đăng nhập một lần với OpenID Connect. Hướng dẫn từng bước cho Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta và các nhà cung cấp OIDC khác."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: 9a052c1bf9c8
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 Đừng đặt `NODE_TLS_REJECT_UNAUTHORIZED=0`. Việc này tắt toàn bộ xác minh TLS và là một rủi ro bảo mật.
 :::
+
+## Issuer dùng http không mã hóa {#plain-http-issuers}
+
+SnapOtter chỉ chấp nhận URL issuer `http://` khi `EXTERNAL_URL` cũng là http không mã hóa, phù hợp với môi trường thử nghiệm cục bộ hoặc trong mạng LAN. Khi đó, quá trình discovery, việc trao đổi mã đăng nhập và các token đều đi qua mạng mà không được mã hóa, nên SnapOtter ghi một cảnh báo khi khởi động, nêu rõ host của issuer. Với `EXTERNAL_URL` là `https://`, issuer dùng http sẽ bị từ chối khi đăng nhập và cảnh báo khởi động sẽ nêu điều đó. Trong cả hai trường hợp, cách khắc phục là phục vụ nhà cung cấp danh tính của bạn qua https.
 
 ## Khắc phục sự cố {#troubleshooting}
 

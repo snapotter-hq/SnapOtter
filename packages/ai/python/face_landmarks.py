@@ -65,9 +65,10 @@ def detect_with_solutions(img_array, max_faces=1):
         refine_landmarks=True,
         min_detection_confidence=0.5,
     )
-
-    results = face_mesh.process(img_array)
-    face_mesh.close()
+    try:
+        results = face_mesh.process(img_array)
+    finally:
+        face_mesh.close()
 
     if not results.multi_face_landmarks:
         return None
@@ -117,9 +118,11 @@ def detect_with_tasks(img_path, max_faces=1):
     )
 
     landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(options)
-    mp_image = mp.Image.create_from_file(img_path)
-    result = landmarker.detect(mp_image)
-    landmarker.close()
+    try:
+        mp_image = mp.Image.create_from_file(img_path)
+        result = landmarker.detect(mp_image)
+    finally:
+        landmarker.close()
 
     if not result.face_landmarks:
         return None
@@ -139,7 +142,14 @@ def main():
 
     try:
         emit_progress(10, "Loading image")
-        from PIL import Image
+        try:
+            from PIL import Image
+        except ImportError:
+            print(json.dumps({
+                "success": False,
+                "error": "Pillow is not installed. Install with: pip install Pillow",
+            }))
+            sys.exit(1)
 
         img = Image.open(input_path).convert("RGB")
         iw, ih = img.size
@@ -150,13 +160,16 @@ def main():
 
             emit_progress(20, "Initializing face mesh")
 
-            landmarks_list = None
+            img_array = np.array(img)
+            emit_progress(30, "Detecting face landmarks")
             try:
-                img_array = np.array(img)
-                emit_progress(30, "Detecting face landmarks")
-                landmarks_list = detect_with_solutions(img_array, max_faces)
+                mp_face_mesh = mp.solutions.face_mesh
             except AttributeError:
-                emit_progress(30, "Detecting face landmarks")
+                mp_face_mesh = None
+
+            if mp_face_mesh is not None:
+                landmarks_list = detect_with_solutions(img_array, max_faces)
+            else:
                 landmarks_list = detect_with_tasks(input_path, max_faces)
 
             if landmarks_list is None:
@@ -180,21 +193,21 @@ def main():
                 "imageHeight": ih,
             }))
 
-        except ImportError:
+        except ImportError as e:
+            msg = str(e).strip() or type(e).__name__
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Install with: pip install mediapipe numpy"
+            )
             print(json.dumps({
                 "success": False,
-                "error": "Face landmark detection requires MediaPipe. Install with: pip install mediapipe",
+                "error": f"Missing dependency: {msg}. {hint}",
             }))
             sys.exit(1)
 
-    except ImportError:
-        print(json.dumps({
-            "success": False,
-            "error": "Pillow is not installed. Install with: pip install Pillow",
-        }))
-        sys.exit(1)
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

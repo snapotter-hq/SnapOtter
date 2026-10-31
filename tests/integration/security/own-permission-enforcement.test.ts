@@ -140,7 +140,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 15_000);
+});
 
 describe("files:own is enforced on the file library routes", () => {
   it("denies listing to a role without files:own", async () => {

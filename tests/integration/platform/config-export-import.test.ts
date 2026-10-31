@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { raceInserts } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const ADMIN_PERMISSIONS = [
@@ -24,65 +25,67 @@ const ADMIN_PERMISSIONS = [
   "security:manage",
 ];
 
-let testApp: TestApp;
-let adminToken: string;
+describe("config export and import without enterprise license", () => {
+  let testApp: TestApp;
+  let adminToken: string;
 
-beforeAll(async () => {
-  testApp = await buildTestApp();
-  adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
-
-afterAll(async () => {
-  await testApp.cleanup();
-}, 10_000);
-
-describe("config export without enterprise license", () => {
-  it("returns 403 without enterprise license", async () => {
-    const res = await testApp.app.inject({
-      method: "GET",
-      url: "/api/v1/enterprise/config/export",
-      headers: { authorization: `Bearer ${adminToken}` },
-    });
-    expect(res.statusCode).toBe(403);
-    const body = JSON.parse(res.body);
-    expect(body.error).toContain("enterprise");
+  beforeAll(async () => {
+    testApp = await buildTestApp();
+    adminToken = await loginAsAdmin(testApp.app);
   });
 
-  it("returns 401 without authentication", async () => {
-    const res = await testApp.app.inject({
-      method: "GET",
-      url: "/api/v1/enterprise/config/export",
-    });
-    expect(res.statusCode).toBe(401);
-  });
-});
-
-describe("config import without enterprise license", () => {
-  it("returns 403 without enterprise license", async () => {
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/v1/enterprise/config/import",
-      headers: { authorization: `Bearer ${adminToken}` },
-      payload: {
-        dryRun: false,
-        config: { configSchemaVersion: 1 },
-      },
-    });
-    expect(res.statusCode).toBe(403);
-    const body = JSON.parse(res.body);
-    expect(body.error).toContain("enterprise");
+  afterAll(async () => {
+    await testApp.cleanup();
   });
 
-  it("returns 401 without authentication", async () => {
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/v1/enterprise/config/import",
-      payload: {
-        dryRun: false,
-        config: { configSchemaVersion: 1 },
-      },
+  describe("config export without enterprise license", () => {
+    it("returns 403 without enterprise license", async () => {
+      const res = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(res.statusCode).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("enterprise");
     });
-    expect(res.statusCode).toBe(401);
+
+    it("returns 401 without authentication", async () => {
+      const res = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+      });
+      expect(res.statusCode).toBe(401);
+    });
+  });
+
+  describe("config import without enterprise license", () => {
+    it("returns 403 without enterprise license", async () => {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          dryRun: false,
+          config: { configSchemaVersion: 1 },
+        },
+      });
+      expect(res.statusCode).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("enterprise");
+    });
+
+    it("returns 401 without authentication", async () => {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: { configSchemaVersion: 1 },
+        },
+      });
+      expect(res.statusCode).toBe(401);
+    });
   });
 });
 
@@ -97,12 +100,25 @@ describe("config export with enterprise license", () => {
     const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
     licensedApp = await buildTestApp();
     licensedToken = await loginAsAdmin(licensedApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
+
+  it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
+    const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const queue = getQueue("system");
+    try {
+      await vi.waitFor(async () => expect(await queue.getWorkersCount()).toBe(1), {
+        timeout: 1_000,
+        interval: 25,
+      });
+    } finally {
+      await closeQueues();
+    }
+  });
 
   it("returns 200 with config object", async () => {
     const res = await licensedApp.app.inject({
@@ -206,6 +222,66 @@ describe("config export with enterprise license", () => {
             .update(schema.settings)
             .set({ value: original })
             .where(eq(schema.settings.key, key));
+        }
+      }
+    }
+  });
+
+  it("normalizes non-canonical password-rule values and falls back to passwordRequireNumber on export (#2036)", async () => {
+    const keys = [
+      "passwordRequireUppercase",
+      "passwordRequireLowercase",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+      "passwordRequireSpecial",
+    ];
+    const originalRows = await db.select().from(schema.settings);
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+
+    try {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "passwordRequireDigit"));
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireUppercase", value: "TRUE" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "TRUE" } });
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireLowercase", value: "0" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "0" } });
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireNumber", value: "false" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "false" } });
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireSpecial", value: "1" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "1" } });
+
+      const res = await licensedApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+        headers: { authorization: `Bearer ${licensedToken}` },
+      });
+      const body = JSON.parse(res.body);
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(body.settings.passwordRequireUppercase).toBe("true");
+      expect(body.settings.passwordRequireLowercase).toBe("true");
+      expect(body.settings.passwordRequireDigit).toBe("false");
+      expect(body.settings.passwordRequireNumber).toBeUndefined();
+      expect(body.settings.passwordRequireSpecial).toBe("false");
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .insert(schema.settings)
+            .values({ key, value: original })
+            .onConflictDoUpdate({ target: schema.settings.key, set: { value: original } });
         }
       }
     }
@@ -339,12 +415,12 @@ describe("config import with enterprise license", () => {
     const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
     licensedApp = await buildTestApp();
     licensedToken = await loginAsAdmin(licensedApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   it("returns 403 for non-admin users", async () => {
     await licensedApp.app.inject({
@@ -994,6 +1070,95 @@ describe("config import with enterprise license", () => {
     }
   });
 
+  it("normalizes non-canonical password-rule values on import and deletes stale passwordRequireNumber rows (#2036)", async () => {
+    const keys = [
+      "passwordRequireUppercase",
+      "passwordRequireLowercase",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+      "passwordRequireSpecial",
+    ];
+    const originalRows = await db.select().from(schema.settings);
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+
+    await db.delete(schema.settings).where(eq(schema.settings.key, "passwordRequireDigit"));
+    await db
+      .insert(schema.settings)
+      .values({ key: "passwordRequireNumber", value: "true" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+
+    try {
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireUppercase: "TRUE",
+              passwordRequireLowercase: "false",
+              passwordRequireNumber: "0",
+              passwordRequireSpecial: "1",
+            },
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(JSON.parse(dryRunRes.body).details.settings).toContainEqual({
+        key: "passwordRequireDigit",
+        action: "update",
+      });
+
+      const res = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireUppercase: "TRUE",
+              passwordRequireLowercase: "false",
+              passwordRequireNumber: "0",
+              passwordRequireSpecial: "1",
+            },
+          },
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body)).toMatchObject({
+        applied: true,
+        changes: { settings: 4, roles: 0, teams: 0 },
+      });
+
+      const rows = await db.select().from(schema.settings);
+      const map = new Map(rows.map((r) => [r.key, r.value]));
+      expect(map.get("passwordRequireUppercase")).toBe("true");
+      expect(map.get("passwordRequireLowercase")).toBe("false");
+      expect(map.get("passwordRequireDigit")).toBe("true");
+      expect(map.get("passwordRequireSpecial")).toBe("false");
+      expect(map.has("passwordRequireNumber")).toBe(false);
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .insert(schema.settings)
+            .values({ key, value: original })
+            .onConflictDoUpdate({ target: schema.settings.key, set: { value: original } });
+        }
+      }
+    }
+  });
+
   it("applies settings, roles, and teams, both updating existing rows and inserting new ones", async () => {
     const suffix = Date.now().toString(36);
     const updateSettingKey = "defaultToolView";
@@ -1120,6 +1285,392 @@ describe("config import with enterprise license", () => {
       await db.delete(schema.settings).where(eq(schema.settings.key, insertSettingKey));
     }
   });
+
+  it("upserts concurrent first-time setting imports in deterministic key order without a primary-key collision and preserves dry-run setting order (#3014)", async () => {
+    const keys = [
+      "defaultLocale",
+      "defaultToolView",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+    ];
+    const originalRows = await db.select().from(schema.settings);
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+
+    try {
+      for (const key of keys) {
+        await db.delete(schema.settings).where(eq(schema.settings.key, key));
+      }
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireNumber", value: "true" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireDigit: "false",
+              defaultToolView: "fullscreen",
+              defaultLocale: "de",
+            },
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(JSON.parse(dryRunRes.body).details.settings).toEqual([
+        { key: "passwordRequireDigit", action: "update" },
+        { key: "defaultToolView", action: "create" },
+        { key: "defaultLocale", action: "create" },
+      ]);
+
+      const [first, second] = await Promise.all([
+        licensedApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/config/import",
+          headers: { authorization: `Bearer ${licensedToken}` },
+          payload: {
+            dryRun: false,
+            config: {
+              configSchemaVersion: 1,
+              settings: {
+                passwordRequireDigit: "false",
+                defaultToolView: "fullscreen",
+                defaultLocale: "de",
+              },
+            },
+          },
+        }),
+        licensedApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/config/import",
+          headers: { authorization: `Bearer ${licensedToken}` },
+          payload: {
+            dryRun: false,
+            config: {
+              configSchemaVersion: 1,
+              settings: {
+                defaultLocale: "fr",
+                defaultToolView: "sidebar",
+                passwordRequireNumber: "false",
+              },
+            },
+          },
+        }),
+      ]);
+
+      expect(first.statusCode, first.body).toBe(200);
+      expect(second.statusCode, second.body).toBe(200);
+
+      const rows = await db.select().from(schema.settings);
+      const map = new Map(rows.map((r) => [r.key, r.value]));
+      expect(["de", "fr"]).toContain(map.get("defaultLocale"));
+      expect(["fullscreen", "sidebar"]).toContain(map.get("defaultToolView"));
+      expect(map.get("passwordRequireDigit")).toBe("false");
+      expect(map.has("passwordRequireNumber")).toBe(false);
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .insert(schema.settings)
+            .values({ key, value: original })
+            .onConflictDoUpdate({ target: schema.settings.key, set: { value: original } });
+        }
+      }
+    }
+  });
+
+  it("refreshes the analytics gate immediately when importing analyticsEnabled (#3021)", async () => {
+    const { __resetGateForTests, analyticsEnabled, refreshAnalyticsGate } = await import(
+      "../../../apps/api/src/lib/analytics-gate.js"
+    );
+    const [originalRow] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "analyticsEnabled"));
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+
+    try {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
+      __resetGateForTests();
+      await refreshAnalyticsGate();
+      expect(analyticsEnabled()).toBe(true);
+
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "false" },
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(analyticsEnabled()).toBe(true);
+
+      const disableRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "false" },
+          },
+        },
+      });
+      expect(disableRes.statusCode, disableRes.body).toBe(200);
+      expect(analyticsEnabled()).toBe(false);
+
+      const analyticsConfigDisabled = JSON.parse(
+        (await licensedApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
+      );
+      expect(analyticsConfigDisabled.enabled).toBe(false);
+
+      const enableRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "true" },
+          },
+        },
+      });
+      expect(enableRes.statusCode, enableRes.body).toBe(200);
+      expect(analyticsEnabled()).toBe(true);
+    } finally {
+      if (originalRow === undefined) {
+        await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
+      } else {
+        await db
+          .insert(schema.settings)
+          .values({ key: "analyticsEnabled", value: originalRow.value })
+          .onConflictDoUpdate({
+            target: schema.settings.key,
+            set: { value: originalRow.value },
+          });
+      }
+      delete process.env.ANALYTICS_BAKED_OVERRIDE;
+      __resetGateForTests();
+    }
+  });
+
+  it("upserts concurrent first-time role and case-insensitive team imports in deterministic name order without a unique-constraint collision and preserves dry-run order (#3022)", async () => {
+    const suffix = Date.now().toString(36);
+    const roleA = `cfg-role-a-${suffix}`;
+    const roleZ = `cfg-role-z-${suffix}`;
+    const teamAlphaUpper = `Cfg Team Alpha ${suffix}`;
+    const teamAlphaLower = teamAlphaUpper.toLowerCase();
+    const teamZetaUpper = `Cfg Team Zeta ${suffix}`;
+    const teamZetaLower = teamZetaUpper.toLowerCase();
+    const seededRoleId = randomUUID();
+    const seededTeamId = randomUUID();
+
+    try {
+      await db.insert(schema.roles).values({
+        id: seededRoleId,
+        name: roleZ,
+        description: "seeded-z",
+        permissions: ["settings:read"],
+        toolPermissions: null,
+        isBuiltin: false,
+      });
+      await db.insert(schema.teams).values({
+        id: seededTeamId,
+        name: teamZetaUpper,
+        storageQuota: 50,
+        retentionHours: 12,
+      });
+
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            roles: [
+              { name: roleZ, permissions: ["audit:read"] },
+              { name: roleA, permissions: ["files:own"] },
+            ],
+            teams: [
+              { name: teamZetaLower, storageQuota: 100 },
+              { name: teamAlphaUpper, storageQuota: 200 },
+            ],
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(JSON.parse(dryRunRes.body).details.roles).toEqual([
+        { name: roleZ, action: "update" },
+        { name: roleA, action: "create" },
+      ]);
+      expect(JSON.parse(dryRunRes.body).details.teams).toEqual([
+        { name: teamZetaLower, action: "update" },
+        { name: teamAlphaUpper, action: "create" },
+      ]);
+
+      const [firstRolesRes, secondRolesRes] = await raceInserts("roles", 2, () =>
+        Promise.all([
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                roles: [
+                  {
+                    name: roleZ,
+                    description: "first-z",
+                    permissions: ["audit:read"],
+                    toolPermissions: { mode: "category", allowed: ["image"] },
+                  },
+                  {
+                    name: roleA,
+                    description: "first-a",
+                    permissions: ["files:own"],
+                  },
+                ],
+              },
+            },
+          }),
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                roles: [
+                  {
+                    name: roleA,
+                    description: "second-a",
+                    permissions: ["settings:read"],
+                  },
+                  {
+                    name: roleZ,
+                    description: "second-z",
+                    permissions: ["audit:read", "settings:read"],
+                    toolPermissions: null,
+                  },
+                ],
+              },
+            },
+          }),
+        ]),
+      );
+
+      expect(firstRolesRes.statusCode, firstRolesRes.body).toBe(200);
+      expect(secondRolesRes.statusCode, secondRolesRes.body).toBe(200);
+
+      const [roleARow] = await db.select().from(schema.roles).where(eq(schema.roles.name, roleA));
+      const [roleZRow] = await db.select().from(schema.roles).where(eq(schema.roles.name, roleZ));
+      expect(roleZRow?.id).toBe(seededRoleId);
+      expect(["first-a", "second-a"]).toContain(roleARow?.description);
+      if (roleARow?.description === "first-a") {
+        expect(roleARow.permissions).toEqual(["files:own"]);
+        expect(roleZRow?.description).toBe("first-z");
+        expect(roleZRow?.permissions).toEqual(["audit:read"]);
+        expect(roleZRow?.toolPermissions).toEqual({ mode: "category", allowed: ["image"] });
+      } else {
+        expect(roleARow?.permissions).toEqual(["settings:read"]);
+        expect(roleZRow?.description).toBe("second-z");
+        expect(roleZRow?.permissions).toEqual(["audit:read", "settings:read"]);
+        expect(roleZRow?.toolPermissions).toBeNull();
+      }
+
+      const [firstTeamsRes, secondTeamsRes] = await raceInserts("teams", 2, () =>
+        Promise.all([
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                teams: [
+                  { name: teamZetaUpper, storageQuota: 300, retentionHours: 24 },
+                  { name: teamAlphaUpper, storageQuota: 100, retentionHours: 12 },
+                ],
+              },
+            },
+          }),
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                teams: [
+                  { name: teamAlphaLower, storageQuota: 200, retentionHours: 36 },
+                  { name: teamZetaLower, storageQuota: 400, retentionHours: 48 },
+                ],
+              },
+            },
+          }),
+        ]),
+      );
+
+      expect(firstTeamsRes.statusCode, firstTeamsRes.body).toBe(200);
+      expect(secondTeamsRes.statusCode, secondTeamsRes.body).toBe(200);
+
+      const alphaRows = await db
+        .select()
+        .from(schema.teams)
+        .where(sql`lower(${schema.teams.name}) = ${teamAlphaLower}`);
+      const zetaRows = await db
+        .select()
+        .from(schema.teams)
+        .where(sql`lower(${schema.teams.name}) = ${teamZetaLower}`);
+      expect(alphaRows).toHaveLength(1);
+      expect(zetaRows).toHaveLength(1);
+      expect(zetaRows[0]?.id).toBe(seededTeamId);
+      expect(zetaRows[0]?.name).toBe(teamZetaUpper);
+      // Whichever contender inserted teamAlpha first kept its name casing, and
+      // the second contender's ON CONFLICT DO UPDATE overwrote the quotas on
+      // both teamAlpha and teamZeta.
+      if (alphaRows[0]?.name === teamAlphaUpper) {
+        expect(alphaRows[0]?.storageQuota).toBe(200);
+        expect(alphaRows[0]?.retentionHours).toBe(36);
+        expect(zetaRows[0]?.storageQuota).toBe(400);
+        expect(zetaRows[0]?.retentionHours).toBe(48);
+      } else {
+        expect(alphaRows[0]?.name).toBe(teamAlphaLower);
+        expect(alphaRows[0]?.storageQuota).toBe(100);
+        expect(alphaRows[0]?.retentionHours).toBe(12);
+        expect(zetaRows[0]?.storageQuota).toBe(300);
+        expect(zetaRows[0]?.retentionHours).toBe(24);
+      }
+    } finally {
+      await db.delete(schema.roles).where(eq(schema.roles.name, roleA));
+      await db.delete(schema.roles).where(eq(schema.roles.name, roleZ));
+      await db.delete(schema.teams).where(sql`lower(${schema.teams.name}) = ${teamAlphaLower}`);
+      await db.delete(schema.teams).where(sql`lower(${schema.teams.name}) = ${teamZetaLower}`);
+    }
+  });
 });
 
 describe("config round-trip", () => {
@@ -1133,12 +1684,12 @@ describe("config round-trip", () => {
     const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
     licensedApp = await buildTestApp();
     licensedToken = await loginAsAdmin(licensedApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   it("export then dry-run import classifies existing records as updates", async () => {
     const exportRes = await licensedApp.app.inject({

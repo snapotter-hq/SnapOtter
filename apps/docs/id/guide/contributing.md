@@ -1,6 +1,6 @@
 ---
 description: "Cara berkontribusi ke SnapOtter. Laporan bug, permintaan fitur, pull request, dan persyaratan CLA."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: 33567fdbf8ef
 i18n_hash_version: 2

@@ -5,9 +5,267 @@ import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { resolveFfmpeg } from "@snapotter/media-engine";
+import { hasServerErrorStatus, isSafeMessageError, SafeError } from "@snapotter/shared";
 import sharp from "sharp";
+import { isBinarySpawnFailure } from "./binary-overrides.js";
+import { isRawExtension } from "./file-validation.js";
+import { logger } from "./logger.js";
+import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * A decoder CLI is not installed or could not be started. That is the
+ * operator's container, not the caller's file, so it carries the same 503
+ * ENGINE_UNAVAILABLE the media and document input handlers use instead of the
+ * plain Error a corrupt upload produces (#795). As a SafeError with a status,
+ * the global error handler logs it, reports it, and shows its message. The
+ * decoders also use it when the server runs out of memory mid-decode, for the
+ * same reason (#1577, #1751).
+ */
+export class DecoderUnavailableError extends SafeError {
+  constructor(message: string, cause?: unknown) {
+    super(message, { kind: "operational", code: "ENGINE_UNAVAILABLE", statusCode: 503, cause });
+    this.name = "DecoderUnavailableError";
+  }
+}
+
+/**
+ * The server ran out of memory mid-decode. Still ENGINE_UNAVAILABLE, so every
+ * route that answers a missing decoder with a 503 answers this one the same
+ * way (#1577), but named apart so reporting doesn't fold an intermittent
+ * fault into a permanent one (#1628).
+ */
+export class DecoderOutOfMemoryError extends DecoderUnavailableError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = "DecoderOutOfMemoryError";
+  }
+}
+
+/**
+ * A missing decoder is the server's fault, not the upload's. Routes that
+ * answer a decode failure with a 4xx check this first and rethrow, so the
+ * global handler answers 503 and logs and reports it (#795, #1428). Marker
+ * check rather than instanceof, per the SafeError convention in
+ * @snapotter/shared.
+ */
+export function isDecoderUnavailable(err: unknown): boolean {
+  return isSafeMessageError(err) && err.code === "ENGINE_UNAVAILABLE";
+}
+
+const fallbackReported = new Set<string>();
+export const __test_clearFallbackReported = () => fallbackReported.clear();
+
+export function noteDecoderFallback(
+  err: unknown,
+  format: string,
+  log: { warn: (obj: object, msg: string) => void },
+): void {
+  if (isDecoderUnavailable(err)) {
+    const key = `${format}-fallback`;
+    if (!fallbackReported.has(key) || process.env.NODE_ENV === "test") {
+      (log ?? logger).warn({ err, format }, "CLI decoder unavailable, taking Sharp fallback");
+      fallbackReported.add(key);
+    }
+  }
+}
+
+/**
+ * The error for a probe loop that found no working decoder. Only "every
+ * candidate failed to spawn" proves the decoder is absent; a `--version` that
+ * timed out on a loaded host or exited non-zero means it is there but unwell,
+ * so that stays a plain Error rather than telling the operator to install
+ * something they already have.
+ */
+export function noDecoderFound(message: string, probeFailures: unknown[]): Error {
+  for (const err of probeFailures) {
+    const outOfMemory = asDecoderOutOfMemory(err);
+    if (outOfMemory !== err) return outOfMemory as Error;
+  }
+  const notInstalled = probeFailures.every(cannotStart);
+  if (notInstalled) return new DecoderUnavailableError(message, probeFailures.at(-1));
+  return new Error(message, { cause: probeFailures.find((err) => !cannotStart(err)) });
+}
+
+/**
+ * A decoder binary that exists on PATH at probe time can still fail to start
+ * (removed since, not executable, wrong architecture), and a decoder with no
+ * probe (ffmpeg for EXR) is only ever found by spawning it. Both reject with a
+ * spawn syscall; everything else is the decoder's verdict on the file.
+ */
+export function asDecoderUnavailable(err: unknown): unknown {
+  if (err instanceof DecoderUnavailableError) return err;
+  if (cannotStart(err)) {
+    return new DecoderUnavailableError(
+      "An image decoder on this server could not be started. Check that the container's decoder binaries are installed and executable.",
+      err,
+    );
+  }
+  if (lacksFormatSupport(err)) {
+    return new DecoderUnavailableError(
+      blockedBySecurityPolicy(err)
+        ? "An image decoder on this server has no support for this format because ImageMagick's security policy (policy.xml) blocks it."
+        : "An image decoder on this server has no support for this format. Check the container's decoder packages (ImageMagick delegates, libheif plugins).",
+      err,
+    );
+  }
+  return err;
+}
+
+/**
+ * The binary never ran: a failed spawn, or exit 127, which from a shell-less
+ * execFile means its shared libraries wouldn't load (#1429).
+ */
+function cannotStart(err: unknown): boolean {
+  return isBinarySpawnFailure(err) || (err as { code?: unknown } | null)?.code === 127;
+}
+
+const POLICY_BLOCKED = /not allowed by the security policy/i;
+
+/**
+ * Ghostscript's own fatal banner on a bad PostScript/EPS input, or an
+ * ImageMagick 7 `FailedToExecuteCommand` line carrying exit status 1 (`256`
+ * from waitpid, or `1`) rather than `/bin/sh`'s exit 127 (`32512`).
+ * ImageMagick 7 follows every non-zero Ghostscript exit with
+ * `FailedToExecuteCommand `'gs' ...'`, so `FailedToExecuteCommand` naming `gs`
+ * only means Ghostscript was missing when Ghostscript itself never ran (#1461).
+ */
+const GHOSTSCRIPT_VERDICT =
+  /Ghostscript.*Unrecoverable error|FailedToExecuteCommand\s+[`"']*gs\b[^\r\n]*\((?:256|1)\)/i;
+
+/**
+ * The decoder ran but can't handle the format at all, so it never judged the
+ * file: ImageMagick without the delegate, blocked by policy.xml, or missing
+ * Ghostscript (#1461), or libheif without its HEVC/AV1 plugin (newer and
+ * 1.15-1.17 wording, heif-enc missing an encoder plugin (#3884), and a build
+ * without plugin loading). Only stderr is read: the command line in the error
+ * message carries a temp path derived from the upload (#1429).
+ */
+const MISSING_SUPPORT =
+  /no decode delegate for this image format|delegate library support not built-in|not allowed by the security policy|FailedToExecuteCommand\s+[`"']*gs\b|No decoding plugin installed|No decoder for this image format|No [A-Z0-9]+ encoder available|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
+
+function blockedBySecurityPolicy(err: unknown): boolean {
+  const stderr = (err as { stderr?: unknown } | null)?.stderr;
+  return stderr !== undefined && POLICY_BLOCKED.test(String(stderr));
+}
+
+function hasGhostscriptVerdict(err: unknown): boolean {
+  const stderr = (err as { stderr?: unknown } | null)?.stderr;
+  return stderr !== undefined && GHOSTSCRIPT_VERDICT.test(String(stderr));
+}
+
+export function lacksFormatSupport(err: unknown): boolean {
+  const stderr = (err as { stderr?: unknown } | null)?.stderr;
+  if (stderr === undefined || hasGhostscriptVerdict(err)) return false;
+  return MISSING_SUPPORT.test(String(stderr));
+}
+
+/**
+ * The server running out of memory mid-decode, which says nothing about the
+ * upload. It gets the same 503 ENGINE_UNAVAILABLE as a missing decoder, so
+ * every caller that already lets isDecoderUnavailable through answers it that
+ * way instead of a 422 blaming the file (#1577). The message doesn't promise a
+ * retry will work: with no pixel limits passed, a very large image can exhaust
+ * memory every time.
+ *
+ * - V8 unable to allocate a buffer for the decoded output.
+ * - SIGKILL, the kernel OOM killer's signal. execFile's own timeout and abort
+ *   send SIGTERM, which is often a hostile file, so that stays out.
+ * - libheif's "Allocating <n> bytes failed", which only fires after the size
+ *   passed libheif's security limits (#1629). Security limits share the
+ *   "Memory allocation error" heading but are the file's fault, so the match
+ *   is on "failed".
+ * - A decoder thread that couldn't start: an abort on std::system_error
+ *   "Resource temporarily unavailable" (EAGAIN from pthread_create), or
+ *   libgomp's "Thread creation failed" (#1751). In a container that's as
+ *   often a pids or thread limit as memory, so it gets its own message.
+ *
+ * The libheif and thread shapes are stderr from the shipped image under
+ * `ulimit -v`: heif-dec, and ImageMagick decoding a HEIC through libheif.
+ * Not matched: an uncaught std::bad_alloc and ImageMagick's "memory
+ * allocation failed", since nothing bounds those allocations and a crafted
+ * file can raise them on a healthy host, and ImageMagick's "cache resources
+ * exhausted", which our own -limit flags produce. For child processes, stderr
+ * is read rather than the message, which adds the command line; for in-process
+ * Sharp errors (no stderr or cmd), the message itself carries libheif's error
+ * (#3837).
+ */
+const LIBHEIF_ALLOCATION_FAILED = /\bAllocating \d+ bytes failed\b/;
+const THREAD_START_ABORTED =
+  /instance of 'std::system_error'\s+what\(\):\s+Resource temporarily unavailable/;
+const OPENMP_THREAD_FAILED = /libgomp: Thread creation failed: Resource temporarily unavailable/;
+
+export function asDecoderOutOfMemory(err: unknown): unknown {
+  if (err instanceof DecoderOutOfMemoryError) return err;
+  const { cmd, signal, stderr } = (err ?? {}) as {
+    cmd?: unknown;
+    signal?: unknown;
+    stderr?: unknown;
+  };
+  const decoderOutput =
+    typeof stderr === "string" ? stderr : Buffer.isBuffer(stderr) ? stderr.toString("utf8") : "";
+  if (
+    (signal === "SIGABRT" && THREAD_START_ABORTED.test(decoderOutput)) ||
+    OPENMP_THREAD_FAILED.test(decoderOutput)
+  ) {
+    return new DecoderOutOfMemoryError(
+      "The image decoder couldn't start its decoding threads. The server hit a memory, thread or process limit.",
+      err,
+    );
+  }
+  const inProcessMessage =
+    stderr === undefined &&
+    cmd === undefined &&
+    err instanceof Error &&
+    !err.message.startsWith("Command failed:")
+      ? err.message
+      : "";
+  const outOfMemory =
+    (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) ||
+    signal === "SIGKILL" ||
+    LIBHEIF_ALLOCATION_FAILED.test(decoderOutput) ||
+    LIBHEIF_ALLOCATION_FAILED.test(inProcessMessage);
+  if (!outOfMemory) return err;
+  return new DecoderOutOfMemoryError(
+    "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
+    err,
+  );
+}
+
+/** Killed or timed out, or exited 0 without writing its output: no verdict either way. */
+function inconclusive(err: unknown): boolean {
+  const e = err as { killed?: unknown; signal?: unknown; code?: unknown; syscall?: unknown } | null;
+  if (e?.killed === true || (typeof e?.signal === "string" && e.signal !== "")) return true;
+  return e?.code === "ENOENT" && e.syscall === "open";
+}
+
+function unavailable(err: unknown): boolean {
+  return err instanceof DecoderUnavailableError || cannotStart(err) || lacksFormatSupport(err);
+}
+
+/**
+ * The error a failed fallback chain surfaces: the first decoder that actually
+ * judged the file, so a real rejection keeps its 422 even when a later
+ * fallback can't read the format at all. With no verdict, a decoder that ran
+ * out of memory, then the first that was unavailable (the chain's own
+ * decoder, named in the cause), which the caller turns into a 503 (#1429).
+ * Out of memory goes first among those so a killed decoder followed by one
+ * without the delegate reads as the server's memory, not a missing package,
+ * and is reported as the intermittent fault it is (#1751). A real verdict
+ * still wins over it: the other decoder judged the file.
+ */
+function chainFailure(failures: unknown[]): unknown {
+  const verdict = failures.find(
+    (err) => !unavailable(err) && !inconclusive(err) && !outOfMemory(err),
+  );
+  return verdict ?? failures.find(outOfMemory) ?? failures.find(unavailable) ?? failures[0];
+}
+
+function outOfMemory(err: unknown): boolean {
+  return err instanceof DecoderOutOfMemoryError || asDecoderOutOfMemory(err) !== err;
+}
 
 export interface DecodeSafetyOptions {
   /** Maximum decoded width * height accepted by this operation. */
@@ -57,10 +315,8 @@ async function assertDecodedWithinLimit(
       }).metadata();
       assertDimensionsWithinLimit(metadata.width, metadata.height, options);
     } catch (error) {
-      if (isImageSafetyError(error)) throw error;
-      throw new Error("Decoded image exceeds the configured image safety limits", {
-        cause: error,
-      });
+      options.signal?.throwIfAborted();
+      throw asDecoderOutOfMemory(error);
     }
   }
   options.signal?.throwIfAborted();
@@ -194,33 +450,78 @@ async function preflightEncodedDimensions(
   // the hard-to-parse formats here (camera RAW, EXR, JXL and JPEG 2000). It is
   // part of every supported container image alongside these decoders.
   const id = randomUUID();
-  const safeExt = (ext || format || "img").replace(/[^a-z0-9]/gi, "") || "img";
+  const cleanExt = ext?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const candidateExt =
+    format === "raw"
+      ? cleanExt && isRawExtension(cleanExt)
+        ? cleanExt
+        : format
+      : cleanExt || format;
+  const safeExt = (candidateExt || "img").replace(/[^a-z0-9]/gi, "") || "img";
   const inputPath = join(tmpdir(), `dimensions-${id}.${safeExt}`);
+  let exiftoolFailure: unknown;
   try {
-    await writeTempExclusive(inputPath, buffer);
-    const { stdout } = await execFileAsync(
-      "exiftool",
-      ["-fast2", "-s3", "-ImageWidth", "-ImageHeight", inputPath],
-      {
-        timeout: 15_000,
-        maxBuffer: 64 * 1024,
-        signal: options.signal,
-      },
-    );
-    const values = String(stdout).trim().split(/\s+/).map(Number);
-    if (values.length >= 2 && values.every(Number.isFinite)) {
-      assertDimensionsWithinLimit(values[0], values[1], options);
-      return;
+    try {
+      await writeTempExclusive(inputPath, buffer);
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      const classified = normalizeOperationalWriteError(asDecoderOutOfMemory(error));
+      if (
+        classified instanceof DecoderOutOfMemoryError ||
+        (hasServerErrorStatus(classified) && !isDecoderUnavailable(classified))
+      ) {
+        throw classified;
+      }
+      throw new DecoderUnavailableError(
+        "The server could not write a temporary file to check image dimensions.",
+        isSafeMessageError(classified) && classified.cause !== undefined
+          ? classified.cause
+          : classified,
+      );
     }
-  } catch (error) {
-    options.signal?.throwIfAborted();
-    if (isImageSafetyError(error)) throw error;
+    try {
+      const { stdout } = await execFileAsync(
+        "exiftool",
+        ["-fast2", "-s3", "-ImageWidth", "-ImageHeight", inputPath],
+        {
+          timeout: 15_000,
+          maxBuffer: 64 * 1024,
+          signal: options.signal,
+        },
+      );
+      const values = String(stdout).trim().split(/\s+/).map(Number);
+      if (values.length >= 2 && values.every((v) => Number.isFinite(v) && v > 0)) {
+        assertDimensionsWithinLimit(values[0], values[1], options);
+        return;
+      }
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      if (isImageSafetyError(error)) throw error;
+      // Without exiftool the safety limits can't be checked at all, whatever
+      // the file: that's the host, not the upload (#1428).
+      if ((error as NodeJS.ErrnoException).code === "ENOENT" && isBinarySpawnFailure(error)) {
+        throw new DecoderUnavailableError(
+          "No exiftool found. Install exiftool (libimage-exiftool-perl) to check image dimensions safely.",
+          error,
+        );
+      }
+      const unavailable = asDecoderUnavailable(asDecoderOutOfMemory(error));
+      if (unavailable !== error) throw unavailable;
+      if (inconclusive(error)) {
+        throw new DecoderUnavailableError(
+          "Exiftool timed out or was terminated before it could check image dimensions.",
+          error,
+        );
+      }
+      exiftoolFailure = error;
+    }
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
   }
 
   throw new Error(
     `Cannot safely decode ${format.toUpperCase()}: encoded dimensions are unavailable for the configured image safety limits`,
+    exiftoolFailure !== undefined ? { cause: exiftoolFailure } : undefined,
   );
 }
 
@@ -229,11 +530,21 @@ async function preflightEncodedDimensions(
  * Prevents symlink / race-condition attacks on predictable temp paths.
  */
 async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<void> {
-  const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
   try {
-    await fh.writeFile(buffer);
-  } finally {
-    await fh.close();
+    const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+    let fileWriteErr: unknown;
+    try {
+      await fh.writeFile(buffer);
+    } catch (err) {
+      fileWriteErr = err;
+      throw err;
+    } finally {
+      await fh.close().catch((closeErr: unknown) => {
+        if (fileWriteErr === undefined) throw closeErr;
+      });
+    }
+  } catch (err) {
+    throw normalizeOperationalWriteError(asDecoderOutOfMemory(err));
   }
 }
 
@@ -282,6 +593,21 @@ export async function decodeToSharpCompat(
 ): Promise<Buffer> {
   options.signal?.throwIfAborted();
   await preflightEncodedDimensions(buffer, format, ext, options);
+  let decoded: Buffer;
+  try {
+    decoded = await decodeByFormat(buffer, format, ext, options);
+  } catch (err) {
+    throw normalizeOperationalWriteError(asDecoderUnavailable(asDecoderOutOfMemory(err)));
+  }
+  return assertDecodedWithinLimit(decoded, options);
+}
+
+async function decodeByFormat(
+  buffer: Buffer,
+  format: string,
+  ext: string | undefined,
+  options: DecodeSafetyOptions,
+): Promise<Buffer> {
   let decoded: Buffer;
   switch (format) {
     case "raw":
@@ -337,7 +663,7 @@ export async function decodeToSharpCompat(
     default:
       decoded = buffer;
   }
-  return assertDecodedWithinLimit(decoded, options);
+  return decoded;
 }
 
 /**
@@ -363,8 +689,14 @@ export async function decodeAnyFormat(
       cmd,
       magickArgs(cmd, [inputPath, "-colorspace", "sRGB", `png:${outputPath}`], options),
       commandOptions(options, 120_000),
-    );
-    return await assertDecodedWithinLimit(await readFile(outputPath), options);
+    ).catch((err: unknown) => {
+      throw asDecoderUnavailable(asDecoderOutOfMemory(err));
+    });
+    // V8 unable to allocate ImageMagick's output is the server's memory too.
+    const decoded = await readFile(outputPath).catch((err: unknown) => {
+      throw asDecoderOutOfMemory(err);
+    });
+    return await assertDecodedWithinLimit(decoded, options);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
     await rm(outputPath, { force: true }).catch(() => {});
@@ -378,17 +710,23 @@ let cachedMagickCmd: string | null = null;
 async function findMagickCmd(options: DecodeSafetyOptions = {}): Promise<string> {
   options.signal?.throwIfAborted();
   if (cachedMagickCmd) return cachedMagickCmd;
+  const probeFailures: unknown[] = [];
   for (const cmd of ["magick", "convert"]) {
     try {
       await execFileAsync(cmd, ["--version"], commandOptions(options, 5_000));
       cachedMagickCmd = cmd;
       return cmd;
-    } catch {
+    } catch (err) {
       options.signal?.throwIfAborted();
-      // try next
+      const outOfMemory = asDecoderOutOfMemory(err);
+      if (outOfMemory !== err) throw outOfMemory;
+      probeFailures.push(err);
     }
   }
-  throw new Error("No ImageMagick found. Install imagemagick (provides convert/magick).");
+  throw noDecoderFound(
+    "No ImageMagick found. Install imagemagick (provides convert/magick).",
+    probeFailures,
+  );
 }
 
 /** Build resource limits with syntax shared by ImageMagick 6 and 7. */
@@ -481,7 +819,12 @@ async function decodeRaw(
   const id = randomUUID();
   // Use the original extension so LibRaw / ExifTool / ImageMagick can identify
   // the RAW variant.
-  const suffix = ext ? `.${ext.replace(/^\./, "")}` : ".dng";
+  // The extension comes from the upload's filename; keep it alphanumeric so it
+  // can't smuggle text into the decoders' command lines and stderr (#1429), and
+  // only accept recognised RAW extensions so a bare filename token never steers
+  // ImageMagick into a missing-delegate 503 (#3246).
+  const safeExt = ext?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const suffix = safeExt && isRawExtension(safeExt) ? `.${safeExt}` : ".dng";
   const inputPath = join(tmpdir(), `raw-in-${id}${suffix}`);
   const outputPath = join(tmpdir(), `raw-out-${id}.png`);
   // dcraw_emu APPENDS the output extension to the full input path
@@ -492,6 +835,7 @@ async function decodeRaw(
     await writeTempExclusive(inputPath, buffer);
 
     // Attempt 1: dcraw_emu (direct LibRaw decode to TIFF) -- full resolution.
+    let dcrawFailure: unknown;
     try {
       await execFileAsync(
         "dcraw_emu",
@@ -505,8 +849,11 @@ async function decodeRaw(
       }
     } catch (error) {
       options.signal?.throwIfAborted();
-      if (error instanceof Error && /pixel safety limit/i.test(error.message)) throw error;
+      if (isImageSafetyError(error)) throw error;
+      const outOfMemory = asDecoderOutOfMemory(error);
+      if (outOfMemory !== error) throw outOfMemory;
       // dcraw_emu not available or unsupported format -- fall through
+      dcrawFailure = error;
     }
 
     // Attempt 2: ExifTool full-size embedded JPEG (JpgFromRaw). Many formats
@@ -524,8 +871,10 @@ async function decodeRaw(
       if (jpegBuf && jpegBuf.length > 1000 && jpegBuf[0] === 0xff && jpegBuf[1] === 0xd8) {
         return jpegBuf;
       }
-    } catch {
+    } catch (error) {
       options.signal?.throwIfAborted();
+      const outOfMemory = asDecoderOutOfMemory(error);
+      if (outOfMemory !== error) throw outOfMemory;
       // ExifTool not available or no embedded JPEG -- fall through
     }
 
@@ -547,23 +896,34 @@ async function decodeRaw(
       ) {
         return previewBuf;
       }
-    } catch {
+    } catch (error) {
       options.signal?.throwIfAborted();
+      const outOfMemory = asDecoderOutOfMemory(error);
+      if (outOfMemory !== error) throw outOfMemory;
       // fall through
     }
 
     // Attempt 4: ImageMagick (last resort -- its RAW delegate may be the
     // deprecated ufraw-batch, which fails on modern formats).
-    const cmd = await findMagickCmd(options);
-    await execFileAsync(
-      cmd,
-      magickArgs(
+    try {
+      const cmd = await findMagickCmd(options);
+      await execFileAsync(
         cmd,
-        [inputPath, "-colorspace", "sRGB", "-auto-orient", `png:${outputPath}`],
-        options,
-      ),
-      commandOptions(options, 120_000),
-    );
+        magickArgs(
+          cmd,
+          [inputPath, "-colorspace", "sRGB", "-auto-orient", `png:${outputPath}`],
+          options,
+        ),
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      // dcraw_emu is the image's RAW decoder. ImageMagick's RAW path hands off
+      // to ufraw or darktable, which fail with messages no pattern can tell
+      // from a bad file, so a dcraw_emu that can't start decides it (#1429).
+      if (cannotStart(dcrawFailure) && !outOfMemory(error)) throw dcrawFailure;
+      throw chainFailure([dcrawFailure, error].filter((err) => err !== undefined));
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -634,6 +994,7 @@ async function decodeExr(buffer: Buffer, options: DecodeSafetyOptions): Promise<
     await writeTempExclusive(inputPath, buffer);
 
     // ImageMagick needs the OpenEXR delegate which is often missing on macOS
+    let magickFailure: unknown;
     try {
       const cmd = await findMagickCmd(options);
       await execFileAsync(
@@ -645,17 +1006,26 @@ async function decodeExr(buffer: Buffer, options: DecodeSafetyOptions): Promise<
         ),
         commandOptions(options, 120_000),
       );
-      return await readFile(outputPath);
-    } catch {
+      return await readFile(outputPath).catch((err: unknown) => {
+        throw asDecoderOutOfMemory(err);
+      });
+    } catch (error) {
       options.signal?.throwIfAborted();
+      if (error instanceof DecoderOutOfMemoryError) throw error;
       // ImageMagick failed, try ffmpeg
+      magickFailure = error;
     }
 
-    await execFileAsync(
-      "ffmpeg",
-      ["-y", "-i", inputPath, "-pix_fmt", "rgba", "-update", "1", outputPath],
-      commandOptions(options, 120_000),
-    );
+    try {
+      await execFileAsync(
+        resolveFfmpeg() ?? "ffmpeg",
+        ["-y", "-i", inputPath, "-pix_fmt", "rgba", "-update", "1", outputPath],
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw chainFailure([magickFailure, error]);
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -720,20 +1090,30 @@ async function decodeJxl(buffer: Buffer, options: DecodeSafetyOptions): Promise<
 
     // Try djxl first (from libjxl-tools) — works even when ImageMagick
     // lacks a JXL delegate (common on Ubuntu stock packages).
+    let djxlFailure: unknown;
     try {
       await execFileAsync("djxl", [inputPath, outputPath], commandOptions(options, 120_000));
-      return await readFile(outputPath);
-    } catch {
+      return await readFile(outputPath).catch((err: unknown) => {
+        throw asDecoderOutOfMemory(err);
+      });
+    } catch (error) {
       options.signal?.throwIfAborted();
+      if (error instanceof DecoderOutOfMemoryError) throw error;
       // djxl not available, fall back to ImageMagick
+      djxlFailure = error;
     }
 
-    const cmd = await findMagickCmd(options);
-    await execFileAsync(
-      cmd,
-      magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
-      commandOptions(options, 120_000),
-    );
+    try {
+      const cmd = await findMagickCmd(options);
+      await execFileAsync(
+        cmd,
+        magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw chainFailure([djxlFailure, error]);
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -749,22 +1129,32 @@ async function decodeJp2(buffer: Buffer, options: DecodeSafetyOptions): Promise<
   const outputPath = join(tmpdir(), `jp2-out-${id}.png`);
   try {
     await writeTempExclusive(inputPath, buffer);
+    let opjFailure: unknown;
     try {
       await execFileAsync("opj_decompress", ["-i", inputPath, "-o", outputPath], {
         timeout: 60_000,
         signal: options.signal,
       });
-      return await readFile(outputPath);
-    } catch {
+      return await readFile(outputPath).catch((err: unknown) => {
+        throw asDecoderOutOfMemory(err);
+      });
+    } catch (error) {
       options.signal?.throwIfAborted();
+      if (error instanceof DecoderOutOfMemoryError) throw error;
       // opj_decompress not available, fall back to ImageMagick
+      opjFailure = error;
     }
-    const cmd = await findMagickCmd(options);
-    await execFileAsync(
-      cmd,
-      magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
-      commandOptions(options, 120_000),
-    );
+    try {
+      const cmd = await findMagickCmd(options);
+      await execFileAsync(
+        cmd,
+        magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw chainFailure([opjFailure, error]);
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -788,24 +1178,46 @@ async function decodeEps(buffer: Buffer, options: DecodeSafetyOptions): Promise<
   const outputPath = join(tmpdir(), `eps-out-${id}.png`);
   try {
     await writeTempExclusive(inputPath, buffer);
-    await execFileAsync(
-      cmd,
-      magickArgs(
+    try {
+      await execFileAsync(
         cmd,
-        [
-          "-density",
-          "300",
-          "-define",
-          "gs:MaxBitmap=500000000",
-          inputPath,
-          "-colorspace",
-          "sRGB",
-          `png:${outputPath}`,
-        ],
-        options,
-      ),
-      commandOptions(options, 30_000),
-    );
+        magickArgs(
+          cmd,
+          [
+            "-density",
+            "300",
+            "-define",
+            "gs:MaxBitmap=500000000",
+            inputPath,
+            "-colorspace",
+            "sRGB",
+            `png:${outputPath}`,
+          ],
+          options,
+        ),
+        commandOptions(options, 30_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      if (
+        !unavailable(error) &&
+        !outOfMemory(error) &&
+        !inconclusive(error) &&
+        !hasGhostscriptVerdict(error)
+      ) {
+        // ImageMagick 6 without Ghostscript exits 1 with `delegate failed` or
+        // `no images defined`, the same wording a corrupt EPS produces (#1461).
+        try {
+          await execFileAsync("gs", ["--version"], commandOptions(options, 5_000));
+        } catch (gsErr) {
+          options.signal?.throwIfAborted();
+          const outOfMemory = asDecoderOutOfMemory(gsErr);
+          if (outOfMemory !== gsErr) throw outOfMemory;
+          if (cannotStart(gsErr)) throw gsErr;
+        }
+      }
+      throw error;
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -909,8 +1321,11 @@ async function decodeNetpbm(
   options.signal?.throwIfAborted();
   try {
     return await sharp(buffer, { limitInputPixels: options.maxPixels }).png().toBuffer();
-  } catch {
+  } catch (error) {
     options.signal?.throwIfAborted();
+    if (isImageSafetyError(error)) throw error;
+    const outOfMemory = asDecoderOutOfMemory(error);
+    if (outOfMemory !== error) throw outOfMemory;
     const cmd = await findMagickCmd(options);
     const id = randomUUID();
     const ext = format === "pgm" ? "pgm" : format === "pbm" ? "pbm" : "ppm";

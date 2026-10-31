@@ -133,7 +133,7 @@ afterAll(async () => {
   await scratch?.end();
   await asAdmin((admin) => admin.query(`DROP DATABASE IF EXISTS ${scratchName}`));
   if (preIndexFolder) rmSync(preIndexFolder, { recursive: true, force: true });
-}, 30_000);
+});
 
 describe("users identity index migration (issue #969)", () => {
   it("detaches every twin but the oldest, then builds the partial unique index", async () => {

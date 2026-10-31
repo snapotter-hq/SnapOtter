@@ -1,0 +1,916 @@
+// @vitest-environment jsdom
+import "@testing-library/jest-dom/vitest";
+import { en } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
+
+vi.mock("@/lib/image-preview", () => ({
+  needsServerPreview: vi.fn(() => false),
+  fetchDecodedPreview: vi.fn(() => Promise.resolve(null)),
+  revokePreviewUrl: vi.fn(),
+}));
+
+import { I18nProvider } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
+import { AutomatePage } from "@/pages/automate-page";
+import { useFileStore } from "@/stores/file-store";
+import { usePipelineStore } from "@/stores/pipeline-store";
+
+/**
+ * Importing a pipeline file reads the file, saves it, then refreshes the
+ * saved list. Each of those can fail on its own, and the message has to name
+ * the one that did (#1956): a dropped connection on the save is not a bad
+ * file, and a list refresh that fails after a good save must say so instead
+ * of leaving the new pipeline invisible until a reload.
+ */
+
+const PIPELINE = {
+  format: "snapotter-pipeline",
+  version: 1,
+  name: "Imported",
+  steps: [{ toolId: "resize", settings: {} }],
+};
+
+const SAVED = {
+  id: "p1",
+  name: "Imported",
+  description: null,
+  steps: PIPELINE.steps,
+  createdAt: "2026-10-02T00:00:00.000Z",
+};
+
+type Answer = Response | Promise<Response> | "network-down";
+
+interface Server {
+  /** Answers the first pipeline/list request (the page's own load on mount). */
+  initialList?: () => Answer;
+  /** Answers every pipeline/list request after the first. */
+  list: () => Answer;
+  save: () => Answer;
+  delete?: () => Answer;
+}
+
+let server: Server;
+
+async function respond(answer: Answer): Promise<Response> {
+  if (answer === "network-down") throw new TypeError("Failed to fetch");
+  return answer;
+}
+
+const storageMap = new Map<string, string>();
+
+beforeEach(() => {
+  storageMap.clear();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => storageMap.get(key) ?? null,
+    setItem: (key: string, value: string) => storageMap.set(key, value),
+    removeItem: (key: string) => storageMap.delete(key),
+    clear: () => storageMap.clear(),
+    key: () => null,
+    get length() {
+      return storageMap.size;
+    },
+  });
+  useFileStore.getState().reset();
+  usePipelineStore.getState().reset();
+  let listCalls = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/pipeline/list")) {
+        listCalls += 1;
+        // The first list call is the page's own load on mount; later ones are
+        // refreshes after import, save, or delete.
+        if (listCalls === 1) {
+          if (server?.initialList) return respond(server.initialList());
+          return new Response(
+            JSON.stringify({ pipelines: usePipelineStore.getState().savedPipelines }),
+          );
+        }
+        return respond(server.list());
+      }
+      if (url.includes("/pipeline/save")) return respond(server.save());
+      if (init?.method === "DELETE" && url.includes("/pipeline/")) {
+        return respond(
+          server.delete ? server.delete() : new Response(JSON.stringify({ ok: true })),
+        );
+      }
+      if (url.includes("/config/auth")) {
+        return new Response(JSON.stringify({ authEnabled: false }), { status: 200 });
+      }
+      return new Response("{}", { status: 404 });
+    }),
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  useFileStore.getState().reset();
+  usePipelineStore.getState().reset();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+/** Lands on /automate and picks a file with the given contents to import. */
+async function importFile(contents: string): Promise<void> {
+  const created: HTMLInputElement[] = [];
+  const realCreate = document.createElement.bind(document);
+  vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+    const el = realCreate(tag);
+    if (tag === "input") {
+      created.push(el as HTMLInputElement);
+      (el as HTMLInputElement).click = () => {};
+    }
+    return el;
+  }) as typeof document.createElement);
+
+  render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/automate"]}>
+        <AutomatePage />
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  fireEvent.click(await screen.findByText(en.automate.importButton));
+  const input = created.at(-1);
+  if (!input) throw new Error("import created no file input");
+  const file = new File([contents], "p.snapotter.json", { type: "application/json" });
+  Object.defineProperty(input, "files", { value: [file] });
+  input.onchange?.({ target: input } as unknown as Event);
+}
+
+const savedOk = () => new Response(JSON.stringify({ id: "p1" }), { status: 201 });
+const listOk = () => new Response(JSON.stringify({ pipelines: [SAVED] }));
+
+describe("automate pipeline import (#1956)", () => {
+  it("calls a save that never reached the server a network error, not a bad file", async () => {
+    server = { save: () => "network-down", list: listOk };
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+    expect(screen.queryByText(en.automate.couldNotRead)).not.toBeInTheDocument();
+  });
+
+  it("says the list didn't refresh when the save worked but the list answered non-2xx", async () => {
+    server = { save: savedOk, list: () => new Response("busy", { status: 503 }) };
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.importListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(en.automate.couldNotRead)).not.toBeInTheDocument();
+  });
+
+  it("says the list didn't refresh when the list request itself never got through", async () => {
+    server = { save: savedOk, list: () => "network-down" };
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.importListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+  });
+
+  it("says the list didn't refresh when the list answer is not JSON", async () => {
+    server = { save: savedOk, list: () => new Response("<html>proxy</html>") };
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.importListRefreshFailed)).toBeInTheDocument(),
+    );
+  });
+
+  it("keeps the shown list, and says it's stale, when an OK list answer carries no list", async () => {
+    usePipelineStore.setState({ savedPipelines: [{ ...SAVED, id: "old", name: "Old" }] });
+    server = { save: savedOk, list: () => new Response("{}") };
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.importListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["old"]);
+  });
+
+  it("shows the imported pipeline and no error when save and refresh both work", async () => {
+    server = { save: savedOk, list: listOk };
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+    expect(screen.queryByText(en.automate.importListRefreshFailed)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.couldNotRead)).not.toBeInTheDocument();
+  });
+
+  it("still calls a file that isn't JSON unreadable", async () => {
+    server = { save: savedOk, list: listOk };
+    await importFile("{ not json");
+    await waitFor(() => expect(screen.getByText(en.automate.couldNotRead)).toBeInTheDocument());
+  });
+
+  it.each([
+    ["null", "null"],
+    ["a number", "42"],
+    ["an array", "[]"],
+  ])("calls a JSON file holding %s an invalid pipeline file", async (_label, contents) => {
+    server = { save: savedOk, list: listOk };
+    await importFile(contents);
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.invalidPipelineFile)).toBeInTheDocument(),
+    );
+  });
+
+  it.each([
+    ["a newer version", { version: 2 }, en.automate.newerVersion],
+    ["a string version", { version: "1" }, en.automate.newerVersion],
+    ["no name", { name: undefined }, en.automate.missingName],
+    ["an empty name", { name: "" }, en.automate.missingName],
+    ["no steps", { steps: [] }, en.automate.noSteps],
+    ["steps that aren't a list", { steps: {} }, en.automate.noSteps],
+  ])("rejects a pipeline with %s before saving it", async (_label, patch, expected) => {
+    server = { save: savedOk, list: listOk };
+    await importFile(JSON.stringify({ ...PIPELINE, ...patch }));
+    await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument());
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urls.some((url) => url.includes("/pipeline/save"))).toBe(false);
+  });
+});
+
+/** Lands on /automate with one step configured, opens the Save form, fills a name, and clicks Save. */
+async function savePipeline(name = "My Pipeline"): Promise<void> {
+  usePipelineStore.getState().loadSteps([{ toolId: "resize", settings: {} }]);
+  render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/automate"]}>
+        <AutomatePage />
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  fireEvent.click(await screen.findByText(en.automate.saveButton));
+  fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+    target: { value: name },
+  });
+  fireEvent.click(screen.getByText(en.common.save));
+}
+
+describe("automate pipeline save (#1987)", () => {
+  it("shows a network error and keeps the save form open when the save request rejects", async () => {
+    server = { save: () => "network-down", list: listOk };
+    await savePipeline("Evening Batch");
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+    expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("Evening Batch");
+    expect(screen.getByText(en.common.save)).toBeEnabled();
+  });
+
+  it("shows the server's reason and keeps the save form open when the save answers non-2xx", async () => {
+    server = {
+      save: () =>
+        new Response(JSON.stringify({ error: "Step 1: Tool not found" }), { status: 400 }),
+      list: listOk,
+    };
+    await savePipeline("Evening Batch");
+    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+    expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("Evening Batch");
+  });
+
+  it("falls back to saveFailed when a non-2xx save answer carries no JSON reason", async () => {
+    server = {
+      save: () => new Response("<html>502</html>", { status: 502 }),
+      list: listOk,
+    };
+    await savePipeline("Evening Batch");
+    await waitFor(() => expect(screen.getByText(en.automate.saveFailed)).toBeInTheDocument());
+    expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("Evening Batch");
+  });
+
+  it("closes the save form and says the list didn't refresh when the save worked but the list answered non-2xx", async () => {
+    server = { save: savedOk, list: () => new Response("busy", { status: 503 }) };
+    await savePipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.saveListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(en.automate.saveButton));
+    expect(screen.queryByText(en.automate.saveListRefreshFailed)).not.toBeInTheDocument();
+  });
+
+  it("closes the save form and says the list didn't refresh when the list request rejects", async () => {
+    server = { save: savedOk, list: () => "network-down" };
+    await savePipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.saveListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("closes the save form and says the list didn't refresh when the list answer is not JSON", async () => {
+    server = { save: savedOk, list: () => new Response("<html>proxy</html>") };
+    await savePipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.saveListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("keeps the shown list, closes the save form, and says the list is stale when an OK list answer carries no pipelines array", async () => {
+    usePipelineStore.setState({ savedPipelines: [{ ...SAVED, id: "old", name: "Old" }] });
+    server = { save: savedOk, list: () => new Response("{}") };
+    await savePipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.saveListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["old"]);
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+  });
+
+  it("clears the save error when the user edits the name, edits the description, dismisses the alert, or cancels the form", async () => {
+    server = { save: () => "network-down", list: listOk };
+    await savePipeline("Evening Batch");
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+      target: { value: "Evening Batch 2" },
+    });
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(en.common.save));
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText(en.automate.descriptionPlaceholder), {
+      target: { value: "Notes" },
+    });
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(en.common.save));
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText(en.common.close));
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(en.common.save));
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText(en.common.cancel));
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+  });
+
+  it("saves the pipeline, updates the list, and closes the form when both requests succeed", async () => {
+    server = { save: savedOk, list: listOk };
+    await savePipeline("Imported");
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.saveListRefreshFailed)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+  });
+
+  it("closes the save form and resets its inputs and error when the last step is removed (#2962)", async () => {
+    server = { save: () => "network-down", list: listOk };
+    usePipelineStore.getState().loadSteps([
+      { toolId: "resize", settings: {} },
+      { toolId: "compress", settings: {} },
+    ]);
+    renderAutomate();
+
+    fireEvent.click(await screen.findByText(en.automate.saveButton));
+    fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+      target: { value: "Draft Pipeline" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(en.automate.descriptionPlaceholder), {
+      target: { value: "Draft notes" },
+    });
+    fireEvent.click(screen.getByText(en.common.save));
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    // Removing one step while another remains keeps the form open and preserves draft inputs.
+    fireEvent.click(screen.getAllByTitle(en.automate.removeStep)[0]);
+    expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("Draft Pipeline");
+    expect(screen.getByPlaceholderText(en.automate.descriptionPlaceholder)).toHaveValue(
+      "Draft notes",
+    );
+
+    // Removing the last step closes the form and clears the draft inputs and error.
+    fireEvent.click(screen.getByTitle(en.automate.removeStep));
+
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.common.save)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.saveButton)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText(/resize/i)[0]);
+    const saveTrigger = await screen.findByText(en.automate.saveButton);
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+
+    fireEvent.click(saveTrigger);
+    expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("");
+    expect(screen.getByPlaceholderText(en.automate.descriptionPlaceholder)).toHaveValue("");
+  });
+});
+
+/** Lands on /automate with four saved pipelines, expands the list, and clicks Delete on the first. */
+async function deleteFirstSavedPipeline(): Promise<void> {
+  const four = [1, 2, 3, 4].map((n) => ({
+    ...SAVED,
+    id: `p${n}`,
+    name: `Pipeline ${n}`,
+  }));
+  usePipelineStore.setState({ savedPipelines: four });
+  render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/automate"]}>
+        <AutomatePage />
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  fireEvent.click(await screen.findByText(format(en.automate.moreCount, { count: 1 })));
+  const deleteButtons = await screen.findAllByTitle(en.automate.deletePipeline);
+  fireEvent.click(deleteButtons[0]);
+}
+
+describe("automate pipeline delete (#1987)", () => {
+  it("shows a network error and skips refreshing the list when the delete request rejects", async () => {
+    server = { save: savedOk, list: listOk, delete: () => "network-down" };
+    await deleteFirstSavedPipeline();
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+    const listCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(([input]) => String(input).includes("/pipeline/list"));
+    expect(listCalls).toHaveLength(1);
+    expect(usePipelineStore.getState().savedPipelines).toHaveLength(4);
+  });
+
+  it("shows the server's reason and skips refreshing the list when the delete answers non-2xx", async () => {
+    server = {
+      save: savedOk,
+      list: listOk,
+      delete: () =>
+        new Response(JSON.stringify({ error: "Not authorized to delete this pipeline" }), {
+          status: 403,
+        }),
+    };
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
+    );
+    const listCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(([input]) => String(input).includes("/pipeline/list"));
+    expect(listCalls).toHaveLength(1);
+  });
+
+  it("falls back to deleteFailed when a non-2xx delete answer carries no JSON reason", async () => {
+    server = {
+      save: savedOk,
+      list: listOk,
+      delete: () => new Response("<html>500</html>", { status: 500 }),
+    };
+    await deleteFirstSavedPipeline();
+    await waitFor(() => expect(screen.getByText(en.automate.deleteFailed)).toBeInTheDocument());
+  });
+
+  it("says the list didn't refresh when the delete worked but the list answered non-2xx", async () => {
+    server = {
+      save: savedOk,
+      list: () => new Response("busy", { status: 503 }),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.deleteListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(usePipelineStore.getState().savedPipelines).toHaveLength(4);
+  });
+
+  it("says the list didn't refresh when the list request after delete rejects", async () => {
+    server = {
+      save: savedOk,
+      list: () => "network-down",
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.deleteListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(usePipelineStore.getState().savedPipelines).toHaveLength(4);
+  });
+
+  it("says the list didn't refresh when the list answer after delete is not JSON", async () => {
+    server = {
+      save: savedOk,
+      list: () => new Response("<html>proxy</html>"),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.deleteListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(usePipelineStore.getState().savedPipelines).toHaveLength(4);
+  });
+
+  it("keeps the shown list and says it's stale when an OK list answer after delete carries no pipelines array", async () => {
+    server = {
+      save: savedOk,
+      list: () => new Response("{}"),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.deleteListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(usePipelineStore.getState().savedPipelines).toHaveLength(4);
+  });
+
+  it("ignores a second delete click on the same pipeline while the first delete is in flight", async () => {
+    let resolveFirstDelete: (res: Response) => void = () => {};
+    let deleteCount = 0;
+    server = {
+      save: savedOk,
+      list: () => new Response(JSON.stringify({ pipelines: [SAVED] })),
+      delete: () => {
+        deleteCount += 1;
+        if (deleteCount === 1) {
+          return new Promise<Response>((resolve) => {
+            resolveFirstDelete = resolve;
+          });
+        }
+        return new Response(JSON.stringify({ error: "Pipeline not found" }), { status: 404 });
+      },
+    };
+
+    await deleteFirstSavedPipeline();
+    const deleteButtons = await screen.findAllByTitle(en.automate.deletePipeline);
+    fireEvent.click(deleteButtons[0]);
+
+    expect(deleteCount).toBe(1);
+    resolveFirstDelete(new Response(JSON.stringify({ ok: true })));
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+    expect(screen.queryByText("Pipeline not found")).not.toBeInTheDocument();
+  });
+
+  it("dismisses the delete error when the Close button is clicked", async () => {
+    server = { save: savedOk, list: listOk, delete: () => "network-down" };
+    await deleteFirstSavedPipeline();
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText(en.common.close));
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+  });
+
+  it("updates the saved list and shows no error when delete and refresh both succeed", async () => {
+    server = {
+      save: savedOk,
+      list: () => new Response(JSON.stringify({ pipelines: [SAVED] })),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+    await deleteFirstSavedPipeline();
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+    expect(screen.queryByText(en.automate.deleteListRefreshFailed)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+  });
+
+  it("renders a delete button for each row and deletes a saved pipeline when 3 or fewer exist (#2960)", async () => {
+    const three = [1, 2, 3].map((n) => ({
+      ...SAVED,
+      id: `p${n}`,
+      name: `Pipeline ${n}`,
+    }));
+    usePipelineStore.setState({ savedPipelines: three });
+    server = {
+      save: savedOk,
+      list: () => new Response(JSON.stringify({ pipelines: three.slice(1) })),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+
+    renderAutomate();
+
+    const deleteButtons = await screen.findAllByTitle(en.automate.deletePipeline);
+    expect(deleteButtons).toHaveLength(3);
+    expect(screen.queryByText(format(en.automate.moreCount, { count: 1 }))).not.toBeInTheDocument();
+
+    fireEvent.click(deleteButtons[0]);
+
+    await waitFor(() =>
+      expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["p2", "p3"]),
+    );
+    const deleteCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(
+        ([input, init]) => init?.method === "DELETE" && String(input).endsWith("/pipeline/p1"),
+      );
+    expect(deleteCalls).toHaveLength(1);
+  });
+
+  it("deletes the last saved pipeline and shows the empty state (#2960)", async () => {
+    usePipelineStore.setState({ savedPipelines: [SAVED] });
+    server = {
+      save: savedOk,
+      list: () => new Response(JSON.stringify({ pipelines: [] })),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+
+    renderAutomate();
+
+    const deleteButton = await screen.findByTitle(en.automate.deletePipeline);
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => expect(screen.getByText(en.automate.noSavedPipelines)).toBeInTheDocument());
+    expect(usePipelineStore.getState().savedPipelines).toEqual([]);
+  });
+
+  it("keeps the list expanded when deleting from 5 to 4, then hides Show less and resets expansion when deleting down to 3 (#2973)", async () => {
+    const five = [1, 2, 3, 4, 5].map((n) => ({
+      ...SAVED,
+      id: `p${n}`,
+      name: `Pipeline ${n}`,
+    }));
+    usePipelineStore.setState({ savedPipelines: five });
+    let listReplies = 0;
+    server = {
+      save: savedOk,
+      list: () => {
+        listReplies += 1;
+        return new Response(
+          JSON.stringify({ pipelines: listReplies === 1 ? five.slice(1) : five.slice(2) }),
+        );
+      },
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+
+    renderAutomate();
+
+    fireEvent.click(await screen.findByText(format(en.automate.moreCount, { count: 2 })));
+    expect(screen.getByText(en.common.showLess)).toBeInTheDocument();
+
+    // Deleting from 5 down to 4 keeps the list expanded and Show less visible.
+    fireEvent.click((await screen.findAllByTitle(en.automate.deletePipeline))[0]);
+    await waitFor(() =>
+      expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual([
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+      ]),
+    );
+    expect(screen.getByText(en.common.showLess)).toBeInTheDocument();
+    expect(screen.getByText("Pipeline 5")).toBeInTheDocument();
+
+    // Deleting from 4 down to 3 hides Show less and resets showAllSaved.
+    fireEvent.click((await screen.findAllByTitle(en.automate.deletePipeline))[0]);
+    await waitFor(() =>
+      expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual([
+        "p3",
+        "p4",
+        "p5",
+      ]),
+    );
+    expect(screen.queryByText(en.common.showLess)).not.toBeInTheDocument();
+    expect(screen.queryByText(format(en.automate.moreCount, { count: 1 }))).not.toBeInTheDocument();
+
+    // If a fourth pipeline is added later, the list should stay collapsed (+1 more)
+    // rather than auto-expanding from a stale showAllSaved flag.
+    act(() => {
+      usePipelineStore.setState({ savedPipelines: five.slice(1) });
+    });
+    await waitFor(() =>
+      expect(screen.getByText(format(en.automate.moreCount, { count: 1 }))).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(en.common.showLess)).not.toBeInTheDocument();
+  });
+});
+
+function renderAutomate() {
+  return render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/automate"]}>
+        <AutomatePage />
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+}
+
+describe("automate initial saved pipelines load (#1987)", () => {
+  it("shows a network error instead of 'No saved pipelines' when the initial list fetch rejects, and keeps 'No saved pipelines' hidden after dismissing the banner", async () => {
+    server = { initialList: () => "network-down", save: savedOk, list: listOk };
+    renderAutomate();
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(en.common.close));
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("shows the server's reason instead of 'No saved pipelines' when the initial list answers non-2xx", async () => {
+    server = {
+      initialList: () =>
+        new Response(JSON.stringify({ error: "Insufficient permissions" }), { status: 403 }),
+      save: savedOk,
+      list: listOk,
+    };
+    renderAutomate();
+    await waitFor(() => expect(screen.getByText("Insufficient permissions")).toBeInTheDocument());
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("falls back to loadFailed when a non-2xx initial list answer carries no JSON reason", async () => {
+    server = {
+      initialList: () => new Response("<html>502</html>", { status: 502 }),
+      save: savedOk,
+      list: listOk,
+    };
+    renderAutomate();
+    await waitFor(() => expect(screen.getByText(en.automate.loadFailed)).toBeInTheDocument());
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("shows loadFailed and preserves any cached list when an OK initial list answer carries no pipelines array", async () => {
+    usePipelineStore.setState({ savedPipelines: [{ ...SAVED, id: "cached", name: "Cached" }] });
+    server = { initialList: () => new Response("{}"), save: savedOk, list: listOk };
+    renderAutomate();
+    await waitFor(() => expect(screen.getByText(en.automate.loadFailed)).toBeInTheDocument());
+    expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["cached"]);
+  });
+
+  it("shows loadFailed instead of 'No saved pipelines' when the initial list answer is not JSON", async () => {
+    server = {
+      initialList: () => new Response("<html>proxy</html>"),
+      save: savedOk,
+      list: listOk,
+    };
+    renderAutomate();
+    await waitFor(() => expect(screen.getByText(en.automate.loadFailed)).toBeInTheDocument());
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("clears the initial load error banner when a subsequent save refreshes the saved list", async () => {
+    server = { initialList: () => "network-down", save: savedOk, list: listOk };
+    usePipelineStore.getState().loadSteps([{ toolId: "resize", settings: {} }]);
+    renderAutomate();
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText(en.automate.saveButton));
+    fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+      target: { value: "Recovered" },
+    });
+    fireEvent.click(screen.getByText(en.common.save));
+
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+  });
+
+  it("drops a slow initial list answer when a save completes and refreshes the list first", async () => {
+    let resolveInitialList: (res: Response) => void = () => {};
+    server = {
+      initialList: () =>
+        new Promise<Response>((resolve) => {
+          resolveInitialList = resolve;
+        }),
+      save: savedOk,
+      list: listOk,
+    };
+
+    usePipelineStore.getState().loadSteps([{ toolId: "resize", settings: {} }]);
+    renderAutomate();
+
+    fireEvent.click(await screen.findByText(en.automate.saveButton));
+    fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+      target: { value: "Saved First" },
+    });
+    fireEvent.click(screen.getByText(en.common.save));
+
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+
+    resolveInitialList(new Response(JSON.stringify({ pipelines: [] })));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(usePipelineStore.getState().savedPipelines).toHaveLength(1);
+  });
+
+  it("keeps an import error on screen and still populates savedPipelines when a slow initial list fetch resolves after the import fails (#2980)", async () => {
+    let resolveInitialList: (res: Response) => void = () => {};
+    server = {
+      initialList: () =>
+        new Promise<Response>((resolve) => {
+          resolveInitialList = resolve;
+        }),
+      save: () =>
+        new Response(JSON.stringify({ error: "Step 1: Tool not found" }), { status: 400 }),
+      list: listOk,
+    };
+
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+
+    await act(async () => {
+      resolveInitialList(new Response(JSON.stringify({ pipelines: [SAVED] })));
+    });
+    expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument();
+    expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("keeps an import error on screen and records listLoadFailed when a slow initial list fetch fails after the import fails (#2980)", async () => {
+    let resolveInitialList: (res: Response) => void = () => {};
+    server = {
+      initialList: () =>
+        new Promise<Response>((resolve) => {
+          resolveInitialList = resolve;
+        }),
+      save: () =>
+        new Response(JSON.stringify({ error: "Step 1: Tool not found" }), { status: 400 }),
+      list: listOk,
+    };
+
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+
+    await act(async () => {
+      resolveInitialList(new Response("busy", { status: 503 }));
+    });
+    expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument();
+    expect(screen.queryByText(en.automate.loadFailed)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(en.common.close));
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("keeps a delete error on screen when a slow initial list fetch resolves after the delete fails (#2980)", async () => {
+    let resolveInitialList: (res: Response) => void = () => {};
+    server = {
+      initialList: () =>
+        new Promise<Response>((resolve) => {
+          resolveInitialList = resolve;
+        }),
+      save: savedOk,
+      list: listOk,
+      delete: () =>
+        new Response(JSON.stringify({ error: "Not authorized to delete this pipeline" }), {
+          status: 403,
+        }),
+    };
+
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      resolveInitialList(new Response(JSON.stringify({ pipelines: [] })));
+    });
+    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+  });
+
+  it("does not re-fetch /api/v1/pipeline/list when a non-English locale finishes loading, and translates an initial load error into that locale (#2980)", async () => {
+    storageMap.set("snapotter-locale", "de");
+    server = {
+      initialList: () => new Response("<html>502</html>", { status: 502 }),
+      save: savedOk,
+      list: listOk,
+    };
+    renderAutomate();
+
+    await screen.findByText(de.automate.importButton);
+    await waitFor(() => expect(screen.getByText(de.automate.loadFailed)).toBeInTheDocument());
+    const listCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(([input]) => String(input).includes("/pipeline/list"));
+    expect(listCalls).toHaveLength(1);
+  });
+
+  it("preserves an active delete error when the user cancels the import file picker or saves a pipeline in the builder (#2980)", async () => {
+    server = {
+      save: savedOk,
+      list: listOk,
+      delete: () =>
+        new Response(JSON.stringify({ error: "Not authorized to delete this pipeline" }), {
+          status: 403,
+        }),
+    };
+    usePipelineStore.getState().loadSteps([{ toolId: "resize", settings: {} }]);
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
+    );
+
+    // Clicking Import without picking a file must not wipe the delete error.
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") (el as HTMLInputElement).click = () => {};
+      return el;
+    }) as typeof document.createElement);
+    fireEvent.click(screen.getByText(en.automate.importButton));
+    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+
+    // Saving a pipeline in the builder refreshes the list without clearing the delete error.
+    fireEvent.click(screen.getByText(en.automate.saveButton));
+    fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+      target: { value: "Builder Save" },
+    });
+    fireEvent.click(screen.getByText(en.common.save));
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+  });
+});

@@ -20,25 +20,57 @@
  *
  * Correctness rests on two invariants:
  *
- *   1. Every tool, batch and pipeline row is enqueued with `jobId` set to the
- *      row id, so `jobs.id` is also the BullMQ job id and "is there still a
- *      live queue entry" is a direct lookup. Rows of type `system`
- *      (gdpr-export) are the exception, because they enqueue without a jobId
- *      and BullMQ generates its own, so they are excluded.
+ *   1. Every tool, batch, pipeline and gdpr-export row is enqueued with `jobId`
+ *      set to the row id, so `jobs.id` is also the BullMQ job id and "is there
+ *      still a live queue entry" is a direct lookup. gdpr-export (type
+ *      `system`) is included as the backstop when its terminal write is lost or
+ *      BullMQ fails it by stall eviction (#1441, #1495), and an archive it
+ *      already wrote is adopted the same way a tool's output is, reaching the
+ *      same download route its own completion would have used.
  *   2. Every write is guarded on the row still being non-terminal, so two
  *      reconcilers racing each other (or racing a worker that recovered)
  *      cannot double-resolve, and a genuinely canceled job is never
  *      resurrected.
  */
-import { and, eq, inArray, isNotNull, lt, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, ne, type SQL, sql } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
+import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
-import { getObjectSize, listObjects, type ObjectInfo } from "../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  getObjectSize,
+  isMissingObjectError,
+  isStorageServiceFault,
+  listObjects,
+  normalizeS3ReadFault,
+  type ObjectInfo,
+} from "../lib/object-storage.js";
+import { clearTerminalReplayKey } from "../routes/progress.js";
 import { getQueue } from "./queues.js";
-import { POOLS, type Pool } from "./types.js";
+import { POOLS, type Pool, RESULT_PAYLOAD_FILENAME } from "./types.js";
 
 /** DB statuses a reconciler may resolve. Terminal rows are never touched. */
 const NON_TERMINAL = ["queued", "processing"] as const;
+
+/**
+ * The rows this reconciler settles, before the grace window: non-terminal and
+ * actually enqueued. A row with no tool_id (an inline batch row or SSE-progress
+ * placeholder) was never enqueued; those are reconciled at startup in
+ * apps/api/src/index.ts and after an hour by SYSTEM_JOBS.jobReconciliation in
+ * apps/api/src/jobs/system-jobs.ts (#1726), and the two sets are deliberately
+ * disjoint.
+ *
+ * The storage TTL sweep uses this same predicate to decide which in-flight
+ * jobs keep their files (#1412), so a row can only hold a dir while something
+ * is guaranteed to settle it. Change it here, never in a copy.
+ */
+export function reconcilableJobRows(): SQL | undefined {
+  return and(
+    inArray(schema.jobs.status, NON_TERMINAL),
+    isNotNull(schema.jobs.toolId),
+    ne(schema.jobs.toolId, ""),
+  );
+}
 
 /**
  * BullMQ states in which the job will still be executed, or is executing.
@@ -102,6 +134,54 @@ function isPreviewKey(key: string): boolean {
   return name === "preview.webp" || name === "preview.png";
 }
 
+/** Sidecar carrying the tool's own resultPayload fields (#1389), never a deliverable artifact. */
+function isResultPayloadKey(key: string): boolean {
+  const name = key.slice(key.lastIndexOf("/") + 1);
+  return name === RESULT_PAYLOAD_FILENAME;
+}
+
+/**
+ * Read the tool's resultPayload sidecar when one was written alongside the
+ * output (#1389). Storage/IO faults from `getObjectBuffer` propagate so a
+ * transient storage blip does not irreversibly complete the row without its
+ * payload; a corrupt or non-object JSON payload is logged at error level and
+ * reported to Sentry while still allowing the primary artifact to be recovered.
+ */
+async function readResultPayload(
+  jobId: string,
+  objects: ObjectInfo[],
+): Promise<Record<string, unknown> | undefined> {
+  const sidecar = objects.find((object) => isResultPayloadKey(object.key));
+  if (!sidecar) return undefined;
+  let raw: Buffer;
+  try {
+    raw = await getObjectBuffer(sidecar.key);
+  } catch (err) {
+    if (isMissingObjectError(err)) return undefined;
+    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+    throw err;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw.toString("utf8"));
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    const shapeErr = new Error(`Result payload sidecar ${sidecar.key} is not a JSON object`);
+    logger.error(
+      { err: shapeErr, jobId, key: sidecar.key },
+      "Result payload sidecar is not a JSON object; ignoring",
+    );
+    void reportError(shapeErr, { source: "worker", pool: "system", jobId });
+  } catch (err) {
+    logger.error(
+      { err, jobId, key: sidecar.key },
+      "Failed to parse result payload sidecar during job reconciliation; continuing without tool payload",
+    );
+    void reportError(err, { source: "worker", pool: "system", jobId });
+  }
+  return undefined;
+}
+
 /**
  * Is there still a BullMQ entry that will run this job?
  *
@@ -125,12 +205,39 @@ async function hasLiveQueueEntry(jobId: string, pool: string | null): Promise<bo
 }
 
 /** Best-effort input size so a recovered row still reports a real size delta. */
-async function resolveOriginalSize(bytesIn: number | null, inputRefs: string[] | null) {
-  if (bytesIn !== null) return bytesIn;
+async function resolveOriginalSize(
+  row: Pick<StrandedRow, "id" | "type" | "bytesIn" | "inputRefs">,
+): Promise<number> {
+  if (row.bytesIn !== null) return row.bytesIn;
+  let inputRefs = row.inputRefs;
+  if (row.type === "pipeline" || row.type === "pipeline-finalize") {
+    const [step0] = await db
+      .select({
+        bytesIn: schema.jobs.bytesIn,
+        inputRefs: schema.jobs.inputRefs,
+      })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, `${row.id}-s0`));
+    if (step0?.bytesIn !== null && step0?.bytesIn !== undefined && step0.bytesIn > 0) {
+      return step0.bytesIn;
+    }
+    if (!inputRefs?.length && step0?.inputRefs?.length) {
+      inputRefs = step0.inputRefs;
+    }
+  }
   if (!inputRefs?.length) return 0;
   let total = 0;
   for (const ref of inputRefs) {
-    total += await getObjectSize(ref).catch(() => 0);
+    try {
+      total += await getObjectSize(ref);
+    } catch (err) {
+      if (!isMissingObjectError(err)) {
+        logger.warn(
+          { err, jobId: row.id, key: ref },
+          "Failed to read input object size during job reconciliation; counting as 0 bytes",
+        );
+      }
+    }
   }
   return total;
 }
@@ -142,7 +249,9 @@ async function resolveOriginalSize(bytesIn: number | null, inputRefs: string[] |
  */
 function orderArtifacts(objects: ObjectInfo[]): ObjectInfo[] {
   return objects
-    .filter((object) => object.size > 0 && !isPreviewKey(object.key))
+    .filter(
+      (object) => object.size > 0 && !isPreviewKey(object.key) && !isResultPayloadKey(object.key),
+    )
     .sort((a, b) => a.mtimeMs - b.mtimeMs || a.key.localeCompare(b.key));
 }
 
@@ -150,10 +259,50 @@ type StrandedRow = {
   id: string;
   toolId: string | null;
   pool: string | null;
+  type: string;
   status: string;
   bytesIn: number | null;
   inputRefs: string[] | null;
+  progress: unknown;
 };
+
+function isBatchCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function pickBatchErrors(value: unknown): Array<{ filename: string; error: string }> {
+  if (!Array.isArray(value)) return [];
+  const out: Array<{ filename: string; error: string }> = [];
+  for (const entry of value) {
+    if (
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as { filename?: unknown }).filename === "string" &&
+      typeof (entry as { error?: unknown }).error === "string"
+    ) {
+      out.push({
+        filename: (entry as { filename: string }).filename,
+        error: (entry as { error: string }).error,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Non-terminal clientJobId alias rows still pointing at this artifact or
+ * pipeline flow job (#2682, #2701). Guarded on `settings->>'artifactJobId'`
+ * or `settings->>'pipelineFlowId'` and `NON_TERMINAL` so a channel that a
+ * newer run has already re-pointed (#886, #2650) or that a cancel already
+ * settled is left untouched.
+ */
+function reconcilableAliasRows(targetJobId: string): SQL | undefined {
+  return and(
+    eq(schema.jobs.type, "single"),
+    inArray(schema.jobs.status, NON_TERMINAL),
+    sql`(${schema.jobs.settings}->>'artifactJobId' = ${targetJobId} OR ${schema.jobs.settings}->>'pipelineFlowId' = ${targetJobId})`,
+  );
+}
 
 async function recoverFromOutputs(
   row: StrandedRow,
@@ -163,10 +312,12 @@ async function recoverFromOutputs(
   const primary = artifacts[0];
   const filename = primary.key.slice(primary.key.lastIndexOf("/") + 1);
   const preview = objects.find((object) => isPreviewKey(object.key));
-  const originalSize = await resolveOriginalSize(row.bytesIn, row.inputRefs);
+  const originalSize = await resolveOriginalSize(row);
   const outputRefs = artifacts.map((artifact) => artifact.key);
+  const toolPayload = await readResultPayload(row.id, objects);
 
   const result: Record<string, unknown> = {
+    ...toolPayload,
     jobId: row.id,
     downloadUrl: `/api/v1/download/${row.id}/${encodeURIComponent(filename)}`,
     originalSize,
@@ -177,24 +328,79 @@ async function recoverFromOutputs(
   };
   if (preview) {
     result.previewUrl = `/api/v1/download/${row.id}/${preview.key.slice(preview.key.lastIndexOf("/") + 1)}`;
+  } else {
+    delete result.previewUrl;
   }
 
-  const updated = await db
-    .update(schema.jobs)
-    .set({
-      status: "completed",
-      completedAt: new Date(),
-      outputRefs,
-      bytesIn: originalSize || null,
-      bytesOut: primary.size,
-      progress: { percent: 100, stage: "complete", result },
-    })
-    .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
-    .returning({ id: schema.jobs.id });
+  const completedAt = new Date();
+  const existingProgress =
+    row.type === "batch" && typeof row.progress === "object" && row.progress !== null
+      ? (row.progress as Record<string, unknown>)
+      : undefined;
+  const pickBatchCounter = (key: "totalFiles" | "completedFiles" | "failedFiles") => {
+    const fromSidecar = row.type === "batch" ? toolPayload?.[key] : undefined;
+    if (isBatchCount(fromSidecar)) return fromSidecar;
+    const fromProgress = existingProgress?.[key];
+    return isBatchCount(fromProgress) ? fromProgress : undefined;
+  };
+  if (row.type === "batch") {
+    delete result.totalFiles;
+    delete result.completedFiles;
+    delete result.failedFiles;
+    delete result.errors;
+  }
+  const sidecarErrors = row.type === "batch" ? pickBatchErrors(toolPayload?.errors) : [];
+  const totalFiles = pickBatchCounter("totalFiles");
+  const completedFiles = pickBatchCounter("completedFiles");
+  const failedFiles = pickBatchCounter("failedFiles");
+  const batchCounts = {
+    ...(totalFiles !== undefined && { totalFiles }),
+    ...(completedFiles !== undefined && { completedFiles }),
+    ...(failedFiles !== undefined && { failedFiles }),
+  };
+  const progress = { percent: 100, stage: "complete", ...batchCounts, result };
+  const updated = await db.transaction(async (tx) => {
+    const settled = await tx
+      .update(schema.jobs)
+      .set({
+        status: "completed",
+        completedAt,
+        outputRefs,
+        bytesIn: originalSize || null,
+        bytesOut: primary.size,
+        progress,
+        ...(sidecarErrors.length > 0 && {
+          error: { message: `${sidecarErrors.length} file(s) failed`, details: sidecarErrors },
+        }),
+      })
+      .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
+      .returning({ id: schema.jobs.id });
+
+    if (settled.length > 0) {
+      const aliases = await tx
+        .update(schema.jobs)
+        .set({
+          status: "completed",
+          completedAt,
+          progress,
+          error: null,
+        })
+        .where(reconcilableAliasRows(row.id))
+        .returning({ id: schema.jobs.id });
+      return [...settled.map((r) => r.id), ...aliases.map((r) => r.id)];
+    }
+    return [];
+  });
 
   if (updated.length === 0) {
     return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "raced" };
   }
+  await clearTerminalReplayKey(...updated).catch((err) => {
+    logger.warn(
+      { err, jobId: row.id, settledIds: updated },
+      "Failed to clear terminal replay cache after job reconciliation",
+    );
+  });
   return {
     jobId: row.id,
     toolId: row.toolId,
@@ -205,20 +411,80 @@ async function recoverFromOutputs(
 }
 
 async function failWithoutOutput(row: StrandedRow): Promise<StrandedJobOutcome> {
-  const updated = await db
-    .update(schema.jobs)
-    .set({
-      status: "failed",
-      completedAt: new Date(),
-      error: { message: UNRECOVERABLE_STRANDED_JOB_ERROR },
-    })
-    .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
-    .returning({ id: schema.jobs.id });
+  const completedAt = new Date();
+  const error = { message: UNRECOVERABLE_STRANDED_JOB_ERROR };
+  const updated = await db.transaction(async (tx) => {
+    const settled = await tx
+      .update(schema.jobs)
+      .set({
+        status: "failed",
+        completedAt,
+        error,
+      })
+      .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
+      .returning({ id: schema.jobs.id });
+
+    if (settled.length > 0) {
+      const aliases = await tx
+        .update(schema.jobs)
+        .set({
+          status: "failed",
+          completedAt,
+          progress: { percent: 0 },
+          error,
+        })
+        .where(reconcilableAliasRows(row.id))
+        .returning({ id: schema.jobs.id });
+      return [...settled.map((r) => r.id), ...aliases.map((r) => r.id)];
+    }
+    return [];
+  });
 
   if (updated.length === 0) {
     return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "raced" };
   }
+  await clearTerminalReplayKey(...updated).catch((err) => {
+    logger.warn(
+      { err, jobId: row.id, settledIds: updated },
+      "Failed to clear terminal replay cache after job reconciliation",
+    );
+  });
   return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "failed" };
+}
+
+/**
+ * Fail non-terminal rows with no `tool_id` at startup (inline batch parents
+ * and SSE progress placeholders that were never enqueued to BullMQ), while
+ * skipping single-file `clientJobId` alias rows whose target `artifactJobId`
+ * or `pipelineFlowId` row is still non-terminal (#2700). Those alias rows are
+ * settled alongside their target by the worker or `reconcileStrandedJobs`,
+ * whereas dangling pre-enqueue alias rows (whose target was never inserted)
+ * and alias rows pointing at an already-terminal target are cleaned up here.
+ */
+export async function reconcileOrphanedJobsAtStartup(): Promise<number> {
+  const result = await db.execute(
+    sql`UPDATE jobs
+      SET status = 'failed',
+          error = '{"message":"Orphaned job reconciled at startup"}'::jsonb,
+          completed_at = now()
+      WHERE status IN ('processing', 'queued')
+        AND (tool_id IS NULL OR tool_id = '')
+        AND NOT (
+          type = 'single'
+          AND EXISTS (
+            SELECT 1
+            FROM jobs AS target
+            WHERE target.id IN (
+              jobs.settings->>'artifactJobId',
+              jobs.settings->>'pipelineFlowId'
+            )
+              AND target.status IN ('processing', 'queued')
+              AND target.tool_id IS NOT NULL
+              AND target.tool_id <> ''
+          )
+        )`,
+  );
+  return (result as { rowCount?: number }).rowCount ?? 0;
 }
 
 /**
@@ -240,25 +506,14 @@ export async function reconcileStrandedJobs(
       id: schema.jobs.id,
       toolId: schema.jobs.toolId,
       pool: schema.jobs.pool,
+      type: schema.jobs.type,
       status: schema.jobs.status,
       bytesIn: schema.jobs.bytesIn,
       inputRefs: schema.jobs.inputRefs,
+      progress: schema.jobs.progress,
     })
     .from(schema.jobs)
-    .where(
-      and(
-        inArray(schema.jobs.status, NON_TERMINAL),
-        // A row with no tool_id is an SSE-progress placeholder that was never
-        // enqueued. Those are reconciled at startup by their own narrow path in
-        // apps/api/src/index.ts; the two sets are deliberately disjoint.
-        isNotNull(schema.jobs.toolId),
-        ne(schema.jobs.toolId, ""),
-        // gdpr-export enqueues without a jobId, so its row id is not a BullMQ
-        // job id and the queue lookup below would wrongly report it dead.
-        ne(schema.jobs.type, "system"),
-        lt(schema.jobs.createdAt, new Date(Date.now() - graceMs)),
-      ),
-    )
+    .where(and(reconcilableJobRows(), lt(schema.jobs.createdAt, new Date(Date.now() - graceMs))))
     .orderBy(schema.jobs.createdAt)
     .limit(limit);
 
@@ -283,15 +538,34 @@ export async function reconcileStrandedJobs(
       continue;
     }
 
-    const objects = await listObjects(`outputs/${row.id}/`);
-    const artifacts = orderArtifacts(objects);
-    const outcome =
-      artifacts.length > 0
-        ? await recoverFromOutputs(row, artifacts, objects)
-        : await failWithoutOutput(row);
+    try {
+      let objects: ObjectInfo[];
+      try {
+        objects = await listObjects(`outputs/${row.id}/`);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
+      const artifacts = orderArtifacts(objects);
+      const outcome =
+        artifacts.length > 0
+          ? await recoverFromOutputs(row, artifacts, objects)
+          : await failWithoutOutput(row);
 
-    summary[outcome.resolution] += 1;
-    summary.outcomes.push(outcome);
+      summary[outcome.resolution] += 1;
+      summary.outcomes.push(outcome);
+    } catch (err) {
+      logger.error(
+        { err, jobId: row.id, toolId: row.toolId },
+        "Failed to reconcile stranded job row; leaving non-terminal for next sweep",
+      );
+      void reportError(err, {
+        source: "worker",
+        pool: "system",
+        toolId: row.toolId ?? undefined,
+        jobId: row.id,
+      });
+    }
   }
 
   if (summary.recovered > 0 || summary.failed > 0) {

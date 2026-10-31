@@ -1,6 +1,6 @@
 ---
 description: "如何為 SnapOtter 做出貢獻。錯誤回報、功能請求、拉取請求以及 CLA 要求。"
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: 99d1ae43ef11
 i18n_hash_version: 2

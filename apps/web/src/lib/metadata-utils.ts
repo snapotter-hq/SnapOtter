@@ -87,6 +87,25 @@ export const SKIP_KEYS = new Set([
   "PrintImageMatching",
 ]);
 
+export function isDisplayableMetadataEntry(key: string, value: unknown): boolean {
+  return (
+    !SKIP_KEYS.has(key) &&
+    !key.startsWith("_") &&
+    value !== undefined &&
+    value !== null &&
+    String(value) !== ""
+  );
+}
+
+export function countDisplayableMetadata(data: Record<string, unknown> | null | undefined): number {
+  if (!data) return 0;
+  let count = 0;
+  for (const [k, v] of Object.entries(data)) {
+    if (isDisplayableMetadataEntry(k, v)) count++;
+  }
+  return count;
+}
+
 export function formatExifValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "N/A";
   if (typeof value === "string") return value;

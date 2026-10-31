@@ -1,6 +1,6 @@
 ---
 description: "Formati di file supportati in tutte le modalità: oltre 55 formati di input immagine, video, audio, PDF e file."
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: c6576f5d623c
 ---

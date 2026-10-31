@@ -1,4 +1,8 @@
+import { spawnSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("sharp", () => ({
   default: vi.fn(() => ({
@@ -107,6 +111,49 @@ describe("extractText error and progress behavior", () => {
     expect(runAdaptiveTesseract).not.toHaveBeenCalled();
     expect(runOcrRuntime).not.toHaveBeenCalled();
   });
+
+  it("rejects explicit Arabic Fast OCR before image processing or Tesseract dispatch", async () => {
+    await expect(
+      extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "ar" }),
+    ).rejects.toThrow(
+      "Fast OCR does not support Arabic. Install the Accurate OCR bundle and choose Balanced or Best.",
+    );
+
+    expect(sharp).not.toHaveBeenCalled();
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+    expect(runOcrRuntime).not.toHaveBeenCalled();
+  });
+
+  it.each(["balanced", "best"] as const)(
+    "keeps explicit Arabic on the %s accurate tier without silent rerouting",
+    async (quality) => {
+      vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+        runtimeResponse({
+          success: true,
+          text: "مرحبا بالعالم",
+          engine: "rapidocr-onnx",
+          requestedQuality: quality,
+          actualQuality: quality,
+          device: "cpu",
+          provider: "CPUExecutionProvider",
+          degraded: false,
+          warnings: [],
+        }),
+      );
+
+      const result = await extractText(INPUT, "/tmp/ocr", { quality, language: "ar" });
+
+      expect(result.text).toBe("مرحبا بالعالم");
+      expect(result.requestedQuality).toBe(quality);
+      expect(result.actualQuality).toBe(quality);
+      expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+      expect(runOcrRuntime).toHaveBeenCalledTimes(1);
+      const runtimeOptions = JSON.parse(
+        vi.mocked(runOcrRuntime).mock.calls[0]?.[1][1] ?? "null",
+      ) as Record<string, unknown>;
+      expect(runtimeOptions).toMatchObject({ language: "ar", quality });
+    },
+  );
 
   it.each(["balanced", "best"] as const)(
     "keeps explicit Korean on the %s accurate tier without silent rerouting",
@@ -457,12 +504,50 @@ describe("extractText error and progress behavior", () => {
     }
   });
 
+  it("throws a SafeError when the accurate runtime reports a tier mismatch", async () => {
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+      runtimeResponse({
+        success: true,
+        text: "hello",
+        engine: "paddle",
+        requestedQuality: "best",
+        actualQuality: "fast",
+        device: "cpu",
+        provider: "none",
+        degraded: false,
+        warnings: [],
+      }),
+    );
+
+    const promise = extractText(INPUT, "/tmp/ocr", { quality: "best" });
+    const err = await promise.catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("bug");
+    expect(err.code).toBe("OCR_RUNTIME_MISMATCH");
+    expect(err.statusCode).toBe(500);
+    expect(err.cause).toBeInstanceOf(Error);
+    expect(err.cause.message).toBe("requested best, reported best/fast");
+  });
+
   it("propagates malformed accurate-runtime output", async () => {
     vi.mocked(runOcrRuntime).mockResolvedValueOnce(runtimeResponse("not an object"));
+    const promise1 = extractText(INPUT, "/tmp/ocr", { quality: "balanced" });
+    await expect(promise1).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "bug",
+      code: "OCR_RUNTIME_INVALID_METADATA",
+      statusCode: 500,
+    });
 
-    await expect(extractText(INPUT, "/tmp/ocr", { quality: "balanced" })).rejects.toThrow(
-      "invalid metadata",
-    );
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce(runtimeResponse({ success: true }));
+    const promise2 = extractText(INPUT, "/tmp/ocr", { quality: "balanced" });
+    await expect(promise2).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "bug",
+      code: "OCR_RUNTIME_INVALID_METADATA",
+      statusCode: 500,
+    });
   });
 
   it("preserves multiline Unicode text", async () => {
@@ -475,5 +560,256 @@ describe("extractText error and progress behavior", () => {
 
     const result = await extractText(INPUT, "/tmp/ocr", { quality: "fast" });
     expect(result.text).toBe("こんにちは\n안녕하세요\n你好");
+  });
+
+  describe.skipIf(!hasPython)("ocr_preprocess.py sidecar script", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pyDir = resolve(here, "../../../packages/ai/python");
+    const fakeCv2Bootstrap = `
+import importlib.util, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeImg:
+    shape = (64, 64, 3)
+
+fake_cv2 = types.ModuleType("cv2")
+fake_cv2.COLOR_BGR2GRAY = 6
+fake_cv2.COLOR_GRAY2BGR = 8
+fake_cv2.COLOR_BGR2LAB = 44
+fake_cv2.COLOR_LAB2BGR = 56
+fake_cv2.ADAPTIVE_THRESH_GAUSSIAN_C = 1
+fake_cv2.THRESH_BINARY = 0
+fake_cv2.imread = lambda _p: FakeImg()
+fake_cv2.imwrite = lambda _p, _img: True
+fake_cv2.cvtColor = lambda img, _c: img
+fake_cv2.Canny = lambda _g, _a, _b, apertureSize=3: FakeImg()
+fake_cv2.HoughLinesP = lambda *_a, **_k: None
+fake_cv2.split = lambda img: (img, img, img)
+fake_cv2.merge = lambda chs: chs[0]
+fake_cv2.createCLAHE = lambda **_k: types.SimpleNamespace(apply=lambda ch: ch)
+fake_cv2.bilateralFilter = lambda img, *_a: img
+fake_cv2.adaptiveThreshold = lambda img, *_a: img
+sys.modules["cv2"] = fake_cv2
+
+fake_np = types.ModuleType("numpy")
+fake_np.pi = 3.141592653589793
+sys.modules["numpy"] = fake_np
+`;
+
+    it("raises RuntimeError when cv2.imwrite returns False in preprocess() (issue #3087)", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `${fakeCv2Bootstrap}
+fake_cv2.imwrite = lambda _p, _img: False
+
+spec = importlib.util.spec_from_file_location("ocr_preprocess_mod", os.path.join(py_dir, "ocr_preprocess.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+try:
+    mod.preprocess("/tmp/in_ocr.png", "/tmp/out_ocr.png")
+except RuntimeError as exc:
+    assert str(exc) == "Failed to write output image: /tmp/out_ocr.png", exc
+else:
+    raise AssertionError("Expected RuntimeError when cv2.imwrite returns False in ocr_preprocess.preprocess")
+
+fake_cv2.imwrite = lambda _p, _img: True
+assert mod.preprocess("/tmp/in_ocr.png", "/tmp/out_ocr.png") == "/tmp/out_ocr.png"
+
+print("OCR_PREPROCESS_3087_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("OCR_PREPROCESS_3087_OK");
+    });
+
+    it("executes main() on __main__ dispatch and returns JSON on success and failure (issue #3420)", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `${fakeCv2Bootstrap}
+import io, json
+
+read_paths = []
+written_paths = []
+
+def _imread(p):
+    read_paths.append(p)
+    return FakeImg()
+
+def _imwrite(p, _img):
+    written_paths.append(p)
+    return True
+
+fake_cv2.imread = _imread
+fake_cv2.imwrite = _imwrite
+
+for mod_name in ("PIL", "mediapipe", "gpu", "rembg", "torchvision", "torchvision.transforms", "torchvision.transforms.functional_tensor"):
+    sys.modules[mod_name] = types.ModuleType(mod_name)
+
+os.environ.pop("DISPATCHER_PROFILE", None)
+import dispatcher
+assert "ocr_preprocess" in dispatcher.ALLOWED_SCRIPTS, dispatcher.ALLOWED_SCRIPTS
+
+# 1. Success via dispatcher._run_script_main using real ALLOWED_SCRIPTS
+out, code = dispatcher._run_script_main("ocr_preprocess", ["/tmp/in_ocr.png", "/tmp/out_ocr.png"])
+assert code == 0, f"expected exit 0, got {code}: {out}"
+payload = json.loads(out)
+assert payload == {"success": True, "output_path": "/tmp/out_ocr.png"}, payload
+assert read_paths == ["/tmp/in_ocr.png"], read_paths
+assert written_paths == ["/tmp/out_ocr.png"], written_paths
+
+# 2. Failure via dispatcher._run_script_main when preprocess raises
+fake_cv2.imread = lambda _p: None
+out_err, code_err = dispatcher._run_script_main("ocr_preprocess", ["/tmp/missing.png", "/tmp/out_ocr.png"])
+assert code_err == 1, f"expected exit 1, got {code_err}: {out_err}"
+payload_err = json.loads(out_err)
+assert payload_err == {"success": False, "error": "Cannot read image: /tmp/missing.png"}, payload_err
+
+# 3. Direct mod.main() call with empty-message exception falls back to class name
+spec = importlib.util.spec_from_file_location("ocr_preprocess_mod", os.path.join(py_dir, "ocr_preprocess.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod.preprocess = lambda _i, _o: (_ for _ in ()).throw(RuntimeError(""))
+buf = io.StringIO()
+old_stdout, old_argv = sys.stdout, sys.argv
+sys.stdout = buf
+sys.argv = ["ocr_preprocess.py", "/tmp/in.png", "/tmp/out.png"]
+try:
+    mod.main()
+except SystemExit as exc:
+    assert exc.code == 1, exc.code
+else:
+    raise AssertionError("Expected SystemExit(1)")
+finally:
+    sys.stdout = old_stdout
+    sys.argv = old_argv
+
+assert json.loads(buf.getvalue()) == {"success": False, "error": "RuntimeError"}, buf.getvalue()
+print("OCR_PREPROCESS_3420_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("OCR_PREPROCESS_3420_OK");
+    });
+
+    it("guards top-level cv2 and numpy imports and reports Missing dependency JSON with libGL hint (issue #3640)", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `
+import builtins, contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+script_path = os.path.join(py_dir, "ocr_preprocess.py")
+
+orig_import = builtins.__import__
+
+def exec_with_import_error(module_name, target_pkg, exc):
+    def custom_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == target_pkg:
+            raise exc
+        return orig_import(name, globals, locals, fromlist, level)
+
+    sys.modules.pop("cv2", None)
+    sys.modules.pop("numpy", None)
+    if target_pkg != "cv2":
+        sys.modules["cv2"] = types.ModuleType("cv2")
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    mod = importlib.util.module_from_spec(spec)
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    builtins.__import__ = custom_import
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            spec.loader.exec_module(mod)
+    finally:
+        builtins.__import__ = orig_import
+    return mod, out_buf.getvalue().strip()
+
+# 1. Standalone (__main__) execution with libGL ImportError emits JSON with libgl1 hint and exits 1
+for target_pkg, exc, expected_err in (
+    (
+        "cv2",
+        ImportError("libGL.so.1: cannot open shared object file: No such file or directory"),
+        "Missing dependency: libGL.so.1: cannot open shared object file: No such file or directory. Fix with: apt-get install -y libgl1",
+    ),
+    (
+        "cv2",
+        ModuleNotFoundError("No module named 'cv2'"),
+        "Missing dependency: No module named 'cv2'. Install with: pip install opencv-python-headless numpy",
+    ),
+    (
+        "numpy",
+        ModuleNotFoundError("No module named 'numpy'"),
+        "Missing dependency: No module named 'numpy'. Install with: pip install opencv-python-headless numpy",
+    ),
+    (
+        "cv2",
+        ImportError("   "),
+        "Missing dependency: ImportError. Install with: pip install opencv-python-headless numpy",
+    ),
+):
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    def custom_import(name, globals=None, locals=None, fromlist=(), level=0, _pkg=target_pkg, _exc=exc):
+        if name == _pkg:
+            raise _exc
+        return orig_import(name, globals, locals, fromlist, level)
+
+    sys.modules.pop("cv2", None)
+    sys.modules.pop("numpy", None)
+    if target_pkg != "cv2":
+        sys.modules["cv2"] = types.ModuleType("cv2")
+    spec = importlib.util.spec_from_file_location("__main__", script_path)
+    mod = importlib.util.module_from_spec(spec)
+    builtins.__import__ = custom_import
+    try:
+        try:
+            with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+                spec.loader.exec_module(mod)
+        except SystemExit as exit_exc:
+            assert exit_exc.code == 1, exit_exc.code
+        else:
+            raise AssertionError("Expected SystemExit(1) on __main__ import failure")
+    finally:
+        builtins.__import__ = orig_import
+    payload = json.loads(out_buf.getvalue().strip())
+    assert payload == {"success": False, "error": expected_err}, (target_pkg, exc, payload)
+
+    # 2. Imported as non-__main__ module: defers exit to main()
+    mod_imported, import_stdout = exec_with_import_error("ocr_preprocess_mod", target_pkg, exc)
+    assert import_stdout == "", import_stdout
+    assert mod_imported._IMPORT_ERROR is exc
+    assert mod_imported.cv2 is None
+    assert mod_imported.np is None
+    main_out, main_err = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(main_out), contextlib.redirect_stderr(main_err):
+            mod_imported.main()
+    except SystemExit as exit_exc:
+        assert exit_exc.code == 1, exit_exc.code
+    else:
+        raise AssertionError("Expected SystemExit(1) when calling main() with _IMPORT_ERROR set")
+    main_payload = json.loads(main_out.getvalue().strip())
+    assert main_payload == {"success": False, "error": expected_err}, (target_pkg, exc, main_payload)
+
+print("OCR_PREPROCESS_3640_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("OCR_PREPROCESS_3640_OK");
+    });
   });
 });

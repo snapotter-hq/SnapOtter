@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
-    select: () => ({ from: () => ({ where: () => ({ get: () => null }) }) }),
+    select: () => ({
+      from: () => ({ where: () => ({ get: () => null, limit: async () => [] }) }),
+    }),
   },
   pool: {},
   closeDb: async () => {},

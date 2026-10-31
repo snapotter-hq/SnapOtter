@@ -1,8 +1,8 @@
 ---
 description: "Trình tạo ảnh hộ chiếu và ảnh thẻ do AI hỗ trợ với phát hiện khuôn mặt, xóa nền và ghép tấm để in."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 413767761f2b
+i18n_output_hash: ff62c89911f0
 ---
 
 # Passport Photo {#passport-photo}
@@ -92,7 +92,7 @@ Cắt, thay đổi kích thước và tùy chọn ghép ảnh lên một tấm i
 | documentType | string | No | `"passport"` | Loại giấy tờ (theo thông số quốc gia) |
 | bgColor | string | No | `"#FFFFFF"` | Màu nền dạng hex |
 | printLayout | string | No | `"none"` | Bố cục giấy in: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | Ràng buộc kích thước tệp tối đa tính bằng KB (0 = không giới hạn) |
+| maxFileSizeKb | number | No | `0` | Kích thước tệp tối đa tính bằng KB, trong đó 1 KB = 1000 byte (0 = không giới hạn) |
 | dpi | number | No | `300` | DPI đầu ra (72-1200) |
 | customWidthMm | number | No | - | Chiều rộng ảnh tùy chỉnh tính bằng mm (ghi đè thông số quốc gia) |
 | customHeightMm | number | No | - | Chiều cao ảnh tùy chỉnh tính bằng mm (ghi đè thông số quốc gia) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Error: Analysis Expired (410) {#error-analysis-expired-410}
+
+Generate hoạt động dựa trên ảnh đã xóa nền mà analyze đã lưu cho `jobId`. Các đầu ra đã lưu sẽ bị dọn dẹp sau một thời gian, vì vậy nếu quá nhiều thời gian trôi qua giữa hai lần gọi, ảnh đó sẽ không còn. Hãy gọi lại analyze với cùng ảnh và dùng `jobId` mà nó trả về.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+Một `jobId` hoặc `filename` không thể chỉ định một tệp đã lưu (dấu phân cách đường dẫn, `..`, chuỗi rỗng) sẽ trả về 400.
+
 ---
 
 ### Base Route {#base-route}
@@ -170,4 +183,4 @@ Trả về hướng dẫn dùng đúng endpoint con.
 - Trường `preview` trong phản hồi phân tích là một PNG mã hóa base64 (tối đa rộng 800px) để hiển thị nhanh.
 - Thông số quốc gia bao gồm kích thước giấy tờ, tỷ lệ chiều cao đầu và vị trí đường mắt dựa trên yêu cầu ảnh hộ chiếu chính thức.
 - Tùy chọn `printLayout` tạo một tấm ghép trên giấy 4x6\" hoặc A4 với khoảng cách 2mm giữa các ảnh.
-- Khi `maxFileSizeKb` được đặt, đầu ra sẽ được nén lặp lại để vừa với giới hạn kích thước.
+- Khi `maxFileSizeKb` được đặt, chất lượng JPEG của đầu ra được hạ từng bước cho đến khi vừa giới hạn. Kích thước điểm ảnh do thông số quốc gia cố định, nên nếu ảnh vẫn không vừa ở chất lượng thấp nhất, `/generate` trả về 422 kèm thông báo thay vì một tệp vượt giới hạn.

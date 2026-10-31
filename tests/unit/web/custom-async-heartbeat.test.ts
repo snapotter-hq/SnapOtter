@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
+
+import { subscribeExportJobProgress } from "@/components/editor/common/export-dialog";
 import { subscribeEraseObjectJobProgress } from "@/components/tools/erase-object-settings";
 import { subscribeSignPdfJobProgress } from "@/components/tools/sign-pdf-settings";
+import { captureHandledError } from "@/lib/analytics";
 
 class FakeEventSource {
   static OPEN = 1;
@@ -22,16 +30,38 @@ class FakeEventSource {
   }
 }
 
+// Erase Object's and Sign PDF's subscribers return { stop, touch } (#1968,
+// #1959); the shared cases below only need the stop half.
 const subscribers = [
-  ["erase-object", subscribeEraseObjectJobProgress],
-  ["sign-pdf", subscribeSignPdfJobProgress],
+  [
+    "erase-object",
+    (...args: Parameters<typeof subscribeEraseObjectJobProgress>) =>
+      subscribeEraseObjectJobProgress(...args).stop,
+  ],
+  [
+    "sign-pdf",
+    (...args: Parameters<typeof subscribeSignPdfJobProgress>) =>
+      subscribeSignPdfJobProgress(...args).stop,
+  ],
+  [
+    "editor-export",
+    (...args: Parameters<typeof subscribeExportJobProgress>) =>
+      subscribeExportJobProgress(...args).stop,
+  ],
 ] as const;
+
+const STREAM_TEARDOWN_MESSAGES = {
+  "erase-object": "Ending an Erase Object run after a stream handling error failed",
+  "sign-pdf": "Ending a Sign PDF run after a stream handling error failed",
+  "editor-export": "Ending an editor export after a stream handling error failed",
+} as const;
 
 describe.each(subscribers)("%s async progress", (_name, subscribe) => {
   beforeEach(() => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];
     vi.stubGlobal("EventSource", FakeEventSource);
+    vi.mocked(captureHandledError).mockClear();
   });
 
   afterEach(() => {
@@ -87,36 +117,148 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     ).toThrow("boom");
 
     expect(onFailed).toHaveBeenCalledOnce();
-    expect(onFailed).toHaveBeenCalledWith(
-      "Something went wrong while tracking this job. Try again.",
-    );
+    // A reason, not text: this function has no locale, so the component
+    // translates it (#1593).
+    expect(onFailed).toHaveBeenCalledWith({ reason: "trackingFailed" });
     expect(FakeEventSource.instances[0].readyState).toBe(2);
     vi.advanceTimersByTime(10 * 60_000);
     expect(onStall).not.toHaveBeenCalled();
   });
 
   it("rethrows the original error when onFailed itself throws", () => {
-    const onFailed = vi
-      .fn()
-      .mockImplementationOnce(() => {
-        throw new Error("onFailed broke");
-      })
-      .mockImplementation(() => {
-        throw new Error("second onFailed");
-      });
-    subscribe("job-failed-throw", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const onFailed = vi
+        .fn()
+        .mockImplementationOnce(() => {
+          throw new Error("onFailed broke");
+        })
+        .mockImplementation(() => {
+          throw new Error("second onFailed");
+        });
+      subscribe("job-failed-throw", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
 
-    expect(() =>
-      FakeEventSource.instances[0].onmessage?.({
-        data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
+        }),
+      ).toThrow("onFailed broke");
+      expect(onFailed).toHaveBeenNthCalledWith(1, { message: "server said no" });
+      expect(onFailed).toHaveBeenNthCalledWith(2, { reason: "trackingFailed" });
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "second onFailed" }),
+      );
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+      const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(reported.message).toBe(STREAM_TEARDOWN_MESSAGES[_name]);
+      expect(reported.cause).toMatchObject({ message: "second onFailed" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: _name });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("passes the server's own error through as the failure message", () => {
+    const onFailed = vi.fn();
+    subscribe("job-failed", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "failed",
+        error: "Signature box is off the page",
       }),
-    ).toThrow("onFailed broke");
-    expect(onFailed).toHaveBeenNthCalledWith(1, "server said no");
-    expect(onFailed).toHaveBeenNthCalledWith(
-      2,
-      "Something went wrong while tracking this job. Try again.",
-    );
-    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ message: "Signature box is off the page" });
+  });
+
+  // #1593: this used to hand onFailed the English "Processing failed", which
+  // the component showed as-is in every locale.
+  it("reports a failed frame with no error text as a reason, not English", () => {
+    const onFailed = vi.fn();
+    subscribe("job-failed-bare", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "failed" }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
+  });
+
+  it("treats a blank server error as no detail instead of showing nothing", () => {
+    // The worker publishes error: "" when a handler throws an Error with no text.
+    const onFailed = vi.fn();
+    subscribe("job-failed-blank", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "failed", error: "  " }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
+  });
+
+  // #1623: a canceled frame carries error: "Canceled" and code: "CANCELED"
+  // (or code: "CANCELED" alone); subscribers must report { reason: "canceled" }
+  // instead of passing English "Canceled" as a server message.
+  it("reports a canceled frame as { reason: 'canceled' }, not English (#1623)", () => {
+    const onFailed = vi.fn();
+    subscribe("job-canceled", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        error: "Canceled",
+        code: "CANCELED",
+      }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "canceled" });
+  });
+
+  it("reports a code-only CANCELED frame as { reason: 'canceled' } (#1623)", () => {
+    const onFailed = vi.fn();
+    subscribe("job-canceled-code", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        code: "CANCELED",
+      }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "canceled" });
+  });
+
+  // #1830 split "complete with no result" off the progress branch; a running
+  // job's progress frame must still only report progress.
+  it("passes a progress frame through without ending the run", () => {
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+    const onFailed = vi.fn();
+    const cleanup = subscribe("job-progress", {
+      onProgress,
+      onComplete,
+      onFailed,
+      onStall: vi.fn(),
+    });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "processing", percent: 40 }),
+    });
+
+    expect(onProgress).toHaveBeenCalledWith(40);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onFailed).not.toHaveBeenCalled();
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    expect(FakeEventSource.instances[0].readyState).toBe(FakeEventSource.OPEN);
+    cleanup();
   });
 
   it("ignores a malformed frame and keeps waiting", () => {
@@ -127,10 +269,350 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     FakeEventSource.instances[0].onmessage?.({ data: "not json" });
     expect(onFailed).not.toHaveBeenCalled();
 
+    const result = { downloadUrl: "/api/v1/download/job-malformed/out.png" };
     FakeEventSource.instances[0].onmessage?.({
-      data: JSON.stringify({ type: "single", phase: "complete", result: { ok: true } }),
+      data: JSON.stringify({ type: "single", phase: "complete", result }),
     });
-    expect(onComplete).toHaveBeenCalledWith({ ok: true });
+    expect(onComplete).toHaveBeenCalledWith(result);
     cleanup();
+  });
+});
+
+describe.each([
+  ["erase-object", subscribeEraseObjectJobProgress],
+  ["sign-pdf", subscribeSignPdfJobProgress],
+  ["editor-export", subscribeExportJobProgress],
+] as const)("%s async progress: stop (#2932, #2949)", (_name, subscribe) => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.mocked(captureHandledError).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("ignores queued messages arriving after stop()", () => {
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+    const onFailed = vi.fn();
+    const onStall = vi.fn();
+    const { stop } = subscribe("job-stopped-message", {
+      onProgress,
+      onComplete,
+      onFailed,
+      onStall,
+    });
+
+    stop();
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "heartbeat" }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "complete",
+        result: { downloadUrl: "/api/v1/download/job-stopped-message/out.png" },
+      }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "failed", error: "late error" }),
+    });
+    vi.advanceTimersByTime(10 * 60_000);
+
+    expect(onProgress).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onFailed).not.toHaveBeenCalled();
+    expect(onStall).not.toHaveBeenCalled();
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+});
+
+describe.each(subscribers)(
+  "%s async progress: stream teardown failure (#1951, #3010)",
+  (_name, subscribe) => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      FakeEventSource.instances = [];
+      vi.stubGlobal("EventSource", FakeEventSource);
+      vi.mocked(captureHandledError).mockClear();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it("reports a teardown failure when onFailed throws after a stream handling error (#1951, #3010)", () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const onFailed = vi.fn(() => {
+          throw new Error("teardown broke");
+        });
+        subscribe("job-teardown-throw", {
+          onComplete: () => {
+            throw new Error("root cause");
+          },
+          onFailed,
+          onStall: vi.fn(),
+        });
+
+        expect(() =>
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "complete",
+              result: { downloadUrl: "/api/v1/download/job-teardown-throw/out.png" },
+            }),
+          }),
+        ).toThrow("root cause");
+
+        expect(onFailed).toHaveBeenCalledOnce();
+        expect(onFailed).toHaveBeenCalledWith({ reason: "trackingFailed" });
+        expect(FakeEventSource.instances[0].readyState).toBe(2);
+        expect(consoleError).toHaveBeenCalledWith(
+          "Ending the run after a stream handling error failed",
+          expect.objectContaining({ message: "teardown broke" }),
+        );
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+        const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+        expect(reported.message).toBe(STREAM_TEARDOWN_MESSAGES[_name]);
+        expect(reported.cause).toMatchObject({ message: "teardown broke" });
+        expect(tags).toEqual({ error_class: "bug", tool_id: _name });
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+  },
+);
+
+describe("subscribeExportJobProgress custom toolId teardown failure (#3010)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.mocked(captureHandledError).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("tags reportRunEndFailure with the custom toolId when onFailed throws during recovery", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const onFailed = vi.fn(() => {
+        throw new Error("open teardown broke");
+      });
+      subscribeExportJobProgress(
+        "job-open-teardown-throw",
+        {
+          onComplete: () => {
+            throw new Error("open root cause");
+          },
+          onFailed,
+          onStall: vi.fn(),
+        },
+        "editor-open",
+      );
+
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: "/api/v1/download/job-open-teardown-throw/out.png" },
+          }),
+        }),
+      ).toThrow("open root cause");
+
+      expect(onFailed).toHaveBeenCalledOnce();
+      expect(onFailed).toHaveBeenCalledWith({ reason: "trackingFailed" });
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "open teardown broke" }),
+      );
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+      const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(reported.message).toBe("Ending an editor export after a stream handling error failed");
+      expect(reported.cause).toMatchObject({ message: "open teardown broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "editor-open" });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+});
+
+// #1830 and #1885: both subscribers check a completed frame's result the way
+// the shared hooks do since #1794, so a frame with nothing to download ends the
+// run at once instead of waiting out the stall timer.
+describe.each(subscribers)(
+  "%s async progress: a completed frame with nothing to download",
+  (name, subscribe) => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      FakeEventSource.instances = [];
+      vi.stubGlobal("EventSource", FakeEventSource);
+      vi.mocked(captureHandledError).mockClear();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it.each([
+      ["an empty result", { result: {} }, "ResultWithoutDownloadError"],
+      ["a non-string download URL", { result: { downloadUrl: 42 } }, "ResultWithoutDownloadError"],
+      ["an array result", { result: [] }, "ResultNotAnObjectError"],
+      ["a string result", { result: "done" }, "ResultNotAnObjectError"],
+      ["a null result", { result: null }, "ResultNotAnObjectError"],
+      ["no result at all", {}, "ResultNotAnObjectError"],
+    ])("fails the run as an invalid response for %s", (_label, extra, reportedAs) => {
+      const onComplete = vi.fn();
+      const onFailed = vi.fn();
+      const onStall = vi.fn();
+      subscribe("job-empty", { onComplete, onFailed, onStall });
+
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", ...extra }),
+      });
+
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onFailed).toHaveBeenCalledOnce();
+      expect(onFailed).toHaveBeenCalledWith({ reason: "invalidResponse" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+      const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(reported.name).toBe(reportedAs);
+      expect((reported as { statusCode?: number }).statusCode).toBeUndefined();
+      expect(tags).toEqual({ error_class: "operational", tool_id: name });
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
+      // The run is over: the stall timer went with the stream.
+      vi.advanceTimersByTime(10 * 60_000);
+      expect(onStall).not.toHaveBeenCalled();
+    });
+
+    it("rethrows a throw from onFailed without relabelling it as a tracking failure", () => {
+      const onFailed = vi.fn(() => {
+        throw new Error("onFailed broke");
+      });
+      subscribe("job-empty-throw", {
+        onComplete: vi.fn(),
+        onFailed,
+        onStall: vi.fn(),
+      });
+
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        }),
+      ).toThrow("onFailed broke");
+      expect(onFailed).toHaveBeenCalledOnce();
+      expect(onFailed).toHaveBeenCalledWith({ reason: "invalidResponse" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+    });
+
+    it("ignores a completed frame of another kind", () => {
+      const onComplete = vi.fn();
+      const onFailed = vi.fn();
+      const cleanup = subscribe("job-batch-frame", {
+        onComplete,
+        onFailed,
+        onStall: vi.fn(),
+      });
+
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "batch", phase: "complete" }),
+      });
+
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onFailed).not.toHaveBeenCalled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+      expect(FakeEventSource.instances[0].readyState).toBe(FakeEventSource.OPEN);
+      cleanup();
+    });
+  },
+);
+
+// #1968: the stall timer is armed before the upload starts. touch() lets the
+// upload's own progress count as a sign of life, so a quiet stream can't cut
+// off a large PDF that is still uploading.
+const touchSubscribers = [
+  ["erase-object", subscribeEraseObjectJobProgress],
+  ["sign-pdf", subscribeSignPdfJobProgress],
+  ["editor-export", subscribeExportJobProgress],
+] as const;
+
+describe.each(touchSubscribers)("%s async progress: touch", (_name, subscribe) => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("restarts the stall timeout the way a heartbeat does", () => {
+    const onStall = vi.fn();
+    const { stop, touch } = subscribe("job-touch", {
+      onComplete: vi.fn(),
+      onFailed: vi.fn(),
+      onStall,
+    });
+
+    vi.advanceTimersByTime(4 * 60_000 + 59_000);
+    touch();
+    vi.advanceTimersByTime(2_000);
+    expect(onStall).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(4 * 60_000 + 59_000);
+    expect(onStall).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it("does nothing after stop", () => {
+    const onStall = vi.fn();
+    const { stop, touch } = subscribe("job-touch-stopped", {
+      onComplete: vi.fn(),
+      onFailed: vi.fn(),
+      onStall,
+    });
+
+    stop();
+    touch();
+    vi.advanceTimersByTime(10 * 60_000);
+
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it("does nothing after the stall already ended the run", () => {
+    const onStall = vi.fn();
+    const { touch } = subscribe("job-touch-stalled", {
+      onComplete: vi.fn(),
+      onFailed: vi.fn(),
+      onStall,
+    });
+
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(onStall).toHaveBeenCalledOnce();
+
+    touch();
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(onStall).toHaveBeenCalledOnce();
   });
 });

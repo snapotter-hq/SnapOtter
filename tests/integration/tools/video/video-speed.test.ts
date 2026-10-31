@@ -35,11 +35,11 @@ beforeAll(async () => {
     // Verify sampleRate is populated correctly from ffprobe
     expect(audioStream.sampleRate).toBe(44100);
   }
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([

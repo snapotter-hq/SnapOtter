@@ -1,4 +1,5 @@
 import type { OcrRuntimeCapability } from "@snapotter/ai";
+import { OCR_FAST_UNSUPPORTED_LANGUAGES } from "@snapotter/shared";
 import { describe, expect, it, vi } from "vitest";
 import { resolveOcrIngressSettings } from "../../../apps/api/src/lib/ocr-capability.js";
 
@@ -18,12 +19,16 @@ const incompatibleCapability: OcrRuntimeCapability = {
   providers: [],
 };
 
-function readyCapability(qualities: readonly ("balanced" | "best")[]): OcrRuntimeCapability {
+function readyCapability(
+  qualities: readonly ("balanced" | "best")[],
+  installedLanguages: readonly string[] = ["ar"],
+): OcrRuntimeCapability {
   return {
     available: true,
     status: "ready",
     qualities,
     providers: ["CPUExecutionProvider"],
+    installedLanguages,
     descriptor: {} as never,
   };
 }
@@ -197,6 +202,95 @@ describe("resolveOcrIngressSettings", () => {
       ok: true,
       settings: { language: "en", quality },
     });
+  });
+
+  it.each(["ocr", "ocr-pdf"])(
+    "rejects explicit Fast Arabic %s before reading or queueing an accurate runtime",
+    (toolId) => {
+      const getCapability = vi.fn(() => readyCapability(["balanced", "best"]));
+
+      expect(
+        resolveOcrIngressSettings(
+          toolId,
+          { quality: "fast", language: "ar" },
+          { readCapability: getCapability },
+        ),
+      ).toEqual({
+        ok: false,
+        code: "FEATURE_INCOMPATIBLE",
+        reason: "fast-arabic-unsupported",
+        requestedQuality: "fast",
+        guidance:
+          "Fast OCR does not support Arabic. Install the Accurate OCR bundle and choose Balanced or Best.",
+      });
+      expect(getCapability).not.toHaveBeenCalled();
+    },
+  );
+
+  it("defaults Arabic to the accurate tier like Korean when no quality is requested", () => {
+    expect(
+      resolveOcrIngressSettings(
+        "ocr",
+        { language: "ar" },
+        { readCapability: () => readyCapability(["balanced", "best"]) },
+      ),
+    ).toMatchObject({ ok: true, settings: { language: "ar", quality: "best" } });
+  });
+
+  it.each([...OCR_FAST_UNSUPPORTED_LANGUAGES])(
+    "gives Fast-unsupported language %s its own reason code, not the generic fallback",
+    (language) => {
+      const result = resolveOcrIngressSettings(
+        "ocr",
+        { quality: "fast", language },
+        { readCapability: () => readyCapability(["balanced", "best"]) },
+      );
+
+      expect(result).toMatchObject({ ok: false, code: "FEATURE_INCOMPATIBLE" });
+      expect(result).not.toMatchObject({ reason: "fast-language-unsupported" });
+    },
+  );
+
+  it.each(["ocr", "ocr-pdf"])(
+    "rejects Arabic %s when the installed pack predates the Arabic recognizer",
+    (toolId) => {
+      const getCapability = vi.fn(() => readyCapability(["balanced", "best"], []));
+
+      expect(
+        resolveOcrIngressSettings(
+          toolId,
+          { quality: "balanced", language: "ar" },
+          { readCapability: getCapability },
+        ),
+      ).toEqual({
+        ok: false,
+        code: "FEATURE_NOT_INSTALLED",
+        reason: "language-not-installed",
+        requestedQuality: "balanced",
+        guidance:
+          "This language is not in the installed OCR pack. Update the Accurate OCR pack in Settings > AI Features, then run it again.",
+      });
+    },
+  );
+
+  it("keeps other languages working on a pack that predates the Arabic recognizer", () => {
+    expect(
+      resolveOcrIngressSettings(
+        "ocr",
+        { quality: "balanced", language: "en" },
+        { readCapability: () => readyCapability(["balanced", "best"], []) },
+      ),
+    ).toEqual({ ok: true, settings: { language: "en", quality: "balanced" } });
+  });
+
+  it("accepts Arabic on the Accurate tiers when the pack includes the recognizer", () => {
+    expect(
+      resolveOcrIngressSettings(
+        "ocr",
+        { quality: "best", language: "ar" },
+        { readCapability: () => readyCapability(["balanced", "best"], ["ar"]) },
+      ),
+    ).toEqual({ ok: true, settings: { language: "ar", quality: "best" } });
   });
 
   it("rejects legacy Tesseract for Korean like explicit Fast", () => {

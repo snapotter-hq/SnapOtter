@@ -1,22 +1,46 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath } from "@snapotter/shared";
+import { apiToolPath, hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
+import { db, schema } from "../../db/index.js";
+import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
+import {
+  allFailedFault,
+  type BatchFault,
+  preFailureFaultFields,
+  reportEngineUnavailable,
+} from "../../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../../lib/env.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
-import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { updateJobProgress } from "../progress.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
+import { isUniqueViolation } from "../../lib/pg-errors.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgClientError,
+  sanitizeSvg,
+} from "../../lib/svg-sanitize.js";
+import { emitInlineBatchAudit } from "../../lib/tool-audit.js";
+import { engineUnavailable } from "../../modality/image-input.js";
+import { requireToolAccess } from "../../permissions.js";
+import { failBatchJob, updateJobProgress } from "../progress.js";
 
-const NON_PREVIEWABLE = new Set(["tiff", "heif"]);
+const NON_PREVIEWABLE = new Set(["tiff", "heif", "jxl"]);
 
 /** Case-insensitive check that a filename ends with one of the accepted extensions. */
 function matchesAccept(filename: string, accept: string[]): boolean {
@@ -77,7 +101,7 @@ async function convertSvg(
       ext = "avif";
       break;
     case "tiff":
-      buffer = await image.tiff({ quality: settings.quality }).toBuffer();
+      buffer = await image.tiff({ compression: "lzw", quality: settings.quality }).toBuffer();
       ext = "tiff";
       break;
     case "gif":
@@ -118,9 +142,13 @@ export function registerSvgToRasterRoute(
 
   // --- Batch endpoint (registered first for route priority) ---
   app.post(`${basePath}/batch`, async (request, reply) => {
+    const authUser = await requireToolAccess(request, reply, opts.toolId);
+    if (!authUser) return;
+
     const files: ParsedSvgFile[] = [];
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
+    let clientJobIdRaw: string | null = null;
 
     try {
       const parts = request.parts();
@@ -141,18 +169,19 @@ export function registerSvgToRasterRoute(
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          const raw = part.value as string;
-          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-            clientJobId = raw;
-          }
+          clientJobIdRaw = part.value as string;
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
+
+    const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+    if (clientJobIdField === null) {
+      return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+    }
+    clientJobId = clientJobIdField ?? null;
 
     if (files.length === 0) {
       return reply.status(400).send({ error: "No SVG files provided" });
@@ -200,11 +229,34 @@ export function registerSvgToRasterRoute(
     }
 
     const jobId = clientJobId || randomUUID();
+
+    // Reserve the id before the first progress write. The progress persist
+    // updates whatever row already has this id, so a clientJobId naming
+    // another job would write into that job's row (#1686, as #1554 was for
+    // pdf-to-image). The insert makes a collision fail on the primary key.
+    // No toolId: reconciliation treats a non-terminal row with a tool id as
+    // queued work, and this inline run has no queue entry.
+    try {
+      await db.insert(schema.jobs).values({
+        id: jobId,
+        userId: authUser.id,
+        type: "batch",
+        status: "processing",
+        inputRefs: [],
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+      }
+      throw err;
+    }
+
     const queue = new PQueue({ concurrency: resolveConcurrency(env) });
     const results: ({ buffer: Buffer; filename: string } | null)[] = new Array(files.length).fill(
       null,
     );
-    const errors: { filename: string; error: string }[] = [];
+    const errors: { filename: string; error: string; code?: string }[] = [];
+    const faults: BatchFault[] = [];
     let completedFiles = 0;
 
     updateJobProgress({
@@ -232,10 +284,30 @@ export function registerSvgToRasterRoute(
         try {
           decompressed = decompressSvgz(file.buffer);
         } catch (err) {
-          errors.push({
-            filename: file.filename,
-            error: err instanceof Error ? err.message : "Invalid SVGZ file",
-          });
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) {
+            const unavailable = engineUnavailable(oom);
+            reportEngineUnavailable(unavailable, opts.toolId, request.log);
+            faults.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...preFailureFaultFields(unavailable),
+            });
+            errors.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...(unavailable.code && { code: unavailable.code }),
+            });
+          } else if (isSvgClientError(err)) {
+            const error = err instanceof Error ? err.message : "Invalid SVGZ file";
+            faults.push({ filename: file.filename, error });
+            errors.push({
+              filename: file.filename,
+              error,
+            });
+          } else {
+            throw err;
+          }
           completedFiles++;
           updateJobProgress({
             jobId,
@@ -249,7 +321,9 @@ export function registerSvgToRasterRoute(
         }
 
         if (!isSvgBuffer(decompressed)) {
-          errors.push({ filename: file.filename, error: "Not a valid SVG file" });
+          const error = "Not a valid SVG file";
+          faults.push({ filename: file.filename, error });
+          errors.push({ filename: file.filename, error });
           completedFiles++;
           updateJobProgress({
             jobId,
@@ -266,10 +340,30 @@ export function registerSvgToRasterRoute(
         try {
           sanitized = sanitizeSvg(decompressed);
         } catch (err) {
-          errors.push({
-            filename: file.filename,
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) {
+            const unavailable = engineUnavailable(oom);
+            reportEngineUnavailable(unavailable, opts.toolId, request.log);
+            faults.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...preFailureFaultFields(unavailable),
+            });
+            errors.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...(unavailable.code && { code: unavailable.code }),
+            });
+          } else if (isSvgClientError(err)) {
+            const error = err instanceof Error ? err.message : "Invalid SVG";
+            faults.push({ filename: file.filename, error });
+            errors.push({
+              filename: file.filename,
+              error,
+            });
+          } else {
+            throw err;
+          }
           completedFiles++;
           updateJobProgress({
             jobId,
@@ -285,11 +379,35 @@ export function registerSvgToRasterRoute(
         try {
           const result = await convertSvg(sanitized, file.filename, settings);
           results[index] = { buffer: result.buffer, filename: result.filename };
-        } catch (err) {
-          errors.push({
-            filename: file.filename,
-            error: err instanceof Error ? err.message : "Conversion failed",
-          });
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+            const unavailable = engineUnavailable(err);
+            reportEngineUnavailable(unavailable, opts.toolId, request.log);
+            faults.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...preFailureFaultFields(unavailable),
+            });
+            errors.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...(unavailable.code && { code: unavailable.code }),
+            });
+          } else {
+            request.log?.warn(
+              { err, filename: file.filename, toolId: opts.toolId },
+              "SVG batch file conversion failed",
+            );
+            const error = stripInternalPaths(
+              err instanceof Error ? err.message : "Conversion failed",
+            );
+            faults.push({ filename: file.filename, error });
+            errors.push({
+              filename: file.filename,
+              error,
+            });
+          }
         }
         completedFiles++;
         updateJobProgress({
@@ -303,19 +421,82 @@ export function registerSvgToRasterRoute(
       }),
     );
 
-    await Promise.all(tasks);
-
-    updateJobProgress({
-      jobId,
-      status: errors.length === files.length ? "failed" : "completed",
-      totalFiles: files.length,
-      completedFiles,
-      failedFiles: errors.length,
-      errors,
-    });
+    try {
+      await Promise.all(tasks);
+    } catch (err) {
+      queue.clear();
+      const statusCode =
+        typeof (err as { statusCode?: unknown })?.statusCode === "number"
+          ? (err as { statusCode: number }).statusCode
+          : 500;
+      const safe = isSafeMessageError(err) && err.statusCode !== undefined;
+      const message =
+        statusCode >= 500 && !safe
+          ? "Internal server error"
+          : friendlyError(err instanceof Error ? err.message : String(err));
+      const applied = await failBatchJob({
+        jobId,
+        totalFiles: files.length,
+        completedFiles: files.length,
+        failedFiles: files.length,
+        errors: [
+          ...errors.map(({ filename, error }) => ({ filename, error })),
+          { filename: "", error: message },
+        ],
+        message,
+        ...(safe && err.code ? { code: err.code } : {}),
+      }).catch((settleErr) => {
+        request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
+        return null;
+      });
+      if (applied === false) {
+        request.log.warn(
+          { jobId },
+          "faulted SVG batch progress row was missing or already terminal; no terminal frame announced",
+        );
+      }
+      throw err;
+    }
 
     if (errors.length === files.length) {
-      return reply.status(422).send({ error: "All files failed processing", errors });
+      const fault = allFailedFault([], 0, faults, files.length);
+      // Awaited: this route owns the row, and until it is terminal it counts
+      // against the user's concurrent-job limit (#1688, #2765). A failed write
+      // still sends the result, but is logged; nothing else will settle the row
+      // before the next restart.
+      const applied = await failBatchJob({
+        jobId,
+        totalFiles: files.length,
+        completedFiles,
+        failedFiles: errors.length,
+        errors: fault
+          ? [
+              ...errors,
+              {
+                filename: "",
+                error: fault.details ? `${fault.error}: ${fault.details}` : fault.error,
+              },
+            ]
+          : errors,
+        message: fault?.error ?? "All files failed processing",
+        ...(fault && { code: fault.code }),
+        ...(fault?.details && { details: fault.details }),
+      }).catch((settleErr) => {
+        request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
+        return null;
+      });
+      if (applied === false) {
+        request.log.warn(
+          { jobId },
+          "faulted SVG batch progress row was missing or already terminal; no terminal frame announced",
+        );
+      }
+      return reply.status(fault?.statusCode ?? 422).send({
+        error: fault?.error ?? "All files failed processing",
+        ...(fault && { code: fault.code }),
+        ...(fault?.details && { details: fault.details }),
+        errors,
+      });
     }
 
     // Deduplicate filenames and build X-File-Results header
@@ -350,34 +531,126 @@ export function registerSvgToRasterRoute(
     // directory. Entries here are in-memory buffers, so unlike the other batch
     // routes there is no storage read to fail, but an archiver fault still has
     // to reach the client.
-    let streamFailed = false;
+    let streamError = null as Error | null;
+    let rejectStream: ((err: Error) => void) | null = null;
+    const streamDone = new Promise<void>((resolve, reject) => {
+      rejectStream = reject;
+      archive.on("end", resolve);
+    });
+    streamDone.catch(() => {});
+
     const failStream = (err: Error, msg: string) => {
-      if (streamFailed) return;
-      streamFailed = true;
+      if (streamError) return;
+      streamError = err;
       request.log.error({ err, jobId }, msg);
       archive.abort();
-      reply.raw.destroy(err);
+      rejectStream?.(err);
     };
 
     archive.on("error", (err) => failStream(err, "Archiver error during SVG batch processing"));
-
-    archive.pipe(reply.raw);
+    const onReplyClose = () => {
+      if (!archive.readableEnded) {
+        failStream(
+          new Error("Response stream closed before SVG batch ZIP finished"),
+          "Response stream closed during SVG batch processing",
+        );
+      }
+    };
+    const onReplyError = (err: Error) =>
+      failStream(err, "Response stream error during SVG batch processing");
+    reply.raw.on("close", onReplyClose);
+    reply.raw.on("error", onReplyError);
+    // Keep reply.raw open until the terminal progress write settles (#1688,
+    // #2751): ending the socket is what resolves the client's request, so
+    // settling after pipe's default auto-end would race the next request's
+    // concurrency check, and settling before the stream finishes would leave
+    // the row completed when the ZIP stream fails.
+    archive.pipe(reply.raw, { end: false });
+    if (reply.raw.destroyed) {
+      onReplyClose();
+    }
 
     // A throw past this point cannot be answered: the reply is hijacked, so
     // Fastify logs and walks away, leaving the socket neither ended nor
     // destroyed and the client waiting forever.
     try {
-      for (const result of results) {
-        if (result) {
+      try {
+        for (const result of results) {
+          if (!result) continue;
+          if (streamError) break;
           archive.append(result.buffer, { name: result.filename });
         }
+        if (!streamError) {
+          void archive
+            .finalize()
+            .catch((err) =>
+              failStream(
+                err instanceof Error ? err : new Error(String(err)),
+                "Failed to finalize ZIP during SVG batch processing",
+              ),
+            );
+        }
+        await streamDone;
+      } catch (err) {
+        failStream(
+          err instanceof Error ? err : new Error(String(err)),
+          "Failed to finalize ZIP during SVG batch processing",
+        );
       }
-      await archive.finalize();
-    } catch (err) {
-      failStream(
-        err instanceof Error ? err : new Error(String(err)),
-        "Failed to finalize ZIP during SVG batch processing",
-      );
+
+      if (streamError) {
+        const message = isSafeMessageError(streamError)
+          ? friendlyError(streamError.message)
+          : "Failed to package batch results";
+        const applied = await failBatchJob({
+          jobId,
+          totalFiles: files.length,
+          completedFiles,
+          failedFiles: errors.length,
+          errors: [...errors, { filename: "", error: message }],
+          message,
+          ...(isSafeMessageError(streamError) && streamError.code
+            ? { code: streamError.code }
+            : {}),
+        }).catch((settleErr) => {
+          request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
+          return null;
+        });
+        if (applied === false) {
+          request.log.warn(
+            { jobId },
+            "faulted SVG batch progress row was missing or already terminal; no terminal frame announced",
+          );
+        }
+      } else {
+        await updateJobProgress({
+          jobId,
+          status: "completed",
+          totalFiles: files.length,
+          completedFiles,
+          failedFiles: errors.length,
+          errors,
+        }).catch((err) =>
+          request.log.error({ err, jobId }, "failed to persist an SVG batch's terminal progress"),
+        );
+        await emitInlineBatchAudit(request, {
+          totalFiles: files.length,
+          completedFiles: files.length - errors.length,
+          failedFiles: errors.length,
+        });
+      }
+    } finally {
+      reply.raw.removeListener("close", onReplyClose);
+      reply.raw.removeListener("error", onReplyError);
+    }
+
+    if (streamError) {
+      if (!reply.raw.destroyed) {
+        reply.raw.once("error", () => {});
+      }
+      reply.raw.destroy(streamError);
+    } else {
+      reply.raw.end();
     }
   });
 
@@ -404,10 +677,8 @@ export function registerSvgToRasterRoute(
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -423,9 +694,12 @@ export function registerSvgToRasterRoute(
     try {
       fileBuffer = decompressSvgz(fileBuffer);
     } catch (err) {
-      return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Invalid SVGZ file",
-      });
+      if (isSvgClientError(err)) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : "Invalid SVGZ file",
+        });
+      }
+      throw asDecoderOutOfMemory(err);
     }
 
     if (!isSvgBuffer(fileBuffer)) {
@@ -437,9 +711,12 @@ export function registerSvgToRasterRoute(
     try {
       fileBuffer = sanitizeSvg(fileBuffer);
     } catch (err) {
-      return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Invalid SVG",
-      });
+      if (isSvgClientError(err)) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : "Invalid SVG",
+        });
+      }
+      throw asDecoderOutOfMemory(err);
     }
 
     let settings: z.infer<typeof settingsSchema>;
@@ -472,15 +749,41 @@ export function registerSvgToRasterRoute(
       let previewUrl: string | undefined;
       if (NON_PREVIEWABLE.has(ext)) {
         try {
-          // Sharp can't decode HEVC-encoded HEIF; decode first
-          const previewInput = ext === "heif" ? await decodeHeic(buffer) : buffer;
-          const previewBuffer = await sharp(previewInput)
-            .resize(1200, 1200, { fit: "inside" })
-            .webp({ quality: 80 })
-            .toBuffer();
-          await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
-          previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-        } catch {
+          // Sharp can't decode HEVC-encoded HEIF or JXL; decode first
+          let previewInput: Buffer | null = buffer;
+          try {
+            if (ext === "heif") {
+              previewInput = await decodeHeic(buffer);
+            } else if (ext === "jxl") {
+              previewInput = await decodeToSharpCompat(buffer, "jxl");
+            }
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+              reportEngineUnavailable(engineUnavailable(decodeErr), opts.toolId, request.log);
+              previewInput = null;
+            } else {
+              throw rawDecodeErr;
+            }
+          }
+          if (previewInput) {
+            const previewBuffer = await sharp(previewInput)
+              .resize(1200, 1200, { fit: "inside" })
+              .webp({ quality: 80 })
+              .toBuffer();
+            await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
+            previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+          }
+        } catch (err) {
+          const decoderErr = asDecoderOutOfMemory(err);
+          if (isDecoderUnavailable(decoderErr)) {
+            reportEngineUnavailable(engineUnavailable(decoderErr), opts.toolId, request.log);
+          } else {
+            request.log.warn(
+              { err, jobId, ext },
+              "preview generation failed; result has no renderable preview",
+            );
+          }
           // Non-fatal - frontend shows success card fallback
         }
       }
@@ -492,10 +795,13 @@ export function registerSvgToRasterRoute(
         originalSize: fileBuffer.length,
         processedSize: buffer.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: opts.toolId }, "SVG conversion failed");
       return reply.status(422).send({
         error: "SVG conversion failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

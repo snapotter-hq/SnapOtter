@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { en } from "@snapotter/shared/i18n/en.js";
 import { act, renderHook } from "@testing-library/react";
 import AdmZip from "adm-zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +12,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -31,7 +33,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { track } from "@/lib/analytics";
+import { captureHandledError, track } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 
 interface MockXhr {
@@ -157,6 +159,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.mocked(track).mockClear();
+  // Console spies must not outlive a test that failed partway.
+  vi.restoreAllMocks();
 });
 
 function startBatchRun() {
@@ -324,6 +328,62 @@ describe("useToolProcessor batch cancel (#767)", () => {
     hook.unmount();
   });
 
+  // #1814: a local cancel whose teardown throws must still end the batch.
+  // Zustand commits a write before its listeners run, so a throw there used
+  // to skip every write after it and the outcome report: the run kept its
+  // timers, its stream and its job handle, with nothing left to end it.
+  it.each([
+    [
+      "every write",
+      () => {
+        throw new Error("teardown broke");
+      },
+    ],
+    [
+      "the cancel-handle write",
+      (
+        state: ReturnType<typeof useFileStore.getState>,
+        prev: ReturnType<typeof useFileStore.getState>,
+      ) => {
+        if (prev.activeJobId && !state.activeJobId) throw new Error("teardown broke");
+      },
+    ],
+  ] as const)("ends a locally canceled batch when %s throws (#1814)", async (_name, listener) => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const hook = startBatchRun();
+    const unsubscribe = useFileStore.subscribe(listener);
+
+    try {
+      await act(async () => {
+        // The first throw still reaches the cancel button's catch.
+        await expect(hook.result.current.cancelCurrentJob()).rejects.toThrow("teardown broke");
+      });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+
+    const state = useFileStore.getState();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe("Canceled");
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(hook.result.current.progress.phase).toBe("idle");
+    expect(latestSse().close).toHaveBeenCalled();
+    for (const entry of state.entries) {
+      expect(entry).toMatchObject({ status: "failed", error: "Canceled" });
+    }
+    await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
+    expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
+
+    hook.unmount();
+  });
+
   it("labels skipped files on the sync partial-ZIP response after a cancel", async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
@@ -393,9 +453,17 @@ describe("useToolProcessor batch cancel (#767)", () => {
       xhrs[0].onload?.();
     });
 
+    // The server's "can't cancel this now" is told to the user (#1815).
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
     await act(async () => {
-      await hook.result.current.cancelCurrentJob();
+      await expect(hook.result.current.cancelCurrentJob()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "notCancellable",
+      });
     });
+    expect(consoleInfo).toHaveBeenCalledWith(
+      "Cancel refused: the server can't cancel this run now",
+    );
 
     act(() => {
       sendBatchFrame({
@@ -561,6 +629,183 @@ describe("useToolProcessor batch cancel (#767)", () => {
     });
     expect(useFileStore.getState().error).toBe("All files failed processing");
 
+    hook.unmount();
+  });
+});
+
+// #1341 made a batch 413 read in the user's language. That text can't be
+// classified for feedback, so the entry also stores the cause (#1596).
+describe("useToolProcessor batch 413", () => {
+  it("fails every file with the translated too-large text and an upload_error category", async () => {
+    const hook = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 413;
+      xhrs[0].response = new Blob(["<html>413 Request Entity Too Large</html>"]);
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries.every((e) => e.status === "failed")).toBe(true);
+    });
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry).toMatchObject({ error: en.errors.fileTooLarge, errorCategory: "upload_error" });
+    }
+
+    hook.unmount();
+  });
+});
+/**
+ * #1815: a cancel the server refuses used to vanish. The batch keeps going
+ * (only the server can stop it, #767), but the cancel rejects with the
+ * refusal's reason for the button to show, the refusal is logged, and only a
+ * fault reaches Sentry, under a constant message with the status as its tag.
+ */
+describe("useToolProcessor refused cancel (#1815)", () => {
+  it.each([
+    [409, "notCancellable", "info", false],
+    [401, "notAllowed", "warn", false],
+    [403, "notAllowed", "warn", false],
+    [429, "failed", "warn", false],
+    [500, "failed", "warn", true],
+  ] as const)(
+    "keeps the batch going on a %i and rejects with %s",
+    async (status, reason, level, reported) => {
+      const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.mocked(captureHandledError).mockClear();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({
+            ok: false,
+            status,
+            json: () => Promise.resolve({ error: "secret server detail" }),
+          } as unknown as Response),
+        ),
+      );
+      const hook = startBatchRun();
+
+      await act(async () => {
+        await expect(hook.result.current.cancelCurrentJob()).rejects.toMatchObject({
+          name: "CancelRefusedError",
+          reason,
+          status,
+        });
+      });
+
+      const state = useFileStore.getState();
+      expect(state.processing).toBe(true);
+      expect(state.activeJobId).toBe(JOB_ID);
+      expect(state.cancelCurrentJob).not.toBeNull();
+      expect(state.error).toBeNull();
+      expect(xhrs[0].abort).not.toHaveBeenCalled();
+      expect(state.entries.every((e) => e.status === "processing")).toBe(true);
+
+      const logged = level === "info" ? consoleInfo : consoleWarn;
+      expect(logged).toHaveBeenCalledWith("Cancel refused", status);
+      const reports = vi.mocked(captureHandledError).mock.calls;
+      if (reported) {
+        expect(reports).toHaveLength(1);
+        const [report, tags] = reports[0] as unknown as [
+          Error & { statusCode?: number },
+          Record<string, string>,
+        ];
+        expect(report.message).toBe("The server refused a cancel");
+        expect(report.statusCode).toBe(status);
+        expect(tags).toEqual({
+          error_class: "operational",
+          tool_id: "resize",
+          status_code: String(status),
+        });
+        expect(JSON.stringify(reports)).not.toContain("secret server detail");
+      } else {
+        expect(reports).toHaveLength(0);
+      }
+
+      // The refused click recorded no intent: a later full result settles as
+      // a plain completion, not a cancel.
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 202;
+        xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+        xhrs[0].onload?.();
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(fullZipBlob()) }),
+        ),
+      );
+      act(() => {
+        sendBatchFrame({
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: { ...PARTIAL_RESULT, fileResults: FULL_NAMES },
+        });
+      });
+      await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
+      expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "completed" });
+
+      consoleInfo.mockRestore();
+      consoleWarn.mockRestore();
+      hook.unmount();
+    },
+  );
+
+  it("rejects a cancel request that never reached the server and leaves the batch running", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(captureHandledError).mockClear();
+    const failure = new TypeError("Failed to fetch");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(failure)),
+    );
+    const hook = startBatchRun();
+
+    await act(async () => {
+      await expect(hook.result.current.cancelCurrentJob()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+      });
+    });
+
+    expect(consoleWarn).toHaveBeenCalledWith("Cancel request failed", failure);
+    expect(captureHandledError).not.toHaveBeenCalled();
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+
+    consoleWarn.mockRestore();
+    hook.unmount();
+  });
+
+  it("reports a cancel request that failed for any other reason under the tool's id", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(captureHandledError).mockClear();
+    const failure = new Error("headers broke");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(failure)),
+    );
+    const hook = startBatchRun();
+
+    await act(async () => {
+      await expect(hook.result.current.cancelCurrentJob()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+      });
+    });
+
+    const reports = vi.mocked(captureHandledError).mock.calls;
+    expect(reports).toHaveLength(1);
+    const [report, tags] = reports[0] as unknown as [Error, Record<string, string>];
+    expect(report.message).toBe("A cancel request never reached the server");
+    expect(report.cause).toBe(failure);
+    expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
     hook.unmount();
   });
 });

@@ -24,6 +24,23 @@ function makeIspeBox(width: number, height: number): Buffer {
   return box;
 }
 
+/**
+ * Rewrite an AVIF fixture's ftyp major and compatible brands from `avif` to
+ * `mif1` so format detection classifies it as generic HEIF while its payload
+ * remains an AV1 bitstream (#1462).
+ */
+function makeMif1Av1Buffer(): Buffer {
+  const buf = Buffer.from(readFixture(fixtures.image.formats("avif")));
+  const ftypSize = buf.readUInt32BE(0);
+  buf.write("mif1", 8, 4, "ascii");
+  for (let offset = 16; offset + 4 <= ftypSize && offset + 4 <= buf.length; offset += 4) {
+    if (buf.subarray(offset, offset + 4).toString("ascii") === "avif") {
+      buf.write("mif1", offset, 4, "ascii");
+    }
+  }
+  return buf;
+}
+
 describe("decodeHeic", () => {
   it("rejects source dimensions over a caller-supplied pixel cap", async () => {
     const heicBuf = readFixture(fixtures.image.formats("heic"));
@@ -53,6 +70,77 @@ describe("decodeHeic", () => {
     await expect(
       decodeHeic(extremeImage, { maxDimension: 40_000, maxPixels: 40_000_000 }),
     ).rejects.toThrow(/dimension safety limit.*40,001x1/i);
+  });
+
+  it("does not let a 0x0 or zero-side ispe box bypass the dimension preflight when safety limits are set (#2896)", async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      for (const [width, height] of [
+        [0, 0],
+        [0, 100],
+        [100, 0],
+      ] as const) {
+        const zeroIspe = Buffer.concat([makeHeicHeader("heic"), makeIspeBox(width, height)]);
+        await expect(decodeHeic(zeroIspe, { maxPixels: 1_000_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+        await expect(decodeHeic(zeroIspe, { maxDimension: 1_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+      }
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("does not trust a small valid ispe box when another ispe box has zero dimensions (#2896)", async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      for (const boxes of [
+        [makeIspeBox(100, 100), makeIspeBox(0, 0)],
+        [makeIspeBox(0, 0), makeIspeBox(100, 100)],
+        [makeIspeBox(100, 100), makeIspeBox(100, 0)],
+        [makeIspeBox(100, 100), makeIspeBox(0, 100)],
+      ]) {
+        const mixedIspe = Buffer.concat([makeHeicHeader("heic"), ...boxes]);
+        await expect(decodeHeic(mixedIspe, { maxPixels: 1_000_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+        await expect(decodeHeic(mixedIspe, { maxDimension: 1_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+      }
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("still rejects an oversized ispe box before metadata preflight when paired with a 0x0 ispe box (#2896)", async () => {
+    const mixedOversized = Buffer.concat([
+      makeHeicHeader("heic"),
+      makeIspeBox(0, 0),
+      makeIspeBox(10_000, 10_000),
+    ]);
+    await expect(decodeHeic(mixedOversized, { maxPixels: 1_000_000 })).rejects.toThrow(
+      /pixel safety limit.*10000x10000/i,
+    );
+  });
+
+  it("recovers via Sharp metadata preflight when a valid mif1 AV1 container has a trailing 0x0 ispe box (#2896)", async () => {
+    const mif1WithTrailingZeroIspe = Buffer.concat([makeMif1Av1Buffer(), makeIspeBox(0, 0)]);
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await decodeHeic(mif1WithTrailingZeroIspe, {
+        maxPixels: 1_000_000,
+        maxDimension: 1_000,
+      });
+      expect(isPng(result)).toBe(true);
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 
   it("honors an already-aborted request", async () => {
@@ -116,6 +204,69 @@ describe("decodeHeic", () => {
       .filter((f) => !beforeSet.has(f));
     expect(leftover).toHaveLength(0);
   });
+
+  it("decodes an AV1 image in a mif1 HEIF container via Sharp without shelling out (#1462)", async () => {
+    const mif1Av1 = makeMif1Av1Buffer();
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await decodeHeic(mif1Av1);
+      expect(isPng(result)).toBe(true);
+      const meta = await sharp(result).metadata();
+      expect(meta.width).toBe(740);
+      expect(meta.height).toBe(493);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("preserves EXIF metadata when decoding a mif1 AV1 container via Sharp (#1462)", async () => {
+    const avifWithExif = await sharp({
+      create: { width: 32, height: 16, channels: 3, background: { r: 200, g: 100, b: 50 } },
+    })
+      .withMetadata({ orientation: 6 })
+      .avif()
+      .toBuffer();
+    const mif1WithExif = Buffer.from(avifWithExif);
+    const ftypSize = mif1WithExif.readUInt32BE(0);
+    mif1WithExif.write("mif1", 8, 4, "ascii");
+    for (
+      let offset = 16;
+      offset + 4 <= ftypSize && offset + 4 <= mif1WithExif.length;
+      offset += 4
+    ) {
+      if (mif1WithExif.subarray(offset, offset + 4).toString("ascii") === "avif") {
+        mif1WithExif.write("mif1", offset, 4, "ascii");
+      }
+    }
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await decodeHeic(mif1WithExif);
+      const meta = await sharp(result).metadata();
+      expect(meta.format).toBe("png");
+      expect(meta.exif).toBeDefined();
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("enforces maxDimension and maxPixels on a mif1 AV1 buffer without a CLI decoder (#1462)", async () => {
+    const mif1Av1 = makeMif1Av1Buffer();
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      await expect(
+        decodeHeic(mif1Av1, { maxDimension: 500, maxPixels: 40_000_000 }),
+      ).rejects.toThrow(/dimension safety limit.*740x493/i);
+      await expect(decodeHeic(mif1Av1, { maxPixels: 100 })).rejects.toThrow(
+        /pixel safety limit.*740x493/i,
+      );
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
 });
 
 describe("ensureSharpCompat", () => {
@@ -123,6 +274,18 @@ describe("ensureSharpCompat", () => {
     const heicBuf = readFixture(fixtures.image.formats("heic"));
     const result = await ensureSharpCompat(heicBuf);
     expect(isPng(result)).toBe(true);
+  });
+
+  it("decodes a mif1 AV1 HEIF buffer to PNG via Sharp without a CLI decoder (#1462)", async () => {
+    const mif1Av1 = makeMif1Av1Buffer();
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await ensureSharpCompat(mif1Av1);
+      expect(isPng(result)).toBe(true);
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 
   it("passes through a PNG buffer unchanged", async () => {

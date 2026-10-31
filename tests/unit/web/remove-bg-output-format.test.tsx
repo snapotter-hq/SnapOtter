@@ -1,10 +1,21 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { en } from "@snapotter/shared/i18n/en.js";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const deployment = vi.hoisted(() => ({ basePath: "", downloadUrl: null as string | null }));
+const deployment = vi.hoisted(() => ({
+  basePath: "",
+  downloadUrl: null as string | null,
+  // Phase 1 not run yet: no result, so the submit button is what renders.
+  beforeRun: false,
+  // What the processor reports while and after a run, for the tests that watch
+  // the panel react to a re-run.
+  processing: false,
+  error: null as string | null,
+  processFiles: vi.fn(),
+}));
 
 // Phase 1 (background removal) is "done": the processor exposes a mask PNG
 // download URL and is no longer processing, so the wrapper renders its
@@ -12,19 +23,20 @@ const deployment = vi.hoisted(() => ({ basePath: "", downloadUrl: null as string
 // chosen output format; Phase 1 always emits PNG.
 vi.mock("@/hooks/use-tool-processor", () => ({
   useToolProcessor: () => ({
-    processFiles: vi.fn(),
+    processFiles: deployment.processFiles,
     processAllFiles: vi.fn(),
-    processing: false,
-    error: null,
-    downloadUrl:
-      deployment.downloadUrl ?? `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`,
+    processing: deployment.processing,
+    error: deployment.error,
+    downloadUrl: deployment.beforeRun
+      ? null
+      : (deployment.downloadUrl ?? `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`),
     originalSize: 1000,
     processedSize: 500,
     progress: { phase: "idle", percent: 0, stage: "", elapsed: 0 },
   }),
 }));
 
-import { RemoveBgSettings } from "@/components/tools/remove-bg-settings";
+import { RemoveBgControls, RemoveBgSettings } from "@/components/tools/remove-bg-settings";
 import { useFileStore } from "@/stores/file-store";
 
 beforeEach(() => {
@@ -43,7 +55,584 @@ afterEach(() => {
   vi.unstubAllGlobals();
   deployment.basePath = "";
   deployment.downloadUrl = null;
+  deployment.beforeRun = false;
+  deployment.processing = false;
+  deployment.error = null;
+  deployment.processFiles.mockReset();
   useFileStore.getState().setFiles([]);
+});
+
+// The single-file page sent only the model to Phase 1, while the batch and
+// pipeline paths sent every setting. Edge smoothing and decontamination are
+// sidecar options that Phase 2 can't apply, so they have to ride on the
+// Phase 1 request (#2077).
+describe("remove-background Phase 1 request (#2077)", () => {
+  it("sends edge smoothing and decontamination for a single file", async () => {
+    deployment.beforeRun = true;
+    render(<RemoveBgSettings />);
+
+    fireEvent.click(await screen.findByText("Effects"));
+    fireEvent.change(await screen.findByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    const [, settings, options] = deployment.processFiles.mock.calls[0];
+    expect(settings).toMatchObject({ edgeRefine: 3, decontaminate: true });
+    expect(options).toEqual({ skipLibrarySave: true });
+  });
+
+  it("sends only the model when the refinements are left at their defaults", async () => {
+    deployment.beforeRun = true;
+    render(<RemoveBgSettings />);
+
+    fireEvent.click(await screen.findByTestId("remove-background-submit"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    const [, settings] = deployment.processFiles.mock.calls[0];
+    expect(settings).not.toHaveProperty("edgeRefine");
+    expect(settings).not.toHaveProperty("decontaminate");
+  });
+});
+
+// Edge smoothing and decontamination are sidecar options: only a new removal can
+// apply them. Changing them after a result leaves the download as it was, so the
+// panel says so and offers to run again (#2112).
+describe("remove-background refinements changed after the first run (#2112)", () => {
+  const stale = () => screen.queryByTestId("remove-background-refine-stale");
+
+  /** Runs the removal with the defaults and lands its result. */
+  async function runAndLand(view: ReturnType<typeof render>) {
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-submit"));
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    deployment.beforeRun = false;
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+  }
+
+  async function openEffects() {
+    fireEvent.click(await screen.findByText(en.toolSettings["remove-bg"].effects));
+  }
+
+  it("says nothing while the settings still match the run", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("offers to run again once edge smoothing changes", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+  });
+
+  it("offers to run again once decontamination changes, and stops when it is changed back", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    expect(stale()).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("runs the removal again with the new values and settles the notice when it lands", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+
+    fireEvent.click(screen.getByTestId("remove-background-rerun"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(2));
+    const [, settings, options] = deployment.processFiles.mock.calls[1];
+    expect(settings).toMatchObject({ edgeRefine: 2, decontaminate: true });
+    expect(options).toEqual({ skipLibrarySave: true });
+
+    // Land the second run: the notice clears while the controls match the new run,
+    // and reappears if a control is moved back to its default.
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "0" },
+    });
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("disables the re-run button while effects are rendering and clears a prior effects error on re-run", async () => {
+    let settleEffects!: (response: unknown) => void;
+    const fetch = vi.fn().mockReturnValue(new Promise((resolve) => (settleEffects = resolve)));
+    vi.stubGlobal("fetch", fetch);
+
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("remove-background-rerun")).toBeDisabled();
+
+    await act(async () => {
+      settleEffects({ ok: false, status: 500, json: async () => ({ error: "composite failed" }) });
+    });
+    expect(await screen.findByText("composite failed")).toBeVisible();
+    expect(screen.getByTestId("remove-background-rerun")).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId("remove-background-rerun"));
+    expect(screen.queryByText("composite failed")).toBeNull();
+  });
+
+  it("still offers to run again for a result restored after a remount", async () => {
+    // Crossing the mobile/desktop layout breakpoint remounts the panel while
+    // the result stays loaded; the run's values survive the remount and any
+    // refinement set afterwards counts as a change.
+    const first = render(<RemoveBgSettings />);
+    await runAndLand(first);
+    first.unmount();
+
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "1" },
+    });
+
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("assumes default refinements and model when a cutout is already present without a recorded run", async () => {
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
+    );
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("does not react to settings Phase 2 can apply itself", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(screen.getByText(en.toolSettings["remove-background"].blurBackground));
+
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("offers to run again when Subject changes the model, and clears when switched back (#2488)", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("offers to run again when Passport or Quality changes the model and re-runs with the new model (#2488)", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+
+    // Uncheck Passport / ID photo at the default HD tier: model switches from
+    // birefnet-portrait to birefnet-general-lite and flags the cutout as stale (#2503).
+    fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+
+    // Re-checking Passport returns the model to birefnet-portrait and clears the notice.
+    fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
+    expect(stale()).not.toBeInTheDocument();
+
+    // Clicking Max directly while Passport is checked unchecks Passport, selects
+    // birefnet-matting, and offers to re-run (#2503).
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
+    expect(
+      screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+    ).not.toBeChecked();
+    expect(stale()).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("remove-background-rerun"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(2));
+    const [, settings, options] = deployment.processFiles.mock.calls[1];
+    expect(settings).toEqual({ model: "birefnet-matting" });
+    expect(options).toEqual({ skipLibrarySave: true });
+
+    // Land the second run: notice clears while model stays birefnet-matting, and
+    // reappears if Quality is moved back to HD (birefnet-general-lite) or Passport is checked.
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].hd }));
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("sends u2net, birefnet-matting, and birefnet-hr-matting when Fast, Max, or Ultra is clicked on People without manually unchecking Passport (#2503)", async () => {
+    const onChange = vi.fn();
+    const lastModel = () => (onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>)?.model;
+    render(<RemoveBgControls settings={{}} onChange={onChange} />);
+
+    const passportCheckbox = screen.getByLabelText(
+      en.toolSettings["remove-background"].passportIdPhoto,
+    );
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Clicking the already-active HD button keeps Passport checked and birefnet-portrait active.
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].hd }));
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Clicking Fast unchecks Passport and emits u2net.
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].fast }),
+    );
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("u2net");
+
+    // Re-checking Passport resets Quality to HD and emits birefnet-portrait.
+    fireEvent.click(passportCheckbox);
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Clicking Max unchecks Passport and emits birefnet-matting.
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("birefnet-matting");
+
+    // Clicking Ultra keeps Passport unchecked and emits birefnet-hr-matting.
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].ultra }),
+    );
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("birefnet-hr-matting");
+
+    // Re-checking Passport from Ultra returns to HD + birefnet-portrait, and unchecking it at HD
+    // switches to birefnet-general-lite (#2503).
+    fireEvent.click(passportCheckbox);
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    fireEvent.click(passportCheckbox);
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("birefnet-general-lite");
+
+    // Switching to Products and back to People while on HD re-checks Passport (birefnet-portrait).
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    expect(lastModel()).toBe("bria-rmbg");
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
+    expect(
+      screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+    ).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Switching to Products and back to People while on Fast, Max, or Ultra preserves the chosen
+    // quality model and keeps Passport unchecked.
+    for (const [tierKey, tierModel, productsModel] of [
+      ["fast", "u2net", "u2net"],
+      ["max", "birefnet-matting", "birefnet-general"],
+      ["ultra", "birefnet-hr-matting", "birefnet-general"],
+    ] as const) {
+      fireEvent.click(
+        screen.getByRole("button", { name: en.toolSettings["remove-background"][tierKey] }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
+      );
+      expect(lastModel()).toBe(productsModel);
+      fireEvent.click(
+        screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+      );
+      expect(
+        screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+      ).not.toBeChecked();
+      expect(lastModel()).toBe(tierModel);
+    }
+  });
+
+  it.each([
+    { labelKey: "fast" as const, expectedModel: "u2net" },
+    { labelKey: "max" as const, expectedModel: "birefnet-matting" },
+    { labelKey: "ultra" as const, expectedModel: "birefnet-hr-matting" },
+  ])(
+    "submits Phase 1 with $expectedModel when $labelKey is clicked on People (#2503)",
+    async ({ labelKey, expectedModel }) => {
+      deployment.beforeRun = true;
+      render(<RemoveBgSettings />);
+
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: en.toolSettings["remove-background"][labelKey],
+        }),
+      );
+      fireEvent.click(screen.getByTestId("remove-background-submit"));
+
+      await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+      expect(deployment.processFiles.mock.calls[0][1]).toEqual({ model: expectedModel });
+    },
+  );
+
+  it("assumes the default model after a remount and offers to run again when Subject changes (#2488)", async () => {
+    const first = render(<RemoveBgSettings />);
+    await runAndLand(first);
+    first.unmount();
+
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
+    );
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("records a non-default model on the first run and offers to run again if switched back to People (#2488)", async () => {
+    deployment.beforeRun = true;
+    const view = render(<RemoveBgSettings />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    expect(deployment.processFiles.mock.calls[0][1]).toEqual({ model: "bria-rmbg" });
+
+    deployment.beforeRun = false;
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("preserves non-default controls and recorded removalRefine across a remount (#2489)", async () => {
+    deployment.beforeRun = true;
+    const first = render(<RemoveBgSettings />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].color }));
+    fireEvent.change(screen.getByPlaceholderText("#FF5500"), { target: { value: "#FF0000" } });
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    expect(deployment.processFiles.mock.calls[0][1]).toEqual({
+      model: "birefnet-general",
+      edgeRefine: 3,
+      decontaminate: true,
+    });
+
+    deployment.beforeRun = false;
+    first.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download-effects");
+    expect(stale()).not.toBeInTheDocument();
+
+    // Crossing the 768px breakpoint unmounts and remounts RemoveBgSettings
+    // while the cutout remains in useFileStore.
+    first.unmount();
+    render(<RemoveBgSettings />);
+
+    await screen.findByTestId("remove-background-download-effects");
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("3");
+    expect(
+      screen.getByText(en.toolSettings["remove-background"].edgeSmoothingStrong),
+    ).toBeVisible();
+    expect(screen.getByTestId("remove-background-decontaminate")).toBeChecked();
+    expect(screen.getByDisplayValue("#FF0000")).toBeVisible();
+    expect(screen.getByTestId("remove-background-format-webp")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(stale()).not.toBeInTheDocument();
+
+    // Changing edge smoothing back to 0 after the remount must flag the cutout as stale,
+    // because the cutout was generated with edgeRefine: 3, decontaminate: true.
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "0" },
+    });
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("keeps a manually collapsed Effects section closed and resets when a different file is loaded before remounting (#2489)", async () => {
+    deployment.beforeRun = true;
+    const first = render(<RemoveBgSettings />);
+
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "2" },
+    });
+    // Collapse Effects while edgeRefine > 0 is active.
+    await openEffects();
+    expect(screen.queryByTestId("remove-background-edge-refine")).not.toBeInTheDocument();
+
+    first.unmount();
+    const second = render(<RemoveBgSettings />);
+    // Effects stays collapsed across the remount even though edgeRefine is 2.
+    expect(screen.queryByTestId("remove-background-edge-refine")).not.toBeInTheDocument();
+    await openEffects();
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("2");
+
+    // Replacing the file in useFileStore directly while unmounted resets controls to defaults.
+    second.unmount();
+    useFileStore
+      .getState()
+      .setFiles([new File([new Uint8Array([9, 8, 7])], "fresh.png", { type: "image/png" })]);
+    render(<RemoveBgSettings />);
+    expect(screen.queryByTestId("remove-background-edge-refine")).not.toBeInTheDocument();
+    await openEffects();
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("0");
+  });
+
+  it("re-anchors serverFileId on the moved entry when reordered during a Phase 2 overwrite save (#1114)", async () => {
+    useFileStore
+      .getState()
+      .setFiles([new File([new Uint8Array([1, 2, 3])], "pic-a.png", { type: "image/png" })]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a-v1" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    let resolveEffects: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveEffects = resolve;
+          }),
+      ),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(<RemoveBgSettings />);
+    const btn = await screen.findByTestId("remove-background-download-effects");
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(resolveEffects).toBeDefined());
+    // Add a second file and reorder [pic-a.png, pic-b.png] -> [pic-b.png, pic-a.png] while /effects is in flight.
+    act(() => {
+      useFileStore
+        .getState()
+        .addFiles([new File([new Uint8Array([4, 5, 6])], "pic-b.png", { type: "image/png" })]);
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+
+    await act(async () => {
+      resolveEffects?.(
+        new Response(
+          JSON.stringify({
+            downloadUrl: "/api/v1/download/JOB123/pic_effects.png",
+            savedFileId: "lib-a-v2",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    await waitFor(() => expect(useFileStore.getState().lastSavedLibraryFileId).toBe("lib-a-v2"));
+    const { entries } = useFileStore.getState();
+    expect(entries[1].file.name).toBe("pic-a.png");
+    expect(entries[1].serverFileId).toBe("lib-a-v2");
+    expect(entries[0].file.name).toBe("pic-b.png");
+    expect(entries[0].serverFileId).toBeUndefined();
+  });
+
+  it.each([
+    "birefnet-portrait",
+    "birefnet-matting",
+    "birefnet-hr-matting",
+    "u2net",
+    "bria-rmbg",
+    "birefnet-general-lite",
+    "birefnet-general",
+  ] as const)("seeds RemoveBgControls model %s without resetting it on mount (#2489)", (model) => {
+    const onChange = vi.fn();
+    render(
+      <RemoveBgControls
+        settings={{
+          model,
+          backgroundType: "gradient",
+          gradientColor1: "#112233",
+          gradientColor2: "#445566",
+          gradientAngle: 90,
+          blurEnabled: true,
+          blurIntensity: 70,
+          shadowEnabled: true,
+          shadowOpacity: 80,
+          edgeRefine: 2,
+          decontaminate: true,
+          outputFormat: "avif",
+        }}
+        onChange={onChange}
+      />,
+    );
+
+    const emitted = onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(emitted).toEqual({
+      model,
+      backgroundType: "gradient",
+      gradientColor1: "#112233",
+      gradientColor2: "#445566",
+      gradientAngle: 90,
+      blurEnabled: true,
+      blurIntensity: 70,
+      shadowEnabled: true,
+      shadowOpacity: 80,
+      edgeRefine: 2,
+      decontaminate: true,
+      outputFormat: "avif",
+    });
+  });
 });
 
 describe("remove-background output format routing (#720)", () => {
@@ -97,4 +686,327 @@ describe("remove-background output format routing (#720)", () => {
     expect(await screen.findByTestId("remove-background-submit")).toBeInTheDocument();
     expect(screen.queryByTestId("remove-background-download")).not.toBeInTheDocument();
   });
+});
+
+// The effects request reads the mask and original an earlier removal stored.
+// When the server no longer holds them it answers 410 BACKGROUND_REMOVAL_EXPIRED
+// and the panel removes the background again instead of leaving a download
+// button that can never work (#2119).
+describe("remove-background effects after the stored cutout expired (#2119)", () => {
+  async function applyEffects(answer: { status: number; body: unknown }) {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: answer.status,
+      json: async () => answer.body,
+    });
+    vi.stubGlobal("fetch", fetch);
+    const view = render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    return view;
+  }
+
+  const expired = {
+    status: 410,
+    body: { error: "expired", code: "BACKGROUND_REMOVAL_EXPIRED" },
+  };
+  const note = () => en.toolSettings["remove-background"].effectsExpired;
+
+  it("removes the background again and says why", async () => {
+    await applyEffects({
+      status: 410,
+      body: { error: "expired", code: "BACKGROUND_REMOVAL_EXPIRED" },
+    });
+
+    expect(
+      await screen.findByText(en.toolSettings["remove-background"].effectsExpired),
+    ).toBeVisible();
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    const [files, , options] = deployment.processFiles.mock.calls[0];
+    expect(files).toHaveLength(1);
+    expect(options).toEqual({ skipLibrarySave: true });
+  });
+
+  it("shows any other failure as before, without running the removal again", async () => {
+    await applyEffects({ status: 500, body: { error: "disk on fire" } });
+
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(screen.queryByText(en.toolSettings["remove-background"].effectsExpired)).toBeNull();
+    expect(deployment.processFiles).not.toHaveBeenCalled();
+  });
+
+  it("drops the note when the new removal fails, leaving the real error", async () => {
+    const view = await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    // A run that starts clears the entry's result, and a failed one leaves it
+    // cleared, so the panel never sees a fresh download URL.
+    deployment.beforeRun = true;
+    deployment.processing = true;
+    view.rerender(<RemoveBgSettings />);
+    deployment.processing = false;
+    deployment.error = "Canceled";
+    view.rerender(<RemoveBgSettings />);
+
+    await waitFor(() => expect(screen.queryByText(note())).toBeNull());
+    expect(screen.getByText("Canceled")).toBeVisible();
+  });
+
+  it("drops the note once the new removal's result arrives", async () => {
+    const view = await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    view.rerender(<RemoveBgSettings />);
+
+    await waitFor(() => expect(screen.queryByText(note())).toBeNull());
+  });
+
+  it("does not run the removal again for a file the user has since replaced", async () => {
+    let answer!: (response: unknown) => void;
+    const fetch = vi.fn().mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    vi.stubGlobal("fetch", fetch);
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    // A different file lands in the store while the request is in flight.
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([new File([new Uint8Array([4, 5, 6])], "other.png", { type: "image/png" })]);
+    });
+    await act(async () => {
+      answer({ ok: false, status: 410, json: async () => expired.body });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(deployment.processFiles).not.toHaveBeenCalled();
+    expect(screen.queryByText(note())).toBeNull();
+  });
+
+  it("clears a Phase 2 effectsError when Undo clears the cutout (#2490)", async () => {
+    const view = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    // Undo clears the entry's processed URL without starting a new removal.
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+
+    expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("clears a Phase 2 effectsError when the loaded file is replaced (#2490)", async () => {
+    await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([new File([new Uint8Array([4, 5, 6])], "other.png", { type: "image/png" })]);
+    });
+
+    expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("clears the 410 expired notice if the file is replaced while the automatic re-run is in flight (#2490)", async () => {
+    await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([new File([new Uint8Array([4, 5, 6])], "other.png", { type: "image/png" })]);
+    });
+
+    expect(screen.queryByText(note())).toBeNull();
+  });
+
+  it("clears the 410 expired notice if Undo clears the state while the automatic re-run is in flight (#2490)", async () => {
+    const view = await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    // Real in-flight re-run state: processedUrl is cleared while processing is true.
+    deployment.beforeRun = true;
+    deployment.processing = true;
+    view.rerender(<RemoveBgSettings />);
+    expect(screen.getByText(note())).toBeVisible();
+
+    // Undo / reset clears processing with no result URL.
+    deployment.processing = false;
+    view.rerender(<RemoveBgSettings />);
+
+    expect(screen.queryByText(note())).toBeNull();
+  });
+
+  it("clears effectsError when a second file is added and keeps it cleared when removed (#2490)", async () => {
+    await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    act(() => {
+      useFileStore
+        .getState()
+        .addFiles([new File([new Uint8Array([4, 5, 6])], "second.png", { type: "image/png" })]);
+    });
+
+    expect(screen.queryByText("disk on fire")).toBeNull();
+
+    // Removing the second file restores the original single-file cutout without bringing back the old error.
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(screen.getByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("does not surface an in-flight Phase 2 error or 410 re-run if Undo ran before the response arrived (#2490)", async () => {
+    let answer!: (response: unknown) => void;
+    const fetch = vi.fn().mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    vi.stubGlobal("fetch", fetch);
+    const view = render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    // User clicks Undo while the effects request is still in flight.
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+
+    await act(async () => {
+      answer({ ok: false, status: 500, json: async () => ({ error: "late 500" }) });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText("late 500")).toBeNull();
+
+    // Restore the cutout, start another effects request, Undo while in flight, and settle with 410.
+    fetch.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    deployment.beforeRun = false;
+    view.rerender(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+
+    await act(async () => {
+      answer({ ok: false, status: 410, json: async () => expired.body });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(deployment.processFiles).not.toHaveBeenCalled();
+    expect(screen.queryByText(note())).toBeNull();
+  });
+
+  it("preserves a Phase 2 effectsError across a remount and clears it on retry or a new downloadUrl (#2559)", async () => {
+    const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    // Crossing the 768px mobile/desktop breakpoint unmounts and remounts RemoveBgSettings
+    // while the same file and cutout downloadUrl stay loaded.
+    first.unmount();
+    const second = render(<RemoveBgSettings />);
+
+    expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.getByText("disk on fire")).toBeVisible();
+
+    // Retrying Phase 2 after the remount sends the hydrated jobId/filename and clears the error on 200.
+    const retryFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ downloadUrl: "/api/v1/download/JOB123/pic_effects.webp" }),
+    });
+    vi.stubGlobal("fetch", retryFetch);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    fireEvent.click(screen.getByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(retryFetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(retryFetch.mock.calls[0][1].body.get("settings"))).toMatchObject({
+      jobId: "JOB123",
+      filename: "pic.png",
+      outputFormat: "webp",
+    });
+    await waitFor(() => expect(screen.queryByText("disk on fire")).toBeNull());
+
+    // Another remount after the successful retry keeps the error cleared.
+    second.unmount();
+    render(<RemoveBgSettings />);
+    expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("clears a remount-restored Phase 2 effectsError when a new downloadUrl arrives (#2559)", async () => {
+    const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    first.unmount();
+    const second = render(<RemoveBgSettings />);
+    expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.getByText("disk on fire")).toBeVisible();
+
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    second.rerender(<RemoveBgSettings />);
+
+    await waitFor(() => expect(screen.queryByText("disk on fire")).toBeNull());
+  });
+
+  it.each([
+    {
+      label: "a new downloadUrl",
+      mutateWhileUnmounted: () => {
+        deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+      },
+      assertAfterRemount: async () => {
+        expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+      },
+    },
+    {
+      label: "Undo clearing downloadUrl",
+      mutateWhileUnmounted: () => {
+        deployment.beforeRun = true;
+      },
+      assertAfterRemount: async () => {
+        expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
+      },
+    },
+    {
+      label: "a Phase 1 error",
+      mutateWhileUnmounted: () => {
+        deployment.error = "Run interrupted";
+      },
+      assertAfterRemount: async () => {
+        expect(screen.getByText("Run interrupted")).toBeVisible();
+      },
+    },
+  ])(
+    "drops a stored effectsError on remount if $label landed while unmounted (#2559)",
+    async ({ mutateWhileUnmounted, assertAfterRemount }) => {
+      const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+      expect(await screen.findByText("disk on fire")).toBeVisible();
+
+      first.unmount();
+      mutateWhileUnmounted();
+      const second = render(<RemoveBgSettings />);
+
+      await assertAfterRemount();
+      expect(screen.queryByText("disk on fire")).toBeNull();
+      second.unmount();
+
+      // Even if the original cutout state is restored afterwards, the stored error was cleared.
+      deployment.beforeRun = false;
+      deployment.error = null;
+      deployment.downloadUrl = "/api/v1/download/JOB123/pic_mask.png";
+      render(<RemoveBgSettings />);
+      expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+      expect(screen.queryByText("disk on fire")).toBeNull();
+    },
+  );
 });

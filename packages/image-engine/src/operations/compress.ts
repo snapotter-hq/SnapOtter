@@ -1,6 +1,7 @@
 import { formatTargetKb, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import type { CompressOptions, Sharp, SharpFormat } from "../types.js";
+import { hasFloatPipelineStage } from "./convert.js";
 
 const FORMAT_MAP: Record<string, SharpFormat> = {
   jpg: "jpeg",
@@ -17,11 +18,15 @@ const FORMAT_MAP: Record<string, SharpFormat> = {
 function formatOpts(format: SharpFormat, quality: number): Record<string, unknown> {
   const opts: Record<string, unknown> = { quality };
   if (format === "avif") opts.effort = 4;
+  if (format === "gif") opts.reuse = false;
+  if (format === "tiff") opts.compression = "lzw";
   return opts;
 }
 
 export interface CompressResult {
   image: Sharp;
+  /** Encoded bytes from the target-size search, set when `targetSizeBytes` is used. */
+  buffer?: Buffer;
   /** Set only when a target size forced the image below its original dimensions. */
   resizedTo?: { width: number; height: number };
 }
@@ -60,20 +65,41 @@ export async function compressDetailed(
   }
 
   const metadata = await image.metadata();
-  const detectedFormat = FORMAT_MAP[metadata.format ?? ""] ?? "png";
+  const formatOut = (image as unknown as { options?: { formatOut?: string } }).options?.formatOut;
+  const detectedFormat = FORMAT_MAP[formatOut ?? ""] ?? FORMAT_MAP[metadata.format ?? ""] ?? "png";
   const outputFormat = explicitFormat ?? detectedFormat;
 
   if (targetSizeBytes !== undefined) {
-    const inputBuffer = await image.toBuffer();
+    const needsLosslessIntermediate =
+      (formatOut !== undefined && formatOut !== "input") ||
+      detectedFormat === "gif" ||
+      detectedFormat === "tiff" ||
+      (outputFormat === "tiff" && hasFloatPipelineStage(image));
+    const inputBuffer = await (outputFormat === "gif"
+      ? image.gif({ reuse: false })
+      : outputFormat === "tiff" && !hasFloatPipelineStage(image)
+        ? image.tiff({ compression: "lzw" })
+        : needsLosslessIntermediate
+          ? animated
+            ? image.webp({ lossless: true })
+            : image.png({ palette: false })
+          : image
+    ).toBuffer();
     return compressToTargetSize(inputBuffer, outputFormat, targetSizeBytes, animated);
   }
 
+  const pipeline =
+    outputFormat === "tiff" && hasFloatPipelineStage(image)
+      ? sharp(await image.png().toBuffer()).keepMetadata()
+      : image;
+
   const q = quality ?? 80;
-  return { image: image.toFormat(outputFormat, formatOpts(outputFormat, q)) };
+  return { image: pipeline.toFormat(outputFormat, formatOpts(outputFormat, q)) };
 }
 
 interface CompressionCandidate {
   quality: number;
+  buffer: Buffer;
 }
 
 /** Re-open the source, keeping frames when the caller is compressing an animation. */
@@ -88,14 +114,13 @@ async function findBestQuality(
   targetBytes: number,
   animated: boolean,
 ): Promise<CompressionCandidate | null> {
-  // Sharp's GIF encoder has no quality setting, so every step of the search
-  // below would encode the same bytes. On an animation that is a full
-  // re-encode of every frame, up to seven times per size step (#1183).
-  if (format === "gif") {
+  // Sharp's GIF and LZW TIFF encoders have no quality setting, so every step of
+  // the search below would encode the same bytes (#1183, #2607).
+  if (format === "gif" || format === "tiff") {
     let pipeline = openSource(inputBuffer, animated);
     if (resize) pipeline = pipeline.resize(resize.width, resize.height);
-    const size = (await pipeline.toFormat(format, formatOpts(format, 100)).toBuffer()).length;
-    return size <= targetBytes ? { quality: 100 } : null;
+    const buffer = await pipeline.toFormat(format, formatOpts(format, 100)).toBuffer();
+    return buffer.length <= targetBytes ? { quality: 100, buffer } : null;
   }
 
   let low = 1;
@@ -111,7 +136,7 @@ async function findBestQuality(
     const resultSize = resultBuffer.length;
 
     if (resultSize <= targetBytes) {
-      best = { quality: mid };
+      best = { quality: mid, buffer: resultBuffer };
       if ((targetBytes - resultSize) / targetBytes <= tolerance) break;
       low = mid + 1;
     } else {
@@ -135,6 +160,7 @@ async function compressToTargetSize(
         format,
         formatOpts(format, fullSizeCandidate.quality),
       ),
+      buffer: fullSizeCandidate.buffer,
     };
   }
 
@@ -164,6 +190,7 @@ async function compressToTargetSize(
         image: openSource(inputBuffer, animated)
           .resize(newWidth, newHeight)
           .toFormat(format, formatOpts(format, candidate.quality)),
+        buffer: candidate.buffer,
         resizedTo: dims,
       };
     }

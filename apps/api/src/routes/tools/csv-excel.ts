@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
+import { csvParseFailure } from "../../lib/csv-parse.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -59,8 +60,9 @@ export function registerCsvExcel(app: FastifyInstance) {
         header: false,
         skipEmptyLines: true,
       });
-      if (parsed.errors.length > 0) {
-        throw new InputValidationError(`CSV parse failed: ${parsed.errors[0].message}`);
+      const parseFailure = csvParseFailure(parsed);
+      if (parseFailure) {
+        throw new InputValidationError(`CSV parse failed: ${parseFailure}`);
       }
       const workbook = new ExcelJS.Workbook();
       const ws = workbook.addWorksheet("Sheet1");

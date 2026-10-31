@@ -2,6 +2,7 @@ import { TOOLS } from "@snapotter/shared";
 import { useId } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import type { UserFile } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useFilesPageStore } from "@/stores/files-page-store";
 
@@ -9,14 +10,6 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function toolName(toolId: string): string {
@@ -42,7 +35,7 @@ export function FileListItem({
   onActivate,
   onNavigate,
 }: FileListItemProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { selectedFileId, checkedIds, selectFile, toggleChecked } = useFilesPageStore();
   const isSelected = selectedFileId === file.id;
   const isChecked = checkedIds.has(file.id);
@@ -105,7 +98,7 @@ export function FileListItem({
         </span>
         <span id={fileDescriptionId} className="sr-only">
           {t.files.version} {file.version}, {t.files.size}: {formatSize(file.size)},{" "}
-          {formatDate(file.createdAt)}
+          {formatDate(file.createdAt, locale)}
           {file.toolChain.length > 0
             ? `, ${t.files.toolsUsed}: ${file.toolChain.map(toolName).join(", ")}`
             : ""}
@@ -137,7 +130,7 @@ export function FileListItem({
 
         {/* Date */}
         <span className="hidden lg:block text-xs text-muted-foreground shrink-0 w-24 text-end">
-          {formatDate(file.createdAt)}
+          {formatDate(file.createdAt, locale)}
         </span>
       </button>
     </li>

@@ -1,6 +1,6 @@
 ---
 description: "Verklein de bestandsgrootte van een PDF door ingebedde afbeeldingen te comprimeren."
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: 51fa6d44d483
 ---

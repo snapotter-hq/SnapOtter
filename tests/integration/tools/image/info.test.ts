@@ -5,7 +5,11 @@
  * histogram, EXIF presence, and input validation.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -28,11 +32,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Info", () => {
   it("returns correct metadata for a PNG image", async () => {
@@ -1099,5 +1103,291 @@ describe("Info", () => {
     expect(result.fileSize).toBe(SVG_LOGO.length);
     expect(result.width).toBeGreaterThan(0);
     expect(result.height).toBeGreaterThan(0);
+  });
+
+  it("decompresses and sanitizes .svgz and .svg inputs and rejects invalid SVGZ or over-cap SVG with 400 (#3095)", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><script>if (1 < 2) alert(1);</script><rect width="100" height="80" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body: okBody, contentType: okCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: svgz },
+    ]);
+    const okRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": okCt },
+      body: okBody,
+    });
+    expect(okRes.statusCode).toBe(200);
+    const okResult = JSON.parse(okRes.body);
+    expect(okResult.filename).toBe("icon.svgz");
+    expect(okResult.fileSize).toBe(svgz.length);
+    expect(okResult.width).toBe(100);
+    expect(okResult.height).toBe(80);
+    expect(okResult.format).toBe("svg");
+
+    const { body: svgBody, contentType: svgCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: rawSvg },
+    ]);
+    const svgRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": svgCt },
+      body: svgBody,
+    });
+    expect(svgRes.statusCode).toBe(200);
+    const svgResult = JSON.parse(svgRes.body);
+    expect(svgResult.filename).toBe("icon.svg");
+    expect(svgResult.fileSize).toBe(rawSvg.length);
+    expect(svgResult.width).toBe(100);
+    expect(svgResult.height).toBe(80);
+    expect(svgResult.format).toBe("svg");
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const { body: badBody, contentType: badCt } = createMultipartPayload([
+      { name: "file", filename: "bad.svgz", contentType: "image/svg+xml", content: badSvgz },
+    ]);
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": badCt },
+      body: badBody,
+    });
+    expect(badRes.statusCode).toBe(400);
+    expect(JSON.parse(badRes.body).error).toContain("valid SVG content");
+
+    const nonGzipSvgz = Buffer.from("not gzip and not an image", "utf-8");
+    const { body: nonGzipBody, contentType: nonGzipCt } = createMultipartPayload([
+      { name: "file", filename: "broken.svgz", contentType: "image/svg+xml", content: nonGzipSvgz },
+    ]);
+    const nonGzipRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": nonGzipCt },
+      body: nonGzipBody,
+    });
+    expect(nonGzipRes.statusCode).toBe(400);
+    expect(JSON.parse(nonGzipRes.body)).toEqual({ error: "Invalid SVGZ file" });
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const { body: capBody, contentType: capCt } = createMultipartPayload([
+      { name: "file", filename: "too-many.svg", contentType: "image/svg+xml", content: overCapSvg },
+    ]);
+    const capRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": capCt },
+      body: capBody,
+    });
+    expect(capRes.statusCode).toBe(400);
+    expect(JSON.parse(capRes.body).error).toContain("maximum element count");
+  });
+
+  it.each([
+    ["missing ImageWidth/ImageHeight", '[{"FileType":"DNG"}]'],
+    ["zero ImageWidth/ImageHeight", '[{"FileType":"DNG","ImageWidth":0,"ImageHeight":0}]'],
+    [
+      "negative and non-numeric ImageWidth/ImageHeight",
+      '[{"FileType":"DNG","ImageWidth":-10,"ImageHeight":"100x200"}]',
+    ],
+  ] as const)(
+    "falls back to Sharp decoded dimensions when exiftool emits %s on a DNG upload (#3600)",
+    async (_label, jsonOutput) => {
+      const DNG = readFixture(fixtures.image.formats("dng"));
+      const originalPath = process.env.PATH;
+      const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-shim-"));
+      try {
+        const shimPath = join(shimDir, "exiftool");
+        writeFileSync(shimPath, `#!/bin/sh\nprintf '%s\\n' '${jsonOutput}'\n`);
+        chmodSync(shimPath, 0o755);
+        process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+        const { body, contentType } = createMultipartPayload([
+          { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+        ]);
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/info",
+          headers: {
+            authorization: `Bearer ${adminToken}`,
+            "content-type": contentType,
+          },
+          body,
+        });
+
+        expect(res.statusCode).toBe(200);
+        const result = JSON.parse(res.body);
+        expect(result.filename).toBe("sample.dng");
+        expect(result.format).toBe("dng");
+        expect(typeof result.width).toBe("number");
+        expect(typeof result.height).toBe("number");
+        expect(result.width).toBeGreaterThan(0);
+        expect(result.height).toBeGreaterThan(0);
+      } finally {
+        process.env.PATH = originalPath;
+        rmSync(shimDir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("answers 503 ENGINE_UNAVAILABLE when exiftool is killed by SIGKILL during RAW metadata enrichment (#3458)", async () => {
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const originalPath = process.env.PATH;
+    const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-oom-"));
+    try {
+      const shimPath = join(shimDir, "exiftool");
+      writeFileSync(shimPath, '#!/bin/sh\nif [ "$1" = "-j" ]; then\n  kill -9 $$\nfi\nexit 1\n');
+      chmodSync(shimPath, 0o755);
+      process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    } finally {
+      process.env.PATH = originalPath;
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+
+  it("passes -G to exiftool and preserves RAW metadata when -EXIF:all JSON exceeds 1 MiB without ExifVersion (#3634)", async () => {
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const originalPath = process.env.PATH;
+    const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-grouped-large-"));
+    try {
+      const shimPath = join(shimDir, "exiftool");
+      writeFileSync(
+        shimPath,
+        [
+          "#!/bin/sh",
+          'has_g=0; for arg in "$@"; do if [ "$arg" = "-G" ]; then has_g=1; fi; done',
+          'if [ "$has_g" = "1" ]; then',
+          '  pad=$(head -c 1500000 /dev/zero | tr "\\0" "A")',
+          '  printf \'[{"File:FileType":"DNG","EXIF:ImageWidth":5472,"EXIF:ImageHeight":3648,"EXIF:BitsPerSample":16,"EXIF:ColorSpace":"Adobe RGB","EXIF:XResolution":300,"ICC_Profile:ICCProfileName":"Display P3","XMP:XMPToolkit":"Adobe XMP","EXIF:Make":"Canon","EXIF:Padding":"%s"}]\\n\' "$pad"',
+          "else",
+          '  printf \'[{"FileType":"DNG","ImageWidth":5472,"ImageHeight":3648,"Make":"Canon"}]\\n\'',
+          "fi",
+          "",
+        ].join("\n"),
+      );
+      chmodSync(shimPath, 0o755);
+      process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body)).toMatchObject({
+        filename: "sample.dng",
+        format: "dng",
+        width: 5472,
+        height: 3648,
+        bitDepth: "16",
+        colorSpace: "Adobe RGB",
+        hasExif: true,
+        hasIcc: true,
+        hasXmp: true,
+      });
+    } finally {
+      process.env.PATH = originalPath;
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+
+  it("answers 503 ENGINE_UNAVAILABLE with DecoderOutOfMemoryError message when Sharp stats or the DNG fallback probe hits V8 buffer allocation OOM (#3633)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+    const statsSpy = vi
+      .spyOn(sharpMod.prototype, "stats")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      ]);
+      const statsRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+      expect(statsRes.statusCode, statsRes.body).toBe(503);
+      expect(JSON.parse(statsRes.body)).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        message: oomMessage,
+      });
+    } finally {
+      statsSpy.mockRestore();
+    }
+
+    const originalPath = process.env.PATH;
+    const emptyBinDir = mkdtempSync(join(tmpdir(), "info-no-decoders-"));
+    const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+      this: InstanceType<typeof sharpMod>,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as InstanceType<typeof sharpMod>;
+    });
+    try {
+      process.env.PATH = emptyBinDir;
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+      ]);
+      const dngRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+      expect(dngRes.statusCode, dngRes.body).toBe(503);
+      expect(JSON.parse(dngRes.body)).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        message: oomMessage,
+      });
+    } finally {
+      process.env.PATH = originalPath;
+      rawSpy.mockRestore();
+      rmSync(emptyBinDir, { recursive: true, force: true });
+    }
   });
 });

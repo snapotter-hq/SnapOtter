@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { codeSplitting } from "./vite.chunks";
+import { pdfjsAssets } from "./vite.pdfjs-assets";
 
 // Source maps are emitted and uploaded to Sentry only when the build supplies
 // SENTRY_AUTH_TOKEN (the published Docker image does; dev and the source-archive
@@ -18,6 +19,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    pdfjsAssets(),
     // Must come after the other plugins so it sees the final bundle.
     sentryVitePlugin({
       org: "snapotter",

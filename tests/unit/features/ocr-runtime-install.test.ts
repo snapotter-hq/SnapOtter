@@ -20,6 +20,47 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+type OpenHandleInterceptor = (
+  path: string,
+  handle: Awaited<ReturnType<typeof import("node:fs/promises").open>>,
+) => Awaited<ReturnType<typeof import("node:fs/promises").open>>;
+
+type RmInterceptor = (
+  path: string,
+  options: Parameters<typeof import("node:fs/promises").rm>[1],
+  actualRm: typeof import("node:fs/promises").rm,
+) => Promise<void>;
+
+const fsOpenHoisted = vi.hoisted(() => ({
+  interceptor: null as OpenHandleInterceptor | null,
+  rmInterceptor: null as RmInterceptor | null,
+}));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    open: (async (path: unknown, flags?: unknown, ...rest: unknown[]) => {
+      const handle = await (
+        actual.open as (
+          p: unknown,
+          f?: unknown,
+          ...r: unknown[]
+        ) => Promise<Awaited<ReturnType<typeof actual.open>>>
+      )(path, flags, ...rest);
+      if (!fsOpenHoisted.interceptor) return handle;
+      return fsOpenHoisted.interceptor(String(path), handle);
+    }) as typeof actual.open,
+    rm: (async (path: unknown, options?: Parameters<typeof actual.rm>[1]) => {
+      if (!fsOpenHoisted.rmInterceptor) {
+        return actual.rm(path as Parameters<typeof actual.rm>[0], options);
+      }
+      return fsOpenHoisted.rmInterceptor(String(path), options, actual.rm);
+    }) as typeof actual.rm,
+  };
+});
+
 import {
   assertOcrRuntimeInstallDiskSpace,
   buildOcrRuntimeInstallerCommand,
@@ -92,6 +133,11 @@ async function purgeOcrRuntimeDownloads(aiDataDir: string) {
 }
 
 afterEach(() => {
+  // A test that fakes timers and then times out never reaches its own
+  // finally, so restore them here or every later test runs on a frozen clock.
+  fsOpenHoisted.interceptor = null;
+  fsOpenHoisted.rmInterceptor = null;
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   for (const directory of temporaryDirectories.splice(0)) {
@@ -185,6 +231,142 @@ describe("canonicalRuntimeJson (#667)", () => {
   });
 });
 
+describe("canonicalRuntimeJson key order (#800)", () => {
+  // Python's sort_keys orders by code point; a plain .sort() orders by UTF-16
+  // code unit. They disagree where a key char in U+D800-U+FFFF (a BMP char or
+  // a lone surrogate) sits beside an astral char, whose high surrogate sorts
+  // first by code unit but last by code point.
+  it("orders a BMP key above U+E000 before an astral key, as Python's sort_keys does", () => {
+    // Python: json.dumps({"\U00010000":2,"\uffff":1}, sort_keys=True, separators=(",",":"))
+    //   -> {"\uffff":1,"\ud800\udc00":2}
+    expect(canonicalRuntimeJson({ "\u{10000}": 2, "\uffff": 1 })).toBe(
+      '{"\\uffff":1,"\\ud800\\udc00":2}\n',
+    );
+  });
+
+  it("gives the same bytes whatever order the keys arrive in", () => {
+    const keys = ["\u{1f600}", "\ue000", "a", "\u00e9", "\u{10000}", "\uffff"];
+    const forward = Object.fromEntries(keys.map((key, i) => [key, i]));
+    const reversed = Object.fromEntries([...keys].reverse().map((key) => [key, keys.indexOf(key)]));
+    // Python: json.dumps over these keys with sort_keys=True emits them as
+    // a, \u00e9, \ue000, \uffff, \ud800\udc00, \ud83d\ude00
+    const expected =
+      '{"a":2,"\\u00e9":3,"\\ue000":1,"\\uffff":5,"\\ud800\\udc00":4,"\\ud83d\\ude00":0}\n';
+    expect(canonicalRuntimeJson(forward)).toBe(expected);
+    expect(canonicalRuntimeJson(reversed)).toBe(expected);
+  });
+
+  it("orders a key before any longer key it prefixes, in either insertion order", () => {
+    // Python: json.dumps({"ab":1,"a":2}, sort_keys=True, separators=(",",":")) -> {"a":2,"ab":1}
+    expect(canonicalRuntimeJson({ ab: 1, a: 2 })).toBe('{"a":2,"ab":1}\n');
+    expect(canonicalRuntimeJson({ a: 2, ab: 1 })).toBe('{"a":2,"ab":1}\n');
+  });
+
+  it("compares by code point past a shared prefix, not only at the first character", () => {
+    // Python: json.dumps({"x\U00010000":2,"x\uffff":1}, sort_keys=True, separators=(",",":"))
+    //   -> {"x\uffff":1,"x\ud800\udc00":2}
+    expect(canonicalRuntimeJson({ "x\u{10000}": 2, "x\uffff": 1 })).toBe(
+      '{"x\\uffff":1,"x\\ud800\\udc00":2}\n',
+    );
+  });
+
+  it("applies code-point order to nested objects and objects inside arrays", () => {
+    expect(canonicalRuntimeJson({ outer: [{ "\u{10000}": 1, "\uffff": 0 }] })).toBe(
+      '{"outer":[{"\\uffff":0,"\\ud800\\udc00":1}]}\n',
+    );
+  });
+});
+
+describe("canonicalRuntimeJson integer-like keys (#1411)", () => {
+  // JS objects enumerate array-index keys ("0" to "4294967294") first, in
+  // numeric order, so rebuilding a sorted object loses the sort for them.
+  // Python's sort_keys orders them as strings like any other key.
+  it("orders integer-like keys as strings, as Python's sort_keys does", () => {
+    // Python: json.dumps({"9":1,"10":2}, sort_keys=True, separators=(",",":")) -> {"10":2,"9":1}
+    expect(canonicalRuntimeJson({ 9: 1, 10: 2 })).toBe('{"10":2,"9":1}\n');
+  });
+
+  it("keeps string order for integer-like keys in nested objects and arrays", () => {
+    // Python: {"a":[{"100":1,"20":2}],"b":{"10":1,"2":0}}
+    expect(canonicalRuntimeJson({ b: { 2: 0, 10: 1 }, a: [{ 100: 1, 20: 2 }] })).toBe(
+      '{"a":[{"100":1,"20":2}],"b":{"10":1,"2":0}}\n',
+    );
+  });
+
+  it("sorts keys on both sides of the array-index range as plain strings", () => {
+    // "4294967294" is the largest array index; "4294967295", "-1" and "01"
+    // are ordinary string keys. Python sorts all of them as strings:
+    // {"-1":4,"01":5,"10":1,"4294967294":7,"4294967295":6,"9":2,"a":3}
+    const value = JSON.parse(
+      '{"10":1,"9":2,"a":3,"-1":4,"01":5,"4294967295":6,"4294967294":7}',
+    ) as unknown;
+    expect(canonicalRuntimeJson(value)).toBe(
+      '{"-1":4,"01":5,"10":1,"4294967294":7,"4294967295":6,"9":2,"a":3}\n',
+    );
+  });
+
+  it("drops undefined and function values from objects and nulls them in arrays, like JSON.stringify", () => {
+    const value = { a: undefined, b: 1, c: [undefined, () => 1], d: () => 1 };
+    expect(canonicalRuntimeJson(value)).toBe('{"b":1,"c":[null,null]}\n');
+  });
+
+  it("writes array holes as null, like JSON.stringify", () => {
+    // biome-ignore lint/suspicious/noSparseArray: the hole is what's under test
+    expect(canonicalRuntimeJson({ a: [1, , 3] })).toBe('{"a":[1,null,3]}\n');
+    expect(canonicalRuntimeJson(new Array(2))).toBe("[null,null]\n");
+  });
+
+  it("escapes quotes, backslashes and control characters in keys", () => {
+    // Python: json.dumps({'a"b':1,"c\\d":2,"e\nf":3}, sort_keys=True, separators=(",",":"))
+    //   -> {"a\"b":1,"c\\d":2,"e\nf":3}
+    expect(canonicalRuntimeJson({ "e\nf": 3, "c\\d": 2, 'a"b': 1 })).toBe(
+      '{"a\\"b":1,"c\\\\d":2,"e\\nf":3}\n',
+    );
+  });
+
+  it("throws on a top-level value JSON can't represent", () => {
+    expect(() => canonicalRuntimeJson(undefined)).toThrow(/needs a JSON value/);
+    expect(() => canonicalRuntimeJson(() => 1)).toThrow(/needs a JSON value/);
+  });
+});
+
+describe("canonicalRuntimeJson numbers (#1415)", () => {
+  // Python's json.dumps writes floats as 1.0, -0.0 and 1e-07 and keeps big
+  // integers exact; JS can't reproduce either after JSON.parse. The canonical
+  // form only allows safe integers, which print the same on both sides.
+  it("writes safe integers exactly as Python does", () => {
+    // Python: {"max":9007199254740991,"min":-9007199254740991,"t":true,"zero":0}
+    expect(
+      canonicalRuntimeJson({
+        zero: 0,
+        t: true,
+        min: -Number.MAX_SAFE_INTEGER,
+        max: Number.MAX_SAFE_INTEGER,
+      }),
+    ).toBe('{"max":9007199254740991,"min":-9007199254740991,"t":true,"zero":0}\n');
+  });
+
+  it("rejects fractions, unsafe integers and non-finite numbers wherever they sit", () => {
+    for (const value of [
+      { a: 1.5 },
+      { a: [1e-7] },
+      { a: { b: Number.MAX_SAFE_INTEGER + 1 } },
+      { a: -(2 ** 60) },
+      JSON.parse('{"a":1e400}') as unknown,
+      [Number.NaN],
+      Number.POSITIVE_INFINITY,
+    ]) {
+      expect(() => canonicalRuntimeJson(value)).toThrow(/safe integer/);
+    }
+  });
+
+  it("names where the offending number sits", () => {
+    expect(() => canonicalRuntimeJson({ a: { b: [1, 2, 0.5] } })).toThrow(/a\.b\[2\] is not one/);
+    expect(() => canonicalRuntimeJson({ ok: 1, z: 1.5 })).toThrow(/ z is not one/);
+    expect(() => canonicalRuntimeJson(0.5)).toThrow(/the top-level value is not one/);
+  });
+});
+
 describe("remainingInstallerTimeoutMs", () => {
   it("floors a fractional remaining budget to the safe integer the installer requires", () => {
     // The deadline is set at one performance.now() read and the remaining time is
@@ -251,10 +433,36 @@ describe("verifyRuntimeIndex", () => {
   });
 
   it("requires a signed positive safe minimum-memory policy", () => {
-    for (const minimumMemoryBytes of [null, 0, -1, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const minimumMemoryBytes of [null, 0, -1]) {
       const fixture = signedIndex({ minimumMemoryBytes });
       expect(() => verifyRuntimeIndex(fixture.raw, TARGET, [fixture.trustKey], "2.1.0")).toThrow(
         "memory",
+      );
+    }
+    // An unsafe integer can't be canonicalized at all (#1415), so it's
+    // refused before the memory policy is ever read.
+    expect(() => signedIndex({ minimumMemoryBytes: Number.MAX_SAFE_INTEGER + 1 })).toThrow(
+      /safe integer/,
+    );
+  });
+
+  it("names the offending field when a signed index carries a non-integer (#1415)", () => {
+    // Python's signer writes 1000.5 and 1e-07 as floats and keeps big integers
+    // exact; JSON.parse turns all three into numbers JS would re-serialize
+    // differently, so the verifier must say where instead of reporting a
+    // generic canonical-bytes mismatch.
+    const fixture = signedIndex();
+    for (const replacement of [
+      '"expandedSize":1000.5',
+      '"expandedSize":1e-07',
+      '"expandedSize":9007199254740993',
+    ]) {
+      const raw = Buffer.from(
+        fixture.raw.toString("utf8").replace('"expandedSize":1000', replacement),
+      );
+      expect(raw.equals(fixture.raw)).toBe(false);
+      expect(() => verifyRuntimeIndex(raw, TARGET, [fixture.trustKey], "2.1.0")).toThrow(
+        /artifacts\[0\]\.archive\.expandedSize is not one/,
       );
     }
   });
@@ -1806,7 +2014,19 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(readFileSync(outsidePath)).toEqual(outsideBytes);
   });
 
-  it("cancels and retries a stalled response", async () => {
+  // The stall tests below race a 10ms stall watchdog against the overall
+  // deadline, which starts before the download cache is set up. On a loaded
+  // runner that setup has taken over 500ms (#1617), long enough for the
+  // deadline to win and turn the expected "stalled" error into "timed out"
+  // (#1641). They only care about the watchdog, so the deadline sits past
+  // anything setup can take, and a watchdog that never fires fails on the test
+  // timeout instead. That timeout has to clear the install-lease helper, a
+  // blocking flock or python spawn with its own 5s limit that runs before the
+  // deadline starts, so a slow host doesn't read as a broken watchdog.
+  const STALL_TEST_DEADLINE_MS = 60_000;
+  const stallTest = { timeout: 20_000 };
+
+  it("cancels and retries a stalled response", stallTest, async () => {
     const fixture = signedIndex();
     const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-stall-retry-"));
     temporaryDirectories.push(directory);
@@ -1835,7 +2055,7 @@ describe("downloadVerifiedRuntimeRelease", () => {
         target: TARGET,
         trustKeys: [fixture.trustKey],
         fetchImpl,
-        timeoutMs: 1_000,
+        timeoutMs: STALL_TEST_DEADLINE_MS,
         stallTimeoutMs: 10,
         retry: {
           maxAttempts: 2,
@@ -1849,96 +2069,144 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(canceled).toHaveBeenCalledOnce();
   });
 
-  it("aborts a persistently stalled response instead of holding the install queue forever", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-stall-"));
-    temporaryDirectories.push(directory);
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        new ReadableStream<Uint8Array>({
-          pull() {
-            return new Promise(() => {});
-          },
+  it(
+    "aborts a persistently stalled response instead of holding the install queue forever",
+    stallTest,
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-stall-"));
+      temporaryDirectories.push(directory);
+      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              return new Promise(() => {});
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [],
+          fetchImpl,
+          timeoutMs: STALL_TEST_DEADLINE_MS,
+          stallTimeoutMs: 10,
+          retry: { maxAttempts: 1 },
         }),
-        { status: 200 },
-      ),
-    );
+      ).rejects.toThrow(/OCR runtime index download stalled for 10ms/);
+    },
+  );
 
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        timeoutMs: 1_000,
-        stallTimeoutMs: 10,
-        retry: { maxAttempts: 1 },
-      }),
-    ).rejects.toThrow("stalled");
-  });
+  it(
+    "enforces the overall deadline while a response body is stalled",
+    async () => {
+      // This used to bound the wall-clock time of a 10ms deadline, which fired
+      // during setup, before fetch was ever called. So it never reached a
+      // stalled body, and on a loaded runner the setup alone passed the bound
+      // (#1617). Fake timers hold the deadline until the read is actually
+      // stalled, then fire it. The stall watchdog's timer never advances, so if
+      // the deadline couldn't interrupt the read, this would hang until the
+      // test's timeout instead of rejecting. The outer "timed out" message
+      // wraps any error once the deadline has aborted, so the cause is what
+      // proves the read itself was interrupted, and one attempt keeps a stall
+      // plus a retry sleep from standing in for it.
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-deadline-"));
+        temporaryDirectories.push(directory);
+        let bodyRead!: () => void;
+        const reading = new Promise<void>((resolve) => {
+          bodyRead = resolve;
+        });
+        const cancel = vi.fn();
+        const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+          new Response(
+            new ReadableStream<Uint8Array>(
+              {
+                pull() {
+                  bodyRead();
+                  return new Promise(() => {});
+                },
+                cancel,
+              },
+              // No read-ahead: pull runs only once the installer reads the body.
+              { highWaterMark: 0 },
+            ),
+            { status: 200 },
+          ),
+        );
 
-  it("enforces the overall deadline while a response body is stalled", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-deadline-"));
-    temporaryDirectories.push(directory);
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        new ReadableStream<Uint8Array>({
-          pull() {
-            return new Promise(() => {});
-          },
+        const download = downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [],
+          fetchImpl,
+          timeoutMs: 10,
+          stallTimeoutMs: 1_000,
+          retry: { maxAttempts: 1 },
+        });
+        const outcome = expect(download).rejects.toMatchObject({
+          message: expect.stringContaining("timed out after 10ms"),
+          cause: expect.objectContaining({
+            message: expect.stringContaining("download was canceled or timed out"),
+          }),
+        });
+        // A download that fails before it reads the body settles first and
+        // surfaces its own error here, instead of a bare timeout.
+        await Promise.race([reading, download]);
+        await vi.advanceTimersByTimeAsync(10);
+        await outcome;
+        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(cancel).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+    stallTest.timeout,
+  );
+
+  it(
+    "does not let an unresponsive body cancellation defeat the stall watchdog",
+    stallTest,
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-cancel-watchdog-"));
+      temporaryDirectories.push(directory);
+      const canceled = vi.fn(() => new Promise<void>(() => {}));
+      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              return new Promise(() => {});
+            },
+            cancel: canceled,
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [],
+          fetchImpl,
+          timeoutMs: STALL_TEST_DEADLINE_MS,
+          stallTimeoutMs: 10,
+          retry: { maxAttempts: 1 },
         }),
-        { status: 200 },
-      ),
-    );
-
-    const startedAt = Date.now();
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        timeoutMs: 10,
-        stallTimeoutMs: 1_000,
-      }),
-    ).rejects.toThrow("timed out after 10ms");
-    expect(Date.now() - startedAt).toBeLessThan(500);
-  });
-
-  it("does not let an unresponsive body cancellation defeat the stall watchdog", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-cancel-watchdog-"));
-    temporaryDirectories.push(directory);
-    const canceled = vi.fn(() => new Promise<void>(() => {}));
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        new ReadableStream<Uint8Array>({
-          pull() {
-            return new Promise(() => {});
-          },
-          cancel: canceled,
-        }),
-        { status: 200 },
-      ),
-    );
-
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        timeoutMs: 500,
-        stallTimeoutMs: 10,
-        retry: { maxAttempts: 1 },
-      }),
-    ).rejects.toThrow("stalled");
-    expect(canceled).toHaveBeenCalledOnce();
-  });
+      ).rejects.toThrow(/OCR runtime index download stalled for 10ms/);
+      expect(canceled).toHaveBeenCalledOnce();
+    },
+  );
 
   it("rejects a verified cached archive when hashing crosses the overall deadline", async () => {
     const archiveSize = 128 * 1024 * 1024;
@@ -2438,5 +2706,836 @@ describe("prepareOfflineRuntimeRelease", () => {
         memoryOptions: { effectiveMemoryBytes: 4 * 1024 ** 3 - 1 },
       }),
     ).rejects.toThrow("insufficient memory for accurate OCR runtime");
+  });
+});
+
+describe("FileHandle close and sync error preservation (#3774)", () => {
+  it("retries an interrupted archive download when file.sync() in catch also rejects with EIO", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-part-sync-eio-"));
+    temporaryDirectories.push(directory);
+    const prefixLength = 8;
+    let firstPartOpen = true;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part") || !firstPartOpen) return handle;
+      firstPartOpen = false;
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "sync") {
+            return async () => {
+              throw Object.assign(new Error("EIO: sync failed on interrupted partial"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    let firstPull = true;
+    const interruptedBody = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (firstPull) {
+          firstPull = false;
+          controller.enqueue(ARCHIVE_BYTES.subarray(0, prefixLength));
+          return;
+        }
+        controller.error(new TypeError("terminated"));
+      },
+    });
+
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(new Response(interruptedBody, { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl,
+        retry: {
+          maxAttempts: 2,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+          maxTotalDelayMs: 10,
+          sleep: async () => {},
+        },
+      }),
+    ).resolves.toMatchObject({ archiveSize: ARCHIVE_BYTES.length });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries a truncated archive download when file.close() in finally also rejects with EIO", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-part-close-eio-"));
+    temporaryDirectories.push(directory);
+    const prefixLength = 8;
+    let firstPartOpen = true;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part") || !firstPartOpen) return handle;
+      firstPartOpen = false;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EIO: close failed on truncated partial"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES.subarray(0, prefixLength), { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl,
+        retry: {
+          maxAttempts: 2,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+          maxTotalDelayMs: 10,
+          sleep: async () => {},
+        },
+      }),
+    ).resolves.toMatchObject({ archiveSize: ARCHIVE_BYTES.length });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("preserves a writeBufferFully ENOSPC error when file.sync() and file.close() also reject with EIO", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-write-enospc-eio-"));
+    temporaryDirectories.push(directory);
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "write") {
+            return async () => {
+              throw Object.assign(new Error("ENOSPC: no space left on device"), {
+                code: "ENOSPC",
+              });
+            };
+          }
+          if (prop === "sync") {
+            return async () => {
+              throw Object.assign(new Error("EIO: sync failed after ENOSPC"), {
+                code: "EIO",
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EIO: close failed after ENOSPC"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl,
+        retry: { maxAttempts: 2, baseDelayMs: 1, sleep: async () => {} },
+      }),
+    ).rejects.toMatchObject({
+      message: "ENOSPC: no space left on device",
+      code: "ENOSPC",
+    });
+  });
+
+  it("preserves a primary file.sync() ENOSPC error without re-running sync in catch when file.close() also rejects with EIO", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-sync-enospc-eio-"));
+    temporaryDirectories.push(directory);
+    let syncCalls = 0;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "sync") {
+            return async () => {
+              syncCalls += 1;
+              throw Object.assign(new Error("ENOSPC: sync flush failed"), {
+                code: "ENOSPC",
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EIO: close failed after sync ENOSPC"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl,
+        retry: { maxAttempts: 2, baseDelayMs: 1, sleep: async () => {} },
+      }),
+    ).rejects.toMatchObject({
+      message: "ENOSPC: sync flush failed",
+      code: "ENOSPC",
+    });
+    expect(syncCalls).toBe(1);
+  });
+
+  it("preserves a response.body.getReader() error when file.close() also rejects with EIO", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-getreader-close-eio-"));
+    temporaryDirectories.push(directory);
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EIO: close failed after getReader error"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    const brokenResponse = new Response(ARCHIVE_BYTES, { status: 200 });
+    Object.defineProperty(brokenResponse, "body", {
+      value: {
+        bodyUsed: false,
+        cancel: async () => {},
+        getReader() {
+          throw new Error("archive stream reader unavailable");
+        },
+      },
+    });
+
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(brokenResponse);
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl,
+        retry: { maxAttempts: 1 },
+      }),
+    ).rejects.toThrow("archive stream reader unavailable");
+  });
+
+  it("preserves openChildDirectory's primary error when handle.close() also rejects", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-child-dir-close-eio-"));
+    temporaryDirectories.push(directory);
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith("/v3")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "sync") {
+            return async () => {
+              throw Object.assign(new Error("EIO: directory sync failed"), {
+                code: "EIO",
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EBADF: directory close failed"), {
+                code: "EBADF",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi.fn<typeof fetch>(),
+      }),
+    ).rejects.toThrow("EIO: directory sync failed");
+  });
+
+  it("preserves cachedFileEquals's primary error when file.close() also rejects, and propagates standalone close errors", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-cached-index-close-eio-"));
+    temporaryDirectories.push(directory);
+    const downloads = join(directory, "v3", "downloads");
+    mkdirSync(downloads, { recursive: true });
+    const indexDigest = createHash("sha256").update(fixture.raw).digest("hex");
+    writeFileSync(join(downloads, `${indexDigest}.index.json`), fixture.raw);
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".index.json")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "readFile") {
+            return async () => {
+              throw Object.assign(new Error("EIO: index readFile failed"), { code: "EIO" });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EBADF: index close failed"), { code: "EBADF" });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(fixture.raw)),
+      }),
+    ).rejects.toThrow("EIO: index readFile failed");
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".index.json")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EIO: standalone index close failed"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(fixture.raw)),
+      }),
+    ).rejects.toThrow("EIO: standalone index close failed");
+  });
+
+  it("preserves inspectArchiveFile's primary error when file.close() also rejects, and propagates standalone close errors", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-inspect-archive-close-eio-"));
+    temporaryDirectories.push(directory);
+    const indexPath = join(directory, "ocr-index.json");
+    const archivePath = join(directory, "ocr.tar.gz");
+    writeFileSync(indexPath, fixture.raw);
+    writeFileSync(archivePath, ARCHIVE_BYTES);
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (path !== archivePath) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "read") {
+            return async () => {
+              throw Object.assign(new Error("EIO: archive hash read failed"), { code: "EIO" });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EBADF: archive close failed"), { code: "EBADF" });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      prepareOfflineRuntimeRelease({
+        indexPath,
+        archivePath,
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        version: "2.1.0",
+      }),
+    ).rejects.toThrow("EIO: archive hash read failed");
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (path !== archivePath) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EIO: standalone archive close failed"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      prepareOfflineRuntimeRelease({
+        indexPath,
+        archivePath,
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        version: "2.1.0",
+      }),
+    ).rejects.toThrow("EIO: standalone archive close failed");
+  });
+
+  it("preserves openCurrentPartial's primary error when file.close() also rejects", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-open-partial-close-eio-"));
+    temporaryDirectories.push(directory);
+    const downloads = join(directory, "v3", "downloads");
+    mkdirSync(downloads, { recursive: true });
+    writeFileSync(
+      join(downloads, `${fixture.artifact.archive.sha256}.part`),
+      ARCHIVE_BYTES.subarray(0, 8),
+    );
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "stat") {
+            return async () => {
+              throw Object.assign(new Error("EIO: partial stat failed"), { code: "EIO" });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EBADF: partial close failed"), { code: "EBADF" });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(fixture.raw)),
+      }),
+    ).rejects.toThrow("EIO: partial stat failed");
+  });
+
+  it("preserves createPartial's primary error when file.close() also rejects, and propagates standalone close errors on downloadArchive", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-create-partial-close-eio-"));
+    temporaryDirectories.push(directory);
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part")) return handle;
+      const origStat = handle.stat.bind(handle);
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "stat") {
+            return async (...args: Parameters<typeof origStat>) => {
+              const info = await origStat(...args);
+              return Object.assign(Object.create(Object.getPrototypeOf(info)), info, {
+                size: 4n,
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EBADF: createPartial close failed"), {
+                code: "EBADF",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+          .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 })),
+      }),
+    ).rejects.toThrow("New OCR runtime partial archive was unexpectedly non-empty");
+
+    const cleanDir = mkdtempSync(join(tmpdir(), "snapotter-ocr-download-standalone-close-eio-"));
+    temporaryDirectories.push(cleanDir);
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".part")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              await origClose();
+              throw Object.assign(new Error("EIO: standalone download close failed"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: cleanDir,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+          .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 })),
+      }),
+    ).rejects.toThrow("EIO: standalone download close failed");
+  });
+
+  it("preserves persistVerifiedIndex write and sync ENOSPC errors when close and rm reject with EIO (#3867)", async () => {
+    const fixture = signedIndex();
+    const writeDir = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-write-enospc-rm-eio-"));
+    temporaryDirectories.push(writeDir);
+    let writeCloseCalls = 0;
+    let writeRmCalls = 0;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".tmp")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "write") {
+            return async () => {
+              throw Object.assign(new Error("ENOSPC: index write ran out of space"), {
+                code: "ENOSPC",
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              writeCloseCalls += 1;
+              await origClose();
+              throw Object.assign(new Error("EIO: index close failed after write ENOSPC"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+    fsOpenHoisted.rmInterceptor = async (path, options, actualRm) => {
+      await actualRm(path, options);
+      if (path.endsWith(".tmp")) {
+        writeRmCalls += 1;
+        throw Object.assign(new Error("EIO: index rm failed after write ENOSPC"), {
+          code: "EIO",
+        });
+      }
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: writeDir,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 })),
+      }),
+    ).rejects.toMatchObject({
+      message: "ENOSPC: index write ran out of space",
+      code: "ENOSPC",
+    });
+    expect(writeCloseCalls).toBe(1);
+    expect(writeRmCalls).toBe(1);
+
+    const syncDir = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-sync-enospc-rm-eio-"));
+    temporaryDirectories.push(syncDir);
+    let syncCloseCalls = 0;
+    let syncRmCalls = 0;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".tmp")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "sync") {
+            return async () => {
+              throw Object.assign(new Error("ENOSPC: index sync ran out of space"), {
+                code: "ENOSPC",
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              syncCloseCalls += 1;
+              await origClose();
+              throw Object.assign(new Error("EIO: index close failed after sync ENOSPC"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+    fsOpenHoisted.rmInterceptor = async (path, options, actualRm) => {
+      await actualRm(path, options);
+      if (path.endsWith(".tmp")) {
+        syncRmCalls += 1;
+        throw Object.assign(new Error("EIO: index rm failed after sync ENOSPC"), {
+          code: "EIO",
+        });
+      }
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: syncDir,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 })),
+      }),
+    ).rejects.toMatchObject({
+      message: "ENOSPC: index sync ran out of space",
+      code: "ENOSPC",
+    });
+    expect(syncCloseCalls).toBe(1);
+    expect(syncRmCalls).toBe(1);
+  });
+
+  it("closes the temporary index handle once without promoting it when persistVerifiedIndex close rejects (#3867)", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-close-eio-rm-erofs-"));
+    temporaryDirectories.push(directory);
+    const indexDigest = createHash("sha256").update(fixture.raw).digest("hex");
+    const indexPath = join(directory, "v3", "downloads", `${indexDigest}.index.json`);
+    let closeCalls = 0;
+    let rmCalls = 0;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".tmp")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              closeCalls += 1;
+              await origClose();
+              throw Object.assign(new Error("EIO: standalone temporary index close failed"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+    fsOpenHoisted.rmInterceptor = async (path, options, actualRm) => {
+      await actualRm(path, options);
+      if (path.endsWith(".tmp")) {
+        rmCalls += 1;
+        throw Object.assign(new Error("EROFS: temporary index rm failed after close EIO"), {
+          code: "EROFS",
+        });
+      }
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 })),
+      }),
+    ).rejects.toMatchObject({
+      message: "EIO: standalone temporary index close failed",
+      code: "EIO",
+    });
+    expect(closeCalls).toBe(1);
+    expect(rmCalls).toBe(1);
+    expect(existsSync(indexPath)).toBe(false);
+  });
+
+  it("closes discarded .part handles once in downloadArchive when close() rejects on oversized, corrupt, or HTTP-200-superseded partials (#3869)", async () => {
+    const fixture = signedIndex();
+
+    for (const scenario of ["oversized", "corrupt", "superseded-200"] as const) {
+      const directory = mkdtempSync(join(tmpdir(), `snapotter-ocr-partial-${scenario}-close-eio-`));
+      temporaryDirectories.push(directory);
+      const downloads = join(directory, "v3", "downloads");
+      mkdirSync(downloads, { recursive: true, mode: 0o770 });
+      const partPath = join(downloads, `${fixture.artifact.archive.sha256}.part`);
+      if (scenario === "oversized") {
+        writeFileSync(partPath, Buffer.concat([ARCHIVE_BYTES, Buffer.from("extra")]), {
+          mode: 0o660,
+        });
+      } else if (scenario === "corrupt") {
+        writeFileSync(partPath, Buffer.alloc(ARCHIVE_BYTES.byteLength, 0x78), {
+          mode: 0o660,
+        });
+      } else {
+        writeFileSync(partPath, ARCHIVE_BYTES.subarray(0, 5), {
+          mode: 0o660,
+        });
+      }
+
+      let closeCalls = 0;
+      fsOpenHoisted.interceptor = (path, handle) => {
+        if (!path.endsWith(".part")) return handle;
+        const origClose = handle.close.bind(handle);
+        return new Proxy(handle, {
+          get(target, prop, receiver) {
+            if (prop === "close") {
+              return async () => {
+                closeCalls += 1;
+                await origClose();
+                throw Object.assign(new Error(`EIO: ${scenario} partial close failed`), {
+                  code: "EIO",
+                });
+              };
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+      };
+
+      const fetchImpl = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }));
+      if (scenario === "superseded-200") {
+        fetchImpl.mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+      }
+
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [fixture.trustKey],
+          fetchImpl,
+        }),
+      ).rejects.toMatchObject({
+        message: `EIO: ${scenario} partial close failed`,
+        code: "EIO",
+      });
+      expect(closeCalls).toBe(1);
+      expect(existsSync(partPath)).toBe(false);
+    }
   });
 });

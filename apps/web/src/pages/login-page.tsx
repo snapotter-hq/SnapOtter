@@ -5,10 +5,50 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { setToken } from "@/lib/api";
+import { useTimeouts } from "@/hooks/use-timeouts";
+import { clearToken, setToken } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
+
+/**
+ * The last step of every successful login: remember the token and username,
+ * then go into the app. Every route that returns a session token also sets the
+ * session cookie, so a storage failure (a full quota) must not read as a failed
+ * login and send the user back to retype a good password; the app runs on the
+ * cookie without the stored copies (#2053). Each write has its own try so one
+ * failing doesn't skip the other, and a failed write removes the old value, so
+ * a token or username left by an earlier session can't outlive this login.
+ */
+function completeLogin(
+  data: { token?: string; user?: { username?: string; mustChangePassword?: boolean } },
+  typedUsername: string,
+): void {
+  try {
+    setToken(data.token ?? "");
+  } catch (err) {
+    console.warn(
+      "Could not save the session token to browser storage; using the session cookie",
+      err,
+    );
+    try {
+      clearToken();
+    } catch {
+      /* storage is unusable; nothing stale to clear */
+    }
+  }
+  try {
+    localStorage.setItem("snapotter-username", data.user?.username || typedUsername);
+  } catch (err) {
+    console.warn("Could not save the username to browser storage", err);
+    try {
+      localStorage.removeItem("snapotter-username");
+    } catch {
+      /* storage is unusable; nothing stale to clear */
+    }
+  }
+  window.location.href = appUrl(data.user?.mustChangePassword ? "/change-password" : "/");
+}
 
 function parseManualSecret(uri: string): string {
   try {
@@ -45,13 +85,42 @@ function retryAfterMinutes(bodyRetryAfter: unknown, header: string | null): numb
  * another 429. "Too many login attempts" (the message #826 gave handleSubmit)
  * is also wrong here: this user is past the password and one code away, not
  * guessing credentials.
+ *
+ * MFA_EXPIRED (#1234) and MFA_ATTEMPTS_EXHAUSTED (#2019) are 401s like a wrong
+ * code, but the challenge token is gone (5 minute TTL, or burned by 5 wrong
+ * codes) so no later code can work. `restart` tells the caller to drop back to
+ * the password form.
  */
 function mfaFailureMessage(
   status: number,
+  code: unknown,
   bodyRetryAfter: unknown,
   header: string | null,
   t: TranslationKeys,
-): { message: string; clearCode: boolean } {
+  enrolling = false,
+): { message: string; clearCode: boolean; restart: boolean } {
+  if (code === "USER_DISABLED") {
+    return { message: t.auth.accountDisabled, clearCode: true, restart: true };
+  }
+  if (code === "MFA_NOT_CONFIGURED") {
+    return { message: t.auth.mfaNotConfigured, clearCode: true, restart: true };
+  }
+  if (code === "MFA_ALREADY_ENABLED") {
+    return { message: t.auth.mfaAlreadyEnabled, clearCode: true, restart: true };
+  }
+  if (code === "MFA_ATTEMPTS_EXHAUSTED") {
+    return {
+      message: enrolling ? t.auth.mfaEnrollmentAttemptsExhausted : t.auth.mfaAttemptsExhausted,
+      clearCode: true,
+      restart: true,
+    };
+  }
+  if (code === "IP_NOT_ALLOWED") {
+    return { message: t.auth.ipNotAllowed, clearCode: false, restart: false };
+  }
+  if (code === "DECRYPTION_FAILED") {
+    return { message: t.auth.mfaUnreadable, clearCode: false, restart: false };
+  }
   if (status === 429) {
     const minutes = retryAfterMinutes(bodyRetryAfter, header);
     return {
@@ -60,13 +129,32 @@ function mfaFailureMessage(
           ? t.auth.mfaThrottledUnknownWait
           : format(plural(minutes, t.auth.mfaThrottled, t.auth.mfaThrottledPlural), { minutes }),
       clearCode: false,
+      restart: false,
     };
   }
-  if (status >= 500) {
-    return { message: t.auth.connectionError, clearCode: false };
+  if (code === "INVALID_CODE") {
+    return { message: t.auth.mfaInvalidCode, clearCode: true, restart: false };
   }
-  return { message: t.auth.mfaInvalidCode, clearCode: true };
+  if (
+    code === "MFA_EXPIRED" ||
+    (status >= 400 && status < 500 && typeof code === "string" && code.length > 0)
+  ) {
+    return {
+      message: enrolling ? t.auth.mfaEnrollmentExpired : t.auth.mfaExpired,
+      clearCode: true,
+      restart: true,
+    };
+  }
+  return { message: t.auth.connectionError, clearCode: false, restart: false };
 }
+
+/**
+ * A code the server could accept: a 6-digit TOTP or an 8-character hex
+ * recovery code. Anything else is a certain INVALID_CODE that would still
+ * burn one of the challenge's few attempts, so Verify stays disabled (#2050).
+ */
+const MFA_CODE_SHAPE = /^(\d{6}|[0-9a-f]{8})$/;
+const RECOVERY_CODE_SHAPE = /^[0-9a-f]{8}$/;
 
 function QrCode({ uri }: { uri: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,14 +188,15 @@ function RotatingPhrase() {
   const phrases = t.auth.rotatingPhrases;
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+  const later = useTimeouts();
 
   const advance = useCallback(() => {
     setVisible(false);
-    setTimeout(() => {
+    later(() => {
       setIndex((i) => (i + 1) % phrases.length);
       setVisible(true);
     }, 300);
-  }, [phrases.length]);
+  }, [phrases.length, later]);
 
   useEffect(() => {
     const timer = setInterval(advance, 3000);
@@ -219,15 +308,26 @@ function LanguageSelector() {
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { oidcEnabled, oidcProviderName, samlEnabled, samlProviderName, ssoEnforced } = useAuth();
+  const {
+    loading: authLoading = false,
+    oidcEnabled,
+    oidcProviderName,
+    samlEnabled,
+    samlProviderName,
+    ssoEnforced,
+  } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState<"idp_logout_failed" | null>(null);
   const [loading, setLoading] = useState(false);
   const [showMfaPrompt, setShowMfaPrompt] = useState(false);
+  const [errorFromRedirect, setErrorFromRedirect] = useState(false);
   const [mfaToken, setMfaToken] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  // A recovery code the server just refused stays on screen; Verify waits for an edit.
+  const [rejectedMfaCode, setRejectedMfaCode] = useState("");
   const [mfaLoading, setMfaLoading] = useState(false);
   const mfaInputRef = useRef<HTMLInputElement>(null);
   const [showMfaEnrollment, setShowMfaEnrollment] = useState(false);
@@ -237,6 +337,22 @@ export function LoginPage() {
   const [enrollmentCode, setEnrollmentCode] = useState("");
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [enrollmentCodesCopied, setEnrollmentCodesCopied] = useState(false);
+  // Keep this above the redirect effect below. useTimeouts arms itself in its
+  // own effect, effects run in hook order, and that effect schedules the MFA
+  // focus on first commit; a later() before arming is silently dropped.
+  const later = useTimeouts();
+
+  const clearMfaState = useCallback(() => {
+    setShowMfaPrompt(false);
+    setMfaToken("");
+    setMfaCode("");
+    setRejectedMfaCode("");
+    setShowMfaEnrollment(false);
+    setEnrollmentToken("");
+    setEnrollmentUri("");
+    setEnrollmentRecoveryCodes([]);
+    setEnrollmentCode("");
+  }, []);
 
   useEffect(() => {
     // A successful OIDC/SAML login for an already-enrolled user redirects
@@ -245,9 +361,13 @@ export function LoginPage() {
     // login's challenge is.
     const redirectedMfaToken = searchParams.get("mfaToken");
     if (redirectedMfaToken) {
+      clearMfaState();
+      setError("");
+      setNotice(null);
       setMfaToken(redirectedMfaToken);
+      setErrorFromRedirect(true);
       setShowMfaPrompt(true);
-      setTimeout(() => mfaInputRef.current?.focus(), 100);
+      later(() => mfaInputRef.current?.focus(), 100);
       // Drop it from the URL: it's a one-time credential and has no business
       // sitting in browser history or a Referer header for the rest of the
       // challenge. Also stops a later effect re-run (e.g. a locale switch)
@@ -270,15 +390,30 @@ export function LoginPage() {
         mfa_enrollment_required: t.auth.mfaEnrollmentRequired,
         mfa_policy_unavailable: t.auth.mfaPolicyUnavailable,
       };
+      clearMfaState();
+      setNotice(null);
       setError(errorMessages[authError] || t.auth.oidcGenericError);
+      setErrorFromRedirect(true);
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    const authNotice = searchParams.get("notice");
+    if (authNotice) {
+      if (authNotice === "idp_logout_failed") {
+        setNotice("idp_logout_failed");
+      }
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams, t]);
+  }, [searchParams, setSearchParams, t, later, clearMfaState]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setErrorFromRedirect(false);
+    setNotice(null);
+    let navigating = false;
     try {
       const res = await fetch(appUrl("/api/auth/login"), {
         method: "POST",
@@ -291,6 +426,14 @@ export function LoginPage() {
           setError(t.auth.mfaEnrollmentRequired);
         } else if (failure?.code === "MFA_POLICY_UNAVAILABLE") {
           setError(t.auth.mfaPolicyUnavailable);
+        } else if (failure?.code === "USER_DISABLED") {
+          // The 403 only goes to a caller who proved the password (#818), so
+          // saying so tells the account owner the truth without leaking it.
+          setError(t.auth.accountDisabled);
+        } else if (failure?.code === "IP_NOT_ALLOWED") {
+          setError(t.auth.ipNotAllowed);
+        } else if (failure?.code === "VALIDATION_ERROR" && failure?.rule === "maxLength") {
+          setError(format(t.errors.passwordTooLongAdminReset, { maxLength: failure.maxLength }));
         } else if (res.status === 429) {
           // Every 429 this route can produce (the per-username throttle from
           // #820, the per-IP limiter, a proxy in front of us) is a "come back
@@ -305,13 +448,14 @@ export function LoginPage() {
                   minutes,
                 }),
           );
-        } else if (res.status >= 500) {
-          // A 5xx (a proxy answering with HTML mid-restart, a handler crash)
-          // is not a credentials problem; claiming "invalid credentials"
-          // invites password resets during an outage.
-          setError(t.auth.connectionError);
-        } else {
+        } else if (res.status === 401 || res.status === 400) {
           setError(t.auth.invalidCredentials);
+        } else {
+          // A 5xx (a proxy answering with HTML mid-restart, a handler crash)
+          // or an unrecognized 4xx (a proxy 403, a misrouted 404, auth disabled)
+          // is not a credentials problem; claiming "invalid credentials"
+          // invites password resets during an outage or misconfiguration (#2052).
+          setError(t.auth.connectionError);
         }
         return;
       }
@@ -326,32 +470,56 @@ export function LoginPage() {
         setEnrollmentUri(data.uri);
         setEnrollmentRecoveryCodes(data.recoveryCodes ?? []);
         setShowMfaEnrollment(true);
-        setTimeout(() => mfaInputRef.current?.focus(), 100);
+        later(() => mfaInputRef.current?.focus(), 100);
         return;
       }
       if (data.requiresMfa) {
         setMfaToken(data.mfaToken);
         setShowMfaPrompt(true);
-        setTimeout(() => mfaInputRef.current?.focus(), 100);
+        later(() => mfaInputRef.current?.focus(), 100);
         return;
       }
-      setToken(data.token);
-      localStorage.setItem("snapotter-username", data.user?.username || username);
-      if (data.user?.mustChangePassword) {
-        window.location.href = appUrl("/change-password");
-      } else {
-        window.location.href = appUrl("/");
-      }
-    } catch {
+      // The page is leaving: keep the buttons disabled so a second click
+      // can't spend the single-use challenge again (#2053).
+      navigating = true;
+      completeLogin(data, username);
+    } catch (err) {
+      console.warn("Login request failed", err);
       setError(t.auth.connectionError);
     } finally {
-      setLoading(false);
+      if (!navigating) setLoading(false);
     }
   };
+
+  // A dead challenge token can't be retried, so leave both MFA panels and show
+  // the password form with the reason (#1234).
+  const restartLogin = (message: string) => {
+    clearMfaState();
+    setError(message);
+    // The focused code input is about to unmount; don't let focus fall to <body>.
+    // A challenge that started from an SSO redirect points back at the SSO
+    // button when one is present instead of the local username field (#2022).
+    const focusSso = errorFromRedirect;
+    later(() => {
+      if (focusSso) {
+        const ssoLink = document.querySelector<HTMLElement>(
+          'a[href$="/api/auth/oidc/login"], a[href$="/api/auth/saml/login"]',
+        );
+        if (ssoLink) {
+          ssoLink.focus();
+          return;
+        }
+      }
+      document.getElementById("username")?.focus();
+    }, 100);
+  };
+
+  const mfaCodeReady = MFA_CODE_SHAPE.test(mfaCode) && mfaCode !== rejectedMfaCode;
 
   const handleMfaComplete = async () => {
     setMfaLoading(true);
     setError("");
+    let navigating = false;
     try {
       const res = await fetch(appUrl("/api/auth/mfa/complete"), {
         method: "POST",
@@ -360,34 +528,41 @@ export function LoginPage() {
       });
       if (!res.ok) {
         const failure = await res.json().catch(() => null);
-        const { message, clearCode } = mfaFailureMessage(
+        const { message, clearCode, restart } = mfaFailureMessage(
           res.status,
+          failure?.code,
           failure?.retryAfter,
           res.headers.get("Retry-After"),
           t,
         );
+        if (restart) {
+          restartLogin(message);
+          return;
+        }
         setError(message);
-        if (clearCode) setMfaCode("");
+        // A TOTP rotates, so clear it; a recovery code doesn't, and the user
+        // needs to see what they typed to spot the character they got wrong.
+        if (clearCode && !RECOVERY_CODE_SHAPE.test(mfaCode)) setMfaCode("");
+        else if (clearCode) setRejectedMfaCode(mfaCode);
         return;
       }
       const data = await res.json();
-      setToken(data.token);
-      localStorage.setItem("snapotter-username", data.user?.username || username);
-      if (data.user?.mustChangePassword) {
-        window.location.href = appUrl("/change-password");
-      } else {
-        window.location.href = appUrl("/");
-      }
-    } catch {
+      // The page is leaving: keep the buttons disabled so a second click
+      // can't spend the single-use challenge again (#2053).
+      navigating = true;
+      completeLogin(data, username);
+    } catch (err) {
+      console.warn("Login request failed", err);
       setError(t.auth.connectionError);
     } finally {
-      setMfaLoading(false);
+      if (!navigating) setMfaLoading(false);
     }
   };
 
   const handleEnrollComplete = async () => {
     setEnrollmentLoading(true);
     setError("");
+    let navigating = false;
     try {
       const res = await fetch(appUrl("/api/auth/mfa/enroll-complete"), {
         method: "POST",
@@ -396,37 +571,46 @@ export function LoginPage() {
       });
       if (!res.ok) {
         const failure = await res.json().catch(() => null);
-        const { message, clearCode } = mfaFailureMessage(
+        const { message, clearCode, restart } = mfaFailureMessage(
           res.status,
+          failure?.code,
           failure?.retryAfter,
           res.headers.get("Retry-After"),
           t,
+          true,
         );
+        if (restart) {
+          restartLogin(message);
+          return;
+        }
         setError(message);
         if (clearCode) setEnrollmentCode("");
         return;
       }
       const data = await res.json();
-      setToken(data.token);
-      localStorage.setItem("snapotter-username", data.user?.username || username);
-      if (data.user?.mustChangePassword) {
-        window.location.href = appUrl("/change-password");
-      } else {
-        window.location.href = appUrl("/");
-      }
-    } catch {
+      // The page is leaving: keep the buttons disabled so a second click
+      // can't spend the single-use challenge again (#2053).
+      navigating = true;
+      completeLogin(data, username);
+    } catch (err) {
+      console.warn("Login request failed", err);
       setError(t.auth.connectionError);
     } finally {
-      setEnrollmentLoading(false);
+      if (!navigating) setEnrollmentLoading(false);
     }
   };
 
   const handleCopyRecoveryCodes = async () => {
     if (enrollmentRecoveryCodes.length === 0) return;
+    // Clear an earlier copy failure before the attempt so a retry that fails
+    // again remounts the alert region and announces to screen readers (#1147).
+    setError((e) => (e === t.settings.security.twoFactorCopyFailed ? "" : e));
     const ok = await copyToClipboard(enrollmentRecoveryCodes.join("\n"));
     if (ok) {
       setEnrollmentCodesCopied(true);
-      setTimeout(() => setEnrollmentCodesCopied(false), 2000);
+      later(() => setEnrollmentCodesCopied(false), 2000, "enrollmentCodesCopied");
+    } else {
+      setError(t.settings.security.twoFactorCopyFailed);
     }
   };
 
@@ -440,35 +624,18 @@ export function LoginPage() {
             </h1>
             <h2 className="text-2xl font-bold mt-4 text-foreground">{t.auth.login}</h2>
           </div>
-          {ssoEnforced && (oidcEnabled || samlEnabled) && (
-            <div className="space-y-3">
-              {oidcEnabled && (
-                <a
-                  href={appUrl("/api/auth/oidc/login")}
-                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
-                  {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
-                </a>
-              )}
-              {samlEnabled && (
-                <a
-                  href={appUrl("/api/auth/saml/login")}
-                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
-                  {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
-                </a>
-              )}
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 border-t border-border" />
-                <span className="text-sm text-muted-foreground">{t.auth.or}</span>
-                <div className="flex-1 border-t border-border" />
-              </div>
-              <p className="text-sm text-muted-foreground text-center">
-                {t.auth.ssoEnforcedLocalRestricted}
-              </p>
-            </div>
+          {notice === "idp_logout_failed" && (
+            <p
+              role="status"
+              className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground"
+            >
+              {t.auth.idpLogoutFailed}
+            </p>
+          )}
+          {!showMfaEnrollment && !showMfaPrompt && errorFromRedirect && error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
           )}
           {showMfaEnrollment ? (
             <div className="space-y-4">
@@ -543,18 +710,25 @@ export function LoginPage() {
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  maxLength={6}
+                  maxLength={20}
                   autoComplete="one-time-code"
                   placeholder={t.settings.security.twoFactorCodePlaceholder}
                   value={enrollmentCode}
-                  onChange={(e) => setEnrollmentCode(e.target.value.replace(/[^0-9]/g, ""))}
+                  onChange={(e) =>
+                    setEnrollmentCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+                  }
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && enrollmentCode.length >= 6) handleEnrollComplete();
+                    if (e.key === "Enter" && !enrollmentLoading && enrollmentCode.length >= 6)
+                      handleEnrollComplete();
                   }}
                   className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleEnrollComplete}
@@ -593,23 +767,38 @@ export function LoginPage() {
               <input
                 ref={mfaInputRef}
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={8}
+                // Room for a pasted code with a separator or a stray space: the
+                // browser cuts to maxLength before onChange runs, so 8 would lose
+                // the tail of "A3F9-C01B" (#2050). The server's limit is 20.
+                maxLength={20}
                 autoComplete="one-time-code"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 placeholder="000000"
                 value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, ""))}
+                aria-invalid={/[^0-9a-f]/.test(mfaCode) || undefined}
+                // A TOTP is 6 digits; a recovery code is 8 lowercase hex characters,
+                // so the keyboard can't be numeric. Separators and capitals are
+                // forgiven; a character that can't be in a code stays visible so a
+                // typo isn't silently dropped.
+                onChange={(e) => setMfaCode(e.target.value.toLowerCase().replace(/[\s-]/g, ""))}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && mfaCode.length >= 6) handleMfaComplete();
+                  if (e.key === "Enter" && !mfaLoading && mfaCodeReady) {
+                    handleMfaComplete();
+                  }
                 }}
                 className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleMfaComplete}
-                disabled={mfaLoading || mfaCode.length < 6}
+                disabled={mfaLoading || !mfaCodeReady}
                 className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {mfaLoading ? t.auth.verifying : t.auth.verify}
@@ -618,9 +807,8 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setShowMfaPrompt(false);
-                  setMfaToken("");
-                  setMfaCode("");
+                  clearMfaState();
+                  setErrorFromRedirect(false);
                   setError("");
                 }}
                 className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -628,89 +816,136 @@ export function LoginPage() {
                 {t.common.back}
               </button>
             </div>
-          ) : (
-            <form
-              onSubmit={handleSubmit}
-              className={`space-y-4${ssoEnforced ? " opacity-60" : ""}`}
+          ) : authLoading ? (
+            <div
+              role="status"
+              className="flex flex-col items-center justify-center py-12 space-y-3"
             >
-              <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium mb-1 text-foreground"
-                >
-                  {t.auth.username}
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t.auth.enterUsername}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  required
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium mb-1 text-foreground"
-                >
-                  {t.auth.password}
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  name="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t.auth.enterPassword}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  required
-                />
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <button
-                type="submit"
-                disabled={loading || !username || !password}
-                className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? t.auth.loggingIn : t.auth.loginButton}
-              </button>
-            </form>
-          )}
-          {!ssoEnforced && (oidcEnabled || samlEnabled) && (
+              <div
+                className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-muted-foreground">{t.common.loading}</p>
+            </div>
+          ) : (
             <>
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 border-t border-border" />
-                <span className="text-sm text-muted-foreground">{t.auth.or}</span>
-                <div className="flex-1 border-t border-border" />
-              </div>
-              {oidcEnabled && (
-                <a
-                  href={appUrl("/api/auth/oidc/login")}
-                  className="group w-full py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound
-                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
-                    aria-hidden="true"
-                  />
-                  {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
-                </a>
+              {ssoEnforced && (oidcEnabled || samlEnabled) && (
+                <div className="space-y-3">
+                  {oidcEnabled && (
+                    <a
+                      href={appUrl("/api/auth/oidc/login")}
+                      className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
+                      {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
+                    </a>
+                  )}
+                  {samlEnabled && (
+                    <a
+                      href={appUrl("/api/auth/saml/login")}
+                      className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
+                      {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
+                    </a>
+                  )}
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 border-t border-border" />
+                    <span className="text-sm text-muted-foreground">{t.auth.or}</span>
+                    <div className="flex-1 border-t border-border" />
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center">
+                    {t.auth.ssoEnforcedLocalRestricted}
+                  </p>
+                </div>
               )}
-              {samlEnabled && (
-                <a
-                  href={appUrl("/api/auth/saml/login")}
-                  className="group w-full mt-2 py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound
-                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
-                    aria-hidden="true"
+              <form
+                onSubmit={handleSubmit}
+                className={`space-y-4${ssoEnforced ? " opacity-60" : ""}`}
+              >
+                <div>
+                  <label
+                    htmlFor="username"
+                    className="block text-sm font-medium mb-1 text-foreground"
+                  >
+                    {t.auth.username}
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    name="username"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder={t.auth.enterUsername}
+                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    required
                   />
-                  {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
-                </a>
+                </div>
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium mb-1 text-foreground"
+                  >
+                    {t.auth.password}
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    name="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t.auth.enterPassword}
+                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    required
+                  />
+                </div>
+                {!errorFromRedirect && error && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={loading || !username || !password}
+                  className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? t.auth.loggingIn : t.auth.loginButton}
+                </button>
+              </form>
+              {!ssoEnforced && (oidcEnabled || samlEnabled) && (
+                <>
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 border-t border-border" />
+                    <span className="text-sm text-muted-foreground">{t.auth.or}</span>
+                    <div className="flex-1 border-t border-border" />
+                  </div>
+                  {oidcEnabled && (
+                    <a
+                      href={appUrl("/api/auth/oidc/login")}
+                      className="group w-full py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound
+                        className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
+                        aria-hidden="true"
+                      />
+                      {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
+                    </a>
+                  )}
+                  {samlEnabled && (
+                    <a
+                      href={appUrl("/api/auth/saml/login")}
+                      className="group w-full mt-2 py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound
+                        className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
+                        aria-hidden="true"
+                      />
+                      {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
+                    </a>
+                  )}
+                </>
               )}
             </>
           )}
@@ -723,7 +958,7 @@ export function LoginPage() {
         <div className="max-w-lg space-y-4 text-center">
           <h2 className="text-4xl font-extrabold tracking-tight">{t.auth.heroTitle}</h2>
           <p className="text-lg text-primary-foreground">{t.auth.heroSubtitle}</p>
-          <p className="text-xl font-medium h-8">
+          <p className="text-xl font-medium h-8" data-testid="login-rotating-phrase">
             <RotatingPhrase />
           </p>
         </div>

@@ -1,7 +1,7 @@
 ---
 description: "अंतर्निहित Tesseract या वैकल्पिक उच्च-सटीकता RapidOCR रनटाइम के साथ स्थानीय रूप से स्कैन किए गए पीडीएफ से टेक्स्ट निकालें।"
 i18n_output_hash: e35b10d659bd
-i18n_source_hash: a19ba25a1ca8
+i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
 
@@ -12,7 +12,7 @@ i18n_provenance: human
 
 <!-- korean-ocr-contract:start -->
 ::: info कोरियाई OCR संगतता
-तेज़ OCR `auto`, `en`, `de`, `es`, `fr`, `zh` और `ja` का समर्थन करता है, लेकिन कोरियाई (`ko`) का नहीं। कोरियाई के लिए सटीक OCR पैक और `balanced` या `best` आवश्यक है। पैक आधिकारिक Linux amd64 और arm64 कंटेनरों पर चलता है; NVIDIA होस्ट पर भी OCR CPU पर ही चलता है। असमर्थित सिस्टम स्पष्ट संगतता त्रुटि लौटाते हैं और चुपचाप `fast` पर वापस नहीं जाते। कोरियाई के साथ `fast` या पुराने `tesseract` नाम को कतार में डालने से पहले `FEATURE_INCOMPATIBLE` और `fast-korean-unsupported` के साथ अस्वीकार किया जाता है।
+तेज़ OCR `auto`, `en`, `de`, `es`, `fr`, `zh` और `ja` का समर्थन करता है, लेकिन कोरियाई (`ko`) और अरबी (`ar`) का नहीं। कोरियाई और अरबी, दोनों के लिए सटीक OCR पैक और `balanced` या `best` आवश्यक है। पैक आधिकारिक Linux amd64 और arm64 कंटेनरों पर चलता है; NVIDIA होस्ट पर भी OCR CPU पर ही चलता है। असमर्थित सिस्टम स्पष्ट संगतता त्रुटि लौटाते हैं और चुपचाप `fast` पर वापस नहीं जाते। कोरियाई या अरबी के साथ `fast` या पुराने `tesseract` नाम को कतार में डालने से पहले `FEATURE_INCOMPATIBLE` और `fast-korean-unsupported` के साथ अस्वीकार किया जाता है।
 :::
 <!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
@@ -27,7 +27,7 @@ i18n_provenance: human
 |-----------|------|----------|---------|-------------|
 | file | file | हाँ | - | PDF फ़ाइल (मल्टीपार्ट), 512 तक MiB एन्कोडेड; कम ऑपरेटर अपलोड सीमा अभी भी लागू है |
 | quality | string | नहीं | गतिशील | OCR गुणवत्ता स्तर: `fast`, `balanced`, या `best` |
-| language | string | No | `"auto"` | दस्तावेज़ भाषा: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| language | string | No | `"auto"` | दस्तावेज़ भाषा: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar` |
 | pages | string | No | `"all"` | पृष्ठ चयन, उदा. `"all"`, `"1-3"`, `"1,3,5"` |
 | enhance | boolean | नहीं | स्तर पर निर्भर | पहचान से पहले स्थानीय कंट्रास्ट में सुधार करें। फास्ट इसे सीधे लागू करता है; बैलेंस्ड और बेस्ट वेरिएंट को तभी बरकरार रखते हैं जब कैलिब्रेटेड स्कोरिंग से परिणाम में सुधार होता है। `best` के लिए डिफ़ॉल्ट `true` और `fast`/`balanced` के लिए `false` |
 | engine | string | नहीं | - | अस्वीकृत अनुकूलता उपनाम. इसके बजाय `quality` का उपयोग करें। `tesseract` से `fast` मानचित्र; लीगेसी `paddleocr` मान `balanced` पर मैप होता है लेकिन PaddlePaddle लोड नहीं होता है |

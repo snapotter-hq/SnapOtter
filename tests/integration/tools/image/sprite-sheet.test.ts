@@ -25,11 +25,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Sprite Sheet", () => {
   it("creates a sprite sheet from 4 images with 2 columns", async () => {

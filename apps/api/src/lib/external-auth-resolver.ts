@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { SafeError } from "@snapotter/shared";
 import { and, asc, eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { db, schema } from "../db/index.js";
@@ -32,10 +33,20 @@ export interface ExternalAuthResult {
  * Auto-create lost the username race on every retry. The SSO callbacks catch
  * this one type and turn it into a login failure (issue #978); any other
  * throw out of the resolver is a fault and keeps surfacing as one.
+ *
+ * The callbacks also report it to Sentry, so the message is a constant and
+ * carries no username (issue #1866): the scrubber only masks long quoted
+ * runs, so a short IdP-supplied name went out verbatim. The callback's route
+ * tag says which provider raced, and the audit row's `attemptedUsername`
+ * keeps the name for an operator. Kind "bug" keeps the class reportError
+ * gave the plain Error this used to be.
  */
-export class UsernameRaceExhaustedError extends Error {
-  constructor(provider: string, username: string, attempts: number) {
-    super(`${provider} auto-create lost the username race ${attempts} times for "${username}"`);
+export class UsernameRaceExhaustedError extends SafeError {
+  constructor() {
+    super("SSO auto-create lost the username race on every retry", {
+      kind: "bug",
+      code: "USERNAME_RACE_EXHAUSTED",
+    });
     this.name = "UsernameRaceExhaustedError";
   }
 }
@@ -61,12 +72,14 @@ export function sanitizeUsername(raw: string): string {
 }
 
 export async function findUniqueUsername(base: string): Promise<string> {
-  const [existing] = await db
-    .select({ username: schema.users.username })
-    .from(schema.users)
-    .where(eq(schema.users.username, base));
+  if (base.toLowerCase() !== "anonymous") {
+    const [existing] = await db
+      .select({ username: schema.users.username })
+      .from(schema.users)
+      .where(eq(schema.users.username, base));
 
-  if (!existing) return base;
+    if (!existing) return base;
+  }
 
   for (let i = 2; i <= 1000; i++) {
     const candidate = `${base}_${i}`;
@@ -115,6 +128,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       await audit(`${providerUpper}_LOGIN_FAILED`, {
         reason: "user_disabled",
         userId: existingByExtId.id,
+        username: existingByExtId.username,
       });
       return { user: null, action: "denied", deniedReason: "user_disabled" };
     }
@@ -154,6 +168,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
         await audit(`${providerUpper}_LOGIN_FAILED`, {
           reason: "user_disabled",
           userId: existingByEmail.id,
+          username: existingByEmail.username,
         });
         return { user: null, action: "denied", deniedReason: "user_disabled" };
       }
@@ -200,8 +215,9 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
     // carries a conflict guard and the loser recovers below. The guard is
     // unqualified on purpose: it has to cover both the username constraint
     // and the (auth_provider, external_id) index that refuses a second
-    // account for one identity (issue #969). The only other constraint on
-    // the table is the primary key, on a fresh UUID.
+    // account for one identity (issue #969). The other constraints can't
+    // fire here: the primary key is a fresh UUID, and scim_external_id
+    // (issue #1510) is left NULL.
     const MAX_USERNAME_RACE_RETRIES = 3;
     for (let attempt = 0; attempt < MAX_USERNAME_RACE_RETRIES; attempt++) {
       const uniqueUsername = await findUniqueUsername(username);
@@ -282,6 +298,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
           await audit(`${providerUpper}_LOGIN_FAILED`, {
             reason: "user_disabled",
             userId: winner.id,
+            username: winner.username,
           });
           return { user: null, action: "denied", deniedReason: "user_disabled" };
         }
@@ -302,7 +319,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       // A different user took the name; rescan and retry.
     }
 
-    throw new UsernameRaceExhaustedError(provider, username, MAX_USERNAME_RACE_RETRIES);
+    throw new UsernameRaceExhaustedError();
   }
 
   // 4. Denied: no matching user, auto-link did not match, auto-create disabled

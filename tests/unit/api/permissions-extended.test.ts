@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: () => ({
-      from: () => ({ where: () => ({ get: () => null }) }),
+      from: () => ({ where: () => ({ get: () => null, limit: async () => [] }) }),
     }),
   },
   pool: {},

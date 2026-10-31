@@ -6,8 +6,10 @@ import {
   telemetryEnvKilled,
 } from "./lib/analytics-gate.js";
 import { deployMode } from "./lib/deploy-mode.js";
-import { buildBeforeSend } from "./lib/sentry-scrub.js";
+import { buildSentryIntegrations } from "./lib/sentry-integrations.js";
+import { buildBeforeSend, buildBeforeSendTransaction } from "./lib/sentry-scrub.js";
 import { buildTracesSampler } from "./lib/sentry-tracing.js";
+import { buildGatedTransport } from "./lib/sentry-transport.js";
 
 // Sentry inits at process load, before the gate cache is primed. Until the
 // first successful read, stay silent rather than emit on the default-ON cache,
@@ -42,16 +44,11 @@ if (dsn && !telemetryEnvKilled()) {
       release,
       environment: process.env.SNAPOTTER_ENV || "production",
       sendDefaultPii: false,
-      // With tracing on, use the function form to DROP the default Redis
-      // integration (the array form is additive and would keep it). With
-      // tracing off, the array form is fine: no sampler means the defaults
-      // never start a transaction, so they stay inert.
-      integrations: tracingEnabled
-        ? (defaults) =>
-            defaults
-              .filter((i) => i.name !== "Redis")
-              .concat(Sentry.httpIntegration({ trackIncomingRequestsAsSessions: false }))
-        : [Sentry.httpIntegration({ trackIncomingRequestsAsSessions: false })],
+      // No request bodies or cookies collected (#1880); the beforeSend hooks
+      // below strip query strings and auth headers. Spotlight, when an operator
+      // sets SENTRY_SPOTLIGHT, sits behind the analytics gate (#1966). See
+      // sentry-integrations.ts.
+      integrations: buildSentryIntegrations(Sentry, tracingEnabled, sentryActive),
       ...(tracingEnabled
         ? {
             tracesSampler: buildTracesSampler(
@@ -67,6 +64,23 @@ if (dsn && !telemetryEnvKilled()) {
         sentryActive,
         sentryDiagnostic(),
       ) as unknown as SentryOptions["beforeSend"],
+      // Transactions skip beforeSend, so they get their own gate check and
+      // request and span scrub (only reachable with SENTRY_TRACES_SAMPLE_RATE
+      // set). The gate sits here, at send time, rather than in tracesSampler:
+      // the sampler decides once per root span and child spans never consult
+      // it, so a transaction sampled before an admin opts out would still
+      // finish and send (#1898).
+      beforeSendTransaction: buildBeforeSendTransaction(
+        sentryActive,
+        sentryDiagnostic(),
+      ) as unknown as SentryOptions["beforeSendTransaction"],
+      // The gate that covers everything else. Sessions (the process session
+      // ends on API stop), cron check-ins, and the SDK's internal error events
+      // never pass through either hook above, so the transport drops every
+      // envelope while analytics is off; the hooks stay as a second line for
+      // events and transactions (#1919).
+      transport: buildGatedTransport(sentryActive, Sentry.makeNodeTransport),
+      tracePropagationTargets: [],
     });
 
     console.log(
@@ -74,7 +88,9 @@ if (dsn && !telemetryEnvKilled()) {
         ? `[sentry] initialized (errors + traces @ ${tracesSampleRate}), release: ${release}`
         : `[sentry] initialized (errors only), release: ${release}`,
     );
-  } catch {
-    // @sentry/node not available
+  } catch (err) {
+    // Fails closed (nothing is sent), but say so: a bad option here would
+    // otherwise switch error reporting off without a trace.
+    console.error("[sentry] init failed, error reporting is off:", err);
   }
 }

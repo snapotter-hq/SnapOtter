@@ -34,16 +34,60 @@ describe("runGs error handling (via gsGrayscalePdf)", () => {
 
   it("rejects on non-zero exit with the stderr tail", async () => {
     h.nextClose({ stderr: "Ghostscript could not open input", code: 1 });
-    await expect(
-      import("../src/ghostscript.js").then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf")),
-    ).rejects.toThrow("gs exited 1: Ghostscript could not open input");
+    const err = await import("../src/ghostscript.js")
+      .then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("gs exited 1: Ghostscript could not open input");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal when code is null", async () => {
-    h.nextClose({ stderr: "boom", code: null, signal: "SIGSEGV" });
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    h.nextClose({ stderr: "boom\n", code: null, signal: "SIGSEGV" });
     await expect(
       import("../src/ghostscript.js").then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf")),
-    ).rejects.toThrow("gs exited SIGSEGV: boom");
+    ).rejects.toMatchObject({
+      message: "gs exited SIGSEGV: boom",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+      signal: "SIGSEGV",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    h.nextClose({ stderr: "  \n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/ghostscript.js").then((m) => m.gsCompressPdf("/in.pdf", "/out.pdf", "ebook")),
+    ).rejects.toMatchObject({
+      message: "spawn /usr/bin/gs ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3829)", async () => {
+    h.nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/ghostscript.js").then((m) => m.gsCompressPdf("/in.pdf", "/out.pdf", "ebook")),
+    ).rejects.toMatchObject({
+      message: "gs exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+    });
+
+    h.nextClose({ stderr: "sh: gs: not found\n", code: 127 });
+    await expect(
+      import("../src/ghostscript.js").then((m) => m.gsPdfaConvert("/in.pdf", "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "gs exited 127: sh: gs: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+    });
   });
 
   it("rejects on an error event", async () => {
@@ -75,6 +119,75 @@ describe("runGs error handling (via gsGrayscalePdf)", () => {
       await vi.advanceTimersByTimeAsync(120_000);
       await settled;
       expect(child.killSignals).toContain("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/ghostscript.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(
+      mod.gsCompressPdf("/in.pdf", "/out.pdf", "ebook", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(
+      mod.gsCompressPdfTuned("/in.pdf", "/out.pdf", 150, 1, { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    await expect(mod.gsGrayscalePdf("/in.pdf", "/out.pdf", { signal: ac.signal })).rejects.toThrow(
+      "Canceled",
+    );
+    await expect(mod.gsPdfaConvert("/in.pdf", "/out.pdf", { signal: ac.signal })).rejects.toThrow(
+      "Canceled",
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("kills the child with SIGKILL and rejects with Canceled when signal aborts mid-run across all gs wrappers", async () => {
+    const mod = await import("../src/ghostscript.js");
+    const calls = [
+      (signal: AbortSignal) => mod.gsCompressPdf("/in.pdf", "/out.pdf", "ebook", { signal }),
+      (signal: AbortSignal) => mod.gsCompressPdfTuned("/in.pdf", "/out.pdf", 150, 1, { signal }),
+      (signal: AbortSignal) => mod.gsGrayscalePdf("/in.pdf", "/out.pdf", { signal }),
+      (signal: AbortSignal) => mod.gsPdfaConvert("/in.pdf", "/out.pdf", { signal }),
+    ];
+    for (const invoke of calls) {
+      const child = h.nextManual();
+      const ac = new AbortController();
+      const pending = invoke(ac.signal);
+      ac.abort();
+      await expect(pending).rejects.toThrow("Canceled");
+      expect(child.killSignals).toContain("SIGKILL");
+    }
+  });
+
+  it("removes the abort listener on close, error, and timeout", async () => {
+    const mod = await import("../src/ghostscript.js");
+    const acClose = new AbortController();
+    const removeClose = vi.spyOn(acClose.signal, "removeEventListener");
+    h.nextClose({ code: 0 });
+    await mod.gsGrayscalePdf("/in.pdf", "/out.pdf", { signal: acClose.signal });
+    expect(removeClose).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const acErr = new AbortController();
+    const removeErr = vi.spyOn(acErr.signal, "removeEventListener");
+    h.nextError(new Error("spawn gs ENOENT"));
+    await expect(
+      mod.gsGrayscalePdf("/in.pdf", "/out.pdf", { signal: acErr.signal }),
+    ).rejects.toThrow("spawn gs ENOENT");
+    expect(removeErr).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    vi.useFakeTimers();
+    try {
+      const acTimeout = new AbortController();
+      const removeTimeout = vi.spyOn(acTimeout.signal, "removeEventListener");
+      h.nextManual();
+      const settled = expect(
+        mod.gsGrayscalePdf("/in.pdf", "/out.pdf", { timeoutMs: 5_000, signal: acTimeout.signal }),
+      ).rejects.toThrow("ghostscript timed out after 5s");
+      await vi.advanceTimersByTimeAsync(5_000);
+      await settled;
+      expect(removeTimeout).toHaveBeenCalledWith("abort", expect.any(Function));
     } finally {
       vi.useRealTimers();
     }
@@ -266,5 +379,14 @@ describe("gsCompressPdfTuned (DPI + QFactor levers)", () => {
     expect(args).toContain("-dGrayImageDownsampleType=/Average");
     expect(args).toContain("-dDownsampleMonoImages=true");
     expect(args).toContain("-dMonoImageDownsampleType=/Subsample");
+  });
+
+  it("asks pdfwrite to embed and subset fonts instead of substituting glyphs (#1086)", async () => {
+    // pdfwrite's own defaults already embed, but the flags make the intent
+    // explicit and survive a distiller preset or a gs build whose defaults
+    // differ, which is how a compress pass turns text into the wrong glyphs.
+    const args = await run(100, 1);
+    expect(args).toContain("-dEmbedAllFonts=true");
+    expect(args).toContain("-dSubsetFonts=true");
   });
 });

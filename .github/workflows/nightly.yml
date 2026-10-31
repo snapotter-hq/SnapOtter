@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "0 3 * * *"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -50,7 +54,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install system dependencies
         uses: ./.github/actions/apt-install
         with:
@@ -71,7 +75,7 @@ jobs:
         env:
           PW_WORKERS: "2"
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-full-report-shard-${{ matrix.shard }}
@@ -106,7 +110,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install system dependencies
         uses: ./.github/actions/apt-install
         with:
@@ -130,7 +134,7 @@ jobs:
       - name: Run viewport-width bucket
         run: pnpm playwright test --project=chromium-widths --workers=1
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-serial-report
@@ -172,7 +176,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install system dependencies
         uses: ./.github/actions/apt-install
         with:
@@ -185,9 +189,11 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-      - name: Install Playwright Chromium
+          key: playwright-editor-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+      - name: Install Playwright Chromium and WebKit
         uses: ./.github/actions/playwright-install
+        with:
+          browsers: chromium webkit
       - name: Run editor suite
         run: pnpm playwright test --config playwright.editor.config.ts
         env:
@@ -204,7 +210,7 @@ jobs:
         # CI exercises that path, so a regression only surfaced on a user's box.
         run: pnpm test:e2e:noauth
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-surfaces-report
@@ -239,7 +245,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -258,7 +264,7 @@ jobs:
         env:
           PW_WORKERS: "1"
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-cross-browser-report
@@ -293,7 +299,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install system dependencies
         uses: ./.github/actions/apt-install
         with:
@@ -316,12 +322,122 @@ jobs:
         env:
           PW_WORKERS: "2"
       - name: Upload report on failure
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: e2e-device-matrix-report
           path: playwright-report/
           retention-days: 7
+
+  # Compares every maintained screenshot against its committed linux baseline.
+  # update-visual-baselines.yml renders the same shots with --update-snapshots,
+  # so it rewrites a stale baseline instead of reporting it, and the device
+  # matrix above grep-inverts @visual: until this job, no workflow ever failed
+  # on a stale or missing baseline (#1507). It runs on ubuntu-latest because
+  # that's where the linux baselines are rendered; another Ubuntu release (the
+  # test fleet's, say) draws fonts differently and fails every shot.
+  e2e-visual:
+    name: E2E Visual Comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ARTIFACT_NAME: e2e-visual-report-${{ github.run_id }}-${{ github.run_attempt }}
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+      - name: Install Playwright Chromium
+        uses: ./.github/actions/playwright-install
+      # --update-snapshots=none: the default (missing) writes an absent
+      # baseline on the first attempt, and the CI retry then passes against
+      # the file it just wrote. none fails both attempts instead.
+      # --fail-on-flaky-tests: with zero changed pixels allowed, a shot that
+      # differs once and matches on the retry is a real intermittent diff,
+      # and passing it would also throw its diff report away.
+      # PLAYWRIGHT_RUN_ID is fixed per lane because Playwright writes its report
+      # under test-results/e2e-runs/<run id>/, and the upload needs that path.
+      - name: Compare desktop screenshots
+        id: desktop
+        run: pnpm playwright test --project=chromium-visual --update-snapshots=none --fail-on-flaky-tests
+        env:
+          PW_WORKERS: "2"
+          PLAYWRIGHT_RUN_ID: visual-desktop
+      - name: Compare device screenshots
+        id: device
+        if: ${{ !cancelled() }}
+        run: pnpm playwright test --project=mobile-chromium --project=tablet-chromium --grep @visual --update-snapshots=none --fail-on-flaky-tests
+        env:
+          PW_WORKERS: "2"
+          PLAYWRIGHT_RUN_ID: visual-device
+      # The report holds the expected, actual and diff image for every
+      # failing shot; playwright-output holds the same PNGs as plain files.
+      # Gated on the lanes rather than failure(), so a missing report after a
+      # failed comparison is an error here instead of a warning (#1025).
+      - name: Upload diff report on failure
+        if: ${{ !cancelled() && (steps.desktop.outcome == 'failure' || steps.device.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: |
+            test-results/e2e-runs/visual-desktop/playwright-report/
+            test-results/e2e-runs/visual-device/playwright-report/
+            test-results/e2e-runs/visual-desktop/playwright-output/
+            test-results/e2e-runs/visual-device/playwright-output/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Summarize
+        if: ${{ !cancelled() }}
+        env:
+          DESKTOP: ${{ steps.desktop.outcome }}
+          DEVICE: ${{ steps.device.outcome }}
+          REPO: ${{ github.repository }}
+        run: |
+          {
+            echo "## Visual comparison against the linux baselines"
+            echo
+            echo "| Lane | Result |"
+            echo "| --- | --- |"
+            echo "| Desktop (chromium-visual) | $DESKTOP |"
+            echo "| Devices (mobile-chromium, tablet-chromium @visual) | $DEVICE |"
+            echo
+            if [ "$DESKTOP" != success ] || [ "$DEVICE" != success ]; then
+              echo "A screenshot no longer matches its committed linux baseline, or has none. The \`$ARTIFACT_NAME\` artifact holds the Playwright report with the expected, actual and diff image for each failing shot (open it with \`pnpm exec playwright show-report <dir>\`)."
+              echo
+            fi
+            echo "If the new rendering is intended, refresh the baselines: dispatch [Update Visual Baselines](https://github.com/$REPO/actions/workflows/update-visual-baselines.yml) (\`.github/workflows/update-visual-baselines.yml\`) on main with \`update_snapshots=all\`, i.e. \`gh workflow run update-visual-baselines.yml --ref main -f update_snapshots=all\`. Each OS leg (\`linux\` and \`darwin\`) uploads a \`visual-baselines-<os>-...\` artifact and opens a \`chore/visual-baselines-<os>-...\` PR with the regenerated PNGs. If the new rendering isn't intended, the diff is the regression."
+            echo
+            echo "A new tool moves these shots on purpose (home-page counts and cards, plus a baseline for its own page). The tool's PR should refresh them; the steps are in the [Developer Guide](https://docs.snapotter.com/guide/developer#_5-visual-baselines) (\`apps/docs/guide/developer.md\`). A release shouldn't: the app version is masked in every shot that shows it."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   docker-e2e:
     name: Docker Container E2E
@@ -330,7 +446,7 @@ jobs:
     # ~65 min, so the old 60-minute budget cancelled the job before it finished.
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Free disk space
         # The from-scratch image is ~15 GB and the build layers add more on top
         # of three running containers, which crowds a standard runner and has
@@ -365,7 +481,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install system dependencies
         uses: ./.github/actions/apt-install
         with:
@@ -434,13 +550,13 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install system dependencies
         uses: ./.github/actions/apt-install
         with:
           packages: ${{ env.SYSTEM_DEPS }}
       - uses: ./.github/actions/setup
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install Schemathesis
@@ -487,7 +603,7 @@ jobs:
             --report junit \
             --report-dir st-report
       - name: Upload fuzz report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: schemathesis-report
@@ -499,7 +615,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install system dependencies
         uses: ./.github/actions/apt-install
         with:
@@ -522,7 +638,7 @@ jobs:
           VITEST_TEST_TIMEOUT: "300000"
           VITEST_HOOK_TIMEOUT: "120000"
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-report
           path: coverage/

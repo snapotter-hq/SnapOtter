@@ -4,6 +4,7 @@ Converts grayscale / black-and-white photos to full color using the DDColor
 dual-decoder architecture. Falls back to a lightweight OpenCV DNN colorizer
 when the DDColor model is unavailable.
 """
+import errno
 import sys
 import json
 import os
@@ -12,11 +13,66 @@ try:
     import numpy as np
     import cv2
     from PIL import Image
+    _IMPORT_ERROR = None
 except ImportError as _e:
-    _msg = str(_e)
-    _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
-    print(json.dumps({"error": f"Missing dependency: {_msg}. {_hint}"}))
-    sys.exit(1)
+    np = None
+    cv2 = None
+    Image = None
+    _IMPORT_ERROR = _e
+    if __name__ == "__main__":
+        _msg = str(_e).strip() or type(_e).__name__
+        _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
+        print(json.dumps({"success": False, "error": f"Missing dependency: {_msg}. {_hint}"}))
+        sys.exit(1)
+
+
+_OOM_MARKERS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
+    "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
+)
+
+
+def is_oom_error(error: BaseException) -> bool:
+    """Return True for CUDA or CPU memory allocation failures."""
+    if isinstance(error, MemoryError):
+        return True
+    if isinstance(error, OSError) and error.errno == errno.ENOMEM:
+        return True
+    msg = str(error).lower()
+    return any(pattern in msg for pattern in _OOM_MARKERS)
+
+
+_is_oom = is_oom_error
+
+
+def ddcolor_failure_message(error: BaseException) -> str:
+    """Say what actually went wrong with DDColor, and what to do about it."""
+    detail = str(error).strip() or type(error).__name__
+    if is_oom_error(error):
+        return (
+            f"DDColor ran out of memory: {detail}. "
+            "Try a smaller image or use model=opencv for basic colorization."
+        )
+    missing = isinstance(error, (ModuleNotFoundError, FileNotFoundError))
+    remedy = (
+        "Install the colorize feature"
+        if missing
+        else (
+            "The colorize libraries are present but did not load, which usually "
+            "means a partial or conflicting install. Reinstall it from Settings > AI "
+            "Features, or use Reset AI Environment if that does not help"
+        )
+    )
+    return f"DDColor is not available: {detail}. {remedy}, or use model=opencv for basic colorization."
 
 
 def emit_progress(percent, stage):
@@ -164,6 +220,12 @@ def colorize_opencv(img_bgr, intensity):
 
 
 def main():
+    if _IMPORT_ERROR is not None:
+        _msg = str(_IMPORT_ERROR).strip() or type(_IMPORT_ERROR).__name__
+        _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
+        print(json.dumps({"success": False, "error": f"Missing dependency: {_msg}. {_hint}"}))
+        sys.exit(1)
+
     input_path = sys.argv[1]
     output_path = sys.argv[2]
     settings = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
@@ -190,26 +252,38 @@ def main():
                 result_bgr, method = colorize_ddcolor(img_bgr, intensity)
             except Exception as e:
                 import traceback
-                print(f"[colorize] DDColor failed: {e}", file=sys.stderr, flush=True)
+                detail = str(e).strip() or type(e).__name__
+                print(json.dumps({"warning": f"[colorize] DDColor failed: {detail}"}), file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
                 print(json.dumps({
                     "success": False,
-                    "error": (
-                        f"DDColor is not available: {e}. "
-                        "Install the colorize feature or use model=opencv for basic colorization."
-                    ),
+                    "error": ddcolor_failure_message(e),
                 }))
                 sys.exit(1)
 
         elif model_choice == "opencv":
             try:
-                if not (os.path.exists(OPENCV_PROTO_PATH) and os.path.exists(OPENCV_MODEL_PATH)):
-                    raise FileNotFoundError(f"OpenCV colorize models not found: {OPENCV_PROTO_PATH}")
+                missing_opencv_paths = [
+                    p
+                    for p in (OPENCV_PROTO_PATH, OPENCV_MODEL_PATH, OPENCV_POINTS_PATH)
+                    if not os.path.exists(p)
+                ]
+                if missing_opencv_paths:
+                    raise FileNotFoundError(
+                        f"OpenCV colorize models not found: {', '.join(missing_opencv_paths)}"
+                    )
                 result_bgr, method = colorize_opencv(img_bgr, intensity)
             except Exception as e:
                 import traceback
-                print(f"[colorize] OpenCV failed: {e}", file=sys.stderr, flush=True)
+                detail = str(e).strip() or type(e).__name__
+                print(json.dumps({"warning": f"[colorize] OpenCV failed: {detail}"}), file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
+                if is_oom_error(e):
+                    print(json.dumps({
+                        "success": False,
+                        "error": f"OpenCV colorizer ran out of memory: {detail}. Try a smaller image.",
+                    }))
+                    sys.exit(1)
                 raise
 
         else:
@@ -222,7 +296,8 @@ def main():
         emit_progress(90, "Saving result")
 
         # Save output as PNG (API route handles format conversion)
-        cv2.imwrite(output_path, result_bgr)
+        if not cv2.imwrite(output_path, result_bgr):
+            raise RuntimeError(f"Failed to write output image: {output_path}")
 
         print(json.dumps({
             "success": True,
@@ -233,7 +308,7 @@ def main():
         }))
 
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

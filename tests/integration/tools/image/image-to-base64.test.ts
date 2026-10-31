@@ -5,7 +5,10 @@
  * with results/errors arrays rather than a file download.
  */
 
+import { gzipSync } from "node:zlib";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../../apps/api/src/config.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -25,11 +28,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("image-to-base64", () => {
   it("converts a PNG to base64", async () => {
@@ -469,12 +472,12 @@ describe("image-to-base64", () => {
     expect(json.results[0].height).toBeLessThanOrEqual(50);
   });
 
-  // ── Branch coverage: line 83 (ignored invalid settings JSON) ──────
+  // ── Unparseable settings JSON answers 400 (#2224) ─────────────────
 
-  it("ignores invalid settings JSON (uses defaults)", async () => {
+  it("answers 400 when the settings field is not valid JSON", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      { name: "settings", content: "not-json-at-all" },
+      { name: "settings", content: "{not json" },
     ]);
 
     const res = await app.inject({
@@ -484,11 +487,88 @@ describe("image-to-base64", () => {
       body,
     });
 
-    // The route silently ignores invalid JSON and uses defaults
+    // Same answer as meme-generator and the tool factory: a client that
+    // mistyped its settings must not get a default-encoded result back.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Settings must be valid JSON");
+    expect(json.results).toBeUndefined();
+  });
+
+  it("answers 400 for unparseable settings even when the field arrives before the file", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: "not-json-at-all" },
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe("Settings must be valid JSON");
+  });
+
+  it("treats an empty settings field as the defaults, like the tool factory", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
+    expect(json.errors).toHaveLength(0);
     expect(json.results).toHaveLength(1);
-    expect(json.results[0].mimeType).toContain("image/");
+    // All four defaults: original format, no resize either way.
+    expect(json.results[0].mimeType).toBe("image/png");
+    expect(json.results[0].width).toBe(200);
+    expect(json.results[0].height).toBe(150);
+  });
+
+  it("answers 400 Invalid settings when the settings JSON is not an object", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "[]" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // Parses as JSON, so it reaches Zod and gets the other 400 message.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.results).toBeUndefined();
+  });
+
+  it("still rejects a missing file before looking at unparseable settings", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: "{not json" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain("No image files");
   });
 
   // ── Branch coverage: lines 149-150 (default case in outputFormat switch) ──
@@ -1169,5 +1249,187 @@ describe("image-to-base64", () => {
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  // ── SVG and SVGZ sanitization in original mode (#2594) ───────
+  it("returns sanitized SVG XML for .svg inputs when outputFormat is original", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" onload="alert(1)"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+    );
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "xss.svg", contentType: "image/svg+xml", content: rawSvg },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 0, maxHeight: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(1);
+
+    const result = json.results[0];
+    expect(result.mimeType).toBe("image/svg+xml");
+    expect(result.dataUri).toBe(`data:image/svg+xml;base64,${result.base64}`);
+
+    const decodedXml = Buffer.from(result.base64, "base64").toString("utf-8");
+    expect(decodedXml).toContain("<svg");
+    expect(decodedXml).toContain("<rect");
+    expect(decodedXml).not.toContain("<script");
+    expect(decodedXml).not.toContain("alert(1)");
+    expect(decodedXml).not.toContain("onload=");
+  });
+
+  it("returns decompressed, sanitized SVG XML for .svgz inputs when outputFormat is original", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "xss.svgz", contentType: "image/svg+xml", content: svgz },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 0, maxHeight: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(1);
+
+    const result = json.results[0];
+    expect(result.mimeType).toBe("image/svg+xml");
+    expect(result.dataUri).toBe(`data:image/svg+xml;base64,${result.base64}`);
+
+    const decodedBytes = Buffer.from(result.base64, "base64");
+    expect(decodedBytes[0]).not.toBe(0x1f);
+    expect(decodedBytes[1]).not.toBe(0x8b);
+
+    const decodedXml = decodedBytes.toString("utf-8");
+    expect(decodedXml.trimStart().startsWith("<svg")).toBe(true);
+    expect(decodedXml).not.toContain("<script");
+    expect(decodedXml).not.toContain("alert(1)");
+  });
+
+  it("keeps decompressed, sanitized SVG XML when maxWidth or maxHeight is set with outputFormat original", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><script>alert(1)</script><rect width="100" height="80"/></svg>',
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: rawSvg },
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: svgz },
+      { name: "file", filename: "vector.png", contentType: "image/png", content: rawSvg },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 40, maxHeight: 40 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(3);
+
+    for (const result of json.results) {
+      expect(result.mimeType).toBe("image/svg+xml");
+      expect(result.width).toBe(100);
+      expect(result.height).toBe(80);
+      const decodedXml = Buffer.from(result.base64, "base64").toString("utf-8");
+      expect(decodedXml.trimStart().startsWith("<svg")).toBe(true);
+      expect(decodedXml).not.toContain("<script");
+      expect(decodedXml).not.toContain("alert(1)");
+    }
+  });
+
+  it("preserves raster MIME type and resize when a PNG file has a .svg extension", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "misnamed.svg", contentType: "image/svg+xml", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 50, maxHeight: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(1);
+    expect(json.results[0].mimeType).toBe("image/png");
+    expect(json.results[0].width).toBeLessThanOrEqual(50);
+    expect(json.results[0].dataUri).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("records MAX_MEGAPIXELS rejections in errors while processing valid files (#3104)", async () => {
+    const twoMpPng = await sharp({
+      create: {
+        width: 2000,
+        height: 1000,
+        channels: 3,
+        background: { r: 20, g: 40, b: 60 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const prevMaxMp = env.MAX_MEGAPIXELS;
+    (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = 1;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "oversized.png", contentType: "image/png", content: twoMpPng },
+        { name: "file", filename: "ok.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ outputFormat: "original" }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/image-to-base64",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.results).toHaveLength(1);
+      expect(json.results[0].filename).toBe("ok.png");
+      expect(json.errors).toEqual([
+        {
+          filename: "oversized.png",
+          error: "Image exceeds maximum size: 2.0MP (limit: 1MP)",
+        },
+      ]);
+    } finally {
+      (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = prevMaxMp;
+    }
   });
 });

@@ -49,6 +49,14 @@ export async function registerStatic(app: FastifyInstance, root?: string) {
     // rewriteUrl has already stripped a configured deployment path.
     const path = request.url.split(/[?#]/)[0];
     warnUndeclaredPrefix(app, path, warnedUndeclaredPrefixes);
+    // The forced change-password page submits a real form POST to the app root so
+    // the browser offers to save the new password. Send the browser on to the app
+    // (303 turns it into a GET). This handler never reads or echoes the form body,
+    // which carries the password (#2088).
+    if (request.method === "POST" && path === "/") {
+      reply.redirect(`${env.BASE_PATH}/`, 303);
+      return;
+    }
     // Only a browser navigation wants the shell. A missing chunk answered with
     // HTML and a 200 surfaces as "Expected a JavaScript module script" with
     // nothing but 200s in the log, and a POST answered with HTML fails as a
@@ -64,7 +72,7 @@ export async function registerStatic(app: FastifyInstance, root?: string) {
 const ASSET_EXTENSION = /\.(js|mjs|css|map|wasm)$/;
 
 function isAssetPath(path: string): boolean {
-  return path.startsWith("/assets/") || ASSET_EXTENSION.test(path);
+  return path.startsWith("/assets/") || path.startsWith("/pdfjs/") || ASSET_EXTENSION.test(path);
 }
 
 // Anyone can send these paths unauthenticated and they skip the rate limit,

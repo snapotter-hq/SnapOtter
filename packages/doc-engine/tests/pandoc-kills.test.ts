@@ -44,8 +44,8 @@ describe("pandoc selfContainedArgs version branch", () => {
     expect(selfContainedFlags(mod)).toEqual(["--embed-resources", "--standalone"]);
   });
 
-  it("major 2 yields --self-contained", async () => {
-    const { mod } = await loadWithVersion(0, "pandoc 2.17.1.1\n");
+  it("major 2 yields --self-contained (multi-space banner also kills \\s+ -> \\s)", async () => {
+    const { mod } = await loadWithVersion(0, "pandoc  2.17.1.1\n");
     expect(selfContainedFlags(mod)).toEqual(["--self-contained"]);
   });
 
@@ -54,21 +54,31 @@ describe("pandoc selfContainedArgs version branch", () => {
     expect(selfContainedFlags(mod)).toEqual(["--embed-resources", "--standalone"]);
   });
 
-  it("output with no version token defaults to major 2 -> --self-contained", async () => {
-    const { mod } = await loadWithVersion(0, "some unexpected banner\n");
+  it("output with no version token falls back to --embed-resources --standalone without caching", async () => {
+    const { mod, spawnSync } = await loadWithVersion(0, "some unexpected banner\n");
+    expect(selfContainedFlags(mod)).toEqual(["--embed-resources", "--standalone"]);
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" });
     expect(selfContainedFlags(mod)).toEqual(["--self-contained"]);
+    expect(spawnSync).toHaveBeenCalledTimes(2);
   });
 
-  it("nonzero status falls back to --self-contained even with a 3.x banner (kills the status operand)", async () => {
-    // status !== 0 is true, stdout is truthy: only the || short-circuit reaches the fallback.
-    const { mod } = await loadWithVersion(1, "pandoc 3.1.2\n");
+  it("nonzero status falls back to --embed-resources --standalone even with a 2.x banner without caching (kills the status operand)", async () => {
+    // status !== 0 is true, stdout is a valid 2.x banner: only the || short-circuit reaches the fallback.
+    const { mod, spawnSync } = await loadWithVersion(1, "pandoc 2.17.1.1\n");
+    expect(selfContainedFlags(mod)).toEqual(["--embed-resources", "--standalone"]);
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" });
     expect(selfContainedFlags(mod)).toEqual(["--self-contained"]);
+    expect(spawnSync).toHaveBeenCalledTimes(2);
   });
 
-  it("empty stdout with status 0 falls back to --self-contained (kills the !stdout operand)", async () => {
-    // status !== 0 is false, !stdout is true: the other || operand must reach the fallback.
-    const { mod } = await loadWithVersion(0, "");
+  it("null/empty stdout with status 0 falls back to --embed-resources --standalone without caching (kills the !stdout operand)", async () => {
+    // status !== 0 is false, !stdout is true (null when spawnSync fails to capture stdout):
+    // the other || operand must guard r.stdout.match().
+    const { mod, spawnSync } = await loadWithVersion(0, null as unknown as string);
+    expect(selfContainedFlags(mod)).toEqual(["--embed-resources", "--standalone"]);
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" });
     expect(selfContainedFlags(mod)).toEqual(["--self-contained"]);
+    expect(spawnSync).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -97,6 +97,8 @@ if not hasattr(mod, "reconcile_onnxruntime"):
     sys.exit(1)
 staging_sp, site_packages = sys.argv[1], sys.argv[2]
 mod.reconcile_onnxruntime(staging_sp, site_packages)
+if hasattr(mod, "reconcile_opencv"):
+    mod.reconcile_opencv(staging_sp, site_packages)
 mod.move_tree(staging_sp, site_packages)
 PYMERGE
   fi

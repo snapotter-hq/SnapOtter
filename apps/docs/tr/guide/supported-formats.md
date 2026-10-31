@@ -1,6 +1,6 @@
 ---
 description: "Tüm modaliteler genelinde desteklenen dosya formatları - 55+ görüntü giriş formatı, video, ses, PDF ve dosya formatları."
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: 39fc493d18f5
 ---

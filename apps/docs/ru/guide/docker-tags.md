@@ -1,6 +1,6 @@
 ---
 description: "Теги Docker-образа SnapOtter, тесты производительности GPU, закрепление версий и поддержка нескольких платформ для AMD64 и ARM64."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: e1331d4f865e
 i18n_hash_version: 2

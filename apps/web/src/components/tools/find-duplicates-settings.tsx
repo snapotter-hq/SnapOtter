@@ -1,11 +1,21 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, FolderArchive, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { quietImport } from "@/lib/chunk-reload";
 import { formatFileSize } from "@/lib/download";
 import { format, plural } from "@/lib/format";
-import type { DuplicateResult } from "@/stores/duplicate-store";
+import { createXhrWatchdog } from "@/lib/xhr-watchdog";
+import type {
+  DuplicateFileInfo,
+  DuplicateGroup,
+  DuplicateResult,
+  SkippedFile,
+} from "@/stores/duplicate-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFileStore } from "@/stores/file-store";
 import { claimToolResult, duplicateResultKey } from "@/stores/tool-result-claims";
@@ -13,36 +23,103 @@ import { claimToolResult, duplicateResultKey } from "@/stores/tool-result-claims
 type Preset = "exact" | "similar" | "loose";
 const PRESET_THRESHOLDS: Record<Preset, number> = { exact: 2, similar: 8, loose: 14 };
 
+function isDuplicateFileInfo(value: unknown): value is DuplicateFileInfo {
+  if (!value || typeof value !== "object") return false;
+  const f = value as Record<string, unknown>;
+  return (
+    typeof f.filename === "string" &&
+    f.filename.length > 0 &&
+    typeof f.similarity === "number" &&
+    Number.isFinite(f.similarity) &&
+    typeof f.width === "number" &&
+    Number.isFinite(f.width) &&
+    f.width >= 0 &&
+    typeof f.height === "number" &&
+    Number.isFinite(f.height) &&
+    f.height >= 0 &&
+    typeof f.fileSize === "number" &&
+    Number.isFinite(f.fileSize) &&
+    f.fileSize >= 0 &&
+    typeof f.format === "string" &&
+    typeof f.isBest === "boolean" &&
+    (f.thumbnail === null || typeof f.thumbnail === "string")
+  );
+}
+
+function isDuplicateGroup(value: unknown): value is DuplicateGroup {
+  if (!value || typeof value !== "object") return false;
+  const g = value as Record<string, unknown>;
+  return (
+    typeof g.groupId === "number" &&
+    Number.isFinite(g.groupId) &&
+    Array.isArray(g.files) &&
+    g.files.length > 0 &&
+    g.files.every(isDuplicateFileInfo)
+  );
+}
+
+function isSkippedFile(value: unknown): value is SkippedFile {
+  if (!value || typeof value !== "object") return false;
+  const sf = value as Record<string, unknown>;
+  return (
+    typeof sf.filename === "string" &&
+    sf.filename.length > 0 &&
+    typeof sf.reason === "string" &&
+    sf.reason.length > 0
+  );
+}
+
+function isDuplicateResult(value: unknown): value is DuplicateResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.totalImages === "number" &&
+    Number.isFinite(data.totalImages) &&
+    data.totalImages >= 0 &&
+    typeof data.uniqueImages === "number" &&
+    Number.isFinite(data.uniqueImages) &&
+    data.uniqueImages >= 0 &&
+    typeof data.spaceSaveable === "number" &&
+    Number.isFinite(data.spaceSaveable) &&
+    data.spaceSaveable >= 0 &&
+    Array.isArray(data.duplicateGroups) &&
+    data.duplicateGroups.every(isDuplicateGroup) &&
+    (data.skippedFiles === undefined ||
+      (Array.isArray(data.skippedFiles) && data.skippedFiles.every(isSkippedFile)))
+  );
+}
+
 export function FindDuplicatesSettings() {
   const { t } = useTranslation();
   const { files } = useFileStore();
   const {
     results,
     scanning,
+    error,
     bestOverrides,
     setResults,
     setScanning,
+    setError,
     reset: resetDuplicates,
   } = useDuplicateStore();
 
   const [preset, setPreset] = useState<Preset | null>("similar");
   const [threshold, setThreshold] = useState(8);
-  const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const mountedRef = useRef(false);
 
+  // New files mean new results. A mount keeps a scan that is still out, though: the
+  // panel remounts when the window crosses the layout breakpoint, and the scan, its
+  // results and its error all live in the store, so wiping them there threw away a
+  // scan the user had started (#2314). The page resets the store on tool entry.
   // biome-ignore lint/correctness/useExhaustiveDependencies: files is a store value that triggers reset when changed
   useEffect(() => {
+    const firstRun = !mountedRef.current;
+    mountedRef.current = true;
+    if (firstRun && useDuplicateStore.getState().scanning) return;
     resetDuplicates();
-    setError(null);
     setUploadProgress(0);
   }, [files, resetDuplicates]);
-
-  useEffect(() => {
-    return () => {
-      xhrRef.current?.abort();
-    };
-  }, []);
 
   const handlePreset = (p: Preset) => {
     setPreset(p);
@@ -60,6 +137,12 @@ export function FindDuplicatesSettings() {
   const handleScan = () => {
     if (files.length < 2) return;
 
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "find-duplicates",
+      is_batch: false,
+      file_count: files.length,
+    });
+
     setScanning(true);
     setError(null);
     setResults(null);
@@ -71,60 +154,148 @@ export function FindDuplicatesSettings() {
     }
     formData.append("threshold", String(threshold));
 
+    // The scan is not aborted when the panel unmounts: it finishes in the
+    // background and lands in the store. Its answer is only taken while the files
+    // it was sent for are still loaded (#2314).
+    const sentFiles = files;
+    let canceled = false;
+    const stillLoaded = () => {
+      if (canceled) return false;
+      const now = useFileStore.getState().files;
+      return now.length === sentFiles.length && now.every((f, i) => f === sentFiles[i]);
+    };
     const xhr = new XMLHttpRequest();
-    xhrRef.current = xhr;
+    const watchdog = createXhrWatchdog(
+      xhr,
+      300_000,
+      () => stillLoaded() && useDuplicateStore.getState().scanning,
+    );
+    const unwatchFiles = useFileStore.subscribe(() => {
+      if (!stillLoaded()) {
+        canceled = true;
+        cleanup();
+        try {
+          resetDuplicates();
+        } finally {
+          xhr.abort();
+        }
+      }
+    });
+    const unwatchDuplicates = useDuplicateStore.subscribe((state) => {
+      if (!state.scanning) {
+        canceled = true;
+        cleanup();
+        xhr.abort();
+      }
+    });
+    function cleanup() {
+      unwatchFiles();
+      unwatchDuplicates();
+      watchdog.clear();
+    }
 
     xhr.upload.onprogress = (e) => {
+      if (!stillLoaded()) {
+        cleanup();
+        return;
+      }
+      watchdog.onUploadProgress(e);
       if (e.lengthComputable) {
         setUploadProgress(Math.round((e.loaded / e.total) * 100));
       }
     };
 
+    xhr.upload.onload = () => {
+      if (!stillLoaded()) {
+        cleanup();
+        return;
+      }
+      watchdog.onUploadLoad();
+    };
+
     xhr.onload = () => {
-      xhrRef.current = null;
+      cleanup();
+      if (!stillLoaded()) return;
       if (xhr.status >= 200 && xhr.status < 300) {
+        let data: unknown;
         try {
-          const data: DuplicateResult = JSON.parse(xhr.responseText);
-          setResults(data);
+          data = JSON.parse(xhr.responseText);
         } catch {
-          setError("Failed to parse scan results");
+          data = null;
+        }
+        if (isDuplicateResult(data)) {
+          setResults(data);
+        } else {
+          setError(t.errors.invalidServerResponse);
         }
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(body.error || `Failed: ${xhr.status}`);
+          setError(
+            failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              format(t.errors.failedWithStatus, { status: xhr.status }),
+            ),
+          );
         } catch {
-          setError(`Failed: ${xhr.status}`);
+          setError(
+            failedAnswerMessage(
+              t,
+              null,
+              xhr.status,
+              format(t.errors.failedWithStatus, { status: xhr.status }),
+            ),
+          );
         }
       }
       setScanning(false);
     };
 
     xhr.onerror = () => {
-      xhrRef.current = null;
-      setError("Network error during upload. Try with fewer files or check connection.");
+      cleanup();
+      if (!stillLoaded()) return;
+      setError(t.toolSettings["find-duplicates"].networkErrorUpload);
       setScanning(false);
     };
 
     xhr.ontimeout = () => {
-      xhrRef.current = null;
-      setError("Request timed out. Try with fewer files.");
+      cleanup();
+      if (!stillLoaded()) return;
+      setError(t.toolSettings["find-duplicates"].requestTimedOut);
       setScanning(false);
     };
 
-    xhr.open("POST", appUrl("/api/v1/tools/image/find-duplicates"));
-    xhr.timeout = 300_000;
-    const headers = formatHeaders();
-    headers.forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    xhr.send(formData);
+    try {
+      xhr.open("POST", appUrl("/api/v1/tools/image/find-duplicates"));
+      const headers = formatHeaders();
+      headers.forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+      watchdog.send(formData);
+    } catch (err) {
+      cleanup();
+      if (!stillLoaded()) return;
+      try {
+        setError(
+          err instanceof Error ? err.message : t.toolSettings["find-duplicates"].networkErrorUpload,
+        );
+      } finally {
+        setScanning(false);
+      }
+    }
   };
 
   const handleDownloadUnique = useCallback(async () => {
     if (!results) return;
 
-    const { zipSync } = await import("fflate");
+    const fflate = await quietImport(() => import("fflate")).catch(() => null);
+    if (!fflate) {
+      toast.error(t.errors.staleVersionReload);
+      return;
+    }
+    const { zipSync } = fflate;
 
     const duplicateFilenames = new Set<string>();
     const bestFilenames = new Set<string>();
@@ -162,7 +333,12 @@ export function FindDuplicatesSettings() {
   const handleDownloadGrouped = useCallback(async () => {
     if (!results || results.duplicateGroups.length === 0) return;
 
-    const { zipSync } = await import("fflate");
+    const fflate = await quietImport(() => import("fflate")).catch(() => null);
+    if (!fflate) {
+      toast.error(t.errors.staleVersionReload);
+      return;
+    }
+    const { zipSync } = fflate;
 
     const duplicateFilenames = new Set<string>();
     const zipData: Record<string, Uint8Array> = {};

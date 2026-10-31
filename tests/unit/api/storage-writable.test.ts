@@ -10,6 +10,7 @@ const mockEnv = vi.hoisted(() => ({
   STORAGE_MODE: "local",
   WORKSPACE_PATH: "",
   FILES_STORAGE_PATH: "",
+  LOG_DIR: "",
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({ env: mockEnv }));
@@ -32,10 +33,12 @@ beforeAll(() => {
 
 afterAll(() => {
   // Restore perms so cleanup can recurse into the read-only dir.
-  try {
-    chmodSync(join(root, "readonly"), 0o755);
-  } catch {
-    /* may not exist */
+  for (const dir of ["readonly", "logs-ro", "logs-ro-s3"]) {
+    try {
+      chmodSync(join(root, dir), 0o755);
+    } catch {
+      /* may not exist */
+    }
   }
   rmSync(root, { recursive: true, force: true });
 });
@@ -114,10 +117,11 @@ describe("storagePermissionMessage", () => {
 });
 
 describe("assertStorageWritable", () => {
-  it("resolves when both storage paths are writable", async () => {
+  it("resolves when the storage paths and the log directory are writable", async () => {
     mockEnv.STORAGE_MODE = "local";
     mockEnv.WORKSPACE_PATH = join(root, "ws-ok");
     mockEnv.FILES_STORAGE_PATH = join(root, "files-ok");
+    mockEnv.LOG_DIR = join(root, "logs-ok");
     await expect(assertStorageWritable()).resolves.toBeUndefined();
   });
 
@@ -130,6 +134,7 @@ describe("assertStorageWritable", () => {
       mockEnv.STORAGE_MODE = "local";
       mockEnv.WORKSPACE_PATH = ws;
       mockEnv.FILES_STORAGE_PATH = join(root, "files-ok2");
+      mockEnv.LOG_DIR = join(root, "logs-ok2");
       await expect(assertStorageWritable()).rejects.toThrow(/not writable/i);
       await expect(assertStorageWritable()).rejects.toThrow(ws);
       chmodSync(ws, 0o755);
@@ -147,17 +152,62 @@ describe("assertStorageWritable", () => {
       mockEnv.STORAGE_MODE = "local";
       mockEnv.WORKSPACE_PATH = join(root, "ws-ok3");
       mockEnv.FILES_STORAGE_PATH = files;
+      mockEnv.LOG_DIR = join(root, "logs-ok3");
       await expect(assertStorageWritable()).rejects.toThrow(/not writable/i);
       await expect(assertStorageWritable()).rejects.toThrow(files);
       chmodSync(files, 0o755);
     },
   );
 
-  it("is a no-op in S3 storage mode (does not touch the filesystem)", async () => {
+  it.skipIf(isRoot)(
+    "rejects naming the log directory when only LOG_DIR is unwritable (#1487)",
+    async () => {
+      // pino-roll's mkdir would otherwise fail asynchronously in the transport
+      // worker as an unhandled 'error' event that names no env var.
+      const logs = join(root, "logs-ro");
+      mkdirSync(logs, { recursive: true });
+      chmodSync(logs, 0o555);
+      mockEnv.STORAGE_MODE = "local";
+      mockEnv.WORKSPACE_PATH = join(root, "ws-ok4");
+      mockEnv.FILES_STORAGE_PATH = join(root, "files-ok4");
+      mockEnv.LOG_DIR = logs;
+      await expect(assertStorageWritable()).rejects.toThrow(/Log directory .* is not writable/);
+      await expect(assertStorageWritable()).rejects.toThrow(logs);
+      await expect(assertStorageWritable()).rejects.not.toThrow(/cannot upload/);
+      chmodSync(logs, 0o755);
+    },
+  );
+
+  it("skips the storage paths in S3 mode but still probes the log directory", async () => {
     mockEnv.STORAGE_MODE = "s3";
     mockEnv.WORKSPACE_PATH = "/nonexistent/should-not-be-touched";
     mockEnv.FILES_STORAGE_PATH = "/nonexistent/should-not-be-touched";
+    mockEnv.LOG_DIR = join(root, "logs-s3");
     await expect(assertStorageWritable()).resolves.toBeUndefined();
+  });
+
+  it.skipIf(isRoot)("rejects an unwritable log directory even in S3 mode", async () => {
+    const logs = join(root, "logs-ro-s3");
+    mkdirSync(logs, { recursive: true });
+    chmodSync(logs, 0o555);
+    mockEnv.STORAGE_MODE = "s3";
+    mockEnv.WORKSPACE_PATH = "/nonexistent/should-not-be-touched";
+    mockEnv.FILES_STORAGE_PATH = "/nonexistent/should-not-be-touched";
+    mockEnv.LOG_DIR = logs;
+    await expect(assertStorageWritable()).rejects.toThrow(logs);
+    chmodSync(logs, 0o755);
+  });
+});
+
+describe("storagePermissionMessage for the log directory", () => {
+  it("names a log directory and what it blocks, without the upload wording", () => {
+    const m = storagePermissionMessage("/data/logs", "logs");
+    expect(m).toContain('Log directory "/data/logs" is not writable');
+    expect(m).toContain("log file");
+    expect(m).not.toContain("cannot upload");
+    // the remediation block is shared with the storage message
+    expect(m).toContain("chown -R");
+    expect(m).toContain("docs.snapotter.com/guide/deployment#storage-permissions");
   });
 });
 

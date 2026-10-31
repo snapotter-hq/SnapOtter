@@ -5,18 +5,30 @@
  * that validates SVG input separately from the standard image validation.
  */
 
+import AdmZip from "adm-zip";
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
+import { encodeHeic } from "../../../../apps/api/src/lib/heic-converter.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
+  createUserAndLogin,
   loginAsAdmin,
   type TestApp,
 } from "../../test-server.js";
 
 const SVG = readFixture(fixtures.image.base.svg100);
 const PNG = readFixture(fixtures.image.base.png200);
+
+// heif-enc can decode without an HEVC encoder, so a decode-side check cannot
+// tell whether HEIF output works. Encode once and gate on the real result.
+const hasHeifEncoder = await encodeHeic(PNG).then(
+  () => true,
+  () => false,
+);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -26,11 +38,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("svg-to-raster", () => {
   it("converts SVG to PNG with default settings", async () => {
@@ -330,10 +342,14 @@ describe("svg-to-raster", () => {
     expect(json.processedSize).toBeGreaterThan(0);
   });
 
-  it("converts to tiff format", async () => {
+  it("converts to tiff format and preserves 4-channel alpha on transparent SVGs (#3113)", async () => {
+    const transparentSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect x="8" y="8" width="12" height="12" fill="#c82828"/></svg>',
+    );
+
     const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "settings", content: JSON.stringify({ outputFormat: "tiff" }) },
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: transparentSvg },
+      { name: "settings", content: JSON.stringify({ outputFormat: "tiff", dpi: 72 }) },
     ]);
 
     const res = await app.inject({
@@ -348,6 +364,51 @@ describe("svg-to-raster", () => {
     expect(json.downloadUrl).toBeDefined();
     // TIFF is non-previewable, so previewUrl should exist
     expect(json.previewUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const meta = await sharp(Buffer.from(dlRes.rawPayload)).metadata();
+    expect(meta.format).toBe("tiff");
+    expect(meta.channels).toBe(4);
+    expect(meta.hasAlpha).toBe(true);
+
+    const { data, info } = await sharp(Buffer.from(dlRes.rawPayload))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(data[(2 * info.width + 2) * info.channels + 3]).toBe(0);
+    const bodyIdx = (14 * info.width + 14) * info.channels;
+    expect([data[bodyIdx], data[bodyIdx + 1], data[bodyIdx + 2], data[bodyIdx + 3]]).toEqual([
+      200, 40, 40, 255,
+    ]);
+
+    const { body: batchBody, contentType: batchCt } = createMultipartPayload([
+      { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: transparentSvg },
+      { name: "settings", content: JSON.stringify({ outputFormat: "tiff", dpi: 72 }) },
+    ]);
+    const batchRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/svg-to-raster/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": batchCt },
+      body: batchBody,
+    });
+    expect(batchRes.statusCode).toBe(200);
+    const zip = new AdmZip(batchRes.rawPayload);
+    const entry = zip.getEntry("a.tiff");
+    expect(entry).toBeDefined();
+    const batchMeta = await sharp(entry?.getData()).metadata();
+    expect(batchMeta.format).toBe("tiff");
+    expect(batchMeta.channels).toBe(4);
+    expect(batchMeta.hasAlpha).toBe(true);
+    const { data: batchData, info: batchInfo } = await sharp(entry?.getData())
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(batchData[(2 * batchInfo.width + 2) * batchInfo.channels + 3]).toBe(0);
   });
 
   it("converts to gif format", async () => {
@@ -746,37 +807,41 @@ describe("svg-to-raster", () => {
 
   // ── Branch coverage: HEIF output with preview (line 363, 404) ───────
 
-  it("converts to heif format and generates a preview", { timeout: 120_000 }, async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
-    ]);
+  it.skipIf(!hasHeifEncoder)(
+    "converts to heif format and generates a preview",
+    { timeout: 120_000 },
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/svg-to-raster",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toBeDefined();
-    // HEIF is non-previewable, so previewUrl should be generated
-    expect(json.previewUrl).toBeDefined();
-
-    // Download the preview and verify it is a webp image
-    if (json.previewUrl) {
-      const previewRes = await app.inject({
-        method: "GET",
-        url: json.previewUrl,
-        headers: { authorization: `Bearer ${adminToken}` },
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
       });
-      expect(previewRes.statusCode).toBe(200);
-      const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
-      expect(meta.format).toBe("webp");
-    }
-  });
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toBeDefined();
+      // HEIF is non-previewable, so previewUrl should be generated
+      expect(json.previewUrl).toBeDefined();
+
+      // Download the preview and verify it is a webp image
+      if (json.previewUrl) {
+        const previewRes = await app.inject({
+          method: "GET",
+          url: json.previewUrl,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(previewRes.statusCode).toBe(200);
+        const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
+        expect(meta.format).toBe("webp");
+      }
+    },
+  );
 
   // ── Branch coverage: TIFF preview generation (non-previewable) ──────
 
@@ -1026,23 +1091,27 @@ describe("svg-to-raster", () => {
 
   // ── Branch coverage: batch with heif output ────────────────────────
 
-  it("batch converts SVGs to heif format", { timeout: 120_000 }, async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
-    ]);
+  it.skipIf(!hasHeifEncoder)(
+    "batch converts SVGs to heif format",
+    { timeout: 120_000 },
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/svg-to-raster/batch",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster/batch",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    expect(res.statusCode).toBe(200);
-    expect(res.headers["content-type"]).toBe("application/zip");
-  });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["content-type"]).toBe("application/zip");
+    },
+  );
 
   // ── Branch coverage: batch with 5+ SVG files ──────────────────────
 
@@ -1092,7 +1161,7 @@ describe("svg-to-raster", () => {
 
   // ── JXL output format ──────────────────────────────────────────────
 
-  it("converts to jxl format (if Sharp supports JXL)", async () => {
+  it("converts to jxl format and generates a webp preview (#3179)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
       { name: "settings", content: JSON.stringify({ outputFormat: "jxl", quality: 75 }) },
@@ -1105,12 +1174,24 @@ describe("svg-to-raster", () => {
       body,
     });
 
-    // JXL support depends on the Sharp build
+    // JXL encoding requires cjxl or an ImageMagick JXL delegate
     expect([200, 422]).toContain(res.statusCode);
     if (res.statusCode === 200) {
       const json = JSON.parse(res.body);
       expect(json.downloadUrl).toBeDefined();
       expect(json.processedSize).toBeGreaterThan(0);
+      expect(json.previewUrl).toBe(`/api/v1/download/${json.jobId}/preview.webp`);
+
+      const previewRes = await app.inject({
+        method: "GET",
+        url: json.previewUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(previewRes.statusCode).toBe(200);
+      const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
+      expect(meta.format).toBe("webp");
+      expect(meta.width).toBeLessThanOrEqual(1200);
+      expect(meta.height).toBeLessThanOrEqual(1200);
     }
   });
 
@@ -1138,27 +1219,31 @@ describe("svg-to-raster", () => {
 
   // ── Branch coverage: heif + background color combination ───────────
 
-  it("converts to heif format with background color applied", { timeout: 120_000 }, async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
-      {
-        name: "settings",
-        content: JSON.stringify({ outputFormat: "heif", backgroundColor: "#FF0000" }),
-      },
-    ]);
+  it.skipIf(!hasHeifEncoder)(
+    "converts to heif format with background color applied",
+    { timeout: 120_000 },
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+        {
+          name: "settings",
+          content: JSON.stringify({ outputFormat: "heif", backgroundColor: "#FF0000" }),
+        },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/svg-to-raster",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toBeDefined();
-    expect(json.previewUrl).toBeDefined();
-  });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toBeDefined();
+      expect(json.previewUrl).toBeDefined();
+    },
+  );
 
   // ── SVGZ (compressed SVG) input ──────────────────────────────────
 
@@ -1307,5 +1392,130 @@ describe("svg-to-raster", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toBe("application/zip");
+  });
+});
+
+describe("svg-to-raster batch reserves its job id (#1686)", () => {
+  let owner: { token: string; userId: string };
+
+  beforeAll(async () => {
+    owner = await createUserAndLogin(app, "svgbatchowner");
+  });
+
+  function postBatch(
+    toolId: string,
+    opts: { clientJobId: string; token?: string; settings?: string },
+  ) {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: opts.settings ?? JSON.stringify({}) },
+      { name: "clientJobId", content: opts.clientJobId },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: `/api/v1/tools/image/${toolId}/batch`,
+      headers: { authorization: `Bearer ${opts.token ?? adminToken}`, "content-type": contentType },
+      body,
+    });
+  }
+
+  async function readRow(id: string) {
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
+    return row;
+  }
+
+  /** The terminal frame is persisted fire and forget, so poll for it. */
+  async function readSettledRow(id: string) {
+    for (let i = 0; i < 100; i++) {
+      const row = await readRow(id);
+      if (row?.status === "completed" || row?.status === "failed") return row;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return readRow(id);
+  }
+
+  it("records the run under the requesting user, with no tool id", async () => {
+    const clientJobId = "svg-batch-1686-owned";
+    const res = await postBatch("svg-to-raster", { clientJobId, token: owner.token });
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+
+    const row = await readSettledRow(clientJobId);
+    expect(row?.userId).toBe(owner.userId);
+    expect(row?.type).toBe("batch");
+    // A tool id would make reconciliation treat this inline run as queued work.
+    expect(row?.toolId).toBeNull();
+    expect(row?.status).toBe("completed");
+  });
+
+  it("answers 409 for a clientJobId that names another user's job, and leaves that job alone", async () => {
+    const victimId = "svg-batch-1686-victim";
+    await db.insert(schema.jobs).values({
+      id: victimId,
+      userId: owner.userId,
+      toolId: "resize",
+      type: "tool",
+      status: "processing",
+      inputRefs: [],
+    });
+    const before = await readRow(victimId);
+
+    const res = await postBatch("svg-to-raster", { clientJobId: victimId });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toMatchObject({ code: "CONFLICT" });
+
+    // Progress writes are fire and forget, so give a stray one time to land
+    // before checking that none did.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(victimId)).toEqual(before);
+  });
+
+  it("answers 409 when a client reuses the id of its own finished run", async () => {
+    const clientJobId = "svg-batch-1686-reused";
+    const first = await postBatch("svg-to-raster", { clientJobId, token: owner.token });
+    expect(first.statusCode, first.body.slice(0, 300)).toBe(200);
+    const settled = await readSettledRow(clientJobId);
+    expect(settled?.status).toBe("completed");
+
+    const second = await postBatch("svg-to-raster", { clientJobId, token: owner.token });
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
+
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(clientJobId)).toEqual(settled);
+  });
+
+  // The presets register the same batch handler under their own ids.
+  it("reserves the id on a preset route too", async () => {
+    const victimId = "svg-batch-1686-preset-victim";
+    await db.insert(schema.jobs).values({
+      id: victimId,
+      userId: owner.userId,
+      type: "batch",
+      status: "completed",
+      inputRefs: [],
+    });
+    const before = await readRow(victimId);
+
+    const res = await postBatch("svg-to-png", { clientJobId: victimId });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(victimId)).toEqual(before);
+  });
+
+  // The reservation comes after validation, so a rejected request leaves no
+  // row behind to block the client's corrected retry under the same id.
+  it("leaves no row behind when the settings are rejected", async () => {
+    const clientJobId = "svg-batch-1686-bad-settings";
+    const res = await postBatch("svg-to-raster", {
+      clientJobId,
+      token: owner.token,
+      settings: JSON.stringify({ outputFormat: "bmp" }),
+    });
+    expect(res.statusCode).toBe(400);
+
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(clientJobId)).toBeUndefined();
   });
 });

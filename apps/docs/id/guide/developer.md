@@ -1,8 +1,8 @@
 ---
 description: "Penyiapan pengembangan lokal, perintah, konvensi kode, dan cara menambahkan tool baru ke SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 6887a74bc3ef
+i18n_output_hash: c882d2cdecd9
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ Tambahkan ke `packages/shared/src/i18n/en.ts`:
 ### 4. Tes {#_4-tests}
 
 Tambahkan atribut `data-testid` ke tombol aksi Anda (seperti ditunjukkan di atas) agar tes e2e dapat menargetkannya secara andal.
+
+### 5. Baseline visual {#_5-visual-baselines}
+
+Tes tangkapan layar tidak mengizinkan satu piksel pun berubah, dan alat baru mengubah apa yang dirender: jumlah alat di halaman beranda dan katalog, kartu baru di grid, dan halamannya sendiri yang membuat `tests/e2e/gui-visual-tools.spec.ts` gagal dengan "snapshot doesn't exist" sampai halaman itu punya baseline. Perbarui baseline di PR yang sama dengan alatnya, agar perbandingan visual malam hari tetap hijau.
+
+CI menghasilkan baseline `linux` (`ubuntu-latest`) sekaligus `darwin` (`macos-latest`). Push branch Anda, lalu jalankan pembaruan pada branch itu:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Setiap job OS mengunggah artefak `visual-baselines-linux-<run-id>-<attempt>` atau `visual-baselines-darwin-<run-id>-<attempt>` dan membuka PR draf (`chore/visual-baselines-linux-...` dan `chore/visual-baselines-darwin-...`) ke `main` berisi PNG yang dibuat ulang. Deskripsi setiap PR draf memuat perintah `gh run download`; jalankan keduanya dari root checkout Anda untuk memasukkan PNG ke branch Anda, commit, lalu tutup PR draf tersebut. Gunakan `update_snapshots=all` jika `changed` melewatkan tangkapan yang Anda perkirakan berubah. Menjalankannya butuh akses tulis ke repositori, jadi jika branch Anda ada di fork, sebutkan di PR bahwa perlu pembaruan baseline dan maintainer akan menjalankannya.
+
+Di Mac, Anda juga dapat memperbarui baseline `darwin` secara lokal untuk iterasi yang lebih cepat:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Apa pun kasusnya, buka setiap PNG baru atau yang berubah sebelum Anda meng-commit-nya: baseline merekam apa pun yang dirender, rusak atau tidak.
+
+Rilis tidak memerlukan semua ini. Versi aplikasi disamarkan di setiap tangkapan layar yang menampilkannya, jadi menaikkannya tidak mengubah baseline mana pun.
 
 ## Build Docker {#docker-builds}
 

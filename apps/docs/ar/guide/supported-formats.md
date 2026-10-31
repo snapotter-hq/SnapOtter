@@ -1,6 +1,6 @@
 ---
 description: "التنسيقات المدعومة عبر جميع الوسائط - أكثر من 55 تنسيق إدخال للصور، والفيديو والصوت وPDF وتنسيقات الملفات."
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: 2c294d200195
 ---

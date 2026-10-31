@@ -20,11 +20,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function postTool(
   filename: string,
@@ -82,7 +82,7 @@ describe.skipIf(!ffmpegAvailable())("audio-channels (requires ffmpeg)", () => {
     });
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/stereo input/i);
+    expect(body.error).toMatch(/stereo input/i);
   }, 60_000);
 
   it("rejects missing mode (400)", async () => {

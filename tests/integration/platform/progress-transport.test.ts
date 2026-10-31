@@ -31,11 +31,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Redis progress transport", () => {
   it("cannot miss a terminal publish while the connection is replaying prior state", async () => {
@@ -270,7 +270,7 @@ describe("Cancel route auth", () => {
     ownerToken = owner.token;
     ownerId = owner.userId;
     attackerToken = attacker.token;
-  }, 30_000);
+  });
 
   /** Seed a durable job row owned by `ownerId`, plus a long-delayed BullMQ job
    *  (workers never promote a delayed job within the test window) so we can

@@ -1,22 +1,25 @@
 import type Konva from "konva";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Group, Line, Rect, Transformer } from "react-konva";
+import { useTranslation } from "@/contexts/i18n-context";
+import { runEditorAction } from "@/lib/editor-action";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CropState } from "@/types/editor";
 
 // ---------------------------------------------------------------------------
-// Aspect ratio presets
+// Aspect ratio presets. `id` is the stable key (also stored as
+// cropState.aspectRatio); only the "free" preset has a translated label.
 // ---------------------------------------------------------------------------
 
 export const ASPECT_RATIOS = [
-  { label: "Free", value: null },
-  { label: "1:1", value: 1 },
-  { label: "4:3", value: 4 / 3 },
-  { label: "3:4", value: 3 / 4 },
-  { label: "16:9", value: 16 / 9 },
-  { label: "9:16", value: 9 / 16 },
-  { label: "3:2", value: 3 / 2 },
-  { label: "2:3", value: 2 / 3 },
+  { id: "free", value: null },
+  { id: "1:1", value: 1 },
+  { id: "4:3", value: 4 / 3 },
+  { id: "3:4", value: 3 / 4 },
+  { id: "16:9", value: 16 / 9 },
+  { id: "9:16", value: 9 / 16 },
+  { id: "3:2", value: 3 / 2 },
+  { id: "2:3", value: 2 / 3 },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -28,7 +31,7 @@ export interface CropToolApi {
   transformerRef: React.RefObject<Konva.Transformer | null>;
   cropState: CropState | null;
   aspectRatio: string;
-  setAspectRatio: (label: string) => void;
+  setAspectRatio: (id: string) => void;
   initCrop: () => void;
   applyCrop: () => void;
   cancelCrop: () => void;
@@ -37,9 +40,10 @@ export interface CropToolApi {
 }
 
 export function useCropTool(): CropToolApi {
+  const { t } = useTranslation();
   const cropRef = useRef<Konva.Rect | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
-  const [aspectRatio, setAspectRatioState] = useState("Free");
+  const [aspectRatio, setAspectRatioState] = useState("free");
 
   const cropState = useEditorStore((s) => s.cropState);
   const setCropState = useEditorStore((s) => s.setCropState);
@@ -68,9 +72,9 @@ export function useCropTool(): CropToolApi {
   }, [canvasSize, setCropState]);
 
   const setAspectRatio = useCallback(
-    (label: string) => {
-      setAspectRatioState(label);
-      const preset = ASPECT_RATIOS.find((p) => p.label === label);
+    (id: string) => {
+      setAspectRatioState(id);
+      const preset = ASPECT_RATIOS.find((p) => p.id === id);
       if (!preset?.value || !cropState) return;
       const ratio = preset.value;
 
@@ -85,15 +89,16 @@ export function useCropTool(): CropToolApi {
         ...cropState,
         width: w,
         height: h,
-        aspectRatio: label,
+        aspectRatio: id,
       });
     },
     [cropState, canvasSize, setCropState],
   );
 
   const applyCrop = useCallback(() => {
-    applyCropAction();
-  }, [applyCropAction]);
+    if (useEditorStore.getState().rebaking) return;
+    runEditorAction(applyCropAction(), t.common.somethingWentWrong);
+  }, [applyCropAction, t]);
 
   const cancelCrop = useCallback(() => {
     setCropState(null);

@@ -1,0 +1,276 @@
+/**
+ * The users_scim_external_id migration (#1510) gives SCIM's externalId its own
+ * column. On an upgrading install, rows SCIM provisioned carry that id in
+ * users.external_id, next to OIDC subjects and SAML NameIDs; the migration
+ * moves the SCIM ones over and leaves every other provider's alone.
+ *
+ * Drives the real migrator over a scratch database the way an upgrading
+ * install goes through it: every migration before this one, rows seeded
+ * straight into the table, then the rest of the folder.
+ */
+import { randomUUID } from "node:crypto";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import pg from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+const MIGRATIONS = join(process.cwd(), "apps/api/drizzle");
+
+interface JournalEntry {
+  idx: number;
+  tag: string;
+}
+interface Journal {
+  entries: JournalEntry[];
+}
+
+/** The migrations folder as it stood before SCIM had its own column. */
+function folderBeforeScimColumn(): string {
+  const journal = JSON.parse(
+    readFileSync(join(MIGRATIONS, "meta/_journal.json"), "utf8"),
+  ) as Journal;
+  const scimColumn = journal.entries.find((e) => e.tag.endsWith("_users_scim_external_id"));
+  if (!scimColumn) throw new Error(`no *_users_scim_external_id migration in ${MIGRATIONS}`);
+
+  const dir = mkdtempSync(join(tmpdir(), "snapotter-pre-scim-column-"));
+  mkdirSync(join(dir, "meta"));
+  const kept = journal.entries.filter((e) => e.idx < scimColumn.idx);
+  for (const entry of kept) {
+    cpSync(join(MIGRATIONS, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
+  }
+  writeFileSync(join(dir, "meta/_journal.json"), JSON.stringify({ ...journal, entries: kept }));
+  return dir;
+}
+
+// Superuser on the shared test server (tests/global-setup.ts); the file's own
+// database is already fully migrated, so the scenario needs a fresh one.
+const baseUrl = process.env.TEST_PG_BASE_URL as string;
+const created: string[] = [];
+const pools: pg.Pool[] = [];
+let preScimColumnFolder: string;
+
+async function asAdmin(fn: (client: pg.Client) => Promise<unknown>): Promise<void> {
+  const admin = new pg.Client({ connectionString: baseUrl });
+  await admin.connect();
+  try {
+    await fn(admin);
+  } finally {
+    await admin.end();
+  }
+}
+
+/** A database migrated up to just before the SCIM column, seeded with these users. */
+async function preScimColumnDatabase(
+  users: Array<[id: string, provider: string, externalId: string | null]>,
+): Promise<pg.Pool> {
+  const name = `snapotter_test_mig_${process.pid}_${randomUUID().slice(0, 8).replace(/-/g, "")}`;
+  await asAdmin((admin) => admin.query(`CREATE DATABASE ${name}`));
+  created.push(name);
+  const url = new URL(baseUrl);
+  url.pathname = `/${name}`;
+  const pool = new pg.Pool({ connectionString: url.toString(), max: 1 });
+  pools.push(pool);
+
+  await migrate(drizzle(pool), { migrationsFolder: preScimColumnFolder });
+  for (const [id, provider, externalId] of users) {
+    await pool.query(
+      "INSERT INTO users (id, username, auth_provider, external_id, created_at, updated_at) VALUES ($1, $1, $2, $3, now(), now())",
+      [id, provider, externalId],
+    );
+  }
+  return pool;
+}
+
+async function identities(
+  pool: pg.Pool,
+): Promise<Record<string, { external: string | null; scim: string | null }>> {
+  const { rows } = await pool.query<{
+    id: string;
+    external_id: string | null;
+    scim_external_id: string | null;
+  }>("SELECT id, external_id, scim_external_id FROM users");
+  return Object.fromEntries(
+    rows.map((r) => [r.id, { external: r.external_id, scim: r.scim_external_id }]),
+  );
+}
+
+/**
+ * The audit row SCIM's create route writes: the user is in details, not
+ * target_id. actor_id is NULL for a user that no longer exists, as the
+ * foreign key's ON DELETE SET NULL leaves it.
+ */
+async function provisionedAudit(
+  pool: pg.Pool,
+  userId: string,
+  externalId: string,
+  action = "SCIM_USER_PROVISIONED",
+): Promise<void> {
+  await pool.query(
+    "INSERT INTO audit_log (id, actor_id, actor_username, action, details, created_at) VALUES ($1, (SELECT id FROM users WHERE id = $2), $2, $3, $4, now())",
+    [randomUUID(), userId, action, JSON.stringify({ userId, username: userId, externalId })],
+  );
+}
+
+/** The SQL blocks under the SCIM guide's recovery heading, in order. */
+function recoveryQueries(): string[] {
+  const guide = readFileSync(join(process.cwd(), "apps/docs/guide/scim.md"), "utf8");
+  const start = guide.indexOf("{#recover-scim-ids-in-oidc-or-saml-users}");
+  if (start === -1) throw new Error("apps/docs/guide/scim.md lost its SCIM id recovery section");
+  const rest = guide.slice(start);
+  const next = rest.slice(1).search(/\n#{2,3} /);
+  const section = next === -1 ? rest : rest.slice(0, next + 1);
+  return [...section.matchAll(/```sql\n([\s\S]*?)```/g)].map((m) => m[1]);
+}
+
+beforeAll(() => {
+  preScimColumnFolder = folderBeforeScimColumn();
+});
+
+afterAll(async () => {
+  await Promise.all(pools.map((p) => p.end()));
+  for (const name of created) {
+    await asAdmin((admin) => admin.query(`DROP DATABASE IF EXISTS ${name}`));
+  }
+  if (preScimColumnFolder) rmSync(preScimColumnFolder, { recursive: true, force: true });
+});
+
+describe("migration: SCIM externalId gets its own column (#1510)", () => {
+  it("moves SCIM rows' external_id over and leaves OIDC, SAML, and local rows alone", async () => {
+    const pool = await preScimColumnDatabase([
+      ["scim_user", "scim", "shared-id"],
+      // Same value under another provider: allowed before, and still allowed.
+      ["oidc_user", "oidc", "shared-id"],
+      ["saml_user", "saml", "name-id"],
+      ["scim_no_id", "scim", null],
+      // #1008's rule: a blank id is no id. A padded one moves verbatim so the
+      // eq filter still matches what the IdP sent.
+      ["scim_blank", "scim", "   "],
+      ["scim_padded", "scim", " padded-id "],
+      ["local_user", "local", null],
+    ]);
+
+    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+
+    expect(await identities(pool)).toEqual({
+      scim_user: { external: null, scim: "shared-id" },
+      oidc_user: { external: "shared-id", scim: null },
+      saml_user: { external: "name-id", scim: null },
+      scim_no_id: { external: null, scim: null },
+      scim_blank: { external: null, scim: null },
+      scim_padded: { external: null, scim: " padded-id " },
+      local_user: { external: null, scim: null },
+    });
+  });
+
+  it("leaves a SCIM id an older SCIM write put into an OIDC user's external_id where it was (#1605)", async () => {
+    const pool = await preScimColumnDatabase([["oidc_took_over", "oidc", "scim-e"]]);
+    await provisionedAudit(pool, "oidc_took_over", "scim-e");
+
+    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+
+    expect(await identities(pool)).toEqual({
+      oidc_took_over: { external: "scim-e", scim: null },
+    });
+  });
+
+  it("refuses a second user with the same SCIM externalId, whatever its provider", async () => {
+    const pool = await preScimColumnDatabase([["scim_user", "scim", "taken-id"]]);
+    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+
+    const err = await pool
+      .query(
+        "INSERT INTO users (id, username, auth_provider, scim_external_id, created_at, updated_at) VALUES ('twin', 'twin', 'oidc', 'taken-id', now(), now())",
+      )
+      .then(
+        () => null,
+        (e: { code?: string; constraint?: string }) => e,
+      );
+
+    expect(err?.code).toBe("23505");
+    expect(err?.constraint).toBe("users_scim_external_id_unique");
+  });
+});
+
+// The migration can't tell a SCIM id an older SCIM write left in an OIDC or
+// SAML user's external_id from that user's own sign-in identity, so the SCIM
+// guide gives operators a query instead (#1605). These run it as published.
+describe("SCIM guide: recovering SCIM ids from OIDC and SAML users (#1605)", () => {
+  it("previews, then copies, only the ids a SCIM provisioning audit row vouches for", async () => {
+    const [preview, update] = recoveryQueries();
+    expect(preview, "the guide's preview SELECT").toMatch(/^SELECT/);
+    expect(update, "the guide's UPDATE").toMatch(/^UPDATE/);
+
+    const pool = await preScimColumnDatabase([
+      ["oidc_took_over", "oidc", "scim-e"],
+      ["saml_took_over", "saml", "scim-f"],
+      // The link replaced its SCIM id with its own sub, and no SCIM write followed.
+      ["oidc_relinked", "oidc", "oidc-sub"],
+      // Nothing in the audit log to vouch for it (pruned, or never SCIM).
+      ["oidc_no_audit", "oidc", "scim-g"],
+      // Another row already owns this SCIM id, so copying it would trip the index.
+      ["scim_owner", "scim", "scim-h"],
+      ["oidc_shadow", "oidc", "scim-h"],
+      ["scim_user", "scim", "scim-i"],
+      // Only someone else's provisioning row carries this value.
+      ["oidc_coincidence", "oidc", "scim-j"],
+      // The IdP already sent a newer id after the upgrade; the stale one mustn't win.
+      ["oidc_resynced", "oidc", "scim-k"],
+      // Blank is no id (#1008), even with an audit row that says the same.
+      ["oidc_blank", "oidc", "  "],
+      // Vouched for only by an update row, which never records values today.
+      ["oidc_decoy", "oidc", "scim-m"],
+      // Two users vouched for one id: copying both would abort on the index.
+      ["oidc_twin", "oidc", "scim-n"],
+      ["saml_twin", "saml", "scim-n"],
+    ]);
+    await provisionedAudit(pool, "oidc_took_over", "scim-e");
+    await provisionedAudit(pool, "saml_took_over", "scim-f");
+    await provisionedAudit(pool, "oidc_relinked", "scim-old");
+    await provisionedAudit(pool, "scim_owner", "scim-h");
+    await provisionedAudit(pool, "oidc_shadow", "scim-h");
+    await provisionedAudit(pool, "scim_user", "scim-i");
+    await provisionedAudit(pool, "deleted_user", "scim-j");
+    await provisionedAudit(pool, "oidc_resynced", "scim-k");
+    await provisionedAudit(pool, "oidc_blank", "  ");
+    await provisionedAudit(pool, "oidc_decoy", "scim-m", "SCIM_USER_UPDATED");
+    await provisionedAudit(pool, "oidc_twin", "scim-n");
+    await provisionedAudit(pool, "saml_twin", "scim-n");
+    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+    await pool.query("UPDATE users SET scim_external_id = 'scim-k-new' WHERE id = 'oidc_resynced'");
+
+    const previewed = await pool.query<{ id: string; scim_id: string }>(preview);
+    expect(previewed.rows.map((r) => [r.id, r.scim_id]).sort()).toEqual([
+      ["oidc_took_over", "scim-e"],
+      ["saml_took_over", "scim-f"],
+    ]);
+
+    const updated = await pool.query<{ id: string; scim_external_id: string }>(update);
+    expect(updated.rows.map((r) => [r.id, r.scim_external_id]).sort()).toEqual([
+      ["oidc_took_over", "scim-e"],
+      ["saml_took_over", "scim-f"],
+    ]);
+    expect(await identities(pool)).toEqual({
+      // external_id stays: Okta and others send the same id as sub and externalId.
+      oidc_took_over: { external: "scim-e", scim: "scim-e" },
+      saml_took_over: { external: "scim-f", scim: "scim-f" },
+      oidc_relinked: { external: "oidc-sub", scim: null },
+      oidc_no_audit: { external: "scim-g", scim: null },
+      scim_owner: { external: null, scim: "scim-h" },
+      oidc_shadow: { external: "scim-h", scim: null },
+      scim_user: { external: null, scim: "scim-i" },
+      oidc_coincidence: { external: "scim-j", scim: null },
+      oidc_resynced: { external: "scim-k", scim: "scim-k-new" },
+      oidc_blank: { external: "  ", scim: null },
+      oidc_decoy: { external: "scim-m", scim: null },
+      oidc_twin: { external: "scim-n", scim: null },
+      saml_twin: { external: "scim-n", scim: null },
+    });
+
+    // A second run finds nothing left to do.
+    expect((await pool.query(preview)).rowCount).toBe(0);
+    expect((await pool.query(update)).rowCount).toBe(0);
+  });
+});

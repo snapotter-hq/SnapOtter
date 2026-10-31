@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter को एक ही कमांड में Docker के साथ इंस्टॉल करें। इसमें Docker Compose सेटअप, सोर्स से बिल्ड करना, और एक पूर्ण फ़ीचर अवलोकन शामिल है।"
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: 16dd84c66bc6
 i18n_hash_version: 2
@@ -100,7 +100,7 @@ pnpm dev
 | **Image** | 112 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
 | **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
 | **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
-| **PDF / Document** | 34 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
+| **PDF / Document** | 35 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
 | **Files** | 23 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
 ### Pipelines {#pipelines}

@@ -46,11 +46,11 @@ let testApp: TestApp;
 
 beforeAll(async () => {
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("V2 process contract", () => {
   it("loads all inputRefs and invokes processV2 with scratchPath output", async () => {

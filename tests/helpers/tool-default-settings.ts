@@ -22,6 +22,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "extract-pages": { range: "1" },
   "remove-pages": { pages: "2" },
   "organize-pdf": { order: "1-z" },
+  "multi-tool-pdf": { items: [{ doc: 0, page: 1 }], pageCounts: [3] },
   "protect-pdf": { userPassword: "test123" },
   "unlock-pdf": { password: "test123" },
   "watermark-pdf": { text: "CONFIDENTIAL" },
@@ -44,6 +45,35 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "ocr-pdf": { quality: "balanced" },
 };
 
+/**
+ * Extra fields merged over `defaultSettingsFor(toolId)` in the pairwise
+ * settings matrix (`tests/integration/generated/settings-pairwise.test.ts`),
+ * which calls `config.process` directly against the pipeline/batch schema.
+ *
+ * Kept separate from `TOOL_SETTINGS_OVERRIDES` so HTTP route matrices
+ * (`format-matrix-generated`) continue to send Phase 1-valid defaults (#2978).
+ */
+export const PAIRWISE_SETTINGS_OVERRIDES: Record<string, Record<string, unknown>> = {
+  // Colors the pairwise lane needs to reach the color and gradient background types (#2075, #2282).
+  "remove-background": {
+    backgroundColor: "#ffffff",
+    gradientColor1: "#000000",
+    gradientColor2: "#ffffff",
+  },
+  "remove-gif-background": {
+    backgroundColor: "#ffffff",
+    gradientColor1: "#000000",
+    gradientColor2: "#ffffff",
+  },
+};
+
 export function defaultSettingsFor(toolId: string): unknown {
   return TOOL_SETTINGS_OVERRIDES[toolId] ?? {};
+}
+
+export function pairwiseSettingsFor(toolId: string): Record<string, unknown> {
+  return {
+    ...(defaultSettingsFor(toolId) as Record<string, unknown>),
+    ...PAIRWISE_SETTINGS_OVERRIDES[toolId],
+  };
 }

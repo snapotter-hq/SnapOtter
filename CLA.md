@@ -65,6 +65,10 @@ This Agreement shall be governed by and construed in accordance with the laws of
 
 ## How to Sign
 
-When you open your first pull request, the CLA Assistant bot will post a comment with a signing link. Click the link and authenticate with your GitHub account. Your signature is recorded and applies to all future contributions.
+When you open your first pull request, the CLA Assistant bot posts a comment asking you to sign. Reply on the pull request with:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+Case and a trailing period don't matter, but keep the phrase on one line. The bot records your signature against your GitHub account and the check turns green. You only sign once; it covers all your future contributions.
 
 If you have questions about the CLA, contact contact@snapotter.com.

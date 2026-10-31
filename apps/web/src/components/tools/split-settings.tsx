@@ -1,34 +1,39 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, Loader2, PackageOpen } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { quietImport } from "@/lib/chunk-reload";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import type { SplitMode } from "@/stores/split-store";
-import { useSplitStore } from "@/stores/split-store";
-import { claimToolResult, splitResultKey } from "@/stores/tool-result-claims";
+import { beginSplitRun, useSplitStore } from "@/stores/split-store";
+import {
+  claimToolResult,
+  claimToolResultItem,
+  splitResultKey,
+  splitTileKey,
+} from "@/stores/tool-result-claims";
 
-const MODES: Array<{ id: SplitMode; label: string }> = [
-  { id: "grid", label: "Grid" },
-  { id: "tile-size", label: "Tile Size" },
-];
+const MODES: SplitMode[] = ["grid", "tile-size"];
 
 const PRESETS = [
-  { label: "2x1", c: 2, r: 1, desc: "Horizontal half" },
-  { label: "1x2", c: 1, r: 2, desc: "Vertical half" },
-  { label: "2x2", c: 2, r: 2, desc: "Quarters" },
-  { label: "3x1", c: 3, r: 1, desc: "Horizontal strip" },
-  { label: "1x3", c: 1, r: 3, desc: "Vertical strip" },
-  { label: "3x3", c: 3, r: 3, desc: "9-tile grid" },
-  { label: "2x3", c: 2, r: 3, desc: "6-tile portrait" },
-  { label: "3x2", c: 3, r: 2, desc: "6-tile landscape" },
-  { label: "4x4", c: 4, r: 4, desc: "16-tile grid" },
-];
+  { label: "2x1", c: 2, r: 1, hintId: "horizontalHalf" },
+  { label: "1x2", c: 1, r: 2, hintId: "verticalHalf" },
+  { label: "2x2", c: 2, r: 2, hintId: "quarters" },
+  { label: "3x1", c: 3, r: 1, hintId: "horizontalStrip" },
+  { label: "1x3", c: 1, r: 3, hintId: "verticalStrip" },
+  { label: "3x3", c: 3, r: 3, hintId: "grid9" },
+  { label: "2x3", c: 2, r: 3, hintId: "portrait6" },
+  { label: "3x2", c: 3, r: 2, hintId: "landscape6" },
+  { label: "4x4", c: 4, r: 4, hintId: "grid16" },
+] as const;
 
 const OUTPUT_FORMATS = [
-  { value: "original", label: "Keep Original" },
+  { value: "original" },
   { value: "png", label: "PNG" },
   { value: "jpg", label: "JPG" },
   { value: "webp", label: "WebP" },
@@ -71,6 +76,9 @@ export function SplitSettings() {
   } = useSplitStore();
 
   const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
+  const downloadingTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => () => clearTimeout(downloadingTimer.current), []);
 
   const hasFile = files.length > 0;
   const grid = getEffectiveGrid();
@@ -96,10 +104,46 @@ export function SplitSettings() {
 
   const handleProcess = useCallback(async () => {
     if (files.length === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "split",
+      is_batch: files.length > 1,
+      file_count: files.length,
+    });
+
+    const controller = new AbortController();
+    const run = beginSplitRun(() => controller.abort());
+
     setProcessing(true);
     setError(null);
     setTiles([]);
     setZipBlobUrl(null);
+
+    const startEntries = useFileStore.getState().entries;
+    const runFiles = new Set(files);
+    const previewTiles: Array<{ row: number; col: number; blobUrl: string | null }> = [];
+    const revokePreviewTiles = () => {
+      for (const t of previewTiles.splice(0)) {
+        if (t.blobUrl) URL.revokeObjectURL(t.blobUrl);
+      }
+    };
+    let filesChanged = false;
+    const unsubscribeFiles = useFileStore.subscribe((state) => {
+      const hasRunEntries =
+        startEntries.length > 0
+          ? startEntries.every((b) => state.entries.some((e) => e.id === b.id && e.file === b.file))
+          : state.files.length > 0 && Array.from(runFiles).every((f) => state.files.includes(f));
+      if (!hasRunEntries) {
+        filesChanged = true;
+        unsubscribeFiles();
+        controller.abort();
+        revokePreviewTiles();
+        if (run.isCurrent()) {
+          setProcessing(false);
+        }
+      }
+    });
+    const isCanceled = () => !run.isCurrent() || controller.signal.aborted || filesChanged;
 
     try {
       const effectiveGrid = getEffectiveGrid();
@@ -117,12 +161,21 @@ export function SplitSettings() {
       }
       const settingsJson = JSON.stringify(settings);
 
-      const JSZip = (await import("jszip")).default;
+      const jszip = await quietImport(() => import("jszip")).catch(() => null);
+      if (!jszip) {
+        setError(t.errors.staleVersionReload);
+        return;
+      }
+      const JSZip = jszip.default;
+      if (isCanceled()) return;
       const combinedZip = new JSZip();
-      const previewTiles: Array<{ row: number; col: number; blobUrl: string | null }> = [];
       const multiFile = files.length > 1;
 
       for (let fi = 0; fi < files.length; fi++) {
+        if (isCanceled()) {
+          revokePreviewTiles();
+          return;
+        }
         const file = files[fi];
         const formData = new FormData();
         formData.append("file", file);
@@ -132,14 +185,24 @@ export function SplitSettings() {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
+          signal: controller.signal,
         });
         if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Failed to split ${file.name}: ${text || res.status}`);
+          const body = await res.json().catch(() => null);
+          throw new Error(
+            format(t.toolSettings.split.failedToSplit, {
+              name: file.name,
+              detail: failedAnswerMessage(t, body, res.status, String(res.status)),
+            }),
+          );
         }
 
         const blob = await res.blob();
         const fileZip = await JSZip.loadAsync(blob);
+        if (isCanceled()) {
+          revokePreviewTiles();
+          return;
+        }
         const baseName = file.name.replace(/\.[^.]+$/, "");
         const prefix = multiFile ? `${baseName}/` : "";
 
@@ -148,6 +211,10 @@ export function SplitSettings() {
 
         for (const name of fileNames) {
           const data = await fileZip.files[name].async("uint8array");
+          if (isCanceled()) {
+            revokePreviewTiles();
+            return;
+          }
           combinedZip.file(`${prefix}${name}`, data);
 
           if (fi === 0) {
@@ -164,6 +231,10 @@ export function SplitSettings() {
       }
 
       const combinedBlob = await combinedZip.generateAsync({ type: "blob" });
+      if (isCanceled()) {
+        revokePreviewTiles();
+        return;
+      }
       setZipBlobUrl(URL.createObjectURL(combinedBlob));
 
       previewTiles.sort((a, b) => a.row - b.row || a.col - b.col);
@@ -176,11 +247,18 @@ export function SplitSettings() {
           height: 0,
           blobUrl: t.blobUrl,
         })),
+        files.length,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Split failed");
+      revokePreviewTiles();
+      if (isCanceled() || (err instanceof DOMException && err.name === "AbortError")) return;
+      setError(err instanceof Error ? err.message : t.toolSettings.split.splitFailed);
     } finally {
-      setProcessing(false);
+      unsubscribeFiles();
+      run.end();
+      if (run.isCurrent() && !filesChanged) {
+        setProcessing(false);
+      }
     }
   }, [
     files,
@@ -194,6 +272,7 @@ export function SplitSettings() {
     setError,
     setTiles,
     setZipBlobUrl,
+    t,
   ]);
 
   const handleDownloadZip = useCallback(() => {
@@ -219,13 +298,12 @@ export function SplitSettings() {
         outputFormat === "original" ? (files[0]?.name?.split(".").pop() ?? "png") : outputFormat;
       a.download = `${baseName}_r${tile.row}_c${tile.col}.${ext}`;
       a.click();
-      setTimeout(() => setDownloadingIndex(null), 500);
-      // Deliberately claims nothing. One tile is not the set, and the claim is
-      // per tool, so claiming here would drop the warning for the tiles the
-      // user never took. Tracking which tiles have been taken is the right
-      // answer; warning about a tile already downloaded is the safe
-      // approximation until then, because silence is the costlier way to be
-      // wrong.
+      clearTimeout(downloadingTimer.current);
+      downloadingTimer.current = setTimeout(() => setDownloadingIndex(null), 500);
+      // This tile only. The guard goes quiet once every tile of the run has
+      // been taken, and never on a multi-file run, whose other files' tiles
+      // are only in the zip (splitTileKeys, runFileCount).
+      claimToolResultItem("split", splitTileKey(tile));
     },
     [tiles, files, outputFormat],
   );
@@ -237,16 +315,16 @@ export function SplitSettings() {
         <div className="flex gap-1">
           {MODES.map((m) => (
             <button
-              key={m.id}
+              key={m}
               type="button"
-              onClick={() => setMode(m.id)}
+              onClick={() => setMode(m)}
               className={`flex-1 text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                mode === m.id
+                mode === m
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              {m.label}
+              {m === "grid" ? t.toolSettings.split.modeGrid : t.toolSettings.split.modeTileSize}
             </button>
           ))}
         </div>
@@ -262,7 +340,7 @@ export function SplitSettings() {
                   key={p.label}
                   type="button"
                   onClick={() => applyPreset(p.c, p.r)}
-                  title={p.desc}
+                  title={t.toolSettings.split.presetHints[p.hintId]}
                   className={`text-xs px-2 py-1.5 rounded-lg transition-colors ${
                     columns === p.c && rows === p.r
                       ? "bg-primary text-primary-foreground"
@@ -379,7 +457,7 @@ export function SplitSettings() {
 
       <CollapsibleSection
         title={t.toolSettings.split.outputFormat}
-        badge={outputFormat === "original" ? "Auto" : outputFormat.toUpperCase()}
+        badge={outputFormat === "original" ? t.toolSettings.split.auto : outputFormat.toUpperCase()}
       >
         <div className="space-y-3 pt-1">
           <div className="grid grid-cols-2 gap-1">
@@ -394,7 +472,7 @@ export function SplitSettings() {
                     : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {f.label}
+                {"label" in f ? f.label : t.toolSettings.split.keepOriginal}
               </button>
             ))}
           </div>

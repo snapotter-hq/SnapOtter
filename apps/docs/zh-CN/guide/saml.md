@@ -1,8 +1,9 @@
 ---
 description: "为 SnapOtter 设置 SAML 2.0 单点登录。提供 Okta、Azure AD / Entra ID、Google Workspace 及其他 SAML 身份提供商的分步指南。"
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 75d4acf29255
+i18n_output_hash: 0159b008bab1
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ services:
 2. 在 **Admin Settings > Security** 中，打开 **SSO Enforcement**。
 3. 设置一个 **应急用户名**：这是唯一一个在 IdP 无法访问时仍可使用密码登录以进行紧急访问的本地账户。
 
-当 SSO 强制处于激活状态时，任何本地登录尝试（应急用户除外）都会返回 403 错误，消息为“Local password login is disabled. Please use SSO.”
+当 SSO 强制处于激活状态时，只有应急用户可以使用本地密码登录。其他任何本地登录尝试都会被拒绝，并返回与密码错误相同的 401“Invalid credentials”，即使密码正确也是如此，并且会计入登录限流。
 
 ::: tip 
 在启用 SSO 强制之前，请务必先配置一个应急用户名。否则，如果你的 IdP 宕机，你可能会被锁在 SnapOtter 之外。

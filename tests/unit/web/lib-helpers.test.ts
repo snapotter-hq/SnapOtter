@@ -49,7 +49,13 @@ describe("formatFileSize", () => {
 // formatExifValue / exifStr (metadata-utils.ts)
 // ==========================================================================
 
-import { exifStr, formatExifValue, SKIP_KEYS } from "@/lib/metadata-utils";
+import {
+  countDisplayableMetadata,
+  exifStr,
+  formatExifValue,
+  isDisplayableMetadataEntry,
+  SKIP_KEYS,
+} from "@/lib/metadata-utils";
 
 describe("formatExifValue", () => {
   it("returns 'N/A' for null", () => {
@@ -144,6 +150,52 @@ describe("SKIP_KEYS", () => {
     expect(SKIP_KEYS.has("Make")).toBe(false);
     expect(SKIP_KEYS.has("Model")).toBe(false);
     expect(SKIP_KEYS.has("ISO")).toBe(false);
+  });
+});
+
+describe("isDisplayableMetadataEntry and countDisplayableMetadata (#3782)", () => {
+  it("rejects SKIP_KEYS, underscore-prefixed keys, null, undefined, and empty stringifies", () => {
+    expect(isDisplayableMetadataEntry("ExifByteOrder", "II")).toBe(false);
+    expect(isDisplayableMetadataEntry("MakerNote", "<binary>")).toBe(false);
+    expect(isDisplayableMetadataEntry("_latitude", 37.7749)).toBe(false);
+    expect(isDisplayableMetadataEntry("Make", undefined)).toBe(false);
+    expect(isDisplayableMetadataEntry("Make", null)).toBe(false);
+    expect(isDisplayableMetadataEntry("Make", "")).toBe(false);
+    expect(isDisplayableMetadataEntry("Keywords", [])).toBe(false);
+  });
+
+  it("accepts non-empty displayable values including 0 and booleans", () => {
+    expect(isDisplayableMetadataEntry("Make", "Canon")).toBe(true);
+    expect(isDisplayableMetadataEntry("ISO", 100)).toBe(true);
+    expect(isDisplayableMetadataEntry("ExposureCompensation", 0)).toBe(true);
+    expect(isDisplayableMetadataEntry("Flash", false)).toBe(true);
+    expect(isDisplayableMetadataEntry("Keywords", ["outdoor"])).toBe(true);
+  });
+
+  it("counts only displayable entries and returns 0 for nullish or all-skipped maps", () => {
+    expect(countDisplayableMetadata(null)).toBe(0);
+    expect(countDisplayableMetadata(undefined)).toBe(0);
+    expect(countDisplayableMetadata({})).toBe(0);
+    expect(
+      countDisplayableMetadata({
+        ExifByteOrder: "II",
+        MakerNote: "<binary 512 bytes>",
+        ThumbnailOffset: 128,
+        _latitude: 37.77,
+        Artist: "",
+        Copyright: null,
+        Software: undefined,
+      }),
+    ).toBe(0);
+    expect(
+      countDisplayableMetadata({
+        Make: "Canon",
+        Model: "EOS R5",
+        ExifByteOrder: "II",
+        _internal: 1,
+        Artist: "",
+      }),
+    ).toBe(2);
   });
 });
 

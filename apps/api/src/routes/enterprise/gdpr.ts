@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { requestCancel } from "../../jobs/cancel.js";
 import { getQueue } from "../../jobs/queues.js";
 import { SYSTEM_JOBS } from "../../jobs/system-jobs.js";
+import { ANONYMOUS_USER_ID, isAnonymousUserId } from "../../lib/anonymous-user.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
-import { deleteStoredFile, deleteThumbnail } from "../../lib/file-storage.js";
+import { assertNotLastAdmin, LastAdminError } from "../../lib/last-admin.js";
+import { deleteLibraryFileStorage } from "../../lib/library-cleanup.js";
+import { logger } from "../../lib/logger.js";
 import { deletePrefix } from "../../lib/object-storage.js";
 import { canManageTargetRole, requirePermission } from "../../permissions.js";
 
@@ -21,38 +24,41 @@ const purgeBodySchema = z.object({
  * Extracted so it can be reused by the team purge endpoint.
  */
 async function purgeUserData(userId: string): Promise<void> {
+  // Refuse up front when this is the last admin, before any data goes. The
+  // final delete below checks again under the shared lock, which is what holds
+  // against a concurrent removal (#2231).
+  await db.transaction((tx) => assertNotLastAdmin(tx, userId));
+
   // a. Delete user's library files from storage
   const userFileRows = await db
-    .select({ storedName: schema.userFiles.storedName })
+    .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
     .from(schema.userFiles)
     .where(eq(schema.userFiles.userId, userId));
 
   for (const file of userFileRows) {
-    await deleteStoredFile(file.storedName);
-    await deleteThumbnail(file.storedName);
+    await deleteLibraryFileStorage(file);
   }
 
   // b. Delete userFiles rows
   await db.delete(schema.userFiles).where(eq(schema.userFiles.userId, userId));
 
-  // c. Delete processing artifacts: workspace objects for each job
+  // c. Delete processing artifacts: workspace objects for each job.
+  // deletePrefix already tolerates a missing directory, so anything thrown here
+  // is a real storage fault that must stop the purge before the jobs rows are
+  // dropped (#2632).
   const jobRows = await db
     .select({ id: schema.jobs.id })
     .from(schema.jobs)
     .where(eq(schema.jobs.userId, userId));
 
-  for (const job of jobRows) {
-    try {
-      await deletePrefix(`uploads/${job.id}/`);
-    } catch {
-      // Workspace directory may not exist
+  const sweepJobStorage = async (ids: Iterable<string>) => {
+    for (const jobId of ids) {
+      await deletePrefix(`uploads/${jobId}/`);
+      await deletePrefix(`outputs/${jobId}/`);
     }
-    try {
-      await deletePrefix(`outputs/${job.id}/`);
-    } catch {
-      // Workspace directory may not exist
-    }
-  }
+  };
+
+  await sweepJobStorage(jobRows.map((job) => job.id));
 
   // d. Cancel any active BullMQ jobs before deleting DB rows
   const activeJobs = await db
@@ -66,16 +72,30 @@ async function purgeUserData(userId: string): Promise<void> {
     for (const job of activeJobs) {
       try {
         await requestCancel(job.id);
-      } catch {
-        // Best-effort cancellation
+      } catch (err) {
+        logger.warn({ err, userId, jobId: job.id }, "gdpr purge: failed to cancel active job");
       }
     }
+    // Mark non-terminal rows canceled before waiting so an in-flight export
+    // polling its row sees the cancellation even before Redis pub/sub arrives (#1496).
+    await db
+      .update(schema.jobs)
+      .set({ status: "canceled", completedAt: new Date() })
+      .where(
+        and(eq(schema.jobs.userId, userId), inArray(schema.jobs.status, ["queued", "processing"])),
+      );
     // Wait briefly for cancellation to propagate
     await new Promise((r) => setTimeout(r, 500));
   }
 
-  // e. Delete jobs rows
+  // e. Delete jobs rows, then sweep storage again so any output written while
+  // cancellation propagated cannot outlive the deleted rows (#1496).
+  const remainingJobRows = await db
+    .select({ id: schema.jobs.id })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.userId, userId));
   await db.delete(schema.jobs).where(eq(schema.jobs.userId, userId));
+  await sweepJobStorage(new Set([...jobRows, ...remainingJobRows].map((job) => job.id)));
 
   // f. Redact audit log entries (preserve structure, remove PII)
   await db
@@ -83,17 +103,22 @@ async function purgeUserData(userId: string): Promise<void> {
     .set({ actorUsername: "[redacted]", ipAddress: null, details: {} })
     .where(eq(schema.auditLog.actorId, userId));
 
-  // g. Delete sessions
-  await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
+  // g-j. The account itself, under the lock every admin removal shares (#2231).
+  await db.transaction(async (tx) => {
+    await assertNotLastAdmin(tx, userId);
 
-  // h. Delete apiKeys
-  await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
+    // g. Delete sessions
+    await tx.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
 
-  // i. Delete userPreferences
-  await db.delete(schema.userPreferences).where(eq(schema.userPreferences.userId, userId));
+    // h. Delete apiKeys
+    await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
 
-  // j. Delete user row (also cascades pipelines)
-  await db.delete(schema.users).where(eq(schema.users.id, userId));
+    // i. Delete userPreferences
+    await tx.delete(schema.userPreferences).where(eq(schema.userPreferences.userId, userId));
+
+    // j. Delete user row (also cascades pipelines)
+    await tx.delete(schema.users).where(eq(schema.users.id, userId));
+  });
 }
 
 export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
@@ -113,6 +138,9 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const targetUserId = request.params.id;
+      if (isAnonymousUserId(targetUserId)) {
+        return reply.status(404).send({ error: "User not found" });
+      }
 
       // Validate the target user exists
       const [targetUser] = await db
@@ -210,6 +238,11 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         return reply.send({ status: "failed", error: errorMsg });
       }
 
+      if (job.status === "canceled") {
+        const errorMsg = (job.error as { message?: string } | null)?.message ?? "Export canceled";
+        return reply.send({ status: "canceled", error: errorMsg });
+      }
+
       // queued or processing
       const progress = job.progress as { percent?: number; stage?: string } | null;
       return reply.send({
@@ -247,6 +280,9 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const targetUserId = request.params.id;
+      if (isAnonymousUserId(targetUserId)) {
+        return reply.status(404).send({ error: "User not found" });
+      }
 
       // Guard: admin cannot purge themselves
       if (targetUserId === user.id) {
@@ -289,7 +325,16 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Execute purge
-      await purgeUserData(targetUserId);
+      try {
+        await purgeUserData(targetUserId);
+      } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply
+            .status(409)
+            .send({ error: "Cannot purge the last admin", code: "LAST_ADMIN" });
+        }
+        throw err;
+      }
 
       // Emit audit event (admin as actor, target = purged userId)
       await auditFromRequest(request)("GDPR_USER_PURGED", {
@@ -353,7 +398,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
           legalHold: schema.users.legalHold,
         })
         .from(schema.users)
-        .where(eq(schema.users.team, targetTeamId));
+        .where(and(eq(schema.users.team, targetTeamId), ne(schema.users.id, ANONYMOUS_USER_ID)));
 
       if (teamUsers.some((member) => member.id === user.id)) {
         return reply.status(400).send({ error: "Cannot purge a team containing your own account" });
@@ -374,9 +419,31 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(409).send({ error: "A team member is under individual legal hold" });
       }
 
+      // A team holding every admin would leave none; refuse before any purge
+      // rather than part way through the members (#2231).
+      const memberIds = new Set(teamUsers.map((member) => member.id));
+      const admins = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(and(eq(schema.users.role, "admin"), ne(schema.users.id, "anonymous")));
+      if (admins.length > 0 && admins.every((admin) => memberIds.has(admin.id))) {
+        return reply
+          .status(409)
+          .send({ error: "Cannot purge a team containing every admin", code: "LAST_ADMIN" });
+      }
+
       // Purge each team member
       for (const member of teamUsers) {
-        await purgeUserData(member.id);
+        try {
+          await purgeUserData(member.id);
+        } catch (err) {
+          if (err instanceof LastAdminError) {
+            return reply
+              .status(409)
+              .send({ error: "Cannot purge the last admin", code: "LAST_ADMIN" });
+          }
+          throw err;
+        }
       }
 
       // Delete the team itself

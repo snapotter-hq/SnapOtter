@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
@@ -97,23 +98,94 @@ describe("selfContainedArgs version detection", () => {
     expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--embed-resources");
   });
 
-  it("falls back to --self-contained when --version exits non-zero", async () => {
-    mockSpawnSync.mockReturnValue({ status: 1, stdout: "" } as never);
+  it("falls back to --embed-resources --standalone without caching when --version exits non-zero", async () => {
+    mockSpawnSync
+      .mockReturnValueOnce({ status: 1, stdout: "pandoc 2.17.1.1\n" } as never)
+      .mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" } as never);
     const { buildPandocArgs } = await import("../src/pandoc.js");
-    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--self-contained");
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--embed-resources",
+      "--standalone",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
   });
 
-  it("falls back to --self-contained when stdout is empty", async () => {
-    mockSpawnSync.mockReturnValue({ status: 0, stdout: "" } as never);
+  it("falls back to --embed-resources --standalone without caching when stdout is empty", async () => {
+    mockSpawnSync
+      .mockReturnValueOnce({ status: 0, stdout: "" } as never)
+      .mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" } as never);
     const { buildPandocArgs } = await import("../src/pandoc.js");
-    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--self-contained");
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--embed-resources",
+      "--standalone",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
   });
 
-  it("defaults the major to 2 when the version string is unparseable", async () => {
-    mockSpawnSync.mockReturnValue({ status: 0, stdout: "some banner without a number\n" } as never);
+  it("falls back to --embed-resources --standalone without caching when the version string is unparseable", async () => {
+    mockSpawnSync
+      .mockReturnValueOnce({ status: 0, stdout: "some banner without a number\n" } as never)
+      .mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" } as never);
     const { buildPandocArgs } = await import("../src/pandoc.js");
-    // major defaults to 2, so we get the 2.x flag.
-    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--self-contained");
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--embed-resources",
+      "--standalone",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
   });
 
   it("caches the detected flags: the version is probed only once", async () => {
@@ -194,16 +266,75 @@ describe("runPandoc", () => {
 
   it("rejects on non-zero exit with the stderr tail", async () => {
     h.nextClose({ stderr: "pandoc: unknown reader", code: 43 });
-    await expect(
-      import("../src/pandoc.js").then((m) => m.runPandoc("/in.md", "/out.html")),
-    ).rejects.toThrow("pandoc exited 43: pandoc: unknown reader");
+    const err = await import("../src/pandoc.js")
+      .then((m) => m.runPandoc("/in.md", "/out.html"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("pandoc exited 43: pandoc: unknown reader");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal when code is null", async () => {
-    h.nextClose({ stderr: "died", code: null, signal: "SIGABRT" });
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    h.nextClose({ stderr: "died\n", code: null, signal: "SIGABRT" });
     await expect(
       import("../src/pandoc.js").then((m) => m.runPandoc("/in.md", "/out.html")),
-    ).rejects.toThrow("pandoc exited SIGABRT: died");
+    ).rejects.toMatchObject({
+      message: "pandoc exited SIGABRT: died",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "pandoc",
+      signal: "SIGABRT",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    process.env.PANDOC_PATH = "/opt/pandoc/bin/pandoc";
+    h.nextClose({ stderr: "  \n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/pandoc.js").then((m) => m.runPandoc("/in.md", "/out.html")),
+    ).rejects.toMatchObject({
+      message: "spawn /opt/pandoc/bin/pandoc ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures and never marks them as ToolInputError (#3829)", async () => {
+    process.env.PANDOC_PATH = "/opt/pandoc/bin/pandoc";
+    const mod = await import("../src/pandoc.js");
+
+    h.nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    const err126 = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(err126)).toBe(false);
+    expect(err126).toMatchObject({
+      message: "pandoc exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+    });
+
+    h.nextClose({ stderr: "sh: pandoc: not found\n", code: 127 });
+    const err127 = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(err127)).toBe(false);
+    expect(err127).toMatchObject({
+      message: "pandoc exited 127: sh: pandoc: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+    });
+
+    h.nextClose({ stderr: "Invalid UTF-8 stream\n", code: null, signal: "SIGKILL" });
+    const errSig = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(errSig)).toBe(false);
+    expect(errSig).toMatchObject({
+      message: "pandoc exited SIGKILL: Invalid UTF-8 stream",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+      signal: "SIGKILL",
+    });
   });
 
   it("rejects on an error event", async () => {
@@ -243,5 +374,100 @@ describe("runPandoc", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("kills the child with SIGKILL and rejects with Canceled when signal aborts mid-run", async () => {
+    const mod = await import("../src/pandoc.js");
+    const child = h.nextManual();
+    const ac = new AbortController();
+    const p = mod.runPandoc("/in.epub", "/out.html", { signal: ac.signal });
+    ac.abort();
+    await expect(p).rejects.toThrow("Canceled");
+    expect(child.killSignals).toContain("SIGKILL");
+  });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/pandoc.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(
+      mod.runPandoc("/in.epub", "/out.html", { selfContained: true, signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("removes the abort listener on normal close and on spawn error", async () => {
+    const mod = await import("../src/pandoc.js");
+    const ac1 = new AbortController();
+    const removeSpy1 = vi.spyOn(ac1.signal, "removeEventListener");
+    h.nextClose({ code: 0 });
+    await mod.runPandoc("/in.epub", "/out.html", { signal: ac1.signal });
+    expect(removeSpy1).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const ac2 = new AbortController();
+    const removeSpy2 = vi.spyOn(ac2.signal, "removeEventListener");
+    h.nextError(new Error("spawn failed"));
+    await expect(mod.runPandoc("/in.epub", "/out.html", { signal: ac2.signal })).rejects.toThrow(
+      "spawn failed",
+    );
+    expect(removeSpy2).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+
+  it("marks corrupt/invalid container and parse exits (44, 63, 64, 91) as ToolInputError even with non-matching stderr", async () => {
+    const mod = await import("../src/pandoc.js");
+    for (const code of [44, 63, 64, 91]) {
+      h.nextClose({ stderr: `PandocExit_${code}\n`, code });
+      const err = await mod.runPandoc("/bad.epub", "/out.html").catch((e: unknown) => e);
+      expect(isToolInputError(err)).toBe(true);
+    }
+  });
+
+  it("markIfPandocInputError matches each stderr pattern even when exit code is not 44/63/64/91", async () => {
+    const { markIfPandocInputError } = await import("../src/pandoc.js");
+    const samples = [
+      "No entry on path: META-INF/container.xml",
+      "Couldn't extract ePub file: Unknown compression method",
+      "couldn't parse docx file: DocxError",
+      "couldn't unpack docx container",
+      "Invalid XML in 'META-INF/container.xml': unexpected EOF",
+      "UTF-8 decoding error at byte 42",
+      "Error parsing YAML metadata at line 4",
+    ];
+    for (const stderr of samples) {
+      expect(isToolInputError(markIfPandocInputError(new Error("fail"), 1, stderr))).toBe(true);
+      expect(isToolInputError(markIfPandocInputError(new Error("fail"), null, stderr))).toBe(true);
+    }
+    expect(
+      isToolInputError(markIfPandocInputError(new Error("fail"), 1, "pandoc: Out of memory")),
+    ).toBe(false);
+  });
+
+  it("marks DRM/invalid-UTF-8 exception on exit 1 as ToolInputError and strips leading warnings and GHC HasCallStack backtrace", async () => {
+    const mod = await import("../src/pandoc.js");
+    const ghcStderr = [
+      "[WARNING] Could not fetch resource http:/127.0.0.1:9/remote.png",
+      "pandoc: Uncaught exception text-2.1.3:Data.Text.Encoding.Error.UnicodeException:",
+      "",
+      "Cannot decode byte '\\x89': Data.Text.Internal.Encoding: Invalid UTF-8 stream",
+      "",
+      "HasCallStack backtrace:",
+      "  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37",
+      "  throw, called at libraries/text/src/Data/Text/Encoding.Error.hs:101:23",
+    ].join("\n");
+    h.nextClose({ stderr: ghcStderr, code: 1 });
+    const err = (await mod.runPandoc("/drm.epub", "/out.html").catch((e: unknown) => e)) as Error;
+    expect(isToolInputError(err)).toBe(true);
+    expect(err.message).toContain("Invalid UTF-8 stream");
+    expect(err.message).not.toContain("[WARNING]");
+    expect(err.message).not.toContain("HasCallStack backtrace");
+    expect(err.message.split("\n").length).toBeLessThanOrEqual(2);
+  });
+
+  it("leaves non-input pandoc failures unmarked so genuine bugs still report", async () => {
+    const mod = await import("../src/pandoc.js");
+    h.nextClose({ stderr: "pandoc: unknown reader", code: 43 });
+    const err = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(err)).toBe(false);
   });
 });

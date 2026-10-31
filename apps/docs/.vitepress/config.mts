@@ -583,6 +583,7 @@ function buildBaseTheme() {
               { text: "Extract Pages", link: "/tools/pdf/extract-pages" },
               { text: "Remove Pages", link: "/tools/pdf/remove-pages" },
               { text: "Organize PDF", link: "/tools/pdf/organize-pdf" },
+              { text: "PDF Multi-Tool", link: "/tools/pdf/multi-tool-pdf" },
               { text: "Protect PDF", link: "/tools/pdf/protect-pdf" },
               { text: "Unlock PDF", link: "/tools/pdf/unlock-pdf" },
               { text: "Repair PDF", link: "/tools/pdf/repair-pdf" },

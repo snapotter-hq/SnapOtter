@@ -1,7 +1,45 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import type { Permission } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { matchDemoRoute } from "../../../apps/demo/src/mock-api.js";
+
+const ALL_ADMIN_PERMISSIONS: Record<Permission, true> = {
+  "tools:use": true,
+  "files:own": true,
+  "files:all": true,
+  "apikeys:own": true,
+  "apikeys:all": true,
+  "pipelines:own": true,
+  "pipelines:all": true,
+  "settings:read": true,
+  "settings:write": true,
+  "users:manage": true,
+  "teams:manage": true,
+  "features:manage": true,
+  "system:health": true,
+  "audit:read": true,
+  "compliance:manage": true,
+  "webhooks:manage": true,
+  "security:manage": true,
+};
+const EXPECTED_ADMIN_PERMISSIONS = Object.keys(ALL_ADMIN_PERMISSIONS) as Permission[];
+const EXPECTED_EDITOR_PERMISSIONS: Permission[] = [
+  "tools:use",
+  "files:own",
+  "files:all",
+  "apikeys:own",
+  "pipelines:own",
+  "pipelines:all",
+  "settings:read",
+];
+const EXPECTED_USER_PERMISSIONS: Permission[] = [
+  "tools:use",
+  "files:own",
+  "apikeys:own",
+  "pipelines:own",
+  "settings:read",
+];
 
 const packageJson = JSON.parse(
   readFileSync(path.resolve(process.cwd(), "package.json"), "utf8"),
@@ -75,7 +113,26 @@ describe("demo mock API", () => {
     };
     expect(data.user.role).toBe("admin");
     expect(data.user.mustChangePassword).toBe(false);
-    expect(Array.isArray(data.user.permissions)).toBe(true);
+    expect(EXPECTED_ADMIN_PERMISSIONS).toHaveLength(17);
+    expect(data.user.permissions).toEqual(EXPECTED_ADMIN_PERMISSIONS);
+  });
+
+  it("seeds built-in admin, editor, and user roles with full permission parity", async () => {
+    const response = matchDemoRoute("/api/v1/roles", "GET");
+    expect(response?.status).toBe(200);
+    const data = (await readJson(response as Response)) as {
+      roles: Array<{ name: string; isBuiltin: boolean; permissions: string[] }>;
+    };
+    const byName = new Map(data.roles.map((r) => [r.name, r]));
+
+    expect(byName.get("admin")?.isBuiltin).toBe(true);
+    expect(byName.get("admin")?.permissions).toEqual(EXPECTED_ADMIN_PERMISSIONS);
+
+    expect(byName.get("editor")?.isBuiltin).toBe(true);
+    expect(byName.get("editor")?.permissions).toEqual(EXPECTED_EDITOR_PERMISSIONS);
+
+    expect(byName.get("user")?.isBuiltin).toBe(true);
+    expect(byName.get("user")?.permissions).toEqual(EXPECTED_USER_PERMISSIONS);
   });
 
   // These lock in the exact response shapes the admin settings screens read.
@@ -264,9 +321,8 @@ describe("demo mock API", () => {
  * the router on /login while the address bar reads /, and the demo rendering
  * the login screen it just bounced away from.
  *
- * tests/e2e-demo/demo-preview.spec.ts catches that, but only after a merge:
- * the demo deploy workflow runs on push to main, not on pull requests (#1128).
- * This assertion is the part that runs on the PR.
+ * tests/e2e-demo/demo-preview.spec.ts catches that in the browser, and this
+ * assertion pins the module-order contract directly in the unit suite (#1128).
  */
 describe("demo boot order", () => {
   const mainSource = readFileSync(path.resolve(process.cwd(), "apps/demo/src/main.tsx"), "utf8");

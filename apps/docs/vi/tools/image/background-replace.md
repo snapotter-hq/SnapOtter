@@ -1,6 +1,6 @@
 ---
 description: "Thay thế nền hình ảnh bằng một màu đơn sắc hoặc dải màu bằng AI."
-i18n_source_hash: 930fe8890e55
+i18n_source_hash: 03d2298daaa3
 i18n_provenance: human
 i18n_output_hash: 69c3fdd4f116
 ---

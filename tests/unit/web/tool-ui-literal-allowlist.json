@@ -3,14 +3,26 @@
   "values": [
     "-180 to 180 (e.g. -0.1278)",
     "-90 to 90 (e.g. 51.5074)",
+    "1080x1080 (Instagram)",
+    "1200x628 (Facebook)",
+    "1920x1080 (HD)",
     "2026 Example Corp",
     "admin",
     "AGPLv3",
+    "android-chrome-192x192.png",
+    "android-chrome-512x512.png",
+    "apple-touch-icon.png",
     "background",
     "background-sizer",
     "bytes",
+    "Code 128",
+    "Code 39",
+    "Data Matrix",
     "Data URI",
     "e.g. Lightroom, Photoshop",
+    "favicon-16x16.png",
+    "favicon-32x32.png",
+    "favicon-48x48.png",
     "image",
     "Letter",
     "Lin",
@@ -25,6 +37,8 @@
     "pt",
     "SnapOtter",
     "Squircle",
-    "WebM"
+    "WebM",
+    "WebP",
+    "WebVTT"
   ]
 }

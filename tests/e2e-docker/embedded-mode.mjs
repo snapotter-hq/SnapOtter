@@ -180,6 +180,46 @@ async function main() {
   countMatches(logs1, /first-boot initdb/g) === 1
     ? ok("initdb ran exactly once")
     : bad("initdb did not run exactly once");
+  let readyMarkerPresent = false;
+  for (let i = 0; i < 10; i++) {
+    if (spawnSync("docker", ["exec", NAME, "test", "-f", "/run/s6/snapotter-ready"]).status === 0) {
+      readyMarkerPresent = true;
+      break;
+    }
+    await sleep(500);
+  }
+  readyMarkerPresent
+    ? ok("wrote /run/s6/snapotter-ready after reaching healthy")
+    : bad("missing /run/s6/snapotter-ready after healthy boot");
+  // A crash after a healthy boot must respawn the API rather than halting the container (#2267).
+  const pidBeforeCrash = quiet([
+    "exec",
+    NAME,
+    "/command/s6-svstat",
+    "-o",
+    "pid",
+    "/run/service/snapotter",
+  ]).trim();
+  quiet(["exec", NAME, "kill", "-9", pidBeforeCrash]);
+  let respawned = false;
+  for (let i = 0; i < 30; i++) {
+    await sleep(1000);
+    const pidNow = quiet([
+      "exec",
+      NAME,
+      "/command/s6-svstat",
+      "-o",
+      "pid",
+      "/run/service/snapotter",
+    ]).trim();
+    if (pidNow && pidNow !== "-1" && pidNow !== pidBeforeCrash) {
+      respawned = true;
+      break;
+    }
+  }
+  respawned && (await waitHealthy(60000))
+    ? ok("s6 respawned the API after a post-boot crash")
+    : bad("API did not recover from a post-boot crash");
 
   // 2. Restart reuses PGDATA (no second initdb), stays healthy.
   console.log("\n[2] restart persists data, no re-init");
@@ -323,6 +363,47 @@ async function main() {
   /Waiting for Redis\.\.\. \d+s/.test(brokenLogs)
     ? ok("printed progress while waiting")
     : bad("no progress output during the wait");
+  cleanup();
+
+  // 8. An invalid API env value fails the boot instead of restart-looping (#2267).
+  //    Without docker/s6/s6-rc.d/snapotter/finish, s6-supervise respawned the API
+  //    forever while Postgres and Redis stayed up, leaving the container "Up" and
+  //    serving nothing.
+  console.log("\n[8] an invalid API env value fails the boot instead of restart-looping");
+  cleanup();
+  createVolume();
+  if (quiet(["inspect", NAME])) throw new Error(`Unique container name collision: ${NAME}`);
+  docker([
+    "run",
+    "-d",
+    "--name",
+    NAME,
+    "--label",
+    OWNER_LABEL,
+    "-v",
+    `${VOL}:/data`,
+    "-e",
+    "SNAPOTTER_TELEMETRY=0",
+    "-e",
+    "BASE_PATH=snapotter",
+    IMAGE,
+  ]);
+  if (!containerIsOwned()) {
+    throw new Error(`Created container failed ownership validation: ${NAME}`);
+  }
+  (await waitExited(300000))
+    ? ok("container exited on invalid env instead of restart-looping")
+    : bad("container still running after invalid env startup failure");
+  Number(quiet(["inspect", "--format", "{{.State.ExitCode}}", NAME]).trim()) === 1
+    ? ok("exited with the API's exit code (1) on invalid env")
+    : bad("did not exit with code 1 on invalid env");
+  const badEnvLogs = dockerLogs(NAME);
+  badEnvLogs.includes("BASE_PATH must be empty, /, or a path such as /snapotter")
+    ? ok("logged the BASE_PATH validation error")
+    : bad("missing BASE_PATH validation error in logs");
+  countMatches(badEnvLogs, /ZodError:/g) === 1
+    ? ok("API ran once and did not respawn")
+    : bad("API respawned more than once before halting");
   cleanup();
 
   console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILED`}`);

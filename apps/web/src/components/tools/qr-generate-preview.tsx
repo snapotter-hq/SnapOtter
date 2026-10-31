@@ -110,18 +110,27 @@ export function QrGeneratePreview() {
   }, [options]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full gap-4">
-      <div
-        className="rounded-xl border border-border p-6 shadow-sm"
-        style={store.bgTransparent ? { background: CHECKER_BG } : undefined}
-      >
-        <div ref={containerRef} className="flex items-center justify-center" />
+    // Scrolls inside the preview area when the code and its hint don't fit (a small
+    // phone), and m-auto centres them only while they do, so the top is never
+    // clipped and nothing spills over the settings controls (#2192).
+    <div className="flex h-full w-full flex-col overflow-auto">
+      <div className="m-auto flex max-w-full flex-col items-center gap-4">
+        <div
+          className="max-w-full rounded-xl border border-border p-6 shadow-sm"
+          style={store.bgTransparent ? { background: CHECKER_BG } : undefined}
+        >
+          <div
+            ref={containerRef}
+            data-testid="qr-preview"
+            className="flex items-center justify-center [&_canvas]:h-auto [&_canvas]:max-w-full"
+          />
+        </div>
+        {isEmpty && (
+          <p className="text-sm text-muted-foreground">
+            {t.toolSettings["qr-generate"].enterContentToGenerateA}
+          </p>
+        )}
       </div>
-      {isEmpty && (
-        <p className="text-sm text-muted-foreground">
-          {t.toolSettings["qr-generate"].enterContentToGenerateA}
-        </p>
-      )}
     </div>
   );
 }

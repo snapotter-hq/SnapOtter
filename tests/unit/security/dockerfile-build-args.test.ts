@@ -57,7 +57,7 @@ describe("Dockerfile build args", () => {
 
   it("pins fixed Go toolchains and checksummed dependency overrides for shipped binaries", () => {
     const goBuilder =
-      "golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58";
+      "golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61";
     expect(dockerfile.split(goBuilder)).toHaveLength(3);
 
     // Transitive modules pinned above what the application itself requires, so
@@ -316,6 +316,36 @@ describe("Dockerfile build args", () => {
     // silently", which leaves the container up with the app never started
     // because its readiness dependency was never satisfied (#962).
     expect(dockerfile).toContain("S6_BEHAVIOUR_IF_STAGE2_FAILS=2");
+  });
+
+  it("wires the snapotter longrun run and finish scripts to halt on first-boot startup failure (#2267)", () => {
+    const dest = dockerfile.match(/^COPY docker\/embedded-lib\.sh (\S+)$/m)?.[1];
+    expect(dest).toBeDefined();
+
+    const finishPath = resolve(root, "docker/s6/s6-rc.d/snapotter/finish");
+    expect(existsSync(finishPath), "snapotter/finish must exist").toBe(true);
+    const snapotterFinish = readFileSync(finishPath, "utf8");
+
+    expect(snapotterRun, "snapotter/run must source embedded-lib.sh").toContain(`. ${dest}`);
+    expect(snapotterRun, "snapotter/run must background mark_snapotter_ready").toMatch(
+      /mark_snapotter_ready "\$\$".*&/,
+    );
+    const sourceIndex = snapotterRun.indexOf(`. ${dest}`);
+    const readyIndex = snapotterRun.indexOf('mark_snapotter_ready "$$"');
+    const execIndex = snapotterRun.indexOf("exec s6-setuidgid snapotter");
+    expect(sourceIndex).toBeGreaterThanOrEqual(0);
+    expect(readyIndex).toBeGreaterThan(sourceIndex);
+    expect(execIndex).toBeGreaterThan(readyIndex);
+    expect(snapotterFinish, "snapotter/finish must use with-contenv").toMatch(
+      /^#!\/command\/with-contenv sh\b/,
+    );
+    expect(snapotterFinish, "snapotter/finish must source embedded-lib.sh").toContain(`. ${dest}`);
+    expect(snapotterFinish, "snapotter/finish must call snapotter_finish").toContain(
+      'snapotter_finish "$@"',
+    );
+    expect(dockerfile, "Dockerfile must chmod +x snapotter/finish").toContain(
+      "/etc/s6-overlay/s6-rc.d/snapotter/finish",
+    );
   });
 
   it("documents the readiness timeouts the lib actually ships", () => {

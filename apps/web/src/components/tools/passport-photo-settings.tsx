@@ -1,4 +1,5 @@
 import {
+  ANALYTICS_EVENTS,
   PASSPORT_SPECS,
   type PassportDocumentSpec,
   type PassportRegion,
@@ -21,14 +22,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
 import {
+  type AnalyzeResult,
+  beginPassportAnalyzeRun,
+  beginPassportGenerateRun,
   type FaceLandmarks,
   type GenerateResult,
+  passportFileKey,
   usePassportPhotoStore,
 } from "@/stores/passport-photo-store";
 import { claimToolResult, passportPhotoResultKey } from "@/stores/tool-result-claims";
@@ -40,6 +46,59 @@ type ComplianceCheckId = "faceCentered" | "headLevel" | "lookingStraight" | "fac
 interface ComplianceCheck {
   id: ComplianceCheckId;
   pass: boolean;
+}
+
+function isLandmarkPoint(value: unknown): value is { x: number; y: number } {
+  if (!value || typeof value !== "object") return false;
+  const p = value as Record<string, unknown>;
+  return (
+    typeof p.x === "number" &&
+    Number.isFinite(p.x) &&
+    typeof p.y === "number" &&
+    Number.isFinite(p.y)
+  );
+}
+
+function isFaceLandmarks(value: unknown): value is FaceLandmarks {
+  if (!value || typeof value !== "object") return false;
+  const lm = value as Record<string, unknown>;
+  return (
+    isLandmarkPoint(lm.leftEye) &&
+    isLandmarkPoint(lm.rightEye) &&
+    isLandmarkPoint(lm.eyeCenter) &&
+    isLandmarkPoint(lm.chin) &&
+    isLandmarkPoint(lm.forehead) &&
+    isLandmarkPoint(lm.crown) &&
+    isLandmarkPoint(lm.nose) &&
+    typeof lm.faceCenterX === "number" &&
+    Number.isFinite(lm.faceCenterX)
+  );
+}
+
+function isAnalyzeResult(value: unknown): value is AnalyzeResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.preview === "string" &&
+    r.preview.length > 0 &&
+    isFaceLandmarks(r.landmarks) &&
+    typeof r.imageWidth === "number" &&
+    Number.isFinite(r.imageWidth) &&
+    r.imageWidth > 0 &&
+    typeof r.imageHeight === "number" &&
+    Number.isFinite(r.imageHeight) &&
+    r.imageHeight > 0 &&
+    typeof r.jobId === "string" &&
+    r.jobId.length > 0 &&
+    typeof r.filename === "string" &&
+    r.filename.length > 0
+  );
+}
+
+function isGenerateResult(value: unknown): value is GenerateResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const r = value as Record<string, unknown>;
+  return typeof r.downloadUrl === "string" && r.downloadUrl.length > 0;
 }
 
 // ── Region groups ──────────────────────────────────────────────────
@@ -73,15 +132,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Display text comes from the countryCUSTOM / docCUSTOM i18n keys (see
+// passportCountryName / passportDocLabel), so name and label stay empty here.
 const CUSTOM_SPEC: PassportSpec = {
   code: "CUSTOM",
-  name: "Custom",
+  name: "",
   flag: "\u2699\uFE0F",
   region: "americas",
   documents: [
     {
       type: "passport",
-      label: "Custom",
+      label: "",
       width: 35,
       height: 45,
       dpi: 300,
@@ -236,7 +297,8 @@ function CountryOption({
 
 export function PassportPhotoSettings() {
   const { t } = useTranslation();
-  const { files } = useFileStore();
+  const { files, entries } = useFileStore();
+  const currentEntryId = entries[0]?.id;
   const { error } = useToolProcessor("passport-photo");
 
   const {
@@ -255,8 +317,12 @@ export function PassportPhotoSettings() {
     setCustomDimensions,
     analyzeResult,
     setAnalyzeResult,
+    analyzeError,
+    setAnalyzeError,
     generateResult,
     setGenerateResult,
+    generateError,
+    setGenerateError,
     analyzing,
     setAnalyzing,
     generating,
@@ -282,10 +348,6 @@ export function PassportPhotoSettings() {
   const [customWInput, setCustomWInput] = useState("");
   const [customHInput, setCustomHInput] = useState("");
 
-  // Errors
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-
   // Derived state
   const selectedSpec = getCountrySpec(countryCode);
   const isCustom = countryCode === "CUSTOM";
@@ -308,8 +370,12 @@ export function PassportPhotoSettings() {
   }, [dropdownOpen]);
 
   // Auto-select bg color when country changes
+  const prevDocBgColorRef = useRef(docSpec.bgColor);
   useEffect(() => {
-    setBgColor(docSpec.bgColor);
+    if (prevDocBgColorRef.current !== docSpec.bgColor) {
+      prevDocBgColorRef.current = docSpec.bgColor;
+      setBgColor(docSpec.bgColor);
+    }
   }, [docSpec.bgColor, setBgColor]);
 
   // Ensure valid documentType when country changes
@@ -322,6 +388,16 @@ export function PassportPhotoSettings() {
   // Analyze
   const runAnalyze = useCallback(
     async (file: File) => {
+      const controller = new AbortController();
+      const run = beginPassportAnalyzeRun(() => controller.abort());
+      const unsubscribeFiles = useFileStore.subscribe((state) => {
+        if (state.files[0] !== file) {
+          controller.abort();
+        }
+      });
+      const isCurrent = () =>
+        run.isCurrent() && !controller.signal.aborted && useFileStore.getState().files[0] === file;
+
       setAnalyzing(true);
       setAnalyzeError(null);
       setAnalyzeResult(null);
@@ -338,46 +414,94 @@ export function PassportPhotoSettings() {
           method: "POST",
           headers,
           body: formData,
+          signal: controller.signal,
         });
 
         if (!response.ok) {
           const body = await response.json().catch(() => null);
-          const msg = body
-            ? typeof body.details === "string"
-              ? body.details
-              : typeof body.error === "string"
-                ? body.error
-                : `Analysis failed: ${response.status}`
-            : `Analysis failed: ${response.status}`;
-          throw new Error(msg);
+          throw new Error(
+            failedAnswerMessage(
+              t,
+              body,
+              response.status,
+              format(t.toolSettings["passport-photo"].analysisFailedWithStatus, {
+                status: response.status,
+              }),
+            ),
+          );
         }
 
-        const result = resolveServerUrls(await response.json());
+        const raw = await response.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
+        if (!isCurrent()) return;
+        const result = resolveServerUrls(raw);
+        if (!isAnalyzeResult(result)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
         setAnalyzeResult(result);
       } catch (err) {
-        setAnalyzeError(err instanceof Error ? err.message : "Face analysis failed");
+        if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
+        setAnalyzeError(
+          err instanceof Error ? err.message : t.toolSettings["passport-photo"].faceAnalysisFailed,
+        );
       } finally {
-        setAnalyzing(false);
+        unsubscribeFiles();
+        run.end();
+        if (run.isCurrent()) {
+          setAnalyzing(false);
+        }
       }
     },
-    [setAnalyzing, setAnalyzeResult, setGenerateResult],
+    [setAnalyzing, setAnalyzeError, setAnalyzeResult, setGenerateResult, t],
   );
 
   // Auto-analyze when files change
-  const analyzeRef = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!hasFile || analyzeResult || analyzing) return;
+    const store = usePassportPhotoStore.getState();
+    if (!hasFile) {
+      if (
+        store.analyzedFileKey !== null ||
+        store.analyzeResult !== null ||
+        store.generateResult !== null ||
+        store.analyzeError !== null ||
+        store.generateError !== null
+      ) {
+        store.setAnalyzedFileKey(null);
+        store.setAnalyzeResult(null);
+        store.setGenerateResult(null);
+        store.setAnalyzeError(null);
+        store.setGenerateError(null);
+      }
+      return;
+    }
     const file = files[0];
-    const fileKey = `${file.name}-${file.size}-${file.lastModified}`;
-    if (analyzeRef.current === fileKey) return;
-    analyzeRef.current = fileKey;
+    const fileKey = passportFileKey(file, currentEntryId);
+    if (store.analyzedFileKey === fileKey) return;
+    store.setAnalyzedFileKey(fileKey);
+    if (store.analyzing || store.generating) return;
+    setGenerateError(null);
     runAnalyze(file);
-  }, [hasFile, files, analyzeResult, analyzing, runAnalyze]);
+  }, [hasFile, files, currentEntryId, runAnalyze, setGenerateError]);
 
   // Generate
   const handleGenerate = useCallback(async () => {
     if (!analyzeResult) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "passport-photo",
+      is_batch: false,
+      file_count: 1,
+    });
+
+    const controller = new AbortController();
+    const run = beginPassportGenerateRun(() => controller.abort());
+    const targetAnalysis = analyzeResult;
+    const isCurrent = () =>
+      run.isCurrent() &&
+      !controller.signal.aborted &&
+      usePassportPhotoStore.getState().analyzeResult === targetAnalysis;
 
     setGenerating(true);
     setGenerateError(null);
@@ -407,29 +531,61 @@ export function PassportPhotoSettings() {
         method: "POST",
         headers,
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
         const errBody = await response.json().catch(() => null);
-        const msg = errBody
-          ? typeof errBody.details === "string"
-            ? errBody.details
-            : typeof errBody.error === "string"
-              ? errBody.error
-              : `Generation failed: ${response.status}`
-          : `Generation failed: ${response.status}`;
-        throw new Error(msg);
+        // The server no longer holds this analysis's background-removed image
+        // (#1674). Analyze the same file again so generate has one to read.
+        if (errBody?.code === "ANALYSIS_EXPIRED" && files[0]) {
+          if (!isCurrent()) return;
+          // The note only holds while that analysis runs: once it settles the
+          // Generate button (or the analysis error) says what happens next.
+          setGenerateError(t.toolSettings["passport-photo"].analysisExpired);
+          void runAnalyze(files[0]).finally(() => {
+            if (run.isCurrent()) setGenerateError(null);
+          });
+          return;
+        }
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            errBody,
+            response.status,
+            format(t.toolSettings["passport-photo"].generationFailedWithStatus, {
+              status: response.status,
+            }),
+          ),
+        );
       }
 
-      const result: GenerateResult = resolveServerUrls(await response.json());
+      const raw = await response.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
+      if (!isCurrent()) return;
+      const result = resolveServerUrls(raw);
+      if (!isGenerateResult(result)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
       setGenerateResult(result);
     } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : "Photo generation failed");
+      if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
+      setGenerateError(
+        err instanceof Error ? err.message : t.toolSettings["passport-photo"].photoGenerationFailed,
+      );
     } finally {
-      setGenerating(false);
+      run.end();
+      if (run.isCurrent()) {
+        setGenerating(false);
+      }
     }
   }, [
+    t,
     analyzeResult,
+    files,
+    runAnalyze,
     countryCode,
     documentType,
     bgColor,
@@ -442,6 +598,7 @@ export function PassportPhotoSettings() {
     adjustX,
     adjustY,
     setGenerating,
+    setGenerateError,
     setGenerateResult,
   ]);
 

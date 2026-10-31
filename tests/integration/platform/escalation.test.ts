@@ -11,11 +11,11 @@ const ts = Date.now();
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /**
  * Helper: register a user via the admin endpoint and return the response.

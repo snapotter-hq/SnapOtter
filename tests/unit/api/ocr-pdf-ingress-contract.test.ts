@@ -16,11 +16,13 @@ function between(source: string, start: string, end?: string): string {
 }
 
 describe("OCR PDF route streaming contract", () => {
-  it("keeps the tool batch OCR-PDF branch path-backed while retaining buffered non-OCR files", () => {
-    expect(batchSource).toMatch(
-      /if \(toolId === "ocr-pdf"\)[\s\S]*spoolMultipartFile[\s\S]*else \{[\s\S]*Buffer\.concat\(chunks\)/,
+  it("spools tool-batch multipart inputs and takes the OCR-PDF path branch without buffering file parts", () => {
+    const batchRoute = between(batchSource, '"/api/v1/tools/:section/:toolId/batch"');
+    expect(batchRoute).toContain("spoolMultipartFile");
+    expect(batchRoute).not.toContain("Buffer.concat(chunks)");
+    expect(batchRoute).toMatch(
+      /if \(toolId === "ocr-pdf"\)[\s\S]*storeValidatedOcrPdf[\s\S]*else \{[\s\S]*readFile\(file\.path\)/,
     );
-    expect(batchSource).toContain("storeValidatedOcrPdf");
   });
 
   it("spools execute-pipeline multipart input and never buffers OCR-PDF validation", () => {

@@ -5,6 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { cn, generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
+import { reportCaptureFailure, strokeToDataUrl } from "../stage-capture";
 
 type FillContent = "foreground" | "background" | "color" | "white" | "black" | "50gray";
 
@@ -83,7 +84,12 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
     ctx.fillStyle = fillColor;
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-    const dataUrl = canvas.toDataURL();
+    const dataUrl = strokeToDataUrl(canvas);
+    if (!dataUrl) {
+      reportCaptureFailure("no-context", t.editor.ui.captureFailure);
+      onClose();
+      return;
+    }
 
     const obj: CanvasObject = {
       id: generateId(),

@@ -22,25 +22,163 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // every other test runs against the real implementation.
 const guardedWriteFault = vi.hoisted(() => ({ target: null as string | null }));
 
+// Runs once right after the real write of an output under `prefix`, standing in
+// for a cancel that arrives while the worker is already past the handler.
+const outputWriteHook = vi.hoisted(() => ({
+  prefix: null as string | null,
+  after: null as (() => Promise<void>) | null,
+}));
+
+// Fails the worker's output cleanup for one job (#2144), standing in for a
+// storage outage that hits after the cancel landed.
+const cleanupFault = vi.hoisted(() => ({ prefix: null as string | null }));
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      await actual.putObject(key, data);
+      if (outputWriteHook.prefix && key.startsWith(outputWriteHook.prefix)) {
+        const run = outputWriteHook.after;
+        outputWriteHook.prefix = null;
+        outputWriteHook.after = null;
+        await run?.();
+      }
+    },
+    deletePrefix: async (prefix: string) => {
+      if (prefix === cleanupFault.prefix) throw new Error("injected cleanup outage");
+      return actual.deletePrefix(prefix);
+    },
+  };
+});
+
+// What the worker hands the Sentry path, per job, so a swallowed cleanup fault
+// can be shown to have been reported.
+const reported = vi.hoisted(
+  () =>
+    [] as Array<{
+      jobId?: string;
+      message: string;
+      code?: string;
+      causeMessage?: string;
+      subsystem?: string;
+    }>,
+);
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (err: unknown, ctx: Parameters<typeof actual.reportError>[1]) => {
+      const cause = (err as { cause?: unknown } | null)?.cause;
+      reported.push({
+        jobId: ctx.jobId,
+        message: err instanceof Error ? err.message : String(err),
+        code: (err as { code?: string } | null)?.code,
+        causeMessage:
+          cause instanceof Error ? cause.message : cause !== undefined ? String(cause) : undefined,
+        subsystem: ctx.subsystem,
+      });
+      return actual.reportError(err, ctx);
+    },
+  };
+});
+
+// Fails the completion commit once for one job (#2144), so the first attempt's
+// output stays in storage and the retry is what a cancel then reaches, or runs
+// a hook right as the commit begins (#2349).
+const completionFault = vi.hoisted(() => ({
+  jobId: null as string | null,
+  before: null as (() => Promise<void>) | null,
+  afterCommit: null as (() => Promise<void>) | null,
+}));
+
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
   return {
     ...actual,
-    cancelSingleJobGuarded: async (args: { jobId: string }) => {
+    cancelSingleJobGuarded: async (args: Parameters<typeof actual.cancelSingleJobGuarded>[0]) => {
       if (args.jobId === guardedWriteFault.target) {
         throw new Error("injected alias-write outage");
       }
       return actual.cancelSingleJobGuarded(args);
     },
+    updateSingleFileProgressAtomically: async (
+      frame: Parameters<typeof actual.updateSingleFileProgressAtomically>[0],
+      commit: Parameters<typeof actual.updateSingleFileProgressAtomically>[1],
+    ) => {
+      if (frame.jobId === completionFault.jobId) {
+        const before = completionFault.before;
+        const afterCommit = completionFault.afterCommit;
+        completionFault.jobId = null;
+        completionFault.before = null;
+        completionFault.afterCommit = null;
+        if (before) {
+          await before();
+          return actual.updateSingleFileProgressAtomically(frame, commit);
+        }
+        return actual.updateSingleFileProgressAtomically(frame, async (tx) => {
+          await commit(tx);
+          await afterCommit?.();
+          throw new Error("injected completion outage");
+        });
+      }
+      return actual.updateSingleFileProgressAtomically(frame, commit);
+    },
   };
 });
 
+// Runs once right after the library auto-save's own blob write (#2143),
+// standing in for a cancel that arrives while autoSaveToLibrary is still
+// uploading. The hook gets the stored name so the test can check the blob.
+// Setting `fail` makes that upload fail once the hook has run: the blob is
+// removed and the save rejects, as a storage fault would.
+const librarySaveHook = vi.hoisted(() => ({
+  after: null as ((storedName: string) => Promise<void>) | null,
+  fail: false,
+}));
+
+// Fails the removal of one stored library blob (#2143), standing in for a
+// storage outage when a canceled save takes its blob back.
+const libraryDeleteFault = vi.hoisted(() => ({ storedName: null as string | null }));
+
+vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/file-storage.js")>();
+  return {
+    ...actual,
+    saveFile: async (buffer: Buffer, originalName: string) => {
+      const storedName = await actual.saveFile(buffer, originalName);
+      const run = librarySaveHook.after;
+      if (run) {
+        librarySaveHook.after = null;
+        await run(storedName);
+      }
+      if (librarySaveHook.fail) {
+        librarySaveHook.fail = false;
+        await actual.deleteStoredFile(storedName);
+        throw new Error("injected library save outage");
+      }
+      return storedName;
+    },
+    deleteStoredFile: async (storedName: string) => {
+      if (storedName === libraryDeleteFault.storedName) {
+        throw new Error("injected blob delete outage");
+      }
+      return actual.deleteStoredFile(storedName);
+    },
+  };
+});
+
+import type { LibrarySaveMode } from "@snapotter/shared";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import {
   requestCancel,
   startCancelListener,
   stopCancelListener,
+  wasUserCanceled,
 } from "../../../apps/api/src/jobs/cancel.js";
 import {
   createRedisSubscriberConnection,
@@ -56,7 +194,9 @@ import {
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
-import { putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { readStoredFile } from "../../../apps/api/src/lib/file-storage.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
+import { listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory.js";
@@ -64,14 +204,19 @@ import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory
 const passthroughSchema = { parse: (v: unknown) => v } as never;
 
 interface RunSettings {
-  mode: "fast" | "slow";
+  mode: "fast" | "slow" | "ignore-abort" | "retry-slow" | "fail";
   tag: string;
+  reportProgress?: { percent: number; stage: string };
 }
 
 // Behavior keyed on settings: fast returns instantly, slow waits on the
-// worker's abort signal, so a cancel has a real running target. Every
-// invocation records its tag, so "this run never started" is a positive
-// assertion instead of a timing guess.
+// worker's abort signal, so a cancel has a real running target. ignore-abort
+// stands in for a handler that never reads the signal (Erase Object, #2092):
+// it notices the abort only to finish a beat later and return a result anyway.
+// retry-slow is fast on its first run and slow from the second on, so a cancel
+// can reach the retry of a job whose first attempt already wrote its output
+// (#2144). Every invocation records its tag, so "this run never started" is a
+// positive assertion instead of a timing guess.
 const invoked: string[] = [];
 registerToolProcessFn({
   toolId: "wt-single-cancel",
@@ -82,9 +227,16 @@ registerToolProcessFn({
     filename: string,
     ctx?: ToolProcessCtx,
   ) => {
-    const { mode, tag } = settings as RunSettings;
+    const { mode, tag, reportProgress } = settings as RunSettings;
+    if (reportProgress) {
+      ctx?.report(reportProgress.percent, reportProgress.stage);
+    }
     invoked.push(tag);
-    if (mode === "slow") {
+    if (mode === "fail") {
+      throw new Error(`wt-single-cancel failed: ${tag}`);
+    }
+    const isRetry = invoked.filter((t) => t === tag).length > 1;
+    if (mode === "slow" || (mode === "retry-slow" && isRetry)) {
       await new Promise<void>((resolve, reject) => {
         const signal = ctx?.signal;
         if (!signal) {
@@ -105,6 +257,26 @@ registerToolProcessFn({
           { once: true },
         );
       });
+    }
+    if (mode === "ignore-abort") {
+      const signal = ctx?.signal;
+      if (!signal) throw new Error("wt-single-cancel requires an abort signal");
+      if (!signal.aborted) {
+        await new Promise<void>((resolve) => {
+          // Bounded like the slow mode, so a lost cancel fails this test instead of
+          // hanging the shard until the job timeout.
+          const timer = setTimeout(resolve, 20_000);
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
+        });
+      }
+      await delay(200);
     }
     return { buffer: inputBuffer, filename, contentType: "image/png" };
   },
@@ -175,11 +347,14 @@ async function createOwner(): Promise<string> {
 }
 
 interface EnqueueOpts {
-  mode: "fast" | "slow";
+  mode: RunSettings["mode"];
   tag: string;
   clientJobId?: string;
   userId?: string | null;
   jobId?: string;
+  /** A library file the run came from; the worker auto-saves the result against it. */
+  fileId?: string;
+  saveMode?: LibrarySaveMode;
 }
 
 /** Enqueue a single-tool run the way every tool route does. */
@@ -200,8 +375,26 @@ async function enqueueSingleRun(
     filename: "input.png",
     settings: { mode: opts.mode, tag: opts.tag },
     clientJobId: opts.clientJobId,
+    fileId: opts.fileId,
+    saveMode: opts.saveMode,
   });
   return { jobId, userId };
+}
+
+/** Insert a library file owned by `userId`, the original a run would overwrite. */
+async function createLibraryFile(userId: string): Promise<string> {
+  const id = randomUUID();
+  await db.insert(schema.userFiles).values({
+    id,
+    userId,
+    originalName: "input.png",
+    storedName: `${randomUUID()}.png`,
+    mimeType: "image/png",
+    size: 7,
+    version: 1,
+    toolChain: [],
+  });
+  return id;
 }
 
 beforeAll(async () => {
@@ -213,7 +406,7 @@ beforeAll(async () => {
   // promises. Warm the consumers up front, the way the production spine
   // does for exactly this reason.
   await warmQueueEvents();
-}, 30_000);
+});
 
 afterAll(async () => {
   await closeWorkers();
@@ -221,7 +414,7 @@ afterAll(async () => {
   await closeQueueEvents();
   await closeQueues();
   await sharedRedis().quit();
-}, 20_000);
+});
 
 // ── Tests ───────────────────────────────────────────────────────
 
@@ -272,17 +465,26 @@ describe("enqueueToolJob alias stamping (#808)", () => {
     expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(jobId);
   });
 
-  it("does not clobber a same-owner batch parent row that collides with the alias id", async () => {
+  it("does not clobber a same-owner batch parent row that collides with the alias id (#808, #895)", async () => {
     // Batch parent ids ARE the client-supplied id, so a collision with a
     // later single-tool run is reachable for the same user. The upsert must
-    // not replace the parent's cancel metadata with an alias pointer.
+    // not replace the parent's cancel metadata with an alias pointer, and the
+    // worker must fall back to its own jobId instead of publishing or
+    // persisting onto the batch parent row (#895).
     const owner = await createOwner();
     const clientJobId = randomUUID();
+    const initialProgress = {
+      percent: 50,
+      totalFiles: 2,
+      completedFiles: 1,
+      failedFiles: 0,
+    };
     await db.insert(schema.jobs).values({
       id: clientJobId,
       userId: owner,
       type: "batch",
       status: "processing",
+      progress: initialProgress,
       inputRefs: [],
       settings: { flowChildCount: 2, stepCount: 1 },
     });
@@ -294,13 +496,17 @@ describe("enqueueToolJob alias stamping (#808)", () => {
       userId: owner,
     });
     await terminalRow(jobId);
+    await terminalFrame(jobId);
 
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
     const parent = await jobRow(clientJobId);
     expect(parent?.type).toBe("batch");
+    expect(parent?.status).toBe("processing");
+    expect(parent?.progress).toEqual(initialProgress);
     expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
   });
 
-  it("leaves a foreign user's row untouched when its id is reused", async () => {
+  it("leaves a foreign user's row untouched when its id is reused (#808, #895)", async () => {
     const foreignOwner = await createOwner();
     const clientJobId = randomUUID();
     await db.insert(schema.jobs).values({
@@ -314,9 +520,51 @@ describe("enqueueToolJob alias stamping (#808)", () => {
 
     const { jobId } = await enqueueSingleRun({ mode: "fast", tag: "stamp-foreign", clientJobId });
     await terminalRow(jobId);
+    await terminalFrame(jobId);
 
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
     const alias = await jobRow(clientJobId);
     expect(alias?.userId).toBe(foreignOwner);
+    expect(alias?.status).toBe("queued");
+    expect(alias?.progress).toBeNull();
+    expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
+      "foreign-artifact",
+    );
+  });
+
+  it("refuses an anonymous caller's claim on an owned row and does not publish on the refused channel when canceled (#895)", async () => {
+    const foreignOwner = await createOwner();
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: foreignOwner,
+      type: "single",
+      status: "completed",
+      progress: { percent: 100, result: { jobId: "foreign-artifact" } },
+      inputRefs: [],
+      settings: { artifactJobId: "foreign-artifact" },
+    });
+    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+
+    const { jobId } = await enqueueSingleRun({
+      mode: "slow",
+      tag: "anon-collide-cancel",
+      clientJobId,
+      userId: null,
+    });
+    await waitFor(async () => (invoked.includes("anon-collide-cancel") ? true : undefined));
+
+    expect(await requestCancel(jobId)).toBe(true);
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    const frame = await terminalFrame(jobId);
+    expect(frame.error).toBe("Canceled");
+
+    // Neither cancelSingleJobGuarded nor publishEphemeral touched the refused channel.
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    const alias = await jobRow(clientJobId);
+    expect(alias?.userId).toBe(foreignOwner);
+    expect(alias?.status).toBe("completed");
+    expect(alias?.progress).toEqual({ percent: 100, result: { jobId: "foreign-artifact" } });
     expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       "foreign-artifact",
     );
@@ -365,6 +613,723 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(frame.error).toBe("Canceled");
   });
 
+  it("does not save a result that finished after the cancel landed (#2092)", async () => {
+    const clientJobId = randomUUID();
+    const { jobId } = await enqueueSingleRun({
+      mode: "ignore-abort",
+      tag: "ignore-abort",
+      clientJobId,
+    });
+    await waitFor(async () => (invoked.includes("ignore-abort") ? true : undefined));
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+
+    // The handler returned a result after the abort. The worker must settle
+    // canceled and write nothing, instead of completing and saving it.
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    expect((await terminalRow(clientJobId)).status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  });
+
+  it("settles canceled when the cancel lands while the output is being written (#2092)", async () => {
+    // Past the first guard, so only the re-check before the library auto-save
+    // can stop this one.
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    outputWriteHook.prefix = `outputs/${jobId}/`;
+    outputWriteHook.after = async () => {
+      // The write landed, so the cleanup below has something to take back.
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+      expect(await requestCancel(clientJobId)).toBe(true);
+      await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+    };
+    await enqueueSingleRun({ mode: "fast", tag: "cancel-mid-write", clientJobId, jobId });
+
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    expect((await terminalRow(clientJobId)).status).toBe("canceled");
+    // The output the hook let through must not stay downloadable or get adopted
+    // by job reconciliation: the row settles with no outputRefs, so nothing
+    // else would ever remove it (#2144).
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  });
+
+  it("still settles canceled, and reports, when the output cleanup fails (#2144)", async () => {
+    // A storage outage during the cleanup must not turn a user cancel into a
+    // retried failure: the terminal write lands, the client gets its frame,
+    // and the fault is logged and reported. The leftover output is the known
+    // cost, swept by storage retention.
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    cleanupFault.prefix = `outputs/${jobId}/`;
+    outputWriteHook.prefix = `outputs/${jobId}/`;
+    outputWriteHook.after = async () => {
+      expect(await requestCancel(clientJobId)).toBe(true);
+      await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({ mode: "fast", tag: "cleanup-fault", clientJobId, jobId });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      expect((await terminalFrame(clientJobId)).error).toBe("Canceled");
+
+      const cleanupLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) =>
+          msg ===
+            "canceled job output cleanup failed; outputs stay downloadable until the storage sweep" &&
+          (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(cleanupLogs).toHaveLength(1);
+      expect(reported.filter((r) => r.jobId === jobId).map((r) => r.message)).toContain(
+        "injected cleanup outage",
+      );
+      // The fault was real: the output is still there.
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+    } finally {
+      cleanupFault.prefix = null;
+      errorLog.mockRestore();
+    }
+  });
+
+  it("removes an earlier attempt's output when the retry is the one canceled (#2144)", async () => {
+    // Output keys are per job, not per attempt. Attempt 1 wrote its output and
+    // then lost the completion commit; the retry is canceled mid-handler,
+    // having written nothing. The cleanup must still take attempt 1's file.
+    const jobId = randomUUID();
+    completionFault.jobId = jobId;
+    await enqueueSingleRun({ mode: "retry-slow", tag: "retry-hole", jobId });
+    await waitFor(async () =>
+      invoked.filter((t) => t === "retry-hole").length === 2 ? true : undefined,
+    );
+    expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+
+    expect(await requestCancel(jobId)).toBe(true);
+
+    const row = await terminalRow(jobId);
+    expect(row.status).toBe("canceled");
+    expect(row.attempts).toBe(2);
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  });
+
+  it("does not replace the library original when the cancel lands during the auto-save (#2143)", async () => {
+    // Past every guard in the worker: the cancel arrives while
+    // autoSaveToLibrary has written its blob and is about to insert the
+    // version row. Nothing may be saved, and the blob has to go with the
+    // job's own outputs.
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    // The hook runs inside the worker's save, where a throw would turn into a
+    // failed save instead of failing here; record it and assert it below.
+    const hook = { storedName: null as string | null, error: null as unknown };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(true);
+        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-mid-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("canceled");
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      // The original alone: no superseding version and no independent copy.
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      if (!hook.storedName) throw new Error("the library save never wrote its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+    }
+  });
+
+  it("still settles canceled, and reports the orphan, when the canceled save cannot remove its blob (#2143)", async () => {
+    // A storage outage while the canceled save takes its blob back must not
+    // turn the cancel into a retried failure or let the version row in. The
+    // blob stays behind, and the log line is the only thing that names it.
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null, error: null as unknown };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      libraryDeleteFault.storedName = storedName;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(true);
+        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-save-delete-fault",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+
+      const orphanLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) =>
+          msg === "canceled library auto-save could not remove its blob; it is an orphan" &&
+          (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(orphanLogs).toHaveLength(1);
+      expect(orphanLogs[0]?.[0]).toMatchObject({ storedName: hook.storedName, fileId });
+      expect(reported.filter((r) => r.jobId === jobId)).toContainEqual({
+        jobId,
+        message: "Could not discard a staged upload",
+        code: "STAGED_DISCARD_FAILED",
+        causeMessage: "injected blob delete outage",
+        subsystem: "upload-storage",
+      });
+      // The fault was real: the blob is still there under the logged name.
+      if (!hook.storedName) throw new Error("the library save never wrote its blob");
+      await expect(readStoredFile(hook.storedName)).resolves.toBeInstanceOf(Buffer);
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      libraryDeleteFault.storedName = null;
+      errorLog.mockRestore();
+    }
+  });
+
+  it("settles canceled, and logs the fault, when the save fails as the cancel lands (#2143)", async () => {
+    // A storage fault that coincides with a cancel must not hide behind it (the
+    // warning carries it) or replace it (the job still settles canceled, with
+    // no retry and no "tool job failed").
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { ran: false, error: null as unknown };
+    librarySaveHook.after = async () => {
+      hook.ran = true;
+      librarySaveHook.fail = true;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(true);
+        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    const warnLog = vi.spyOn(logger, "warn");
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-save-fault",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.ran).toBe(true);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+
+      const faultLogs = warnLog.mock.calls.filter(
+        ([ctx, msg]) =>
+          msg === "library auto-save failed; no library copy was made" &&
+          (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(faultLogs).toHaveLength(1);
+      expect(faultLogs[0]?.[0]).toMatchObject({
+        err: expect.objectContaining({ message: "injected library save outage" }),
+      });
+      const failureLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(failureLogs).toEqual([]);
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      librarySaveHook.fail = false;
+      warnLog.mockRestore();
+      errorLog.mockRestore();
+    }
+  });
+
+  it("completes with the version when the cancel lands right after the version row (#2143)", async () => {
+    // The earliest point where a cancel is too late: the row is in, and the
+    // save has not returned to the worker yet. The job completes and keeps the
+    // version and its blob, so no check after the save may undo it.
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { ran: false, error: null as unknown };
+    const afterVersionRow = async () => {
+      hook.ran = true;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(false);
+        expect(wasUserCanceled(jobId)).toBe(false);
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    // Every insert runs for real; only the version row under this test's file
+    // also runs the cancel once it has landed.
+    const realTransaction = db.transaction.bind(db);
+    const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+      runInTransaction: Parameters<typeof db.transaction>[0],
+      config?: Parameters<typeof db.transaction>[1],
+    ) =>
+      realTransaction(async (tx) => {
+        const realInsert = tx.insert.bind(tx);
+        tx.insert = ((table: Parameters<typeof tx.insert>[0]) => {
+          const builder = realInsert(table);
+          if (table !== schema.userFiles) return builder;
+          const realValues = builder.values.bind(builder);
+          builder.values = ((row: { parentId?: string | null }) => {
+            const query = realValues(row as never);
+            if (row.parentId !== fileId) return query;
+            return query.then(async (result: unknown) => {
+              await afterVersionRow();
+              return result;
+            });
+          }) as typeof builder.values;
+          return builder;
+        }) as typeof tx.insert;
+        return runInTransaction(tx);
+      }, config)) as typeof db.transaction);
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-after-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.ran).toBe(true);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("completed");
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      const versions = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.parentId, fileId));
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ userId: owner, version: 2 });
+      await expect(readStoredFile(versions[0]?.storedName ?? "")).resolves.toBeInstanceOf(Buffer);
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+    } finally {
+      txSpy.mockRestore();
+    }
+  });
+
+  it("rolls back the library version row and discards its staged blob when the completion commit faults, so the retry saves only one version (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const savedBlobs: string[] = [];
+    librarySaveHook.after = async (storedName) => {
+      savedBlobs.push(storedName);
+      // Re-arm for attempt 2 so both attempts' blobs are tracked.
+      librarySaveHook.after = async (retryStoredName) => {
+        savedBlobs.push(retryStoredName);
+      };
+    };
+    completionFault.jobId = clientJobId;
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "commit-fault-retry-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.attempts).toBe(2);
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+
+      const versions = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.parentId, fileId));
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ userId: owner, version: 2 });
+
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(7);
+
+      expect(savedBlobs).toHaveLength(2);
+      await expect(readStoredFile(savedBlobs[0] ?? "")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(readStoredFile(savedBlobs[1] ?? "")).resolves.toBeInstanceOf(Buffer);
+      expect(versions[0]?.storedName).toBe(savedBlobs[1]);
+      expect(
+        (row.progress as { result?: { savedFileId?: string } } | null)?.result?.savedFileId,
+      ).toBe(versions[0]?.id);
+    } finally {
+      librarySaveHook.after = null;
+      completionFault.jobId = null;
+    }
+  });
+
+  it("leaves no version row or staged blob behind when attempt 1's completion commit faults and attempt 2 is canceled (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { firstBlob: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.firstBlob = storedName;
+    };
+    completionFault.jobId = clientJobId;
+    try {
+      await enqueueSingleRun({
+        mode: "retry-slow",
+        tag: "commit-fault-then-cancel-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+      await waitFor(async () =>
+        invoked.filter((t) => t === "commit-fault-then-cancel-save").length === 2
+          ? true
+          : undefined,
+      );
+
+      expect(await requestCancel(clientJobId)).toBe(true);
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(2);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(0);
+      if (!hook.firstBlob) throw new Error("attempt 1 never staged its library blob");
+      await expect(readStoredFile(hook.firstBlob)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      completionFault.jobId = null;
+    }
+  });
+
+  it("rolls back the version row and discards its staged blob when a cancel coincides with a completion-commit fault (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+    };
+    completionFault.jobId = clientJobId;
+    completionFault.afterCommit = async () => {
+      await sharedRedis().publish(`${bullPrefix()}:cancel`, jobId);
+      await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+    };
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-on-commit-fault-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(0);
+      if (!hook.storedName) throw new Error("the library save never staged its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      completionFault.jobId = null;
+      completionFault.afterCommit = null;
+    }
+  });
+
+  it("recovers via the savepoint and completes with autoSaveError when the save query faults inside the completion transaction (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      // Deleting the user after staging looked up the parent makes
+      // tx.insert(schema.userFiles) fail with a 23503 foreign-key violation
+      // inside updateSingleFileProgressAtomically (jobs.user_id is ON DELETE
+      // SET NULL, so the job rows stay). SAVEPOINT autosave_library must
+      // recover the transaction so the job still commits as completed.
+      await db.delete(schema.users).where(eq(schema.users.id, owner));
+    };
+    const warnLog = vi.spyOn(logger, "warn");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "owner-deleted-before-commit",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "new",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      const result = (row.progress as { result?: { savedFileId?: string; autoSaveError?: string } })
+        ?.result;
+      expect(result?.savedFileId).toBeUndefined();
+      expect(result?.autoSaveError).toBe(
+        "An unexpected system error prevented saving to your library.",
+      );
+      if (!hook.storedName) throw new Error("the library save never staged its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        warnLog.mock.calls.filter(
+          ([ctx, msg]) =>
+            msg === "library auto-save failed; no library copy was made" &&
+            (ctx as { jobId?: string }).jobId === jobId,
+        ),
+      ).toHaveLength(1);
+    } finally {
+      librarySaveHook.after = null;
+      warnLog.mockRestore();
+    }
+  });
+
+  it("skips the version insert and discards the staged blob when the parent library file is deleted while staging an overwrite save (#2927)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      await db.delete(schema.userFiles).where(eq(schema.userFiles.id, fileId));
+    };
+    const warnLog = vi.spyOn(logger, "warn");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "parent-deleted-before-overwrite-commit",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      const result = (row.progress as { result?: { savedFileId?: string; autoSaveError?: string } })
+        ?.result;
+      expect(result?.savedFileId).toBeUndefined();
+      expect(result?.autoSaveError).toBeUndefined();
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files).toEqual([]);
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(0);
+      if (!hook.storedName) throw new Error("the library save never staged its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        warnLog.mock.calls.filter(
+          ([ctx, msg]) =>
+            msg === "library auto-save failed; no library copy was made" &&
+            (ctx as { jobId?: string }).jobId === jobId,
+        ),
+      ).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      warnLog.mockRestore();
+    }
+  });
+
+  it("refuses the cancel and completes when the cancel lands during the completion commit (#2349)", async () => {
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { ran: false, error: null as unknown };
+    completionFault.jobId = clientJobId;
+    completionFault.before = async () => {
+      hook.ran = true;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(false);
+        expect(wasUserCanceled(jobId)).toBe(false);
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    try {
+      await enqueueSingleRun({ mode: "fast", tag: "cancel-during-commit", clientJobId, jobId });
+
+      const row = await terminalRow(jobId);
+      expect(hook.ran).toBe(true);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("completed");
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+    } finally {
+      completionFault.jobId = null;
+      completionFault.before = null;
+    }
+  });
+
+  it("settles canceled when the cancel claimed finalize before its pub/sub message reached the worker (#2349)", async () => {
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    outputWriteHook.prefix = `outputs/${jobId}/`;
+    outputWriteHook.after = async () => {
+      await sharedRedis().set(`${bullPrefix()}:finalize:${jobId}`, "cancel", "PX", 60_000, "NX");
+      expect(wasUserCanceled(jobId)).toBe(false);
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({ mode: "fast", tag: "claim-beat-pubsub", clientJobId, jobId });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      expect((await terminalFrame(clientJobId)).error).toBe("Canceled");
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+      const failureLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(failureLogs).toEqual([]);
+    } finally {
+      outputWriteHook.prefix = null;
+      outputWriteHook.after = null;
+      errorLog.mockRestore();
+    }
+  });
+
+  it("settles a library run canceled when the cancel claimed finalize before its pub/sub message reached the save (#2349)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      await sharedRedis().set(`${bullPrefix()}:finalize:${jobId}`, "cancel", "PX", 60_000, "NX");
+      expect(wasUserCanceled(jobId)).toBe(false);
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "claim-beat-pubsub-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      if (!hook.storedName) throw new Error("the library save never wrote its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+      const failureLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(failureLogs).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      errorLog.mockRestore();
+    }
+  });
+
   it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
     // The route's structural 422 keys on this exact chain: worker
     // UnrecoverableError("Canceled") -> BullMQ failedReason ->
@@ -402,7 +1367,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       userId: owner,
     });
     await waitFor(async () => (invoked.includes("reuse-2") ? true : undefined));
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
 
     // Run 2's enqueue re-pointed the alias and reset its stale terminal
     // state (#886), so the cancel resolves the live job and this run's
@@ -555,14 +1520,24 @@ describe("requestCancel through a single-tool alias (#808)", () => {
 
     expect(await requestCancel(clientJobId)).toBe(true);
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
 
-    await enqueueSingleRun({
-      jobId,
-      mode: "fast",
-      tag: "window-cancel",
-      clientJobId,
-      userId: owner,
-    });
+    const queue = getQueue("image");
+    await queue.pause();
+    try {
+      await enqueueSingleRun({
+        jobId,
+        mode: "fast",
+        tag: "window-cancel",
+        clientJobId,
+        userId: owner,
+      });
+      // Re-stamping the same run's alias in upsertToolJobAlias must not wipe
+      // the validation-window cancel's terminal replay key (#2740).
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
+    } finally {
+      await queue.resume();
+    }
     expect((await terminalRow(jobId)).status).toBe("canceled");
     expect(invoked).not.toContain("window-cancel");
   });
@@ -831,5 +1806,105 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     const frame = await terminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
+  });
+
+  it("leaves a re-pointed clientJobId alias row and Redis terminal key untouched when an earlier single-tool job reports progress, completes, fails, or cancels (#3408, #3409)", async () => {
+    const owner = await createOwner();
+    const clientJobId = randomUUID();
+    const liveArtifactId = randomUUID();
+    const liveProgress = { percent: 15, stage: "Validating..." };
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner,
+      pool: "image",
+      type: "single",
+      status: "processing",
+      inputRefs: [],
+      progress: liveProgress,
+      settings: { artifactJobId: liveArtifactId },
+    });
+
+    const enqueueStaleSingleJob = async (
+      mode: RunSettings["mode"],
+      tag: string,
+    ): Promise<string> => {
+      const staleJobId = randomUUID();
+      const uploadKey = `uploads/${staleJobId}/input.png`;
+      const settings: RunSettings = {
+        mode,
+        tag,
+        reportProgress: { percent: 55, stage: `Stale ${tag}` },
+      };
+      await putObject(uploadKey, Buffer.from("payload"));
+      await db.insert(schema.jobs).values({
+        id: staleJobId,
+        userId: owner,
+        toolId: "wt-single-cancel",
+        pool: "image",
+        type: "tool",
+        status: "queued",
+        inputRefs: [uploadKey],
+        settings: settings as unknown as Record<string, unknown>,
+      });
+      await getQueue("image").add(
+        "wt-single-cancel",
+        {
+          kind: "tool",
+          jobId: staleJobId,
+          toolId: "wt-single-cancel",
+          userId: owner,
+          pool: "image",
+          inputRefs: [uploadKey],
+          filename: "input.png",
+          settings,
+          clientJobId,
+        },
+        { jobId: staleJobId, attempts: 1 },
+      );
+      return staleJobId;
+    };
+
+    const assertLiveAliasUntouched = async () => {
+      const alias = await jobRow(clientJobId);
+      expect(alias?.status).toBe("processing");
+      expect(alias?.completedAt).toBeNull();
+      expect(alias?.error).toBeNull();
+      expect(alias?.progress).toEqual(liveProgress);
+      expect(alias?.settings).toEqual({ artifactJobId: liveArtifactId });
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    };
+
+    const [completedJobId, failedJobId, canceledJobId] = await Promise.all([
+      enqueueStaleSingleJob("fast", "stale-complete-3408"),
+      enqueueStaleSingleJob("fail", "stale-fail-3408"),
+      enqueueStaleSingleJob("slow", "stale-cancel-3408"),
+    ]);
+
+    await waitFor(async () => (invoked.includes("stale-cancel-3408") ? true : undefined));
+    expect(await requestCancel(canceledJobId)).toBe(true);
+
+    // Wait for all three BullMQ jobs to finish in the worker (not just the
+    // authoritative DB row update, which on cancel lands before the alias
+    // cancelSingleJobGuarded and publishEphemeral calls in processToolJob).
+    const queue = getQueue("image");
+    await Promise.all(
+      [completedJobId, failedJobId, canceledJobId].map((id) =>
+        waitFor(async () => {
+          const qJob = await queue.getJob(id);
+          return qJob?.finishedOn ? true : undefined;
+        }),
+      ),
+    );
+
+    const [completedRow, failedRow, canceledRow] = await Promise.all([
+      terminalRow(completedJobId),
+      terminalRow(failedJobId),
+      terminalRow(canceledJobId),
+    ]);
+    expect(completedRow.status).toBe("completed");
+    expect(failedRow.status).toBe("failed");
+    expect(canceledRow.status).toBe("canceled");
+
+    await assertLiveAliasUntouched();
   });
 });

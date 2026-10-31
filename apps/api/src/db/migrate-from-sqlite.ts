@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "./index.js";
 import { runMigrations } from "./migrate.js";
+import { DEFAULT_TEAM_ID } from "./schema.js";
 
 // Advisory lock: 7_421_xxx reserved for SnapOtter app locks (7_421_001 = schema migrate).
 const SQLITE_IMPORT_LOCK_KEY = 7_421_002;
@@ -8,6 +9,7 @@ const SQLITE_IMPORT_LOCK_KEY = 7_421_002;
 type SqliteRow = Record<string, unknown>;
 export interface MigrationResult {
   tables: Record<string, number>;
+  detached: DetachedIdentity[];
 }
 
 /** Thrown when the target became non-empty (e.g. another replica imported first). */
@@ -230,10 +232,12 @@ export function detachTwinIdentities(
   for (const row of rows) {
     if (!losers.has(row)) continue;
     const keeper = losers.get(row) ?? null;
+    const rawProvider = row.auth_provider == null ? "local" : String(row.auth_provider);
     detached.push({
       id: String(row.id),
       username: String(row.username),
-      authProvider: row.auth_provider == null ? "local" : String(row.auth_provider),
+      // A 1.x 'local' row with an external_id is a leftover OIDC email auto-link (#1613).
+      authProvider: rawProvider === "local" ? "oidc" : rawProvider,
       externalId: String(row.external_id),
       keptBy: keeper ? { id: String(keeper.id), username: String(keeper.username) } : null,
     });
@@ -245,7 +249,7 @@ export function detachTwinIdentities(
 /**
  * One operator-facing line per detached row. It has to name the row that kept
  * the identity, because unpicking this afterwards means hand-written SQL against
- * external_id: there is no UI for it.
+ * external_id (scim_external_id for a SCIM identity): there is no UI for it.
  */
 export function detachedIdentityWarning(d: DetachedIdentity): string {
   const who = `user "${d.username}" (id ${d.id})`;
@@ -256,10 +260,17 @@ export function detachedIdentityWarning(d: DetachedIdentity): string {
   return `1.x import: ${who} was imported without its ${identity}, which an account already in this database holds. The imported row keeps its files and its provider, but no longer answers to that identity.`;
 }
 
-/** External identities the target already answers for. Empty on a fresh import. */
+/**
+ * External identities the target already answers for. Empty on a fresh import.
+ * SCIM ids live in scim_external_id since #1510 but arrive from 1.x as a scim
+ * row's external_id, so they are keyed as scim identities here, whatever the
+ * holder signs in with.
+ */
 async function heldIdentities(tx: { execute: typeof db.execute }): Promise<Set<string>> {
   const res = await tx.execute(
-    sql`SELECT auth_provider, external_id FROM users WHERE external_id IS NOT NULL`,
+    sql`SELECT auth_provider, external_id FROM users WHERE external_id IS NOT NULL
+        UNION ALL
+        SELECT 'scim', scim_external_id FROM users WHERE scim_external_id IS NOT NULL`,
   );
   const held = new Set<string>();
   for (const row of res.rows) {
@@ -267,6 +278,91 @@ async function heldIdentities(tx: { execute: typeof db.execute }): Promise<Set<s
     if (key !== null) held.add(key);
   }
   return held;
+}
+
+/**
+ * users.team holds a team's id (#1474). 1.x wrote ids too, except where a row
+ * kept the column default "Default", a team *name*. Map any imported name to
+ * the id of the team that carries it, then read a leftover "Default" (no team
+ * of that name came over) as the default team's seeded id. Mirrors migration
+ * 0009, which fixes rows that predate it: the import runs after migrations, so
+ * it has to do the same for what it brings.
+ */
+async function mapUserTeamNamesToIds(tx: { execute: typeof db.execute }): Promise<void> {
+  await tx.execute(sql`
+    UPDATE users u SET team = t.id FROM teams t
+    WHERE u.team = t.name AND NOT EXISTS (SELECT 1 FROM teams x WHERE x.id = u.team)`);
+  await tx.execute(sql`
+    UPDATE users SET team = ${DEFAULT_TEAM_ID}
+    WHERE team = 'Default' AND NOT EXISTS (SELECT 1 FROM teams x WHERE x.id = 'Default')`);
+}
+
+/**
+ * 1.x kept SCIM's externalId in external_id; it lives in scim_external_id since
+ * #1510. Mirrors migration 0010 for the rows this import brings, blank-to-NULL
+ * rule included. Twins were already detached above, so the moved values are
+ * distinct.
+ */
+
+interface CollisionRow {
+  id: string;
+  username: string;
+  external_id: string;
+  kept_by_username: string;
+  kept_by_id: string;
+}
+
+async function repairOidcEmailLinks(
+  tx: { execute: typeof db.execute },
+  detached: DetachedIdentity[],
+  taken: ReadonlySet<string>,
+): Promise<void> {
+  // First, find 'local' rows with external_id that collide with an existing 'oidc' row.
+  // This happens if the user signed in later and a new OIDC row was created, or under
+  // --force when the target database already holds that OIDC identity.
+  const collisions = await tx.execute(
+    sql`SELECT u1.id, u1.username, u1.external_id, u2.username as kept_by_username, u2.id as kept_by_id
+        FROM users u1
+        JOIN users u2 ON u1.external_id = u2.external_id AND u2.auth_provider = 'oidc'
+        WHERE u1.auth_provider = 'local' AND u1.external_id IS NOT NULL`,
+  );
+
+  for (const row of collisions.rows) {
+    const r = row as unknown as CollisionRow;
+    const key = identityKey({ auth_provider: "oidc", external_id: r.external_id });
+    const targetHolds = key !== null && taken.has(key);
+    detached.push({
+      id: r.id,
+      username: r.username,
+      externalId: r.external_id,
+      authProvider: "oidc", // It's an OIDC identity that couldn't be claimed
+      keptBy: targetHolds ? null : { id: r.kept_by_id, username: r.kept_by_username },
+    });
+  }
+
+  // Clear external_id on the colliding local rows so the index doesn't conflict
+  await tx.execute(
+    sql`UPDATE users 
+        SET external_id = NULL 
+        WHERE auth_provider = 'local' AND external_id IS NOT NULL 
+        AND external_id IN (SELECT external_id FROM users WHERE auth_provider = 'oidc')`,
+  );
+
+  // For the remaining 'local' rows with external_id (no collision), they are genuine
+  // 1.x auto-links. Update their auth_provider to 'oidc'.
+  await tx.execute(
+    sql`UPDATE users 
+        SET auth_provider = 'oidc' 
+        WHERE auth_provider = 'local' AND external_id IS NOT NULL`,
+  );
+}
+
+async function moveScimExternalIds(tx: { execute: typeof db.execute }): Promise<void> {
+  await tx.execute(sql`
+    UPDATE users
+    SET scim_external_id = CASE WHEN btrim(external_id) = '' THEN NULL ELSE external_id END,
+        external_id = NULL
+    WHERE auth_provider = 'scim' AND external_id IS NOT NULL`);
 }
 
 /** Live target columns for a public table (drizzle transaction handle). */
@@ -291,8 +387,8 @@ export async function migrateFromSqlite(
   await runMigrations();
 
   const sqlite = new Database(sqlitePath, { readonly: true, fileMustExist: true });
-  const result: MigrationResult = { tables: {} };
   const detached: DetachedIdentity[] = [];
+  const result: MigrationResult = { tables: {}, detached };
   try {
     await db.transaction(async (tx) => {
       // Serialize concurrent replicas: only one import proceeds; losers re-check below.
@@ -300,10 +396,11 @@ export async function migrateFromSqlite(
       const existing = await tx.execute(sql`SELECT count(*)::int AS n FROM users`);
       if ((existing.rows[0].n as number) > 0 && !opts.force) {
         throw new TargetNonEmptyError(
-          "Target Postgres database is non-empty; refusing to migrate. Re-run with --force to attempt inserting 1.x rows into the existing database. This will FAIL and roll back if any primary key or unique value (username, team name, role name) collides with existing data. The one exception is the (auth_provider, external_id) identity index: a 1.x user whose external identity already belongs to an account here is imported without that link instead of colliding.",
+          "Target Postgres database is non-empty; refusing to migrate. Re-run with --force to attempt inserting 1.x rows into the existing database. This will FAIL and roll back if any primary key or unique value (username, team name, role name) collides with existing data. The one exception is an external identity, the (auth_provider, external_id) index or a SCIM externalId: a 1.x user whose external identity already belongs to an account here is imported without that link instead of colliding.",
         );
       }
 
+      const taken = await heldIdentities(tx);
       for (const table of MIGRATED_TABLES) {
         let rows: SqliteRow[];
         try {
@@ -326,7 +423,7 @@ export async function migrateFromSqlite(
         let convertedUsers: SqliteRow[] | null = null;
         if (table === "users") {
           convertedUsers = rows.map((row) => convertRow(table, row));
-          detached.push(...detachTwinIdentities(convertedUsers, await heldIdentities(tx)));
+          detached.push(...detachTwinIdentities(convertedUsers, taken));
         }
 
         // Sum what each INSERT reports rather than counting the table. Under
@@ -365,6 +462,10 @@ export async function migrateFromSqlite(
         }
         result.tables[table] = inserted;
       }
+
+      await mapUserTeamNamesToIds(tx);
+      await moveScimExternalIds(tx);
+      await repairOidcEmailLinks(tx, detached, taken);
     });
   } finally {
     sqlite.close();

@@ -209,6 +209,21 @@ describe("findUniqueUsername", () => {
     const result = await findUniqueUsername("user");
     expect(result).toBe("user_5");
   });
+
+  it.each(["anonymous", "Anonymous", "ANONYMOUS"])(
+    "treats reserved '%s' as already taken so SSO auto-create suffixes it to _2 (#2469)",
+    async (reserved) => {
+      dbMock.reset([[]]);
+      const result = await findUniqueUsername(reserved);
+      expect(result).toBe(`${reserved}_2`);
+    },
+  );
+
+  it("advances to anonymous_3 when reserved anonymous is requested and anonymous_2 is already taken (#2469)", async () => {
+    dbMock.reset([[{ username: "anonymous_2" }], []]);
+    const result = await findUniqueUsername("anonymous");
+    expect(result).toBe("anonymous_3");
+  });
 });
 
 describe("resolveExternalUser", () => {

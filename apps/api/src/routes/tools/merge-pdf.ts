@@ -30,7 +30,7 @@ export function registerMergePdf(app: FastifyInstance) {
       }
       const outPath = join(ctx.scratchDir, "merged.pdf");
       ctx.report(40, "Merging");
-      await qpdfMerge(paths, outPath);
+      await qpdfMerge(paths, outPath, { signal: ctx.signal });
       return { scratchPath: outPath, filename: "merged.pdf", contentType: "application/pdf" };
     },
   });

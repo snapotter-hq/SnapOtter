@@ -16,11 +16,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([
@@ -77,9 +77,9 @@ describe.skipIf(!ffmpegAvailable())("video-to-frames (requires ffmpeg)", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("rejects a timestamp beyond the video duration with 422", async () => {
+  it("rejects a timestamp beyond the video duration with 400", async () => {
     const res = await runTool({ mode: "timestamps", timestamps: "999" });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
     expect(body.details || body.error).toMatch(/timestamp/i);
   });

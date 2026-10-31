@@ -10,7 +10,40 @@
  * namespace-prefixed element names, and SVG detection missed files whose
  * first construct is a DOCTYPE or a comment.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readdirSync } from "node:fs";
+import path from "node:path";
+import { gzipSync } from "node:zlib";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const hooks = vi.hoisted(() => ({
+  writtenKeys: [] as string[],
+  reportError: vi.fn(),
+}));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: (...args: Parameters<typeof actual.reportError>) => {
+      hooks.reportError(...args);
+      return actual.reportError(...args);
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      await actual.putObject(key, data);
+      hooks.writtenKeys.push(key);
+    },
+  };
+});
+
+import { env } from "../../../apps/api/src/config.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -31,6 +64,12 @@ const PAYLOADS = [
     mustNotMatch: [/<!DOCTYPE/i, /<!ENTITY/i],
   },
   {
+    label: "a DOCTYPE with an external entity inside a gzip compressed SVGZ",
+    filename: "xxe.svgz",
+    content: readFixture(fixtures.security.svgXxeFileZipped),
+    mustNotMatch: [/<!DOCTYPE/i, /<!ENTITY/i],
+  },
+  {
     label: "an XHTML-namespaced script element, which Sharp accepts",
     filename: "namespace.svg",
     content: readFixture(fixtures.security.svgXssNamespace),
@@ -47,11 +86,11 @@ const PAYLOADS = [
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function upload(url: string, filename: string, content: Buffer) {
   const { body, contentType } = createMultipartPayload([
@@ -141,4 +180,105 @@ describe("an SVG over the element cap is rejected, not stored", () => {
       expect(body).not.toHaveProperty("files");
     });
   }
+});
+
+function uploadDirs(): Set<string> {
+  const root = path.join(env.WORKSPACE_PATH, "outputs");
+  try {
+    return new Set(readdirSync(root));
+  } catch {
+    return new Set();
+  }
+}
+
+describe("failed multi-file standalone upload cleans up earlier parts (#1210)", () => {
+  const PNG = readFixture(fixtures.image.base.png200);
+  const OVER_LIMIT = Buffer.alloc(11 * 1024 * 1024, 1);
+
+  beforeEach(() => {
+    hooks.writtenKeys.length = 0;
+  });
+
+  it("removes earlier uploaded parts when a later SVG exceeds the element cap", async () => {
+    const before = uploadDirs();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "first.png", contentType: "image/png", content: PNG },
+      {
+        name: "file",
+        filename: "too-complex.svg",
+        contentType: "image/svg+xml",
+        content: OVER_CAP_SVG,
+      },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/upload",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/element count/i);
+    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^outputs\/[^/]+\/first\.png$/)]);
+    expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
+  });
+
+  it("removes earlier uploaded parts when a later file exceeds the upload size limit", async () => {
+    const before = uploadDirs();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "first.png", contentType: "image/png", content: PNG },
+      {
+        name: "file",
+        filename: "huge.bin",
+        contentType: "application/octet-stream",
+        content: OVER_LIMIT,
+      },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/upload",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(413);
+    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^outputs\/[^/]+\/first\.png$/)]);
+    expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
+  });
+
+  it("rejects an .svgz that decompresses past the 50 MiB cap with 400, cleans up earlier parts, and skips Sentry (#2593)", async () => {
+    const svgzBomb = gzipSync(
+      Buffer.concat([
+        Buffer.from('<svg xmlns="http://www.w3.org/2000/svg">'),
+        Buffer.alloc(51 * 1024 * 1024, 0x20),
+        Buffer.from("</svg>"),
+      ]),
+    );
+    hooks.reportError.mockClear();
+    const before = uploadDirs();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "first.png", contentType: "image/png", content: PNG },
+      {
+        name: "file",
+        filename: "bomb.svgz",
+        contentType: "image/svg+xml",
+        content: svgzBomb,
+      },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/upload",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/52428800|larger than/i);
+    expect(hooks.reportError).not.toHaveBeenCalled();
+    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^outputs\/[^/]+\/first\.png$/)]);
+    expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
+  });
 });

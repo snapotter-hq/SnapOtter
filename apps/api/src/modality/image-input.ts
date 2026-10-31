@@ -1,10 +1,23 @@
+import { extname } from "node:path";
+import { hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
+import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../lib/auto-orient.js";
 import { stripInternalPaths } from "../lib/errors.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { decodeAnyFormat, decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeAnyFormat,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+  noteDecoderFallback,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { logger } from "../lib/logger.js";
+import { normalizeOperationalWriteError } from "../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 /**
@@ -21,6 +34,7 @@ export class ImageInputHandler implements InputHandler {
       maxDimension?: number;
       maxPixels?: number;
       signal?: AbortSignal;
+      log?: FastifyBaseLogger;
     },
   ): Promise<PreparedInput> {
     let fileBuffer = raw;
@@ -28,9 +42,23 @@ export class ImageInputHandler implements InputHandler {
     opts.signal?.throwIfAborted();
 
     // Validate the uploaded image
-    const validation = await validateImageBuffer(fileBuffer, name);
-    opts.signal?.throwIfAborted();
+    let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+    try {
+      validation = await validateImageBuffer(fileBuffer, name);
+      opts.signal?.throwIfAborted();
+    } catch (rawErr) {
+      opts.signal?.throwIfAborted();
+      const err = asDecoderOutOfMemory(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw engineUnavailable(err);
+      throw rawErr;
+    }
     if (!validation.valid) {
+      if (validation.cause) {
+        (opts.log || logger).info(
+          { err: validation.cause, filename: originalFilename },
+          "Image validation failed",
+        );
+      }
       throw new InputValidationError(`Invalid image: ${validation.reason}`);
     }
     assertWithinImageLimits(validation.width, validation.height, opts.maxPixels, opts.maxDimension);
@@ -49,11 +77,13 @@ export class ImageInputHandler implements InputHandler {
         opts.signal?.throwIfAborted();
         const ext = name.match(/\.[^.]+$/)?.[0];
         if (ext) name = `${name.slice(0, -ext.length)}.png`;
-      } catch (err) {
+      } catch (rawErr) {
         opts.signal?.throwIfAborted();
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isPixelSafetyError(err)) {
           throw new InputValidationError(err instanceof Error ? err.message : String(err));
         }
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw engineUnavailable(err);
         throw new InputValidationError(
           "Failed to decode HEIC file. Ensure libheif-examples is installed.",
           422,
@@ -66,39 +96,71 @@ export class ImageInputHandler implements InputHandler {
     // The decoded buffer is PNG, so update the filename extension to match.
     // Pass the original file extension so RAW decoder can use the correct
     // temp file suffix (e.g. .cr3, .nef) for format identification.
+    let fallbackFormat: string | undefined;
     if (needsCliDecode(validation.format)) {
       try {
         opts.signal?.throwIfAborted();
-        const fileExt = name.split(".").pop()?.toLowerCase();
+        const fileExt = extname(name).toLowerCase().replace(/^\./, "") || undefined;
         fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt, {
           maxDimension: opts.maxDimension,
           maxPixels: opts.maxPixels,
           signal: opts.signal,
         });
         opts.signal?.throwIfAborted();
-      } catch (decodeErr) {
+      } catch (rawDecodeErr) {
         opts.signal?.throwIfAborted();
+        const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
         if (isPixelSafetyError(decodeErr)) {
           throw new InputValidationError(
             decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
           );
         }
+        // Out of memory or a storage write fault says nothing about whether
+        // Sharp can read the format (DNG's TIFF header, say): surface it
+        // instead of falling back (#1453, #2800).
+        if (
+          decodeErr instanceof DecoderOutOfMemoryError ||
+          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+        ) {
+          throw engineUnavailable(decodeErr);
+        }
         try {
-          await boundedSharp(fileBuffer, opts.maxPixels).metadata();
+          const meta = await boundedSharp(fileBuffer, opts.maxPixels).metadata();
+          fallbackFormat = meta.format;
+          if (fallbackFormat !== "svg") {
+            await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
+          }
+          noteDecoderFallback(decodeErr, validation.format, opts.log || logger);
         } catch (err) {
+          opts.signal?.throwIfAborted();
+          const probeErr = asDecoderOutOfMemory(err);
+          if (probeErr instanceof DecoderOutOfMemoryError) {
+            throw engineUnavailable(probeErr);
+          }
+          if (isPixelSafetyError(err)) {
+            throw new InputValidationError(errorMessage(err));
+          }
+          // Sharp reads some of these formats itself (DNG is a TIFF), so a
+          // missing CLI decoder only matters once that fallback fails too.
+          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+            throw engineUnavailable(decodeErr);
+          }
+          (opts.log ?? logger).warn({ err: decodeErr, format: validation.format }, "Decode failed");
           throw new InputValidationError(
             `Failed to decode ${validation.format.toUpperCase()} file`,
             422,
-            stripInternalPaths(err instanceof Error ? err.message : String(err)),
+            stripInternalPaths(decodeErr instanceof Error ? decodeErr.message : String(decodeErr)),
           );
         }
       }
-      const ext = name.match(/\.[^.]+$/)?.[0];
-      if (ext) name = `${name.slice(0, -ext.length)}.png`;
+      if (fallbackFormat !== "svg") {
+        const ext = name.match(/\.[^.]+$/)?.[0];
+        if (ext) name = `${name.slice(0, -ext.length)}.png`;
+      }
     }
 
     // Sanitize SVG input to prevent XXE, SSRF, and script injection
-    const isSvg = validation.format === "svg";
+    const isSvg = validation.format === "svg" || fallbackFormat === "svg";
     if (isSvg) {
       try {
         opts.signal?.throwIfAborted();
@@ -106,7 +168,13 @@ export class ImageInputHandler implements InputHandler {
         fileBuffer = sanitizeSvg(fileBuffer);
         opts.signal?.throwIfAborted();
       } catch (err) {
-        throw new InputValidationError(err instanceof Error ? err.message : "Invalid SVG");
+        opts.signal?.throwIfAborted();
+        if (isSvgClientError(err)) {
+          throw new InputValidationError(err instanceof Error ? err.message : "Invalid SVG");
+        }
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);
+        throw err;
       }
     }
 
@@ -117,7 +185,20 @@ export class ImageInputHandler implements InputHandler {
       try {
         opts.signal?.throwIfAborted();
         await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
-      } catch {
+      } catch (probeErr) {
+        opts.signal?.throwIfAborted();
+        const probeOom = asDecoderOutOfMemory(probeErr);
+        if (probeOom instanceof DecoderOutOfMemoryError) throw engineUnavailable(probeOom);
+        // The safety cap tripping is not a decoder gap: answer 400 like the
+        // HEIC and CLI branches do, and don't hand the file to ImageMagick.
+        if (isPixelSafetyError(probeErr)) throw new InputValidationError(errorMessage(probeErr));
+        // Say why the native decode was refused before trying the CLI decoder:
+        // a successful fallback is otherwise a silent re-encode, and a double
+        // failure would lose Sharp's reason (#1548).
+        (opts.log ?? logger).info(
+          { err: probeErr, format: "avif" },
+          "image-input: native AVIF decode failed, trying the CLI decoder",
+        );
         try {
           opts.signal?.throwIfAborted();
           fileBuffer = await decodeAnyFormat(fileBuffer, "avif", {
@@ -128,12 +209,22 @@ export class ImageInputHandler implements InputHandler {
           opts.signal?.throwIfAborted();
           const ext = name.match(/\.[^.]+$/)?.[0];
           if (ext) name = `${name.slice(0, -ext.length)}.png`;
-        } catch (fallbackErr) {
+        } catch (rawFallbackErr) {
+          opts.signal?.throwIfAborted();
+          const fallbackErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawFallbackErr));
+          if (isPixelSafetyError(fallbackErr)) {
+            throw new InputValidationError(errorMessage(fallbackErr));
+          }
+          if (isDecoderUnavailable(fallbackErr) || hasServerErrorStatus(fallbackErr)) {
+            throw engineUnavailable(fallbackErr);
+          }
+          // execFile's message ends with the tool's stderr, newline included,
+          // so trim before joining or the second reason starts its own line.
           throw new InputValidationError(
             "Failed to decode AVIF file",
             422,
             stripInternalPaths(
-              fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+              `${errorMessage(fallbackErr).trim()}; native decode: ${errorMessage(probeErr)}`,
             ),
           );
         }
@@ -150,6 +241,8 @@ export class ImageInputHandler implements InputHandler {
       } catch (err) {
         opts.signal?.throwIfAborted();
         if (err instanceof InputValidationError) throw err;
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);
         throw new InputValidationError(
           "Image exceeds the decoded image safety limits",
           400,
@@ -162,7 +255,14 @@ export class ImageInputHandler implements InputHandler {
     // the EXIF orientation tag so the worker sees upright pixels.
     if (!isSvg) {
       opts.signal?.throwIfAborted();
-      fileBuffer = await autoOrient(fileBuffer);
+      try {
+        fileBuffer = await autoOrient(fileBuffer, opts.log);
+      } catch (rawErr) {
+        opts.signal?.throwIfAborted();
+        const err = asDecoderOutOfMemory(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw engineUnavailable(err);
+        throw rawErr;
+      }
       opts.signal?.throwIfAborted();
     }
 
@@ -171,6 +271,29 @@ export class ImageInputHandler implements InputHandler {
       filename: name,
     };
   }
+}
+
+/**
+ * A missing decoder binary is the operator's container, not the caller's
+ * file. As a 503 ENGINE_UNAVAILABLE the factory logs and reports it, the same
+ * contract the media and document handlers use, instead of a 422 that blames
+ * the upload (#1428). The decoder's spawn error rides along as `cause`: its
+ * path and errno are the only record of which binary failed and why.
+ */
+export function engineUnavailable(err: unknown): InputValidationError {
+  const code =
+    isSafeMessageError(err) && typeof err.code === "string" && err.code.length > 0
+      ? err.code
+      : "ENGINE_UNAVAILABLE";
+  const statusCode = hasServerErrorStatus(err) ? err.statusCode : 503;
+  const converted = new InputValidationError(
+    err instanceof Error ? err.message : String(err),
+    statusCode,
+    undefined,
+    code,
+  );
+  converted.cause = err;
+  return converted;
 }
 
 function boundedSharp(buffer: Buffer, maxPixels?: number) {
@@ -200,6 +323,10 @@ function assertWithinImageLimits(
       `Image exceeds the ${formatPixelLimit(maxPixels)} pixel safety limit (${width}x${height})`,
     );
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function isPixelSafetyError(error: unknown): boolean {

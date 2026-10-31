@@ -1,5 +1,8 @@
 import { eq } from "drizzle-orm";
+import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { logger } from "./logger.js";
+import { getSettingPolicy, prepareSetting } from "./settings-policy.js";
 
 /**
  * Atomically insert or update a setting using Postgres ON CONFLICT DO UPDATE.
@@ -26,24 +29,47 @@ export async function setSettingIfAbsent(key: string, value: string): Promise<vo
 }
 
 /**
+ * Validate a stored numeric setting string against its policy schema (when one
+ * is registered) or finite-number parsing, falling back to `defaultValue` with
+ * a warning when the stored value is blank, non-numeric, or out of range (#1713).
+ * Returns `defaultValue` without logging when `raw` is `undefined` (key absent).
+ */
+export function parseNumericSettingValue(
+  key: string,
+  raw: string | undefined,
+  defaultValue = 0,
+): number {
+  if (raw === undefined) return defaultValue;
+  if (raw.trim() !== "") {
+    const schema = getSettingPolicy(key)?.schema;
+    if (schema) {
+      const parsed = schema.safeParse(raw);
+      if (parsed.success) {
+        const num = Number(parsed.data);
+        if (Number.isFinite(num)) return num;
+      }
+    } else {
+      const num = Number(raw);
+      if (Number.isFinite(num)) return num;
+    }
+  }
+  logger.warn({ key, value: raw }, "invalid numeric setting, using default");
+  return defaultValue;
+}
+
+/**
  * Read a numeric setting from the DB `settings` table.
- * Returns `defaultValue` when the key is missing, non-numeric, or on DB error.
+ * Returns `defaultValue` when the key is missing, blank, invalid, or on DB error.
  */
 export async function getSettingNumber(key: string, defaultValue = 0): Promise<number> {
+  let raw: string | undefined;
   try {
-    const result = await db
-      .select({ value: schema.settings.value })
-      .from(schema.settings)
-      .where(eq(schema.settings.key, key))
-      .limit(1);
-    if (result.length > 0) {
-      const num = Number(result[0].value);
-      if (!Number.isNaN(num)) return num;
-    }
-  } catch {
-    /* DB not ready or key absent -- fall through */
+    raw = await getSettingStrict(key);
+  } catch (err) {
+    logger.warn({ err, key }, "setting read failed, using default");
+    return defaultValue;
   }
-  return defaultValue;
+  return parseNumericSettingValue(key, raw, defaultValue);
 }
 
 /**
@@ -52,14 +78,52 @@ export async function getSettingNumber(key: string, defaultValue = 0): Promise<n
  */
 export async function getSettingString(key: string, defaultValue = ""): Promise<string> {
   try {
-    const result = await db
-      .select({ value: schema.settings.value })
-      .from(schema.settings)
-      .where(eq(schema.settings.key, key))
-      .limit(1);
-    if (result.length > 0) return result[0].value;
-  } catch {
-    /* DB not ready or key absent -- fall through */
+    const raw = await getSettingStrict(key);
+    return raw ?? defaultValue;
+  } catch (err) {
+    logger.warn({ err, key }, "setting read failed, using default");
+    return defaultValue;
   }
-  return defaultValue;
+}
+
+/**
+ * Read a setting and let a database fault throw, unlike getSettingString,
+ * which answers its default on any error. For gates where the default would
+ * quietly relax a restriction: the caller decides what a fault means.
+ * Returns undefined when the key is missing.
+ */
+export async function getSettingStrict(key: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ value: schema.settings.value })
+    .from(schema.settings)
+    .where(eq(schema.settings.key, key))
+    .limit(1);
+  return row?.value;
+}
+
+/**
+ * Seed defaultTheme, defaultLocale, and defaultToolView from env when absent,
+ * and repair any existing row whose stored value fails its setting policy
+ * schema (#3964).
+ */
+export async function ensureDefaultSettings(): Promise<void> {
+  const defaults: Record<string, string> = {
+    defaultTheme: env.DEFAULT_THEME,
+    defaultLocale: env.DEFAULT_LOCALE,
+    defaultToolView: env.DEFAULT_TOOL_VIEW,
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    const existing = await getSettingStrict(key);
+    if (existing === undefined) {
+      await setSettingIfAbsent(key, value);
+      continue;
+    }
+    if (!prepareSetting(key, existing).success) {
+      logger.warn(
+        { key, value: existing, replacement: value },
+        "invalid default setting, resetting to env default",
+      );
+      await upsertSetting(key, value);
+    }
+  }
 }

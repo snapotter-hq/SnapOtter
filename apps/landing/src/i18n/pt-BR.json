@@ -187,7 +187,7 @@
   "faq.q3.q": "Preciso de conexão com a internet?",
   "faq.q4.a": "Sem limites artificiais. Você pode processar quantos arquivos quiser, de qualquer tamanho. A única restrição são os recursos de hardware do seu servidor.",
   "faq.q4.q": "Existe alguma limitação de tamanho de arquivo ou de uso?",
-  "faq.q5.a": "O SnapOtter inclui 19 ferramentas de IA locais para remoção de fundo, upscale, OCR, transcrição, detecção de rostos, colorização, remoção de ruído, restauração de fotos e muito mais. Todos os modelos rodam no seu hardware.",
+  "faq.q5.a": "O SnapOtter inclui 19 ferramentas de IA locais para remoção de fundo, upscaling, OCR, transcrição, detecção de rostos, colorização, remoção de ruído, restauração de fotos e muito mais. Todos os modelos são executados no seu hardware (2 GB de RAM executam as ferramentas não-IA, o Fast OCR e a detecção de rostos; os pacotes de IA para CPU exigem 4 GB+ de RAM, ou 8 GB para inpainting HQ).",
   "faq.q5.q": "Quais recursos de IA estão incluídos?",
   "faq.q6.a": "A análise de uso anônima do produto vem ativada por padrão e nunca inclui seus arquivos nem o conteúdo deles. Desative a qualquer momento com um botão de administrador em Configurações > Sistema > Privacidade.",
   "faq.q6.q": "O SnapOtter coleta alguma análise de uso?",

@@ -1,6 +1,6 @@
 ---
 description: "รวมภาพหนึ่งภาพหรือมากกว่าเป็นเอกสาร PDF พร้อมตัวเลือกขนาดหน้า ทิศทาง และขนาดไฟล์เป้าหมาย"
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 92e3ea0833c0
 ---

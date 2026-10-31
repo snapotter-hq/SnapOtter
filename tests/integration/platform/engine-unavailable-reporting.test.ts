@@ -1,0 +1,1961 @@
+/**
+ * An engine-unavailable 503 is the operator's container, not the caller's
+ * file, so every route that can raise one has to leave a trace server side
+ * (#1330, #1403). The single-file tool route already did; batch, pipeline, and
+ * ocr-pdf sent the 503 and logged nothing, pipeline dropped the code, and a 503
+ * raised inside the worker reached the job row as a bare message.
+ *
+ * The engines are faked rather than broken for real: the fleet and dev boxes
+ * have ffmpeg and qpdf, and the point here is what the routes do with the
+ * error, which media-input.test.ts and document-engine-unavailable.test.ts
+ * already pin at the source.
+ */
+import { randomUUID } from "node:crypto";
+import { SafeError } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import { getQueue } from "../../../apps/api/src/jobs/queues.js";
+import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
+import {
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+} from "../../../apps/api/src/lib/format-decoders.js";
+import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
+import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
+import { DocumentInputHandler } from "../../../apps/api/src/modality/document-input.js";
+import { ImageInputHandler } from "../../../apps/api/src/modality/image-input.js";
+import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
+import { buildBatchReplayEvent } from "../../../apps/api/src/routes/progress.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
+import {
+  buildTestApp,
+  createMultipartPayload,
+  loginAsAdmin,
+  type TestApp,
+} from "../test-server.js";
+
+const mocks = vi.hoisted(() => ({
+  reportError: vi.fn(),
+  /** Wraps the real helper, so each call site is visible past its once-per-process dedupe. */
+  reportEngineUnavailable: vi.fn(),
+  /** validatePdfPath calls to let through before it starts failing. */
+  pdfPassesLeft: Number.POSITIVE_INFINITY,
+}));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return { ...actual, reportError: mocks.reportError };
+});
+
+vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/engine-unavailable.js")>();
+  mocks.reportEngineUnavailable.mockImplementation(actual.reportEngineUnavailable);
+  return { ...actual, reportEngineUnavailable: mocks.reportEngineUnavailable };
+});
+
+vi.mock("../../../apps/api/src/modality/document-input.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/modality/document-input.js")>();
+  const { InputValidationError: IVE } = await import("../../../apps/api/src/modality/contract.js");
+  return {
+    ...actual,
+    validatePdfPath: async (...args: Parameters<typeof actual.validatePdfPath>) => {
+      if (mocks.pdfPassesLeft > 0) {
+        mocks.pdfPassesLeft--;
+        return actual.validatePdfPath(...args);
+      }
+      throw new IVE(
+        "PDF processing is unavailable on this server because qpdf could not be started.",
+        503,
+        "Check QPDF_PATH: it must point at an executable qpdf binary.",
+        "ENGINE_UNAVAILABLE",
+      );
+    },
+  };
+});
+
+const VIDEO = readFixture(fixtures.video.tiny("mp4"));
+const PDF = readFixture(fixtures.document.pdf3);
+const SIG = readFixture(fixtures.image.base.png200);
+
+let testApp: TestApp;
+let app: TestApp["app"];
+let token: string;
+let prepareSpy: MockInstance<MediaInputHandler["prepare"]>;
+
+function ffmpegMissing(): InputValidationError {
+  return new InputValidationError(
+    "Media processing is unavailable on this server because ffmpeg is not installed.",
+    503,
+    "Install ffmpeg in the container or set FFMPEG_PATH and FFPROBE_PATH.",
+    "ENGINE_UNAVAILABLE",
+  );
+}
+
+beforeAll(async () => {
+  prepareSpy = vi.spyOn(MediaInputHandler.prototype, "prepare");
+  testApp = await buildTestApp();
+  app = testApp.app;
+  token = await loginAsAdmin(app);
+});
+
+afterAll(async () => {
+  prepareSpy.mockRestore();
+  await testApp.cleanup();
+});
+
+beforeEach(() => {
+  mocks.reportError.mockReset();
+  mocks.reportEngineUnavailable.mockClear();
+  mocks.pdfPassesLeft = Number.POSITIVE_INFINITY;
+  prepareSpy.mockReset();
+  prepareSpy.mockRejectedValue(ffmpegMissing());
+});
+
+async function post(url: string, parts: Parameters<typeof createMultipartPayload>[0]) {
+  const { body, contentType } = createMultipartPayload(parts);
+  return app.inject({
+    method: "POST",
+    url,
+    body,
+    headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+  });
+}
+
+function videoPart(filename: string) {
+  return { name: "file", filename, contentType: "video/mp4", content: VIDEO };
+}
+
+/** Whether a route handed an engine-unavailable error for this tool to the helper. */
+function helperSawEngineDown(toolId: string): boolean {
+  return mocks.reportEngineUnavailable.mock.calls.some(
+    ([err, id]) => (err as { code?: string }).code === "ENGINE_UNAVAILABLE" && id === toolId,
+  );
+}
+
+function pdfPart(filename = "scan.pdf") {
+  return { name: "file", filename, contentType: "application/pdf", content: PDF };
+}
+
+/** The reportError calls that carried an engine-unavailable error for this tool. */
+function engineReports(toolId: string) {
+  return mocks.reportError.mock.calls.filter(
+    ([err, ctx]) =>
+      (err as { code?: string }).code === "ENGINE_UNAVAILABLE" &&
+      (ctx as { toolId?: string }).toolId === toolId,
+  );
+}
+
+describe("engine-unavailable 503s are reported, not just returned (#1403)", () => {
+  it("batch reports it once per tool, however many files fail", async () => {
+    const res = await post("/api/v1/tools/video/mute-video/batch", [
+      videoPart("a.mp4"),
+      videoPart("b.mp4"),
+      { name: "settings", content: "{}" },
+    ]);
+    // Every file failed on the same missing engine, so the batch says so
+    // instead of a generic 422, and each file keeps its code (#1432).
+    expect(res.statusCode, res.body).toBe(503);
+    const body = res.json() as {
+      code?: string;
+      details?: string;
+      errors: Array<{ filename: string; code?: string }>;
+    };
+    expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    expect(body.details).toContain("FFPROBE_PATH");
+    expect(body.errors.map((e) => e.code)).toEqual(["ENGINE_UNAVAILABLE", "ENGINE_UNAVAILABLE"]);
+    expect(engineReports("mute-video")).toHaveLength(1);
+
+    await post("/api/v1/tools/video/mute-video/batch", [
+      videoPart("c.mp4"),
+      { name: "settings", content: "{}" },
+    ]);
+    expect(engineReports("mute-video"), "a busy instance must not report per upload").toHaveLength(
+      1,
+    );
+  });
+
+  it("a batch that fails at upload on the missing engine replays its code and hint as a frame (#2178)", async () => {
+    const clientJobId = randomUUID();
+    const res = await post("/api/v1/tools/video/mute-video/batch", [
+      videoPart("a.mp4"),
+      videoPart("b.mp4"),
+      { name: "settings", content: "{}" },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const replayed = buildBatchReplayEvent({
+      jobId: clientJobId,
+      status: row.status,
+      progress: row.progress,
+      error: row.error,
+    });
+    expect(replayed.status).toBe("failed");
+    expect(replayed.code).toBe("ENGINE_UNAVAILABLE");
+    expect(replayed.details).toContain("FFPROBE_PATH");
+  });
+
+  it("pipeline execute reports it and keeps the code in the reply", async () => {
+    const res = await post("/api/v1/pipeline/execute", [
+      videoPart("clip.mp4"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "trim-video", settings: {} }] }),
+      },
+    ]);
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    expect(engineReports("trim-video")).toHaveLength(1);
+  });
+
+  it("pipeline batch reports it once, with each file still failing on its own", async () => {
+    const res = await post("/api/v1/pipeline/batch", [
+      videoPart("one.mp4"),
+      videoPart("two.mp4"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "extract-audio", settings: {} }] }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+    expect(res.json()).toMatchObject({
+      code: "ENGINE_UNAVAILABLE",
+      details: expect.stringContaining("FFPROBE_PATH"),
+      errors: [{ code: "ENGINE_UNAVAILABLE" }, { code: "ENGINE_UNAVAILABLE" }],
+    });
+    expect(engineReports("extract-audio")).toHaveLength(1);
+  });
+
+  it("the ocr-pdf route reports it", async () => {
+    mocks.pdfPassesLeft = 0;
+    const res = await post("/api/v1/tools/pdf/ocr-pdf", [
+      { name: "file", filename: "scan.pdf", contentType: "application/pdf", content: PDF },
+      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+    ]);
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    expect(engineReports("ocr-pdf")).toHaveLength(1);
+  });
+
+  it("the ocr-pdf batch ingest reports it", async () => {
+    mocks.pdfPassesLeft = 0;
+    const res = await post("/api/v1/tools/pdf/ocr-pdf/batch", [
+      pdfPart("a.pdf"),
+      pdfPart("b.pdf"),
+      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+    ]);
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(helperSawEngineDown("ocr-pdf")).toBe(true);
+  });
+
+  it("pipeline execute with an ocr-pdf first step reports it and keeps the code", async () => {
+    mocks.pdfPassesLeft = 0;
+    const res = await post("/api/v1/pipeline/execute", [
+      pdfPart(),
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+        }),
+      },
+    ]);
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    expect(helperSawEngineDown("ocr-pdf")).toBe(true);
+  });
+
+  it("sign-pdf answers a broken qpdf with its 503 instead of Invalid PDF", async () => {
+    const docSpy = vi
+      .spyOn(DocumentInputHandler.prototype, "prepare")
+      .mockRejectedValueOnce(
+        new InputValidationError(
+          "PDF processing is unavailable on this server because qpdf could not be started.",
+          503,
+          "Check QPDF_PATH: it must point at an executable qpdf binary.",
+          "ENGINE_UNAVAILABLE",
+        ),
+      );
+    try {
+      const res = await post("/api/v1/tools/pdf/sign-pdf", [
+        pdfPart("in.pdf"),
+        { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+        {
+          name: "placements",
+          content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+        },
+      ]);
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        details: expect.stringContaining("QPDF_PATH"),
+      });
+      expect(engineReports("sign-pdf")).toHaveLength(1);
+    } finally {
+      docSpy.mockRestore();
+    }
+  });
+
+  it("the single-file tool route answers every upload with the code, reporting once (#1407)", async () => {
+    const upload = () =>
+      post("/api/v1/tools/video/resize-video", [
+        videoPart("clip.mp4"),
+        { name: "settings", content: JSON.stringify({ width: 320 }) },
+      ]);
+    for (const res of [await upload(), await upload()]) {
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    }
+    expect(
+      engineReports("resize-video"),
+      "a busy instance must not report per upload",
+    ).toHaveLength(1);
+  });
+
+  it("a 503 raised inside the worker keeps its code and details on the job row", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
+    try {
+      // The route's pre-validation passes; qpdf breaks before the worker runs.
+      mocks.pdfPassesLeft = 1;
+      const res = await post("/api/v1/tools/pdf/ocr-pdf", [
+        { name: "file", filename: "scan.pdf", contentType: "application/pdf", content: PDF },
+        { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+      ]);
+      expect(res.statusCode).toBe(202);
+      const { jobId } = res.json() as { jobId: string };
+
+      let row: typeof schema.jobs.$inferSelect | undefined;
+      for (let i = 0; i < 150; i++) {
+        [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        if (row?.status === "failed") break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        details: expect.stringContaining("QPDF_PATH"),
+      });
+
+      // The worker logs it as a fault instead of skipping it as bad input (#1330, #1407).
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId, toolId: "ocr-pdf" }),
+        "tool job failed",
+      );
+
+      // A client reconnecting after the failure replays the same code and hint.
+      const replay = await app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${jobId}/progress`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
+      expect(frame).toMatchObject({
+        phase: "failed",
+        code: "ENGINE_UNAVAILABLE",
+        details: expect.stringContaining("QPDF_PATH"),
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+// #1432 gave the upload-time failure its status and code; the same missing
+// engine one step later, inside the worker, still answered a bare 422 (#1627).
+describe("a batch whose files all fail in the worker on one engine fault (#1627)", () => {
+  const PNG = readFixture(fixtures.image.base.png200);
+  const pngPart = (filename: string) => ({
+    name: "file",
+    filename,
+    contentType: "image/png",
+    content: PNG,
+  });
+  const HINT = "Check the container's image libraries.";
+
+  function engineDown(): InputValidationError {
+    return new InputValidationError(
+      "Image processing is unavailable on this server because its engine could not start.",
+      503,
+      HINT,
+      "ENGINE_UNAVAILABLE",
+    );
+  }
+
+  // Restored after every test, so one that times out mid-request can't leave
+  // the fake installed for the next.
+  let restoreWorker: (() => void) | null = null;
+  afterEach(() => {
+    restoreWorker?.();
+    restoreWorker = null;
+  });
+
+  /** Make the worker's run of `toolId` fail with each error in turn. */
+  function failInWorker(toolId: string, ...errors: Error[]): void {
+    const config = getToolConfig(toolId);
+    if (!config?.processV2) throw new Error(`${toolId} has no processV2`);
+    const real = config.processV2;
+    let call = 0;
+    config.processV2 = async () => {
+      throw errors[Math.min(call++, errors.length - 1)];
+    };
+    restoreWorker = () => {
+      config.processV2 = real;
+    };
+  }
+
+  async function parentRow(id: string) {
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
+    return row;
+  }
+
+  it("answers the shared status, code and hint, with each file's code", async () => {
+    failInWorker("resize", engineDown());
+    const clientJobId = randomUUID();
+    const res = await post("/api/v1/tools/image/resize/batch", [
+      pngPart("a.png"),
+      pngPart("b.png"),
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: engineDown().message,
+      code: "ENGINE_UNAVAILABLE",
+      details: HINT,
+      errors: [{ code: "ENGINE_UNAVAILABLE" }, { code: "ENGINE_UNAVAILABLE" }],
+    });
+
+    // The terminal state a reconnecting client replays says the same thing.
+    const row = await parentRow(clientJobId);
+    expect(row?.error).toMatchObject({
+      message: engineDown().message,
+      code: "ENGINE_UNAVAILABLE",
+      hint: HINT,
+    });
+    // ...as a frame, with the fault's code and hint beside the text (#2178).
+    expect(
+      buildBatchReplayEvent({
+        jobId: clientJobId,
+        status: row.status,
+        progress: row.progress,
+        error: row.error,
+      }),
+    ).toMatchObject({ status: "failed", code: "ENGINE_UNAVAILABLE", details: HINT });
+    // failBatchJob keeps the per-file entries, plus the run's own blank-name
+    // one, as the row error's details.
+    const entries = (row?.error as { details?: Array<{ filename: string; error: string }> })
+      ?.details;
+    expect(entries?.at(-1)).toEqual({ filename: "", error: `${engineDown().message}: ${HINT}` });
+    expect(engineReports("resize")).toHaveLength(2);
+  });
+
+  it("counts a file that failed the same way at upload alongside the worker's", async () => {
+    // The first file's upload-time check hits the fault; the second gets
+    // through and hits it in the worker.
+    const prepare = vi
+      .spyOn(ImageInputHandler.prototype, "prepare")
+      .mockRejectedValueOnce(engineDown());
+    try {
+      failInWorker("resize", engineDown());
+      const res = await post("/api/v1/tools/image/resize/batch", [
+        pngPart("a.png"),
+        pngPart("b.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        errors: [{ filename: "a.png", code: "ENGINE_UNAVAILABLE" }, { code: "ENGINE_UNAVAILABLE" }],
+      });
+    } finally {
+      prepare.mockRestore();
+    }
+  });
+
+  it("keeps the generic 422 when the files failed for different reasons", async () => {
+    failInWorker(
+      "resize",
+      engineDown(),
+      new InputValidationError("This image is too small to resize.", 400),
+    );
+    const res = await post("/api/v1/tools/image/resize/batch", [
+      pngPart("a.png"),
+      pngPart("b.png"),
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+    expect(res.statusCode, res.body).toBe(422);
+    const body = res.json() as { error: string; code?: string; errors: Array<{ code?: string }> };
+    expect(body.error).toBe("All files failed processing");
+    expect(body.code).toBeUndefined();
+    // The file that did hit the engine fault still says so.
+    expect(body.errors.filter((e) => e.code === "ENGINE_UNAVAILABLE")).toHaveLength(1);
+    expect(engineReports("resize")).toHaveLength(1);
+  });
+
+  it("pipeline batch answers the shared fault too", async () => {
+    failInWorker("resize", engineDown());
+    const res = await post("/api/v1/pipeline/batch", [
+      pngPart("one.png"),
+      pngPart("two.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+    expect(res.json()).toMatchObject({
+      code: "ENGINE_UNAVAILABLE",
+      details: HINT,
+      errors: [
+        { filename: "one.png", code: "ENGINE_UNAVAILABLE" },
+        { filename: "two.png", code: "ENGINE_UNAVAILABLE" },
+      ],
+    });
+    expect(engineReports("resize")).toHaveLength(2);
+  });
+
+  // #2179: single-file execute read only the finalize's resultPayload and
+  // answered 422 for every failed step, a server fault included. The failed
+  // step's status, code and hint now ride the payload next to its message.
+  it("pipeline execute answers a step's server fault with its status, code and hint (#2179)", async () => {
+    failInWorker("resize", engineDown());
+    const res = await post("/api/v1/pipeline/execute", [
+      pngPart("one.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: `Step 1: ${engineDown().message}`,
+      code: "ENGINE_UNAVAILABLE",
+      details: HINT,
+      completedSteps: [],
+    });
+    expect(engineReports("resize")).toHaveLength(1);
+  });
+
+  it("pipeline execute keeps the completed steps when a later step hits the fault (#2179)", async () => {
+    failInWorker("resize", engineDown());
+    const res = await post("/api/v1/pipeline/execute", [
+      pngPart("one.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [
+            { toolId: "rotate", settings: { angle: 90 } },
+            { toolId: "resize", settings: { width: 50 } },
+          ],
+        }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+    const body = res.json();
+    expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    expect(body.error).toBe(`Step 2: ${engineDown().message}`);
+    expect(body.completedSteps).toHaveLength(1);
+    expect(engineReports("resize")).toHaveLength(1);
+  });
+
+  it("pipeline execute still answers 422 for a step that failed for another reason (#2179)", async () => {
+    failInWorker("resize", new Error("Resize ran out of road"));
+    const res = await post("/api/v1/pipeline/execute", [
+      pngPart("one.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(422);
+    expect(res.json().error).toBe("Step 1: Resize ran out of road");
+    expect(res.json().code).toBeUndefined();
+  });
+
+  // #2210: the worker recorded a status on a failed row only for input errors,
+  // so a step that died on a storage SafeError (a full workspace, an unwritable
+  // volume) came back 422 from every route that reads the row.
+  describe("a storage fault inside the worker keeps its status and code (#2210)", () => {
+    const storageFull = () =>
+      new SafeError("The server's storage is full.", {
+        statusCode: 503,
+        code: "storage-full",
+      });
+    const resizePipeline = {
+      name: "pipeline",
+      content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+    };
+
+    it("pipeline execute answers 503 with the code", async () => {
+      failInWorker("resize", storageFull());
+      const res = await post("/api/v1/pipeline/execute", [pngPart("one.png"), resizePipeline]);
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({
+        error: `Step 1: ${storageFull().message}`,
+        code: "storage-full",
+      });
+    });
+
+    it("the single-file tool route answers 503 with the code instead of Processing failed", async () => {
+      failInWorker("resize", storageFull());
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({ error: storageFull().message, code: "storage-full" });
+    });
+
+    it("a batch whose every file hits it answers the shared status and code", async () => {
+      failInWorker("resize", storageFull());
+      const res = await post("/api/v1/tools/image/resize/batch", [
+        pngPart("a.png"),
+        pngPart("b.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({ code: "storage-full" });
+    });
+
+    it("keeps the status on the failed job row", async () => {
+      failInWorker("resize", storageFull());
+      const clientJobId = randomUUID();
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+
+      const [row] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, res.json().jobId ?? clientJobId));
+      expect(row?.error).toMatchObject({ code: "storage-full", httpStatus: 503 });
+    });
+
+    it("keeps the single-file 422 for a SafeError that is not a server fault", async () => {
+      failInWorker(
+        "resize",
+        new SafeError("That setting is not allowed.", { statusCode: 400, code: "BAD_SETTING" }),
+      );
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(422);
+      expect(res.json().code).toBeUndefined();
+    });
+
+    it("keeps the single-file 422 for a plain error with no status", async () => {
+      failInWorker("resize", new Error("Resize ran out of road"));
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(422);
+    });
+  });
+
+  it("pipeline batch names one shared reason that isn't a server fault", async () => {
+    failInWorker("resize", new Error("Resize ran out of road"));
+    const res = await post("/api/v1/pipeline/batch", [
+      pngPart("one.png"),
+      pngPart("two.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(422);
+    expect(res.json()).toEqual({
+      error: "Step 1: Resize ran out of road",
+      errors: [
+        { filename: "one.png", error: "Step 1: Resize ran out of road" },
+        { filename: "two.png", error: "Step 1: Resize ran out of road" },
+      ],
+    });
+  });
+
+  describe("image decoder unavailability in batch, pipeline, previews, and workers (#1453)", () => {
+    const HEIC = readFixture(fixtures.image.base.heic200);
+    const ICO = readFixture(fixtures.image.formats("ico"));
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const SVG = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#336699"/></svg>',
+    );
+
+    it("batch image decode reports a missing HEIF or CLI decoder once and answers 503 with per-file codes", async () => {
+      const heicSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/rotate/batch", [
+          { name: "file", filename: "a.heic", contentType: "image/heic", content: HEIC },
+          { name: "file", filename: "b.heic", contentType: "image/heic", content: HEIC },
+          { name: "settings", content: JSON.stringify({ angle: 90 }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          error: "No HEIF decoder found.",
+          errors: [
+            { filename: "a.heic", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.heic", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(helperSawEngineDown("rotate")).toBe(true);
+        expect(engineReports("rotate")).toHaveLength(1);
+      } finally {
+        heicSpy.mockRestore();
+      }
+    });
+
+    it("pipeline batch image decode reports a missing CLI decoder once and answers 503 with per-file codes", async () => {
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderUnavailableError("No ImageMagick found."));
+      try {
+        const res = await post("/api/v1/pipeline/batch", [
+          { name: "file", filename: "a.ico", contentType: "image/x-icon", content: ICO },
+          { name: "file", filename: "b.ico", contentType: "image/x-icon", content: ICO },
+          {
+            name: "pipeline",
+            content: JSON.stringify({
+              steps: [{ toolId: "compress", settings: {} }],
+            }),
+          },
+        ]);
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          error: "No ImageMagick found.",
+          errors: [
+            { filename: "a.ico", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.ico", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(helperSawEngineDown("compress")).toBe(true);
+        expect(engineReports("compress")).toHaveLength(1);
+      } finally {
+        cliSpy.mockRestore();
+      }
+    });
+
+    it("edit-metadata preview keeps the 200 result and reports a missing HEIF decoder once", async () => {
+      const heicSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("edit-metadata")).toBe(true);
+        expect(engineReports("edit-metadata")).toHaveLength(1);
+      } finally {
+        heicSpy.mockRestore();
+      }
+    });
+
+    it("edit-metadata preview keeps the 200 result and reports a CLI decoder fault once (#2704)", async () => {
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderOutOfMemoryError("Decoder out of memory."));
+      try {
+        const res = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "icon.ico", contentType: "image/x-icon", content: ICO },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("edit-metadata")).toBe(true);
+        expect(engineReports("edit-metadata")).toHaveLength(1);
+      } finally {
+        cliSpy.mockRestore();
+      }
+    });
+
+    it("worker generatePreview keeps the 200 result and reports a missing CLI decoder once (#2704)", async () => {
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderUnavailableError("No ImageMagick found."));
+      try {
+        const res = await post("/api/v1/tools/image/convert", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ format: "qoi" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("convert")).toBe(true);
+        expect(engineReports("convert")).toHaveLength(1);
+      } finally {
+        cliSpy.mockRestore();
+      }
+    });
+
+    it("svg-to-raster HEIF preview keeps the 200 result and reports a missing HEIF decoder once", async () => {
+      const encSpy = vi.spyOn(heicConverter, "encodeHeic").mockResolvedValue(HEIC);
+      const decSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+      } finally {
+        encSpy.mockRestore();
+        decSpy.mockRestore();
+      }
+    });
+
+    it("svg-to-raster JXL preview keeps the 200 result and reports a JXL decoder fault once (#3179)", async () => {
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const encSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockResolvedValue(Buffer.from("jxl-bytes"));
+      const decSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderOutOfMemoryError("Decoder out of memory."));
+      try {
+        const res = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "jxl" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+      } finally {
+        encSpy.mockRestore();
+        decSpy.mockRestore();
+      }
+    });
+
+    it("fetch-urls preview decode keeps the stored file and reports a missing decoder once", async () => {
+      const decSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderOutOfMemoryError("Decoder out of memory."));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith(".ico")) {
+            return new Response(new Uint8Array(ICO), {
+              status: 200,
+              headers: { "Content-Type": "image/x-icon" },
+            });
+          }
+          return new Response(new Uint8Array(HEIC), {
+            status: 200,
+            headers: { "Content-Type": "image/heic" },
+          });
+        }),
+      );
+      try {
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/fetch-urls",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          payload: {
+            urls: ["http://1.2.3.4:9999/photo.heic", "http://1.2.3.4:9999/icon.ico"],
+          },
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().results[0]).toMatchObject({
+          success: true,
+          filename: "photo.heic",
+          previewUrl: null,
+        });
+        expect(res.json().results[1]).toMatchObject({
+          success: true,
+          filename: "icon.ico",
+          previewUrl: null,
+        });
+        expect(helperSawEngineDown("fetch-urls")).toBe(true);
+        // Both the missing decoder and the OOM cause are reported independently (#1628).
+        expect(engineReports("fetch-urls")).toHaveLength(2);
+      } finally {
+        vi.unstubAllGlobals();
+        cliSpy.mockRestore();
+        decSpy.mockRestore();
+      }
+    });
+
+    it("preview decode in edit-metadata (including DNG), worker generatePreview, svg-to-raster, and fetch-urls reports 503 tmpdir write faults once while staying non-fatal (#3452)", async () => {
+      const enospc = () =>
+        Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/in-enospc'"), {
+          code: "ENOSPC",
+          syscall: "open",
+        });
+      const eacces = () =>
+        Object.assign(new Error("EACCES: permission denied, open '/tmp/in-eacces'"), {
+          code: "EACCES",
+          syscall: "open",
+        });
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const encJxlSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockResolvedValue(Buffer.from("jxl-bytes"));
+      const decHeicSpy = vi.spyOn(heicConverter, "decodeHeic").mockImplementation(async () => {
+        throw enospc();
+      });
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockImplementation(async () => {
+          throw eacces();
+        });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith(".dng")) {
+            return new Response(new Uint8Array(DNG), {
+              status: 200,
+              headers: { "Content-Type": "image/x-adobe-dng" },
+            });
+          }
+          if (href.endsWith(".ico")) {
+            return new Response(new Uint8Array(ICO), {
+              status: 200,
+              headers: { "Content-Type": "image/x-icon" },
+            });
+          }
+          return new Response(new Uint8Array(HEIC), {
+            status: 200,
+            headers: { "Content-Type": "image/heic" },
+          });
+        }),
+      );
+
+      try {
+        // 1. edit-metadata on DNG must NOT fall back to Sharp when decodeToSharpCompat hits EACCES
+        const editDng = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(editDng.statusCode, editDng.body).toBe(200);
+        expect(editDng.json().previewUrl).toBeUndefined();
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "edit-metadata" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+
+        // 2. worker generatePreview on QOI output reports storage-not-writable once
+        const convertQoi = await post("/api/v1/tools/image/convert", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ format: "qoi" }) },
+        ]);
+        expect(convertQoi.statusCode, convertQoi.body).toBe(200);
+        expect(convertQoi.json().previewUrl).toBeUndefined();
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "convert" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+
+        // 3. svg-to-raster on JXL output reports storage-not-writable once
+        const svgJxl = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "jxl" }) },
+        ]);
+        expect(svgJxl.statusCode, svgJxl.body).toBe(200);
+        expect(svgJxl.json().previewUrl).toBeUndefined();
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "svg-to-raster" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+
+        // 4. fetch-urls on two HEIC URLs (ENOSPC -> storage-full, deduplicated to 1 report),
+        // one ICO URL, and one DNG URL (EACCES -> storage-not-writable, deduplicated to 1 report,
+        // without falling back to Sharp preview on the TIFF-headed DNG, #3486)
+        const fetchRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/fetch-urls",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          payload: {
+            urls: [
+              "http://1.2.3.4:9999/photo-1.heic",
+              "http://1.2.3.4:9999/photo-2.heic",
+              "http://1.2.3.4:9999/icon.ico",
+              "http://1.2.3.4:9999/photo.dng",
+            ],
+          },
+        });
+        expect(fetchRes.statusCode, fetchRes.body).toBe(200);
+        expect(fetchRes.json().results).toEqual([
+          expect.objectContaining({ success: true, filename: "photo-1.heic", previewUrl: null }),
+          expect.objectContaining({ success: true, filename: "photo-2.heic", previewUrl: null }),
+          expect.objectContaining({ success: true, filename: "icon.ico", previewUrl: null }),
+          expect.objectContaining({
+            success: true,
+            filename: "photo.dng",
+            width: 0,
+            height: 0,
+            previewUrl: null,
+          }),
+        ]);
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-full" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "fetch-urls" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "fetch-urls" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+      } finally {
+        vi.unstubAllGlobals();
+        encJxlSpy.mockRestore();
+        cliSpy.mockRestore();
+        decHeicSpy.mockRestore();
+      }
+    });
+
+    it("inline preview WebP encode V8 RangeError in edit-metadata, svg-to-raster, and fetch-urls routes through reportEngineUnavailable as DecoderOutOfMemoryError (#3383)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const tiffBytes = await sharpMod({
+        create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+      })
+        .tiff()
+        .toBuffer();
+      const expiredNow = Date.now() + 11 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+      const webpSpy = vi.spyOn(sharpMod.prototype, "webp").mockImplementation(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          return new Response(new Uint8Array(tiffBytes), {
+            status: 200,
+            headers: { "Content-Type": "image/tiff" },
+          });
+        }),
+      );
+
+      try {
+        const editTiff = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.tiff", contentType: "image/tiff", content: tiffBytes },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(editTiff.statusCode, editTiff.body).toBe(200);
+        expect(editTiff.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("edit-metadata")).toBe(true);
+        expect(engineReports("edit-metadata")).toHaveLength(1);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string; cause?: { name?: string } }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "edit-metadata",
+          ),
+        ).toHaveLength(1);
+
+        const svgTiff = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "tiff" }) },
+        ]);
+        expect(svgTiff.statusCode, svgTiff.body).toBe(200);
+        expect(svgTiff.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string; cause?: { name?: string } }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "svg-to-raster",
+          ),
+        ).toHaveLength(1);
+
+        const fetchRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/fetch-urls",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          payload: {
+            urls: ["http://1.2.3.4:9999/scan-1.tiff", "http://1.2.3.4:9999/scan-2.tiff"],
+          },
+        });
+        expect(fetchRes.statusCode, fetchRes.body).toBe(200);
+        expect(fetchRes.json().results).toEqual([
+          expect.objectContaining({ success: true, filename: "scan-1.tiff", previewUrl: null }),
+          expect.objectContaining({ success: true, filename: "scan-2.tiff", previewUrl: null }),
+        ]);
+        expect(helperSawEngineDown("fetch-urls")).toBe(true);
+        expect(engineReports("fetch-urls")).toHaveLength(1);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string; cause?: { name?: string } }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "fetch-urls",
+          ),
+        ).toHaveLength(2);
+
+        const previewRes = await post("/api/v1/preview", [
+          { name: "file", filename: "photo.tiff", contentType: "image/tiff", content: tiffBytes },
+        ]);
+        expect(previewRes.statusCode, previewRes.body).toBe(503);
+        expect(previewRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        const previewReports = engineReports("file-preview");
+        expect(previewReports).toHaveLength(1);
+        expect((previewReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        vi.unstubAllGlobals();
+        webpSpy.mockRestore();
+        nowSpy.mockRestore();
+      }
+    });
+
+    it("svg-to-raster single-file and batch conversion surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3620)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const expiredNow = Date.now() + 25 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+      const pngSpy = vi.spyOn(sharpMod.prototype, "png").mockImplementationOnce(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
+      const encJxlSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockRejectedValue(new DecoderUnavailableError("No cjxl found."));
+
+      try {
+        const singleRes = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "png" }) },
+        ]);
+        expect(singleRes.statusCode, singleRes.body).toBe(503);
+        expect(singleRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const clientJobId = randomUUID();
+        const batchRes = await post("/api/v1/tools/image/svg-to-raster/batch", [
+          { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "jxl" }) },
+          { name: "clientJobId", content: clientJobId },
+        ]);
+        expect(batchRes.statusCode, batchRes.body).toBe(503);
+        expect(batchRes.json()).toMatchObject({
+          error: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(batchRes.json().errors).toEqual(
+          expect.arrayContaining([
+            { filename: "a.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+          ]),
+        );
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+
+        const row = await parentRow(clientJobId);
+        expect(row?.status).toBe("failed");
+        expect(row?.error).toMatchObject({
+          message: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(
+          buildBatchReplayEvent({
+            jobId: clientJobId,
+            status: row.status,
+            progress: row.progress,
+            error: row.error,
+          }),
+        ).toMatchObject({
+          status: "failed",
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        encJxlSpy.mockRestore();
+        pngSpy.mockRestore();
+        nowSpy.mockRestore();
+      }
+    });
+
+    it("edit-metadata, gif-tools /info and preValidate, image-to-pdf, and pdf-to-image single-file, preview, and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646, #3763, #3772, #3859)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const exiftoolMod = await import("../../../apps/api/src/lib/exiftool.js");
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const expiredNow = Date.now() + 36 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+      const writeSpy = vi
+        .spyOn(exiftoolMod, "writeMetadata")
+        .mockRejectedValueOnce(
+          Object.assign(new Error("exiftool exited SIGKILL"), { signal: "SIGKILL" }),
+        );
+      const pngSpy = vi
+        .spyOn(sharpMod.prototype, "png")
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        })
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+      const jpegSpy = vi.spyOn(sharpMod.prototype, "jpeg").mockImplementationOnce(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
+      const encJxlSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockRejectedValue(new DecoderUnavailableError("No cjxl found."));
+
+      try {
+        const editRes = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ artist: "Test" }) },
+        ]);
+        expect(editRes.statusCode, editRes.body).toBe(503);
+        expect(editRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const imgToPdfRes = await post("/api/v1/tools/image/image-to-pdf", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        ]);
+        expect(imgToPdfRes.statusCode, imgToPdfRes.body).toBe(503);
+        expect(imgToPdfRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const pdfSingleRes = await post("/api/v1/tools/pdf/pdf-to-image", [
+          pdfPart("scan.pdf"),
+          { name: "settings", content: JSON.stringify({ dpi: 36, format: "png", pages: "1" }) },
+        ]);
+        expect(pdfSingleRes.statusCode, pdfSingleRes.body).toBe(503);
+        expect(pdfSingleRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const pdfPreviewRes = await post("/api/v1/tools/pdf/pdf-to-image/preview", [
+          pdfPart("scan.pdf"),
+        ]);
+        expect(pdfPreviewRes.statusCode, pdfPreviewRes.body).toBe(503);
+        expect(pdfPreviewRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const origGifMeta = sharpMod.prototype.metadata;
+        let gifMetaCalls = 0;
+        const gifMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockImplementation(function (
+          this: import("sharp").Sharp,
+        ) {
+          gifMetaCalls++;
+          const pages = (this as unknown as { options?: { input?: { pages?: number } } }).options
+            ?.input?.pages;
+          if (gifMetaCalls === 1 || pages === -1) {
+            return Promise.reject(new RangeError("Array buffer allocation failed"));
+          }
+          return origGifMeta.call(this);
+        });
+        try {
+          const gifPart = {
+            name: "file",
+            filename: "animated.gif",
+            contentType: "image/gif",
+            content: readFixture(fixtures.image.animated.gif),
+          };
+          const gifInfoRes = await post("/api/v1/tools/image/gif-tools/info", [gifPart]);
+          expect(gifInfoRes.statusCode, gifInfoRes.body).toBe(503);
+          expect(gifInfoRes.json()).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+          });
+          const gifToolRes = await post("/api/v1/tools/image/gif-tools", [
+            gifPart,
+            { name: "settings", content: JSON.stringify({ mode: "resize", width: 16 }) },
+          ]);
+          expect(gifToolRes.statusCode, gifToolRes.body).toBe(503);
+          expect(gifToolRes.json()).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+          });
+          expect(helperSawEngineDown("gif-tools")).toBe(true);
+          const gifReports = engineReports("gif-tools");
+          expect(gifReports).toHaveLength(1);
+          expect((gifReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+            "DecoderOutOfMemoryError",
+          );
+          expect(
+            mocks.reportEngineUnavailable.mock.calls.filter(
+              ([err, id]) =>
+                (err as { code?: string }).code === "ENGINE_UNAVAILABLE" &&
+                (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+                id === "gif-tools",
+            ),
+          ).toHaveLength(1);
+        } finally {
+          gifMetaSpy.mockRestore();
+        }
+
+        const clientJobId = randomUUID();
+        const pdfBatchRes = await post("/api/v1/tools/pdf/pdf-to-image/batch", [
+          pdfPart("a.pdf"),
+          pdfPart("b.pdf"),
+          { name: "settings", content: JSON.stringify({ dpi: 36, format: "jxl", pages: "1" }) },
+          { name: "clientJobId", content: clientJobId },
+        ]);
+        expect(pdfBatchRes.statusCode, pdfBatchRes.body).toBe(503);
+        expect(pdfBatchRes.json()).toMatchObject({
+          error: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(helperSawEngineDown("pdf-to-image")).toBe(true);
+        // Both DecoderOutOfMemoryError (single-file + preview, deduplicated within window) and DecoderUnavailableError (batch) report once each (#1628).
+        expect(engineReports("pdf-to-image")).toHaveLength(2);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "pdf-to-image",
+          ),
+        ).toHaveLength(2);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderUnavailableError" &&
+              id === "pdf-to-image",
+          ),
+        ).toHaveLength(1);
+
+        const row = await parentRow(clientJobId);
+        expect(row?.status).toBe("failed");
+        expect(row?.error).toMatchObject({
+          message: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(
+          buildBatchReplayEvent({
+            jobId: clientJobId,
+            status: row.status,
+            progress: row.progress,
+            error: row.error,
+          }),
+        ).toMatchObject({
+          status: "failed",
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        encJxlSpy.mockRestore();
+        jpegSpy.mockRestore();
+        pngSpy.mockRestore();
+        writeSpy.mockRestore();
+        nowSpy.mockRestore();
+      }
+    });
+
+    it("worker process functions propagate a CLI decoder fault even on a DNG Sharp can read, and do not retry ENGINE_UNAVAILABLE", async () => {
+      for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
+        const config = getToolConfig(toolId);
+        expect(config, toolId).toBeDefined();
+        const cliSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(new DecoderOutOfMemoryError("Decoder out of memory."));
+        try {
+          await expect(
+            config?.process(DNG, {}, "photo.dng", {
+              scratchDir: "/tmp",
+              signal: new AbortController().signal,
+              report: () => {},
+            }),
+          ).rejects.toMatchObject({
+            name: "DecoderOutOfMemoryError",
+            code: "ENGINE_UNAVAILABLE",
+            statusCode: 503,
+          });
+        } finally {
+          cliSpy.mockRestore();
+        }
+      }
+
+      const CR2 = readFixture(fixtures.image.formats("cr2"));
+      for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
+        const config = getToolConfig(toolId);
+        expect(config, toolId).toBeDefined();
+        const cliSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
+        try {
+          await expect(
+            config?.process(CR2, {}, "photo.cr2", {
+              scratchDir: "/tmp",
+              signal: new AbortController().signal,
+              report: () => {},
+            }),
+          ).rejects.toMatchObject({
+            name: "DecoderUnavailableError",
+            code: "ENGINE_UNAVAILABLE",
+            statusCode: 503,
+          });
+        } finally {
+          cliSpy.mockRestore();
+        }
+      }
+
+      // A DecoderUnavailableError thrown inside a 2-attempt pool worker
+      // settles on attempt 1 without retrying.
+      let calls = 0;
+      const config = getToolConfig("resize");
+      if (!config?.processV2) throw new Error("resize has no processV2");
+      const real = config.processV2;
+      config.processV2 = async () => {
+        calls++;
+        throw new DecoderUnavailableError("No ImageMagick found.");
+      };
+      restoreWorker = () => {
+        config.processV2 = real;
+      };
+      const clientJobId = randomUUID();
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        error: "No ImageMagick found.",
+      });
+      expect(calls).toBe(1);
+      const [aliasRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(aliasRow?.error).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+      });
+      const artifactId =
+        (aliasRow?.settings as { artifactJobId?: string } | null)?.artifactJobId ?? clientJobId;
+      const [artifactRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, artifactId));
+      expect(artifactRow?.attempts).toBe(1);
+      expect(artifactRow?.error).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+      });
+      const queueJob = await getQueue("image").getJob(artifactId);
+      if (queueJob) {
+        expect(queueJob.attemptsMade).toBe(1);
+      }
+    });
+
+    it("an OCR job whose HEIF decoder is missing in the worker keeps ENGINE_UNAVAILABLE on the job row (#1453)", async () => {
+      const errorSpy = vi.spyOn(logger, "error");
+      const heicSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/ocr", [
+          { name: "file", filename: "scan.heic", contentType: "image/heic", content: HEIC },
+          { name: "settings", content: JSON.stringify({ quality: "fast" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(202);
+        const { jobId } = res.json() as { jobId: string };
+
+        let row: typeof schema.jobs.$inferSelect | undefined;
+        for (let i = 0; i < 150; i++) {
+          [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+          if (row?.status === "failed") break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        expect(row?.status).toBe("failed");
+        expect(row?.error).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          httpStatus: 503,
+          message: expect.stringContaining("No HEIF decoder found"),
+        });
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ jobId, toolId: "ocr" }),
+          "tool job failed",
+        );
+
+        const replay = await app.inject({
+          method: "GET",
+          url: `/api/v1/jobs/${jobId}/progress`,
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
+        expect(frame).toMatchObject({
+          phase: "failed",
+          code: "ENGINE_UNAVAILABLE",
+          httpStatus: 503,
+        });
+      } finally {
+        heicSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
+  });
+
+  it("settles a worker-side qpdf binary spawn failure on repair-pdf as an unrecoverable 503 ENGINE_UNAVAILABLE without leaking the binary path (#2937)", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
+    let calls = 0;
+    const config = getToolConfig("repair-pdf");
+    if (!config?.processV2) throw new Error("repair-pdf has no processV2");
+    const real = config.processV2;
+    const spawnOom = Object.assign(new Error("spawn /usr/bin/qpdf ENOMEM"), {
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/qpdf",
+      signal: "SIGKILL" as const,
+    });
+    config.processV2 = async () => {
+      calls++;
+      throw spawnOom;
+    };
+    restoreWorker = () => {
+      config.processV2 = real;
+    };
+
+    try {
+      const clientJobId = randomUUID();
+      const res = await post("/api/v1/tools/pdf/repair-pdf", [
+        pdfPart("damaged.pdf"),
+        { name: "settings", content: "{}" },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toEqual({
+        code: "ENGINE_UNAVAILABLE",
+        error:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+      expect(res.body).not.toContain("/usr/bin/qpdf");
+      expect(calls).toBe(1);
+
+      const [aliasRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(aliasRow?.error).toEqual({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+        message:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+      const artifactId =
+        (aliasRow?.settings as { artifactJobId?: string } | null)?.artifactJobId ?? clientJobId;
+      const [artifactRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, artifactId));
+      expect(artifactRow?.attempts).toBe(1);
+      expect(artifactRow?.error).toEqual({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+        message:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: artifactId,
+          toolId: "repair-pdf",
+          err: expect.objectContaining({
+            name: "SafeError",
+            code: "ENGINE_UNAVAILABLE",
+            statusCode: 503,
+            cause: spawnOom,
+          }),
+        }),
+        "tool job failed",
+      );
+      await vi.waitFor(() => {
+        expect(engineReports("repair-pdf")).toHaveLength(1);
+      });
+
+      const replay = await app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${clientJobId}/progress`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
+      expect(frame).toMatchObject({
+        phase: "failed",
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+        error:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+      expect(JSON.stringify(frame)).not.toContain("/usr/bin/qpdf");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("routes validateImageBuffer and autoOrient DecoderOutOfMemoryError through reportEngineUnavailable and batch preFailures (#3726)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const autoOrientMod = await import("../../../apps/api/src/lib/auto-orient.js");
+    const expiredNow = Date.now() + 50 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+    const oom = () => new RangeError("Array buffer allocation failed");
+    const origMeta = sharpMod.prototype.metadata;
+    const firstPng = Buffer.concat([PNG, Buffer.from([0])]);
+    const firstPngPart = (filename: string) => ({
+      name: "file",
+      filename,
+      contentType: "image/png",
+      content: firstPng,
+    });
+    const rejectFirstPngMeta = function (this: import("sharp").Sharp) {
+      const inputBuf = (this as unknown as { options?: { input?: { buffer?: Buffer } } }).options
+        ?.input?.buffer;
+      if (Buffer.isBuffer(inputBuf) && inputBuf.equals(firstPng)) {
+        return Promise.reject(oom());
+      }
+      return origMeta.call(this);
+    };
+
+    try {
+      // 1. Single-file tool-factory route (ImageInputHandler.prepare -> validateImageBuffer)
+      const singleMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const singleRes = await post("/api/v1/tools/image/resize", [
+          pngPart("one.png"),
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+        ]);
+        expect(singleRes.statusCode, singleRes.body).toBe(503);
+        expect(singleRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        singleMetaSpy.mockRestore();
+      }
+
+      // 2. Batch route: first file fails in validateImageBuffer, second file fails in autoOrient
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 11 * 60_000);
+      const batchMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(rejectFirstPngMeta);
+      const orientSpy = vi
+        .spyOn(autoOrientMod, "autoOrient")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const batchRes = await post("/api/v1/tools/image/resize/batch", [
+          firstPngPart("a.png"),
+          pngPart("b.png"),
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+        ]);
+        expect(batchRes.statusCode, batchRes.body).toBe(503);
+        expect(batchRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          errors: [
+            { filename: "a.png", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.png", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(orientSpy).toHaveBeenCalledTimes(1);
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        orientSpy.mockRestore();
+        batchMetaSpy.mockRestore();
+      }
+
+      // 3. Pipeline execute and pipeline batch
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 22 * 60_000);
+      const pipeMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const pipeExecRes = await post("/api/v1/pipeline/execute", [
+          pngPart("one.png"),
+          {
+            name: "pipeline",
+            content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+          },
+        ]);
+        expect(pipeExecRes.statusCode, pipeExecRes.body).toBe(503);
+        expect(pipeExecRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        pipeMetaSpy.mockRestore();
+      }
+
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 33 * 60_000);
+      const pipeBatchMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(rejectFirstPngMeta);
+      const pipeBatchOrientSpy = vi
+        .spyOn(autoOrientMod, "autoOrient")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const pipeBatchRes = await post("/api/v1/pipeline/batch", [
+          firstPngPart("one.png"),
+          pngPart("two.png"),
+          {
+            name: "pipeline",
+            content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+          },
+        ]);
+        expect(pipeBatchRes.statusCode, pipeBatchRes.body).toBe(503);
+        expect(pipeBatchRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          errors: [
+            { filename: "one.png", code: "ENGINE_UNAVAILABLE" },
+            { filename: "two.png", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(pipeBatchOrientSpy).toHaveBeenCalledTimes(1);
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        pipeBatchOrientSpy.mockRestore();
+        pipeBatchMetaSpy.mockRestore();
+      }
+
+      // 4. POST /api/v1/preview (validateImageBuffer OOM, deduplicated across repeat requests)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 44 * 60_000);
+      const previewMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const firstPreviewRes = await post("/api/v1/preview", [pngPart("one.png")]);
+        await sharpMod(PNG)
+          .metadata()
+          .catch(() => {});
+        const secondPreviewRes = await post("/api/v1/preview", [pngPart("two.png")]);
+        for (const res of [firstPreviewRes, secondPreviewRes]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const previewReports = engineReports("file-preview");
+        expect(previewReports).toHaveLength(1);
+        expect((previewReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        previewMetaSpy.mockRestore();
+      }
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("routes validateImageBuffer and analyzeImage DecoderOutOfMemoryError through sendInputValidationError on optimize-for-web /preview and image-enhancement /analyze (#3831)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const expiredNow = Date.now() + 120 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+    const oom = () => new RangeError("Array buffer allocation failed");
+
+    try {
+      // 1. POST /api/v1/tools/image/optimize-for-web/preview (validateImageBuffer OOM, deduplicated)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      const optMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const firstOptRes = await post("/api/v1/tools/image/optimize-for-web/preview", [
+          pngPart("one.png"),
+        ]);
+        await sharpMod(PNG)
+          .metadata()
+          .catch(() => {});
+        const secondOptRes = await post("/api/v1/tools/image/optimize-for-web/preview", [
+          pngPart("two.png"),
+        ]);
+        for (const res of [firstOptRes, secondOptRes]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const optReports = engineReports("optimize-for-web");
+        expect(optReports).toHaveLength(1);
+        expect((optReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        optMetaSpy.mockRestore();
+      }
+
+      // 2. POST /api/v1/tools/image/image-enhancement/analyze (validateImageBuffer OOM, deduplicated)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 11 * 60_000);
+      const enhMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const firstEnhMetaRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("one.png"),
+        ]);
+        await sharpMod(PNG)
+          .metadata()
+          .catch(() => {});
+        const secondEnhMetaRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("two.png"),
+        ]);
+        for (const res of [firstEnhMetaRes, secondEnhMetaRes]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const enhValidateReports = engineReports("image-enhancement");
+        expect(enhValidateReports).toHaveLength(1);
+        expect((enhValidateReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        enhMetaSpy.mockRestore();
+      }
+
+      // 3. POST /api/v1/tools/image/image-enhancement/analyze (analyzeImage OOM, deduplicated)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 22 * 60_000);
+      const enhStatsSpy = vi
+        .spyOn(sharpMod.prototype, "stats")
+        .mockImplementation(() => Promise.reject(oom()));
+      try {
+        const firstEnhStatsRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("one.png"),
+        ]);
+        await sharpMod(PNG)
+          .stats()
+          .catch(() => {});
+        const secondEnhStatsRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("two.png"),
+        ]);
+        for (const res of [firstEnhStatsRes, secondEnhStatsRes]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const enhAnalyzeReports = engineReports("image-enhancement");
+        expect(enhAnalyzeReports).toHaveLength(1);
+        expect((enhAnalyzeReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        enhStatsSpy.mockRestore();
+      }
+
+      // 4. POST /api/v1/tools/image/optimize-for-web/preview (processImage / encodeJxl V8 OOM and SIGKILL, deduplicated, #3773)
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 33 * 60_000);
+      let jxlCall = 0;
+      const encJxlSpy = vi.spyOn(formatEncoders, "encodeJxl").mockImplementation(async () => {
+        jxlCall++;
+        if (jxlCall === 1) throw oom();
+        throw Object.assign(new Error("Command failed: cjxl"), {
+          signal: "SIGKILL",
+          killed: true,
+        });
+      });
+      try {
+        const jxlSettings = {
+          name: "settings",
+          content: JSON.stringify({ format: "jxl", quality: 80 }),
+        };
+        for (const res of [
+          await post("/api/v1/tools/image/optimize-for-web/preview", [
+            pngPart("one.png"),
+            jxlSettings,
+          ]),
+          await post("/api/v1/tools/image/optimize-for-web/preview", [
+            pngPart("two.png"),
+            jxlSettings,
+          ]),
+        ]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const optProcessReports = engineReports("optimize-for-web");
+        expect(optProcessReports).toHaveLength(1);
+        expect((optProcessReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        encJxlSpy.mockRestore();
+      }
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+});

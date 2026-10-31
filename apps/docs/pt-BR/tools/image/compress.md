@@ -1,6 +1,6 @@
 ---
 description: "Reduza o tamanho do arquivo de imagem por nível de qualidade ou para um tamanho de arquivo alvo."
-i18n_source_hash: 342c5cf1f864
+i18n_source_hash: e1cc52597983
 i18n_provenance: human
 i18n_output_hash: 7f0e414f0a32
 ---

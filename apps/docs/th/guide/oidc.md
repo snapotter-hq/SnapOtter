@@ -1,6 +1,6 @@
 ---
 description: "ตั้งค่า Single Sign-On ด้วย OpenID Connect คู่มือทีละขั้นตอนสำหรับ Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta และผู้ให้บริการ OIDC อื่น ๆ"
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: cf303e97a8f0
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 อย่าตั้งค่า `NODE_TLS_REJECT_UNAUTHORIZED=0` สิ่งนี้จะปิดการตรวจสอบ TLS ทั้งหมดและเป็นความเสี่ยงด้านความปลอดภัย
 :::
+
+## ผู้ออกโทเค็นที่ใช้ http แบบไม่เข้ารหัส {#plain-http-issuers}
+
+SnapOtter ยอมรับ URL ของผู้ออกโทเค็นที่เป็น `http://` ก็ต่อเมื่อ `EXTERNAL_URL` เป็น http แบบไม่เข้ารหัสด้วย ซึ่งเหมาะกับการตั้งค่าทดสอบในเครื่องหรือใน LAN ในกรณีนี้ การค้นหา (discovery) การแลกเปลี่ยนรหัสเข้าสู่ระบบ และโทเค็นจะส่งผ่านเครือข่ายโดยไม่เข้ารหัส SnapOtter จึงบันทึกคำเตือนเมื่อเริ่มทำงานโดยระบุโฮสต์ของผู้ออกโทเค็น หาก `EXTERNAL_URL` เป็น `https://` ผู้ออกโทเค็นที่ใช้ http จะถูกปฏิเสธเมื่อเข้าสู่ระบบ และคำเตือนตอนเริ่มทำงานจะแจ้งเรื่องนี้ ไม่ว่ากรณีใด วิธีแก้คือให้บริการผู้ให้บริการข้อมูลประจำตัวผ่าน https
 
 ## การแก้ไขปัญหา {#troubleshooting}
 

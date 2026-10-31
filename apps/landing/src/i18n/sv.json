@@ -187,7 +187,7 @@
   "faq.q3.q": "Behöver jag en internetanslutning?",
   "faq.q4.a": "Inga artificiella gränser. Du kan bearbeta hur många filer du vill, i valfri storlek. Den enda begränsningen är din servers hårdvaruresurser.",
   "faq.q4.q": "Finns det några begränsningar för filstorlek eller användning?",
-  "faq.q5.a": "SnapOtter innehåller 19 lokala AI-verktyg för bakgrundsborttagning, uppskalning, OCR, transkribering, ansiktsigenkänning, färgläggning, brusreducering, fotorestaurering och mer. Alla modeller körs på din egen hårdvara.",
+  "faq.q5.a": "SnapOtter innehåller 19 lokala AI-verktyg för bakgrundsborttagning, uppskalning, OCR, transkribering, ansiktsdetektering, färgläggning, brusreducering, fotorestaurering och mer. Alla modeller körs på din hårdvara (2 GB RAM kör icke-AI-verktygen, Fast OCR och ansiktsdetektering; CPU AI-paket kräver 4 GB+ RAM, eller 8 GB för HQ-inpainting).",
   "faq.q5.q": "Vilka AI-funktioner ingår?",
   "faq.q6.a": "Anonym produktanalys är påslagen som standard och inkluderar aldrig dina filer eller deras innehåll. Stäng av den när som helst med en admin-inställning i Inställningar > System > Integritet.",
   "faq.q6.q": "Samlar SnapOtter in någon analysdata?",

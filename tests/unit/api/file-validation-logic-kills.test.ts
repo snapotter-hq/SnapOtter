@@ -1,7 +1,8 @@
 import sharp from "sharp";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 
 // Targets the LOGIC survivors of file-validation.ts (L200+): the megapixel
 // limit arithmetic, the null-byte spot-check positions, the SVGZ gzip guard,
@@ -31,6 +32,10 @@ describe("file-validation megapixel limit (L277/L279/L282)", () => {
     expect((res as { reason: string }).reason).toBe(
       "Image exceeds maximum size: 4.0MP (limit: 3MP)",
     );
+    await expect(validateImageBuffer(buf, "big.tga")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.0MP (limit: 3MP)",
+    });
   });
 
   it("accepts the same image when the limit is above its size (kills the > comparison)", async () => {
@@ -45,6 +50,47 @@ describe("file-validation megapixel limit (L277/L279/L282)", () => {
     env.MAX_MEGAPIXELS = 0;
     const res = await validateImageBuffer(buf, "unlimited.png");
     expect(res).toMatchObject({ valid: true, width: 2000, height: 2000 });
+  });
+
+  it("formats near-boundary exceeded megapixels with 2 decimal places (#3062)", async () => {
+    const svg = (w: number, h: number) =>
+      Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"/>`);
+
+    // 10001x10000 = 100.01 MP against MAX_MEGAPIXELS = 100 (where toFixed(1) rounds down to "100.0")
+    env.MAX_MEGAPIXELS = 100;
+    await expect(validateImageBuffer(svg(10_001, 10_000), "near.svg")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 100.01MP (limit: 100MP)",
+    });
+
+    // 1,000,001 x 100 = 100.0001 MP (< 0.005 MP excess) floors at limit + 0.01 instead of rounding down to 100.00 MP
+    await expect(validateImageBuffer(svg(1_000_001, 100), "tiny-excess.svg")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 100.01MP (limit: 100MP)",
+    });
+
+    // 4024x1000 = 4.024 MP rounds down to 4.02 MP (kills Math.ceil mutant)
+    env.MAX_MEGAPIXELS = 4;
+    await expect(validateImageBuffer(await png(4024, 1000), "round-down.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.02MP (limit: 4MP)",
+    });
+
+    // 4045x1000 = 4.045 MP: IEEE-754 (4.045).toFixed(2) === "4.04", must round to 4.05 MP via Math.round
+    await expect(validateImageBuffer(await png(4045, 1000), "ieee.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.05MP (limit: 4MP)",
+    });
+
+    // 4050x1000 = 4.05 MP ((4.05).toFixed(1) === "4.0" in IEEE-754 -> 4.05 MP) vs 4051x1000 = 4.051 MP -> 4.1 MP
+    await expect(validateImageBuffer(await png(4050, 1000), "upper-two-dec.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.05MP (limit: 4MP)",
+    });
+    await expect(validateImageBuffer(await png(4051, 1000), "one-dec.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.1MP (limit: 4MP)",
+    });
   });
 });
 
@@ -81,7 +127,7 @@ describe("file-validation SVGZ gzip guard (L235-L236)", () => {
   it("accepts an .svgz file that starts with the gzip magic 1f 8b", async () => {
     const buf = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00]);
     const res = await validateImageBuffer(buf, "icon.svgz");
-    expect(res).toEqual({ valid: true, format: "svg", width: 0, height: 0 });
+    expect(res).toEqual({ valid: true, format: "svg", width: 0, height: 0, nameOnly: true });
   });
 
   it("rejects an .svgz whose first byte is not 0x1f (kills the byte[0] check)", async () => {
@@ -114,5 +160,99 @@ describe("file-validation extension extraction + TGA (L216, L228)", () => {
     const buf = Buffer.alloc(18, 0x11);
     const res = await validateImageBuffer(buf);
     expect(res).toEqual({ valid: false, reason: "Unrecognized image format" });
+  });
+
+  it("ignores extensionless and leading-dot filenames that spell an extension (#3245)", async () => {
+    const pngBuf = await png(10, 10);
+    for (const name of ["tga", ".tga", "tga.", "dng", ".dng", "svgz", ".svgz", "apng", ".apng"]) {
+      await expect(validateImageBuffer(pngBuf, name)).resolves.toEqual({
+        valid: true,
+        format: "png",
+        width: 10,
+        height: 10,
+      });
+    }
+
+    const tiffBuf = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .tiff()
+      .toBuffer();
+    for (const name of ["dng", ".dng", "dng."]) {
+      await expect(validateImageBuffer(tiffBuf, name)).resolves.toEqual({
+        valid: true,
+        format: "tiff",
+        width: 10,
+        height: 10,
+      });
+    }
+
+    const textBuf = Buffer.from("hello");
+    const gzipNonSvg = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00]);
+    for (const [buf, name] of [
+      [textBuf, "tga"],
+      [textBuf, ".tga"],
+      [textBuf, "dng"],
+      [textBuf, ".dng"],
+      [textBuf, "apng"],
+      [textBuf, ".apng"],
+      [gzipNonSvg, "svgz"],
+      [gzipNonSvg, ".svgz"],
+    ] as const) {
+      await expect(validateImageBuffer(buf, name)).resolves.toEqual({
+        valid: false,
+        reason: "Unrecognized image format",
+      });
+    }
+  });
+});
+
+describe("file-validation metadata OOM propagation (#3717)", () => {
+  it("rethrows DecoderOutOfMemoryError when sharp.prototype.metadata rejects with a V8 allocation RangeError or libheif OOM", async () => {
+    const buf = await png(10, 10);
+    const oomErr = new RangeError("Array buffer allocation failed");
+    const heifOomErr = new Error(
+      "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed",
+    );
+    const metaSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(oomErr)
+      .mockRejectedValueOnce(heifOomErr)
+      .mockRejectedValueOnce(new RangeError("Invalid count value"));
+    try {
+      const caught = await validateImageBuffer(buf, "sample.png").catch((e: unknown) => e);
+      expect(caught).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(caught).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: oomErr,
+      });
+
+      const caughtHeif = await validateImageBuffer(buf, "sample.png").catch((e: unknown) => e);
+      expect(caughtHeif).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(caughtHeif).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: heifOomErr,
+      });
+
+      await expect(validateImageBuffer(buf, "sample.png")).resolves.toEqual({
+        valid: false,
+        reason: "Failed to read image metadata",
+        cause: expect.any(Error),
+      });
+    } finally {
+      metaSpy.mockRestore();
+    }
+
+    await expect(
+      validateImageBuffer(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00]), "corrupt.png"),
+    ).resolves.toEqual({
+      valid: false,
+      reason: "Failed to read image metadata",
+      cause: expect.any(Error),
+    });
   });
 });

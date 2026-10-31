@@ -1,6 +1,6 @@
 ---
 description: "페이지 크기, 방향, 목표 파일 크기 옵션과 함께 하나 이상의 이미지를 PDF 문서로 결합합니다."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 2858baee8272
 ---

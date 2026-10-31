@@ -1,8 +1,8 @@
 ---
 description: "Tutte le variabili d'ambiente di SnapOtter con i valori predefiniti. Configura autenticazione, archiviazione, modelli AI, analisi e altro."
-i18n_source_hash: 25970c776f7c
+i18n_source_hash: a694a81ef7e0
 i18n_provenance: human
-i18n_output_hash: 06445505769a
+i18n_output_hash: 4920c904b106
 i18n_hash_version: 2
 ---
 
@@ -17,6 +17,7 @@ Tutta la configurazione avviene tramite variabili d'ambiente. Ogni variabile ha 
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
 | `PORT` | `1349` | Porta su cui il server è in ascolto. |
+| `BASE_PATH` | (vuoto) | Percorso di deployment pubblico, ad es. `/snapotter`. Se vuoto o `/`, l'app viene servita alla radice del dominio. Applicato a runtime; nessuna ricostruzione dell'immagine necessaria. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Numero massimo di richieste al minuto per IP. Imposta a 0 per disabilitare il rate limiting. |
 | `CORS_ORIGIN` | (vuoto) | Origini consentite per CORS separate da virgola, oppure vuoto per solo same-origin. |
 | `LOG_LEVEL` | `info` | Verbosità dei log. Uno tra: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -40,7 +41,8 @@ I due booleani qui sotto accettano solo `true` e `false`. Qualsiasi altro valore
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` o `s3`. S3 e MinIO richiedono una licenza con la funzionalità s3_storage, oltre alle variabili `S3_*` qui sotto. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Stringa di connessione PostgreSQL. Lo stack Compose la punta al suo servizio `postgres`; lasciala non impostata (insieme a `REDIS_URL`) per ottenere la modalità embedded. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Stringa di connessione PostgreSQL, e la connessione su cui viene servita ogni richiesta. Dalla 2.3.0, imposta anche `DATABASE_MIGRATION_URL` e questa diventa il ruolo di runtime con privilegi minimi, con DML sulle tabelle dell'app e nient'altro. Lo stack Compose la punta al suo servizio `postgres`; lasciala non impostata (insieme a `REDIS_URL`) per ottenere la modalità embedded. |
+| `DATABASE_MIGRATION_URL` | (vuoto) | Disponibile dalla 2.3.0; l'immagine 2.2.0 la ignora e richiede che `DATABASE_URL` indichi il proprietario del database. Connessione privilegiata, usata solo durante l'avvio per eseguire le migrazioni e concedere i permessi al ruolo di runtime, poi chiusa prima della prima richiesta. Lasciala vuota e SnapOtter funziona in modalità a ruolo unico, con `DATABASE_URL` che svolge entrambi i compiti. Vedi [Ruoli con privilegi minimi](/it/guide/database#least-privilege-roles). |
 | `REDIS_URL` | `redis://localhost:6379` | Stringa di connessione Redis (usata per le code di lavori BullMQ). Compose la punta al suo servizio `redis`. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory per i file temporanei durante l'elaborazione. Pulita automaticamente. L'immagine imposta `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory per i file utente persistenti (immagini caricate, risultati salvati). L'immagine imposta `/data/files`. |
@@ -74,6 +76,8 @@ Esegui l'immagine senza `DATABASE_URL` e senza `REDIS_URL` e avvia il proprio Po
 |---|---|---|
 | `EMBEDDED` | `auto` | Abilitata automaticamente quando sia `DATABASE_URL` sia `REDIS_URL` non sono impostate. Imposta a `0` per disabilitarla (l'app allora fallisce rapidamente se non è impostato alcun `DATABASE_URL`/`REDIS_URL` esterno, invece di avviare silenziosamente un database in-container). |
 | `REDIS_MAXMEMORY` | `512mb` | Limite di memoria per il Redis embedded (solo modalità embedded). Abbassalo su host con memoria limitata come un Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Secondi che l'avvio attende perché il Redis embedded risponda a `PING` prima di arrendersi. Allo scadere del timeout il container si ferma e registra il motivo, invece di restare bloccato. Secondi interi da 1 a 999999; non esiste un valore illimitato, perché attendere per sempre è proprio il guasto che questo limite previene. Alzalo solo se un host lento lo supera. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Lo stesso per il PostgreSQL embedded. Il conteggio parte dopo il completamento di `initdb` al primo avvio, quindi copre l'avvio del server e il ripristino da crash anziché la creazione iniziale del database. |
 
 Aggiornamento dalla 1.x: metti il tuo vecchio `snapotter.db` in `/data/snapotter.db` nel volume e la modalità embedded lo importa nel PostgreSQL embedded al primo avvio. L'importazione avviene una volta sola; gli avvii successivi la saltano.
 
@@ -93,6 +97,23 @@ Nota sulla telemetria: la modalità embedded eredita il valore predefinito delle
 | `MAX_CANVAS_PIXELS` | `0` (nessun limite) | Dimensione massima del canvas in pixel per le immagini di output. Imposta a 0 per nessun limite. |
 | `MAX_SVG_SIZE_MB` | `50` | Il più grande SVG accettato prima della sanificazione, in megabyte. Qui `0` si comporta diversamente rispetto alle righe vicine. Rimuove del tutto il limite di dimensione applicato prima del parsing invece di alzarlo, quindi lascia questo valore impostato. |
 | `MAX_PDF_PAGES` | `0` (illimitato) | Numero massimo di pagine PDF per la conversione PDF-a-immagine. Imposta a 0 per illimitato. |
+
+### Motori di elaborazione {#engines}
+
+SnapOtter cerca ogni binario di elaborazione nel `$PATH` all'interno del container, quindi queste variabili restano vuote a meno che tu non monti una build personalizzata.
+
+| Variabile | Predefinito | Descrizione |
+|---|---|---|
+| `FFMPEG_PATH` | (vuoto) | Percorso del binario `ffmpeg` usato dagli strumenti video e audio. |
+| `FFPROBE_PATH` | (vuoto) | Percorso di `ffprobe`, che legge i file multimediali prima dell'elaborazione. Puntalo alla stessa build di `FFMPEG_PATH`. |
+| `QPDF_PATH` | (vuoto) | Percorso di `qpdf`, usato dagli strumenti PDF e per verificare i PDF caricati. |
+| `SOFFICE_PATH` | (vuoto) | Percorso di `soffice` di LibreOffice, usato per le conversioni dei documenti office. |
+| `PDFCPU_PATH` | (vuoto) | Percorso di `pdfcpu`, usato da alcuni strumenti PDF. |
+| `SNAPOTTER_HW_ACCEL` | (vuoto) | Famiglia di encoder video hardware, `nvenc` o `vaapi`. Se vuoto, la codifica avviene via software. |
+
+`SNAPOTTER_HW_ACCEL` richiede un ffmpeg compilato con quella famiglia di encoder, e il binario ffmpeg presente nell'immagine non ne include nessuna. Con il binario dell'immagine l'impostazione ricade sulla codifica software e lo segnala nel log di avvio. Per usarla, monta una tua build di ffmpeg, punta `FFMPEG_PATH` e `FFPROBE_PATH` su di essa e assegna al container il dispositivo GPU. Per `nvenc`, imposta anche `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: l'immagine richiede solo `compute,utility` e, senza `video`, il runtime NVIDIA non monta la libreria di codifica, quindi l'encoder viene elencato ma ogni codifica fallisce. Anche un override di percorso inesistente o non eseguibile viene indicato nel log di avvio e ogni lavoro che richiede quel binario fallisce finché non correggi il percorso o lo rimuovi.
+
+I file Compose pubblicati passano tutte e sei le variabili da `.env`, quindi impostarle lì è sufficiente.
 
 ### Pulizia {#cleanup}
 

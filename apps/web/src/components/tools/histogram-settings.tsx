@@ -50,8 +50,12 @@ export function HistogramSettings() {
   });
   const [scale, setScale] = useState<"linear" | "log">("linear");
 
-  const bins = resultPayload?.bins as Record<ChannelKey, number[]> | undefined;
-  const stats = resultPayload?.stats as Record<ChannelKey, ChannelStats> | undefined;
+  const bins = downloadUrl
+    ? (resultPayload?.bins as Record<ChannelKey, number[]> | undefined)
+    : undefined;
+  const stats = downloadUrl
+    ? (resultPayload?.stats as Record<ChannelKey, ChannelStats> | undefined)
+    : undefined;
 
   const maxVal = useMemo(() => {
     if (!bins) return 0;

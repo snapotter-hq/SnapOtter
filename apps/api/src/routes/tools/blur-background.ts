@@ -1,20 +1,45 @@
 import { randomUUID } from "node:crypto";
 import { removeBackground } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  getBundleForTool,
+  hasServerErrorStatus,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
-import { autoOrient } from "../../lib/auto-orient.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../../jobs/types.js";
 import { blurBackground } from "../../lib/bg-effects.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+} from "../../lib/object-storage.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 
@@ -30,59 +55,75 @@ registerAiJobHandler("blur-background", async (input, data, ctx) => {
 
   ctx.report(5, "Removing background");
 
-  const subjectPng = await removeBackground(
-    input,
-    ctx.scratchDir,
-    { signal: ctx.signal },
-    (percent, stage) => {
-      // Scale rembg progress into 5..80 range
-      const scaled = 5 + Math.round(percent * 0.75);
-      ctx.report(Math.min(scaled, 80), stage);
-    },
-  );
+  let subjectPng: Buffer;
+  try {
+    subjectPng = await removeBackground(
+      input,
+      ctx.scratchDir,
+      { signal: ctx.signal, toolId: "blur-background" },
+      (percent, stage) => {
+        // Scale rembg progress into 5..80 range
+        const scaled = 5 + Math.round(percent * 0.75);
+        ctx.report(Math.min(scaled, 80), stage);
+      },
+    );
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(input, err);
+  }
 
   ctx.report(85, "Blurring background");
 
-  // If feather > 0, soften the subject alpha edge before compositing. Read the
-  // subject as raw RGBA plus a separately-blurred copy of its alpha and
-  // overwrite the alpha bytes in place; joinChannel does not reliably re-tag the
-  // merged channel as alpha.
-  let compositeSubject = subjectPng;
-  if (settings.feather > 0) {
-    const { data: rgba, info } = await sharp(subjectPng)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const { data: blurredAlpha } = await sharp(subjectPng)
-      .extractChannel(3)
-      .blur(settings.feather)
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    for (let p = 3, a = 0; p < rgba.length; p += 4, a++) {
-      rgba[p] = blurredAlpha[a];
-    }
-    compositeSubject = await sharp(rgba, {
-      raw: { width: info.width, height: info.height, channels: 4 },
-    })
-      .png()
-      .toBuffer();
-  }
+  return withImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Background blur failed",
+    (s) => s.format,
+    async (inputBuffer, s, filename) => {
+      // If feather > 0, soften the subject alpha edge before compositing. Read the
+      // subject as raw RGBA plus a separately-blurred copy of its alpha and
+      // overwrite the alpha bytes in place; joinChannel does not reliably re-tag the
+      // merged channel as alpha.
+      let compositeSubject = subjectPng;
+      if (s.feather > 0) {
+        const { data: rgba, info } = await sharp(subjectPng)
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const { data: blurredAlpha } = await sharp(subjectPng)
+          .extractChannel(3)
+          .blur(s.feather)
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        for (let p = 3, a = 0; p < rgba.length; p += 4, a++) {
+          rgba[p] = blurredAlpha[a];
+        }
+        compositeSubject = await sharp(rgba, {
+          raw: { width: info.width, height: info.height, channels: 4 },
+        })
+          .png()
+          .toBuffer();
+      }
 
-  const blurred = await blurBackground(input, compositeSubject, settings.intensity);
+      let blurred: Buffer;
+      try {
+        blurred = await blurBackground(inputBuffer, compositeSubject, s.intensity);
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(inputBuffer, err);
+      }
 
-  // Encode in the requested output format
-  const fmt = settings.format;
-  const base = data.filename.replace(/\.[^.]+$/, "");
-  const outName = `${base}_blurbg.${fmt}`;
-  const contentType = fmt === "webp" ? "image/webp" : "image/png";
-  const result =
-    fmt === "webp" ? await sharp(blurred).webp({ lossless: true }).toBuffer() : blurred; // blurBackground already returns PNG
+      // Encode in the requested output format
+      const fmt = s.format;
+      const base = filename.replace(/\.[^.]+$/, "");
+      const outName = `${base}_blurbg.${fmt}`;
+      const contentType = fmt === "webp" ? "image/webp" : "image/png";
+      const result =
+        fmt === "webp" ? await sharp(blurred).webp({ lossless: true }).toBuffer() : blurred; // blurBackground already returns PNG
 
-  return {
-    buffer: result,
-    filename: outName,
-    contentType,
-  };
+      return {
+        buffer: result,
+        filename: outName,
+        contentType,
+      };
+    },
+  )(input, settings, data.filename, ctx);
 });
 
 export function registerBlurBackground(app: FastifyInstance) {
@@ -107,6 +148,7 @@ export function registerBlurBackground(app: FastifyInstance) {
       let filename = "image";
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
       let fileId: string | null = null;
       let saveModeRaw: string | null = null;
       let inputKey: string | null = null;
@@ -121,10 +163,7 @@ export function registerBlurBackground(app: FastifyInstance) {
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           } else if (part.fieldname === "fileId") {
             fileId = part.value as string;
           } else if (part.fieldname === "saveMode") {
@@ -132,97 +171,129 @@ export function registerBlurBackground(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        await discardUnenqueuedUploads(jobId, request.log);
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
-      // Stamp the client-facing alias before any pre-enqueue work (#892): a
-      // cancel landing between parse and enqueueToolJob needs a durable pointer
-      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      if (!inputKey) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const { getObjectBuffer, putObject } = await import("../../lib/object-storage.js");
-      fileBuffer = await getObjectBuffer(inputKey);
-
-      if (!fileBuffer || fileBuffer.length === 0) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-
-      let settings: z.infer<typeof settingsSchema>;
+      let enqueued = false;
+      let aliasStamped = false;
       try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
         }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
+        clientJobId = clientJobIdField ?? null;
 
-      try {
-        if (validation.format === "heif") {
-          fileBuffer = await decodeHeic(fileBuffer);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+        // Stamp the client-facing alias before any pre-enqueue work (#892): a
+        // cancel landing between parse and enqueueToolJob needs a durable pointer
+        // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
         }
-        if (needsCliDecode(validation.format)) {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
         }
-        fileBuffer = await autoOrient(fileBuffer);
-      } catch (err) {
-        request.log.error({ err, toolId }, "Input decoding failed");
-        return reply.status(422).send({
-          error: "Processing failed",
-          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
-        });
+
+        if (!inputKey) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        try {
+          fileBuffer = await getObjectBuffer(inputKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
+
+        if (!fileBuffer || fileBuffer.length === 0) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        const validation = await validateImageBuffer(fileBuffer, filename);
+        if (!validation.valid) {
+          return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+        }
+
+        let settings: z.infer<typeof settingsSchema>;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply
+              .status(400)
+              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        try {
+          const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+            log: request.log,
+            rewriteFilenameToPng: true,
+            rasterizeSvg: true,
+          });
+          fileBuffer = prepared.buffer;
+          filename = prepared.filename;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
+          }
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId }, "Input decoding failed");
+          }
+          return reply.status(422).send({
+            error: "Processing failed",
+            details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+          });
+        }
+
+        const decodedKey = `uploads/${jobId}/${filename}`;
+        if (decodedKey !== inputKey) {
+          await putObject(decodedKey, fileBuffer);
+          inputKey = decodedKey;
+        } else {
+          await putObject(inputKey, fileBuffer);
+        }
+
+        enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [inputKey],
+          filename,
+          settings,
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        };
+        try {
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
+
+        return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      } finally {
+        if (!enqueued) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
+        }
       }
-
-      const decodedKey = `uploads/${jobId}/${filename}`;
-      if (decodedKey !== inputKey) {
-        await putObject(decodedKey, fileBuffer);
-        inputKey = decodedKey;
-      } else {
-        await putObject(inputKey, fileBuffer);
-      }
-
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [inputKey],
-        filename,
-        settings,
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-      });
-
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }

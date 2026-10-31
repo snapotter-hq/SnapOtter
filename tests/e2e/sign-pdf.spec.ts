@@ -42,7 +42,7 @@ async function uploadPdf(page: Page): Promise<void> {
 // This whole path is pure client-side until the user clicks Apply & Download.
 async function placeUploadedSignature(page: Page): Promise<void> {
   await page.getByRole("button", { name: "+ New" }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = page.getByRole("dialog", { name: "Create signature" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Upload", exact: true }).click();
   // The hidden file input only mounts once the Upload tab is active. Scope it to
@@ -74,6 +74,128 @@ test.describe("Sign PDF tool", () => {
     // image asynchronously and only then bumps the count, so toBeEnabled
     // auto-retries until the count propagates to the settings panel.
     await expect(apply).toBeEnabled();
+  });
+
+  // #2248: rotating a phone across the 768px breakpoint swapped the mobile and
+  // desktop branches of ToolPage with mismatched keys on the image-area div,
+  // unmounting SignCanvas and destroying every placed signature.
+  test("keeps the placed signature when rotating across 768px", async ({ loggedInPage: page }) => {
+    let submittedBody = "";
+    await page.route("**/api/v1/tools/pdf/sign-pdf", async (route) => {
+      submittedBody = route.request().postData() ?? "";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          jobId: "job-rotate-2248",
+          downloadUrl: "/api/v1/download/job-rotate-2248/test-3page_signed.pdf",
+          originalSize: 1024,
+          processedSize: 1280,
+        }),
+      });
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/pdf/sign-pdf");
+    await uploadPdf(page);
+
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    const apply = page.getByRole("button", { name: /Apply & Download/ });
+    await expect(apply).toBeDisabled();
+
+    await placeUploadedSignature(page);
+    await expect(apply).toBeEnabled();
+
+    // Rotate to landscape (>= 768px): desktop sidebar mounts, SignCanvas survives.
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible();
+    await expect(apply).toBeEnabled();
+
+    // Rotate back to portrait (< 768px): mobile sheet still sees the placement and exports it.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible();
+    await expect(apply).toBeEnabled();
+
+    await apply.click();
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
+    expect(submittedBody).toContain('"page":0');
+
+    // #2512: rotating across 768px after the sign finishes remounts SignPdfSettings;
+    // the signed PDF download link must stay visible in the desktop sidebar.
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
+
+    // #2535: dragging the placed signature on the Konva stage invalidates the
+    // prior download link and swaps the panel back to Apply & Download.
+    const canvasBox = await page.getByTestId("sign-pdf-canvas").boundingBox();
+    expect(canvasBox).not.toBeNull();
+    if (canvasBox) {
+      const startX = canvasBox.x + canvasBox.width * 0.5;
+      const startY = canvasBox.y + canvasBox.height * 0.5;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + 40, startY + 20, { steps: 5 });
+      await page.mouse.up();
+    }
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toHaveCount(0);
+    await expect(apply).toBeEnabled();
+
+    // Rotating across 768px after a placement edit keeps Apply & Download visible.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toHaveCount(0);
+    await expect(apply).toBeEnabled();
+
+    // Re-signing clears the stale state and shows Download signed PDF again.
+    await apply.click();
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
+  });
+
+  // #1969: a failed sign marks its entry failed, which turns on the page's
+  // report-issue button. The page's failed-file card must not take the canvas
+  // away with it, or the placed signatures would be lost and Apply would have
+  // nothing to retry with. The request is answered here, so this runs without
+  // PyMuPDF.
+  test("keeps the canvas and the placed signature when the sign fails", async ({
+    loggedInPage: page,
+  }) => {
+    await page.route("**/api/v1/tools/pdf/sign-pdf", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Processing failed" }),
+      }),
+    );
+
+    await page.goto("/pdf/sign-pdf");
+    await uploadPdf(page);
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible({ timeout: 15_000 });
+    await placeUploadedSignature(page);
+
+    const apply = page.getByRole("button", { name: /Apply & Download/ });
+    await expect(apply).toBeEnabled();
+    await apply.click();
+
+    // The panel's own error line. The page's live region announces the same
+    // text for screen readers, so match the visible paragraph only.
+    await expect(
+      page.locator("p.text-destructive").filter({ hasText: "Processing failed" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Report issue" })).toBeVisible();
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible();
+    await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(0);
+    // The placement survived, so the user can retry straight away.
+    await expect(apply).toBeEnabled();
+
+    // #2512: rotating across 768px after a failed sign remounts SignPdfSettings;
+    // the error message must stay visible alongside Report issue.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    await expect(
+      page.locator("p.text-destructive").filter({ hasText: "Processing failed" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Report issue" })).toBeVisible();
   });
 
   // Stamping calls the Python sidecar (doc_sign, which needs PyMuPDF). The e2e

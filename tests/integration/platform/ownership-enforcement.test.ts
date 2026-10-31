@@ -74,11 +74,11 @@ beforeAll(async () => {
   userAToken = await createAndLogin(testApp.app, adminToken, userAName, "user");
   userBToken = await createAndLogin(testApp.app, adminToken, userBName, "user");
   editorToken = await createAndLogin(testApp.app, adminToken, editorName, "editor");
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ── File ownership ────────────────────────────────────────────────────
 

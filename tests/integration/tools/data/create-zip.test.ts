@@ -16,11 +16,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("create-zip (pure JS, no skipIf)", () => {
   it("zips two fixture files into a valid ZIP with PK magic", async () => {

@@ -12,7 +12,6 @@ import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import {
   type ExternalAuthResult,
-  findUniqueUsername,
   resolveExternalUser,
   sanitizeUsername,
   UsernameRaceExhaustedError,
@@ -20,6 +19,7 @@ import {
 import { authAttempts } from "../lib/metrics.js";
 import { makeRedisSamlCacheProvider } from "../lib/saml-cache.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
+import { evictExcessUserSessions, readMaxSessionsPerUser } from "../lib/session-cookie.js";
 import { createSessionToken } from "./auth.js";
 import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
 
@@ -144,10 +144,10 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
         ? (profile[env.SAML_USERNAME_ATTRIBUTE] as string | undefined)
         : undefined;
 
-      // Derive a username from available claims
+      // Derive a username from available claims. The resolver owns collision
+      // suffixes, and only when it auto-creates, matching the OIDC callback.
       const rawUsername = usernameAttr || email?.split("@")[0] || profile.nameID;
-      let username = sanitizeUsername(rawUsername);
-      username = await findUniqueUsername(username);
+      const username = sanitizeUsername(rawUsername);
 
       // Resolve user via shared external-auth resolver
       let result: ExternalAuthResult;
@@ -204,10 +204,8 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
 
       const resolvedUser = result.user;
 
-      // Unguarded on purpose: this read decides whether MFA gets checked at
-      // all, so a DB error here must fail the login, not silently skip MFA
-      // for an enrolled user. The try/catch below is scoped only to the
-      // optional MFA plugin/policy lookup, same as it always was.
+      // This read decides whether MFA gets checked at all, so a DB error here
+      // must fail the login, never silently skip MFA for an enrolled user.
       let dbUser: { totpEnabled: boolean } | undefined;
       try {
         [dbUser] = await db
@@ -219,6 +217,19 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
           { err, userId: resolvedUser.id },
           "SAML callback: failed to read MFA enrollment status",
         );
+        // request.log has no Sentry bridge, and by catching here the error
+        // never reaches the global handler's reportError. Report explicitly
+        // so a database fault denying every SSO login is visible in triage.
+        // The subsystem tag tells it apart from the MFA-policy fault below:
+        // an operational fault groups by its code, so the two can share an
+        // issue.
+        void reportError(err, {
+          source: "http",
+          route: request.routeOptions?.url,
+          method: request.method,
+          statusCode: 503,
+          subsystem: "mfa-enrollment",
+        });
         authAttempts.inc({ method: "saml", result: "failure" });
         await audit("SAML_LOGIN_FAILED", {
           userId: resolvedUser.id,
@@ -313,13 +324,17 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
       }
 
       // Create session (same pattern as OIDC)
+      const maxSessions = await readMaxSessionsPerUser();
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: resolvedUser.id,
-        expiresAt,
+      await db.transaction(async (tx) => {
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: resolvedUser.id,
+          expiresAt,
+        });
+        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions, token);
       });
 
       authAttempts.inc({ method: "saml", result: "success" });

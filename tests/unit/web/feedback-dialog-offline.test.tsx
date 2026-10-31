@@ -77,6 +77,43 @@ describe("FeedbackDialog off-state handoff", () => {
     expect(screen.queryByText("Thanks for the feedback.")).toBeNull();
   });
 
+  it.each(["tool_result", "admin_installer", "onboarding"] as const)(
+    "offers the handoff instead of thanks for %s when the server declines it (#2252)",
+    async (source) => {
+      submitFeedback.mockResolvedValue({ ok: true, accepted: false });
+      render(<FeedbackDialog open source={source} onClose={vi.fn()} />);
+
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "The survey still had something to say" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+      const githubLink = await screen.findByRole("link", { name: "Open a GitHub issue" });
+      expect(githubLink.getAttribute("href")).toContain("template=feedback.yml");
+      const details = new URL(githubLink.getAttribute("href") ?? "").searchParams.get("details");
+      expect(details).toContain("The survey still had something to say");
+      expect(screen.getByRole("link", { name: "Email us" })).toBeDefined();
+      expect(screen.queryByText("Thanks for the feedback.")).toBeNull();
+    },
+  );
+
+  // The search_miss branch predates #2252; this keeps the branch rewrite from
+  // routing a declined feature request to the generic GitHub/email handoff.
+  it("keeps the search_miss discussions handoff when the server declines it", async () => {
+    submitFeedback.mockResolvedValue({ ok: true, accepted: false });
+    render(
+      <FeedbackDialog open source="search_miss" searchQuery="convert to dicom" onClose={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    const discussionsLink = await screen.findByRole("link", {
+      name: /Open a request in Discussions/,
+    });
+    expect(discussionsLink.getAttribute("href")).toContain("/discussions/new");
+    expect(screen.queryByText("Thanks for the feedback.")).toBeNull();
+  });
+
   it("shows the normal thanks when the feedback is recorded", async () => {
     submitFeedback.mockResolvedValue({ ok: true, accepted: true });
     render(<FeedbackDialog open source="global" onClose={vi.fn()} />);

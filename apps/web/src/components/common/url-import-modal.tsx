@@ -10,7 +10,9 @@ import { extractUrls } from "@/lib/url-parser";
 
 interface UrlImportModalProps {
   onClose: () => void;
-  onImport: (files: File[]) => void;
+  onImport: (files: File[]) => boolean | undefined;
+  fileFilter?: (file: File) => boolean;
+  unsupportedMessage?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -44,17 +46,36 @@ function filenameFromUrl(url: string): string {
 
 // ── Component ──────────────────────────────────────────────────
 
-export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
+export function UrlImportModal({
+  onClose,
+  onImport,
+  fileFilter,
+  unsupportedMessage,
+}: UrlImportModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, true);
+  const onImportRef = useRef(onImport);
+  onImportRef.current = onImport;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [text, setText] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const { entries, importing, importUrls, addReadyFiles, retryUrl, cancel, reset, readyCount } =
-    useUrlImport();
+  const {
+    entries,
+    importing,
+    importUrls,
+    addReadyFiles,
+    removeEntries,
+    retryUrl,
+    cancel,
+    reset,
+    readyCount,
+  } = useUrlImport({ fileFilter, unsupportedMessage });
 
   const hasResults = entries.length > 0;
+  const retrying = entries.some((entry) => entry.status === "fetching");
 
   const handleImport = useCallback(() => {
     const urls = extractUrls(text);
@@ -63,22 +84,27 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
   }, [text, importUrls]);
 
   const handleAdd = useCallback(async () => {
-    if (readyCount === 0) return;
+    if (readyCount === 0 || retrying) return;
     setAdding(true);
     try {
       const files = await addReadyFiles();
-      if (files.length > 0) {
-        onImport(files);
-        onClose();
+      const accepted = files.length > 0 && onImportRef.current(files) !== false;
+      if (files.failedCount === 0 && files.fulfilledIndices.length === entries.length) {
+        if (accepted) {
+          onCloseRef.current();
+        }
+      } else if (accepted) {
+        removeEntries(files.fulfilledIndices);
       }
     } finally {
       setAdding(false);
     }
-  }, [readyCount, addReadyFiles, onImport, onClose]);
+  }, [readyCount, retrying, addReadyFiles, entries.length, removeEntries]);
 
   const handleBack = useCallback(() => {
+    if (retrying) return;
     reset();
-  }, [reset]);
+  }, [retrying, reset]);
 
   const handleClose = useCallback(() => {
     cancel();
@@ -147,14 +173,23 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                     {entry.filename || filenameFromUrl(entry.url)}
                   </span>
                   {entry.status === "failed" && (
-                    <button
-                      type="button"
-                      onClick={() => retryUrl(i)}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground"
-                      title={t.urlImport.retryButton}
-                    >
-                      <RotateCw className="h-3.5 w-3.5" />
-                    </button>
+                    <>
+                      <span
+                        className="text-xs text-destructive max-w-[50%] truncate"
+                        title={entry.error || t.urlImport.failedStatus}
+                      >
+                        {entry.error || t.urlImport.failedStatus}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => retryUrl(i)}
+                        disabled={adding}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={t.urlImport.retryButton}
+                      >
+                        <RotateCw className="h-3.5 w-3.5" />
+                      </button>
+                    </>
                   )}
                   {entry.status === "ready" && entry.size != null && (
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -178,14 +213,15 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="px-4 py-2 text-sm rounded-lg border border-border text-foreground hover:bg-muted"
+                  disabled={retrying}
+                  className="px-4 py-2 text-sm rounded-lg border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t.common.back}
                 </button>
                 <button
                   type="button"
                   onClick={handleAdd}
-                  disabled={readyCount === 0 || adding}
+                  disabled={readyCount === 0 || adding || retrying}
                   className="px-4 py-2 text-sm rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {adding ? (

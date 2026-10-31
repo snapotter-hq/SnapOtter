@@ -5,9 +5,11 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { trace } from "@opentelemetry/api";
 import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
+import { configureSharpConcurrency } from "@snapotter/image-engine";
 import { ANALYTICS_EVENTS, APP_VERSION, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import Fastify from "fastify";
+import sharp from "sharp";
 import { env } from "./config.js";
 import { closeDb, db, schema } from "./db/index.js";
 import {
@@ -19,15 +21,20 @@ import {
 import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { assertRedisCompatible, closeRedis, pingRedis } from "./jobs/connection.js";
 import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enqueue.js";
-import { reconcileStrandedJobs } from "./jobs/job-reconciliation.js";
+import {
+  reconcileOrphanedJobsAtStartup,
+  reconcileStrandedJobs,
+} from "./jobs/job-reconciliation.js";
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
+import { routeAiLogsToPino } from "./lib/ai-log-sink.js";
 import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js";
 import { stripBasePath } from "./lib/base-path.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
+import { resolveWorkerThreads, warnIfExternalUrlCanonicalized } from "./lib/env.js";
 import { setSentryInstanceTag } from "./lib/error-report.js";
 import {
   acquireInstallLock,
@@ -45,7 +52,7 @@ import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
 import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
 import { redactUrl } from "./lib/redact-url.js";
-import { getSettingString } from "./lib/settings-helpers.js";
+import { ensureDefaultSettings } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
 import { parseTrustProxy } from "./lib/trust-proxy.js";
@@ -67,6 +74,7 @@ import { registerPostHogProxy } from "./plugins/posthog-proxy.js";
 import { registerSaml } from "./plugins/saml.js";
 import { registerStatic } from "./plugins/static.js";
 import { toolAccessMiddleware } from "./plugins/tool-access.js";
+import { skipUnmatchedRequestBodies } from "./plugins/unmatched-body.js";
 import { registerUpload } from "./plugins/upload.js";
 import { adminOpsRoutes } from "./routes/admin-ops.js";
 import { analyticsRoutes } from "./routes/analytics.js";
@@ -92,6 +100,13 @@ import { teamsRoutes } from "./routes/teams.js";
 import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
 import { shutdownTracing } from "./tracing.js";
+
+// Before anything can log from packages/ai, so its lines reach LOG_DIR (#1500).
+routeAiLogsToPino();
+
+const bootWorkerThreads = resolveWorkerThreads(env);
+sharp.concurrency(bootWorkerThreads);
+configureSharpConcurrency(bootWorkerThreads);
 
 // Run before anything else, and before the retry loop below: a rejected
 // DATABASE_URL / DATABASE_MIGRATION_URL pair fails the same way on every attempt,
@@ -180,15 +195,21 @@ try {
 }
 console.log("Redis connected");
 
-// Verify the local storage directories are writable before serving. A non-root
-// container launched against a volume it cannot write (TrueNAS, Kubernetes
-// runAsUser / OpenShift, or a bind mount owned by another user) would otherwise
-// boot "healthy" and fail with a cryptic EACCES on the first file operation.
+// Verify the local storage and log directories are writable before serving. A
+// non-root container launched against a volume it cannot write (TrueNAS,
+// Kubernetes runAsUser / OpenShift, or a bind mount owned by another user)
+// would otherwise boot "healthy" and fail with a cryptic EACCES on the first
+// file operation, or die on an unhandled transport error from the log writer.
 try {
   await assertStorageWritable();
-  console.log("Storage directories writable");
+  console.log("Storage and log directories writable");
 } catch (err) {
+  // A permission failure carries its own remediation text. Anything else the
+  // probe rethrows (EEXIST when the path is a file, ENOTDIR, ENOENT for an
+  // empty LOG_DIR) is a raw errno, so print the error too, as the other FATAL
+  // blocks above do.
   console.error(`FATAL: ${(err as Error).message}`);
+  console.error(err);
   process.exit(1);
 }
 
@@ -210,10 +231,16 @@ try {
 await ensureBuiltinRoles();
 await ensureDefaultTeam();
 
-if (env.AUTH_ENABLED) {
-  await ensureDefaultAdmin();
-} else {
-  await ensureAnonymousUser();
+try {
+  if (env.AUTH_ENABLED) {
+    await ensureDefaultAdmin();
+  } else {
+    await ensureAnonymousUser();
+  }
+} catch (err) {
+  console.error(`FATAL: ${(err as Error).message}`);
+  console.error(err);
+  process.exit(1);
 }
 
 async function ensureInstanceId(): Promise<string> {
@@ -231,20 +258,6 @@ async function ensureInstanceId(): Promise<string> {
 // broken install from the whole fleet, and cross-reference an event to the same
 // instance_id used by the PostHog server-side stream.
 await setSentryInstanceTag(await ensureInstanceId());
-
-async function ensureDefaultSettings() {
-  const defaults: Record<string, string> = {
-    defaultTheme: env.DEFAULT_THEME,
-    defaultLocale: env.DEFAULT_LOCALE,
-    defaultToolView: env.DEFAULT_TOOL_VIEW,
-  };
-  for (const [key, value] of Object.entries(defaults)) {
-    const [existing] = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
-    if (!existing) {
-      await db.insert(schema.settings).values({ key, value });
-    }
-  }
-}
 
 await ensureDefaultSettings();
 
@@ -379,6 +392,9 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, b
   }
 });
 
+// A path with no route has nothing to parse; don't buffer its body before the 404 (#2123).
+skipUnmatchedRequestBodies(app);
+
 registerErrorHandler(app);
 
 // Plugins
@@ -487,10 +503,9 @@ app.addHook("preHandler", (request, _reply, done) => {
 // Auth routes
 await authRoutes(app);
 
-// OIDC routes
+// SSO routes
+warnIfExternalUrlCanonicalized(app.log, process.env, env);
 await oidcRoutes(app);
-
-// SAML routes
 await registerSaml(app);
 
 // MFA routes (TOTP enrollment, verification, disable)
@@ -656,32 +671,6 @@ app.get("/api/v1/admin/health", async (request, reply) => {
   };
 });
 
-// Public config endpoint (for frontend to know if auth is required)
-app.get("/api/v1/config/auth", async () => {
-  const config: Record<string, unknown> = {
-    authEnabled: env.AUTH_ENABLED,
-  };
-  if (env.OIDC_ENABLED) {
-    config.oidcEnabled = true;
-    config.oidcProviderName = env.OIDC_PROVIDER_NAME || null;
-    config.oidcLoginUrl = "/api/auth/oidc/login";
-  }
-
-  // SAML SSO requires both env flag and enterprise license
-  const samlLicensed = env.SAML_ENABLED
-    ? await isEnterpriseFeatureEnabled("saml_sso", "boot")
-    : false;
-  if (env.SAML_ENABLED && samlLicensed) {
-    config.samlEnabled = true;
-    config.samlProviderName = env.SAML_PROVIDER_NAME || "SSO";
-    config.samlLoginUrl = "/api/auth/saml/login";
-  }
-
-  config.ssoEnforced = (await getSettingString("ssoEnforcement", "false")) === "true";
-
-  return config;
-});
-
 // Readiness probe (no auth -- used by load balancers / k8s)
 app.get("/api/v1/readyz", async (_request, reply) => {
   let postgres = false;
@@ -741,15 +730,13 @@ startWorkers();
 // Reconcile orphaned job rows. A jobs row created without a tool_id/pool (e.g. an
 // SSE-progress placeholder for a clientJobId whose client then disconnected) is
 // never enqueued to BullMQ, so unlike a genuinely interrupted job (which BullMQ's
-// stalled-detection requeues) it would sit in 'processing'/'queued' forever --
+// stalled-detection requeues) it would sit in 'processing'/'queued' forever,
 // inflating the per-user concurrent-job count and the upgrade-check in-flight gate.
-// Only rows with an empty tool_id are touched, so real jobs are never affected.
-void db
-  .execute(
-    sql`UPDATE jobs SET status = 'failed', error = '{"message":"Orphaned job reconciled at startup"}'::jsonb, completed_at = now() WHERE status IN ('processing','queued') AND (tool_id IS NULL OR tool_id = '')`,
-  )
-  .then((r) => {
-    const n = (r as { rowCount?: number }).rowCount ?? 0;
+// Single-file clientJobId alias rows whose target artifactJobId or pipelineFlowId
+// is still non-terminal are skipped so reconcileStrandedJobs or the worker can
+// settle them alongside their target (#2700).
+void reconcileOrphanedJobsAtStartup()
+  .then((n) => {
     if (n > 0) app.log.info({ count: n }, "Reconciled orphaned job rows at startup");
   })
   .catch((err) => app.log.warn({ err }, "Orphaned-job reconciliation failed"));

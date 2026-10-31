@@ -1,6 +1,6 @@
 ---
 description: "使用 AI 將影像背景替換為純色或漸層。"
-i18n_source_hash: 930fe8890e55
+i18n_source_hash: 03d2298daaa3
 i18n_provenance: human
 i18n_output_hash: 51c11d8ea37f
 ---

@@ -496,7 +496,7 @@ test.describe("Settings People Tab - Team assignment", () => {
     await expect(generateBtn).toBeVisible();
     await generateBtn.click();
 
-    // The password field should now have a value (16 chars generated password).
+    // The password field should now have a value (a generated password).
     // After generating, the password input flips to type="text", so a generic
     // form input[type='text'] selector would also match the (empty) username
     // field. Target the password input by its id instead.
@@ -801,6 +801,12 @@ test.describe("Settings Roles Tab - Extended custom role management", () => {
       // Try to create same role via GUI
       await page.getByRole("button", { name: /create custom role/i }).click();
       await page.getByPlaceholder("Role name").fill(roleName);
+      // A role needs a permission, or the form stops before the name is checked.
+      await page
+        .locator("label")
+        .filter({ hasText: "tools:use" })
+        .locator("input[type='checkbox']")
+        .check();
       await page.getByRole("button", { name: /^create$/i }).click();
 
       // Should show duplicate error

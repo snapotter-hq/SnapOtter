@@ -1,6 +1,6 @@
 ---
 description: "涵蓋所有模態的支援檔案格式，55+ 種影像輸入格式，以及 video、audio、PDF 與檔案格式。"
-i18n_source_hash: e53ecf65be25
+i18n_source_hash: 35e91e8aceff
 i18n_provenance: human
 i18n_output_hash: cd6ab9dec9f1
 ---

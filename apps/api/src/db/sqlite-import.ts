@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { sql } from "drizzle-orm";
 import { getSettingString, upsertSetting } from "../lib/settings-helpers.js";
 import { db } from "./index.js";
-import { MIGRATED_TABLES, migrateFromSqlite, TargetNonEmptyError } from "./migrate-from-sqlite.js";
+import {
+  type DetachedIdentity,
+  MIGRATED_TABLES,
+  migrateFromSqlite,
+  TargetNonEmptyError,
+} from "./migrate-from-sqlite.js";
 
 export const IMPORT_MARKER_KEY = "sqlite_import";
 
@@ -12,8 +17,14 @@ export interface ImportMarker {
   status: ImportStatus;
   tables?: Record<string, number>;
   blobs?: { present: number; missing: number };
+  detached?: DetachedIdentity[];
   sourcePath?: string;
   at?: string;
+}
+
+export function detachedSummarySuffix(count: number): string {
+  if (count <= 0) return "";
+  return `; ${count} ${count === 1 ? "user" : "users"} imported without their SSO identity`;
 }
 
 export type BootState = "import" | "leftover" | "locked" | "none";
@@ -159,12 +170,12 @@ export async function runBootImport(env: {
         status: "completed",
         tables: result.tables,
         blobs,
+        detached: result.detached,
         sourcePath: source,
         at: new Date().toISOString(),
       });
       console.log(
-        "Imported 1.x SQLite database:",
-        JSON.stringify({ tables: result.tables, blobs }),
+        `Imported 1.x SQLite database: ${JSON.stringify({ tables: result.tables, blobs })}${detachedSummarySuffix(result.detached.length)}`,
       );
     } catch (err) {
       if (err instanceof TargetNonEmptyError) {
@@ -226,7 +237,9 @@ if (invokedDirectly) {
   } else {
     migrateFromSqlite(cliPath, { force })
       .then((r) => {
-        console.log("Migration complete:", JSON.stringify(r.tables));
+        console.log(
+          `Migration complete: ${JSON.stringify(r.tables)}${detachedSummarySuffix(r.detached.length)}`,
+        );
         process.exit(0);
       })
       .catch((err) => {

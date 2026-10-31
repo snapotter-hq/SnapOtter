@@ -27,7 +27,7 @@ function getManifest(): unknown {
   return parsedManifestCache;
 }
 
-function hasPathTraversal(filename: string): boolean {
+export function hasPathTraversal(filename: string): boolean {
   return (
     filename.includes("..") ||
     filename.includes("/") ||
@@ -36,7 +36,7 @@ function hasPathTraversal(filename: string): boolean {
   );
 }
 
-function getContentType(filename: string): string | undefined {
+export function getContentType(filename: string): string | undefined {
   const dot = filename.lastIndexOf(".");
   if (dot === -1) return undefined;
   return CONTENT_TYPES[filename.slice(dot).toLowerCase()];

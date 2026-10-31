@@ -7,7 +7,7 @@ import { performance } from "node:perf_hooks";
 import { PassThrough } from "node:stream";
 import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 const { mockSpawn, mockRunAdaptiveTesseract, mockStatfs } = vi.hoisted(() => ({
   mockSpawn: vi.fn(),
@@ -320,6 +320,7 @@ describe("runTesseractPdf", () => {
   it("uses a monotonic deadline for prepared accurate-runtime pages", async () => {
     vi.useFakeTimers();
     const monotonicNow = vi.spyOn(performance, "now").mockReturnValue(0);
+    onTestFinished(() => monotonicNow.mockRestore());
     vi.setSystemTime(new Date("2026-07-13T00:00:00.000Z"));
     mockSuccessfulGhostscript(1);
 
@@ -334,6 +335,7 @@ describe("runTesseractPdf", () => {
   it("uses a monotonic aggregate deadline across PDF OCR wall-clock jumps", async () => {
     vi.useFakeTimers();
     const monotonicNow = vi.spyOn(performance, "now").mockReturnValue(0);
+    onTestFinished(() => monotonicNow.mockRestore());
     vi.setSystemTime(new Date("2026-07-13T00:00:00.000Z"));
     mockSuccessfulGhostscript(2);
     mockRunAdaptiveTesseract.mockImplementation(async (pagePath: string) => {
@@ -486,6 +488,12 @@ describe("runTesseractPdf", () => {
 
   it("force-kills a Ghostscript process that ignores the overall timeout", async () => {
     vi.useFakeTimers();
+    // runTesseractPdf times itself with node:perf_hooks' performance, which fake
+    // timers leave on real time, and it awaits real filesystem calls before its
+    // budget check. Pin the clock so a slow host can't spend the 100ms before
+    // Ghostscript is even spawned (#1551).
+    const now = vi.spyOn(performance, "now").mockReturnValue(0);
+    onTestFinished(() => now.mockRestore());
     const child = createMockChild();
     mockSpawn.mockReturnValue(child);
 

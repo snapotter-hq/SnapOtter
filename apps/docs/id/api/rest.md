@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 7793faea1aad
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 2d4f6ecb375d
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -64,16 +64,16 @@ Kunci diberi awalan `si_` dan disimpan sebagai hash scrypt - kunci mentah ditamp
 | `GET` | `/api/auth/session` | Auth | Validasi sesi saat ini |
 | `POST` | `/api/auth/change-password` | Auth | Ubah kata sandi sendiri (membatalkan semua sesi lain + kunci API) |
 | `GET` | `/api/auth/users` | Admin | Daftar semua pengguna |
-| `POST` | `/api/auth/register` | Admin | Buat pengguna baru |
-| `PUT` | `/api/auth/users/:id` | Admin | Perbarui peran atau tim pengguna |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Atur ulang kata sandi pengguna |
-| `DELETE` | `/api/auth/users/:id` | Admin | Hapus pengguna |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; otoritas peran yang diusulkan) | Buat pengguna baru |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; otoritas target) | Perbarui peran atau tim pengguna |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; otoritas target) | Atur ulang kata sandi pengguna |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; otoritas target) | Hapus pengguna |
 | `GET` | `/api/v1/config/auth` | Publik | Periksa apakah autentikasi diaktifkan (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | Mulai pendaftaran TOTP MFA. Memerlukan fitur enterprise `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Auth | Konfirmasi pendaftaran MFA dengan kode TOTP |
 | `POST` | `/api/auth/mfa/complete` | Publik | Selesaikan tantangan login MFA yang tertunda |
 | `POST` | `/api/auth/mfa/disable` | Auth | Nonaktifkan MFA untuk pengguna saat ini |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Atur ulang MFA untuk seorang pengguna |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; otoritas target) | Atur ulang MFA untuk seorang pengguna |
 | `GET` | `/api/auth/oidc/login` | Publik | Mulai login OIDC ketika OIDC diaktifkan |
 | `GET` | `/api/auth/oidc/callback` | Publik | Callback otorisasi OIDC |
 | `GET` | `/api/auth/saml/metadata` | Publik | XML metadata SP SAML ketika SAML diaktifkan |
@@ -179,7 +179,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 
 | ID Tool | Nama | Model AI | Pengaturan utama |
 |---------|------|---------|-------------|
-| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, dan pipeline: `backgroundType` (transparent/color/gradient/blur, ditambah image pada `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask dikirim sebagai bagian file kedua (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Ekstraksi Teks | Tesseract (cepat); RapidOCR + PP-OCR ONNX (seimbang/terbaik) | `quality` (cepat/seimbang/terbaik), `language`, `enhance` |
@@ -243,7 +243,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 |---------|------|-------------|
 | `svg-to-raster` | SVG to Raster | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Image to SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF Tools | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), parameter spesifik aksi |
+| `gif-tools` | GIF Tools | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP Converter | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Tool Video {#video-tools}
@@ -532,7 +532,7 @@ Untuk menyimpan otomatis hasil tool ke pustaka, sertakan `fileId` sebagai field 
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Daftar tim |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Buat tim |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Ganti nama tim |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Perbarui tim (setidaknya satu field diperlukan) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Hapus tim (tidak dapat menghapus tim default atau tim dengan anggota) |
 
 ## Pengaturan {#settings}
@@ -559,6 +559,8 @@ Preferensi per pengguna terpisah dari pengaturan instans. Setiap pengguna teraut
 ## Peran {#roles}
 
 Manajemen peran kustom dengan izin terperinci.
+
+Pembuatan dan perubahan peran dibatasi oleh pembatasan otoritas: peran yang diusulkan atau saat ini tidak boleh melampaui peringkat aktor, melebihi izin efektif aktor, atau memperluas cakupan alat aktor. Cakupan kunci API turut diperiksa dalam validasi ini. Menghapus peran kustom juga memerlukan otoritas untuk menetapkan peran bawaan cadangan `user` yang digunakan bagi anggotanya.
 
 | Method | Path | Akses | Deskripsi |
 |--------|------|--------|-------------|
@@ -651,8 +653,8 @@ Rute ini dibatasi lisensi oleh fitur enterprise terkaitnya. Rute ini tetap memer
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Perbarui allowlist CIDR dengan pencegahan penguncian diri |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Daftar legal hold pengguna dan tim |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Terapkan atau lepaskan legal hold pada pengguna atau tim |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Hasilkan token bearer SCIM, dikembalikan sekali |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Cabut token bearer SCIM saat ini |
+| `POST` | `/api/v1/enterprise/scim/token` | Admin bawaan penuh | Hasilkan token bearer SCIM, dikembalikan sekali |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Admin bawaan penuh | Cabut token bearer SCIM saat ini |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Baca konfigurasi penerusan SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Perbarui konfigurasi penerusan SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Daftar tujuan webhook |
@@ -662,15 +664,15 @@ Rute ini dibatasi lisensi oleh fitur enterprise terkaitnya. Rute ini tetap memer
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Kirim payload webhook uji |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Mulai job ekspor pengguna GDPR |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Baca status ekspor GDPR dan URL unduhan |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Hapus permanen data pengguna setelah konfirmasi |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Hapus permanen data tim setelah konfirmasi |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; otoritas target) | Hapus permanen data pengguna setelah konfirmasi |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; otoritas semua anggota) | Hapus permanen data tim setelah konfirmasi |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Baca metadata versi app, build, Node, dan skema |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Bandingkan migrasi yang dipaketkan dengan migrasi yang diterapkan |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Jalankan pemeriksaan kesiapan pemutakhiran |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Endpoint penemuan SCIM bersifat publik. Endpoint pengguna dan grup memerlukan token bearer SCIM yang dihasilkan di atas.
+Endpoint penemuan SCIM bersifat publik. Endpoint pengguna dan grup memerlukan token bearer SCIM yang dihasilkan di atas. Token lama tanpa versi tidak valid dan harus diterbitkan ulang sebagai token `so_scim_v2_...` oleh admin bawaan penuh.
 
 | Method | Path | Akses | Deskripsi |
 |--------|------|--------|-------------|

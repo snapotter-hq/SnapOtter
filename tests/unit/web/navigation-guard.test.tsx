@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { en } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router";
@@ -16,6 +16,7 @@ vi.mock("@/lib/analytics", async () => {
 });
 
 import { NavigationGuard } from "@/components/common/navigation-guard";
+import { track } from "@/lib/analytics";
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileStore } from "@/stores/file-store";
 import { useSplitStore } from "@/stores/split-store";
@@ -190,6 +191,7 @@ let removeSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   mintedObjectUrls = 0;
+  vi.mocked(track).mockClear();
   MockURL.createObjectURL.mockReset().mockImplementation(() => `blob:mock-${++mintedObjectUrls}`);
   MockURL.revokeObjectURL.mockReset();
   vi.stubGlobal("URL", MockURL);
@@ -729,8 +731,7 @@ describe("NavigationGuard download then leave", () => {
   // carry, and is not re-read from the store a tick later. A result that lands
   // in that window was never handed over, so claiming it would silence the
   // warning for a file nobody took, which is the loss this whole dialog exists
-  // to prevent. optimize-for-web writes a live preview into the store as a
-  // finished result with no run in flight, so this window is reachable (#1112).
+  // to prevent.
   it("claims only what it downloaded, not a result that landed since", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
@@ -755,6 +756,34 @@ describe("NavigationGuard download then leave", () => {
 
     expect(started).toEqual([{ url: "blob:result-a", filename: "a-small.png" }]);
     expect(useFileStore.getState().entries.map((e) => e.claimed)).toEqual([true, false]);
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
+  it("claims the downloaded entry by id when entries are reordered before the deferred tick (#1114)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore
+      .getState()
+      .updateEntry(0, { processedUrl: "blob:result-a", processedFilename: "a-small.png" });
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+
+    // Reorder [a.png, b.png] -> [b.png, a.png] before the deferred claim runs.
+    await act(async () => {
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    expect(started).toEqual([{ url: "blob:result-a", filename: "a-small.png" }]);
+    expect(useFileStore.getState().entries.map((e) => [e.file.name, e.claimed])).toEqual([
+      ["b.png", false],
+      ["a.png", true],
+    ]);
     expect(router.state.location.pathname).toBe("/files");
   });
 
@@ -838,6 +867,38 @@ describe("NavigationGuard download then leave", () => {
     expect(router.state.location.pathname).toBe("/files");
   });
 
+  it("does not block when a failed rerun cleared the previous batch zip (#1806)", async () => {
+    leaveABatchZip();
+    useFileStore.getState().clearBatchZip();
+    const { router } = renderGuard();
+    const seen = recordBlockerStates(router);
+
+    await navigateTo(router, "/files");
+    seen.stop();
+
+    expect(router.state.location.pathname).toBe("/files");
+    expect(seen.states).not.toContain("blocked");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("falls back to completed entry results after addFiles invalidates the batch zip (#1806)", async () => {
+    leaveTwoResults();
+    useFileStore.getState().setBatchZip(new Blob(["zip"]), "processed-files.zip");
+    useFileStore.getState().addFiles([makeFile("c.png")]);
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(started).toEqual([
+      { url: "blob:result-a", filename: "a-small.png" },
+      { url: "blob:result-b", filename: "b-small.png" },
+    ]);
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
   it("takes every unclaimed result and leaves a claimed one alone", async () => {
     leaveTwoResults();
     useFileStore.getState().markClaimed(0);
@@ -869,6 +930,50 @@ describe("NavigationGuard download then leave", () => {
     expect(MockURL.revokeObjectURL.mock.calls.flat()).not.toContain("blob:result");
     expect(useFileStore.getState().entries[0].processedUrl).toBe("blob:result");
     expect(router.state.location.pathname).toBe("/files");
+  });
+
+  it("emits RESULT_DOWNLOADED for the active tool on Download & Leave and skips non-tool routes (#3970)", async () => {
+    leaveAResult();
+    vi.mocked(track).mockClear();
+    recordDownloads();
+    const { router, unmount } = renderGuard("/image/compress-image");
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "compress-image",
+    });
+    unmount();
+
+    // Batch ZIP on a tool route also emits RESULT_DOWNLOADED once.
+    useFileStore.getState().reset();
+    leaveABatchZip();
+    vi.mocked(track).mockClear();
+    const zipView = renderGuard("/image/resize");
+    await navigateTo(zipView.router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "resize",
+    });
+    zipView.unmount();
+
+    // Pipeline route (/automate) has no single tool_id and must not emit RESULT_DOWNLOADED.
+    useFileStore.getState().reset();
+    leaveAResult();
+    vi.mocked(track).mockClear();
+    const automateView = renderGuard("/automate");
+    await navigateTo(automateView.router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(track).not.toHaveBeenCalled();
+    automateView.unmount();
   });
 });
 

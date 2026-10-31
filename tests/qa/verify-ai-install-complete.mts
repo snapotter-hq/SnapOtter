@@ -7,6 +7,7 @@
 //     apps/api/node_modules/.bin/tsx tests/qa/verify-ai-install-complete.mts
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { chromium } from "@playwright/test";
 import { apiToolPath } from "../../packages/shared/src/constants.js";
 
@@ -14,7 +15,6 @@ const BASE = process.env.QA_BASE_URL || "http://localhost:13499";
 const USERNAME = process.env.QA_USERNAME || "admin";
 const PASSWORD = process.env.QA_PASSWORD || "admin";
 const SHOT_DIR = path.join("tests", "e2e", "screenshots", "qa", "ai-install");
-fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 interface Bundle {
   id: string;
@@ -40,11 +40,14 @@ async function getBundles(token: string): Promise<Bundle[]> {
   return Array.isArray(body) ? body : body.bundles;
 }
 
-const ONE_TOOL_PER_BUNDLE: Record<string, { toolId: string; file: string; settings: object }> = {
+export const ONE_TOOL_PER_BUNDLE: Record<
+  string,
+  { toolId: string; file: string; settings: object }
+> = {
   "background-removal": {
     toolId: "remove-background",
     file: "tests/fixtures/image/valid/portrait-color.jpg",
-    settings: { outputFormat: "png" },
+    settings: {},
   },
   "face-detection": {
     toolId: "smart-crop",
@@ -112,7 +115,7 @@ async function pollSSE(token: string, jobId: string, timeoutMs = 300_000) {
   return { timeout: true };
 }
 
-async function runOneTool(token: string, bundleId: string) {
+export async function runOneTool(token: string, bundleId: string) {
   const spec = ONE_TOOL_PER_BUNDLE[bundleId];
   if (!spec) {
     console.log(`  [${bundleId}] no smoke-tool mapping defined, skipping first-run check`);
@@ -130,6 +133,9 @@ async function runOneTool(token: string, bundleId: string) {
   if (res.status === 200) {
     const j = (await res.json()) as { downloadUrl?: string };
     console.log(`  [${bundleId}] ${spec.toolId}: sync 200, downloadUrl=${!!j.downloadUrl}`);
+    if (!j.downloadUrl) {
+      process.exitCode = 1;
+    }
     return;
   }
   if (res.status === 202) {
@@ -137,17 +143,24 @@ async function runOneTool(token: string, bundleId: string) {
     const done = await pollSSE(token, j.jobId);
     if ((done as { failed?: boolean }).failed) {
       console.log(`  [${bundleId}] ${spec.toolId}: FAILED - ${JSON.stringify(done).slice(0, 200)}`);
+      process.exitCode = 1;
     } else if ((done as { timeout?: boolean }).timeout) {
       console.log(`  [${bundleId}] ${spec.toolId}: TIMED OUT waiting for completion`);
+      process.exitCode = 1;
+    } else if ((done as { error?: string }).error) {
+      console.log(`  [${bundleId}] ${spec.toolId}: ERROR - ${(done as { error: string }).error}`);
+      process.exitCode = 1;
     } else {
       console.log(`  [${bundleId}] ${spec.toolId}: async completed OK`);
     }
     return;
   }
   console.log(`  [${bundleId}] ${spec.toolId}: unexpected status ${res.status}`);
+  process.exitCode = 1;
 }
 
 async function main() {
+  fs.mkdirSync(SHOT_DIR, { recursive: true });
   const token = await login();
   const bundles = await getBundles(token);
   console.log("Bundle status:");
@@ -192,7 +205,12 @@ async function main() {
   console.log("\nDONE");
 }
 
-main().catch((err) => {
-  console.error("FAILED:", err);
-  process.exit(1);
-});
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+if (isMain) {
+  main().catch((err) => {
+    console.error("FAILED:", err);
+    process.exit(1);
+  });
+}

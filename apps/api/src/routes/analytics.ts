@@ -2,6 +2,7 @@ import { ANALYTICS_BAKED, POSTHOG_PROXY_PATH } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db, schema } from "../db/index.js";
+import { hasFeedbackSink } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { posthogProxyEnabled } from "../lib/posthog-proxy.js";
 
@@ -14,6 +15,7 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
         posthogApiKey: "",
         posthogHost: "",
         posthogProxyPath: "",
+        feedbackSink: false,
         sentryDsn: "",
         sentryDsnWeb: "",
         posthogSampleRate: 0,
@@ -33,6 +35,9 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
       // First-party proxy on by default; the break-glass env drops the client
       // back to talking to PostHog directly.
       posthogProxyPath: posthogProxyEnabled() ? POSTHOG_PROXY_PATH : "",
+      // The one fact that decides whether POST /api/v1/feedback can record
+      // anything. A baked key alone is not enough (#2252).
+      feedbackSink: hasFeedbackSink(),
       sentryDsn: ANALYTICS_BAKED.sentryDsn,
       sentryDsnWeb: ANALYTICS_BAKED.sentryDsnWeb,
       posthogSampleRate: ANALYTICS_BAKED.posthogSampleRate,

@@ -1,6 +1,6 @@
 ---
 description: "Installera SnapOtter med Docker i ett enda kommando. Inkluderar Docker Compose-konfiguration, byggande från källkod och en fullständig funktionsöversikt."
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: 2dc08df1543e
 i18n_hash_version: 2
@@ -100,7 +100,7 @@ pnpm dev
 | **Bild** | 112 | Ändra storlek, beskär, komprimera, konvertera, ta bort bakgrund, uppskala, OCR, vattenmärke, collage, färglägg, GIF-verktyg, formatförinställningar |
 | **Video** | 57 | Klipp, beskär, komprimera, konvertera, slå samman, extrahera ljud, autotextning, video till GIF, ändra storlek, stabilisera, formatförinställningar |
 | **Ljud** | 27 | Klipp, slå samman, konvertera, normalisera, brusreducering, transkribera, tonhöjdsskift, tona, ringsignalsskapare, formatförinställningar |
-| **PDF / dokument** | 34 | Slå samman, dela, komprimera, OCR, vattenmärke, redigera bort, Word till PDF, Excel till PDF, rotera, skydda, reparera |
+| **PDF / dokument** | 35 | Slå samman, dela, komprimera, OCR, vattenmärke, redigera bort, Word till PDF, Excel till PDF, rotera, skydda, reparera |
 | **Filer** | 23 | CSV till JSON, JSON till XML, slå samman CSV-filer, dela CSV, skapa ZIP, extrahera ZIP, diagramskapare, YAML/JSON |
 
 ### Pipelines {#pipelines}

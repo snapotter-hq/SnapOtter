@@ -1,11 +1,23 @@
 import { TOOLS, toolSection } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
+import { LEGACY_TOOL_ALIASES } from "../lib/pool.js";
+import {
+  emitInlineRequestAuditIfNeeded,
+  enterToolRequestAuditContext,
+  subRouteFromRoute,
+} from "../lib/tool-audit.js";
 import { requireToolAccess } from "../permissions.js";
 
 const TOOLS_PREFIX = "/api/v1/tools/";
 
 /** toolId -> section, so a route resolves without scanning the catalog. */
 const SECTION_BY_TOOL_ID = new Map(TOOLS.map((tool) => [tool.id, toolSection(tool)]));
+for (const [aliasId, canonicalId] of Object.entries(LEGACY_TOOL_ALIASES)) {
+  const section = SECTION_BY_TOOL_ID.get(canonicalId);
+  if (section) {
+    SECTION_BY_TOOL_ID.set(aliasId, section);
+  }
+}
 
 /**
  * The tool a request targets, read from the route the router actually matched
@@ -58,6 +70,25 @@ export async function toolAccessMiddleware(app: FastifyInstance): Promise<void> 
       request.params as { section?: string; toolId?: string } | undefined,
     );
     if (!toolId) return;
-    if (!(await requireToolAccess(request, reply, toolId))) return reply;
+    const ctx = enterToolRequestAuditContext(request, {
+      userId: null,
+      username: "system",
+      ip: request.ip,
+      requestId: request.id,
+      toolId,
+      subRoute: subRouteFromRoute(request.routeOptions?.url),
+      startTime: Date.now(),
+      authorized: false,
+    });
+    const authUser = await requireToolAccess(request, reply, toolId);
+    if (!authUser) return reply;
+    ctx.userId = authUser.id;
+    ctx.username = authUser.username;
+    ctx.authorized = true;
+  });
+
+  app.addHook("onSend", async (request, reply, payload) => {
+    await emitInlineRequestAuditIfNeeded(request, reply.statusCode, payload);
+    return payload;
   });
 }

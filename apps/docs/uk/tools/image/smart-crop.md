@@ -1,6 +1,6 @@
 ---
 description: "Обрізка з урахуванням об’єкта, обличчя та ентропії, що інтелектуально кадрує зображення за допомогою Sharp та розпізнавання облич ШІ."
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: e230987207b9
 ---

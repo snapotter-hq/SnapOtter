@@ -1,38 +1,82 @@
 /**
  * Unit tests for auth route helper functions and validation logic.
  *
- * Tests getAuthUser, requireAuth, requireAdmin, validatePasswordStrength,
- * validateUsername, isPublicRoute, and extractToken -- all extracted from
- * apps/api/src/plugins/auth.ts.
+ * Tests getAuthUser, requireAuth, requireAdmin, validatePasswordStrength and
+ * validateUsername (the real exports of apps/api/src/plugins/auth.ts, #1570, #2039),
+ * plus isPublicRoute, PUBLIC_PATHS, and extractToken (#2337).
  */
-import { describe, expect, it, vi } from "vitest";
+import { PASSWORD_MAX_LENGTH } from "@snapotter/shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const dbMockState = vi.hoisted(() => ({
+  selectQueue: [] as unknown[][],
+  insertRowCount: 1,
+}));
 
 // Mock DB to avoid SQLite connection
-vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: () => ({ get: () => null, all: () => [] }),
-        all: () => [],
+vi.mock("../../../apps/api/src/db/index.js", () => {
+  const makeSelect = () => ({
+    from: () => ({
+      where: () => {
+        const rows = dbMockState.selectQueue.shift() ?? [];
+        const res = Promise.resolve(rows);
+        return Object.assign(res, {
+          get: () => rows[0] ?? null,
+          all: () => rows,
+          for: () => Promise.resolve(rows),
+        });
+      },
+      all: () => [],
+    }),
+  });
+  const dbObj = {
+    select: makeSelect,
+    insert: () => ({
+      values: () => ({
+        onConflictDoNothing: () => Promise.resolve({ rowCount: dbMockState.insertRowCount }),
+        run: vi.fn(),
       }),
     }),
-    insert: () => ({
-      values: () => ({ onConflictDoNothing: () => ({ run: vi.fn() }), run: vi.fn() }),
-    }),
-    delete: () => ({ where: () => ({ run: vi.fn() }) }),
-    update: () => ({ set: () => ({ where: () => ({ run: vi.fn() }) }) }),
-  },
-  pool: {},
-  closeDb: async () => {},
-  schema: {
-    users: { id: {}, username: {}, role: {} },
-    sessions: { id: {}, userId: {} },
-    settings: { key: {} },
-    apiKeys: { id: {}, userId: {}, keyPrefix: {} },
-    teams: { id: {}, name: {} },
-    roles: { name: {} },
-    auditLog: {},
-  },
+    delete: () => ({ where: () => Promise.resolve({ run: vi.fn() }) }),
+    update: () => ({ set: () => ({ where: () => Promise.resolve({ run: vi.fn() }) }) }),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(dbObj),
+  };
+  return {
+    db: dbObj,
+    pool: {},
+    closeDb: async () => {},
+    schema: {
+      users: { id: {}, username: {}, role: {}, passwordHash: {} },
+      sessions: { id: {}, userId: {} },
+      settings: { key: {} },
+      apiKeys: { id: {}, userId: {}, keyPrefix: {} },
+      teams: { id: {}, name: {} },
+      roles: { id: {}, name: {} },
+      userFiles: { id: {}, storedName: {}, userId: {} },
+      auditLog: {},
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/user-limit.js", () => ({
+  userLimitReached: vi.fn(() => Promise.resolve(false)),
+}));
+
+vi.mock("../../../apps/api/src/lib/last-admin.js", () => ({
+  assertNotLastAdmin: vi.fn(() => Promise.resolve()),
+  LastAdminError: class LastAdminError extends Error {},
+}));
+
+vi.mock("../../../apps/api/src/lib/library-cleanup.js", () => ({
+  deleteLibraryFileStorage: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("../../../apps/api/src/lib/user-mfa.js", () => ({
+  clearUserMfa: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+  isEnterpriseFeatureEnabled: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({
@@ -48,18 +92,78 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   },
 }));
 
+const loggerWarn = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: {
+    warn: loggerWarn,
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+// The password policy reads its settings through these helpers; a map stands in
+// for the settings table so the defaults and a changed policy can both be tried.
+const policy = vi.hoisted(() => ({
+  values: new Map<string, string>(),
+  failKey: null as string | null,
+}));
+
+vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/settings-helpers.js")>();
+  return {
+    ...actual,
+    getSettingString: async (key: string, fallback = "") => policy.values.get(key) ?? fallback,
+    getSettingNumber: async (key: string, fallback = 0) =>
+      actual.parseNumericSettingValue(key, policy.values.get(key), fallback),
+    getSettingStrict: async (key: string) => {
+      if (policy.failKey === key) {
+        throw new Error(`simulated DB failure reading ${key}`);
+      }
+      return policy.values.get(key);
+    },
+    setSettingIfAbsent: async () => {},
+    upsertSetting: async () => {},
+  };
+});
+
+const auditFn = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const auditLogSpy = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
 vi.mock("../../../apps/api/src/lib/audit.js", () => ({
-  auditLog: vi.fn(),
+  auditLog: auditLogSpy,
+  auditFromRequest: () => auditFn,
+  sanitizeAuditInput: (raw: string) => raw,
 }));
 
 import {
+  authRoutes,
   computeKeyPrefix,
+  extractToken,
   getAuthUser,
   hashPassword,
+  isPublicRoute,
+  PUBLIC_PATHS,
   requireAdmin,
   requireAuth,
+  validatePasswordStrength,
+  validateUsername,
   verifyPassword,
 } from "../../../apps/api/src/plugins/auth.js";
+import { registerMfa } from "../../../apps/api/src/plugins/mfa.js";
+import { registerScimRoutes } from "../../../apps/api/src/routes/enterprise/scim.js";
+
+beforeEach(() => {
+  policy.values.clear();
+  policy.failKey = null;
+  loggerWarn.mockReset();
+  auditFn.mockClear();
+  auditLogSpy.mockClear();
+  dbMockState.selectQueue = [];
+  dbMockState.insertRowCount = 1;
+});
 
 // ── getAuthUser ─────────────────────────────────────────────────────────
 
@@ -210,59 +314,226 @@ describe("computeKeyPrefix (additional coverage)", () => {
   });
 });
 
-// ── Password strength validation (reproduced logic) ────────────────────
+// ── Password strength validation (the real function) ──────────────────
 
-// Reproduce the validation function from auth.ts since it's not exported
-function validatePasswordStrength(password: string): string | null {
-  const rules = "Password must be at least 8 characters with uppercase, lowercase, and a number";
-  if (password.length < 8) return rules;
-  if (!/[A-Z]/.test(password)) return rules;
-  if (!/[a-z]/.test(password)) return rules;
-  if (!/[0-9]/.test(password)) return rules;
-  return null;
-}
+const rulesOf = async (password: string) => (await validatePasswordStrength(password))?.rules ?? [];
 
-describe("validatePasswordStrength", () => {
-  it("accepts valid password", () => {
-    expect(validatePasswordStrength("MyPass12")).toBeNull();
+describe("validatePasswordStrength, default policy", () => {
+  it("accepts valid password", async () => {
+    expect(await validatePasswordStrength("MyPass12")).toBeNull();
   });
 
-  it("rejects password shorter than 8 chars", () => {
-    expect(validatePasswordStrength("Ab1")).not.toBeNull();
+  it("rejects password shorter than 8 chars", async () => {
+    const failure = await validatePasswordStrength("Ab1");
+    expect(failure).toEqual({
+      rule: "minLength",
+      rules: ["minLength"],
+      message: "Password must be at least 8 characters",
+      minLength: 8,
+    });
   });
 
-  it("rejects password without uppercase", () => {
-    expect(validatePasswordStrength("lowercase1")).not.toBeNull();
+  it("rejects password without uppercase", async () => {
+    const failure = await validatePasswordStrength("lowercase1");
+    expect(failure).toEqual({
+      rule: "uppercase",
+      rules: ["uppercase"],
+      message: "Password must contain an uppercase letter",
+    });
   });
 
-  it("rejects password without lowercase", () => {
-    expect(validatePasswordStrength("UPPERCASE1")).not.toBeNull();
+  it("rejects password without lowercase", async () => {
+    const failure = await validatePasswordStrength("UPPERCASE1");
+    expect(failure).toEqual({
+      rule: "lowercase",
+      rules: ["lowercase"],
+      message: "Password must contain a lowercase letter",
+    });
   });
 
-  it("rejects password without number", () => {
-    expect(validatePasswordStrength("NoNumberHere")).not.toBeNull();
+  it("rejects password without number", async () => {
+    const failure = await validatePasswordStrength("NoNumberHere");
+    expect(failure).toEqual({
+      rule: "digit",
+      rules: ["digit"],
+      message: "Password must contain a digit",
+    });
   });
 
-  it("accepts password with special characters", () => {
-    expect(validatePasswordStrength("Sp3c!al@")).toBeNull();
+  it("accepts password with special characters", async () => {
+    expect(await validatePasswordStrength("Sp3c!al@")).toBeNull();
   });
 
-  it("rejects empty string", () => {
-    expect(validatePasswordStrength("")).not.toBeNull();
+  it("rejects password made of pure whitespace", async () => {
+    const failure = await validatePasswordStrength("        ");
+    expect(failure?.rules).toEqual(["uppercase", "lowercase", "digit"]);
+    expect(failure?.rule).toBe("uppercase");
+    expect(failure?.message).toBe("Password must contain an uppercase letter");
+  });
+
+  it("rejects empty string", async () => {
+    const failure = await validatePasswordStrength("");
+    expect(failure?.rules).toEqual(["minLength", "uppercase", "lowercase", "digit"]);
+    expect(failure?.rule).toBe("minLength");
+    expect(failure?.message).toBe("Password must be at least 8 characters");
+  });
+
+  it("lists every broken rule at once, first one as `rule`", async () => {
+    const failure = await validatePasswordStrength("abc");
+
+    expect(failure?.rules).toEqual(["minLength", "uppercase", "digit"]);
+    expect(failure?.rule).toBe("minLength");
+    expect(failure?.minLength).toBe(8);
+    expect(failure?.message).toBe("Password must be at least 8 characters");
+  });
+
+  it("refuses a control character before anything else, even on a password that breaks other rules", async () => {
+    const failure = await validatePasswordStrength("MyPass12\t");
+    expect(failure).toEqual({
+      rule: "controlCharacter",
+      rules: ["controlCharacter"],
+      message: "Password must not contain control characters",
+    });
+
+    const multiFailure = await validatePasswordStrength("ab\t");
+    expect(multiFailure?.rules).toEqual(["controlCharacter"]);
+    expect(multiFailure?.message).toBe("Password must not contain control characters");
+  });
+
+  it("refuses a lone UTF-16 surrogate before policy rules, while accepting a valid surrogate pair (#2170)", async () => {
+    const failure = await validatePasswordStrength("MyPass12\uD800");
+    expect(failure).toEqual({
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+      message: "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+    });
+    expect((await validatePasswordStrength("MyPass12\uDC00"))?.rule).toBe("invalidCharacter");
+    expect((await validatePasswordStrength("MyPass12\uDC00\uD800"))?.rule).toBe("invalidCharacter");
+
+    const multiFailure = await validatePasswordStrength("ab\uD800");
+    expect(multiFailure?.rules).toEqual(["invalidCharacter"]);
+    expect(multiFailure?.message).toBe(
+      "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+    );
+
+    expect(await validatePasswordStrength("MyPass12\u{1F600}")).toBeNull();
+  });
+
+  it("counts a halfwidth katakana password the way it is hashed, not as typed (#2056)", async () => {
+    // Four halfwidth kana with a voiced mark are 8 characters as typed and 4
+    // once normalized: that is what gets hashed, so that is what is counted.
+    expect(await rulesOf(`${"\uff76\uff9e".repeat(4)}Aa1`)).toEqual(["minLength"]);
+  });
+
+  it("refuses a password over the shared maximum and names the limit", async () => {
+    const failure = await validatePasswordStrength(`Aa1${"a".repeat(PASSWORD_MAX_LENGTH)}`);
+
+    expect(failure).toEqual({
+      rule: "maxLength",
+      rules: ["maxLength"],
+      message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+      maxLength: PASSWORD_MAX_LENGTH,
+    });
+  });
+
+  it("accepts a password of exactly the shared maximum", async () => {
+    expect(await validatePasswordStrength(`Aa1${"a".repeat(PASSWORD_MAX_LENGTH - 3)}`)).toBeNull();
   });
 });
 
-// ── Username validation (reproduced logic) ─────────────────────────────
+describe("validatePasswordStrength, a changed policy (#2039)", () => {
+  it("follows the configured minimum length", async () => {
+    policy.values.set("passwordMinLength", "12");
 
-function validateUsername(username: string): string | null {
-  if (username.length < 3 || username.length > 50) {
-    return "Username must be between 3 and 50 characters";
-  }
-  if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-    return "Username can only contain letters, numbers, dots, hyphens, and underscores";
-  }
-  return null;
-}
+    const failure = await validatePasswordStrength("MyPass12");
+
+    expect(failure).toEqual({
+      rule: "minLength",
+      rules: ["minLength"],
+      message: "Password must be at least 12 characters",
+      minLength: 12,
+    });
+  });
+
+  it("accepts anything once every rule is off and the minimum is 1", async () => {
+    policy.values.set("passwordMinLength", "1");
+    for (const rule of ["Uppercase", "Lowercase", "Digit"]) {
+      policy.values.set(`passwordRequire${rule}`, "false");
+    }
+
+    expect(await validatePasswordStrength("a")).toBeNull();
+    expect(await validatePasswordStrength("!")).toBeNull();
+  });
+
+  it("requires a special character only when the switch is exactly true", async () => {
+    expect(await validatePasswordStrength("MyPass12")).toBeNull();
+
+    policy.values.set("passwordRequireSpecial", "true");
+    const failure = await validatePasswordStrength("MyPass12");
+    expect(failure).toEqual({
+      rule: "special",
+      rules: ["special"],
+      message: "Password must contain a special character",
+    });
+    expect(await validatePasswordStrength("MyPass12!")).toBeNull();
+  });
+
+  it.each([
+    ["Uppercase", "lowercase1", "uppercase"],
+    ["Lowercase", "UPPERCASE1", "lowercase"],
+    ["Digit", "NoNumberHere", "digit"],
+  ])(
+    "keeps the %s rule on for a stored value that isn't exactly false, and off for false (#2026)",
+    async (key, password, rule) => {
+      policy.values.set(`passwordRequire${key}`, "FALSE");
+      expect(await rulesOf(password)).toEqual([rule]);
+
+      policy.values.set(`passwordRequire${key}`, "false");
+      expect(await rulesOf(password)).toEqual([]);
+    },
+  );
+
+  it("falls back to the default minimum for a stored value that isn't a number", async () => {
+    policy.values.set("passwordMinLength", "lots");
+
+    expect((await validatePasswordStrength("Ab1"))?.minLength).toBe(8);
+  });
+
+  it.each(["", "   ", "0", "-1", "129", "Infinity", "8.5"])(
+    "falls back to the default minimum of 8 when passwordMinLength is %j (#1713)",
+    async (stored) => {
+      policy.values.set("passwordMinLength", stored);
+
+      const failure = await validatePasswordStrength("Aa1");
+      expect(failure).toMatchObject({
+        rule: "minLength",
+        rules: ["minLength"],
+        minLength: 8,
+      });
+      expect(loggerWarn).toHaveBeenCalledWith(
+        { key: "passwordMinLength", value: stored },
+        "invalid numeric setting, using default",
+      );
+      expect(await validatePasswordStrength("MyPass12")).toBeNull();
+    },
+  );
+
+  it.each([
+    "passwordMinLength",
+    "passwordRequireUppercase",
+    "passwordRequireLowercase",
+    "passwordRequireDigit",
+    "passwordRequireSpecial",
+  ])("propagates a DB error when reading %s instead of failing open (#1713)", async (key) => {
+    policy.failKey = key;
+
+    await expect(validatePasswordStrength("MyPass12!")).rejects.toThrow(
+      `simulated DB failure reading ${key}`,
+    );
+  });
+});
+
+// ── Username validation (the real function) ───────────────────────────
 
 describe("validateUsername", () => {
   it("accepts valid usernames", () => {
@@ -299,24 +570,6 @@ describe("validateUsername", () => {
   });
 });
 
-// ── isPublicRoute (reproduced logic) ────────────────────────────────────
-
-const PUBLIC_PATHS = [
-  "/api/v1/health",
-  "/api/v1/config/",
-  "/api/auth/",
-  "/api/v1/download/",
-  "/api/v1/jobs/",
-  "/api/docs",
-  "/api/v1/openapi.yaml",
-  "/api/v1/meme-templates/",
-];
-
-function isPublicRoute(url: string): boolean {
-  if (!url.startsWith("/api/")) return true;
-  return PUBLIC_PATHS.some((path) => url.startsWith(path));
-}
-
 describe("isPublicRoute", () => {
   it("treats non-API routes as public", () => {
     expect(isPublicRoute("/")).toBe(true);
@@ -332,6 +585,14 @@ describe("isPublicRoute", () => {
 
   it("treats health endpoint as public", () => {
     expect(isPublicRoute("/api/v1/health")).toBe(true);
+  });
+
+  it("treats readiness probe as public (#2337)", () => {
+    expect(isPublicRoute("/api/v1/readyz")).toBe(true);
+  });
+
+  it("treats config routes as public (#2337)", () => {
+    expect(isPublicRoute("/api/v1/config/features")).toBe(true);
   });
 
   it("treats download routes as public", () => {
@@ -359,5 +620,336 @@ describe("isPublicRoute", () => {
 
   it("treats meme templates as public", () => {
     expect(isPublicRoute("/api/v1/meme-templates/list")).toBe(true);
+  });
+
+  it("treats SCIM routes as public (#2337)", () => {
+    expect(isPublicRoute("/api/v1/scim/v2/Users")).toBe(true);
+  });
+
+  it("matches the exact canonical public paths list (#2337)", () => {
+    expect(PUBLIC_PATHS).toEqual([
+      "/api/v1/health",
+      "/api/v1/readyz",
+      "/api/v1/config/",
+      "/api/auth/",
+      "/api/v1/download/",
+      "/api/v1/jobs/",
+      "/api/docs",
+      "/api/v1/openapi.yaml",
+      "/api/v1/meme-templates/",
+      "/api/v1/scim/",
+    ]);
+  });
+
+  it.each(PUBLIC_PATHS)("treats %s as public (#2337)", (path) => {
+    expect(isPublicRoute(path)).toBe(true);
+    expect(isPublicRoute(`${path}subpath`)).toBe(true);
+  });
+});
+
+describe("extractToken (#2337)", () => {
+  it("extracts token from Bearer authorization header", () => {
+    const req = {
+      headers: { authorization: "Bearer my-secret-token-123" },
+    } as never;
+    expect(extractToken(req)).toBe("my-secret-token-123");
+  });
+
+  it("extracts token from snapotter-session cookie when no auth header", () => {
+    const req = {
+      headers: {},
+      cookies: { "snapotter-session": "session-cookie-token" },
+    } as never;
+    expect(extractToken(req)).toBe("session-cookie-token");
+  });
+
+  it("prioritizes Bearer authorization header over session cookie", () => {
+    const req = {
+      headers: { authorization: "Bearer bearer-wins" },
+      cookies: { "snapotter-session": "cookie-loses" },
+    } as never;
+    expect(extractToken(req)).toBe("bearer-wins");
+  });
+
+  it("returns null when authorization header is not Bearer", () => {
+    const req = {
+      headers: { authorization: "Basic dXNlcjpwYXNz" },
+    } as never;
+    expect(extractToken(req)).toBeNull();
+  });
+
+  it("returns null when authorization header and cookie are absent", () => {
+    const req = {
+      headers: {},
+    } as never;
+    expect(extractToken(req)).toBeNull();
+  });
+
+  it("returns null when cookies are undefined", () => {
+    const req = {
+      headers: {},
+      cookies: undefined,
+    } as never;
+    expect(extractToken(req)).toBeNull();
+  });
+
+  it("returns empty string when Bearer token is empty", () => {
+    const req = {
+      headers: { authorization: "Bearer " },
+    } as never;
+    expect(extractToken(req)).toBe("");
+  });
+});
+
+// ── Admin user route audit payloads (#3978) ───────────────────────────
+
+describe("admin user route audit payloads (#3978)", () => {
+  type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+  const postHandlers = new Map<string, RouteHandler>();
+  const putHandlers = new Map<string, RouteHandler>();
+  const deleteHandlers = new Map<string, RouteHandler>();
+
+  beforeEach(async () => {
+    postHandlers.clear();
+    putHandlers.clear();
+    deleteHandlers.clear();
+    const fakeApp = {
+      get: vi.fn(),
+      post: vi.fn((path: string, optsOrHandler: unknown, maybeHandler?: RouteHandler) => {
+        const handler = (
+          typeof optsOrHandler === "function" ? optsOrHandler : maybeHandler
+        ) as RouteHandler;
+        postHandlers.set(path, handler);
+      }),
+      put: vi.fn((path: string, handler: RouteHandler) => {
+        putHandlers.set(path, handler);
+      }),
+      delete: vi.fn((path: string, handler: RouteHandler) => {
+        deleteHandlers.set(path, handler);
+      }),
+      register: vi.fn(),
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    };
+    await authRoutes(fakeApp as never);
+    await registerMfa(fakeApp as never);
+    await registerScimRoutes(fakeApp as never);
+  });
+
+  function makeReply() {
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status: vi.fn((code: number) => {
+        reply.statusCode = code;
+        return reply;
+      }),
+      send: vi.fn((body: unknown) => {
+        reply.payload = body;
+        return reply;
+      }),
+    };
+    return reply;
+  }
+
+  const adminActor = { id: "admin-1", username: "admin-user", role: "admin" };
+
+  it("POST /api/auth/register emits USER_CREATED with acting admin username", async () => {
+    dbMockState.selectQueue = [[{ id: "team-1", name: "Default" }], [], [{ role: "admin" }]];
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/register")?.(
+      {
+        user: adminActor,
+        body: { username: "newbie", password: "ValidPassword1", role: "editor" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(201);
+    expect(auditFn).toHaveBeenCalledWith("USER_CREATED", {
+      adminId: "admin-1",
+      username: "admin-user",
+      newUserId: expect.any(String),
+      newUsername: "newbie",
+      role: "editor",
+    });
+  });
+
+  it("PUT /api/auth/users/:id emits USER_UPDATED with acting admin username", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user" }],
+      [{ role: "user" }],
+      [{ role: "admin" }],
+    ];
+    const reply = makeReply();
+    await putHandlers.get("/api/auth/users/:id")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        body: { role: "editor" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("USER_UPDATED", {
+      adminId: "admin-1",
+      username: "admin-user",
+      targetUserId: "user-2",
+      changes: { role: "editor", team: undefined },
+    });
+  });
+
+  it("POST /api/auth/users/:id/reset-password emits PASSWORD_RESET with acting admin username", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user", passwordHash: "salt:hash" }],
+      [{ role: "user", passwordHash: "salt:hash" }],
+      [{ role: "admin" }],
+    ];
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/users/:id/reset-password")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        body: { newPassword: "NewPassword1" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("PASSWORD_RESET", {
+      adminId: "admin-1",
+      username: "admin-user",
+      targetUserId: "user-2",
+      targetUsername: "target",
+    });
+  });
+
+  it("DELETE /api/auth/users/:id emits USER_DELETED with acting admin username", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user" }],
+      [{ role: "admin" }],
+      [{ role: "user" }],
+      [],
+      [{ role: "admin" }],
+      [{ role: "user" }],
+    ];
+    const reply = makeReply();
+    await deleteHandlers.get("/api/auth/users/:id")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("USER_DELETED", {
+      adminId: "admin-1",
+      username: "admin-user",
+      deletedUserId: "user-2",
+      deletedUsername: "target",
+    });
+  });
+
+  it("POST /api/auth/logout emits LOGOUT with userId and username (#3981)", async () => {
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/logout")?.(
+      {
+        user: adminActor,
+        headers: {},
+        cookies: {},
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("LOGOUT", {
+      userId: "admin-1",
+      username: "admin-user",
+    });
+  });
+
+  it("POST /api/auth/users/:id/mfa/reset emits MFA_RESET with acting admin username (#3981)", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user", totpEnabled: true }],
+      [{ role: "admin" }],
+      [{ role: "user" }],
+    ];
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/users/:id/mfa/reset")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("MFA_RESET", {
+      adminId: "admin-1",
+      username: "admin-user",
+      targetUserId: "user-2",
+      targetUsername: "target",
+    });
+  });
+
+  it("POST and DELETE /api/v1/enterprise/scim/token emit SETTINGS_UPDATED with acting adminId and username (#3981)", async () => {
+    dbMockState.selectQueue = [[{ role: "admin" }], [{ role: "admin" }]];
+    const reqLog = { info: vi.fn() };
+    const postReply = makeReply();
+    await postHandlers.get("/api/v1/enterprise/scim/token")?.(
+      {
+        user: adminActor,
+        log: reqLog,
+        ip: "127.0.0.1",
+        id: "req-scim-post",
+      },
+      postReply,
+    );
+
+    expect(postReply.statusCode).toBe(201);
+    expect(auditLogSpy).toHaveBeenCalledWith(
+      reqLog,
+      "SETTINGS_UPDATED",
+      {
+        adminId: "admin-1",
+        username: "admin-user",
+        setting: "scim_token",
+      },
+      "127.0.0.1",
+      "req-scim-post",
+    );
+
+    auditLogSpy.mockClear();
+    const deleteReply = makeReply();
+    await deleteHandlers.get("/api/v1/enterprise/scim/token")?.(
+      {
+        user: adminActor,
+        log: reqLog,
+        ip: "127.0.0.1",
+        id: "req-scim-del",
+      },
+      deleteReply,
+    );
+
+    expect(deleteReply.statusCode).toBe(204);
+    expect(auditLogSpy).toHaveBeenCalledWith(
+      reqLog,
+      "SETTINGS_UPDATED",
+      {
+        adminId: "admin-1",
+        username: "admin-user",
+        setting: "scim_token",
+        action: "revoked",
+      },
+      "127.0.0.1",
+      "req-scim-del",
+    );
   });
 });

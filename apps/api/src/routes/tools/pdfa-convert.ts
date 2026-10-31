@@ -22,7 +22,7 @@ export function registerPdfaConvert(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_pdfa.pdf`);
       ctx.report(10, "Converting to PDF/A");
-      await gsPdfaConvert(inPath, outPath);
+      await gsPdfaConvert(inPath, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

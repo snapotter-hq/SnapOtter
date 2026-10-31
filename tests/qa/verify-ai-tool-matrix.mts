@@ -112,7 +112,7 @@ const CASES: ToolCase[] = [
     toolId: "remove-background",
     fixture: PORTRAIT,
     contentType: "image/jpeg",
-    settings: { backgroundType: "transparent", format: "png" },
+    settings: {},
     expectedMime: "image/png",
     oracle: "border >50% transparent, subject centre >80% opaque, non-degenerate",
     verify: async (out) => {

@@ -38,11 +38,11 @@ const ADMIN_PERMISSIONS = [
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -279,6 +279,24 @@ describe("CRUD edge cases", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toContain("Invalid permissions");
+  });
+
+  it("rejects empty permissions array on update and preserves existing permissions (#2887)", async () => {
+    const id = await createRole(`upd-empty-${Date.now()}`, ["tools:use", "files:own"]);
+    const res = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/v1/roles/${id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { permissions: [] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toEqual({
+      error: "At least one permission is required",
+      code: "VALIDATION_ERROR",
+    });
+
+    const [row] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));
+    expect(row?.permissions).toEqual(["tools:use", "files:own"]);
   });
 
   it("multiple users on deleted role all get reassigned to user", async () => {

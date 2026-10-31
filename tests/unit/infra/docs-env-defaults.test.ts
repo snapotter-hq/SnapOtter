@@ -2,6 +2,8 @@
 import { globSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { BINARY_OVERRIDE_VARS } from "../../../apps/api/src/lib/binary-overrides.js";
+import { HW_ACCEL_FAMILIES } from "../../../packages/media-engine/src/encoders.js";
 
 /**
  * The guide's env-var tables are promises, and they drifted quietly. AUTH_ENABLED
@@ -101,7 +103,10 @@ const APP_SRC = readAll([
  * set it and nothing happened.
  */
 function isRead(name: string): boolean {
-  const inApp = new RegExp(`\\b(?:env|config)\\.${name}\\b|process\\.env\\.${name}\\b`);
+  // doc-engine reads its binary overrides through resolveBin("QPDF_PATH", ...).
+  const inApp = new RegExp(
+    `\\b(?:env|config)\\.${name}\\b|process\\.env\\.${name}\\b|resolveBin\\(\\s*"${name}"`,
+  );
   return inApp.test(APP_SRC) || new RegExp(`\\$\\{?${name}\\b`).test(SHELL_SRC);
 }
 
@@ -187,4 +192,44 @@ describe("guide env-var tables", () => {
       expect(valueTokens(description).filter((t) => !members.includes(t))).toEqual([]);
     },
   );
+});
+
+/**
+ * The published Compose files forward these six from `.env` (#1091), but the
+ * guide never named them, so hardware encoding was undiscoverable without
+ * reading `.env.example` in the repo (#1307).
+ */
+describe("engine overrides", () => {
+  const ENGINE_VARS = [...BINARY_OVERRIDE_VARS, "SNAPOTTER_HW_ACCEL"];
+  const configRows = ROWS.filter((r) => r.doc === "apps/docs/guide/configuration.md");
+
+  it("configuration.md has a row for each one", () => {
+    const documented = new Set(configRows.map((r) => r.name));
+    expect(ENGINE_VARS.filter((name) => !documented.has(name))).toEqual([]);
+  });
+
+  it("the SNAPOTTER_HW_ACCEL row lists exactly the families it accepts", () => {
+    const row = configRows.find((r) => r.name === "SNAPOTTER_HW_ACCEL");
+    const offered = valueTokens(row?.description ?? "");
+    expect(HW_ACCEL_FAMILIES.length).toBeGreaterThan(0);
+    expect(HW_ACCEL_FAMILIES.filter((family) => !offered.includes(family))).toEqual([]);
+    expect(offered.filter((token) => !HW_ACCEL_FAMILIES.includes(token))).toEqual([]);
+  });
+
+  it("every copy-paste Compose file in deployment.md forwards each one", () => {
+    const deployment = readFileSync(path.join(ROOT, "apps/docs/guide/deployment.md"), "utf8");
+    // Checked per file: the CPU example alone would satisfy a whole-page search
+    // while the NVIDIA one, where SNAPOTTER_HW_ACCEL matters, stayed a no-op.
+    const composeFiles = [...deployment.matchAll(/```yaml\n([\s\S]*?)```/g)]
+      .map((m) => m[1])
+      .filter((block) => block.includes("image: snapotter/snapotter"));
+    expect(composeFiles).toHaveLength(2);
+    const missing = composeFiles.flatMap((block, i) =>
+      // Anchored to a live list item, so a commented-out `# - NAME=...` doesn't count.
+      ENGINE_VARS.filter(
+        (name) => !new RegExp(`^\\s+- ${name}=\\$\\{${name}:-\\}`, "m").test(block),
+      ).map((name) => `compose file ${i + 1}: ${name}`),
+    );
+    expect(missing).toEqual([]);
+  });
 });

@@ -4,8 +4,10 @@
  * SafeError: an error whose message was AUTHORED BY US and is safe to send to
  * Sentry verbatim. RULE: the message must be a CONSTANT string; anything
  * variable (exit codes, versions, counts) goes into `code` so Sentry grouping
- * stays stable. Detection is by marker property, not instanceof, so it
- * survives error copying across module boundaries.
+ * stays stable. An HTTP status goes into `statusCode`, which the web reporter
+ * sends as the `status_code` Sentry tag (#1351). Detection is by marker
+ * property, not instanceof, so it survives error copying across module
+ * boundaries.
  *
  * ToolInputError: the user's input was the problem (bad CSV, corrupt media).
  * Never reported to Sentry. Engine packages can import these helpers
@@ -45,8 +47,8 @@ export class ToolInputError extends Error {
   readonly isToolInputError = true;
   readonly statusCode = 400;
 
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, opts?: { cause?: unknown }) {
+    super(message, opts?.cause !== undefined ? { cause: opts.cause } : undefined);
     this.name = "ToolInputError";
   }
 }
@@ -58,3 +60,21 @@ export function isToolInputError(err: unknown): err is Error & { isToolInputErro
 export function markToolInputError<E extends Error>(err: E): E {
   return Object.assign(err, { isToolInputError: true });
 }
+
+/**
+ * True when the error carries a 5xx `statusCode` (storage full, engine
+ * unavailable, ...). Tool routes rethrow these from their catch-all so the
+ * error handler answers with the real status instead of a 422 that blames the
+ * user's file.
+ */
+export function hasServerErrorStatus(err: unknown): err is Error & { statusCode: number } {
+  const code = (err as { statusCode?: unknown } | null)?.statusCode;
+  return err instanceof Error && typeof code === "number" && code >= 500 && code <= 599;
+}
+
+/**
+ * The `code` a text-extraction tool answers with when the PDF has no text layer
+ * (a scan). The web app keys its "run OCR instead" offer on it, since the
+ * message is prose and gets reworded or translated.
+ */
+export const NO_TEXT_LAYER_CODE = "NO_TEXT_LAYER";

@@ -8,7 +8,7 @@ const require = createRequire(
 );
 const sharp = require("sharp") as typeof import("sharp").default;
 
-import { compressDetailed } from "@snapotter/image-engine";
+import { compressDetailed, convert, processImage } from "@snapotter/image-engine";
 
 /** Random noise barely compresses, so a small target forces the downscale path. */
 async function noisyPng(width: number, height: number): Promise<Buffer> {
@@ -34,7 +34,10 @@ describe("compressDetailed (#1272)", () => {
     const result = await compressDetailed(sharp(flat), { targetSizeBytes: 20_000, format: "jpg" });
 
     expect(result.resizedTo).toBeUndefined();
-    const meta = await sharp(await result.image.toBuffer()).metadata();
+    expect(result.buffer).toBeInstanceOf(Buffer);
+    const fromImage = await result.image.toBuffer();
+    expect(result.buffer?.equals(fromImage)).toBe(true);
+    const meta = await sharp(result.buffer).metadata();
     expect({ width: meta.width, height: meta.height }).toEqual({ width: 400, height: 300 });
   });
 
@@ -47,7 +50,9 @@ describe("compressDetailed (#1272)", () => {
       targetSizeBytes: targetBytes,
       format: "jpg",
     });
-    const out = await result.image.toBuffer();
+    expect(result.buffer).toBeInstanceOf(Buffer);
+    const out = result.buffer as Buffer;
+    expect(out.equals(await result.image.toBuffer())).toBe(true);
     const meta = await sharp(out).metadata();
 
     expect(out.length).toBeLessThanOrEqual(targetBytes);
@@ -55,6 +60,21 @@ describe("compressDetailed (#1272)", () => {
     expect(result.resizedTo?.width).toBeLessThan(1200);
     expect(result.resizedTo?.height).toBeLessThan(900);
     expect({ width: meta.width, height: meta.height }).toEqual(result.resizedTo);
+  });
+
+  it("leaves buffer undefined in quality mode so the Sharp pipeline stays lazy (#1379)", async () => {
+    const flat = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: "#884422" },
+    })
+      .jpeg({ quality: 95 })
+      .toBuffer();
+
+    const result = await compressDetailed(sharp(flat), { quality: 60, format: "jpg" });
+
+    expect(result.buffer).toBeUndefined();
+    expect(result.resizedTo).toBeUndefined();
+    const out = await result.image.toBuffer();
+    expect(out.length).toBeGreaterThan(0);
   });
 
   it("explains an unreachable target in KB, not bytes", async () => {
@@ -74,5 +94,28 @@ describe("compressDetailed (#1272)", () => {
     const attempt = compressDetailed(sharp(noise), { targetSizeBytes: 250, format: "jpg" });
 
     await expect(attempt).rejects.toThrow("under 0.25 KB");
+  });
+
+  it("preserves prior convert format when compress omits options.format (#3135)", async () => {
+    const png = await noisyPng(600, 450);
+
+    const viaEngine = await processImage(png, [
+      { type: "convert", options: { format: "webp" } },
+      { type: "compress", options: { quality: 60 } },
+    ]);
+    expect(viaEngine.info.format).toBe("webp");
+
+    // Target small enough to force the downscale path while preserving the prior convert format.
+    const viaDirectTarget = await compressDetailed(await convert(sharp(png), { format: "webp" }), {
+      targetSizeBytes: 5_000,
+    });
+    expect(viaDirectTarget.buffer).toBeInstanceOf(Buffer);
+    const out = viaDirectTarget.buffer as Buffer;
+    expect(out.equals(await viaDirectTarget.image.toBuffer())).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(5_000);
+    expect(viaDirectTarget.resizedTo).toBeDefined();
+    const meta = await sharp(out).metadata();
+    expect(meta.format).toBe("webp");
+    expect({ width: meta.width, height: meta.height }).toEqual(viaDirectTarget.resizedTo);
   });
 });

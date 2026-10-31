@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRecordFeedback,
   parseMigrationMarker,
   shouldShowInstallFeedbackCard,
   shouldShowMigrationBanner,
@@ -216,5 +217,57 @@ describe("parseMigrationMarker", () => {
     expect(parseMigrationMarker(undefined)).toBeNull();
     expect(parseMigrationMarker("not json")).toBeNull();
     expect(parseMigrationMarker(JSON.stringify({ status: "bogus" }))).toBeNull();
+  });
+});
+
+describe("canRecordFeedback (#2220, #2252)", () => {
+  const base = {
+    posthogHost: "",
+    posthogProxyPath: "",
+    sentryDsn: "",
+    sentryDsnWeb: "",
+    posthogSampleRate: 1,
+    instanceId: "",
+  };
+
+  it("is true only with telemetry on and a server-side feedback sink", () => {
+    expect(
+      canRecordFeedback({
+        ...base,
+        enabled: true,
+        posthogApiKey: "phc_x",
+        feedbackSink: true,
+      }),
+    ).toBe(true);
+    // A baked key no longer decides on its own: the server can have the key and
+    // still have no client to take the event, and it answers accepted: false
+    // (#2252).
+    expect(
+      canRecordFeedback({
+        ...base,
+        enabled: true,
+        posthogApiKey: "phc_x",
+        feedbackSink: false,
+      }),
+    ).toBe(false);
+    // The server's answer is authoritative even if the key is blanked.
+    expect(
+      canRecordFeedback({
+        ...base,
+        enabled: true,
+        posthogApiKey: "",
+        feedbackSink: true,
+      }),
+    ).toBe(true);
+    expect(
+      canRecordFeedback({
+        ...base,
+        enabled: false,
+        posthogApiKey: "phc_x",
+        feedbackSink: true,
+      }),
+    ).toBe(false);
+    expect(canRecordFeedback(null)).toBe(false);
+    expect(canRecordFeedback(undefined)).toBe(false);
   });
 });

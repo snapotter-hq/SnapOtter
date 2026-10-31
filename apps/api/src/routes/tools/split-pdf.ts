@@ -42,7 +42,7 @@ export function registerSplitPdf(app: FastifyInstance) {
       if (settings.mode === "range") {
         const outPath = join(ctx.scratchDir, `${base}_pages.pdf`);
         ctx.report(20, "Extracting pages");
-        await qpdfSplitRanges(inPath, settings.range ?? "", outPath);
+        await qpdfSplitRanges(inPath, settings.range ?? "", outPath, { signal: ctx.signal });
         return {
           scratchPath: outPath,
           filename: `${base}_pages.pdf`,
@@ -51,14 +51,14 @@ export function registerSplitPdf(app: FastifyInstance) {
       }
 
       // mode === "every": split into chunks of everyN pages
-      const totalPages = await qpdfPageCount(inPath);
+      const totalPages = await qpdfPageCount(inPath, { signal: ctx.signal });
       const n = settings.everyN ?? 1;
       const parts: string[] = [];
       for (let start = 1; start <= totalPages; start += n) {
         const end = Math.min(start + n - 1, totalPages);
         const partPath = join(ctx.scratchDir, `part-${parts.length + 1}.pdf`);
         const range = `${start}-${end}`;
-        await qpdfSplitRanges(inPath, range, partPath);
+        await qpdfSplitRanges(inPath, range, partPath, { signal: ctx.signal });
         parts.push(partPath);
         const pct = Math.min(80, 10 + Math.round((start / totalPages) * 70));
         ctx.report(pct, `Splitting part ${parts.length}`);

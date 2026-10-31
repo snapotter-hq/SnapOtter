@@ -20,9 +20,8 @@ export function isModuleNotFound(err: unknown): boolean {
  * must never itself throw.
  *
  * `reportError` runs first and is internally guarded. `logger` is imported lazily
- * (a static import would pull the file-transport logger, which builds pino
- * targets from env at load, into every gate consumer's module graph) and its use
- * is wrapped, so a logging fault can never turn a disabled feature into a throw.
+ * (it keeps the logger out of every gate consumer's module graph) and its use is
+ * wrapped, so a logging fault can never turn a disabled feature into a throw.
  */
 async function reportFeatureFailure(
   err: unknown,

@@ -1,9 +1,15 @@
-import type { TranslationKeys } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, type TranslationKeys } from "@snapotter/shared";
 import { useCallback, useEffect, useRef } from "react";
-import { type BlockerFunction, useBlocker } from "react-router";
+import { type BlockerFunction, useBlocker, useLocation } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
-import { normalizePath, useWorkInFlight, type WorkReason } from "@/hooks/use-work-in-flight";
+import {
+  normalizePath,
+  toolIdFromPath,
+  useWorkInFlight,
+  type WorkReason,
+} from "@/hooks/use-work-in-flight";
+import { track } from "@/lib/analytics";
 import { downloadBlob, triggerDownload } from "@/lib/download";
 import { useFileStore } from "@/stores/file-store";
 
@@ -115,6 +121,7 @@ function guardDialog(
  */
 export function NavigationGuard() {
   const { t } = useTranslation();
+  const location = useLocation();
   const reason = useWorkInFlight();
   // useWorkInFlight rebuilds its return value every render, so effects key on
   // this boolean. `[reason]` would re-run them on every store patch in a run.
@@ -220,6 +227,12 @@ export function NavigationGuard() {
     downloadPendingRef.current = true;
 
     const tookTheZip = reason.downloads.some((item) => item.kind === "zip");
+    const storeAtClick = useFileStore.getState();
+    const claimEntryIds = reason.downloads.flatMap((item) => {
+      if (item.kind !== "result") return [];
+      const id = storeAtClick.entries[item.index]?.id;
+      return id ? [id] : [];
+    });
     // Total over the union, so no member can be silently skipped.
     for (const item of reason.downloads) {
       // A zip carries a raw Blob, so downloadBlob mints an object url for it
@@ -229,6 +242,10 @@ export function NavigationGuard() {
       if (item.kind === "zip") downloadBlob(item.blob, item.filename);
       else triggerDownload(item.url, item.filename);
     }
+    const toolId = toolIdFromPath(normalizePath(location.pathname));
+    if (reason.downloads.length > 0 && toolId) {
+      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: toolId });
+    }
 
     // Claim and navigate on a later tick. Proceeding commits the navigation,
     // which remounts tool-page, whose reset() revokes these blob urls. Doing it
@@ -236,16 +253,16 @@ export function NavigationGuard() {
     leaveTimerRef.current = setTimeout(() => {
       leaveTimerRef.current = null;
       const store = useFileStore.getState();
-      // Claims exactly what went out above, by the indices the downloads
-      // carry, never whatever the store holds now. A result that lands in this
-      // window is not in the list, so it stays unclaimed and keeps warning.
-      // The zip needs no such care: it holds every result, so taking it claims
-      // the whole batch.
+      // Claims exactly what went out above, by the entry ids captured when the
+      // downloads started, never whatever the store holds now. A result that
+      // lands in this window is not in the list, so it stays unclaimed and
+      // keeps warning. The zip needs no such care: it holds every result, so
+      // taking it claims the whole batch.
       if (tookTheZip) {
         store.markBatchClaimed();
       } else {
-        for (const item of reason.downloads) {
-          if (item.kind === "result") store.markClaimed(item.index);
+        for (const id of claimEntryIds) {
+          store.markClaimedById(id);
         }
       }
       blocker.proceed?.();

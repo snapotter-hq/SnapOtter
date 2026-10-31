@@ -1,11 +1,23 @@
-import { Check, Copy, Download, Search } from "lucide-react";
-import { useRef, useState } from "react";
+import { ANALYTICS_EVENTS, type TranslationKeys } from "@snapotter/shared";
+import { Check, Copy, Download, Search, X } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { useTimeouts } from "@/hooks/use-timeouts";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
+import {
+  jobFailureMessage,
+  MalformedResultError,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { useRunProgress } from "@/lib/run-progress";
 import { copyToClipboard } from "@/lib/utils";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
 
 interface BarcodeResult {
@@ -63,161 +75,567 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Send one file to the barcode-read API. */
+/** A sync 2xx answer from the barcode-read route. */
+interface BarcodeReadAnswer {
+  filename: string;
+  barcodes: BarcodeResult[];
+  /** The annotated image, or null when nothing was found. */
+  annotatedUrl: string | null;
+}
+
+function isBarcode(value: unknown): value is BarcodeResult {
+  if (value === null || typeof value !== "object") return false;
+  const { type, text } = value as { type?: unknown; text?: unknown };
+  return typeof type === "string" && typeof text === "string";
+}
+
+/**
+ * Parses a sync 2xx barcode-read answer. The route answers with decoded
+ * barcodes and no downloadUrl, so parseResultBody would turn every good answer
+ * away; this checks the fields the panel reads instead and throws a
+ * MalformedResultError otherwise (#1795). Nothing of the body goes into the
+ * error: a JSON SyntaxError quotes it.
+ */
+function parseBarcodeAnswer(text: string): BarcodeReadAnswer {
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new MalformedResultError("notAnObject");
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    throw new MalformedResultError("notAnObject");
+  }
+  const { filename, barcodes, annotatedUrl } = body as Record<string, unknown>;
+  if (
+    typeof filename !== "string" ||
+    !Array.isArray(barcodes) ||
+    !barcodes.every(isBarcode) ||
+    !(annotatedUrl === null || (typeof annotatedUrl === "string" && annotatedUrl))
+  ) {
+    throw new MalformedResultError("notABarcodeResult");
+  }
+  return resolveServerUrls(body as BarcodeReadAnswer);
+}
+
+/**
+ * Send one file to the barcode-read API and hand a good answer to `land`. Only
+ * an answer that isn't one is the server's fault, and it gets reported
+ * (#1740). A throw from `land` is our own store write failing: it fails the
+ * file with the tracking message and is rethrown so it still surfaces (#1795,
+ * after #1354). `onStoppable` gets a stop that drops the request where it
+ * stands.
+ */
+let activeBarcodeWatchdog: XhrWatchdog | null = null;
+let barcodePanelPaused = false;
+
 function scanOneFile(
   file: File,
   tryHarder: boolean,
   onUploadProgress: (pct: number) => void,
-): Promise<{ filename: string; barcodes: BarcodeResult[]; annotatedUrl: string | null }> {
+  land: (answer: BarcodeReadAnswer) => void,
+  onStoppable: (stop: () => void) => void,
+  t: TranslationKeys,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("settings", JSON.stringify({ tryHarder }));
 
     const xhr = new XMLHttpRequest();
-    xhr.timeout = 300_000;
+
+    // Set once the scan stops: an answer arriving after that, from a request
+    // the abort didn't reach, must not land on entries that aren't ours.
+    let stopped = false;
+    const watchdog = createXhrWatchdog(xhr, 300_000, () => !stopped);
+    if (barcodePanelPaused) {
+      watchdog.pause();
+    }
+    activeBarcodeWatchdog = watchdog;
+    const clearWatchdog = () => {
+      watchdog.clear();
+      if (activeBarcodeWatchdog === watchdog) {
+        activeBarcodeWatchdog = null;
+      }
+    };
 
     xhr.upload.onprogress = (e) => {
+      if (stopped) return;
+      watchdog.onUploadProgress(e);
       if (e.lengthComputable) onUploadProgress((e.loaded / e.total) * 100);
     };
 
+    xhr.upload.onload = () => {
+      if (stopped) return;
+      watchdog.onUploadLoad();
+    };
+
     xhr.onload = () => {
+      clearWatchdog();
+      if (stopped) return;
       if (xhr.status >= 200 && xhr.status < 300) {
+        let answer: BarcodeReadAnswer;
         try {
-          resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
-        } catch {
-          reject(new Error("Invalid response"));
+          answer = parseBarcodeAnswer(xhr.responseText);
+        } catch (err) {
+          reject(new Error(t.errors.invalidResponse));
+          reportMalformedResult(err, { status: xhr.status, toolId: "barcode-read" });
+          return;
         }
+        try {
+          land(answer);
+        } catch (err) {
+          reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+          throw err;
+        }
+        resolve();
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          reject(new Error(body.error || `Failed: ${xhr.status}`));
+          reject(
+            new Error(
+              failedAnswerMessage(
+                t,
+                body,
+                xhr.status,
+                format(t.errors.failedWithStatus, { status: xhr.status }),
+              ),
+            ),
+          );
         } catch {
-          reject(new Error(`Scanning failed: ${xhr.status}`));
+          reject(
+            new Error(
+              failedAnswerMessage(
+                t,
+                null,
+                xhr.status,
+                format(t.toolSettings["barcode-read"].scanningFailedWithStatus, {
+                  status: xhr.status,
+                }),
+              ),
+            ),
+          );
         }
       }
     };
-    xhr.onerror = () => reject(new Error("Network error"));
-    xhr.ontimeout = () => reject(new Error("Request timed out"));
+    xhr.onerror = () => {
+      clearWatchdog();
+      reject(new Error(t.errors.network));
+    };
+    xhr.ontimeout = () => {
+      clearWatchdog();
+      reject(new Error(t.errors.requestTimedOut));
+    };
+    // The error only settles the promise and never reaches the UI: the scan
+    // has already decided to write nothing more for this file.
+    onStoppable(() => {
+      stopped = true;
+      clearWatchdog();
+      reject(new Error("Barcode scan stopped"));
+      xhr.abort();
+    });
 
-    xhr.open("POST", appUrl("/api/v1/tools/image/barcode-read"));
-    for (const [key, value] of formatHeaders()) {
-      xhr.setRequestHeader(key, value);
+    try {
+      xhr.open("POST", appUrl("/api/v1/tools/image/barcode-read"));
+      for (const [key, value] of formatHeaders()) {
+        xhr.setRequestHeader(key, value);
+      }
+      watchdog.send(formData);
+    } catch (err) {
+      clearWatchdog();
+      throw err;
     }
-    xhr.send(formData);
   });
 }
+
+const EMPTY_BARCODE_RESULTS: FileResult[] = [];
+let currentBarcodeResults: FileResult[] = EMPTY_BARCODE_RESULTS;
+const barcodeCopiedRows = new Set<number>();
+let barcodeRunFiles: ReadonlySet<File> | null = null;
+let barcodeRunEntryIds: ReadonlySet<string> | null = null;
+const barcodeResultListeners = new Set<() => void>();
+
+function notifyBarcodeResults() {
+  for (const listener of barcodeResultListeners) {
+    listener();
+  }
+}
+
+function subscribeBarcodeResults(listener: () => void) {
+  barcodeResultListeners.add(listener);
+  return () => {
+    barcodeResultListeners.delete(listener);
+  };
+}
+
+function getBarcodeResultsSnapshot(): FileResult[] {
+  return currentBarcodeResults;
+}
+
+function setBarcodeResults(next: FileResult[]) {
+  if (next.length === 0) {
+    if (currentBarcodeResults === EMPTY_BARCODE_RESULTS) return;
+    currentBarcodeResults = EMPTY_BARCODE_RESULTS;
+  } else {
+    currentBarcodeResults = next;
+  }
+  notifyBarcodeResults();
+}
+
+export function resetBarcodeResults() {
+  barcodePanelPaused = false;
+  activeBarcodeWatchdog?.clear();
+  activeBarcodeWatchdog = null;
+  barcodeRunFiles = null;
+  barcodeRunEntryIds = null;
+  barcodeCopiedRows.clear();
+  if (currentBarcodeResults === EMPTY_BARCODE_RESULTS) return;
+  currentBarcodeResults = EMPTY_BARCODE_RESULTS;
+  notifyBarcodeResults();
+}
+
+useFileStore.subscribe((state, prev) => {
+  if (
+    state.stopCount !== prev.stopCount ||
+    state.files.length === 0 ||
+    (barcodeRunFiles && !state.files.some((f) => barcodeRunFiles?.has(f))) ||
+    (barcodeRunEntryIds &&
+      barcodeRunEntryIds.size > 0 &&
+      !state.entries.some((e) => barcodeRunEntryIds?.has(e.id))) ||
+    (!state.processing &&
+      prev.entries.some((e) => e.processedUrl !== null || e.status === "completed") &&
+      state.entries.every((e) => e.processedUrl === null && e.status === "pending"))
+  ) {
+    resetBarcodeResults();
+  }
+});
 
 export function BarcodeReadSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
 
   const [tryHarder, setTryHarder] = useState(false);
-  const [results, setResults] = useState<FileResult[]>([]);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [copiedAll, setCopiedAll] = useState(false);
-  const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [progressStage, setProgressStage] = useState<string | undefined>();
-  const [elapsed, setElapsed] = useState(0);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Shared across a bare panel unmount so closing the mobile settings sheet or
+  // crossing the 768px breakpoint keeps the decoded barcode table visible (#2889).
+  const results = useSyncExternalStore(
+    subscribeBarcodeResults,
+    getBarcodeResultsSnapshot,
+    getBarcodeResultsSnapshot,
+  );
+  const [rowCopy, setRowCopy] = useState<{ idx: number; ok: boolean } | null>(null);
+  const [allCopy, setAllCopy] = useState<"copied" | "failed" | null>(null);
+  const later = useTimeouts();
+
+  useEffect(() => {
+    barcodePanelPaused = false;
+    activeBarcodeWatchdog?.resume();
+    return () => {
+      barcodePanelPaused = true;
+      activeBarcodeWatchdog?.pause();
+    };
+  }, []);
+
+  // Unmounting stops the elapsed counter. The scan itself stops only once its
+  // files leave the store (see handleProcess), and shared progress state lets a
+  // remounted panel show the live phase, percent, stage, and elapsed counter (#2315).
+  const {
+    progressPhase,
+    progressPercent,
+    progressStage,
+    elapsed,
+    startRunProgress,
+    clearRunProgressTimer,
+    setProgressPhase,
+    setProgressPercent,
+    setProgressStage,
+  } = useRunProgress();
 
   const handleProcess = async () => {
     if (files.length === 0) return;
 
-    setError(null);
-    setResults([]);
-    setProcessing(true);
-    setProgressPhase("uploading");
-    setProgressPercent(0);
-    setProgressStage(undefined);
-    setElapsed(0);
-
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "barcode-read",
+      is_batch: files.length > 1,
+      file_count: files.length,
+    });
 
     const total = files.length;
     const allResults: FileResult[] = [];
     const errors: string[] = [];
-    const { updateEntry } = useFileStore.getState();
-
-    for (let i = 0; i < total; i++) {
-      const file = files[i];
-      const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
-      const fileBase = (i / total) * 100;
-      const fileShare = 100 / total;
-
-      try {
-        setProgressStage(`${prefix}Scanning ${file.name}...`);
-
-        const result = await scanOneFile(file, tryHarder, (pct) => {
-          setProgressPhase("uploading");
-          setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
+    const { entries: initialEntries, updateEntryById } = useFileStore.getState();
+    const entryIds = initialEntries.map((e) => e.id);
+    for (const entry of initialEntries) {
+      if (entry.processedUrl !== null) {
+        updateEntryById(entry.id, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          status: "pending",
+          error: null,
         });
-
-        setProgressPhase("processing");
-        setProgressPercent(fileBase + fileShare);
-
-        allResults.push({
-          filename: result.filename,
-          barcodes: result.barcodes,
-        });
-
-        // Set annotated image as processedUrl for before/after view
-        if (result.annotatedUrl) {
-          updateEntry(i, {
-            processedUrl: result.annotatedUrl,
-            processedPreviewUrl: result.annotatedUrl,
-            processedFilename: `annotated-${file.name.replace(/\.[^.]+$/, "")}.png`,
-            status: "completed",
-            processedSize: null,
-          });
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`${file.name}: ${msg}`);
-        allResults.push({ filename: file.name, barcodes: [] });
       }
     }
 
-    if (elapsedRef.current) clearInterval(elapsedRef.current);
+    const runFiles = new Set(files);
+    const runEntryIds = new Set(entryIds);
+    barcodeRunFiles = runFiles;
+    barcodeRunEntryIds = runEntryIds;
+    barcodeCopiedRows.clear();
+    setError(null);
+    setBarcodeResults(EMPTY_BARCODE_RESULTS);
+    setProcessing(true);
+    const runTimer = startRunProgress();
 
-    if (errors.length === total) {
-      setError(errors.join("; "));
-    } else if (errors.length > 0) {
-      setError(`${errors.length} of ${total} files failed`);
+    // Leaving the tool route bumps stopCount (#1994), leaving for another tool
+    // resets the file store, and opening library files replaces it. Either way
+    // the scan stops there: the request in flight is dropped, no more files are
+    // sent, and nothing is written to entries that now belong to someone else
+    // (#1932). This keys on the store rather than on unmount because the panel
+    // also unmounts when the layout swaps across the breakpoint, and that must
+    // not end the scan.
+    const startStopCount = useFileStore.getState().stopCount;
+    let activeIndex = 0;
+    let activeItemIndex: number | null = null;
+    let activeEntryAborted = false;
+    let filesGone = false;
+    let stoppedEarly = false;
+    let stopInFlight: (() => void) | null = null;
+    const isBatchItemPresent = (index: number, state = useFileStore.getState()): boolean => {
+      const file = files[index];
+      if (!file) return false;
+      const entry = initialEntries[index];
+      if (entry) {
+        return state.entries.some((e) => e.id === entry.id && e.file === file);
+      }
+      return state.files.includes(file);
+    };
+    const hasAnyBatchItem = (state: ReturnType<typeof useFileStore.getState>): boolean => {
+      if (state.stopCount !== startStopCount) return false;
+      for (let idx = 0; idx < total; idx++) {
+        if (isBatchItemPresent(idx, state)) return true;
+      }
+      return false;
+    };
+    const hasRemainingWork = (state: ReturnType<typeof useFileStore.getState>): boolean => {
+      if (state.stopCount !== startStopCount) return false;
+      for (let idx = activeIndex; idx < total; idx++) {
+        if (isBatchItemPresent(idx, state)) return true;
+      }
+      return false;
+    };
+    let processedCount = 0;
+    let resultsCommitted = false;
+    const commitCompletedResults = () => {
+      if (resultsCommitted || filesGone || processedCount === 0) return;
+      resultsCommitted = true;
+      if (errors.length === processedCount) {
+        setError(errors.join("; "));
+      } else if (errors.length > 0) {
+        setError(
+          format(t.toolSettings["barcode-read"].filesFailed, {
+            count: errors.length,
+            total: processedCount,
+          }),
+        );
+      }
+
+      setBarcodeResults(allResults);
+    };
+    const stopScanNow = (commitPartial: boolean) => {
+      stoppedEarly = true;
+      activeEntryAborted = true;
+      activeItemIndex = null;
+      const stop = stopInFlight;
+      stopInFlight = null;
+      // This runs inside whoever replaced the files or left the route: a throw
+      // here must not break their update.
+      let stopError: { cause: unknown } | null = null;
+      for (const step of [
+        () => stop?.(),
+        ...(commitPartial ? [commitCompletedResults] : []),
+        () => {
+          if (useFileStore.getState().processing) setProcessing(false);
+        },
+        () => setProgressPhase("idle"),
+      ]) {
+        try {
+          step();
+        } catch (err) {
+          stopError ??= { cause: err };
+        }
+      }
+      if (stopError) {
+        reportRunEndFailure(
+          "Stopping a barcode scan whose files left failed",
+          stopError.cause,
+          "barcode-read",
+        );
+      }
+    };
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (filesGone) return;
+      if (!hasAnyBatchItem(state)) {
+        filesGone = true;
+        if (!stoppedEarly) stopScanNow(false);
+        return;
+      }
+      if (!hasRemainingWork(state)) {
+        if (!stoppedEarly) stopScanNow(true);
+        return;
+      }
+      if (activeItemIndex !== null && !isBatchItemPresent(activeItemIndex, state)) {
+        activeEntryAborted = true;
+        activeItemIndex = null;
+        const stop = stopInFlight;
+        stopInFlight = null;
+        try {
+          stop?.();
+        } catch (err) {
+          reportRunEndFailure(
+            "Stopping a barcode scan whose files left failed",
+            err,
+            "barcode-read",
+          );
+        }
+      }
+    });
+
+    try {
+      for (let i = 0; i < total; i++) {
+        activeIndex = i;
+        if (filesGone || stoppedEarly) break;
+        if (!isBatchItemPresent(i)) continue;
+        const file = files[i];
+        const entryId = entryIds[i];
+        const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
+        const fileBase = (i / total) * 100;
+        const fileShare = 100 / total;
+
+        activeItemIndex = i;
+        activeEntryAborted = false;
+        try {
+          setProgressStage(
+            `${prefix}${format(t.toolSettings["barcode-read"].scanningFile, { name: file.name })}`,
+          );
+
+          await scanOneFile(
+            file,
+            tryHarder,
+            (pct) => {
+              if (filesGone || stoppedEarly || activeEntryAborted) return;
+              setProgressPhase("uploading");
+              setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
+            },
+            (answer) => {
+              if (filesGone || activeEntryAborted || !isBatchItemPresent(i)) return;
+              setProgressPhase("processing");
+              setProgressPercent(fileBase + fileShare);
+
+              allResults.push({
+                filename: answer.filename,
+                barcodes: answer.barcodes,
+              });
+
+              // Set annotated image as processedUrl for before/after view
+              if (answer.annotatedUrl && entryId) {
+                updateEntryById(entryId, {
+                  processedUrl: answer.annotatedUrl,
+                  processedPreviewUrl: answer.annotatedUrl,
+                  processedFilename: `annotated-${file.name.replace(/\.[^.]+$/, "")}.png`,
+                  status: "completed",
+                  processedSize: null,
+                });
+              }
+            },
+            (stop) => {
+              stopInFlight = stop;
+            },
+            t,
+          );
+          if (filesGone) break;
+          if (activeEntryAborted || !isBatchItemPresent(i)) continue;
+          processedCount++;
+        } catch (err) {
+          if (filesGone) break;
+          if (activeEntryAborted || !isBatchItemPresent(i)) continue;
+          const hadLandedResult = allResults.length === processedCount + 1;
+          processedCount++;
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${file.name}: ${msg}`);
+          // A throw while landing comes after this file's barcodes went in.
+          if (!hadLandedResult) allResults.push({ filename: file.name, barcodes: [] });
+        } finally {
+          activeItemIndex = null;
+          stopInFlight = null;
+        }
+      }
+    } finally {
+      unsubscribe();
+      clearRunProgressTimer(runTimer);
+      if (!filesGone && !stoppedEarly) setProgressPhase("idle");
     }
 
-    setResults(allResults);
-    setProcessing(false);
-    setProgressPhase("idle");
+    // The results and errors belong to a scan that was stopped. Its store watch
+    // already cleared processing when the stop fired, so don't write it again
+    // after the await where a next run may have started (#1994).
+    if (filesGone || stoppedEarly || processedCount === 0) {
+      if (!filesGone && !stoppedEarly) {
+        setProcessing(false);
+      }
+      return;
+    }
+
+    try {
+      commitCompletedResults();
+    } finally {
+      setProcessing(false);
+    }
   };
 
   // Total barcode count across all files
   const totalBarcodes = results.reduce((sum, r) => sum + r.barcodes.length, 0);
 
-  const handleCopyOne = async (text: string, globalIdx: number) => {
-    const ok = await copyToClipboard(text);
-    if (ok) {
-      setCopiedIndex(globalIdx);
-      setTimeout(() => setCopiedIndex(null), 1500);
+  const captureEntryUrls = (): Array<{ id: string; url: string }> =>
+    useFileStore
+      .getState()
+      .entries.flatMap((e) => (e.processedUrl ? [{ id: e.id, url: e.processedUrl }] : []));
+
+  const claimCapturedEntries = (targets: ReadonlyArray<{ id: string; url: string }>) => {
+    const store = useFileStore.getState();
+    for (const { id, url } of targets) {
+      store.markClaimedById(id, url);
     }
   };
 
+  const handleCopyOne = async (text: string, globalIdx: number) => {
+    const targets = captureEntryUrls();
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      barcodeCopiedRows.add(globalIdx);
+      if (totalBarcodes > 0 && barcodeCopiedRows.size >= totalBarcodes) {
+        claimCapturedEntries(targets);
+      }
+    }
+    setRowCopy({ idx: globalIdx, ok });
+    later(() => setRowCopy(null), 1500, "rowCopy");
+  };
+
   const handleCopyAll = async () => {
+    const targets = captureEntryUrls();
     const allText = results
       .flatMap((r) => r.barcodes.map((b) => `${FORMAT_LABELS[b.type] ?? b.type}: ${b.text}`))
       .join("\n");
     const ok = await copyToClipboard(allText);
     if (ok) {
-      setCopiedAll(true);
-      setTimeout(() => setCopiedAll(false), 2000);
+      claimCapturedEntries(targets);
     }
+    setAllCopy(ok ? "copied" : "failed");
+    later(() => setAllCopy(null), 2000, "allCopy");
   };
 
   const handleExportCsv = () => {
+    const targets = captureEntryUrls();
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "barcode-read" });
     const header = "File,Type,Value\n";
     const rows = results
       .flatMap((r) =>
@@ -237,6 +655,7 @@ export function BarcodeReadSettings() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    claimCapturedEntries(targets);
   };
 
   const hasFile = files.length > 0;
@@ -327,11 +746,18 @@ export function BarcodeReadSettings() {
                   onClick={handleCopyAll}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {copiedAll ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  {copiedAll
+                  {allCopy === "copied" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  {allCopy === "copied"
                     ? t.toolSettings["barcode-read"].copied
-                    : t.toolSettings["barcode-read"].copyAll}
+                    : allCopy === "failed"
+                      ? t.common.copyFailed
+                      : t.toolSettings["barcode-read"].copyAll}
                 </button>
+                <CopyFeedback status={allCopy} />
               </div>
             )}
           </div>
@@ -374,14 +800,21 @@ export function BarcodeReadSettings() {
                         type="button"
                         onClick={() => handleCopyOne(barcode.text, idx)}
                         className="shrink-0 p-1 rounded hover:bg-background/80 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity"
-                        title={t.toolSettings["barcode-read"].copyValue}
+                        title={
+                          rowCopy?.idx === idx && !rowCopy.ok
+                            ? t.common.copyFailed
+                            : t.toolSettings["barcode-read"].copyValue
+                        }
                       >
-                        {copiedIndex === idx ? (
+                        {rowCopy?.idx !== idx ? (
+                          <Copy className="h-3.5 w-3.5" />
+                        ) : rowCopy.ok ? (
                           <Check className="h-3.5 w-3.5 text-success-ink" />
                         ) : (
-                          <Copy className="h-3.5 w-3.5" />
+                          <X className="h-3.5 w-3.5 text-destructive" />
                         )}
                       </button>
+                      <CopyFeedback status={rowCopy?.idx === idx ? rowCopy : null} />
                     </div>
                   );
                 })

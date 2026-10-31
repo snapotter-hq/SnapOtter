@@ -1,6 +1,6 @@
 ---
 description: "Połącz jeden lub więcej obrazów w dokument PDF z opcjami rozmiaru strony, orientacji i docelowego rozmiaru pliku."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 990d14b7fce3
 ---

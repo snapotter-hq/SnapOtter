@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter में स्थानीय विकास सेटअप, कमांड, कोड परंपराएँ, और एक नया टूल कैसे जोड़ें।"
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: feb4df3446de
+i18n_output_hash: 11914c4e8f89
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ const MyToolSettings = lazy(() =>
 ### 4. टेस्ट {#_4-tests}
 
 अपने एक्शन बटन में एक `data-testid` एट्रिब्यूट जोड़ें (जैसा ऊपर दिखाया गया है) ताकि e2e टेस्ट इसे विश्वसनीय रूप से लक्षित कर सकें।
+
+### 5. विज़ुअल बेसलाइन {#_5-visual-baselines}
+
+स्क्रीनशॉट टेस्ट एक भी बदले हुए पिक्सल की अनुमति नहीं देते, और एक नया टूल वह बदल देता है जो वे रेंडर करते हैं: होम पेज और कैटलॉग पर टूल की गिनती, ग्रिड में एक नया कार्ड, और उसका अपना पेज, जिस पर `tests/e2e/gui-visual-tools.spec.ts` तब तक "snapshot doesn't exist" के साथ फ़ेल होता है जब तक उसकी बेसलाइन न बन जाए। टूल वाले PR में ही बेसलाइन रीफ़्रेश करें, ताकि रात में चलने वाली विज़ुअल तुलना हरी बनी रहे।
+
+CI `linux` (`ubuntu-latest`) और `darwin` (`macos-latest`) दोनों बेसलाइन बनाता है। अपनी ब्रांच पुश करें, फिर उस पर रीफ़्रेश चलाएँ:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+हर OS लेग `visual-baselines-linux-<run-id>-<attempt>` या `visual-baselines-darwin-<run-id>-<attempt>` आर्टिफ़ैक्ट अपलोड करता है और दोबारा बनाए गए PNG के साथ `main` के विरुद्ध एक ड्राफ़्ट PR (`chore/visual-baselines-linux-...` और `chore/visual-baselines-darwin-...`) खोलता है। हर ड्राफ़्ट PR के विवरण में एक `gh run download` कमांड होता है; PNG को अपनी ब्रांच में लाने के लिए दोनों को अपने चेकआउट के रूट से चलाएँ, उन्हें कमिट करें और ड्राफ़्ट PR बंद कर दें। अगर `changed` कोई ऐसा शॉट छोड़ दे जिसके बदलने की आपको उम्मीद थी, तो उसकी जगह `update_snapshots=all` इस्तेमाल करें। इसे चलाने के लिए रिपॉज़िटरी पर लिखने की अनुमति चाहिए, इसलिए अगर आपकी ब्रांच किसी फ़ोर्क पर है, तो PR में बताएँ कि उसे बेसलाइन रीफ़्रेश चाहिए और कोई मेंटेनर उसे चलाएगा।
+
+Mac पर तेज़ बदलावों के लिए आप `darwin` बेसलाइन को लोकल रूप से भी रीफ़्रेश कर सकते हैं:
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+हर हाल में, कमिट करने से पहले हर नया या बदला हुआ PNG खोलकर देखें: बेसलाइन वही दर्ज करती है जो रेंडर हुआ, चाहे वह टूटा हो या नहीं।
+
+रिलीज़ के लिए इसमें से कुछ भी ज़रूरी नहीं है। ऐप वर्शन उसे दिखाने वाले हर स्क्रीनशॉट में मास्क किया जाता है, इसलिए उसे बढ़ाने से कोई बेसलाइन नहीं बदलती।
 
 ## Docker बिल्ड {#docker-builds}
 

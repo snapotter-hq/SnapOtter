@@ -1,15 +1,15 @@
 import { AlertTriangle, BookmarkPlus, Loader2, MapPin, PenLine, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { MetadataGrid } from "@/components/common/metadata-grid";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
-import { EXIF_LABELS, exifStr, SKIP_KEYS } from "@/lib/metadata-utils";
+import { countDisplayableMetadata, EXIF_LABELS, exifStr } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface InspectResult {
@@ -20,6 +20,40 @@ interface InspectResult {
   xmp?: Record<string, unknown> | null;
   gps?: Record<string, unknown> | null;
   keywords?: string[];
+}
+
+function isOptionalRecord(value: unknown): value is Record<string, unknown> | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "object" && !Array.isArray(value))
+  );
+}
+
+function isOptionalFiniteNumber(value: unknown): value is number | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+function isInspectResult(value: unknown): value is InspectResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.filename === "string" &&
+    data.filename.length > 0 &&
+    typeof data.fileSize === "number" &&
+    Number.isFinite(data.fileSize) &&
+    data.fileSize >= 0 &&
+    isOptionalRecord(data.exif) &&
+    isOptionalRecord(data.iptc) &&
+    isOptionalRecord(data.xmp) &&
+    isOptionalRecord(data.gps) &&
+    (!data.gps ||
+      (isOptionalFiniteNumber(data.gps.GPSLatitude) &&
+        isOptionalFiniteNumber(data.gps.GPSLongitude))) &&
+    (data.keywords === undefined ||
+      (Array.isArray(data.keywords) &&
+        data.keywords.every((item): item is string => typeof item === "string")))
+  );
 }
 
 interface FormFields {
@@ -75,17 +109,59 @@ interface Template {
 
 const TEMPLATES_KEY = "metadata-templates";
 
+function isTemplateValues(value: unknown): value is Partial<FormFields> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  for (const [key, fieldValue] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "__proto__" || !Object.hasOwn(EMPTY_FORM, key)) return false;
+    if (fieldValue === undefined) continue;
+    if (key === "clearGps") {
+      if (typeof fieldValue !== "boolean") return false;
+    } else if (key === "keywords") {
+      if (
+        !Array.isArray(fieldValue) ||
+        !fieldValue.every((item): item is string => typeof item === "string")
+      ) {
+        return false;
+      }
+    } else if (key === "dateMode") {
+      if (fieldValue !== "edit" && fieldValue !== "shift") return false;
+    } else if (key === "dateShiftDirection") {
+      if (fieldValue !== "+" && fieldValue !== "-") return false;
+    } else if (key === "keywordsMode") {
+      if (fieldValue !== "add" && fieldValue !== "set") return false;
+    } else if (typeof fieldValue !== "string") {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isTemplate(value: unknown): value is Template {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.name === "string" && isTemplateValues(record.values);
+}
+
 function loadTemplates(): Template[] {
   try {
     const raw = localStorage.getItem(TEMPLATES_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every(isTemplate)) {
+      return [];
+    }
+    return parsed;
   } catch {
     return [];
   }
 }
 
 function saveTemplates(templates: Template[]) {
-  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+  try {
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+  } catch {
+    // Storage blocked or full
+  }
 }
 
 function LabeledInput({
@@ -146,7 +222,7 @@ export function EditMetadataSettings() {
   const [inspectData, setInspectData] = useState<InspectResult | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const [inspectError, setInspectError] = useState<string | null>(null);
-  const [inspectCache, setInspectCache] = useState<Map<string, InspectResult>>(new Map());
+  const inspectCacheRef = useRef<Map<string, InspectResult>>(new Map());
   const [keywordInput, setKeywordInput] = useState("");
   const [templates, setTemplates] = useState<Template[]>(loadTemplates);
   const [templateName, setTemplateName] = useState("");
@@ -189,8 +265,10 @@ export function EditMetadataSettings() {
     setFieldsToRemove(new Set());
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: t only supplies error fallbacks; a locale switch must not refetch or reset the form
   useEffect(() => {
     if (!currentFile || !fileKey) {
+      setInspecting(false);
       setForm(EMPTY_FORM);
       setInitialForm(EMPTY_FORM);
       setInspectData(null);
@@ -199,8 +277,10 @@ export function EditMetadataSettings() {
       return;
     }
 
-    const cached = inspectCache.get(fileKey);
+    const cached = inspectCacheRef.current.get(fileKey);
     if (cached) {
+      setInspecting(false);
+      setInspectError(null);
       populateForm(cached);
       return;
     }
@@ -210,6 +290,9 @@ export function EditMetadataSettings() {
       setInspecting(true);
       setInspectError(null);
       setInspectData(null);
+      setForm(EMPTY_FORM);
+      setInitialForm(EMPTY_FORM);
+      setFieldsToRemove(new Set());
       try {
         const formData = new FormData();
         formData.append("file", currentFile);
@@ -219,25 +302,48 @@ export function EditMetadataSettings() {
           body: formData,
           signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Failed: ${res.status}`);
+          if (controller.signal.aborted) return;
+          throw new Error(
+            failedAnswerMessage(
+              t,
+              body,
+              res.status,
+              format(t.errors.failedWithStatus, { status: res.status }),
+            ),
+          );
         }
-        const data: InspectResult = await res.json();
-        setInspectCache((prev) => new Map(prev).set(fileKey, data));
+        const data = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
+        if (controller.signal.aborted) return;
+        if (!isInspectResult(data)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
+        inspectCacheRef.current.set(fileKey, data);
         populateForm(data);
       } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        setInspectError(err instanceof Error ? err.message : "Failed to inspect file");
+        if (controller.signal.aborted || (err as Error)?.name === "AbortError") return;
+        setInspectError(
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : t.toolSettings["edit-metadata"].inspectFailed,
+        );
         setForm(EMPTY_FORM);
         setInitialForm(EMPTY_FORM);
+        setFieldsToRemove(new Set());
       } finally {
-        setInspecting(false);
+        if (!controller.signal.aborted) {
+          setInspecting(false);
+        }
       }
     })();
 
     return () => controller.abort();
-  }, [currentFile, fileKey, inspectCache, populateForm]);
+  }, [currentFile, fileKey, populateForm]);
 
   const setField = <K extends keyof FormFields>(key: K, value: FormFields[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -327,6 +433,11 @@ export function EditMetadataSettings() {
   }, [form, initialForm, fieldsToRemove]);
 
   const hasFile = files.length > 0;
+  const exifCount = countDisplayableMetadata(inspectData?.exif);
+  const iptcCount = countDisplayableMetadata(inspectData?.iptc);
+  const xmpCount = countDisplayableMetadata(inspectData?.xmp);
+  const gpsCount = countDisplayableMetadata(inspectData?.gps);
+  const hasRawMetadata = exifCount + iptcCount + xmpCount + gpsCount > 0;
   const gpsLat = inspectData?.gps?.GPSLatitude as number | undefined;
   const gpsLon = inspectData?.gps?.GPSLongitude as number | undefined;
   const gpsCoords = gpsLat != null && gpsLon != null ? { lat: gpsLat, lon: gpsLon } : null;
@@ -414,7 +525,7 @@ export function EditMetadataSettings() {
       {hasFile && inspectError && !inspecting && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
           <AlertTriangle className="h-3 w-3 shrink-0" />
-          {t.toolSettings["edit-metadata"].couldNotReadMetadata}
+          {inspectError}
         </div>
       )}
 
@@ -719,14 +830,11 @@ export function EditMetadataSettings() {
       )}
 
       {/* Section 5: All Metadata (raw view) */}
-      {hasFile && inspectData && (
+      {hasFile && inspectData && hasRawMetadata && (
         <CollapsibleSection title={t.toolSettings["edit-metadata"].allMetadata}>
           <div className="space-y-2">
-            {inspectData.exif && Object.keys(inspectData.exif).length > 0 && (
-              <CollapsibleSection
-                title="EXIF"
-                badge={`${Object.keys(inspectData.exif).filter((k) => !SKIP_KEYS.has(k)).length}`}
-              >
+            {inspectData.exif && exifCount > 0 && (
+              <CollapsibleSection title="EXIF" badge={`${exifCount}`}>
                 <MetadataGrid
                   data={inspectData.exif}
                   labelMap={EXIF_LABELS}
@@ -735,8 +843,8 @@ export function EditMetadataSettings() {
                 />
               </CollapsibleSection>
             )}
-            {inspectData.iptc && Object.keys(inspectData.iptc).length > 0 && (
-              <CollapsibleSection title="IPTC" badge={`${Object.keys(inspectData.iptc).length}`}>
+            {inspectData.iptc && iptcCount > 0 && (
+              <CollapsibleSection title="IPTC" badge={`${iptcCount}`}>
                 <MetadataGrid
                   data={inspectData.iptc}
                   labelMap={EXIF_LABELS}
@@ -745,8 +853,8 @@ export function EditMetadataSettings() {
                 />
               </CollapsibleSection>
             )}
-            {inspectData.xmp && Object.keys(inspectData.xmp).length > 0 && (
-              <CollapsibleSection title="XMP" badge={`${Object.keys(inspectData.xmp).length}`}>
+            {inspectData.xmp && xmpCount > 0 && (
+              <CollapsibleSection title="XMP" badge={`${xmpCount}`}>
                 <MetadataGrid
                   data={inspectData.xmp}
                   labelMap={EXIF_LABELS}
@@ -755,8 +863,8 @@ export function EditMetadataSettings() {
                 />
               </CollapsibleSection>
             )}
-            {inspectData.gps && Object.keys(inspectData.gps).length > 0 && (
-              <CollapsibleSection title="GPS">
+            {inspectData.gps && gpsCount > 0 && (
+              <CollapsibleSection title="GPS" badge={`${gpsCount}`}>
                 <MetadataGrid data={inspectData.gps} labelMap={EXIF_LABELS} />
               </CollapsibleSection>
             )}

@@ -160,20 +160,68 @@ describe("convertDocument success path", () => {
 describe("convertDocument failure paths", () => {
   it("rejects on non-zero exit with the stderr tail", async () => {
     nextClose({ stderr: "source file could not be loaded", code: 1 });
-    await expect(
-      import("../src/libreoffice.js").then((m) =>
-        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
-      ),
-    ).rejects.toThrow("LibreOffice exited 1: source file could not be loaded");
+    const err = await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("LibreOffice exited 1: source file could not be loaded");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal when code is null", async () => {
-    nextClose({ stderr: "crashed", code: null, signal: "SIGSEGV" });
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    nextClose({ stderr: "crashed\n", code: null, signal: "SIGSEGV" });
     await expect(
       import("../src/libreoffice.js").then((m) =>
         m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
       ),
-    ).rejects.toThrow("LibreOffice exited SIGSEGV: crashed");
+    ).rejects.toMatchObject({
+      message: "LibreOffice exited SIGSEGV: crashed",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+      signal: "SIGSEGV",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    nextClose({ stderr: "  \n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "spawn /usr/bin/soffice ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3829)", async () => {
+    nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "LibreOffice exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+    });
+
+    nextClose({ stderr: "sh: soffice: not found\n", code: 127 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "LibreOffice exited 127: sh: soffice: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+    });
   });
 
   it("rejects on an error event", async () => {
@@ -260,6 +308,70 @@ describe("convertDocument timeout", () => {
       await vi.advanceTimersByTimeAsync(3_000);
       await settled;
       expect(child.killSignals).toContain("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/libreoffice.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(
+      mod.convertDocument("/docs/report.docx", "/outdir", "pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(readdir).not.toHaveBeenCalled();
+  });
+
+  it("kills the child with SIGKILL, cleans up the profile dir, and rejects with Canceled when signal aborts mid-run", async () => {
+    const mod = await import("../src/libreoffice.js");
+    const child = nextManual();
+    const ac = new AbortController();
+    const pending = mod.convertDocument("/docs/report.docx", "/outdir", "pdf", {
+      signal: ac.signal,
+    });
+    ac.abort();
+    await expect(pending).rejects.toThrow("Canceled");
+    expect(child.killSignals).toContain("SIGKILL");
+    expect(readdir).not.toHaveBeenCalled();
+    expect(rm).toHaveBeenCalledWith("/tmp/snapotter-lo-FIXED-UUID", {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it("removes the abort listener on close, error, and timeout", async () => {
+    const mod = await import("../src/libreoffice.js");
+    const acClose = new AbortController();
+    const removeClose = vi.spyOn(acClose.signal, "removeEventListener");
+    nextClose({ code: 0 });
+    readdir.mockResolvedValueOnce(["report.pdf"]);
+    await mod.convertDocument("/docs/report.docx", "/outdir", "pdf", { signal: acClose.signal });
+    expect(removeClose).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const acErr = new AbortController();
+    const removeErr = vi.spyOn(acErr.signal, "removeEventListener");
+    nextError(new Error("spawn soffice ENOENT"));
+    await expect(
+      mod.convertDocument("/docs/report.docx", "/outdir", "pdf", { signal: acErr.signal }),
+    ).rejects.toThrow("spawn soffice ENOENT");
+    expect(removeErr).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    vi.useFakeTimers();
+    try {
+      const acTimeout = new AbortController();
+      const removeTimeout = vi.spyOn(acTimeout.signal, "removeEventListener");
+      nextManual();
+      const settled = expect(
+        mod.convertDocument("/docs/report.docx", "/outdir", "pdf", {
+          timeoutMs: 3_000,
+          signal: acTimeout.signal,
+        }),
+      ).rejects.toThrow("LibreOffice timed out after 3s");
+      await vi.advanceTimersByTimeAsync(3_000);
+      await settled;
+      expect(removeTimeout).toHaveBeenCalledWith("abort", expect.any(Function));
     } finally {
       vi.useRealTimers();
     }

@@ -1,6 +1,6 @@
 ---
 description: "Tagi obrazów Docker SnapOtter, testy wydajności GPU, przypinanie wersji i obsługa wielu platform dla AMD64 oraz ARM64."
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: d6e0033d1b88
 i18n_hash_version: 2

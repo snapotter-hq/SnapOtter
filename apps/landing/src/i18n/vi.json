@@ -187,7 +187,7 @@
   "faq.q3.q": "Tôi có cần kết nối internet không?",
   "faq.q4.a": "Không có giới hạn nhân tạo. Bạn có thể xử lý bao nhiêu tệp tùy thích, ở bất kỳ kích thước nào. Ràng buộc duy nhất là tài nguyên phần cứng của máy chủ.",
   "faq.q4.q": "Có giới hạn nào về kích thước tệp hay mức sử dụng không?",
-  "faq.q5.a": "SnapOtter bao gồm 19 công cụ AI cục bộ cho xóa nền, phóng đại, OCR, chuyển giọng nói thành văn bản, nhận diện khuôn mặt, tô màu, khử nhiễu, phục hồi ảnh và nhiều hơn nữa. Tất cả các mô hình đều chạy trên phần cứng của bạn.",
+  "faq.q5.a": "SnapOtter bao gồm 19 công cụ AI cục bộ để xóa nền, nâng cấp độ phân giải, OCR, phiên âm, phát hiện khuôn mặt, tô màu, khử nhiễu, phục hồi ảnh và hơn thế nữa. Tất cả mô hình chạy trên phần cứng của bạn (2 GB RAM chạy các công cụ không phải AI, Fast OCR và phát hiện khuôn mặt; gói AI cho CPU cần 4 GB+ RAM, hoặc 8 GB cho inpainting HQ).",
   "faq.q5.q": "Có những tính năng AI nào?",
   "faq.q6.a": "Dữ liệu phân tích sản phẩm ẩn danh được bật theo mặc định và không bao giờ bao gồm tệp hay nội dung tệp của bạn. Bạn có thể tắt bất cứ lúc nào bằng một công tắc quản trị chỉ với một cú nhấp trong Cài đặt > Hệ thống > Quyền riêng tư.",
   "faq.q6.q": "SnapOtter có thu thập dữ liệu phân tích nào không?",

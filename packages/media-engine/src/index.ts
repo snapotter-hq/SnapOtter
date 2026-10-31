@@ -4,14 +4,24 @@ export {
   HW_ACCEL_FAMILIES,
   type HwAccelStatus,
   hwAccelStatus,
+  isVaapiEncoder,
   type RateControlledTarget,
   resolveEncoder,
   type SoftwareEncoderStatus,
   softwareEncoder,
   softwareEncoderStatus,
+  VAAPI_DEVICE,
+  VAAPI_FILTER,
   videoCodecArgs,
+  withVaapiEncodeArgs,
 } from "./encoders.js";
 export { type RunFfmpegOptions, runFfmpeg } from "./ffmpeg.js";
-export { type MediaInfo, type MediaStreamInfo, type ProbeOptions, probeMedia } from "./ffprobe.js";
+export {
+  FfprobeTimeoutError,
+  type MediaInfo,
+  type MediaStreamInfo,
+  type ProbeOptions,
+  probeMedia,
+} from "./ffprobe.js";
 export { type FontRef, resolveFontFile } from "./fonts.js";
 export { type FfmpegProgress, parseProgressBlock } from "./progress.js";

@@ -1,17 +1,23 @@
 // apps/web/src/components/editor/common/new-document-dialog.tsx
+
+import { SafeError } from "@snapotter/shared";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
+// `id` is the stable key held in state; "custom" is the only preset whose
+// label is copy (the rest are dimensions plus a locale-invariant tag).
 const PRESETS = [
-  { label: "Custom", width: 1920, height: 1080 },
-  { label: "1920x1080 (HD)", width: 1920, height: 1080 },
-  { label: "3840x2160 (4K)", width: 3840, height: 2160 },
-  { label: "1080x1080 (Instagram)", width: 1080, height: 1080 },
-  { label: "1200x628 (Facebook)", width: 1200, height: 628 },
-  { label: "800x600", width: 800, height: 600 },
-  { label: "1280x720", width: 1280, height: 720 },
+  { id: "custom", label: null, width: 1920, height: 1080 },
+  { id: "hd", label: "1920x1080 (HD)", width: 1920, height: 1080 },
+  { id: "4k", label: "3840x2160 (4K)", width: 3840, height: 2160 },
+  { id: "instagram", label: "1080x1080 (Instagram)", width: 1080, height: 1080 },
+  { id: "facebook", label: "1200x628 (Facebook)", width: 1200, height: 628 },
+  { id: "800x600", label: "800x600", width: 800, height: 600 },
+  { id: "1280x720", label: "1280x720", width: 1280, height: 720 },
 ];
 
 const BACKGROUNDS = ["White", "Black", "Transparent"] as const;
@@ -25,7 +31,7 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
   const { t } = useTranslation();
   const [width, setWidth] = useState(1920);
   const [height, setHeight] = useState(1080);
-  const [preset, setPreset] = useState("1920x1080 (HD)");
+  const [preset, setPreset] = useState("hd");
   const [background, setBackground] = useState<(typeof BACKGROUNDS)[number]>("White");
   const loadImage = useEditorStore((s) => s.loadImage);
 
@@ -38,10 +44,10 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
   };
 
   const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = PRESETS.find((p) => p.label === e.target.value);
+    const selected = PRESETS.find((p) => p.id === e.target.value);
     if (selected) {
-      setPreset(selected.label);
-      if (selected.label !== "Custom") {
+      setPreset(selected.id);
+      if (selected.id !== "custom") {
         setWidth(selected.width);
         setHeight(selected.height);
       }
@@ -54,8 +60,13 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
     const canvas = document.createElement("canvas");
     canvas.width = validWidth;
     canvas.height = validHeight;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
+
+    try {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("canvas.getContext returned null");
+      }
+
       if (background === "White") {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, validWidth, validHeight);
@@ -63,10 +74,24 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, validWidth, validHeight);
       }
+
+      const url = canvas.toDataURL("image/png");
+      if (url === "data:,") {
+        throw new Error("canvas.toDataURL returned empty data URI");
+      }
+
+      loadImage(url, validWidth, validHeight);
+      onClose();
+    } catch (err) {
+      void captureHandledError(
+        new SafeError("Editor failed to create new document canvas", {
+          kind: "operational",
+          cause: err,
+        }),
+        { error_class: "operational" },
+      );
+      toast.error(t.editor.ui.captureFailure.noCanvasMemory);
     }
-    const url = canvas.toDataURL("image/png");
-    loadImage(url, validWidth, validHeight);
-    onClose();
   };
 
   return (
@@ -88,8 +113,8 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
               className="w-full mt-1 px-2 py-1.5 bg-muted border border-border rounded text-sm text-foreground"
             >
               {PRESETS.map((p) => (
-                <option key={p.label} value={p.label}>
-                  {p.label}
+                <option key={p.id} value={p.id}>
+                  {p.label ?? t.editor.ui.newDocument.presetCustom}
                 </option>
               ))}
             </select>
@@ -106,7 +131,7 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
                 value={width}
                 onChange={(e) => {
                   setWidth(Number(e.target.value));
-                  setPreset("Custom");
+                  setPreset("custom");
                 }}
                 className="w-full mt-1 px-2 py-1.5 bg-muted border border-border rounded text-sm text-foreground"
                 min={1}
@@ -123,7 +148,7 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
                 value={height}
                 onChange={(e) => {
                   setHeight(Number(e.target.value));
-                  setPreset("Custom");
+                  setPreset("custom");
                 }}
                 className="w-full mt-1 px-2 py-1.5 bg-muted border border-border rounded text-sm text-foreground"
                 min={1}

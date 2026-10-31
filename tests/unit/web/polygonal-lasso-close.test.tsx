@@ -7,6 +7,10 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+const toastError = vi.hoisted(() => vi.fn());
+// By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
+vi.mock("../../../apps/web/node_modules/sonner", () => ({ toast: { error: toastError } }));
+
 // The shortcut hook reaches the stage through this module; the stage is not needed.
 vi.mock("@/components/editor/editor-canvas", () => ({
   editorStageRefHolder: { current: null },
@@ -44,8 +48,9 @@ function setup(zoom = 1) {
   return { result, click, dblclick, drawTriangle };
 }
 
-function setupCropOnEnter() {
-  const applyCrop = vi.fn();
+function setupCropOnEnter(applyImpl: () => Promise<boolean> = () => Promise.resolve(true)) {
+  // The store's applyCrop returns a promise (#2070); the shortcut handles its failure.
+  const applyCrop = vi.fn(applyImpl);
   const cropState = { x: 0, y: 0, width: 4, height: 4, aspectRatio: null };
   useEditorStore.setState({ ...INITIAL_STATE, isCropping: true, cropState, applyCrop }, true);
   renderHook(() => useEditorShortcuts());
@@ -156,16 +161,26 @@ describe("polygonal lasso close gestures (#1059)", () => {
 
   it("gives the polygon priority over the Enter crop binding", () => {
     const { applyCrop, pressEnter } = setupCropOnEnter();
-    polygonalLassoRefHolder.current = { close: () => true };
+    polygonalLassoRefHolder.current = { close: () => true, cancel: () => false };
     pressEnter();
     expect(applyCrop).not.toHaveBeenCalled();
   });
 
   it("still applies the crop on Enter when no polygon is in progress", () => {
     const { applyCrop, pressEnter } = setupCropOnEnter();
-    polygonalLassoRefHolder.current = { close: () => false };
+    polygonalLassoRefHolder.current = { close: () => false, cancel: () => false };
     pressEnter();
     expect(applyCrop).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the user when the crop on Enter cannot be applied", async () => {
+    const { applyCrop, pressEnter } = setupCropOnEnter(() =>
+      Promise.reject(new Error("tainted canvas")),
+    );
+    polygonalLassoRefHolder.current = null;
+    pressEnter();
+    expect(applyCrop).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
   });
 
   it("still applies the crop on Enter when the lasso tool is not mounted", () => {
@@ -173,5 +188,128 @@ describe("polygonal lasso close gestures (#1059)", () => {
     polygonalLassoRefHolder.current = null;
     pressEnter();
     expect(applyCrop).toHaveBeenCalledTimes(1);
+  });
+
+  it("discards an in-progress polygon on Escape, leaving an existing selection intact", () => {
+    const existingSelection = {
+      type: "lasso" as const,
+      points: [0, 0, 100, 0, 100, 100],
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+    };
+    const { result, drawTriangle } = setup();
+    act(() => {
+      useEditorStore.setState({ selection: existingSelection });
+    });
+    renderHook(() => useEditorShortcuts());
+
+    drawTriangle();
+    expect(result.current.currentPoints).toEqual(TRIANGLE);
+    expect(result.current.polygonCloseTarget).toEqual({ x: 10, y: 10, active: false });
+
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    });
+
+    expect(result.current.currentPoints).toEqual([]);
+    expect(result.current.polygonCloseTarget).toBeNull();
+    expect(polygonalLassoRefHolder.current?.cancel()).toBe(false);
+    expect(polygonalLassoRefHolder.current?.close()).toBe(false);
+    expect(selection()).toEqual(existingSelection);
+  });
+
+  it("discards a polygon with fewer than three vertices on Escape", () => {
+    const { result, click } = setup();
+    renderHook(() => useEditorShortcuts());
+    click(10, 10);
+    click(110, 10);
+    expect(result.current.currentPoints).toEqual([10, 10, 110, 10]);
+
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    });
+
+    expect(result.current.currentPoints).toEqual([]);
+    expect(polygonalLassoRefHolder.current?.cancel()).toBe(false);
+  });
+
+  it("gives the polygon priority over Escape deselect and crop cancellation", () => {
+    const cropState = { x: 0, y: 0, width: 4, height: 4, aspectRatio: null };
+    const existingSelection = {
+      type: "lasso" as const,
+      points: [0, 0, 100, 0, 100, 100],
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+    };
+    useEditorStore.setState(
+      {
+        ...INITIAL_STATE,
+        isCropping: true,
+        cropState,
+        selection: existingSelection,
+        selectedObjectIds: ["obj1"],
+      },
+      true,
+    );
+    renderHook(() => useEditorShortcuts());
+    polygonalLassoRefHolder.current = { close: () => false, cancel: () => true };
+
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    });
+
+    expect(useEditorStore.getState().cropState).toEqual(cropState);
+    expect(useEditorStore.getState().selection).toEqual(existingSelection);
+    expect(useEditorStore.getState().selectedObjectIds).toEqual(["obj1"]);
+  });
+
+  it("clears selection, selected objects, and crop state on Escape when no polygon is in progress", () => {
+    const cropState = { x: 0, y: 0, width: 4, height: 4, aspectRatio: null };
+    const existingSelection = {
+      type: "lasso" as const,
+      points: [0, 0, 100, 0, 100, 100],
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+    };
+    useEditorStore.setState(
+      {
+        ...INITIAL_STATE,
+        isCropping: true,
+        cropState,
+        selection: existingSelection,
+        selectedObjectIds: ["obj1"],
+      },
+      true,
+    );
+    renderHook(() => useEditorShortcuts());
+    polygonalLassoRefHolder.current = { close: () => false, cancel: () => false };
+
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    });
+
+    expect(useEditorStore.getState().cropState).toBeNull();
+    expect(useEditorStore.getState().selection).toBeNull();
+    expect(useEditorStore.getState().selectedObjectIds).toEqual([]);
+  });
+
+  it("clears an in-flight cropState on Escape even after switching away from the crop tool (#2114)", () => {
+    const cropState = { x: 0, y: 0, width: 4, height: 4, aspectRatio: null };
+    useEditorStore.setState(
+      {
+        ...INITIAL_STATE,
+        activeTool: "move",
+        isCropping: false,
+        cropApplying: true,
+        cropState,
+      },
+      true,
+    );
+    renderHook(() => useEditorShortcuts());
+    polygonalLassoRefHolder.current = { close: () => false, cancel: () => false };
+
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    });
+
+    expect(useEditorStore.getState().cropState).toBeNull();
+    expect(useEditorStore.getState().cropApplying).toBe(false);
   });
 });

@@ -42,4 +42,35 @@ describe("signature-store", () => {
     deleteSignature(sig.id);
     expect(listSignatures()).toHaveLength(0);
   });
+
+  it.each([
+    "{corrupt",
+    "{}",
+    "null",
+    "42",
+    '"data:image/png;base64,AAAA"',
+    "true",
+    "[null]",
+    "[42]",
+    "[{}]",
+    "[[]]",
+    JSON.stringify([{ id: 123, dataUrl: "data:image/png;base64,AAAA", createdAt: 1 }]),
+    JSON.stringify([{ id: "1", dataUrl: null, createdAt: 1 }]),
+    JSON.stringify([{ id: "1", dataUrl: "data:image/png;base64,AAAA", createdAt: "1" }]),
+    JSON.stringify([{ id: "1", dataUrl: "data:image/png;base64,AAAA", createdAt: null }]),
+    JSON.stringify([
+      { id: "1", dataUrl: "data:image/png;base64,AAAA", createdAt: 1 },
+      { id: "2", dataUrl: 42, createdAt: 2 },
+    ]),
+  ])("falls back to [] when snapotter.signatures.v1 holds %s (#3421)", (corruptRaw) => {
+    localStorage.setItem("snapotter.signatures.v1", corruptRaw);
+    expect(listSignatures()).toEqual([]);
+
+    deleteSignature("nonexistent");
+    expect(listSignatures()).toEqual([]);
+
+    localStorage.setItem("snapotter.signatures.v1", corruptRaw);
+    const added = addSignature("data:image/png;base64,CCCC");
+    expect(listSignatures()).toEqual([added]);
+  });
 });

@@ -3,26 +3,57 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { upscale } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  getBundleForTool,
+  hasServerErrorStatus,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+  type ToolJobData,
+} from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
-import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { encodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { logger } from "../../lib/logger.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+} from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
-import { registerToolProcessFn } from "../tool-factory.js";
+import { registerToolProcessFn, type ToolProcessCtx } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   scale: z.union([z.number(), z.string()]).transform(Number).default(2),
@@ -33,9 +64,40 @@ const settingsSchema = z.object({
   quality: z.union([z.number(), z.string()]).transform(Number).default(95),
 });
 
-// ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("upscale", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+const EXT_MAP: Record<string, string> = {
+  jpeg: "jpg",
+  jpg: "jpg",
+  png: "png",
+  webp: "webp",
+  tiff: "tiff",
+  gif: "gif",
+  avif: "avif",
+  heic: "heic",
+  heif: "heif",
+  jxl: "jxl",
+};
+
+const CONTENT_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  tiff: "image/tiff",
+  gif: "image/gif",
+  avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
+  jxl: "image/jxl",
+};
+
+async function runUpscale(
+  input: Buffer,
+  rawSettings: unknown,
+  filename: string,
+  scratchDir: string,
+  ctx?: ToolProcessCtx,
+) {
+  const settings = settingsSchema.parse(rawSettings);
   const scale = settings.scale;
   const model = settings.model;
   const faceEnhance = settings.faceEnhance;
@@ -44,27 +106,32 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
   const outputQuality = settings.quality;
 
   if (format === "auto") {
-    const detected = await resolveOutputFormat(input, data.filename);
+    const detected = await resolveOutputFormat(input, filename);
     format = detected.format === "jpeg" ? "jpg" : detected.format;
   }
 
   const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
   const pythonFormat = needsNodeConversion ? "png" : format;
 
-  const result = await upscale(
-    input,
-    ctx.scratchDir,
-    {
-      scale,
-      model,
-      faceEnhance,
-      denoise,
-      format: pythonFormat,
-      quality: outputQuality,
-      signal: ctx.signal,
-    },
-    (percent, stage) => ctx.report(percent, stage),
-  );
+  let result: Awaited<ReturnType<typeof upscale>>;
+  try {
+    result = await upscale(
+      input,
+      scratchDir,
+      {
+        scale,
+        model,
+        faceEnhance,
+        denoise,
+        format: pythonFormat,
+        quality: outputQuality,
+        signal: ctx?.signal,
+      },
+      ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+    );
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(input, err);
+  }
 
   let outputBuffer = result.buffer;
   let finalFormat = result.format;
@@ -81,33 +148,8 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
     }
   }
 
-  const EXT_MAP: Record<string, string> = {
-    jpeg: "jpg",
-    jpg: "jpg",
-    png: "png",
-    webp: "webp",
-    tiff: "tiff",
-    gif: "gif",
-    avif: "avif",
-    heic: "heic",
-    heif: "heif",
-    jxl: "jxl",
-  };
   const ext = EXT_MAP[finalFormat] || "png";
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
-
-  const CONTENT_TYPES: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    tiff: "image/tiff",
-    gif: "image/gif",
-    avif: "image/avif",
-    heic: "image/heic",
-    heif: "image/heif",
-    jxl: "image/jxl",
-  };
+  const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
 
   return {
     buffer: outputBuffer,
@@ -119,7 +161,19 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
       method: result.method,
     },
   };
-});
+}
+
+// ── AI job handler (runs inside the BullMQ worker) ────────────────
+registerAiJobHandler(
+  "upscale",
+  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Image upscaling failed",
+    (s) => String(s?.format ?? "auto"),
+    async (input, data, ctx) => {
+      return runUpscale(input, data.settings, data.filename, ctx.scratchDir, ctx);
+    },
+  ),
+);
 
 /**
  * AI image upscaling route.
@@ -145,6 +199,7 @@ export function registerUpscale(app: FastifyInstance) {
     let filename = "image";
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
+    let clientJobIdRaw: string | null = null;
     let fileId: string | null = null;
     let saveModeRaw: string | null = null;
     let inputKey: string | null = null;
@@ -159,10 +214,7 @@ export function registerUpscale(app: FastifyInstance) {
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          const raw = part.value as string;
-          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-            clientJobId = raw;
-          }
+          clientJobIdRaw = part.value as string;
         } else if (part.fieldname === "fileId") {
           fileId = part.value as string;
         } else if (part.fieldname === "saveMode") {
@@ -170,124 +222,151 @@ export function registerUpscale(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
+      await discardUnenqueuedUploads(jobId, request.log);
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
-    // Stamp the client-facing alias before any pre-enqueue work (#892): a
-    // cancel landing between parse and enqueueToolJob needs a durable pointer
-    // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-    if (clientJobId && clientJobId !== jobId) {
-      await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-    }
-
-    const saveMode = parseSaveModeField(saveModeRaw);
-    if (saveMode === null) {
-      return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-    }
-
-    if (!inputKey) {
-      return reply.status(400).send({ error: "No image file provided" });
-    }
-
-    fileBuffer = await getObjectBuffer(inputKey);
-
-    const validation = await validateImageBuffer(fileBuffer, filename);
-    if (!validation.valid) {
-      // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-      return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-    }
-
-    let settings: z.infer<typeof settingsSchema>;
+    let enqueued = false;
+    let aliasStamped = false;
     try {
-      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const result = settingsSchema.safeParse(parsed);
-      if (!result.success) {
-        return reply
-          .status(400)
-          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
       }
-      settings = result.data;
-    } catch {
-      return reply.status(400).send({ error: "Settings must be valid JSON" });
-    }
+      clientJobId = clientJobIdField ?? null;
 
-    try {
-      if (validation.format === "heif") {
-        fileBuffer = await decodeHeic(fileBuffer);
+      // Stamp the client-facing alias before any pre-enqueue work (#892): a
+      // cancel landing between parse and enqueueToolJob needs a durable pointer
+      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+      if (clientJobId && clientJobId !== jobId) {
+        aliasStamped =
+          (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
       }
-      if (needsCliDecode(validation.format)) {
-        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+
+      const saveMode = parseSaveModeField(saveModeRaw);
+      if (saveMode === null) {
+        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
       }
-      fileBuffer = await autoOrient(fileBuffer);
-    } catch (err) {
-      request.log.error({ err, toolId: "upscale" }, "Input decoding failed");
-      return reply.status(422).send({
-        error: "Upscaling failed",
-        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
-      });
+
+      if (!inputKey) {
+        return reply.status(400).send({ error: "No image file provided" });
+      }
+
+      try {
+        fileBuffer = await getObjectBuffer(inputKey);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
+
+      const validation = await validateImageBuffer(fileBuffer, filename);
+      if (!validation.valid) {
+        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+      }
+
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      try {
+        const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+          log: request.log,
+          rewriteFilenameToPng: true,
+          rasterizeSvg: true,
+        });
+        fileBuffer = prepared.buffer;
+        filename = prepared.filename;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
+        }
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "upscale" }, "Input decoding failed");
+        }
+        return reply.status(422).send({
+          error: "Upscaling failed",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+        });
+      }
+
+      // Write decoded input for the worker
+      const decodedKey = `uploads/${jobId}/${filename}`;
+      if (decodedKey !== inputKey) {
+        await putObject(decodedKey, fileBuffer);
+        inputKey = decodedKey;
+      } else {
+        await putObject(inputKey, fileBuffer);
+      }
+
+      enqueued = true;
+      const jobData: ToolJobData = {
+        jobId,
+        toolId,
+        userId,
+        pool: "ai",
+        inputRefs: [inputKey],
+        filename,
+        settings,
+        clientJobId: clientJobId ?? undefined,
+        fileId: fileId ?? undefined,
+        saveMode,
+        kind: "ai-tool",
+      };
+      try {
+        await enqueueToolJob(jobData);
+        clientJobId = jobData.clientJobId ?? null;
+      } catch (err) {
+        if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+        throw err;
+      }
+
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+    } finally {
+      if (!enqueued) {
+        await discardUnenqueuedUploads(jobId, request.log);
+        if (aliasStamped) {
+          await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+        }
+      }
     }
-
-    // Write decoded input for the worker
-    const decodedKey = `uploads/${jobId}/${filename}`;
-    if (decodedKey !== inputKey) {
-      await putObject(decodedKey, fileBuffer);
-      inputKey = decodedKey;
-    } else {
-      await putObject(inputKey, fileBuffer);
-    }
-
-    await enqueueToolJob({
-      jobId,
-      toolId,
-      userId,
-      pool: "ai",
-      inputRefs: [inputKey],
-      filename,
-      settings,
-      clientJobId: clientJobId ?? undefined,
-      fileId: fileId ?? undefined,
-      saveMode,
-      kind: "ai-tool",
-    });
-
-    return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
   });
 
   // Register in the pipeline/batch registry so this tool can be used
-  // as a step in automation pipelines (without progress callbacks).
+  // as a step in automation pipelines and batch runs.
   registerToolProcessFn({
     toolId: "upscale",
-    settingsSchema: z.object({
-      scale: z.union([z.number(), z.string()]).transform(Number).default(2),
-    }),
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const scale = Number((settings as { scale?: number }).scale) || 2;
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const result = await upscale(orientedBuffer, scratchDir, { scale, signal: ctx?.signal });
-        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-        let outputBuffer = result.buffer;
-        if (outputFormat.format !== "png") {
-          outputBuffer = await sharp(result.buffer)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+    settingsSchema,
+    process: withImageEncodeContext<unknown>(
+      "Image upscaling failed",
+      (s) => String((s as z.infer<typeof settingsSchema>)?.format ?? "auto"),
+      async (inputBuffer, settings, filename, ctx) => {
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          return await runUpscale(orientedBuffer, settings, filename, scratchDir, ctx);
+        } finally {
+          if (needsCleanup) {
+            await rm(scratchDir, { recursive: true, force: true }).catch((err) => {
+              logger.error({ err, scratchDir }, "Failed to clean up upscale scratch directory");
+            });
+          }
         }
-        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
-        return {
-          buffer: outputBuffer,
-          filename: outputFilename,
-          contentType: outputFormat.contentType,
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+      },
+    ),
   });
 }

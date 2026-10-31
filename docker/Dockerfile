@@ -14,7 +14,7 @@ FROM mwader/static-ffmpeg:8.1.2@sha256:33f770f812cbfc3de96c547157fc9faf8bd95a364
 # Stage 0b: Static pdfcpu binary (pure Go, no CGO)
 # ============================================
 # CGO_ENABLED=0 produces a fully static binary; no cross-compiler needed.
-FROM --platform=$BUILDPLATFORM golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58 AS pdfcpu-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS pdfcpu-builder
 ARG TARGETOS=linux
 ARG TARGETARCH
 WORKDIR /build
@@ -40,7 +40,7 @@ RUN go mod download all && go mod verify && \
 # these binaries ship inside the runtime image, so they must be built for
 # TARGETPLATFORM. Pinning this to the build platform would put a foreign-arch
 # redis-server in the image, which fails the same way #734 did.
-FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS redis-builder
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS redis-builder
 ARG REDIS_VERSION=8.10.1
 RUN set -eux; \
     for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $((i * 15)); done; \
@@ -83,7 +83,7 @@ RUN set -eux; \
 # Run on the native build platform to avoid QEMU crashes with esbuild on
 # Apple Silicon.  The output (HTML/CSS/JS) is architecture-agnostic so it
 # is safe to build on arm64 and copy into the amd64 production layer.
-FROM --platform=$BUILDPLATFORM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS builder
+FROM --platform=$BUILDPLATFORM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS builder
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
@@ -93,7 +93,7 @@ WORKDIR /app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json tsconfig.base.json ./
 
 # Copy all package.json files for dependency install
-COPY apps/web/package.json apps/web/tsconfig.json apps/web/vite.config.ts apps/web/vite.chunks.ts apps/web/index.html ./apps/web/
+COPY apps/web/package.json apps/web/tsconfig.json apps/web/vite.*.ts apps/web/index.html ./apps/web/
 COPY apps/web/postcss.config.js ./apps/web/
 COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
 COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
@@ -150,7 +150,7 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
 # on Apple Silicon when cross-compiling for linux/amd64.
 # caire imports gioui.org/app which requires CGO on Linux, so we use a
 # proper C cross-compiler instead of CGO_ENABLED=0.
-FROM --platform=$BUILDPLATFORM golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58 AS caire-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS caire-builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -217,7 +217,7 @@ RUN set -e; \
 # files with multiple auxiliary images (depth maps, HDR gain maps).
 # Build libheif >= 1.19 from source for the fix (GitHub #183).
 # Base images match production to avoid shared-library ABI mismatches.
-FROM debian:bookworm@sha256:9344f8b8992482f80cba753f323adeaf17690076c095ccff6cc9536be98185dc AS libheif-base-arm64
+FROM debian:bookworm@sha256:813017f3d62be4b5891a7acca6a01bdcd4b8513daa81b1ab99d3a50385b26931 AS libheif-base-arm64
 FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54 AS libheif-base-amd64
 
 ARG TARGETARCH
@@ -318,7 +318,7 @@ RUN curl --fail --location --silent --show-error --retry 3 \
 # Stage 3: Platform-specific base images
 # Pin tags to a stable upstream series; release digests provide artifact provenance.
 # ============================================
-FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS base-linux-arm64
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS base-linux-arm64
 # CUDA base must match the remaining GPU AI bundles' torch/onnxruntime wheels
 # (cu126) and the libcublas-12-6 install below. It also sets the NVIDIA_REQUIRE_CUDA
 # driver gate enforced by nvidia-container-toolkit at container start: a 12.6 base
@@ -328,7 +328,7 @@ FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04@sha256:8aef630a54bc5c5146ae5ce
 
 # Node.js donor: provides Node binaries for the CUDA amd64 image without
 # relying on NodeSource apt repos or Ubuntu mirrors (which are flaky on CI).
-FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS node-bins
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS node-bins
 
 # ============================================
 # Stage 4: Production runtime
@@ -401,17 +401,17 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     && rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
     && test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
     && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
        else \
          echo "No supported ImageMagick EXR coder package found" >&2; exit 1; \
        fi \
     && convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)' \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-199; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libx265-209; \
+         timeout -k 30 300 apt-get install -y --no-install-recommends libx265-209; \
        fi \
     && if apt-cache show libcublas-12-6 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libcublas-12-6; \
@@ -546,7 +546,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install --upgrade "pip==26.1.2" && \
     /opt/venv/bin/pip install --upgrade "wheel==0.47.0" "setuptools==78.1.1" "jaraco.context==6.1.0" && \
     /opt/venv/bin/pip install \
-        Pillow==12.3.0 \
+        Pillow==13.0.0 \
         numpy==1.26.4 \
         opencv-python-headless==4.10.0.84 \
         "huggingface-hub[hf_xet,hf_transfer]==0.36.2" \
@@ -686,7 +686,7 @@ RUN apt-get purge -y --auto-remove \
 
 # Copy source code for API (tsx runs TS directly - no build step needed)
 COPY apps/api/src ./apps/api/src
-# Offline recovery CLI (see apps/api/src/scripts/mfa-recover.ts). pnpm is not in
+# Offline recovery CLI (see apps/api/src/scripts/admin-recovery.ts). pnpm is not in
 # the runtime image, so this wraps the direct tsx invocation.
 COPY docker/snapotter-admin /usr/local/bin/snapotter-admin
 RUN chmod +x /usr/local/bin/snapotter-admin
@@ -723,6 +723,7 @@ ENV PORT=1349 \
     WORKSPACE_PATH=/tmp/workspace \
     FILES_STORAGE_PATH=/data/files \
     PYTHON_VENV_PATH=/data/ai/venv \
+    DOCS_PYTHON_VENV_PATH=/opt/venv \
     MODELS_PATH=/data/ai/models \
     DATA_DIR=/data \
     U2NET_HOME=/data/ai/models/rembg \
@@ -812,7 +813,7 @@ COPY docker/s6/s6-rc.d /etc/s6-overlay/s6-rc.d
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/embedded-postgres-bootstrap.sh \
     /usr/local/bin/reseed-ai-venv.sh \
     && chmod +x /etc/s6-overlay/s6-rc.d/postgres/run /etc/s6-overlay/s6-rc.d/redis/run \
-                /etc/s6-overlay/s6-rc.d/snapotter/run \
+                /etc/s6-overlay/s6-rc.d/snapotter/run /etc/s6-overlay/s6-rc.d/snapotter/finish \
                 /etc/s6-overlay/s6-rc.d/postgres-init/up /etc/s6-overlay/s6-rc.d/postgres-ready/up \
                 /etc/s6-overlay/s6-rc.d/redis-ready/up
 

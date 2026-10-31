@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { en } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Global mocks
@@ -60,12 +61,41 @@ describe("parseApiError", () => {
       500,
     );
     expect(typeof result).toBe("object");
-    if (typeof result === "object") {
-      expect(result.type).toBe("feature_not_installed");
+    if (typeof result === "object" && result.type === "feature_not_installed") {
       expect(result.feature).toBe("ai-rembg");
       expect(result.featureName).toBe("AI Background Remover");
       expect(result.estimatedSize).toBe("500MB");
     }
+  });
+
+  it("returns FeatureIncompatibleError for FEATURE_INCOMPATIBLE code", () => {
+    const result = parseApiError(
+      {
+        code: "FEATURE_INCOMPATIBLE",
+        feature: "ocr",
+        featureName: "OCR",
+        compatibilityReason: "unsupported-host",
+      },
+      501,
+    );
+    expect(result).toEqual({
+      type: "feature_incompatible",
+      feature: "ocr",
+      featureName: "OCR",
+      compatibilityReason: "unsupported-host",
+    });
+
+    expect(
+      parseApiError(
+        { code: "FEATURE_INCOMPATIBLE", featureName: "OCR", compatibilityReason: 42 },
+        501,
+      ),
+    ).toEqual({
+      type: "feature_incompatible",
+      feature: "",
+      featureName: "OCR",
+      compatibilityReason: "",
+    });
   });
 
   it("returns error string when error field is present", () => {
@@ -81,6 +111,33 @@ describe("parseApiError", () => {
   it("returns fallback message when no error or message", () => {
     const result = parseApiError({}, 422);
     expect(result).toBe("Processing failed: 422");
+  });
+
+  it("falls back when the error is the generic 500 mask 'Internal server error'", () => {
+    expect(
+      parseApiError({ error: "Internal server error" }, 500, en.errors.processingFailedWithStatus),
+    ).toBe(en.errors.processingFailedWithStatus);
+    expect(
+      parseApiError(
+        { error: "Internal server error", details: "Internal server error" },
+        500,
+        en.errors.processingFailedWithStatus,
+      ),
+    ).toBe(en.errors.processingFailedWithStatus);
+    expect(
+      parseApiError(
+        { error: "Internal server error", message: "Internal server error" },
+        500,
+        en.errors.processingFailedWithStatus,
+      ),
+    ).toBe(en.errors.processingFailedWithStatus);
+    expect(
+      parseApiError(
+        { error: "Internal server error", details: "disk full" },
+        500,
+        en.errors.processingFailedWithStatus,
+      ),
+    ).toBe("disk full");
   });
 
   it("returns string details appended to error", () => {
@@ -114,6 +171,37 @@ describe("parseApiError", () => {
   it("returns details only when error is not a string", () => {
     const result = parseApiError({ error: 123, details: "some detail" }, 400);
     expect(result).toBe("some detail");
+  });
+
+  it.each([
+    ["null", null],
+    ["a primitive", "oops"],
+    ["an array", ["oops"]],
+  ])("returns fallback without throwing when body is %s (#3985)", (_label, body) => {
+    expect(parseApiError(body, 500, "Fallback: 500")).toBe("Fallback: 500");
+  });
+
+  it("falls through to error or fallback when FEATURE_NOT_INSTALLED or FEATURE_INCOMPATIBLE lacks string feature identifiers (#3985)", () => {
+    expect(parseApiError({ code: "FEATURE_NOT_INSTALLED" }, 501, "Fallback: 501")).toBe(
+      "Fallback: 501",
+    );
+    expect(
+      parseApiError(
+        { code: "FEATURE_NOT_INSTALLED", feature: null, featureName: { bad: true }, error: "No" },
+        501,
+        "Fallback: 501",
+      ),
+    ).toBe("No");
+    expect(parseApiError({ code: "FEATURE_INCOMPATIBLE" }, 501, "Fallback: 501")).toBe(
+      "Fallback: 501",
+    );
+    expect(
+      parseApiError(
+        { code: "FEATURE_INCOMPATIBLE", feature: null, featureName: { bad: true }, error: "No" },
+        501,
+        "Fallback: 501",
+      ),
+    ).toBe("No");
   });
 });
 
@@ -240,7 +328,7 @@ describe("apiUploadUserFiles", () => {
     expect(result.files).toHaveLength(1);
   });
 
-  it("throws on non-ok response", async () => {
+  it("throws plain-language fileTooLarge message on 413 response", async () => {
     const file = new File(["content"], "img.png", { type: "image/png" });
 
     const promise = apiUploadUserFiles([file]);
@@ -249,7 +337,41 @@ describe("apiUploadUserFiles", () => {
     xhr.responseText = "";
     (xhr.onload as () => void)();
 
-    await expect(promise).rejects.toThrow("Upload failed: 413");
+    await expect(promise).rejects.toThrow(en.errors.fileTooLarge);
+  });
+
+  it("preserves STORAGE_QUOTA_EXCEEDED error on 413 response", async () => {
+    const file = new File(["content"], "img.png", { type: "image/png" });
+
+    const promise = apiUploadUserFiles([file]);
+    const xhr = xhrInstances[0];
+    xhr.status = 413;
+    xhr.responseText = JSON.stringify({
+      error: "Storage quota exceeded",
+      code: "STORAGE_QUOTA_EXCEEDED",
+    });
+    (xhr.onload as () => void)();
+
+    await expect(promise).rejects.toThrow("Storage quota exceeded");
+  });
+
+  it("parses JSON error details on non-413 failures and masks Internal server error", async () => {
+    const file = new File(["content"], "img.png", { type: "image/png" });
+
+    const p1 = apiUploadUserFiles([file]);
+    xhrInstances[0].status = 400;
+    xhrInstances[0].responseText = JSON.stringify({
+      error: "Unsupported file",
+      details: "corrupt header",
+    });
+    (xhrInstances[0].onload as () => void)();
+    await expect(p1).rejects.toThrow("Unsupported file: corrupt header");
+
+    const p2 = apiUploadUserFiles([file]);
+    xhrInstances[1].status = 500;
+    xhrInstances[1].responseText = JSON.stringify({ error: "Internal server error" });
+    (xhrInstances[1].onload as () => void)();
+    await expect(p2).rejects.toThrow(en.errors.failedWithStatus);
   });
 
   it("triggers disconnected on network error", async () => {
@@ -348,6 +470,7 @@ describe("throwWithMessage error extraction", () => {
 
   it("falls back to status code when JSON parsing fails", async () => {
     const { apiGet } = await import("@/lib/api");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     fetchMock.mockReturnValueOnce(
       Promise.resolve({
         ok: false,
@@ -355,7 +478,34 @@ describe("throwWithMessage error extraction", () => {
         json: () => Promise.reject(new Error("not json")),
       }),
     );
-    await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+    try {
+      await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("logs the parse error and status when a non-2xx response is not JSON", async () => {
+    const { apiGet } = await import("@/lib/api");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const parseError = new SyntaxError('Unexpected token "<", "<!doctype "... is not valid JSON');
+    fetchMock.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 502,
+        json: () => Promise.reject(parseError),
+      }),
+    );
+
+    try {
+      await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+      expect(warn).toHaveBeenCalledWith(
+        "Failed to parse non-2xx API response (status: 502):",
+        parseError,
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

@@ -89,7 +89,7 @@ describe.skipIf(!minioAvailable)("S3 storage backend", () => {
       forcePathStyle: true,
       prefix: "",
     });
-  }, 15_000);
+  });
 
   afterAll(async () => {
     (env as Record<string, unknown>).STORAGE_MODE = originalStorageMode;
@@ -105,7 +105,7 @@ describe.skipIf(!minioAvailable)("S3 storage backend", () => {
     } catch {
       // Best-effort cleanup
     }
-  }, 15_000);
+  });
 
   it("saveFile writes object to S3", async () => {
     const { saveFile } = await import("../../../apps/api/src/lib/file-storage.js");

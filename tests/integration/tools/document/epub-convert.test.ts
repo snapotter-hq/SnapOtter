@@ -16,14 +16,20 @@ import {
 } from "../../test-server.js";
 
 const EPUB = readFixture(fixtures.document.tiny("epub"));
+const PNG_1X1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 /**
  * Build a minimal valid epub in memory containing a remote image reference and
  * an external link. `imageOrigin` points the image at a caller-supplied host so
  * a test can prove nothing ever asked for it; the default closed port keeps the
- * pandoc-only cases self-contained.
+ * pandoc-only cases self-contained. When `includeLocalImage` is true, also
+ * embeds a 1x1 PNG in the EPUB manifest and chapter so tests can verify local
+ * book media is preserved while remote refs stay uninlined.
  */
-function buildRemoteRefEpub(imageOrigin = "http://127.0.0.1:9"): Buffer {
+function buildRemoteRefEpub(imageOrigin = "http://127.0.0.1:9", includeLocalImage = false): Buffer {
   const zip = new AdmZip();
   // mimetype must be first entry, stored (no compression)
   zip.addFile("mimetype", Buffer.from("application/epub+zip"), "", 0o644);
@@ -38,6 +44,9 @@ function buildRemoteRefEpub(imageOrigin = "http://127.0.0.1:9"): Buffer {
 </container>`,
     ),
   );
+  const imgManifest = includeLocalImage
+    ? '\n    <item id="img1" href="images/local.png" media-type="image/png"/>'
+    : "";
   zip.addFile(
     "OEBPS/content.opf",
     Buffer.from(
@@ -50,12 +59,16 @@ function buildRemoteRefEpub(imageOrigin = "http://127.0.0.1:9"): Buffer {
     <meta property="dcterms:modified">2024-01-01T00:00:00Z</meta>
   </metadata>
   <manifest>
-    <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>${imgManifest}
   </manifest>
   <spine><itemref idref="ch1"/></spine>
 </package>`,
     ),
   );
+  if (includeLocalImage) {
+    zip.addFile("OEBPS/images/local.png", PNG_1X1);
+  }
+  const localImgTag = includeLocalImage ? '\n  <img src="images/local.png" alt="local-fig"/>' : "";
   zip.addFile(
     "OEBPS/chapter1.xhtml",
     Buffer.from(
@@ -65,7 +78,7 @@ function buildRemoteRefEpub(imageOrigin = "http://127.0.0.1:9"): Buffer {
 <body>
   <h1>RemoteRefBook</h1>
   <p>Content for remote-ref SSRF test.</p>
-  <p>See <a href="https://example.com">the publisher</a>.</p>
+  <p>See <a href="https://example.com">the publisher</a>.</p>${localImgTag}
   <img src="${imageOrigin}/x.png" alt="remote"/>
 </body>
 </html>`,
@@ -80,11 +93,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(filename: string, content: Buffer, settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([
@@ -154,11 +167,10 @@ describe.skipIf(!pandocAvailable())("epub-convert (requires pandoc)", () => {
 
   it("converts an epub with a remote ref without fetching it (no SSRF)", async () => {
     const remoteEpub = buildRemoteRefEpub();
-    // The book references a remote image on a closed port (127.0.0.1:9). The
-    // conversion must complete from the book's own content and never fetch that
-    // ref (resource embedding is off in the route). pandoc strips the
-    // unmanifested remote <img> rather than inlining it; either way it must not
-    // be fetched and inlined as a data: URI.
+    // The book references a remote image on a closed port (127.0.0.1:9).
+    // runPandoc always passes --sandbox (PandocPure), so even with
+    // selfContained: true the conversion completes from the book's own
+    // MediaBag and never fetches or base64-inlines the remote ref.
     const dl = await convertAndDownload("remote.epub", remoteEpub, { format: "html" });
     expect(dl.payload).toContain("RemoteRefBook");
     expect(dl.payload).not.toContain("base64");
@@ -168,6 +180,37 @@ describe.skipIf(!pandocAvailable())("epub-convert (requires pandoc)", () => {
     const dl = await convertAndDownload("tiny.epub", EPUB, { format: "md" });
     expect(dl.payload.length).toBeGreaterThan(0);
     expect(dl.payload).toContain("SnapOtter");
+  }, 90_000);
+
+  it("inlines embedded EPUB images as data: URIs in HTML output without fetching remote refs", async () => {
+    const illustratedEpub = buildRemoteRefEpub("http://127.0.0.1:9", true);
+    const dl = await convertAndDownload("illustrated.epub", illustratedEpub, { format: "html" });
+    expect(dl.payload).toContain("RemoteRefBook");
+    expect(dl.payload).toContain(`data:image/png;base64,${PNG_1X1.toString("base64")}`);
+    expect(dl.payload).toContain("127.0.0.1:9/x.png");
+  }, 90_000);
+
+  it("classifies a non-EPUB zip container as a 400 input error", async () => {
+    const zip = new AdmZip();
+    zip.addFile("hello.txt", Buffer.from("not an epub"));
+    const res = await runTool("not-an-epub.epub", zip.toBuffer(), { format: "html" });
+    expect(res.statusCode).toBe(202);
+    const { jobId } = JSON.parse(res.body);
+    const { db, schema } = await import("../../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    let row:
+      | { status: string; error: { message?: string; httpStatus?: number } | null }
+      | undefined;
+    for (let i = 0; i < 120; i++) {
+      [row] = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    expect(row?.status).toBe("failed");
+    expect(row?.error?.httpStatus).toBe(400);
   }, 90_000);
 });
 
@@ -185,7 +228,7 @@ describe.skipIf(!pandocAvailable() || !pythonWith("weasyprint"))(
       const remote = await startRequestRecorder();
       try {
         await remote.probe();
-        const remoteEpub = buildRemoteRefEpub(remote.origin);
+        const remoteEpub = buildRemoteRefEpub(remote.origin, true);
         const dl = await convertAndDownload("remote.epub", remoteEpub, { format: "pdf" });
         expect(dl.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
         expect(remote.requests).toEqual([]);

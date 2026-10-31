@@ -12,10 +12,30 @@
  * window fall through to the error boundary instead of looping: chunks that
  * are still missing after a fresh load mean the server is broken, not
  * updated.
+ *
+ * Firefox and Safari also abort in-flight imports when the page starts
+ * navigating away, which raises the same event. Reloading then reloads the
+ * page being left and cancels the navigation (#912), so failures that follow
+ * a beforeunload are left alone. Vite needs the answer synchronously, and
+ * beforeunload is the first step of every cross-document navigation. The
+ * listener costs Firefox's back/forward cache for these pages; in-app
+ * navigation is pushState, so only cross-document history pays for it.
+ * iOS Safari skips beforeunload, so a cross-document `navigate` event from
+ * the Navigation API starts the same window there (#1479).
+ *
+ * A reload is only worth its cost for route and tool chunks, where the
+ * alternative is a crash screen. An import started from an event handler
+ * (a download button that loads a zip library) has the user's work on the
+ * page, and a reload would throw it away. Those go through quietImport(): the
+ * handler leaves the failure alone and the caller's own catch reports it.
  */
 
 export const CHUNK_RELOAD_GUARD_KEY = "snapotter-chunk-reload-at";
 export const CHUNK_RELOAD_GUARD_MS = 30_000;
+// How long after beforeunload (or a cross-document `navigate`) a chunk
+// failure is blamed on the navigation.
+// There is no event for a cancelled leave, so this is what ends it.
+export const LEAVING_WINDOW_MS = 10_000;
 
 function readLastReloadAt(): number {
   try {
@@ -33,17 +53,97 @@ function markReloadedNow(): void {
   }
 }
 
+// The exact errors left alone while the page was being left. Vite rethrows
+// the same object, so the boundary can tell them apart from real crashes
+// without matching engine-specific messages.
+const abortedByLeaving = new WeakSet<object>();
+
+/**
+ * True for a chunk error this handler left unhandled because the page was
+ * being left. Usually the browser aborted the import and nothing crashed:
+ * released builds sent these to Sentry with Firefox's and Safari's wording,
+ * never Chrome's (Chrome doesn't abort), in bursts as several imports died
+ * at once (#1480). It can't prove an abort, though, so reportRenderError
+ * delays the report rather than dropping it.
+ */
+export function isAbortedByLeaving(error: unknown): boolean {
+  return typeof error === "object" && error !== null && abortedByLeaving.has(error);
+}
+
+// Vite fires vite:preloadError before the importer's catch runs and gives the
+// event no way to name the failing import, so quietImport counts the imports
+// in flight instead. A route chunk failing during one is left to the error
+// boundary rather than reloaded; the window is a few hundred milliseconds.
+let quietImportsInFlight = 0;
+
+/**
+ * Runs a dynamic import whose failure the caller handles itself. A stale-deploy
+ * 404 rejects the returned promise without reloading the page, so the caller
+ * can say so and keep the user's files.
+ */
+export async function quietImport<T>(load: () => Promise<T>): Promise<T> {
+  quietImportsInFlight++;
+  try {
+    return await load();
+  } finally {
+    quietImportsInFlight--;
+  }
+}
+
 /** Returns an uninstall function (used by tests; the app installs once for its lifetime). */
 export function installChunkReloadHandler(
   reload: () => void = () => window.location.reload(),
 ): () => void {
+  let leavingAt = Number.NEGATIVE_INFINITY;
+  const onBeforeUnload = () => {
+    leavingAt = Date.now();
+  };
+  // iOS Safari never fires beforeunload (#1479), but it does fire the
+  // Navigation API's `navigate` before aborting the import. Only a
+  // cross-document destination leaves the page: router pushState is
+  // same-document, and a download keeps the page where it is.
+  const navigation = (window as Window & { navigation?: EventTarget }).navigation;
+  const onNavigate = (event: Event) => {
+    const { destination, downloadRequest } = event as Event & {
+      destination?: { sameDocument?: boolean; url?: string };
+      downloadRequest?: string | null;
+    };
+    if (destination?.sameDocument !== false) return;
+    // downloadRequest is null for a real navigation; a bare <a download> gives "".
+    if (downloadRequest != null) return;
+    // mailto: and other external schemes hand off to another app and the page
+    // stays; Chromium still fires a cross-document navigate for them.
+    if (!/^https?:/i.test(destination.url ?? "")) return;
+    leavingAt = Date.now();
+  };
+  // A page restored from the back/forward cache is no longer being left.
+  const onPageShow = (event: PageTransitionEvent) => {
+    if (event.persisted) leavingAt = Number.NEGATIVE_INFINITY;
+  };
   const onPreloadError = (event: Event) => {
+    // Not preventDefault'd: Vite must reject the import so the caller's catch runs.
+    if (quietImportsInFlight > 0) return;
+    // Unhandled on purpose: if the leave is cancelled after all, the error
+    // boundary shows the real chunk error rather than an undefined module.
+    if (Date.now() - leavingAt < LEAVING_WINDOW_MS) {
+      const { payload } = event as Event & { payload?: unknown };
+      if (typeof payload === "object" && payload !== null) abortedByLeaving.add(payload);
+      return;
+    }
     if (Date.now() - readLastReloadAt() < CHUNK_RELOAD_GUARD_MS) return;
     markReloadedNow();
     // Handled here: stop Vite from rethrowing into the error boundary.
     event.preventDefault();
     reload();
   };
+  window.addEventListener("beforeunload", onBeforeUnload);
+  window.addEventListener("pageshow", onPageShow);
   window.addEventListener("vite:preloadError", onPreloadError);
-  return () => window.removeEventListener("vite:preloadError", onPreloadError);
+  navigation?.addEventListener("navigate", onNavigate);
+  return () => {
+    window.removeEventListener("beforeunload", onBeforeUnload);
+    window.removeEventListener("pageshow", onPageShow);
+    window.removeEventListener("vite:preloadError", onPreloadError);
+    navigation?.removeEventListener("navigate", onNavigate);
+  };
 }

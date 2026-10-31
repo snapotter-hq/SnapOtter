@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
-import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
+import { isPdfFile, usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { claimToolResult, pdfToImageResultKey } from "@/stores/tool-result-claims";
 
 const FORMAT_OPTIONS = [
@@ -25,17 +25,18 @@ const DPI_PRESETS = [
   { value: 600, label: "600" },
 ];
 
-const DPI_LABELS: Record<number, string> = {
-  72: "Screen",
-  150: "Standard",
-  300: "Print",
-  600: "High Quality",
-};
+const DPI_LABEL_KEYS: Record<number, "dpiScreen" | "dpiStandard" | "dpiPrint" | "dpiHighQuality"> =
+  {
+    72: "dpiScreen",
+    150: "dpiStandard",
+    300: "dpiPrint",
+    600: "dpiHighQuality",
+  };
 
 const COLOR_MODE_OPTIONS = [
-  { value: "color", label: "Color" },
-  { value: "grayscale", label: "Grayscale" },
-  { value: "bw", label: "B&W" },
+  { value: "color", labelKey: "colorModeColor" },
+  { value: "grayscale", labelKey: "colorModeGrayscale" },
+  { value: "bw", labelKey: "colorModeBw" },
 ] as const;
 
 const LOSSY_FORMATS = ["jpg", "webp", "avif", "heic", "heif", "jxl"];
@@ -46,11 +47,18 @@ export function PdfToImageSettings() {
   const file = useFileStore((s) => s.entries[s.selectedIndex]?.file);
 
   useEffect(() => {
-    if (file && file !== store.file) {
-      store.setFile(file);
-      store.loadPreview(file);
+    const state = useFileStore.getState();
+    const activeFile = state.entries[state.selectedIndex]?.file;
+    if (!file || activeFile !== file) return;
+    if (!isPdfFile(file)) {
+      if (store.file !== null) store.setFile(null);
+      return;
     }
-  }, [file, store]);
+    if (file !== store.file) {
+      store.setFile(file);
+      store.loadPreview(file, t);
+    }
+  }, [file, store, t]);
 
   const isLossy = LOSSY_FORMATS.includes(store.format);
   const selectedCount = store.selectedPages.size;
@@ -173,7 +181,11 @@ export function PdfToImageSettings() {
             className="w-full mt-1.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
           />
         ) : (
-          <p className="text-xs text-muted-foreground mt-1">{DPI_LABELS[store.dpi] ?? ""}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {store.dpi in DPI_LABEL_KEYS
+              ? t.toolSettings["pdf-to-image"][DPI_LABEL_KEYS[store.dpi]]
+              : ""}
+          </p>
         )}
       </div>
 
@@ -194,7 +206,7 @@ export function PdfToImageSettings() {
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {opt.label}
+              {t.toolSettings["pdf-to-image"][opt.labelKey]}
             </button>
           ))}
         </div>
@@ -227,7 +239,7 @@ export function PdfToImageSettings() {
       <button
         type="button"
         data-testid="pdf-to-image-submit"
-        onClick={() => store.convert()}
+        onClick={() => store.convert(t)}
         disabled={!store.file || !store.pageCount || store.processing || selectedCount === 0}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >

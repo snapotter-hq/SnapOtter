@@ -1,13 +1,23 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  isAnimated,
+  readAnimationFor,
+  runPerFrame,
+} from "../../../apps/api/src/lib/animated-image.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
+import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
 import { registerCircleCrop } from "../../../apps/api/src/routes/tools/circle-crop.js";
 import { registerColorBlindness } from "../../../apps/api/src/routes/tools/color-blindness.js";
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
+import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerCrop } from "../../../apps/api/src/routes/tools/crop.js";
 import { registerDuotone } from "../../../apps/api/src/routes/tools/duotone.js";
+import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
 import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
 import { registerImagePad } from "../../../apps/api/src/routes/tools/image-pad.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
@@ -42,11 +52,14 @@ const app = { post: () => undefined } as unknown as FastifyInstance;
 
 beforeAll(() => {
   registerColorAdjustments(app);
+  registerBorder(app);
   registerCircleCrop(app);
   registerColorBlindness(app);
   registerCompress(app);
+  registerConvert(app);
   registerCrop(app);
   registerDuotone(app);
+  registerGifTools(app);
   registerImageEnhancement(app);
   registerImagePad(app);
   registerOptimizeForWeb(app);
@@ -65,6 +78,7 @@ beforeAll(() => {
 /** Tools expected to carry animation from input to output. */
 const ROUND_TRIP_TOOLS = [
   "adjust-colors",
+  "border",
   "color-blindness",
   "compress",
   "crop",
@@ -208,6 +222,67 @@ describe.each([
       width: still.width,
       pageHeight: still.pageHeight,
     });
+  });
+
+  it("adjust-colors with effect=invert preserves all frames and opaque alpha (#3132)", async () => {
+    const config = getToolConfig("adjust-colors");
+    if (!config) throw new Error("adjust-colors must be registered");
+    const source = await load();
+    const stillIn = await firstFrameOnly(source, format);
+    const settings = config.settingsSchema.parse({ effect: "invert" });
+
+    const animatedOut = (await config.process(source, settings, filename)).buffer;
+    const stillOut = (await config.process(stillIn, settings, filename)).buffer;
+    const animated = await frameShape(animatedOut);
+    const still = await frameShape(stillOut);
+
+    expect(animated).toEqual({
+      pages: 3,
+      width: still.width,
+      pageHeight: still.pageHeight,
+    });
+
+    const { data, info } = await sharp(animatedOut, { animated: true })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(data[3]).toBe(255);
+    expect(info.height).toBe(still.pageHeight * 3);
+  });
+});
+
+describe("adjust-colors invert preserves animated.gif frames and inverted RGB (#3132)", () => {
+  it("inverts all 3 frames of animated.gif without negating alpha into a 1-frame transparent GIF", async () => {
+    const config = getToolConfig("adjust-colors");
+    if (!config) throw new Error("adjust-colors must be registered");
+    const source = readFixture(fixtures.image.animated.gif);
+    const settings = config.settingsSchema.parse({ effect: "invert" });
+
+    const { buffer } = await config.process(source, settings, "animated.gif");
+    expect(await frameShape(buffer)).toEqual({ pages: 3, width: 100, pageHeight: 100 });
+
+    const { data, info } = await sharp(buffer, { animated: true })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const stride = 100 * 100 * info.channels;
+    expect([...data.slice(0, 4)]).toEqual([0, 255, 255, 255]);
+    expect([...data.slice(stride, stride + 4)]).toEqual([255, 0, 255, 255]);
+    expect([...data.slice(stride * 2, stride * 2 + 4)]).toEqual([255, 255, 0, 255]);
+
+    const recombInverted = (
+      await config.process(
+        source,
+        config.settingsSchema.parse({ red: 50, effect: "invert" }),
+        "animated.gif",
+      )
+    ).buffer;
+    expect(await frameShape(recombInverted)).toEqual({ pages: 3, width: 100, pageHeight: 100 });
+    const recombRaw = await sharp(recombInverted, { animated: true })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect([...recombRaw.data.slice(0, 4)]).toEqual([128, 255, 255, 255]);
+    expect([...recombRaw.data.slice(stride, stride + 4)]).toEqual([255, 0, 255, 255]);
+    expect([...recombRaw.data.slice(stride * 2, stride * 2 + 4)]).toEqual([255, 255, 0, 255]);
   });
 });
 
@@ -391,26 +466,66 @@ describe("a setting that needs alpha does not cost the animation (#1083)", () =>
   // PNG is the natural choice and cannot hold frames, which flattens the
   // animation as silently as the original bug did. WebP has both.
   it.each([
-    { toolId: "replace-color", settings: { makeTransparent: true } },
-    { toolId: "image-pad", settings: { background: "transparent" } },
-  ])("$toolId falls back to WebP rather than PNG", async ({ toolId, settings }) => {
-    const config = getToolConfig(toolId);
-    if (!config) throw new Error(`${toolId} must be registered`);
+    {
+      toolId: "replace-color",
+      settings: { makeTransparent: true },
+      expectedFilename: "frames.webp",
+    },
+    {
+      toolId: "image-pad",
+      settings: { background: "transparent" },
+      expectedFilename: "frames_padded.webp",
+    },
+    {
+      toolId: "border",
+      settings: { cornerRadius: 10 },
+      expectedFilename: "frames.webp",
+    },
+    {
+      toolId: "border",
+      settings: { shadow: true },
+      expectedFilename: "frames.webp",
+    },
+  ])(
+    "$toolId falls back to WebP rather than PNG",
+    async ({ toolId, settings, expectedFilename }) => {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} must be registered`);
 
-    const result = await config.process(
-      await gifSource(),
-      config.settingsSchema.parse(settings),
-      "frames.gif",
-    );
+      const result = await config.process(
+        await gifSource(),
+        config.settingsSchema.parse(settings),
+        "frames.gif",
+      );
 
-    expect(result.contentType).toBe("image/webp");
-    expect((await frameShape(result.buffer)).pages).toBe(3);
-  });
+      expect(result.contentType).toBe("image/webp");
+      expect(result.filename).toBe(expectedFilename);
+      expect((await frameShape(result.buffer)).pages).toBe(3);
+    },
+  );
 
   it.each([
-    { toolId: "replace-color", settings: { makeTransparent: true } },
-    { toolId: "image-pad", settings: { background: "transparent" } },
-  ])("$toolId still returns PNG for a still", async ({ toolId, settings }) => {
+    {
+      toolId: "replace-color",
+      settings: { makeTransparent: true },
+      expectedFilename: "test-200x150.png",
+    },
+    {
+      toolId: "image-pad",
+      settings: { background: "transparent" },
+      expectedFilename: "test-200x150_padded.png",
+    },
+    {
+      toolId: "border",
+      settings: { cornerRadius: 10 },
+      expectedFilename: "test-200x150.png",
+    },
+    {
+      toolId: "border",
+      settings: { shadow: true },
+      expectedFilename: "test-200x150.png",
+    },
+  ])("$toolId still returns PNG for a still", async ({ toolId, settings, expectedFilename }) => {
     const config = getToolConfig(toolId);
     if (!config) throw new Error(`${toolId} must be registered`);
 
@@ -421,7 +536,140 @@ describe("a setting that needs alpha does not cost the animation (#1083)", () =>
     );
 
     expect(result.contentType).toBe("image/png");
+    expect(result.filename).toBe(expectedFilename);
   });
+
+  it.each([
+    {
+      label: "still JPEG with .jpg extension",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedFilename: "test-100x100.png",
+    },
+    {
+      label: "still JPEG without extension",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "image",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedFilename: "image.png",
+    },
+    {
+      label: "animated GIF without extension",
+      load: gifSource,
+      filename: "frames",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/webp",
+      expectedFilename: "frames.webp",
+    },
+    {
+      label: "single-frame GIF",
+      load: async () => firstFrameOnly(await gifSource(), "gif"),
+      filename: "still.gif",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedFilename: "still.png",
+    },
+    {
+      label: "still JPEG when makeTransparent is false",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { makeTransparent: false },
+      expectedContentType: "image/jpeg",
+      expectedFilename: "test-100x100.jpg",
+    },
+  ])(
+    "replace-color updates filename extension only when container changes ($label) (#3048)",
+    async ({ load, filename, settings, expectedContentType, expectedFilename }) => {
+      const config = getToolConfig("replace-color");
+      if (!config) throw new Error("replace-color must be registered");
+
+      const result = await config.process(
+        await load(),
+        config.settingsSchema.parse(settings),
+        filename,
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
+    },
+  );
+
+  it.each([
+    {
+      label: "still JPEG with .jpg extension and cornerRadius",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "test-100x100.png",
+    },
+    {
+      label: "still JPEG without extension and cornerRadius",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "image",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "image.png",
+    },
+    {
+      label: "still JPEG with dotfile filename and shadow",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: ".hidden",
+      settings: { shadow: true },
+      expectedContentType: "image/png",
+      expectedFilename: ".hidden.png",
+    },
+    {
+      label: "animated GIF without extension and cornerRadius",
+      load: gifSource,
+      filename: "frames",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/webp",
+      expectedFilename: "frames.webp",
+    },
+    {
+      label: "animated GIF with dotfile filename and shadow",
+      load: gifSource,
+      filename: ".frames",
+      settings: { shadow: true },
+      expectedContentType: "image/webp",
+      expectedFilename: ".frames.webp",
+    },
+    {
+      label: "single-frame GIF with cornerRadius",
+      load: async () => firstFrameOnly(await gifSource(), "gif"),
+      filename: "still.gif",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "still.png",
+    },
+    {
+      label: "still JPEG when neither cornerRadius nor shadow is enabled",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { borderWidth: 10 },
+      expectedContentType: "image/jpeg",
+      expectedFilename: "test-100x100.jpg",
+    },
+  ])(
+    "border updates filename extension only when container changes ($label) (#3067)",
+    async ({ load, filename, settings, expectedContentType, expectedFilename }) => {
+      const config = getToolConfig("border");
+      if (!config) throw new Error("border must be registered");
+
+      const result = await config.process(
+        await load(),
+        config.settingsSchema.parse(settings),
+        filename,
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
+    },
+  );
 });
 
 describe("converting an animation to a still format does not stack frames (#1083)", () => {
@@ -523,5 +771,312 @@ describe("still images are untouched by the animated path (#1083)", () => {
     const shape = await frameShape(out);
 
     expect(shape).toEqual({ pages: 1, width: 200, pageHeight: 150 });
+  });
+});
+
+describe("gif-tools reverse and rotate preserve each frame's colours (#1221)", () => {
+  const FRAME_COLOURS = ["220,30,30", "30,200,60", "40,60,220"] as const;
+
+  async function rgbThreeFrameGif(): Promise<Buffer> {
+    const frames = await Promise.all(
+      [
+        { r: 220, g: 30, b: 30 },
+        { r: 30, g: 200, b: 60 },
+        { r: 40, g: 60, b: 220 },
+      ].map((background) =>
+        sharp({
+          create: { width: 40, height: 24, channels: 3, background },
+        })
+          .png()
+          .toBuffer(),
+      ),
+    );
+    return await sharp(frames, { join: { across: 1, animated: true } })
+      .gif({ delay: FRAME_DELAYS, loop: FRAME_LOOP })
+      .toBuffer();
+  }
+
+  async function frameCentres(buffer: Buffer): Promise<string[]> {
+    const { data, info } = await sharp(buffer, { animated: true })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const meta = await sharp(buffer, { animated: true }).metadata();
+    const pages = meta.pages ?? 1;
+    const pageHeight = meta.pageHeight ?? info.height;
+    const width = info.width;
+
+    return Array.from({ length: pages }, (_, page) => {
+      const y = page * pageHeight + Math.floor(pageHeight / 2);
+      const offset = (y * width + Math.floor(width / 2)) * info.channels;
+      return `${data[offset]},${data[offset + 1]},${data[offset + 2]}`;
+    });
+  }
+
+  async function runGifTools(settings: Record<string, unknown>, input?: Buffer): Promise<Buffer> {
+    const config = getToolConfig("gif-tools");
+    if (!config) throw new Error("gif-tools must be registered");
+    const result = await config.process(
+      input ?? (await rgbThreeFrameGif()),
+      config.settingsSchema.parse(settings),
+      "rgb.gif",
+    );
+    return result.buffer;
+  }
+
+  it("reverse flips frame colours and delays without painting every frame in the last frame's palette", async () => {
+    const out = await runGifTools({ mode: "reverse", speedFactor: 2, loop: 4 });
+
+    expect(await frameCentres(out)).toEqual([...FRAME_COLOURS].reverse());
+    expect(await frameTiming(out)).toEqual({
+      delay: [100, 60, 40],
+      loop: 4,
+    });
+  });
+
+  it("rotate 90 degrees keeps every frame's colour and swaps frame dimensions", async () => {
+    const out = await runGifTools({ mode: "rotate", angle: 90, loop: 3 });
+
+    expect(await frameCentres(out)).toEqual([...FRAME_COLOURS]);
+    expect(await frameShape(out)).toEqual({ pages: 3, width: 24, pageHeight: 40 });
+    expect(await frameTiming(out)).toEqual({ delay: FRAME_DELAYS, loop: 3 });
+  });
+
+  it("rotate with horizontal and vertical flips keeps every frame's colour and order", async () => {
+    const out = await runGifTools({ mode: "rotate", flipH: true, flipV: true, loop: 2 });
+
+    expect(await frameCentres(out)).toEqual([...FRAME_COLOURS]);
+    expect(await frameTiming(out)).toEqual({ delay: FRAME_DELAYS, loop: 2 });
+  });
+
+  it("rotate 90 degrees on a single-frame GIF keeps its colour and swaps dimensions", async () => {
+    const singleGif = await sharp({
+      create: { width: 40, height: 24, channels: 3, background: { r: 30, g: 200, b: 60 } },
+    })
+      .gif()
+      .toBuffer();
+
+    const out = await runGifTools({ mode: "rotate", angle: 90 }, singleGif);
+
+    expect(await frameCentres(out)).toEqual(["30,200,60"]);
+    expect(await frameShape(out)).toEqual({ pages: 1, width: 24, pageHeight: 40 });
+  });
+});
+
+describe("animation detection inspects buffer format, not filename extension or document pages (#2549)", () => {
+  it.each([
+    {
+      label: "animated GIF named frames.png -> webp",
+      load: gifSource,
+      filename: "frames.png",
+      format: "webp" as const,
+      expectedContentType: "image/webp",
+      expectedFilename: "frames.webp",
+    },
+    {
+      label: "animated WebP with extensionless filename -> gif",
+      load: async () => readFixture(fixtures.image.animated.webp),
+      filename: "animation",
+      format: "gif" as const,
+      expectedContentType: "image/gif",
+      expectedFilename: "animation.gif",
+    },
+  ])(
+    "convert preserves animation frames for $label",
+    async ({ load, filename, format, expectedContentType, expectedFilename }) => {
+      const convertTool = getToolConfig("convert");
+      if (!convertTool) throw new Error("convert must be registered");
+      const source = await load();
+      const sourceShape = await frameShape(source);
+
+      const result = await convertTool.process(
+        source,
+        convertTool.settingsSchema.parse({ format }),
+        filename,
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
+      expect(await frameShape(result.buffer)).toEqual(sourceShape);
+    },
+  );
+
+  it("treats multipage.tiff as a still in readAnimationFor and isAnimated", async () => {
+    const tiff = readFixture(fixtures.image.multipageTiff);
+
+    expect(await readAnimationFor(tiff, "webp")).toEqual({
+      animated: false,
+      pages: 1,
+      pageHeight: 0,
+      width: 0,
+    });
+    expect(await readAnimationFor(tiff, "gif")).toEqual({
+      animated: false,
+      pages: 1,
+      pageHeight: 0,
+      width: 0,
+    });
+    expect(await isAnimated(tiff)).toBe(false);
+  });
+
+  it.each([
+    {
+      toolId: "optimize-for-web",
+      settings: { format: "webp" },
+      expectedContentType: "image/webp",
+      expectedFilename: "multipage.webp",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "convert",
+      settings: { format: "webp" },
+      expectedContentType: "image/webp",
+      expectedFilename: "multipage.webp",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "convert",
+      settings: { format: "gif" },
+      expectedContentType: "image/gif",
+      expectedFilename: "multipage.gif",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "replace-color",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedFilename: "multipage.png",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "image-pad",
+      settings: { background: "transparent" },
+      expectedContentType: "image/png",
+      expectedFilename: "multipage_padded.png",
+      expectedShape: { pages: 1, width: 800, pageHeight: 800 },
+    },
+    {
+      toolId: "border",
+      settings: { borderWidth: 10, cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "multipage.png",
+      expectedShape: { pages: 1, width: 820, pageHeight: 620 },
+    },
+  ])(
+    "$toolId converts multipage.tiff page 1 as a single-frame still instead of an animation",
+    async ({ toolId, settings, expectedContentType, expectedFilename, expectedShape }) => {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} must be registered`);
+
+      const result = await config.process(
+        readFixture(fixtures.image.multipageTiff),
+        config.settingsSchema.parse(settings),
+        "multipage.tiff",
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
+      expect(await frameShape(result.buffer)).toEqual(expectedShape);
+    },
+  );
+});
+
+describe("readAnimation rethrows DecoderOutOfMemoryError on metadata() OOM (#3836)", () => {
+  it("rethrows DecoderOutOfMemoryError without logging warn when sharp.metadata() hits V8 OOM or libheif allocation failure", async () => {
+    const source = await gifSource();
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      for (const buildErr of [
+        () => new RangeError("Array buffer allocation failed"),
+        () =>
+          new Error(
+            "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed (4.1000)",
+          ),
+      ]) {
+        const metaSpy = vi.spyOn(sharp.prototype, "metadata");
+        try {
+          for (const call of [
+            () => readAnimationFor(source, "gif"),
+            () => readAnimationFor(source, "webp"),
+            () => isAnimated(source),
+            () => runPerFrame(source, "gif", async (frame) => frame),
+          ]) {
+            const oomErr = buildErr();
+            metaSpy.mockRejectedValueOnce(oomErr);
+            const thrown = await call().catch((e: unknown) => e);
+            expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+            expect(thrown).toMatchObject({
+              name: "DecoderOutOfMemoryError",
+              statusCode: 503,
+              code: "ENGINE_UNAVAILABLE",
+              cause: oomErr,
+            });
+          }
+          expect(warnSpy).not.toHaveBeenCalled();
+        } finally {
+          metaSpy.mockRestore();
+        }
+      }
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("propagates DecoderOutOfMemoryError from strip-metadata instead of silently dropping frames past frame 1 when readAnimationFor hits OOM", async () => {
+    const source = await gifSource();
+    const stripConfig = getToolConfig("strip-metadata");
+    if (!stripConfig) throw new Error("strip-metadata must be registered");
+    const settings = stripConfig.settingsSchema.parse({});
+
+    const origMetadata = sharp.prototype.metadata;
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    let callCount = 0;
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
+      this: sharp.Sharp,
+    ) {
+      callCount++;
+      // Call 1 is strip-metadata reading the input format; call 2 is readAnimationFor.
+      if (callCount === 2) {
+        return Promise.reject(v8Oom);
+      }
+      return origMetadata.call(this);
+    });
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      const thrown = await stripConfig
+        .process(source, settings, "frames.gif")
+        .catch((e: unknown) => e);
+      expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(thrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      metaSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("still logs a warning and returns STILL when sharp.metadata() rejects with a non-OOM error", async () => {
+    const source = await gifSource();
+    const secLimitErr = new Error(
+      "heif: Memory allocation error: Security limit exceeded: Allocating 2147483648 bytes exceeds the security limit of 536870912 bytes",
+    );
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(secLimitErr);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      expect(await readAnimationFor(source, "gif")).toEqual({
+        animated: false,
+        pages: 1,
+        pageHeight: 0,
+        width: 0,
+      });
+      expect(warnSpy).toHaveBeenCalledOnce();
+    } finally {
+      metaSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

@@ -18,12 +18,16 @@ const booleanSetting = z
   .union([z.boolean(), z.enum(["true", "false"])])
   .transform((value) => String(value));
 
+// Number("") and Number("   ") are both 0, which means unlimited or off for
+// several of these settings, so a blank string must not reach the transform (#1695).
+const numericString = z.string().trim().min(1, "Must not be empty");
+
 function integerSetting(
   minimum: number,
   maximum = Number.MAX_SAFE_INTEGER,
 ): z.ZodType<string, z.ZodTypeDef, unknown> {
   return z
-    .union([z.number(), z.string()])
+    .union([z.number(), numericString])
     .transform((value) => (typeof value === "number" ? value : Number(value)))
     .refine(Number.isSafeInteger, "Must be an integer")
     .refine((value) => value >= minimum, `Must be at least ${minimum}`)
@@ -33,7 +37,7 @@ function integerSetting(
 
 function finiteNumberSetting(minimumExclusive: number): z.ZodType<string, z.ZodTypeDef, unknown> {
   return z
-    .union([z.number(), z.string()])
+    .union([z.number(), numericString])
     .transform((value) => (typeof value === "number" ? value : Number(value)))
     .refine(Number.isFinite, "Must be a finite number")
     .refine((value) => value > minimumExclusive, `Must be greater than ${minimumExclusive}`)
@@ -60,10 +64,11 @@ const disabledToolsSetting = z
   )
   .transform((value) => JSON.stringify(value));
 
-const localeCodes = new Set(SUPPORTED_LOCALES.map((locale) => locale.code));
-const localeSetting = z
-  .string()
-  .refine((value) => localeCodes.has(value), "Must be a supported locale");
+let localeCodes: Set<string> | undefined;
+const localeSetting = z.string().refine((value) => {
+  localeCodes ??= new Set(SUPPORTED_LOCALES.map((locale) => locale.code));
+  return localeCodes.has(value);
+}, "Must be a supported locale");
 
 const breakGlassUsernameSetting = z
   .string()
@@ -116,7 +121,7 @@ const readonly = (options: Pick<SettingPolicy, "encrypted" | "redacted"> = {}): 
  * Security-sensitive keys must be added here deliberately so a new runtime
  * consumer cannot silently inherit the coarse settings:write permission.
  */
-const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
+export const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
   defaultTheme: general(z.enum(["light", "dark", "system"])),
   defaultLocale: general(localeSetting),
   defaultToolView: general(z.enum(["sidebar", "fullscreen"])),
@@ -144,7 +149,7 @@ const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
   mfaPolicy: security(z.enum(["optional", "admins_only", "required"])),
   ssoEnforcement: security(booleanSetting),
   ssoBreakGlassUsername: security(breakGlassUsernameSetting),
-  passwordMinLength: security(integerSetting(8, 128)),
+  passwordMinLength: security(integerSetting(1, 128)),
   passwordRequireUppercase: security(booleanSetting),
   passwordRequireLowercase: security(booleanSetting),
   passwordRequireDigit: security(booleanSetting),
@@ -195,6 +200,8 @@ export type SettingsRuntimeValidation =
       statusCode: 400 | 403;
       code: "DEPENDENCY_VALIDATION_FAILED" | "FEATURE_NOT_LICENSED";
       error: string;
+      /** The setting that was refused, so a client can point at its row (#2339). */
+      setting: string;
       validationErrors?: string[];
     };
 
@@ -214,6 +221,7 @@ export async function validateSettingsRuntimeConstraints(
         statusCode: 403,
         error: "MFA requires an enterprise license",
         code: "FEATURE_NOT_LICENSED",
+        setting: "mfaPolicy",
       };
     }
   }
@@ -230,7 +238,20 @@ export async function validateSettingsRuntimeConstraints(
       statusCode: 400,
       error: "Dependency validation failed",
       code: "DEPENDENCY_VALIDATION_FAILED",
+      setting: "ssoEnforcement",
       validationErrors,
+    };
+  }
+
+  // The login route only enforces SSO when the feature is licensed, so saving
+  // the setting without it would report "saved" and change nothing (#2298).
+  if (enforcesSso && !(await isEnterpriseFeatureEnabled("sso_enforcement"))) {
+    return {
+      success: false,
+      statusCode: 403,
+      error: "SSO enforcement requires an enterprise license",
+      code: "FEATURE_NOT_LICENSED",
+      setting: "ssoEnforcement",
     };
   }
 

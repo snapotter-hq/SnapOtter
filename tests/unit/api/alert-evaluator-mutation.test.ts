@@ -12,13 +12,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // relative mock paths are three "../" segments (not four).
 
 const statfsMock = vi.hoisted(() => vi.fn());
-const getSettingStringMock = vi.hoisted(() => vi.fn());
+const getSettingStrictMock = vi.hoisted(() => vi.fn());
 const deliverWebhookMock = vi.hoisted(() => vi.fn());
-const decryptMock = vi.hoisted(() => vi.fn());
-const isEncryptedMock = vi.hoisted(() => vi.fn());
+const decryptSettingMock = vi.hoisted(() => vi.fn());
 const getActiveLicenseMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
+const updateMock = vi.hoisted(() => vi.fn());
+const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
 
 function queryChain<T>(result: T) {
   const chain = {
@@ -30,18 +37,24 @@ function queryChain<T>(result: T) {
 
 const NOW = new Date("2026-06-29T12:00:00.000Z").getTime();
 
-async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) {
-  const { dataEncryptionKey = "test-key" } = options;
+async function loadAlertEvaluator() {
   vi.resetModules();
   statfsMock.mockReset();
-  getSettingStringMock.mockReset();
+  getSettingStrictMock.mockReset();
   deliverWebhookMock.mockReset();
-  decryptMock.mockReset();
-  isEncryptedMock.mockReset();
+  decryptSettingMock.mockReset();
   getActiveLicenseMock.mockReset();
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
+  updateMock.mockReset();
+  updateMock.mockImplementation(() => ({
+    set: () => ({
+      where: () => Promise.resolve(),
+    }),
+  }));
+  reportErrorMock.mockClear();
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
 
   vi.doMock("node:fs/promises", () => ({ statfs: statfsMock }));
 
@@ -55,24 +68,36 @@ async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) 
   vi.doMock("../../../apps/api/src/config.js", () => ({
     env: {
       WORKSPACE_PATH: "/workspace",
-      DATA_ENCRYPTION_KEY: dataEncryptionKey,
     },
   }));
 
   vi.doMock("../../../apps/api/src/db/index.js", () => ({
-    db: { select: selectMock },
+    db: { select: selectMock, update: updateMock },
     schema: {
       auditLog: { action: "action", createdAt: "createdAt" },
+      settings: { key: "settings.key", value: "settings.value" },
     },
   }));
 
   vi.doMock("../../../apps/api/src/lib/settings-helpers.js", () => ({
-    getSettingString: getSettingStringMock,
+    getSettingStrict: getSettingStrictMock,
   }));
 
   vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
-    decrypt: decryptMock,
-    isEncrypted: isEncryptedMock,
+    decryptSetting: decryptSettingMock,
+    decryptSettingWithRotation: async (val: string) => {
+      const res = await decryptSettingMock(val);
+      if (res === null || res === undefined) return null;
+      return typeof res === "string" ? { value: res } : res;
+    },
+  }));
+
+  vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({
+    reportError: reportErrorMock,
+  }));
+
+  vi.doMock("../../../apps/api/src/lib/logger.js", () => ({
+    logger: loggerMock,
   }));
 
   vi.doMock("../../../apps/api/src/lib/webhook-delivery.js", () => ({
@@ -109,7 +134,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("delivers when a destination is both enabled and type alerts", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
+      getSettingStrictMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
@@ -122,7 +147,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
     it("skips a destination that is enabled but not type alerts", async () => {
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce(
+      getSettingStrictMock.mockResolvedValueOnce(
         JSON.stringify([
           { url: "https://example.test/siem", authHeader: "", enabled: true, type: "siem" },
         ]),
@@ -137,7 +162,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
     it("skips a destination that is type alerts but disabled", async () => {
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce(
+      getSettingStrictMock.mockResolvedValueOnce(
         JSON.stringify([
           { url: "https://example.test/alerts", authHeader: "", enabled: false, type: "alerts" },
         ]),
@@ -149,14 +174,31 @@ describe("alert-evaluator.ts mutation coverage", () => {
       expect(deliverWebhookMock).not.toHaveBeenCalled();
     });
 
-    it("defaults the webhook_destinations lookup to an empty array", async () => {
+    it("defaults an absent webhook_destinations setting to no destinations", async () => {
       const { evaluateAlerts } = await loadAlertEvaluator();
-      // Return the default the source passes to getSettingString unchanged.
-      getSettingStringMock.mockResolvedValueOnce("[]");
+      getSettingStrictMock.mockResolvedValueOnce(undefined);
 
       await evaluateAlerts();
 
-      expect(getSettingStringMock).toHaveBeenNthCalledWith(1, "webhook_destinations", "[]");
+      expect(getSettingStrictMock).toHaveBeenNthCalledWith(1, "webhook_destinations");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+      expect(statfsMock).not.toHaveBeenCalled();
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+    });
+
+    it("logs a warning and returns early when reading webhook_destinations throws (#3052)", async () => {
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      const dbError = new Error("connection terminated unexpectedly");
+      getSettingStrictMock.mockRejectedValueOnce(dbError);
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: dbError, key: "webhook_destinations" },
+        "alert-evaluator: failed to read webhook_destinations setting",
+      );
+      expect(statfsMock).not.toHaveBeenCalled();
       expect(deliverWebhookMock).not.toHaveBeenCalled();
     });
   });
@@ -165,7 +207,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     async function runWithFreeGb(freeGb: number) {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         // fresh backup so only the disk condition can trip
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:00:00.000Z" }));
@@ -191,7 +233,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("computes freeGb as bfree * bsize divided by 1024^3", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:00:00.000Z" }));
       // 805306368 bytes = 0.75 GiB. Verifies the multiply and the /1024**3.
@@ -211,7 +253,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     async function runWithFailures(count: number) {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:00:00.000Z" }));
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -241,7 +283,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       vi.resetModules();
       statfsMock.mockReset();
-      getSettingStringMock.mockReset();
+      getSettingStrictMock.mockReset();
       deliverWebhookMock.mockReset();
       getActiveLicenseMock.mockReset();
       selectMock.mockReset();
@@ -263,11 +305,21 @@ describe("alert-evaluator.ts mutation coverage", () => {
         schema: { auditLog: { action: "action", createdAt: "createdAt" } },
       }));
       vi.doMock("../../../apps/api/src/lib/settings-helpers.js", () => ({
-        getSettingString: getSettingStringMock,
+        getSettingStrict: getSettingStrictMock,
       }));
       vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
-        decrypt: decryptMock,
-        isEncrypted: isEncryptedMock,
+        decryptSetting: decryptSettingMock,
+        decryptSettingWithRotation: async (val: string) => {
+          const res = await decryptSettingMock(val);
+          if (res === null || res === undefined) return null;
+          return typeof res === "string" ? { value: res } : res;
+        },
+      }));
+      vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({
+        reportError: reportErrorMock,
+      }));
+      vi.doMock("../../../apps/api/src/lib/logger.js", () => ({
+        logger: loggerMock,
       }));
       vi.doMock("../../../apps/api/src/lib/webhook-delivery.js", () => ({
         deliverWebhook: deliverWebhookMock,
@@ -278,7 +330,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
       }));
 
       const { evaluateAlerts } = await import("../../../apps/api/src/jobs/alert-evaluator.js");
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:00:00.000Z" }));
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -297,7 +349,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
       const backupTs = new Date(NOW - ageHours * 3_600_000).toISOString();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: backupTs }));
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -321,7 +373,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("emits backup_never_run (no numeric fields) when no backup value exists", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
+      getSettingStrictMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
@@ -329,13 +381,17 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
       await evaluateAlerts();
 
+      expect(loggerMock.warn).not.toHaveBeenCalled();
       const alerts = deliveredAlerts();
       expect(alerts).toEqual([{ condition: "backup_never_run" }]);
     });
 
-    it("reads backup_last_completed with an empty-string default", async () => {
+    it("reads backup_last_completed via getSettingStrict and emits backup_never_run when absent", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
+      getSettingStrictMock
+        .mockResolvedValueOnce(healthyDestinations())
+        .mockResolvedValueOnce(undefined);
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
@@ -343,7 +399,84 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
       await evaluateAlerts();
 
-      expect(getSettingStringMock).toHaveBeenNthCalledWith(2, "backup_last_completed", "");
+      expect(getSettingStrictMock).toHaveBeenNthCalledWith(2, "backup_last_completed");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+      expect(deliveredAlerts()).toEqual([{ condition: "backup_never_run" }]);
+    });
+
+    it("logs a warning and skips backup_never_run when reading backup_last_completed throws (#3052)", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      const dbError = new Error("connection terminated unexpectedly");
+      getSettingStrictMock
+        .mockResolvedValueOnce(healthyDestinations())
+        .mockRejectedValueOnce(dbError);
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: dbError, key: "backup_last_completed" },
+        "alert-evaluator: failed to read backup_last_completed setting",
+      );
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+    });
+
+    it("logs a warning and emits backup_never_run on malformed backup_last_completed JSON (#3039)", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      getSettingStrictMock
+        .mockResolvedValueOnce(healthyDestinations())
+        .mockResolvedValueOnce("{corrupt");
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: expect.any(SyntaxError), key: "backup_last_completed" },
+        "alert-evaluator: failed to parse stored backup_last_completed JSON",
+      );
+      expect(deliveredAlerts()).toEqual([{ condition: "backup_never_run" }]);
+    });
+
+    it("logs a warning and emits backup_never_run when backup_last_completed JSON is not a valid backup record (#3039)", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      for (const invalidPayload of [
+        "null",
+        "42",
+        "[]",
+        '"str"',
+        "{}",
+        '{"timestamp":123}',
+        '{"timestamp":"invalid"}',
+      ]) {
+        loggerMock.warn.mockClear();
+        deliverWebhookMock.mockClear();
+        getSettingStrictMock
+          .mockResolvedValueOnce(healthyDestinations())
+          .mockResolvedValueOnce(invalidPayload);
+        statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+        selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+        getActiveLicenseMock.mockReturnValue(null);
+        deliverWebhookMock.mockResolvedValue({ success: true });
+
+        await evaluateAlerts();
+
+        expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+        expect(loggerMock.warn).toHaveBeenCalledWith(
+          { key: "backup_last_completed" },
+          "alert-evaluator: stored backup_last_completed is not a valid backup record",
+        );
+        expect(deliveredAlerts()).toEqual([{ condition: "backup_never_run" }]);
+      }
     });
   });
 
@@ -352,7 +485,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
       const expiresAt = new Date(NOW + daysLeft * 86_400_000).toISOString();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:00:00.000Z" }));
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -384,7 +517,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("does not alert when the license has no expiresAt", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:00:00.000Z" }));
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -400,7 +533,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("does not alert when there is no active license", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:00:00.000Z" }));
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -418,7 +551,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("delivers all four alert conditions with their exact computed values", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         // backup 72 hours stale
         .mockResolvedValueOnce(
@@ -447,7 +580,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("does not deliver anything when every condition is healthy", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(healthyDestinations())
         .mockResolvedValueOnce(JSON.stringify({ timestamp: "2026-06-29T11:30:00.000Z" }));
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -468,7 +601,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
     it("delivers to every enabled alerts destination and skips disabled ones", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(
           JSON.stringify([
             { url: "https://example.test/a", authHeader: "", enabled: true, type: "alerts" },
@@ -494,8 +627,9 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
     it("passes maxRetries: 1 to every webhook delivery", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
+      getSettingStrictMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
@@ -509,12 +643,14 @@ describe("alert-evaluator.ts mutation coverage", () => {
         [{ condition: "backup_never_run" }],
         { maxRetries: 1 },
       );
+      expect(loggerMock.error).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
     });
 
     it("decrypts an encrypted auth header before delivery", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(
           JSON.stringify([
             {
@@ -529,19 +665,19 @@ describe("alert-evaluator.ts mutation coverage", () => {
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
-      isEncryptedMock.mockReturnValue(true);
-      decryptMock.mockResolvedValue("Bearer clear");
+      decryptSettingMock.mockResolvedValue("Bearer clear");
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await evaluateAlerts();
 
+      expect(decryptSettingMock).toHaveBeenCalledWith("$ENC$blob");
       expect(deliverWebhookMock.mock.calls[0][1]).toBe("Bearer clear");
     });
 
     it("sends the raw header when it is not encrypted", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(
           JSON.stringify([
             {
@@ -556,22 +692,24 @@ describe("alert-evaluator.ts mutation coverage", () => {
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
-      isEncryptedMock.mockReturnValue(false);
+      decryptSettingMock.mockResolvedValue("Bearer plain");
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await evaluateAlerts();
 
-      expect(decryptMock).not.toHaveBeenCalled();
+      expect(decryptSettingMock).toHaveBeenCalledWith("Bearer plain");
       expect(deliverWebhookMock.mock.calls[0][1]).toBe("Bearer plain");
     });
 
-    it("falls back to an empty auth header when decrypt resolves null", async () => {
+    it("logs, reports an operational error, and skips delivery when decryptSetting resolves null", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(
           JSON.stringify([
             {
+              name: "Ops Alerts",
               url: "https://example.test/alerts",
               authHeader: "$ENC$blob",
               enabled: true,
@@ -583,13 +721,114 @@ describe("alert-evaluator.ts mutation coverage", () => {
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
-      isEncryptedMock.mockReturnValue(true);
-      decryptMock.mockResolvedValue(null);
+      decryptSettingMock.mockResolvedValue(null);
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await evaluateAlerts();
 
-      expect(deliverWebhookMock.mock.calls[0][1]).toBe("");
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { name: "Ops Alerts" },
+        expect.stringContaining("DATA_ENCRYPTION_KEY"),
+      );
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+      expect(reportErrorMock.mock.calls[0][0]).toMatchObject({
+        code: "ALERT_DECRYPTION_FAILED",
+        kind: "operational",
+      });
+      expect(reportErrorMock.mock.calls[0][1]).toMatchObject({
+        source: "worker",
+        pool: "system",
+        subsystem: "alert-evaluator",
+      });
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it("logs error details and does not log completion when deliverWebhook returns success: false", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      getSettingStrictMock
+        .mockResolvedValueOnce(
+          JSON.stringify([
+            {
+              name: "Ops Alerts",
+              url: "https://example.test/alerts",
+              authHeader: "",
+              enabled: true,
+              type: "alerts",
+            },
+          ]),
+        )
+        .mockResolvedValueOnce("");
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      deliverWebhookMock.mockResolvedValue({ success: false, statusCode: 500, error: "HTTP 500" });
+
+      await evaluateAlerts();
+
+      expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+      expect(loggerMock.error).toHaveBeenCalledTimes(1);
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { name: "Ops Alerts", statusCode: 500, error: "HTTP 500" },
+        "alert-evaluator: webhook delivery failed",
+      );
+      expect(reportErrorMock).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it("logs a warning and still delivers to all destinations when key-rotation writeback throws (#3398)", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      const dbError = new Error("db writeback failed");
+      getSettingStrictMock
+        .mockResolvedValueOnce(
+          JSON.stringify([
+            {
+              name: "Ops Alerts",
+              url: "https://example.test/alerts-1",
+              authHeader: "$ENC$old-1",
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Backup Alerts",
+              url: "https://example.test/alerts-2",
+              authHeader: "$ENC$old-2",
+              enabled: true,
+              type: "alerts",
+            },
+          ]),
+        )
+        .mockResolvedValueOnce("");
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      decryptSettingMock
+        .mockResolvedValueOnce({ value: "Bearer rotated-1", reencrypted: "$ENC$new-1" })
+        .mockResolvedValueOnce({ value: "Bearer rotated-2", reencrypted: "$ENC$new-2" });
+      updateMock.mockImplementationOnce(() => ({
+        set: () => ({
+          where: () => Promise.reject(dbError),
+        }),
+      }));
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: dbError, name: "Ops Alerts", key: "webhook_destinations" },
+        "alert-evaluator: failed to persist re-encrypted webhook authHeader",
+      );
+      expect(deliverWebhookMock).toHaveBeenCalledTimes(2);
+      expect(deliverWebhookMock.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+        ["https://example.test/alerts-1", "Bearer rotated-1"],
+        ["https://example.test/alerts-2", "Bearer rotated-2"],
+      ]);
+      expect(loggerMock.error).not.toHaveBeenCalled();
+      expect(reportErrorMock).not.toHaveBeenCalled();
     });
   });
 
@@ -600,7 +839,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
       await evaluateAlerts();
 
-      expect(getSettingStringMock).not.toHaveBeenCalled();
+      expect(getSettingStrictMock).not.toHaveBeenCalled();
       expect(deliverWebhookMock).not.toHaveBeenCalled();
     });
 
@@ -613,14 +852,60 @@ describe("alert-evaluator.ts mutation coverage", () => {
       expect(isFeatureEnabledMock).toHaveBeenCalledWith("admin_alerts");
     });
 
-    it("returns early on invalid webhook_destinations JSON", async () => {
+    it("returns early and logs a warning on invalid webhook_destinations JSON (#2554)", async () => {
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce("{not json");
+      getSettingStrictMock.mockResolvedValueOnce("{not json");
 
       await evaluateAlerts();
 
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: expect.any(SyntaxError), key: "webhook_destinations" },
+        "alert-evaluator: failed to parse stored webhook_destinations JSON",
+      );
       expect(statfsMock).not.toHaveBeenCalled();
       expect(deliverWebhookMock).not.toHaveBeenCalled();
+    });
+
+    it("returns early and logs a warning when webhook_destinations JSON is not an array (#2554)", async () => {
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      getSettingStrictMock.mockResolvedValueOnce('{"enabled":true,"type":"alerts"}');
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "webhook_destinations" },
+        "alert-evaluator: stored webhook_destinations is not a JSON array",
+      );
+      expect(statfsMock).not.toHaveBeenCalled();
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+    });
+
+    it("returns early and logs a warning when webhook_destinations array contains null or non-object elements (#3040)", async () => {
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      for (const invalidArray of [
+        "[null]",
+        "[42]",
+        "[[]]",
+        JSON.stringify([
+          { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
+          null,
+        ]),
+      ]) {
+        loggerMock.warn.mockClear();
+        getSettingStrictMock.mockResolvedValueOnce(invalidArray);
+
+        await evaluateAlerts();
+
+        expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+        expect(loggerMock.warn).toHaveBeenCalledWith(
+          { key: "webhook_destinations" },
+          "alert-evaluator: stored webhook_destinations is not a JSON array",
+        );
+        expect(statfsMock).not.toHaveBeenCalled();
+        expect(deliverWebhookMock).not.toHaveBeenCalled();
+      }
     });
   });
 });

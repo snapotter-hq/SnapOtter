@@ -2,6 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -157,4 +158,34 @@ describe("LoginPage forced MFA enrollment", () => {
     });
     expect(codeInput.value).toBe("");
   });
+
+  it.each(["123 456", "123-456", " 123456", " 123-456 ", "12345678"])(
+    "keeps all 6 digits (and caps at 6) when %j is pasted into the enrollment input (#2480)",
+    async (pasted) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            requiresMfaEnrollment: true,
+            enrollmentToken: "enroll-token-1",
+            uri: ENROLLMENT_URI,
+            recoveryCodes: ["AAAA-1111"],
+          }),
+        }),
+      );
+
+      renderLoginPage();
+      await submitLogin();
+
+      const codeInput = (await screen.findByLabelText(/6-digit code/i)) as HTMLInputElement;
+      const user = userEvent.setup();
+      await user.click(codeInput);
+      await user.paste(pasted);
+
+      expect(codeInput.value).toBe("123456");
+      expect(screen.getByRole("button", { name: /confirm and enable/i })).toBeEnabled();
+    },
+  );
 });

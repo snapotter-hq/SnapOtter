@@ -34,11 +34,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 interface Box {
   left: number;
@@ -355,7 +355,7 @@ describe("Pixelate", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(result.error).toBeDefined();
   });

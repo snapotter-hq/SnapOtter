@@ -13,11 +13,11 @@ let token: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   token = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("conversion preset smoke", () => {
   it("jpg-to-png returns a png (fast/200)", async () => {

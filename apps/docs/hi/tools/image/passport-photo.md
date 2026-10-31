@@ -1,8 +1,8 @@
 ---
 description: "फेस डिटेक्शन, बैकग्राउंड हटाने और प्रिंट शीट टाइलिंग के साथ AI-संचालित पासपोर्ट और ID फ़ोटो जनरेटर।"
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: eb0abd3dfc5d
+i18n_output_hash: a48fb5e654e0
 ---
 
 # Passport Photo {#passport-photo}
@@ -92,7 +92,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | documentType | string | No | `"passport"` | दस्तावेज़ प्रकार (देश स्पेक से) |
 | bgColor | string | No | `"#FFFFFF"` | बैकग्राउंड रंग hex |
 | printLayout | string | No | `"none"` | प्रिंट पेपर लेआउट: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | KB में अधिकतम फ़ाइल आकार सीमा (0 = कोई सीमा नहीं) |
+| maxFileSizeKb | number | No | `0` | KB में अधिकतम फ़ाइल आकार सीमा, जहाँ 1 KB = 1000 बाइट (0 = कोई सीमा नहीं) |
 | dpi | number | No | `300` | आउटपुट DPI (72-1200) |
 | customWidthMm | number | No | - | mm में कस्टम फ़ोटो चौड़ाई (देश स्पेक को ओवरराइड करता है) |
 | customHeightMm | number | No | - | mm में कस्टम फ़ोटो ऊँचाई (देश स्पेक को ओवरराइड करता है) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### त्रुटि: विश्लेषण समाप्त (410) {#error-analysis-expired-410}
+
+Generate उस बैकग्राउंड-हटाई गई इमेज से काम करता है जिसे analyze ने `jobId` के लिए संग्रहीत किया था। संग्रहीत आउटपुट कुछ समय बाद साफ़ कर दिए जाते हैं, इसलिए यदि दोनों कॉलों के बीच बहुत अधिक समय बीत जाए, तो वह इमेज चली जाती है। उसी फ़ोटो के साथ analyze को फिर से कॉल करें और उसके द्वारा लौटाए गए `jobId` का उपयोग करें।
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+ऐसा `jobId` या `filename` जो किसी संग्रहीत फ़ाइल को नाम नहीं दे सकता (पथ विभाजक, `..`, खाली स्ट्रिंग) 400 लौटाता है।
+
 ---
 
 ### Base Route {#base-route}
@@ -170,4 +183,4 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 - विश्लेषण प्रतिक्रिया में `preview` फ़ील्ड तेज़ प्रदर्शन के लिए एक base64-एन्कोडेड PNG (अधिकतम 800px चौड़ा) है।
 - देश स्पेक में आधिकारिक पासपोर्ट फ़ोटो आवश्यकताओं के आधार पर दस्तावेज़ आयाम, सिर की ऊँचाई अनुपात और आँख-रेखा स्थिति शामिल है।
 - `printLayout` विकल्प फ़ोटो के बीच 2mm गटर के साथ 4x6\" या A4 पेपर पर एक टाइल की गई शीट जनरेट करता है।
-- जब `maxFileSizeKb` सेट किया जाता है, तो आउटपुट को आकार सीमा के भीतर फ़िट करने के लिए पुनरावृत्त रूप से संपीड़ित किया जाता है।
+- जब `maxFileSizeKb` सेट किया जाता है, तो आउटपुट की JPEG गुणवत्ता तब तक चरणबद्ध रूप से घटाई जाती है जब तक वह सीमा में फ़िट न हो जाए। पिक्सेल आकार देश स्पेक द्वारा तय होता है, इसलिए यदि फ़ोटो न्यूनतम गुणवत्ता पर भी फ़िट नहीं होती, तो `/generate` सीमा से बड़ी फ़ाइल के बजाय ऐसा बताने वाले संदेश के साथ 422 लौटाता है।

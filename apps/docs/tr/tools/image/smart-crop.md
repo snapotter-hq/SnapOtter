@@ -1,6 +1,6 @@
 ---
 description: "Sharp ve AI yüz algılama kullanarak görüntüleri akıllıca çerçeveleyen özne, yüz ve entropi farkındalıklı kırpma."
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: a0cecd8b79a9
 ---

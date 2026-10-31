@@ -1,5 +1,5 @@
 import { AlertCircle, Camera, FileImage, FileUp, Upload } from "lucide-react";
-import { type DragEvent, useCallback, useEffect, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTouchDevice } from "@/hooks/use-mobile";
 import { useUrlImport } from "@/hooks/use-url-import";
@@ -84,7 +84,7 @@ export function isImageFile(file: File): boolean {
 
 interface DropzoneProps {
   onFiles?: (files: File[]) => void;
-  onUrlImport?: (file: File) => void;
+  onUrlImport?: (file: File) => boolean | undefined;
   accept?: string;
   multiple?: boolean;
   /** Files that have already been dropped (for showing count & list). */
@@ -97,13 +97,19 @@ interface DropzoneProps {
   acceptDescription?: string;
   /** Offer a "Take photo" button on touch devices (image-accepting tools). */
   cameraCapture?: boolean;
+  /** Attach a document-level paste listener while mounted. Defaults to true. */
+  enablePaste?: boolean;
+  /** Controlled open state for the bulk URL import modal. */
+  bulkModalOpen?: boolean;
+  /** Controlled open-state change handler for the bulk URL import modal. */
+  onBulkModalOpenChange?: (open: boolean) => void;
 }
 
 // Browsers may not map certain formats (HEIC, JXL, RAW, etc.) to image/* in file pickers.
 // Append explicit extensions so they are selectable.
-function expandAccept(accept?: string): string | undefined {
+export function expandAccept(accept?: string): string | undefined {
   if (!accept?.includes("image/*")) return accept;
-  return `${accept},.avif,.heic,.heif,.hif,.jxl,.ico,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.3fr,.iiq,.srw,.x3f,.rwl,.gpr,.fff,.mrw,.mef,.kdc,.dcr,.erf,.ptx,.tga,.psd,.exr,.hdr,.svgz,.jp2,.j2k,.j2c,.jpc,.jpf,.jpx,.qoi,.eps,.epsf,.dds,.cur,.apng,.dpx,.cin,.fits,.fit,.fts,.ppm,.pgm,.pbm,.pnm,.pam,.pfm`;
+  return `${accept},.avif,.heic,.heif,.hif,.jxl,.tiff,.tif,.ico,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.3fr,.iiq,.srw,.x3f,.rwl,.gpr,.fff,.mrw,.mef,.kdc,.dcr,.erf,.ptx,.tga,.psd,.exr,.hdr,.svgz,.jp2,.j2k,.j2c,.jpc,.jpf,.jpx,.qoi,.eps,.epsf,.dds,.cur,.apng,.dpx,.cin,.fits,.fit,.fts,.ppm,.pgm,.pbm,.pnm,.pam,.pfm`;
 }
 
 export function Dropzone({
@@ -116,6 +122,9 @@ export function Dropzone({
   fileFilter,
   acceptDescription,
   cameraCapture = false,
+  enablePaste = true,
+  bulkModalOpen,
+  onBulkModalOpenChange,
 }: DropzoneProps) {
   const { t } = useTranslation();
   // When no explicit filter is given, accept any file: the file picker still
@@ -124,42 +133,52 @@ export function Dropzone({
   const checkFile = fileFilter ?? (() => true);
   const resolvedAccept = expandAccept(accept);
   const isTouchDevice = useTouchDevice();
-  const unsupportedMessage =
-    acceptDescription || `This tool accepts ${accept || "the supported file types"}`;
+  const unsupportedMessage = acceptDescription || t.dropzone.unsupportedFileType;
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [urlLoading, setUrlLoading] = useState(false);
+  const urlLoadingRef = useRef(false);
   const [urlError, setUrlError] = useState<string | null>(null);
-  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [uncontrolledBulkModal, setUncontrolledBulkModal] = useState(false);
+  const bulkModalControlled = onBulkModalOpenChange !== undefined;
+  const showBulkModal = bulkModalControlled ? Boolean(bulkModalOpen) : uncontrolledBulkModal;
+  const onUrlImportRef = useRef(onUrlImport);
+  onUrlImportRef.current = onUrlImport;
 
   useEffect(() => {
-    if (error) {
+    if (error && !showBulkModal) {
       const timer = setTimeout(() => setError(null), 5000);
       return () => clearTimeout(timer);
     }
-  }, [error]);
+  }, [error, showBulkModal]);
 
   const { importSingleUrl } = useUrlImport();
 
   const handleUrlSubmit = useCallback(async () => {
     const url = urlInput.trim();
-    if (!url) return;
+    if (!url || urlLoadingRef.current) return;
+    urlLoadingRef.current = true;
     setUrlLoading(true);
     setUrlError(null);
-    const file = await importSingleUrl(url);
+    let file: File | null;
+    try {
+      file = await importSingleUrl(url);
+    } catch (err) {
+      setUrlError(err instanceof Error && err.message ? err.message : t.dropzone.urlFetchFailed);
+      return;
+    } finally {
+      urlLoadingRef.current = false;
+      setUrlLoading(false);
+    }
     if (file) {
       if (!checkFile(file)) {
-        setUrlError(acceptDescription ?? t.dropzone.unsupportedFileType);
-      } else {
+        setUrlError(unsupportedMessage);
+      } else if (onUrlImportRef.current?.(file) !== false) {
         setUrlInput("");
-        onUrlImport?.(file);
       }
-    } else {
-      setUrlError(t.dropzone.urlFetchFailed);
     }
-    setUrlLoading(false);
-  }, [urlInput, importSingleUrl, onUrlImport, checkFile, acceptDescription, t]);
+  }, [urlInput, importSingleUrl, checkFile, unsupportedMessage, t.dropzone.urlFetchFailed]);
 
   const handleDrag = useCallback((e: DragEvent) => {
     e.preventDefault();
@@ -223,13 +242,16 @@ export function Dropzone({
   }, [checkFile, onFiles, unsupportedMessage]);
 
   useEffect(() => {
+    if (!enablePaste) return;
     const handlePaste = (e: ClipboardEvent) => {
       const clip = e.clipboardData;
       if (!clip) return;
 
       const files: File[] = [];
+      let hadCandidateFiles = false;
 
       if (clip.files.length > 0) {
+        hadCandidateFiles = true;
         for (const file of clip.files) {
           if (checkFile(file)) files.push(file);
         }
@@ -237,19 +259,25 @@ export function Dropzone({
         for (const item of clip.items) {
           if (item.kind === "file") {
             const file = item.getAsFile();
-            if (file && checkFile(file)) files.push(file);
+            if (file) {
+              hadCandidateFiles = true;
+              if (checkFile(file)) files.push(file);
+            }
           }
         }
       }
 
       if (files.length > 0) {
         e.preventDefault();
+        setError(null);
         onFiles?.(files);
+      } else if (hadCandidateFiles) {
+        setError(unsupportedMessage);
       }
     };
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [onFiles, checkFile]);
+  }, [enablePaste, onFiles, checkFile, unsupportedMessage]);
 
   const hasMultipleFiles = currentFiles.length > 1;
 
@@ -374,7 +402,11 @@ export function Dropzone({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowBulkModal(true);
+                if (bulkModalControlled) {
+                  onBulkModalOpenChange(true);
+                } else {
+                  setUncontrolledBulkModal(true);
+                }
               }}
               className="text-xs text-primary-ink hover:text-primary-ink-strong"
             >
@@ -404,14 +436,18 @@ export function Dropzone({
         )}
       </div>
 
-      {showBulkModal && (
+      {!bulkModalControlled && showBulkModal && (
         <UrlImportModal
-          onClose={() => setShowBulkModal(false)}
+          onClose={() => setUncontrolledBulkModal(false)}
+          fileFilter={checkFile}
+          unsupportedMessage={unsupportedMessage}
           onImport={(files) => {
             for (const file of files) {
-              if (checkFile(file)) onUrlImport?.(file);
+              if (onUrlImportRef.current?.(file) === false) {
+                return false;
+              }
             }
-            setShowBulkModal(false);
+            setError(null);
           }}
         />
       )}

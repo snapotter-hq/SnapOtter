@@ -1,4 +1,6 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { create } from "zustand";
+import { track } from "@/lib/analytics";
 import { COLLAGE_TEMPLATES, getDefaultTemplate } from "@/lib/collage-templates";
 import { fetchDecodedPreview, needsServerPreview, revokePreviewUrl } from "@/lib/image-preview";
 
@@ -83,7 +85,60 @@ interface CollageState {
 
 const DEFAULT_TRANSFORM: CellTransform = { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
 
+const CLEARED_RESULT = {
+  resultUrl: null,
+  resultSize: null,
+  originalSize: null,
+  jobId: null,
+} as const;
+
 let nextImageId = 0;
+let activeCollageAbort: (() => void) | null = null;
+let collageRunId = 0;
+
+export function beginCollageRun(abort: () => void): {
+  isCurrent: () => boolean;
+  end: () => void;
+} {
+  activeCollageAbort?.();
+  const runId = ++collageRunId;
+  activeCollageAbort = abort;
+  return {
+    isCurrent: () => runId === collageRunId,
+    end: () => {
+      if (activeCollageAbort === abort) activeCollageAbort = null;
+    },
+  };
+}
+
+function cancelActiveCollageRun() {
+  collageRunId++;
+  const abort = activeCollageAbort;
+  activeCollageAbort = null;
+  abort?.();
+}
+
+function clearCollageResult(state: Pick<CollageState, "images" | "phase">): {
+  resultUrl: null;
+  resultSize: null;
+  originalSize: null;
+  jobId: null;
+  phase: Phase;
+  error: null;
+} {
+  cancelActiveCollageRun();
+  const phase =
+    state.phase === "processing" || state.phase === "result"
+      ? state.images.length > 0
+        ? "editing"
+        : "upload"
+      : state.phase;
+  return {
+    ...CLEARED_RESULT,
+    phase,
+    error: null,
+  };
+}
 
 function buildDefaultAssignments(imageCount: number, cellCount: number): number[] {
   const assignments: number[] = [];
@@ -108,13 +163,16 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   selectedCell: null,
   phase: "upload",
   progress: 0,
-  resultUrl: null,
-  resultSize: null,
-  originalSize: null,
+  ...CLEARED_RESULT,
   error: null,
-  jobId: null,
 
   addImages: (files) => {
+    if (files.length === 0) return;
+    track(ANALYTICS_EVENTS.FILE_ADDED, {
+      tool_id: "collage",
+      file_count: files.length,
+    });
+    cancelActiveCollageRun();
     const newImages: CollageImage[] = files.map((f) => ({
       id: `img-${++nextImageId}`,
       file: f,
@@ -132,19 +190,23 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       templateId: template.id,
       cellAssignments: assignments,
       cellTransforms: {},
+      selectedCell: null,
       phase: "editing",
-      resultUrl: null,
-      resultSize: null,
+      ...CLEARED_RESULT,
       error: null,
     });
 
     for (const img of newImages) {
       if (img.previewLoading) {
         const imgId = img.id;
-        fetchDecodedPreview(img.file).then((result) => {
+        const file = img.file;
+        fetchDecodedPreview(file).then((result) => {
           const current = get();
-          const idx = current.images.findIndex((i) => i.id === imgId);
-          if (idx === -1) return;
+          const idx = current.images.findIndex((i) => i.id === imgId && i.file === file);
+          if (idx === -1) {
+            if (result?.url) revokePreviewUrl(result.url);
+            return;
+          }
           const updated = [...current.images];
           updated[idx] = {
             ...updated[idx],
@@ -160,15 +222,15 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   removeImage: (index) => {
     const state = get();
     const img = state.images[index];
-    if (img) {
-      URL.revokeObjectURL(img.blobUrl);
-      if (img.previewBlobUrl) revokePreviewUrl(img.previewBlobUrl);
-    }
+    if (!img) return;
     const newImages = state.images.filter((_, i) => i !== index);
     if (newImages.length === 0) {
       get().reset();
       return;
     }
+    cancelActiveCollageRun();
+    URL.revokeObjectURL(img.blobUrl);
+    if (img.previewBlobUrl) revokePreviewUrl(img.previewBlobUrl);
     const template = getDefaultTemplate(newImages.length);
     const assignments = buildDefaultAssignments(newImages.length, template.cells.length);
     set({
@@ -176,12 +238,15 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       templateId: template.id,
       cellAssignments: assignments,
       cellTransforms: {},
+      selectedCell: null,
       phase: "editing",
-      resultUrl: null,
+      ...CLEARED_RESULT,
+      error: null,
     });
   },
 
   clearImages: () => {
+    cancelActiveCollageRun();
     const state = get();
     for (const img of state.images) {
       URL.revokeObjectURL(img.blobUrl);
@@ -192,8 +257,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       cellAssignments: [],
       cellTransforms: {},
       phase: "upload",
-      resultUrl: null,
-      resultSize: null,
+      ...CLEARED_RESULT,
       error: null,
       selectedCell: null,
     });
@@ -204,14 +268,31 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const template = COLLAGE_TEMPLATES.find((t) => t.id === id);
     if (!template) return;
     const assignments = buildDefaultAssignments(state.images.length, template.cells.length);
-    set({ templateId: id, cellAssignments: assignments, cellTransforms: {}, resultUrl: null });
+    set({
+      templateId: id,
+      cellAssignments: assignments,
+      cellTransforms: {},
+      selectedCell: null,
+      ...clearCollageResult(state),
+    });
   },
 
   setCellAssignment: (cellIndex, imageIndex) => {
     const state = get();
     const newAssignments = [...state.cellAssignments];
     newAssignments[cellIndex] = imageIndex;
-    set({ cellAssignments: newAssignments, resultUrl: null });
+    if (imageIndex < 0) {
+      const newTransforms = { ...state.cellTransforms };
+      delete newTransforms[cellIndex];
+      set({
+        cellAssignments: newAssignments,
+        cellTransforms: newTransforms,
+        selectedCell: state.selectedCell === cellIndex ? null : state.selectedCell,
+        ...clearCollageResult(state),
+      });
+      return;
+    }
+    set({ cellAssignments: newAssignments, ...clearCollageResult(state) });
   },
 
   swapCells: (a, b) => {
@@ -222,9 +303,24 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     [newAssignments[a], newAssignments[b]] = [newAssignments[b], newAssignments[a]];
     // Swap transforms
     const tmpT = newTransforms[a];
-    newTransforms[a] = newTransforms[b];
-    newTransforms[b] = tmpT;
-    set({ cellAssignments: newAssignments, cellTransforms: newTransforms, resultUrl: null });
+    if (newTransforms[b] !== undefined) {
+      newTransforms[a] = newTransforms[b];
+    } else {
+      delete newTransforms[a];
+    }
+    if (tmpT !== undefined) {
+      newTransforms[b] = tmpT;
+    } else {
+      delete newTransforms[b];
+    }
+    const selectedCell =
+      state.selectedCell === a ? b : state.selectedCell === b ? a : state.selectedCell;
+    set({
+      cellAssignments: newAssignments,
+      cellTransforms: newTransforms,
+      selectedCell,
+      ...clearCollageResult(state),
+    });
   },
 
   setCellTransform: (cellIndex, transform) => {
@@ -235,7 +331,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
         ...state.cellTransforms,
         [cellIndex]: { ...current, ...transform },
       },
-      resultUrl: null,
+      ...clearCollageResult(state),
     });
   },
 
@@ -243,12 +339,12 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const state = get();
     const newTransforms = { ...state.cellTransforms };
     delete newTransforms[cellIndex];
-    set({ cellTransforms: newTransforms, resultUrl: null });
+    set({ cellTransforms: newTransforms, ...clearCollageResult(state) });
   },
 
-  setGap: (v) => set({ gap: v, resultUrl: null }),
-  setCornerRadius: (v) => set({ cornerRadius: v, resultUrl: null }),
-  setBackgroundColor: (color) => set({ backgroundColor: color, resultUrl: null }),
+  setGap: (v) => set({ gap: v, ...clearCollageResult(get()) }),
+  setCornerRadius: (v) => set({ cornerRadius: v, ...clearCollageResult(get()) }),
+  setBackgroundColor: (color) => set({ backgroundColor: color, ...clearCollageResult(get()) }),
   setBgPreset: (preset) => {
     const colors: Record<string, string> = {
       white: "#FFFFFF",
@@ -258,25 +354,25 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     if (preset === "custom") {
       set({ bgPreset: preset });
     } else {
-      set({ bgPreset: preset, backgroundColor: colors[preset], resultUrl: null });
+      set({ bgPreset: preset, backgroundColor: colors[preset], ...clearCollageResult(get()) });
     }
   },
-  setAspectRatio: (v) => set({ aspectRatio: v, resultUrl: null }),
-  setOutputFormat: (v) => set({ outputFormat: v, resultUrl: null }),
-  setQuality: (v) => set({ quality: v, resultUrl: null }),
+  setAspectRatio: (v) => set({ aspectRatio: v, ...clearCollageResult(get()) }),
+  setOutputFormat: (v) => set({ outputFormat: v, ...clearCollageResult(get()) }),
+  setQuality: (v) => set({ quality: v, ...clearCollageResult(get()) }),
   setSelectedCell: (v) => set({ selectedCell: v }),
-  setPhase: (v) => set({ phase: v }),
+  setPhase: (v) => set(v === "processing" ? { phase: v, ...CLEARED_RESULT } : { phase: v }),
   setProgress: (v) => set({ progress: v }),
   setResult: (url, size, originalSize, jobId) =>
     set({ resultUrl: url, resultSize: size, originalSize, jobId, phase: "result", error: null }),
-  setError: (e) => set({ error: e, phase: "editing" }),
+  setError: (e) => set(e ? { error: e, phase: "editing" } : { error: null }),
   reset: () => {
+    cancelActiveCollageRun();
     const state = get();
     for (const img of state.images) {
       URL.revokeObjectURL(img.blobUrl);
       if (img.previewBlobUrl) revokePreviewUrl(img.previewBlobUrl);
     }
-    nextImageId = 0;
     set({
       images: [],
       templateId: "2-h-equal",
@@ -292,11 +388,8 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       selectedCell: null,
       phase: "upload",
       progress: 0,
-      resultUrl: null,
-      resultSize: null,
-      originalSize: null,
+      ...CLEARED_RESULT,
       error: null,
-      jobId: null,
     });
   },
 }));

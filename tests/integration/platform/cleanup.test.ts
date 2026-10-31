@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import { getMaxAgeMs, shouldRunStartupCleanup } from "../../../apps/api/src/lib/cleanup.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 
 beforeAll(async () => {
   await runMigrations();
@@ -42,26 +43,65 @@ describe("getMaxAgeMs", () => {
     expect(result).toBe(1 * 60 * 60 * 1000);
   });
 
-  it("returns env fallback for invalid (non-numeric) DB value", async () => {
-    await setSetting("tempFileMaxAgeHours", "notanumber");
-    const result = await getMaxAgeMs();
-    expect(result).toBe(1 * 60 * 60 * 1000);
+  it("returns 0 and logs a warning for invalid (non-numeric, blank, non-finite, or trailing-junk) DB values (#2752)", async () => {
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      for (const invalid of ["notanumber", "", "   ", "Infinity", "-Infinity", "1abc"]) {
+        warnSpy.mockClear();
+        await setSetting("tempFileMaxAgeHours", invalid);
+        const result = await getMaxAgeMs();
+        expect(result).toBe(0);
+        expect(warnSpy).toHaveBeenCalledWith(
+          { key: "tempFileMaxAgeHours", value: invalid },
+          "invalid numeric setting, using default",
+        );
+      }
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
-  it("returns env fallback for zero or negative DB value", async () => {
-    await setSetting("tempFileMaxAgeHours", "0");
-    const result = await getMaxAgeMs();
-    expect(result).toBe(1 * 60 * 60 * 1000);
+  it("returns 0 and logs a warning for zero or negative DB values (#2752)", async () => {
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await setSetting("tempFileMaxAgeHours", "0");
+      const result = await getMaxAgeMs();
+      expect(result).toBe(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key: "tempFileMaxAgeHours", value: "0" },
+        "invalid numeric setting, using default",
+      );
 
-    await setSetting("tempFileMaxAgeHours", "-5");
-    const result2 = await getMaxAgeMs();
-    expect(result2).toBe(1 * 60 * 60 * 1000);
+      warnSpy.mockClear();
+      await setSetting("tempFileMaxAgeHours", "-5");
+      const result2 = await getMaxAgeMs();
+      expect(result2).toBe(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key: "tempFileMaxAgeHours", value: "-5" },
+        "invalid numeric setting, using default",
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it("handles fractional hours", async () => {
     await setSetting("tempFileMaxAgeHours", "0.5");
     const result = await getMaxAgeMs();
     expect(result).toBe(0.5 * 60 * 60 * 1000);
+  });
+
+  it("propagates a DB error instead of falling back to FILE_MAX_AGE_HOURS (#1525)", async () => {
+    await setSetting("tempFileMaxAgeHours", "168");
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    try {
+      await expect(getMaxAgeMs()).rejects.toThrow(dbError);
+    } finally {
+      selectSpy.mockRestore();
+    }
   });
 });
 
@@ -87,5 +127,24 @@ describe("shouldRunStartupCleanup", () => {
 
     await setSetting("startupCleanup", "1");
     expect(await shouldRunStartupCleanup()).toBe(true);
+  });
+
+  it("logs the error and returns false when a DB error occurs while reading startupCleanup (#2719)", async () => {
+    await setSetting("startupCleanup", "false");
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    try {
+      await expect(shouldRunStartupCleanup()).resolves.toBe(false);
+      expect(errorSpy).toHaveBeenCalledWith(
+        { err: dbError },
+        "Startup cleanup: startupCleanup read failed; skipping startup sweep",
+      );
+    } finally {
+      errorSpy.mockRestore();
+      selectSpy.mockRestore();
+    }
   });
 });

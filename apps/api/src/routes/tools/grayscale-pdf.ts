@@ -22,7 +22,7 @@ export function registerGrayscalePdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_grayscale.pdf`);
       ctx.report(10, "Converting to grayscale");
-      await gsGrayscalePdf(inPath, outPath);
+      await gsGrayscalePdf(inPath, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

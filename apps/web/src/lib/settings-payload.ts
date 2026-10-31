@@ -38,3 +38,19 @@ export function changedSettings(
   }
   return out;
 }
+
+export function parseStringArray(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every((item): item is string => typeof item === "string")
+    ) {
+      return [];
+    }
+    return parsed;
+  } catch {
+    return [];
+  }
+}

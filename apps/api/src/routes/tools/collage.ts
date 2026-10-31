@@ -1,17 +1,27 @@
 import { randomUUID } from "node:crypto";
-import { COLLAGE_PAN_LIMIT } from "@snapotter/shared";
+import { extname } from "node:path";
+import { COLLAGE_PAN_LIMIT, hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+  noteDecoderFallback,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 
 // ── Template definitions (mirrors the frontend) ─────────────────────
@@ -322,7 +332,7 @@ const TEMPLATES: Template[] = [
 // ── Zod schema ──────────────��───────────────────────────────────────
 
 const cellSchema = z.object({
-  imageIndex: z.number().int().min(0),
+  imageIndex: z.number().int().min(-1),
   // COLLAGE_PAN_LIMIT mirrors the preview's drag clamp (collage-preview.tsx),
   // shared so the two can't drift; anything narrower turns a draggable position
   // into a 400 at submit time (#718). In cover mode the extract saturates at the
@@ -338,8 +348,10 @@ const settingsSchema = z.object({
   cells: z.array(cellSchema).optional(),
   gap: z.number().min(0).max(500).default(8),
   cornerRadius: z.number().min(0).max(500).default(0),
-  backgroundColor: z.string().default("#FFFFFF"),
-  aspectRatio: z.string().default("free"),
+  backgroundColor: z
+    .union([z.literal("transparent"), z.string().regex(/^#[0-9a-fA-F]{6}$/)])
+    .default("#FFFFFF"),
+  aspectRatio: z.enum(["free", "1:1", "4:3", "3:2", "16:9", "9:16", "4:5"]).default("free"),
   outputFormat: z.enum(["png", "jpeg", "webp", "avif", "jxl"]).default("png"),
   quality: z.number().min(1).max(100).default(90),
 });
@@ -451,10 +463,8 @@ export function registerCollage(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (files.length === 0) {
@@ -472,39 +482,69 @@ export function registerCollage(app: FastifyInstance) {
       if (validation.format === "heif") {
         try {
           file.buffer = await decodeHeic(file.buffer);
-        } catch (err) {
+        } catch (rawErr) {
+          // A missing decoder or storage write fault is this server's fault,
+          // not the user's file: rethrow so the global handler logs and
+          // reports it as a 503 (#795, #2800).
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       }
+      let fallbackFormat: string | undefined;
       if (needsCliDecode(validation.format)) {
         try {
-          const fileExt = file.filename.split(".").pop()?.toLowerCase();
+          const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-        } catch {
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
           try {
-            await sharp(file.buffer).metadata();
-          } catch (err) {
+            const meta = await sharp(file.buffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(file.buffer).resize(1).raw().toBuffer();
+            }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+            // Sharp can read some of these formats itself, so a missing CLI
+            // decoder only matters once that fallback fails too (#795).
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+            request.log?.warn({ err: decodeErr, toolId: "collage" }, "Decode failed");
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(
+                decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+              ),
             });
           }
         }
       }
-      if (validation.format === "svg") {
+      if (validation.format === "svg" || fallbackFormat === "svg") {
         try {
           file.buffer = decompressSvgz(file.buffer);
           file.buffer = sanitizeSvg(file.buffer);
         } catch (err) {
-          return reply.status(400).send({
-            error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
-          });
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
+            });
+          }
+          throw asDecoderOutOfMemory(err);
         }
+      } else {
+        file.buffer = await autoOrient(file.buffer);
       }
-      file.buffer = await autoOrient(file.buffer);
     }
 
     let settings: z.infer<typeof settingsSchema>;
@@ -572,128 +612,143 @@ export function registerCollage(app: FastifyInstance) {
       const composites: OverlayOptions[] = [];
       const cellSettings = settings.cells ?? [];
 
-      for (let i = 0; i < cellRects.length && i < files.length; i++) {
+      for (let i = 0; i < cellRects.length; i++) {
+        const cellSetting = cellSettings[i] ?? {
+          imageIndex: i,
+          panX: 0,
+          panY: 0,
+          zoom: 1,
+          objectFit: "cover",
+        };
+        const file = cellSetting.imageIndex >= 0 ? files[cellSetting.imageIndex] : undefined;
+        if (!file) continue;
+
         const rect = cellRects[i];
         const cellW = Math.max(1, Math.round(rect.w));
         const cellH = Math.max(1, Math.round(rect.h));
-        const cellSetting = cellSettings[i] ?? { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
-
-        // Get image metadata for proper crop calculation
-        const meta = await sharp(files[i].buffer).metadata();
-        if (!meta.width || !meta.height) {
-          // Falling back to the cell's own size would fill-stretch the image
-          // to the cell aspect: silent distortion instead of an error (#718).
-          throw new InputValidationError(
-            `Could not read image dimensions for "${files[i].filename}"`,
-          );
-        }
-        const imgW = meta.width;
-        const imgH = meta.height;
 
         const zoom = Math.max(1, cellSetting.zoom);
         const fitMode = cellSetting.objectFit ?? "cover";
 
         let cellBuffer: Buffer;
 
-        if (fitMode === "contain") {
-          // Contain: fit entire image inside the cell, fill rest with background
-          const bgColor =
-            settings.backgroundColor === "transparent"
-              ? { r: 0, g: 0, b: 0, alpha: 0 }
-              : (() => {
-                  const hex = settings.backgroundColor.replace("#", "");
-                  return {
-                    r: Number.parseInt(hex.substring(0, 2), 16),
-                    g: Number.parseInt(hex.substring(2, 4), 16),
-                    b: Number.parseInt(hex.substring(4, 6), 16),
-                    alpha: 1,
-                  };
-                })();
+        try {
+          // Get image metadata for proper crop calculation
+          const meta = await sharp(file.buffer).metadata();
+          if (!meta.width || !meta.height) {
+            // Falling back to the cell's own size would fill-stretch the image
+            // to the cell aspect: silent distortion instead of an error (#718).
+            throw new InputValidationError(
+              `Could not read image dimensions for "${file.filename}"`,
+            );
+          }
+          const imgW = meta.width;
+          const imgH = meta.height;
 
-          // The preview renders contain cells as object-contain plus
-          // `translate(panX%, panY%) scale(zoom)` clipped at the cell (#711).
-          // Pan is a fraction of the cell, and neither offset scales with zoom.
-          const panXPx = Math.round((cellSetting.panX / 100) * cellW);
-          const panYPx = Math.round((cellSetting.panY / 100) * cellH);
+          if (fitMode === "contain") {
+            // Contain: fit entire image inside the cell, fill rest with background
+            const bgColor =
+              settings.backgroundColor === "transparent"
+                ? { r: 0, g: 0, b: 0, alpha: 0 }
+                : (() => {
+                    const hex = settings.backgroundColor.replace("#", "");
+                    return {
+                      r: Number.parseInt(hex.substring(0, 2), 16),
+                      g: Number.parseInt(hex.substring(2, 4), 16),
+                      b: Number.parseInt(hex.substring(4, 6), 16),
+                      alpha: 1,
+                    };
+                  })();
 
-          if (zoom === 1 && panXPx === 0 && panYPx === 0) {
+            // The preview renders contain cells as object-contain plus
+            // `translate(panX%, panY%) scale(zoom)` clipped at the cell (#711).
+            // Pan is a fraction of the cell, and neither offset scales with zoom.
+            const panXPx = Math.round((cellSetting.panX / 100) * cellW);
+            const panYPx = Math.round((cellSetting.panY / 100) * cellH);
+
+            if (zoom === 1 && panXPx === 0 && panYPx === 0) {
+              // PNG, not the input format: a JPEG cell buffer cannot carry the
+              // alpha the cornerRadius mask cuts, so corners flatten to black.
+              cellBuffer = await sharp(file.buffer)
+                .resize(cellW, cellH, { fit: "contain", background: bgColor })
+                .png()
+                .toBuffer();
+            } else {
+              // Chaining a zoom resize into the contain resize does not work:
+              // Sharp keeps one set of resize options per pipeline, and even as
+              // two pipelines the contain step would scale the zoom right back
+              // out. Scale the contain-fitted image, place it about the cell
+              // centre, clip to the cell and composite over the background.
+              const fitScale = Math.min(cellW / imgW, cellH / imgH);
+              const contentW = Math.max(1, Math.round(imgW * fitScale * zoom));
+              const contentH = Math.max(1, Math.round(imgH * fitScale * zoom));
+              // floor, not round: sharp's own contain places content at
+              // floor((cell - content) / 2), and matching it keeps the two
+              // paths from drifting a pixel apart when the difference is odd.
+              const x0 = Math.floor((cellW - contentW) / 2) + panXPx;
+              const y0 = Math.floor((cellH - contentH) / 2) + panYPx;
+
+              const visLeft = Math.max(0, x0);
+              const visTop = Math.max(0, y0);
+              const visRight = Math.min(cellW, x0 + contentW);
+              const visBottom = Math.min(cellH, y0 + contentH);
+
+              const canvas = sharp({
+                create: { width: cellW, height: cellH, channels: 4, background: bgColor },
+              });
+
+              if (visRight <= visLeft || visBottom <= visTop) {
+                // Panned entirely out of the cell: background only.
+                cellBuffer = await canvas.png().toBuffer();
+              } else {
+                // PNG, so the cell is not re-encoded in its own input's container
+                // on the way to the canvas (#1190).
+                const visible = await sharp(file.buffer)
+                  .resize(contentW, contentH, { fit: "fill" })
+                  .extract({
+                    left: visLeft - x0,
+                    top: visTop - y0,
+                    width: visRight - visLeft,
+                    height: visBottom - visTop,
+                  })
+                  .png()
+                  .toBuffer();
+                cellBuffer = await canvas
+                  .composite([{ input: visible, left: visLeft, top: visTop }])
+                  .png()
+                  .toBuffer();
+              }
+            }
+          } else {
+            // Cover: resize to fully fill the cell, then crop with pan offset
+            const scaleToFit = Math.max(cellW / imgW, cellH / imgH);
+            const resizedW = Math.round(imgW * scaleToFit * zoom);
+            const resizedH = Math.round(imgH * scaleToFit * zoom);
+
+            const overflowX = Math.max(0, resizedW - cellW);
+            const overflowY = Math.max(0, resizedH - cellH);
+            const extractLeft = Math.round(
+              overflowX / 2 - (cellSetting.panX / 100) * (overflowX / 2),
+            );
+            const extractTop = Math.round(
+              overflowY / 2 - (cellSetting.panY / 100) * (overflowY / 2),
+            );
+
             // PNG, not the input format: a JPEG cell buffer cannot carry the
             // alpha the cornerRadius mask cuts, so corners flatten to black.
-            cellBuffer = await sharp(files[i].buffer)
-              .resize(cellW, cellH, { fit: "contain", background: bgColor })
+            cellBuffer = await sharp(file.buffer)
+              .resize(resizedW, resizedH, { fit: "fill" })
+              .extract({
+                left: Math.max(0, Math.min(extractLeft, resizedW - cellW)),
+                top: Math.max(0, Math.min(extractTop, resizedH - cellH)),
+                width: cellW,
+                height: cellH,
+              })
               .png()
               .toBuffer();
-          } else {
-            // Chaining a zoom resize into the contain resize does not work:
-            // Sharp keeps one set of resize options per pipeline, and even as
-            // two pipelines the contain step would scale the zoom right back
-            // out. Scale the contain-fitted image, place it about the cell
-            // centre, clip to the cell and composite over the background.
-            const fitScale = Math.min(cellW / imgW, cellH / imgH);
-            const contentW = Math.max(1, Math.round(imgW * fitScale * zoom));
-            const contentH = Math.max(1, Math.round(imgH * fitScale * zoom));
-            // floor, not round: sharp's own contain places content at
-            // floor((cell - content) / 2), and matching it keeps the two
-            // paths from drifting a pixel apart when the difference is odd.
-            const x0 = Math.floor((cellW - contentW) / 2) + panXPx;
-            const y0 = Math.floor((cellH - contentH) / 2) + panYPx;
-
-            const visLeft = Math.max(0, x0);
-            const visTop = Math.max(0, y0);
-            const visRight = Math.min(cellW, x0 + contentW);
-            const visBottom = Math.min(cellH, y0 + contentH);
-
-            const canvas = sharp({
-              create: { width: cellW, height: cellH, channels: 4, background: bgColor },
-            });
-
-            if (visRight <= visLeft || visBottom <= visTop) {
-              // Panned entirely out of the cell: background only.
-              cellBuffer = await canvas.png().toBuffer();
-            } else {
-              // PNG, so the cell is not re-encoded in its own input's container
-              // on the way to the canvas (#1190).
-              const visible = await sharp(files[i].buffer)
-                .resize(contentW, contentH, { fit: "fill" })
-                .extract({
-                  left: visLeft - x0,
-                  top: visTop - y0,
-                  width: visRight - visLeft,
-                  height: visBottom - visTop,
-                })
-                .png()
-                .toBuffer();
-              cellBuffer = await canvas
-                .composite([{ input: visible, left: visLeft, top: visTop }])
-                .png()
-                .toBuffer();
-            }
           }
-        } else {
-          // Cover: resize to fully fill the cell, then crop with pan offset
-          const scaleToFit = Math.max(cellW / imgW, cellH / imgH);
-          const resizedW = Math.round(imgW * scaleToFit * zoom);
-          const resizedH = Math.round(imgH * scaleToFit * zoom);
-
-          const overflowX = Math.max(0, resizedW - cellW);
-          const overflowY = Math.max(0, resizedH - cellH);
-          const extractLeft = Math.round(
-            overflowX / 2 - (cellSetting.panX / 100) * (overflowX / 2),
-          );
-          const extractTop = Math.round(overflowY / 2 - (cellSetting.panY / 100) * (overflowY / 2));
-
-          // PNG, not the input format: a JPEG cell buffer cannot carry the
-          // alpha the cornerRadius mask cuts, so corners flatten to black.
-          cellBuffer = await sharp(files[i].buffer)
-            .resize(resizedW, resizedH, { fit: "fill" })
-            .extract({
-              left: Math.max(0, Math.min(extractLeft, resizedW - cellW)),
-              top: Math.max(0, Math.min(extractTop, resizedH - cellH)),
-              width: cellW,
-              height: cellH,
-            })
-            .png()
-            .toBuffer();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(file.buffer, err);
         }
 
         // Apply corner radius via SVG mask if needed
@@ -720,6 +775,12 @@ export function registerCollage(app: FastifyInstance) {
           top: Math.round(rect.y),
           left: Math.round(rect.x),
         });
+      }
+
+      if (composites.length === 0) {
+        return reply
+          .status(400)
+          .send({ error: "At least one cell must reference a provided image" });
       }
 
       // Create canvas and composite
@@ -773,13 +834,14 @@ export function registerCollage(app: FastifyInstance) {
         processedSize: finalBuffer.length,
       });
     } catch (err) {
-      if (err instanceof InputValidationError) {
-        // Genuine bad input (e.g. an image whose dimensions won't decode). The
-        // 422 here is the documented worker-error convention, not the factory's
-        // 400 (see #718); keep it.
+      if (err instanceof InputValidationError || isToolInputError(err)) {
+        // Genuine bad input (e.g. an image whose dimensions or pixels won't
+        // decode). The 422 here is the documented worker-error convention, not
+        // the factory's 400 (see #718); keep it.
+        request.log?.warn({ err, toolId: "collage" }, "Collage creation failed");
         return reply.status(422).send({
           error: "Collage creation failed",
-          details: err.message,
+          details: stripInternalPaths(err.message),
         });
       }
       // Everything else is infrastructure, not the user's images: a storage

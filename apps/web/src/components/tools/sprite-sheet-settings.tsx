@@ -1,14 +1,19 @@
-import { Check, ClipboardCopy } from "lucide-react";
+import { Check, ClipboardCopy, X } from "lucide-react";
 import { useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format as formatMessage } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 type OutputFormat = "png" | "webp" | "jpeg";
+type ExportKind = "css" | "json";
+/** Which export was copied last, and whether it reached the clipboard. */
+type ExportCopy = { kind: ExportKind; ok: boolean };
 
 interface Frame {
   index: number;
@@ -29,7 +34,14 @@ export function SpriteSheetSettings() {
   const [background, setBackground] = useState("#ffffff");
   const [format, setFormat] = useState<OutputFormat>("png");
   const [quality, setQuality] = useState(90);
-  const [copiedExport, setCopiedExport] = useState<"css" | "json" | null>(null);
+  const [exportCopy, setExportCopy] = useState<ExportCopy | null>(null);
+  // The copy state lives here, so its reset does too: a re-run unmounts SpriteOutput
+  // but not this panel, and a reset owned by the child would leave it stuck.
+  const later = useTimeouts();
+  const flashCopy = (kind: ExportKind, ok: boolean) => {
+    setExportCopy({ kind, ok });
+    later(() => setExportCopy(null), 1500, "exportCopy");
+  };
 
   const handleProcess = () => {
     const settings = { columns, padding, background, format, quality };
@@ -179,12 +191,12 @@ export function SpriteSheetSettings() {
       {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="sprite-sheet-download" />}
 
       {/* Coordinate map output */}
-      {Array.isArray(resultPayload?.frames) && (
+      {downloadUrl && Array.isArray(resultPayload?.frames) && (
         <SpriteOutput
           payload={resultPayload}
           format={format}
-          copiedExport={copiedExport}
-          setCopiedExport={setCopiedExport}
+          exportCopy={exportCopy}
+          onCopy={flashCopy}
         />
       )}
     </form>
@@ -194,13 +206,13 @@ export function SpriteSheetSettings() {
 function SpriteOutput({
   payload,
   format,
-  copiedExport,
-  setCopiedExport,
+  exportCopy,
+  onCopy,
 }: {
   payload: Record<string, unknown>;
   format: OutputFormat;
-  copiedExport: "css" | "json" | null;
-  setCopiedExport: (v: "css" | "json" | null) => void;
+  exportCopy: ExportCopy | null;
+  onCopy: (kind: ExportKind, ok: boolean) => void;
 }) {
   const { t } = useTranslation();
   const frames = payload.frames as Frame[];
@@ -221,11 +233,7 @@ function SpriteOutput({
           `.sprite-${f.index} {\n  width: ${f.width}px;\n  height: ${f.height}px;\n  background-position: -${f.left}px -${f.top}px;\n}`,
       )
       .join("\n");
-    const ok = await copyToClipboard(`${base}\n${rules}`);
-    if (ok) {
-      setCopiedExport("css");
-      setTimeout(() => setCopiedExport(null), 1500);
-    }
+    onCopy("css", await copyToClipboard(`${base}\n${rules}`));
   };
 
   const copyJson = async () => {
@@ -236,11 +244,19 @@ function SpriteOutput({
         2,
       ),
     );
-    if (ok) {
-      setCopiedExport("json");
-      setTimeout(() => setCopiedExport(null), 1500);
-    }
+    onCopy("json", ok);
   };
+
+  const copyIcon = (kind: ExportKind) =>
+    exportCopy?.kind !== kind ? (
+      <ClipboardCopy className="h-3 w-3" />
+    ) : exportCopy.ok ? (
+      <Check className="h-3 w-3 text-success-ink" />
+    ) : (
+      <X className="h-3 w-3 text-destructive" />
+    );
+  const copyTitle = (kind: ExportKind) =>
+    exportCopy?.kind === kind && !exportCopy.ok ? t.common.copyFailed : undefined;
 
   return (
     <div className="space-y-3 pt-2 border-t border-border" data-testid="sprite-sheet-output">
@@ -260,12 +276,9 @@ function SpriteOutput({
           onClick={copyCss}
           className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
           data-testid="sprite-sheet-copy-css"
+          title={copyTitle("css")}
         >
-          {copiedExport === "css" ? (
-            <Check className="h-3 w-3 text-success-ink" />
-          ) : (
-            <ClipboardCopy className="h-3 w-3" />
-          )}
+          {copyIcon("css")}
           {t.toolSettings["sprite-sheet"].copyCss}
         </button>
         <button
@@ -273,14 +286,12 @@ function SpriteOutput({
           onClick={copyJson}
           className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
           data-testid="sprite-sheet-copy-json"
+          title={copyTitle("json")}
         >
-          {copiedExport === "json" ? (
-            <Check className="h-3 w-3 text-success-ink" />
-          ) : (
-            <ClipboardCopy className="h-3 w-3" />
-          )}
+          {copyIcon("json")}
           {t.toolSettings["sprite-sheet"].copyJson}
         </button>
+        <CopyFeedback key={exportCopy?.kind} status={exportCopy} />
       </div>
     </div>
   );

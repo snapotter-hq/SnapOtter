@@ -30,7 +30,7 @@ export function registerRemovePages(app: FastifyInstance) {
       await writeFile(inPath, input.buffer);
 
       ctx.report(10, "Analyzing pages");
-      const total = await qpdfPageCount(inPath);
+      const total = await qpdfPageCount(inPath, { signal: ctx.signal });
       const removeSet = parsePageSpec(settings.pages, total);
 
       // Build the keep list: all pages NOT in the remove set
@@ -48,7 +48,7 @@ export function registerRemovePages(app: FastifyInstance) {
       const keepSpec = compressPageRuns(keepPages);
       const outPath = join(ctx.scratchDir, `${base}_removed.pdf`);
       ctx.report(30, "Removing pages");
-      await qpdfPagesSpecUnchecked(inPath, keepSpec, outPath);
+      await qpdfPagesSpecUnchecked(inPath, keepSpec, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

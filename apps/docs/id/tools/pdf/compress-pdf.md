@@ -1,6 +1,6 @@
 ---
 description: "Perkecil ukuran file PDF dengan mengompresi gambar yang tertanam."
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: 3e03cf496906
 ---

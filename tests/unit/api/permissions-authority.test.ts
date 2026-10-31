@@ -206,6 +206,26 @@ describe("hasToolAccess for custom category-mode roles", () => {
     });
     expect(await hasToolAccess("photographer", "no-such-tool")).toBe(false);
   });
+
+  it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+    "resolves legacy alias %s to adjust-colors in category mode (#2858)",
+    async (aliasId) => {
+      const { hasToolAccess } = await loadPermissions({
+        customRoles: [
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "category", allowed: ["image"] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "category", allowed: ["video"] },
+          },
+        ],
+      });
+      expect(await hasToolAccess("photographer", aliasId)).toBe(true);
+      expect(await hasToolAccess("videographer", aliasId)).toBe(false);
+    },
+  );
 });
 
 // ── hasToolAccess: custom role, tool mode (enterprise gated) ─────────
@@ -244,6 +264,37 @@ describe("hasToolAccess for custom tool-mode roles", () => {
     });
     expect(await hasToolAccess("restricted", "resize")).toBe(false);
   });
+
+  it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+    "resolves legacy alias %s to adjust-colors when per_tool_permissions IS enforced (#2858)",
+    async (aliasId) => {
+      const { hasToolAccess } = await loadPermissions({
+        perToolEnforced: true,
+        customRoles: [
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: ["adjust-colors"] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: ["crop"] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: [aliasId] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: [aliasId] },
+          },
+        ],
+      });
+      expect(await hasToolAccess("color-editor", aliasId)).toBe(true);
+      expect(await hasToolAccess("crop-only", aliasId)).toBe(false);
+      expect(await hasToolAccess("alias-only", aliasId)).toBe(true);
+      expect(await hasToolAccess("alias-only", "adjust-colors")).toBe(false);
+    },
+  );
 
   it("treats tool restrictions as unrestricted when the enterprise import throws", async () => {
     // isPerToolPermissionEnforced catch => fail-closed to "not enforced", which
@@ -419,6 +470,92 @@ describe("tool-scope containment (canGrantRoleDefinition)", () => {
     expect(ok).toBe(true);
     // Admin resolves from ROLE_PERMISSIONS, so no DB lookup.
     expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it("category and tool actors contain adjust-colors legacy alias targets without escalating alias-only actors (#2858)", async () => {
+    const { canGrantRoleDefinition } = await loadPermissions({
+      perToolEnforced: true,
+      customRoles: [
+        { permissions: ["tools:use"], toolPermissions: { mode: "category", allowed: ["image"] } },
+        { permissions: ["tools:use"], toolPermissions: { mode: "category", allowed: ["video"] } },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["adjust-colors"] },
+        },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["brightness-contrast"] },
+        },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["brightness-contrast"] },
+        },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["brightness-contrast"] },
+        },
+      ],
+    });
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "image-category-actor", id: "a1" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast", "saturation"],
+        },
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "video-category-actor", id: "a2" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast"],
+        },
+      ),
+    ).toBe(false);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "adjust-colors-actor", id: "a3" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast", "color-effects"],
+        },
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "alias-only-actor", id: "a4" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast"],
+        },
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "alias-only-actor", id: "a4" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["saturation"],
+        },
+      ),
+    ).toBe(false);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "alias-only-actor", id: "a4" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["adjust-colors"],
+        },
+      ),
+    ).toBe(false);
   });
 });
 
@@ -669,5 +806,150 @@ describe("requireToolAccess guard", () => {
     const { reply } = makeMockReply();
     const result = await requireToolAccess({} as never, reply as never, "resize");
     expect(result).toEqual(user);
+  });
+});
+
+// ── Custom query runner + DB error propagation (#2672) ───────────────
+
+describe("custom query runner and database error propagation (#2672)", () => {
+  it("uses the provided conn runner instead of top-level db.select for custom role lookups", async () => {
+    const {
+      canAssignRole,
+      canGrantRoleDefinition,
+      canManageRoleDefinition,
+      canManageTargetRole,
+      getEffectivePermissions,
+      getPermissions,
+      hasEffectivePermission,
+      hasEffectiveToolAccess,
+      hasPermission,
+      hasToolAccess,
+      permissionsNotHeldBy,
+    } = await loadPermissions();
+
+    const txSelect = vi.fn(() =>
+      selectChain([
+        {
+          permissions: ["tools:use", "users:manage", "security:manage"],
+          toolPermissions: { mode: "category", allowed: ["image"] },
+        },
+      ]),
+    );
+    const txConn = { select: txSelect } as never;
+    const customActor = makeUser({ role: "custom-manager", id: "u-mgr" });
+
+    expect(await getPermissions("custom-manager", txConn)).toEqual([
+      "tools:use",
+      "users:manage",
+      "security:manage",
+    ]);
+    expect(await hasPermission("custom-manager", "users:manage", txConn)).toBe(true);
+    expect(await hasEffectivePermission(customActor, "users:manage", txConn)).toBe(true);
+    expect(await getEffectivePermissions(customActor, txConn)).toEqual([
+      "tools:use",
+      "users:manage",
+      "security:manage",
+    ]);
+    expect(await permissionsNotHeldBy(customActor, ["tools:use", "files:all"], txConn)).toEqual([
+      "files:all",
+    ]);
+    expect(
+      await canManageRoleDefinition(
+        customActor,
+        "subordinate",
+        ["tools:use"],
+        { mode: "category", allowed: ["image"] },
+        txConn,
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        customActor,
+        ["tools:use"],
+        { mode: "category", allowed: ["image"] },
+        txConn,
+      ),
+    ).toBe(true);
+    expect(await canAssignRole(customActor, "custom-manager", txConn)).toBe(true);
+    expect(await canManageTargetRole(customActor, "custom-manager", txConn)).toBe(true);
+    expect(await hasToolAccess("custom-manager", "resize", txConn)).toBe(true);
+    expect(await hasEffectiveToolAccess(customActor, "resize", txConn)).toBe(true);
+
+    expect(selectMock).not.toHaveBeenCalled();
+    expect(txSelect).toHaveBeenCalled();
+  });
+
+  it("propagates database errors from custom-role lookups instead of returning null/false (#2672)", async () => {
+    const {
+      canAssignRole,
+      canGrantRoleDefinition,
+      canManageRoleDefinition,
+      canManageTargetRole,
+      getEffectivePermissions,
+      getPermissions,
+      hasEffectivePermission,
+      hasEffectiveToolAccess,
+      hasPermission,
+      hasToolAccess,
+      permissionsNotHeldBy,
+    } = await loadPermissions();
+
+    const dbError = new Error("connection terminated unexpectedly");
+    const failingConn = {
+      select: vi.fn(() => ({
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.reject(dbError),
+          }),
+        }),
+      })),
+    } as never;
+    const customActor = makeUser({ role: "custom-manager", id: "u-mgr" });
+
+    // Default conn = db also propagates DB errors when selectMock rejects.
+    selectMock.mockReturnValueOnce({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.reject(dbError),
+        }),
+      }),
+    });
+    await expect(getPermissions("custom-manager")).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+
+    await expect(getPermissions("custom-manager", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(hasPermission("custom-manager", "users:manage", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(hasEffectivePermission(customActor, "users:manage", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(getEffectivePermissions(customActor, failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(permissionsNotHeldBy(customActor, ["tools:use"], failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(canAssignRole(customActor, "subordinate", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(canManageTargetRole(customActor, "subordinate", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(
+      canManageRoleDefinition(customActor, "sub", ["tools:use"], null, failingConn),
+    ).rejects.toThrow("connection terminated unexpectedly");
+    await expect(
+      canGrantRoleDefinition(customActor, ["tools:use"], null, failingConn),
+    ).rejects.toThrow("connection terminated unexpectedly");
+    await expect(hasToolAccess("custom-manager", "resize", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(hasEffectiveToolAccess(customActor, "resize", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
   });
 });

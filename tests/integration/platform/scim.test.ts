@@ -1,12 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { hashPassword, verifyPassword } from "../../../apps/api/src/plugins/auth.js";
-import { raceInserts, raceUpdates } from "../../helpers/pg-race.js";
-import { buildTestApp, type TestApp } from "../test-server.js";
+import { ANONYMOUS_USER_ID } from "../../../apps/api/src/lib/anonymous-user.js";
+import {
+  computeKeyPrefix,
+  ensureAnonymousUser,
+  hashPassword,
+  verifyPassword,
+} from "../../../apps/api/src/plugins/auth.js";
+import { raceInserts, raceRowLocks, waitForLockWaiters } from "../../helpers/pg-race.js";
+import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
-let testApp: TestApp;
 const SCIM_TOKEN = `so_scim_v2_${"a".repeat(64)}`;
 const ADMIN_PERMISSIONS = [
   "tools:use",
@@ -28,22 +33,24 @@ const ADMIN_PERMISSIONS = [
   "security:manage",
 ];
 
-beforeAll(async () => {
-  testApp = await buildTestApp();
-
-  // Set up a SCIM token hash in the settings table
-  const tokenHash = await hashPassword(SCIM_TOKEN);
-  await db
-    .insert(schema.settings)
-    .values({ key: "scim_token_hash", value: tokenHash })
-    .onConflictDoNothing();
-}, 30_000);
-
-afterAll(async () => {
-  await testApp.cleanup();
-}, 10_000);
-
 describe("SCIM 2.0 provisioning", () => {
+  let testApp: TestApp;
+
+  beforeAll(async () => {
+    testApp = await buildTestApp();
+
+    // Set up a SCIM token hash in the settings table
+    const tokenHash = await hashPassword(SCIM_TOKEN);
+    await db
+      .insert(schema.settings)
+      .values({ key: "scim_token_hash", value: tokenHash })
+      .onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await testApp.cleanup();
+  });
+
   // ── Discovery (no auth required) ───────────────────────────────
 
   describe("discovery endpoints", () => {
@@ -227,6 +234,69 @@ describe("SCIM 2.0 provisioning", () => {
           .update(schema.settings)
           .set({ value: currentHash })
           .where(eq(schema.settings.key, "scim_token_hash"));
+      }
+    });
+
+    it("returns 401 SCIM not configured when scim_token_hash is absent or empty", async () => {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
+      try {
+        const absentRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/scim/v2/Users",
+          headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+        });
+
+        expect(absentRes.statusCode).toBe(401);
+        expect(JSON.parse(absentRes.body)).toEqual({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+          status: 401,
+          detail: "SCIM not configured",
+        });
+
+        await db.insert(schema.settings).values({ key: "scim_token_hash", value: "" });
+        const emptyRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/scim/v2/Users",
+          headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+        });
+
+        expect(emptyRes.statusCode).toBe(401);
+        expect(JSON.parse(emptyRes.body)).toEqual({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+          status: 401,
+          detail: "SCIM not configured",
+        });
+      } finally {
+        const currentHash = await hashPassword(SCIM_TOKEN);
+        await db
+          .insert(schema.settings)
+          .values({ key: "scim_token_hash", value: currentHash })
+          .onConflictDoUpdate({
+            target: schema.settings.key,
+            set: { value: currentHash },
+          });
+      }
+    });
+
+    it("returns 500 SCIM error instead of 401 when reading scim_token_hash throws (#2915)", async () => {
+      const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+        throw new Error("connection terminated unexpectedly");
+      });
+      try {
+        const res = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/scim/v2/Users",
+          headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+        });
+
+        expect(res.statusCode).toBe(500);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+          status: 500,
+          detail: "Internal server error",
+        });
+      } finally {
+        selectSpy.mockRestore();
       }
     });
   });
@@ -442,7 +512,7 @@ describe("SCIM global token administration", () => {
       throw new Error(`Failed to create scoped admin API key: ${apiKeyRes.body}`);
     }
     scopedAdminKey = JSON.parse(apiKeyRes.body).key as string;
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
@@ -454,7 +524,20 @@ describe("SCIM global token administration", () => {
     }
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
+
+  it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
+    const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const queue = getQueue("system");
+    try {
+      await vi.waitFor(async () => expect(await queue.getWorkersCount()).toBe(1), {
+        timeout: 1_000,
+        interval: 25,
+      });
+    } finally {
+      await closeQueues();
+    }
+  });
 
   it("denies token issuance to a custom role even when it has every admin permission", async () => {
     const originalHash = "scim-issuance-authorization-sentinel";
@@ -603,6 +686,16 @@ describe("SCIM global token administration", () => {
     });
     expect(listRes.statusCode, listRes.body).toBe(200);
     expect(JSON.parse(listRes.body).Resources).toBeInstanceOf(Array);
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "SETTINGS_UPDATED"))
+      .orderBy(desc(schema.auditLog.createdAt))
+      .limit(1);
+    expect(auditRow?.actorUsername).toBe("admin");
+    expect(auditRow?.actorId).toBeTruthy();
+    expect(auditRow?.details).toMatchObject({ setting: "scim_token" });
   });
 
   it("allows the full built-in admin to revoke a token", async () => {
@@ -627,6 +720,16 @@ describe("SCIM global token administration", () => {
 
     expect(res.statusCode).toBe(204);
     expect(storedToken).toBeUndefined();
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "SETTINGS_UPDATED"))
+      .orderBy(desc(schema.auditLog.createdAt))
+      .limit(1);
+    expect(auditRow?.actorUsername).toBe("admin");
+    expect(auditRow?.actorId).toBeTruthy();
+    expect(auditRow?.details).toMatchObject({ setting: "scim_token", action: "revoked" });
   });
 
   it("keeps repeated user deprovisioning idempotent and recoverable", async () => {
@@ -760,6 +863,22 @@ describe("SCIM global token administration", () => {
         Operations: [{ op: "Replace", value: { active: false } }],
       },
     },
+    // A cased path or key deactivates now (#1731), so it has to meet the
+    // last-admin check too, not slip past it.
+    {
+      method: "PATCH" as const,
+      payload: {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "Replace", path: "Active", value: "False" }],
+      },
+    },
+    {
+      method: "PATCH" as const,
+      payload: {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "Replace", value: { Active: false } }],
+      },
+    },
     {
       method: "DELETE" as const,
       payload: undefined,
@@ -798,7 +917,9 @@ describe("SCIM global token administration", () => {
         .where(eq(schema.users.id, adminBefore.id));
 
       expect.soft(res.statusCode).toBe(409);
-      expect.soft(JSON.parse(res.body)).toMatchObject({
+      // Not a uniqueness conflict, so no scimType (issue #1509).
+      expect.soft(JSON.parse(res.body)).toEqual({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
         status: 409,
         detail: "Cannot deactivate the last active administrator",
       });
@@ -889,13 +1010,13 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         target: schema.settings.key,
         set: { value: tokenHash },
       });
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
     await crudApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   describe("Users create and read", () => {
     it("creates a user with primary email, externalId, and the Default team", async () => {
@@ -929,14 +1050,14 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const row = await userRow(body.id);
       expect(row?.username).toBe(username);
       expect(row?.email).toBe("primary@example.com");
-      expect(row?.externalId).toBe("ext-create-full");
+      expect(row?.scimExternalId).toBe("ext-create-full");
       expect(row?.role).toBe("user");
       expect(row?.team).toBe(DEFAULT_TEAM_ID);
       expect(row?.authProvider).toBe("scim");
     });
 
     it("refuses a second create carrying an already-provisioned externalId with the SCIM 409 envelope", async () => {
-      // Issue #969: only the (auth_provider, external_id) index stops an IdP
+      // Issues #969 and #1510: only the SCIM externalId index stops an IdP
       // retry under a fresh userName from minting a second account for one
       // identity. The insert guard is unqualified so that refusal lands as
       // the pre-check's 409 rather than a 500.
@@ -951,16 +1072,59 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode, res.body).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "User already exists",
+        scimType: "uniqueness",
       });
       const rows = await db
         .select()
         .from(schema.users)
-        .where(eq(schema.users.externalId, externalId));
+        .where(eq(schema.users.scimExternalId, externalId));
       expect(rows.map((r) => r.id)).toEqual([first.id]);
+    });
+
+    it("stores a blank externalId as NULL so blank creates don't collide on the identity index", async () => {
+      // Issue #1008: "" is not NULL, so the externalId unique index treated
+      // every blank externalId as one shared identity and refused the second
+      // create with a 409.
+      const ids: string[] = [];
+      for (const externalId of ["", "   "]) {
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: { userName: uniqueName("scim-blank-ext"), externalId },
+        });
+        expect(res.statusCode, res.body).toBe(201);
+        const body = JSON.parse(res.body);
+        expect(body).not.toHaveProperty("externalId");
+        ids.push(body.id);
+      }
+      // A third blank create after the whitespace one still has to succeed.
+      ids.push(
+        (await createScimUser({ userName: uniqueName("scim-blank-ext"), externalId: "" })).id,
+      );
+
+      for (const id of ids) {
+        expect((await userRow(id))?.scimExternalId).toBeNull();
+      }
+    });
+
+    it("stores a padded non-blank externalId verbatim so the eq filter still finds it", async () => {
+      const externalId = ` ${uniqueName("scim-pad-ext")} `;
+      const { id } = await createScimUser({ userName: uniqueName("scim-pad"), externalId });
+
+      expect((await userRow(id))?.scimExternalId).toBe(externalId);
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        query: { filter: `externalId eq "${externalId}"` },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).Resources.map((r: { id: string }) => r.id)).toEqual([id]);
     });
 
     it("creates a disabled user when active is false and falls back to the first email", async () => {
@@ -988,6 +1152,62 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.passwordHash).toBeNull();
     });
 
+    it("skips blank email entries on create and stores NULL when all email values are blank (#3168)", async () => {
+      const blankPrimary = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        payload: {
+          userName: uniqueName("scim-post-blank-primary-email"),
+          emails: [{ value: "   ", primary: true }, { value: "fallback@example.com" }],
+        },
+      });
+      expect(blankPrimary.statusCode, blankPrimary.body).toBe(201);
+      const blankPrimaryBody = JSON.parse(blankPrimary.body);
+      expect(blankPrimaryBody.emails).toEqual([{ value: "fallback@example.com", primary: true }]);
+      expect((await userRow(blankPrimaryBody.id))?.email).toBe("fallback@example.com");
+
+      const laterPrimary = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        payload: {
+          userName: uniqueName("scim-post-later-primary-email"),
+          emails: [
+            { value: "   ", primary: true },
+            { value: "secondary@example.com" },
+            { value: "real-primary@example.com", primary: true },
+          ],
+        },
+      });
+      expect(laterPrimary.statusCode, laterPrimary.body).toBe(201);
+      const laterPrimaryBody = JSON.parse(laterPrimary.body);
+      expect(laterPrimaryBody.emails).toEqual([
+        { value: "real-primary@example.com", primary: true },
+      ]);
+      expect((await userRow(laterPrimaryBody.id))?.email).toBe("real-primary@example.com");
+
+      for (const emails of [
+        [{ value: "" }],
+        [{ value: "   ", primary: true }],
+        [{ value: "" }, { value: "\t\n" }],
+      ]) {
+        const allBlank = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: {
+            userName: uniqueName("scim-post-all-blank-email"),
+            emails,
+          },
+        });
+        expect(allBlank.statusCode, allBlank.body).toBe(201);
+        const allBlankBody = JSON.parse(allBlank.body);
+        expect(allBlankBody.emails).toEqual([]);
+        expect((await userRow(allBlankBody.id))?.email).toBeNull();
+      }
+    });
+
     it("rejects creation without a userName using the SCIM 400 envelope", async () => {
       const res = await crudApp.app.inject({
         method: "POST",
@@ -1003,6 +1223,59 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         detail: "userName is required",
       });
     });
+
+    it.each(["", "   ", "\t\n"])(
+      "rejects creation with an empty or whitespace-only userName (%j) using a 400 invalidValue SCIM error (#2639)",
+      async (userName) => {
+        const externalId = uniqueName("scim-post-blank-un");
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: { userName, externalId, active: true },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName is required",
+        });
+
+        const rows = await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.scimExternalId, externalId));
+        expect(rows).toHaveLength(0);
+      },
+    );
+
+    it.each(["anonymous", "Anonymous", "ANONYMOUS"])(
+      "rejects creation with reserved userName '%s' using a 400 invalidValue SCIM error (#2469)",
+      async (userName) => {
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: { userName, active: true },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName 'anonymous' is reserved",
+        });
+
+        const rows = await db
+          .select()
+          .from(schema.users)
+          .where(sql`lower(${schema.users.username}) = 'anonymous'`);
+        expect(rows).toHaveLength(0);
+      },
+    );
 
     it("concurrent duplicate creates return one 201 and one SCIM 409, never 500", async () => {
       // Issue #927: IdP provisioning retries can race. Requests that pass
@@ -1023,10 +1296,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(statuses).toEqual([201, 409]);
 
       const conflict = results.find((r) => r.statusCode === 409);
-      expect(JSON.parse(conflict?.body ?? "{}")).toMatchObject({
+      expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "User already exists",
+        scimType: "uniqueness",
       });
 
       const rows = await db.select().from(schema.users).where(eq(schema.users.username, userName));
@@ -1043,10 +1317,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "User already exists",
+        scimType: "uniqueness",
       });
     });
 
@@ -1233,14 +1508,65 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "userName already taken",
+        scimType: "uniqueness",
       });
       const row = await userRow(victim.id);
       expect(row?.username).toBe(victim.userName);
     });
+
+    it.each(["", "   ", "\t\n"])(
+      "rejects a PUT with an empty or whitespace-only userName (%j) with 400 invalidValue and leaves the row unchanged (#2639)",
+      async (userName) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-put-blank-un") });
+
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: { userName, active: false },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName must not be empty",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.username).toBe(victim.userName);
+        expect(row?.role).toBe("user");
+      },
+    );
+
+    it.each(["anonymous", "Anonymous", "ANONYMOUS"])(
+      "rejects a PUT rename onto reserved userName '%s' with 400 invalidValue and leaves the row unchanged (#2469)",
+      async (reserved) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-put-anon") });
+
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: { userName: reserved, active: false },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName 'anonymous' is reserved",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.username).toBe(victim.userName);
+        expect(row?.role).toBe("user");
+      },
+    );
 
     it("concurrent renames onto one userName return one 200 and one SCIM 409, never 500", async () => {
       // Issue #968: both renames pass the conflict pre-check before either
@@ -1257,21 +1583,79 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           payload: { userName: target, active: true },
         });
 
-      const results = await raceUpdates("users", 2, () =>
+      const results = await raceRowLocks("users", 2, () =>
         Promise.all([rename(a.id), rename(b.id)]),
       );
       const statuses = results.map((r) => r.statusCode).sort();
       expect(statuses).toEqual([200, 409]);
 
       const conflict = results.find((r) => r.statusCode === 409);
-      expect(JSON.parse(conflict?.body ?? "{}")).toMatchObject({
+      expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "userName already taken",
+        scimType: "uniqueness",
       });
 
       const rows = await db.select().from(schema.users).where(eq(schema.users.username, target));
       expect(rows).toHaveLength(1);
+    });
+
+    it("rejects an externalId another user holds with a uniqueness 409 naming externalId", async () => {
+      // Issue #1006: the externalId unique index turns this into a 23505,
+      // which used to come back as "userName already taken".
+      const externalId = uniqueName("scim-put-ext-taken");
+      await createScimUser({ userName: uniqueName("scim-put-ext-holder"), externalId });
+      const victim = await createScimUser({ userName: uniqueName("scim-put-ext-victim") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${victim.id}`,
+        headers: authHeaders(),
+        payload: { userName: victim.userName, externalId, active: true },
+      });
+
+      expect(res.statusCode, res.body).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        scimType: "uniqueness",
+        detail: "externalId already assigned to another user",
+      });
+      const row = await userRow(victim.id);
+      expect(row?.scimExternalId).toBeNull();
+    });
+
+    it("a deactivation that 409s keeps the user's sessions and role", async () => {
+      // Issue #1508: sessions were deleted before the UPDATE, so a 409 left
+      // the user logged out but still active.
+      const externalId = uniqueName("scim-put-deact-ext");
+      await createScimUser({ userName: uniqueName("scim-put-deact-holder"), externalId });
+      const victim = await createScimUser({ userName: uniqueName("scim-put-deact-victim") });
+      await db.insert(schema.sessions).values({
+        id: randomUUID(),
+        userId: victim.id,
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${victim.id}`,
+        headers: authHeaders(),
+        payload: { userName: victim.userName, externalId, active: false },
+      });
+
+      // The detail proves the 409 came from the identity index at the UPDATE,
+      // not the last-admin guard or the userName pre-check.
+      expect(res.statusCode, res.body).toBe(409);
+      expect(JSON.parse(res.body).detail).toBe("externalId already assigned to another user");
+      const row = await userRow(victim.id);
+      expect(row?.role).toBe("user");
+      const sessions = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, victim.id));
+      expect(sessions).toHaveLength(1);
     });
 
     it("replaces userName, externalId, and primary email", async () => {
@@ -1301,8 +1685,119 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
       const row = await userRow(id);
       expect(row?.username).toBe(renamed);
-      expect(row?.externalId).toBe("put-ext-1");
+      expect(row?.scimExternalId).toBe("put-ext-1");
       expect(row?.email).toBe("put-primary@example.com");
+    });
+
+    it.each([
+      ["an empty emails array", []],
+      ["a null emails field", null],
+      ["a blank email entry", [{ value: "" }]],
+      ["a whitespace-only primary email entry", [{ value: "   ", primary: true }]],
+    ] as const)(
+      "clears the stored email to NULL when PUT sends %s, and keeps it when emails is omitted (#3157, #3168)",
+      async (_label, emails) => {
+        const { id, userName } = await createScimUser({
+          userName: uniqueName("scim-put-clear-email"),
+          emails: [{ value: "before-put@example.com", primary: true }],
+        });
+
+        const omitted = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: { userName, active: true },
+        });
+        expect(omitted.statusCode, omitted.body).toBe(200);
+        expect(JSON.parse(omitted.body).emails).toEqual([
+          { value: "before-put@example.com", primary: true },
+        ]);
+        expect((await userRow(id))?.email).toBe("before-put@example.com");
+
+        const cleared = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: { userName, active: true, emails },
+        });
+        expect(cleared.statusCode, cleared.body).toBe(200);
+        expect(JSON.parse(cleared.body).emails).toEqual([]);
+        expect((await userRow(id))?.email).toBeNull();
+      },
+    );
+
+    it("skips a blank primary email entry on PUT and selects the first non-blank address (#3168)", async () => {
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-put-skip-blank-primary"),
+        emails: [{ value: "initial@example.com", primary: true }],
+      });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          userName,
+          active: true,
+          emails: [
+            { value: "" },
+            { value: "   ", primary: true },
+            { value: "put-fallback@example.com" },
+          ],
+        },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).emails).toEqual([
+        { value: "put-fallback@example.com", primary: true },
+      ]);
+      expect((await userRow(id))?.email).toBe("put-fallback@example.com");
+    });
+
+    it("clears externalId to NULL when PUT sends a blank one, for more than one user", async () => {
+      // Issue #1008: a stored "" held the identity index, so the second user
+      // to receive a blank externalId collided with the first.
+      const a = await createScimUser({
+        userName: uniqueName("scim-put-blank-a"),
+        externalId: uniqueName("ext"),
+      });
+      const b = await createScimUser({
+        userName: uniqueName("scim-put-blank-b"),
+        externalId: uniqueName("ext"),
+      });
+
+      for (const [user, externalId] of [
+        [a, ""],
+        [b, ""],
+      ] as const) {
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${user.id}`,
+          headers: authHeaders(),
+          payload: { userName: user.userName, externalId, active: true },
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body)).not.toHaveProperty("externalId");
+        expect((await userRow(user.id))?.scimExternalId).toBeNull();
+      }
+    });
+
+    it("leaves the stored externalId alone when PUT omits it", async () => {
+      const externalId = uniqueName("scim-put-keep-ext");
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-put-keep"),
+        externalId,
+      });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: { userName, active: true },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).externalId).toBe(externalId);
+      expect((await userRow(id))?.scimExternalId).toBe(externalId);
     });
 
     it("deactivation revokes sessions, stores a restorable role, and stays canonical", async () => {
@@ -1348,6 +1843,93 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect.soft(again.statusCode, again.body).toBe(200);
       expect(rowAgain?.role).toBe("disabled:user");
     });
+
+    it("compares userName against the locked row so a concurrent rename before the row lock is overwritten and audited accurately (#3576)", async () => {
+      // 1. User is renamed away from originalName after the pre-transaction SELECT
+      //    and before updateScimUser locks the row; PUT sending originalName must
+      //    still set username back to originalName and log "username" in changes.
+      const originalName = uniqueName("scim-put-lock-orig");
+      const concurrentName = uniqueName("scim-put-lock-concurrent");
+      const user = await createScimUser({ userName: originalName });
+
+      const restoreRes = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: { userName: originalName, active: true },
+          }),
+        (tx) =>
+          tx
+            .update(schema.users)
+            .set({ username: concurrentName })
+            .where(eq(schema.users.id, user.id)),
+      );
+
+      expect(restoreRes.statusCode, restoreRes.body).toBe(200);
+      expect(JSON.parse(restoreRes.body).userName).toBe(originalName);
+      expect((await userRow(user.id))?.username).toBe(originalName);
+
+      const restoreAudits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(restoreAudits).toHaveLength(1);
+      expect(restoreAudits[0]?.details).toEqual({
+        userId: user.id,
+        username: originalName,
+        changes: ["username"],
+      });
+
+      // 2. User is concurrently renamed to targetName after the pre-transaction
+      //    SELECT and before updateScimUser locks the row; PUT sending targetName
+      //    sees the locked row already holds targetName and omits "username" from changes.
+      const targetName = uniqueName("scim-put-lock-target");
+      const sameRes = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: { userName: targetName, externalId: "ext-3576", active: true },
+          }),
+        (tx) =>
+          tx.update(schema.users).set({ username: targetName }).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(sameRes.statusCode, sameRes.body).toBe(200);
+      expect(JSON.parse(sameRes.body).userName).toBe(targetName);
+      expect((await userRow(user.id))?.username).toBe(targetName);
+
+      const allAudits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(allAudits).toHaveLength(2);
+      const secondAudit = allAudits.find(
+        (row) => (row.details as { username?: string })?.username === targetName,
+      );
+      expect(secondAudit?.details).toEqual({
+        userId: user.id,
+        username: targetName,
+        changes: ["externalId"],
+      });
+    });
   });
 
   describe("Users PATCH", () => {
@@ -1388,14 +1970,53 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "userName already taken",
+        scimType: "uniqueness",
       });
       const row = await userRow(victim.id);
       expect(row?.username).toBe(victim.userName);
     });
+
+    it.each([
+      [
+        "path replace",
+        (userName: string) => ({ op: "replace", path: "userName", value: userName }),
+      ],
+      ["path add", (userName: string) => ({ op: "add", path: "USERNAME", value: userName })],
+      ["valueless replace", (userName: string) => ({ op: "replace", value: { userName } })],
+      ["valueless add", (userName: string) => ({ op: "add", value: { USERNAME: userName } })],
+    ])(
+      "rejects a PATCH setting reserved 'anonymous' userName via %s with 400 invalidValue (#2469)",
+      async (_label, makeOp) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-anon") });
+
+        for (const reserved of ["anonymous", "Anonymous", "ANONYMOUS"]) {
+          const res = await crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Users/${victim.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [{ op: "replace", path: "active", value: false }, makeOp(reserved)],
+            },
+          });
+
+          expect(res.statusCode, res.body).toBe(400);
+          expect(JSON.parse(res.body)).toEqual({
+            schemas: [SCIM_ERROR_SCHEMA],
+            status: 400,
+            scimType: "invalidValue",
+            detail: "userName 'anonymous' is reserved",
+          });
+          const row = await userRow(victim.id);
+          expect(row?.username).toBe(victim.userName);
+          expect(row?.role).toBe("user");
+        }
+      },
+    );
 
     it("concurrent PATCH renames onto one userName return one 200 and one SCIM 409", async () => {
       const a = await createScimUser({ userName: uniqueName("scim-patch-race-a") });
@@ -1413,15 +2034,102 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           },
         });
 
-      const results = await raceUpdates("users", 2, () =>
+      const results = await raceRowLocks("users", 2, () =>
         Promise.all([rename(a.id), rename(b.id)]),
       );
       const statuses = results.map((r) => r.statusCode).sort();
       expect(statuses).toEqual([200, 409]);
+      const conflict = results.find((r) => r.statusCode === 409);
+      expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "userName already taken",
+        scimType: "uniqueness",
+      });
 
       const rows = await db.select().from(schema.users).where(eq(schema.users.username, target));
       expect(rows).toHaveLength(1);
     });
+
+    it.each([
+      ["a path replace", (value: string) => ({ op: "replace", path: "externalId", value })],
+      ["a valueless replace", (value: string) => ({ op: "replace", value: { externalId: value } })],
+    ])(
+      "rejects an externalId another user holds via %s with a uniqueness 409",
+      async (_label, op) => {
+        // Issue #1006: same identity-index 23505 as the PUT case.
+        const externalId = uniqueName("scim-patch-ext-taken");
+        await createScimUser({ userName: uniqueName("scim-patch-ext-holder"), externalId });
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-ext-victim") });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [op(externalId)],
+          },
+        });
+
+        expect(res.statusCode, res.body).toBe(409);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 409,
+          scimType: "uniqueness",
+          detail: "externalId already assigned to another user",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.scimExternalId).toBeNull();
+      },
+    );
+
+    it.each([
+      ["externalId", "externalId already assigned to another user"],
+      ["userName", "userName already taken"],
+    ] as const)(
+      "a deactivating PATCH that 409s on %s keeps the user's sessions and role",
+      async (path, detail) => {
+        // Issue #1508: the session delete ran inside the operations loop,
+        // before the UPDATE that then hit the unique index.
+        const externalId = uniqueName("scim-patch-deact-ext");
+        const holder = await createScimUser({
+          userName: uniqueName("scim-patch-deact-holder"),
+          externalId,
+        });
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-deact-victim") });
+        await db.insert(schema.sessions).values({
+          id: randomUUID(),
+          userId: victim.id,
+          expiresAt: new Date(Date.now() + 3_600_000),
+        });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [
+              { op: "replace", path: "active", value: false },
+              { op: "replace", path, value: path === "userName" ? holder.userName : externalId },
+            ],
+          },
+        });
+
+        // The detail proves the 409 came from the unique index at the UPDATE,
+        // not the last-admin guard or a pre-check that runs before any write.
+        expect(res.statusCode, res.body).toBe(409);
+        expect(JSON.parse(res.body).detail).toBe(detail);
+        const row = await userRow(victim.id);
+        expect(row?.role).toBe("user");
+        const sessions = await db
+          .select()
+          .from(schema.sessions)
+          .where(eq(schema.sessions.userId, victim.id));
+        expect(sessions).toHaveLength(1);
+      },
+    );
 
     it("adds an externalId with a mixed-case op name", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-patch-ext") });
@@ -1436,7 +2144,109 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(res.statusCode, res.body).toBe(200);
       expect(JSON.parse(res.body).externalId).toBe("patched-ext");
       const row = await userRow(id);
-      expect(row?.externalId).toBe("patched-ext");
+      expect(row?.scimExternalId).toBe("patched-ext");
+    });
+
+    it("clears externalId to NULL when a PATCH replace sends a blank one, by path or value object", async () => {
+      // Issue #1008: both replace shapes wrote a blank externalId verbatim,
+      // where it held a slot on the identity index like a real value.
+      const a = await createScimUser({
+        userName: uniqueName("scim-patch-blank-a"),
+        externalId: uniqueName("ext"),
+      });
+      const b = await createScimUser({
+        userName: uniqueName("scim-patch-blank-b"),
+        externalId: uniqueName("ext"),
+      });
+
+      const byPath = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${a.id}`,
+        headers: authHeaders(),
+        payload: { Operations: [{ op: "replace", path: "externalId", value: "" }] },
+      });
+      expect(byPath.statusCode, byPath.body).toBe(200);
+      expect(JSON.parse(byPath.body)).not.toHaveProperty("externalId");
+      expect((await userRow(a.id))?.scimExternalId).toBeNull();
+
+      const byValue = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${b.id}`,
+        headers: authHeaders(),
+        payload: { Operations: [{ op: "replace", value: { externalId: " " } }] },
+      });
+      expect(byValue.statusCode, byValue.body).toBe(200);
+      expect(JSON.parse(byValue.body)).not.toHaveProperty("externalId");
+      expect((await userRow(b.id))?.scimExternalId).toBeNull();
+    });
+
+    it("keeps the existing or earlier in-batch externalId when PATCH add sends null or blank (#3168)", async () => {
+      const initialExt = uniqueName("scim-patch-keep-ext");
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-patch-keep-ext-user"),
+        externalId: initialExt,
+      });
+
+      const keepExisting = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          Operations: [
+            { op: "add", path: "externalId", value: "" },
+            { op: "add", path: "externalId", value: "   " },
+            { op: "add", path: "externalId", value: null },
+            { op: "add", value: { userName, externalId: null } },
+            { op: "add", value: { externalId: "" } },
+            { op: "Add", value: { ExternalId: "   " } },
+          ],
+        },
+      });
+      expect(keepExisting.statusCode, keepExisting.body).toBe(200);
+      expect(JSON.parse(keepExisting.body).externalId).toBe(initialExt);
+      expect((await userRow(id))?.scimExternalId).toBe(initialExt);
+
+      const inBatchExt = uniqueName("scim-patch-inbatch-ext");
+      const keepInBatch = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          Operations: [
+            { op: "replace", path: "externalId", value: inBatchExt },
+            { op: "add", path: "externalId", value: "" },
+            { op: "add", value: { externalId: null } },
+          ],
+        },
+      });
+      expect(keepInBatch.statusCode, keepInBatch.body).toBe(200);
+      expect(JSON.parse(keepInBatch.body).externalId).toBe(inBatchExt);
+      expect((await userRow(id))?.scimExternalId).toBe(inBatchExt);
+
+      const bulkAddExt = uniqueName("scim-patch-bulk-add-ext");
+      const bulkAdd = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          Operations: [
+            {
+              op: "add",
+              value: {
+                externalId: bulkAddExt,
+                emails: [{ value: "   ", primary: true }, { value: "bulk-added@example.com" }],
+              },
+            },
+          ],
+        },
+      });
+      expect(bulkAdd.statusCode, bulkAdd.body).toBe(200);
+      const bulkAddBody = JSON.parse(bulkAdd.body);
+      expect(bulkAddBody.externalId).toBe(bulkAddExt);
+      expect(bulkAddBody.emails).toEqual([{ value: "bulk-added@example.com", primary: true }]);
+      const bulkAddRow = await userRow(id);
+      expect(bulkAddRow?.scimExternalId).toBe(bulkAddExt);
+      expect(bulkAddRow?.email).toBe("bulk-added@example.com");
     });
 
     it("updates email via the emails array and the work-email value path", async () => {
@@ -1481,7 +2291,102 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       ]);
     });
 
-    it("treats name.formatted as a no-op and ignores unknown op types", async () => {
+    it.each([
+      ["path emails with []", { op: "replace", path: "emails", value: [] }],
+      ["path emails with null", { op: "replace", path: "emails", value: null }],
+      ["path emails with blank string", { op: "replace", path: "emails", value: "" }],
+      [
+        "path emails with whitespace entry",
+        { op: "replace", path: "emails", value: [{ value: "   ", primary: true }] },
+      ],
+      [
+        'path emails[type eq "work"].value with []',
+        { op: "replace", path: 'emails[type eq "work"].value', value: [] },
+      ],
+      [
+        'path emails[type eq "work"].value with whitespace',
+        { op: "replace", path: 'emails[type eq "work"].value', value: "   " },
+      ],
+      ["path-less value with emails: []", { op: "replace", value: { emails: [] } }],
+      ["path-less value with emails: null", { op: "replace", value: { emails: null } }],
+      [
+        "path-less value with blank email entry",
+        { op: "replace", value: { emails: [{ value: "" }] } },
+      ],
+      ["path-less value with cased Emails: null", { op: "Replace", value: { Emails: null } }],
+    ])(
+      "clears the stored email to NULL when PATCH replace sends %s (#3157, #3168)",
+      async (_label, op) => {
+        const { id, userName } = await createScimUser({
+          userName: uniqueName("scim-patch-clear-email"),
+          emails: [{ value: "before-patch@example.com", primary: true }],
+        });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: { Operations: [op] },
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body).emails).toEqual([]);
+        expect((await userRow(id))?.email).toBeNull();
+
+        // Restore email and confirm an add with empty/null/blank emails or a path-less
+        // replace that omits emails leaves both an earlier in-batch email update
+        // and the already-persisted email intact.
+        const inBatchRes = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: {
+            Operations: [
+              {
+                op: "replace",
+                path: "emails",
+                value: [{ value: "   ", primary: true }, { value: "restored@example.com" }],
+              },
+              { op: "replace", value: { userName } },
+              { op: "add", path: "emails", value: [] },
+              { op: "add", path: "emails", value: "   " },
+              { op: "add", path: 'emails[type eq "work"].value', value: "" },
+              { op: "add", value: { emails: null } },
+              { op: "add", value: { emails: [{ value: "   ", primary: true }] } },
+            ],
+          },
+        });
+        expect(inBatchRes.statusCode, inBatchRes.body).toBe(200);
+        expect(JSON.parse(inBatchRes.body).emails).toEqual([
+          { value: "restored@example.com", primary: true },
+        ]);
+        expect((await userRow(id))?.email).toBe("restored@example.com");
+
+        const keepRes = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: {
+            Operations: [
+              { op: "replace", value: { userName } },
+              { op: "add", path: "emails", value: [] },
+              { op: "add", path: "emails", value: "" },
+              { op: "add", path: 'emails[type eq "work"].value', value: "   " },
+              { op: "add", value: { emails: null } },
+              { op: "add", value: { emails: [{ value: "" }] } },
+            ],
+          },
+        });
+        expect(keepRes.statusCode, keepRes.body).toBe(200);
+        expect(JSON.parse(keepRes.body).emails).toEqual([
+          { value: "restored@example.com", primary: true },
+        ]);
+        expect((await userRow(id))?.email).toBe("restored@example.com");
+      },
+    );
+
+    it("treats name.formatted as a no-op", async () => {
+      // An unknown op used to be skipped here too. It's refused now, applying
+      // nothing (#1731); see "refuses an op that isn't add, remove or replace".
       const { id, userName } = await createScimUser({ userName: uniqueName("scim-patch-noop") });
 
       const res = await crudApp.app.inject({
@@ -1489,10 +2394,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         url: `/api/v1/scim/v2/Users/${id}`,
         headers: authHeaders(),
         payload: {
-          Operations: [
-            { op: "replace", path: "name.formatted", value: "Display Name" },
-            { op: "bogus", path: "userName", value: "should-not-apply" },
-          ],
+          Operations: [{ op: "replace", path: "name.formatted", value: "Display Name" }],
         },
       });
 
@@ -1527,9 +2429,41 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(res.statusCode, res.body).toBe(200);
       const row = await userRow(id);
       expect(row?.username).toBe(renamed);
-      expect(row?.externalId).toBe("bulk-ext");
+      expect(row?.scimExternalId).toBe("bulk-ext");
       expect(row?.email).toBe("bulk@example.com");
     });
+
+    it.each([
+      ["replace with empty userName", { op: "replace", value: { userName: "" } }],
+      ["replace with whitespace userName", { op: "replace", value: { userName: "   " } }],
+      ["add with cased whitespace USERNAME", { op: "add", value: { USERNAME: " \t " } }],
+    ])(
+      "rejects a path-less PATCH (%s) with 400 invalidValue and leaves the row unchanged (#2639)",
+      async (_label, op) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-blank-un") });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [{ op: "replace", path: "active", value: false }, op],
+          },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "Operations.1.value.userName must not be empty",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.username).toBe(victim.userName);
+        expect(row?.role).toBe("user");
+      },
+    );
 
     it("deactivates via path active and reactivates via a bulk string True", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-patch-active") });
@@ -1597,11 +2531,13 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(body.emails).toEqual([]);
 
       const row = await userRow(id);
-      expect(row?.externalId).toBeNull();
+      expect(row?.scimExternalId).toBeNull();
       expect(row?.email).toBeNull();
     });
 
-    it("accepts a PATCH without Operations and changes nothing", async () => {
+    it("refuses a PATCH without Operations and changes nothing", async () => {
+      // RFC 7644 3.5.2 requires at least one operation. This used to answer
+      // 200 having done nothing, which hid a misnamed key (#1511).
       const { id, userName } = await createScimUser({ userName: uniqueName("scim-patch-empty") });
 
       const res = await crudApp.app.inject({
@@ -1611,10 +2547,261 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         payload: {},
       });
 
-      expect(res.statusCode, res.body).toBe(200);
-      const body = JSON.parse(res.body);
-      expect(body.userName).toBe(userName);
-      expect(body.active).toBe(true);
+      expect(res.statusCode, res.body).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        detail: "Operations is required",
+        scimType: "invalidSyntax",
+      });
+      const row = await userRow(id);
+      expect(row?.username).toBe(userName);
+      expect(row?.role).toBe("user");
+    });
+
+    it("returns SCIM 404 and skips SCIM_USER_UPDATED when a user is deleted before PUT locks the user row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-put-user-del-race") });
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: {
+              userName: uniqueName("scim-put-user-del-renamed"),
+              active: false,
+            },
+          }),
+        (tx) => tx.delete(schema.users).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "User not found",
+      });
+
+      const updatedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(updatedAuditRows).toHaveLength(0);
+    });
+
+    it("returns SCIM 404 and skips SCIM_USER_UPDATED when a user is deleted before PATCH locks the user row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-patch-user-del-race") });
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [
+                {
+                  op: "replace",
+                  path: "userName",
+                  value: uniqueName("scim-patch-user-del-renamed"),
+                },
+                { op: "replace", path: "active", value: false },
+              ],
+            },
+          }),
+        (tx) => tx.delete(schema.users).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "User not found",
+      });
+
+      const updatedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(updatedAuditRows).toHaveLength(0);
+    });
+
+    it("returns SCIM 404 and skips SCIM_USER_DEPROVISIONED when a user is deleted before DELETE locks the user row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-del-user-del-race") });
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+          }),
+        (tx) => tx.delete(schema.users).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "User not found",
+      });
+
+      const deprovisionedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_DEPROVISIONED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(deprovisionedAuditRows).toHaveLength(0);
+    });
+
+    it("logs the locked user's current username in SCIM_USER_DEPROVISIONED when renamed before DELETE locks the row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-del-user-rename-old") });
+      const renamedUsername = uniqueName("scim-del-user-rename-new");
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+          }),
+        (tx) =>
+          tx
+            .update(schema.users)
+            .set({ username: renamedUsername })
+            .where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(204);
+
+      const deprovisionedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_DEPROVISIONED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(deprovisionedAuditRows).toHaveLength(1);
+      expect((deprovisionedAuditRows[0]?.details as { username?: string })?.username).toBe(
+        renamedUsername,
+      );
+    });
+  });
+
+  // A deprovision through DELETE removed the user's API keys; a deactivation
+  // through PATCH or PUT only revoked sessions, so a key survived the disable
+  // and started working again the moment the user was reactivated (#2233).
+  describe("a deactivation revokes API keys (#2233)", () => {
+    const RAW_KEY = `si_scimdeact_${"d".repeat(32)}`;
+
+    async function seedApiKey(userId: string): Promise<void> {
+      await db.insert(schema.apiKeys).values({
+        id: randomUUID(),
+        userId,
+        keyHash: await hashPassword(RAW_KEY),
+        keyPrefix: computeKeyPrefix(RAW_KEY),
+        name: "scim-deactivation-test",
+      });
+    }
+
+    async function keyWorks(): Promise<number> {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/preferences",
+        headers: { authorization: `Bearer ${RAW_KEY}` },
+      });
+      return res.statusCode;
+    }
+
+    async function apiKeyCount(userId: string): Promise<number> {
+      return (await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.userId, userId)))
+        .length;
+    }
+
+    it("PATCH deactivation revokes the key, so reactivation starts clean", async () => {
+      const { id } = await createScimUser({
+        userName: uniqueName("scim-key-revoke"),
+        active: true,
+      });
+      await seedApiKey(id);
+
+      expect(await keyWorks(), "the key works before any deactivation").toBe(200);
+
+      const patch = (active: boolean) => ({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "replace", path: "active", value: active }],
+      });
+      const off = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: patch(false),
+      });
+      expect(off.statusCode, off.body).toBe(200);
+      expect(await apiKeyCount(id)).toBe(0);
+      expect(await keyWorks(), "a revoked key is not accepted while disabled").toBe(401);
+
+      const on = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: patch(true),
+      });
+      expect(on.statusCode, on.body).toBe(200);
+      expect((await userRow(id))?.role).toBe("user");
+      expect(await keyWorks(), "reactivation does not bring the key back").toBe(401);
+    });
+
+    it("PUT deactivation revokes the key, so reactivation starts clean", async () => {
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-key-revoke-put"),
+        active: true,
+      });
+      await seedApiKey(id);
+      expect(await keyWorks()).toBe(200);
+
+      const off = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: { userName, active: false },
+      });
+      expect(off.statusCode, off.body).toBe(200);
+      expect(await apiKeyCount(id)).toBe(0);
+      expect(await keyWorks()).toBe(401);
+
+      const on = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: { userName, active: true },
+      });
+      expect(on.statusCode, on.body).toBe(200);
+      expect(await keyWorks(), "reactivation does not bring the key back").toBe(401);
     });
   });
 
@@ -1697,6 +2884,817 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     });
   });
 
+  // Issue #1510: SCIM's externalId used to share users.external_id with the
+  // OIDC subject and SAML NameID, so the two identities overwrote and shadowed
+  // each other. SCIM now keeps its own column.
+  describe("Users externalId alongside OIDC identities (issue #1510)", () => {
+    async function insertOidcUser(sub: string): Promise<{ id: string; userName: string }> {
+      const id = randomUUID();
+      const userName = uniqueName("scim-oidc-user");
+      const now = new Date();
+      await db.insert(schema.users).values({
+        id,
+        username: userName,
+        authProvider: "oidc",
+        externalId: sub,
+        mustChangePassword: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { id, userName };
+    }
+
+    async function filterByExternalId(externalId: string) {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        query: { filter: `externalId eq "${externalId}"` },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      return JSON.parse(res.body) as { totalResults: number; Resources: Array<{ id: string }> };
+    }
+
+    it("a SCIM user sharing an OIDC user's subject is the only externalId match", async () => {
+      const shared = uniqueName("idp-user-id");
+      await insertOidcUser(shared);
+      const scimUser = await createScimUser({
+        userName: uniqueName("scim-shared"),
+        externalId: shared,
+      });
+
+      const body = await filterByExternalId(shared);
+
+      expect(body.totalResults).toBe(1);
+      expect(body.Resources.map((r) => r.id)).toEqual([scimUser.id]);
+    });
+
+    it("a SCIM PUT with an externalId leaves an OIDC user's sign-in subject alone", async () => {
+      const sub = uniqueName("oidc-sub");
+      const oidcUser = await insertOidcUser(sub);
+      const scimId = uniqueName("scim-assigned");
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${oidcUser.id}`,
+        headers: authHeaders(),
+        payload: { userName: oidcUser.userName, externalId: scimId, active: true },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).externalId).toBe(scimId);
+      const row = await userRow(oidcUser.id);
+      expect(row?.externalId).toBe(sub);
+      expect(row?.authProvider).toBe("oidc");
+      expect(row?.scimExternalId).toBe(scimId);
+    });
+
+    it("a SCIM user linked by an OIDC sign-in still answers to its externalId and can be deactivated", async () => {
+      const scimId = uniqueName("scim-linked");
+      const email = `${uniqueName("linked")}@example.com`;
+      const scimUser = await createScimUser({
+        userName: uniqueName("scim-linked-user"),
+        externalId: scimId,
+        emails: [{ value: email, primary: true }],
+      });
+
+      // The real OIDC auto-link path: it rewrites auth_provider and
+      // external_id on the row it links.
+      const { resolveExternalUser } = await import(
+        "../../../apps/api/src/lib/external-auth-resolver.js"
+      );
+      const linked = await resolveExternalUser({
+        provider: "oidc",
+        externalId: uniqueName("oidc-sub"),
+        email,
+        emailVerified: true,
+        username: uniqueName("oidc-name"),
+        autoCreate: false,
+        autoLink: true,
+        defaultRole: "user",
+        logger: crudApp.app.log,
+        ip: "127.0.0.1",
+        requestId: "test-1510",
+      });
+      expect(linked.action).toBe("linked");
+      expect(linked.user?.id).toBe(scimUser.id);
+
+      const found = await filterByExternalId(scimId);
+      expect(found.Resources.map((r) => r.id)).toEqual([scimUser.id]);
+
+      const get = await crudApp.app.inject({
+        method: "GET",
+        url: `/api/v1/scim/v2/Users/${scimUser.id}`,
+        headers: authHeaders(),
+      });
+      expect(JSON.parse(get.body).externalId).toBe(scimId);
+
+      const deactivate = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${scimUser.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "replace", path: "active", value: false }],
+        },
+      });
+      expect(deactivate.statusCode, deactivate.body).toBe(200);
+      expect((await userRow(scimUser.id))?.role).toBe("disabled:user");
+
+      // The link used to free the id, so an IdP retrying the create under a
+      // fresh userName minted a second account for the same person.
+      const again = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        payload: { userName: uniqueName("scim-linked-again"), externalId: scimId },
+      });
+      expect(again.statusCode, again.body).toBe(409);
+      const holders = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.scimExternalId, scimId));
+      expect(holders.map((u) => u.id)).toEqual([scimUser.id]);
+    });
+
+    it("a SCIM PATCH removing externalId leaves an OIDC user's sign-in subject alone", async () => {
+      const sub = uniqueName("oidc-sub-remove");
+      const oidcUser = await insertOidcUser(sub);
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${oidcUser.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "remove", path: "externalId" }],
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      const row = await userRow(oidcUser.id);
+      expect(row?.externalId).toBe(sub);
+      expect(row?.scimExternalId).toBeNull();
+    });
+  });
+
+  describe("wrong-typed request bodies (#1511)", () => {
+    // Every route cast request.body field by field, so a wrong-typed value
+    // reached Postgres as JSON text, or threw a 500 partway through.
+    async function send(method: "POST" | "PUT" | "PATCH", url: string, payload: unknown) {
+      return crudApp.app.inject({
+        method,
+        url: `/api/v1/scim/v2/${url}`,
+        headers: authHeaders(),
+        payload: payload as Record<string, unknown>,
+      });
+    }
+
+    function expectRefused(
+      res: { statusCode: number; body: string },
+      detail: string,
+      scimType: "invalidValue" | "invalidSyntax" | "invalidPath" = "invalidValue",
+    ) {
+      expect(res.statusCode, res.body).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail,
+        scimType,
+      });
+    }
+
+    it("Users POST refuses an object externalId and creates nobody", async () => {
+      const userName = uniqueName("scim-typed-post-obj");
+      const res = await send("POST", "Users", { userName, externalId: { id: 1 } });
+
+      expectRefused(res, "externalId must be a string, got object");
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, userName));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("Users POST stores a numeric externalId as its string", async () => {
+      const res = await send("POST", "Users", {
+        userName: uniqueName("scim-typed-post-num"),
+        externalId: 12345,
+      });
+
+      expect(res.statusCode, res.body).toBe(201);
+      expect(JSON.parse(res.body).externalId).toBe("12345");
+      expect((await userRow(JSON.parse(res.body).id))?.scimExternalId).toBe("12345");
+    });
+
+    it('Users POST reads active "false" as inactive, not as a truthy string', async () => {
+      const res = await send("POST", "Users", {
+        userName: uniqueName("scim-typed-post-inactive"),
+        active: "false",
+      });
+
+      expect(res.statusCode, res.body).toBe(201);
+      expect(JSON.parse(res.body).active).toBe(false);
+      expect((await userRow(JSON.parse(res.body).id))?.role).toBe("disabled");
+    });
+
+    it('Users PUT reads Entra\'s active "False" as a deactivation', async () => {
+      const { id, userName } = await createScimUser({ userName: uniqueName("scim-typed-put-off") });
+      const res = await send("PUT", `Users/${id}`, { userName, active: "False" });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).active).toBe(false);
+      expect((await userRow(id))?.role).toBe("disabled:user");
+    });
+
+    it("Users PUT refuses emails that aren't a list and changes nothing", async () => {
+      const { id, userName } = await createScimUser({ userName: uniqueName("scim-typed-put") });
+      const res = await send("PUT", `Users/${id}`, {
+        userName: uniqueName("scim-typed-put-renamed"),
+        emails: { value: "x@example.com" },
+      });
+
+      expectRefused(res, "emails must be an array, got object");
+      expect((await userRow(id))?.username).toBe(userName);
+    });
+
+    it("Users PATCH refuses an operation without an op", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-op") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ path: "userName", value: "x" }],
+      });
+
+      expectRefused(res, "Operations.0.op is required", "invalidSyntax");
+    });
+
+    it("Users PATCH refuses a patch with no operations instead of answering 200", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-none") });
+      const res = await send("PATCH", `Users/${id}`, { Operations: [] });
+
+      expectRefused(res, "Operations must not be empty", "invalidSyntax");
+    });
+
+    it("Users PATCH applies operations sent under a lowercase key", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-lower") });
+      const res = await send("PATCH", `Users/${id}`, {
+        operations: [{ op: "replace", path: "active", value: false }],
+      });
+
+      // Attribute names are case-insensitive (RFC 7643 2.1). This used to
+      // answer 200 having dropped the deactivation.
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(id))?.role).toBe("disabled:user");
+    });
+
+    it("Users PATCH matches a cased path, so a deactivation isn't skipped (#1731)", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-cased") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ op: "Replace", path: "Active", value: "False" }],
+      });
+
+      // Attribute names are case-insensitive (RFC 7643 2.1). This used to
+      // answer 200 and leave the user active.
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(id))?.role).toBe("disabled:user");
+    });
+
+    it("Users PATCH refuses an op that isn't add, remove or replace, applying nothing", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-badop") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [
+          { op: "replace", path: "active", value: false },
+          { op: "delete", path: "title" },
+        ],
+      });
+
+      expectRefused(res, "Operations.1.op must be add, remove or replace", "invalidSyntax");
+      expect((await userRow(id))?.role).toBe("user");
+    });
+
+    it("Users PATCH deactivates through a cased key in a path-less value object", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-bulkcase") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ op: "Replace", value: { Active: false } }],
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(id))?.role).toBe("disabled:user");
+    });
+
+    it("Users PATCH removes through cased paths, including the work-email filter", async () => {
+      const { id } = await createScimUser({
+        userName: uniqueName("scim-typed-patch-rm"),
+        externalId: uniqueName("ext"),
+        emails: [{ value: "rm@example.com", primary: true }],
+      });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [
+          { op: "Remove", path: "ExternalId" },
+          { op: "remove", path: 'Emails[type eq "work"].value' },
+        ],
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      const row = await userRow(id);
+      expect(row?.scimExternalId).toBeNull();
+      expect(row?.email).toBeNull();
+    });
+
+    it("Users PATCH refuses to remove userName or active, and a remove with no path", async () => {
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-typed-patch-rmbad"),
+      });
+
+      const userNameRes = await send("PATCH", `Users/${id}`, {
+        Operations: [{ op: "remove", path: "userName" }],
+      });
+      expectRefused(userNameRes, "Operations.0: userName can't be removed");
+
+      const noTarget = await send("PATCH", `Users/${id}`, { Operations: [{ op: "remove" }] });
+      expectRefused(noTarget, "Operations.0.path is required for remove", "noTarget");
+
+      const row = await userRow(id);
+      expect(row?.username).toBe(userName);
+      expect(row?.role).toBe("user");
+    });
+
+    it("Users PATCH still ignores attributes it doesn't store", async () => {
+      // IdPs send attributes SnapOtter keeps no column for (title,
+      // name.givenName, phoneNumbers). Refusing them would break every sync.
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-typed-patch-title"),
+      });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ op: "replace", path: "title", value: "Engineer" }],
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(id))?.username).toBe(userName);
+    });
+
+    it("Users PATCH refuses a path-less value object with a wrong-typed field", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-bulk") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [
+          { op: "replace", path: "emails", value: "bulk@example.com" },
+          { op: "replace", value: { externalId: ["x"] } },
+        ],
+      });
+
+      expectRefused(res, "Operations.1.value.externalId must be a string, got array");
+      expect((await userRow(id))?.email).toBeNull();
+    });
+
+    it.each([
+      ["missing value", { op: "replace" }, "Operations.1.value is required"],
+      ["null value", { op: "add", value: null }, "Operations.1.value must be an object, got null"],
+      [
+        "primitive value",
+        { op: "replace", value: "alice" },
+        "Operations.1.value must be an object, got string",
+      ],
+      [
+        "array value",
+        { op: "add", value: ["alice"] },
+        "Operations.1.value must be an object, got array",
+      ],
+    ])(
+      "Users PATCH refuses a path-less op with a %s and applies none of the operations (#2657)",
+      async (_label, op, detail) => {
+        const { id, userName } = await createScimUser({
+          userName: uniqueName("scim-typed-patch-pathless-nonobj"),
+        });
+        const res = await send("PATCH", `Users/${id}`, {
+          Operations: [{ op: "replace", path: "active", value: false }, op],
+        });
+
+        expectRefused(res, detail);
+        const row = await userRow(id);
+        expect(row?.username).toBe(userName);
+        expect(row?.role).toBe("user");
+      },
+    );
+
+    it("Users PATCH refuses an object userName and applies none of the operations", async () => {
+      const { id, userName } = await createScimUser({ userName: uniqueName("scim-typed-patch") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [
+          { op: "replace", path: "emails", value: "patched@example.com" },
+          { op: "replace", path: "userName", value: { first: "u" } },
+        ],
+      });
+
+      expectRefused(res, "Operations.1.value must be a string, got object");
+      const row = await userRow(id);
+      expect(row?.username).toBe(userName);
+      expect(row?.email).toBeNull();
+    });
+
+    it("Groups POST refuses members that aren't a list and creates no group", async () => {
+      const displayName = uniqueName("scim-typed-grp-post");
+      const res = await send("POST", "Groups", { displayName, members: { value: "u1" } });
+
+      expectRefused(res, "members must be an array, got object");
+      const rows = await db.select().from(schema.teams).where(eq(schema.teams.name, displayName));
+      expect(rows).toHaveLength(0);
+    });
+
+    describe("Groups PATCH operations it used to skip (#1683)", () => {
+      async function members(groupId: string): Promise<string[]> {
+        const rows = await db
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(eq(schema.users.team, groupId));
+        return rows.map((r) => r.id).sort();
+      }
+
+      it("applies a path-less replace, the way Okta renames a group, and keeps its members", async () => {
+        const member = await createScimUser({ userName: uniqueName("scim-1683-okta-m") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1683-okta"),
+          members: [{ value: member.id }],
+        });
+        const renamed = uniqueName("scim-1683-okta-renamed");
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "replace", value: { id: group.id, displayName: renamed } }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+        expect(row?.name).toBe(renamed);
+        expect(await members(group.id)).toEqual([member.id]);
+      });
+
+      it("renames on an add with path displayName", async () => {
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-add-name") });
+        const renamed = uniqueName("scim-1683-add-name-renamed");
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "add", path: "displayName", value: renamed }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+        expect(row?.name).toBe(renamed);
+      });
+
+      it("refuses a remove filter it can't parse and removes nobody", async () => {
+        const member = await createScimUser({ userName: uniqueName("scim-1683-filter") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1683-filter"),
+          members: [{ value: member.id }],
+        });
+        const path = `members[display eq "${member.userName}"]`;
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "remove", path }],
+        });
+
+        expectRefused(
+          res,
+          `Operations.0.path ${JSON.stringify(path)} isn't one SnapOtter can apply`,
+          "invalidPath",
+        );
+        expect(await members(group.id)).toEqual([member.id]);
+      });
+
+      it("removes members sent as a list on path members, the way Entra ID does", async () => {
+        const stay = await createScimUser({ userName: uniqueName("scim-1683-stay") });
+        const leave = await createScimUser({ userName: uniqueName("scim-1683-leave") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1683-entra"),
+          members: [{ value: stay.id }, { value: leave.id }],
+        });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "Remove", path: "members", value: [{ value: leave.id }] }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await members(group.id)).toEqual([stay.id]);
+        expect((await userRow(leave.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
+
+      it("empties the group on a remove of members with no value", async () => {
+        const a = await createScimUser({ userName: uniqueName("scim-1683-all-a") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1683-all"),
+          members: [{ value: a.id }],
+        });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "remove", path: "members" }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await members(group.id)).toEqual([]);
+        expect((await userRow(a.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
+
+      it("adds members through a cased path", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1683-cased") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-cased") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "Add", path: "Members", value: [{ value: user.id }] }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await members(group.id)).toEqual([user.id]);
+      });
+
+      it("refuses an unknown op and applies nothing before it", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1683-badop") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-badop") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "merge", path: "members", value: [] },
+          ],
+        });
+
+        expectRefused(res, "Operations.1.op must be add, remove or replace", "invalidSyntax");
+        expect(await members(group.id)).toEqual([]);
+      });
+
+      it("reports only real members when an added id matches no user", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1683-known") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-unknown") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }, { value: "no-such-user" }] },
+          ],
+        });
+
+        // Skipped and logged rather than refused: a member deleted here but
+        // still in the IdP's group would otherwise fail every sync for good.
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body).members.map((m: { value: string }) => m.value)).toEqual([
+          user.id,
+        ]);
+      });
+    });
+
+    // Skips and moves used to be invisible: the audit row only had memberCount,
+    // and a user in two IdP groups was moved out of the first with no trace.
+    describe("Groups sync audit: skipped and moved members (#1747, #1748)", () => {
+      async function lastSync(teamId: string): Promise<Record<string, unknown>> {
+        const [row] = await db
+          .select({ details: schema.auditLog.details })
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${teamId}`,
+            ),
+          )
+          .orderBy(desc(schema.auditLog.createdAt))
+          .limit(1);
+        return (row?.details ?? {}) as Record<string, unknown>;
+      }
+
+      it("records member ids a PATCH skipped because they match no user", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1748-known") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1748-patch") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }, { value: "no-such-user" }] },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        const details = await lastSync(group.id);
+        expect(details.action).toBe("patched");
+        expect(details.skippedMembers).toEqual(["no-such-user"]);
+        expect(details.skippedCount).toBe(1);
+      });
+
+      it("records skipped ids on a create and a replace too", async () => {
+        const created = await send("POST", "Groups", {
+          displayName: uniqueName("scim-1748-post"),
+          members: [{ value: "gone-1" }],
+        });
+        expect(created.statusCode, created.body).toBe(201);
+        const groupId = JSON.parse(created.body).id;
+        expect((await lastSync(groupId)).skippedMembers).toEqual(["gone-1"]);
+
+        const replaced = await send("PUT", `Groups/${groupId}`, {
+          displayName: uniqueName("scim-1748-put"),
+          members: [{ value: "gone-2" }],
+        });
+        expect(replaced.statusCode, replaced.body).toBe(200);
+        const details = await lastSync(groupId);
+        expect(details.action).toBe("replaced");
+        expect(details.skippedMembers).toEqual(["gone-2"]);
+      });
+
+      it("caps the skipped list but keeps the full count", async () => {
+        const group = await createScimGroup({ displayName: uniqueName("scim-1748-cap") });
+        const ids = Array.from({ length: 60 }, (_, i) => ({ value: `missing-${i}` }));
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "add", path: "members", value: ids }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        const details = await lastSync(group.id);
+        expect(details.skippedMembers).toHaveLength(50);
+        expect(details.skippedCount).toBe(60);
+      });
+
+      it("records a user moved out of another group, and still moves them", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-both") });
+        const first = await createScimGroup({
+          displayName: uniqueName("scim-1747-first"),
+          members: [{ value: user.id }],
+        });
+        const second = await send("POST", "Groups", {
+          displayName: uniqueName("scim-1747-second"),
+          members: [{ value: user.id }],
+        });
+
+        expect(second.statusCode, second.body).toBe(201);
+        const secondId = JSON.parse(second.body).id;
+        // Users have one team, so the last sync still wins (the owner's call
+        // on #1747); what changed is that the move is on record.
+        expect((await userRow(user.id))?.team).toBe(secondId);
+        const details = await lastSync(secondId);
+        expect(details.movedMembers).toEqual([{ userId: user.id, fromTeam: first.id }]);
+        expect(details.movedCount).toBe(1);
+      });
+
+      it("doesn't count a PATCH add of a user already in the group as a move", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-again") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1747-again"),
+          members: [{ value: user.id }],
+        });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "add", path: "members", value: [{ value: user.id }] }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+      });
+
+      it("doesn't record a move into a group the user was removed from in the same PATCH", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-addrm") });
+        await createScimGroup({
+          displayName: uniqueName("scim-1747-addrm-from"),
+          members: [{ value: user.id }],
+        });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1747-addrm-to") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "remove", path: `members[value eq "${user.id}"]` },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+      });
+
+      it("records nothing for a PATCH that rolled back", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-rollback") });
+        const first = await createScimGroup({
+          displayName: uniqueName("scim-1747-rb-first"),
+          members: [{ value: user.id }],
+        });
+        const taken = await createScimGroup({ displayName: uniqueName("scim-1747-rb-taken") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1747-rb-group") });
+        const before = await lastSync(group.id);
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "replace", path: "displayName", value: taken.displayName },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(409);
+        expect((await userRow(user.id))?.team).toBe(first.id);
+        expect(await lastSync(group.id)).toEqual(before);
+      });
+
+      it("records moves on a PATCH add and a member replace", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-patch") });
+        const first = await createScimGroup({
+          displayName: uniqueName("scim-1747-p-first"),
+          members: [{ value: user.id }],
+        });
+        const second = await createScimGroup({ displayName: uniqueName("scim-1747-p-second") });
+        const added = await send("PATCH", `Groups/${second.id}`, {
+          Operations: [{ op: "add", path: "members", value: [{ value: user.id }] }],
+        });
+        expect(added.statusCode, added.body).toBe(200);
+        expect((await lastSync(second.id)).movedMembers).toEqual([
+          { userId: user.id, fromTeam: first.id },
+        ]);
+
+        const replaced = await send("PATCH", `Groups/${first.id}`, {
+          Operations: [{ op: "replace", path: "members", value: [{ value: user.id }] }],
+        });
+        expect(replaced.statusCode, replaced.body).toBe(200);
+        expect((await lastSync(first.id)).movedMembers).toEqual([
+          { userId: user.id, fromTeam: second.id },
+        ]);
+      });
+
+      it("leaves both fields off a clean sync, including a user coming from Default", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-clean") });
+        expect((await userRow(user.id))?.team).toBe(DEFAULT_TEAM_ID);
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1747-clean"),
+          members: [{ value: user.id }],
+        });
+
+        const details = await lastSync(group.id);
+        expect(details).not.toHaveProperty("skippedMembers");
+        expect(details).not.toHaveProperty("movedMembers");
+      });
+
+      it("finds Default by name, so a resync isn't read as moves when its id isn't the seed's", async () => {
+        // The seed is skipped when another team already holds the name, so the
+        // team named "Default" can have any id (#1474). PUT parks members there
+        // before re-adding them, and that must not read as a move.
+        const seededName = uniqueName("scim-1747-seed");
+        const otherDefault = `team-${randomUUID()}`;
+        await db
+          .update(schema.teams)
+          .set({ name: seededName })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+        try {
+          await db.insert(schema.teams).values({ id: otherDefault, name: "Default" });
+          const user = await createScimUser({ userName: uniqueName("scim-1747-named") });
+          const group = await createScimGroup({
+            displayName: uniqueName("scim-1747-named"),
+            members: [{ value: user.id }],
+          });
+          const res = await send("PUT", `Groups/${group.id}`, {
+            displayName: group.displayName,
+            members: [{ value: user.id }],
+          });
+
+          expect(res.statusCode, res.body).toBe(200);
+          expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+        } finally {
+          await db
+            .update(schema.users)
+            .set({ team: DEFAULT_TEAM_ID })
+            .where(eq(schema.users.team, otherDefault));
+          await db.delete(schema.teams).where(eq(schema.teams.id, otherDefault));
+          await db
+            .update(schema.teams)
+            .set({ name: "Default" })
+            .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+        }
+      });
+
+      it("doesn't count re-adding a group's own member as a move", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-own") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1747-own"),
+          members: [{ value: user.id }],
+        });
+        const res = await send("PUT", `Groups/${group.id}`, {
+          displayName: group.displayName,
+          members: [{ value: user.id }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+      });
+    });
+
+    it("Groups PATCH refuses an object displayName", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-typed-grp-patch") });
+      const res = await send("PATCH", `Groups/${group.id}`, {
+        Operations: [{ op: "replace", path: "displayName", value: { name: "g" } }],
+      });
+
+      expectRefused(res, "Operations.0.value must be a string, got object");
+      const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+      expect(row?.name).toBe(group.displayName);
+    });
+
+    it("Groups PUT refuses an object displayName and changes nothing", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-typed-grp-put-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-typed-grp-put"),
+        members: [{ value: member.id }],
+      });
+      const res = await send("PUT", `Groups/${group.id}`, { displayName: { a: 1 }, members: [] });
+
+      expectRefused(res, "displayName must be a string, got object");
+      const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+      expect(row?.name).toBe(group.displayName);
+      expect((await userRow(member.id))?.team).toBe(group.id);
+    });
+
+    it("Groups PATCH replaces members with one sent as a single object", async () => {
+      // This used to empty the group: a non-list replace was read as no members.
+      const user = await createScimUser({ userName: uniqueName("scim-typed-grp-one") });
+      const group = await createScimGroup({ displayName: uniqueName("scim-typed-grp-one") });
+      const res = await send("PATCH", `Groups/${group.id}`, {
+        Operations: [{ op: "replace", path: "members", value: { value: user.id } }],
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(user.id))?.team).toBe(group.id);
+    });
+  });
+
   describe("Groups CRUD", () => {
     it("rejects group creation without displayName", async () => {
       const res = await crudApp.app.inject({
@@ -1732,10 +3730,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(statuses).toEqual([201, 409]);
 
       const conflict = results.find((r) => r.statusCode === 409);
-      expect(JSON.parse(conflict?.body ?? "{}")).toMatchObject({
+      expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "Group already exists",
+        scimType: "uniqueness",
       });
 
       const rows = await db.select().from(schema.teams).where(eq(schema.teams.name, displayName));
@@ -1758,10 +3757,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "Group already exists",
+        scimType: "uniqueness",
       });
     });
 
@@ -1781,10 +3781,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "Group already exists",
+        scimType: "uniqueness",
       });
     });
 
@@ -1855,10 +3856,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "Group already exists",
+        scimType: "uniqueness",
       });
     });
 
@@ -1877,17 +3879,18 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           payload: { displayName: target },
         });
 
-      const results = await raceUpdates("teams", 2, () =>
+      const results = await raceRowLocks("teams", 2, () =>
         Promise.all([rename(a.id), rename(b.id)]),
       );
       const statuses = results.map((r) => r.statusCode).sort();
       expect(statuses).toEqual([200, 409]);
 
       const conflict = results.find((r) => r.statusCode === 409);
-      expect(JSON.parse(conflict?.body ?? "{}")).toMatchObject({
+      expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "Group name already taken",
+        scimType: "uniqueness",
       });
 
       const rows = await db.select().from(schema.teams).where(eq(schema.teams.name, target));
@@ -1911,14 +3914,126 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
 
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "Group name already taken",
+        scimType: "uniqueness",
       });
 
       const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, victim.id));
       expect(row?.name).toBe(victim.displayName);
+    });
+
+    describe("a PATCH that fails partway applies none of its operations (#1543)", () => {
+      // Each operation used to write straight to the database, so an earlier
+      // member change stayed committed when a later operation answered 400 or
+      // 409, while the IdP read the error as the whole request rejected.
+      async function patchGroup(id: string, operations: unknown[]) {
+        return crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Groups/${id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: operations,
+          },
+        });
+      }
+
+      it("keeps an added member out when a later rename collides", async () => {
+        const taken = await createScimGroup({ displayName: uniqueName("scim-grp-atomic-taken") });
+        const user = await createScimUser({ userName: uniqueName("scim-grp-atomic-add-u") });
+        // Start the user somewhere other than Default, so staying put can't be
+        // confused with being moved back there.
+        const home = await createScimGroup({
+          displayName: uniqueName("scim-grp-atomic-home"),
+          members: [{ value: user.id }],
+        });
+        const group = await createScimGroup({ displayName: uniqueName("scim-grp-atomic-add") });
+
+        const res = await patchGroup(group.id, [
+          { op: "add", path: "members", value: [{ value: user.id }] },
+          { op: "replace", path: "displayName", value: taken.displayName },
+        ]);
+
+        expect(res.statusCode, res.body).toBe(409);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 409,
+          detail: "Group name already taken",
+          scimType: "uniqueness",
+        });
+        expect((await userRow(user.id))?.team).toBe(home.id);
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+        expect(row?.name).toBe(group.displayName);
+      });
+
+      it("keeps a removed member in when a later rename is empty", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-grp-atomic-rm-u") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-atomic-rm"),
+          members: [{ value: user.id }],
+        });
+
+        const res = await patchGroup(group.id, [
+          { op: "remove", path: `members[value eq "${user.id}"]` },
+          // Mixed-case op name: the check before any write has to match the
+          // same ops the loop treats as a rename.
+          { op: "Replace", path: "displayName", value: "   " },
+        ]);
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body).detail).toBe("displayName cannot be empty");
+        expect((await userRow(user.id))?.team).toBe(group.id);
+      });
+
+      it("keeps the old membership when a member replace is followed by a colliding rename", async () => {
+        const taken = await createScimGroup({
+          displayName: uniqueName("scim-grp-atomic-rep-taken"),
+        });
+        const kept = await createScimUser({ userName: uniqueName("scim-grp-atomic-rep-kept") });
+        const incoming = await createScimUser({ userName: uniqueName("scim-grp-atomic-rep-in") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-atomic-rep"),
+          members: [{ value: kept.id }],
+        });
+
+        const res = await patchGroup(group.id, [
+          { op: "replace", path: "members", value: [{ value: incoming.id }] },
+          { op: "replace", path: "displayName", value: taken.displayName },
+        ]);
+
+        expect(res.statusCode, res.body).toBe(409);
+        expect((await userRow(kept.id))?.team).toBe(group.id);
+        expect((await userRow(incoming.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
+
+      it("commits every operation of a successful multi-op PATCH, in order", async () => {
+        const previous = await createScimUser({ userName: uniqueName("scim-grp-multi-prev") });
+        const first = await createScimUser({ userName: uniqueName("scim-grp-multi-a") });
+        const second = await createScimUser({ userName: uniqueName("scim-grp-multi-b") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-multi"),
+          members: [{ value: previous.id }],
+        });
+        const renamed = uniqueName("scim-grp-multi-renamed");
+
+        // The add only survives if it runs after the replace, and the rename
+        // lands alongside both.
+        const res = await patchGroup(group.id, [
+          { op: "replace", path: "members", value: [{ value: first.id }] },
+          { op: "add", path: "members", value: [{ value: second.id }] },
+          { op: "replace", path: "displayName", value: renamed },
+        ]);
+
+        expect(res.statusCode, res.body).toBe(200);
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+        expect(row?.name).toBe(renamed);
+        expect((await userRow(first.id))?.team).toBe(group.id);
+        expect((await userRow(second.id))?.team).toBe(group.id);
+        expect((await userRow(previous.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
     });
 
     it("returns a group by id with its members and 404 for unknown ids", async () => {
@@ -2047,9 +4162,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         payload: { displayName: first.displayName },
       });
       expect(conflict.statusCode).toBe(409);
-      expect(JSON.parse(conflict.body)).toMatchObject({
+      expect(JSON.parse(conflict.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
         status: 409,
         detail: "Group name already taken",
+        scimType: "uniqueness",
       });
       const [secondRow] = await db
         .select()
@@ -2064,6 +4181,34 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         payload: { displayName: "ghost" },
       });
       expect(missing.statusCode).toBe(404);
+    });
+
+    it("PUT rejects renaming onto a case twin of an existing group name", async () => {
+      // The PUT pre-check is exact-case, so a case twin gets past it and trips
+      // the lower(name) index on the UPDATE (#970). That makes this the one
+      // sequential request that reaches the catch, not the pre-check.
+      const first = await createScimGroup({ displayName: uniqueName("scim-group-put-case-a") });
+      const second = await createScimGroup({ displayName: uniqueName("scim-group-put-case-b") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Groups/${second.id}`,
+        headers: authHeaders(),
+        payload: { displayName: first.displayName.toUpperCase() },
+      });
+
+      expect(res.statusCode, res.body).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "Group name already taken",
+        scimType: "uniqueness",
+      });
+      const [secondRow] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, second.id));
+      expect(secondRow?.name).toBe(second.displayName);
     });
 
     it("PUT with an empty body leaves name and membership untouched", async () => {
@@ -2084,6 +4229,130 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const body = JSON.parse(res.body);
       expect(body.displayName).toBe(group.displayName);
       expect(body.members).toEqual([{ value: member.id, display: member.userName }]);
+    });
+
+    describe("a PUT that fails after its rename changes nothing (#1682)", () => {
+      // PUT renamed the group, moved every member to Default, then added the
+      // new ones, each straight to the database. A failure after the rename
+      // left the group renamed and emptied behind a 500.
+      async function putGroup(id: string, payload: Record<string, unknown>) {
+        return crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Groups/${id}`,
+          headers: authHeaders(),
+          payload,
+        });
+      }
+
+      async function groupState(id: string, memberIds: string[]) {
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+        const teams = await Promise.all(memberIds.map(async (m) => (await userRow(m))?.team));
+        return { name: row?.name, teams };
+      }
+
+      it("rejects a members value that isn't an array before writing anything", async () => {
+        const member = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-obj") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-put-atomic-obj"),
+          members: [{ value: member.id }],
+        });
+
+        const res = await putGroup(group.id, {
+          displayName: uniqueName("scim-grp-put-atomic-obj-renamed"),
+          members: { value: member.id },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toMatchObject({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "members must be an array, got object",
+        });
+        expect(await groupState(group.id, [member.id])).toEqual({
+          name: group.displayName,
+          teams: [group.id],
+        });
+      });
+
+      it("treats members: null as an empty list and clears the group", async () => {
+        const member = await createScimUser({ userName: uniqueName("scim-grp-put-null-m") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-put-null"),
+          members: [{ value: member.id }],
+        });
+
+        const res = await putGroup(group.id, { members: null });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body).members).toEqual([]);
+        expect(await groupState(group.id, [member.id])).toEqual({
+          name: group.displayName,
+          teams: [DEFAULT_TEAM_ID],
+        });
+      });
+
+      it("rolls back the rename and member changes when a later member write fails", async () => {
+        const kept = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-kept") });
+        const incoming = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-in") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-put-atomic-db"),
+          members: [{ value: kept.id }],
+        });
+
+        // Postgres rejects a NUL byte in a text parameter, so the second
+        // member's UPDATE fails after the rename, the move-out, and the first
+        // add have all run. This relies on member ids not being checked up
+        // front; if they ever are, fail inside the transaction another way.
+        const res = await putGroup(group.id, {
+          displayName: uniqueName("scim-grp-put-atomic-db-renamed"),
+          members: [{ value: incoming.id }, { value: "no\u0000such-user" }],
+        });
+
+        expect(res.statusCode, res.body).toBe(500);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 500,
+          detail: "Internal server error",
+        });
+        expect(await groupState(group.id, [kept.id, incoming.id])).toEqual({
+          name: group.displayName,
+          teams: [group.id, DEFAULT_TEAM_ID],
+        });
+      });
+    });
+
+    describe("a POST that fails after its insert creates nothing (#1763)", () => {
+      // POST inserted the team, then moved each member into it, each straight
+      // to the database. A failure after the insert left the team and the
+      // moved members behind a 500, and the IdP's retry got a 409.
+      it("leaves no team and moves no one when a later member write fails", async () => {
+        const first = await createScimUser({ userName: uniqueName("scim-grp-post-atomic-in") });
+        const displayName = uniqueName("scim-grp-post-atomic");
+
+        // Postgres rejects a NUL byte in a text parameter, so the second
+        // member's UPDATE fails after the team insert and the first add have
+        // run. This relies on member ids not being checked up front; if they
+        // ever are, fail inside the transaction another way.
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Groups",
+          headers: authHeaders(),
+          payload: { displayName, members: [{ value: first.id }, { value: "no\u0000such-user" }] },
+        });
+
+        expect(res.statusCode, res.body).toBe(500);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 500,
+          detail: "Internal server error",
+        });
+        const teams = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.name, displayName));
+        expect(teams).toEqual([]);
+        expect((await userRow(first.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
     });
 
     it("PATCH adds members from an array value and from a single object value", async () => {
@@ -2123,7 +4392,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(rowC?.team).toBe(group.id);
     });
 
-    it("PATCH removes a member by value filter and ignores unparsable remove paths", async () => {
+    it("PATCH removes a member by value filter, then every member with a bare remove", async () => {
       const memberA = await createScimUser({ userName: uniqueName("scim-grp-rm-a") });
       const memberB = await createScimUser({ userName: uniqueName("scim-grp-rm-b") });
       const group = await createScimGroup({
@@ -2146,14 +4415,16 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const rowA = await userRow(memberA.id);
       expect(rowA?.team).toBe(DEFAULT_TEAM_ID);
 
-      const noMatch = await crudApp.app.inject({
+      // A remove on members with no value removes them all (RFC 7644
+      // 3.5.2.2); it used to be skipped as unparsable (#1683).
+      const removeAll = await crudApp.app.inject({
         method: "PATCH",
         url: `/api/v1/scim/v2/Groups/${group.id}`,
         headers: authHeaders(),
         payload: { Operations: [{ op: "remove", path: "members" }] },
       });
-      expect(noMatch.statusCode).toBe(200);
-      expect(JSON.parse(noMatch.body).members).toHaveLength(1);
+      expect(removeAll.statusCode, removeAll.body).toBe(200);
+      expect(JSON.parse(removeAll.body).members).toEqual([]);
     });
 
     it("PATCH replaces displayName and rejects an empty replacement name", async () => {
@@ -2182,7 +4453,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(teamRowDb?.name).toBe(renamed);
     });
 
-    it("PATCH replace members swaps membership and empties it for non-array values", async () => {
+    it("PATCH replace members swaps membership, refuses a non-list value, and empties it for null", async () => {
       const before = await createScimUser({ userName: uniqueName("scim-grp-swap-old") });
       const after = await createScimUser({ userName: uniqueName("scim-grp-swap-new") });
       const group = await createScimGroup({
@@ -2203,13 +4474,25 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const beforeRow = await userRow(before.id);
       expect(beforeRow?.team).toBe(DEFAULT_TEAM_ID);
 
-      const emptied = await crudApp.app.inject({
+      // A malformed value used to wipe the group and answer 200 (#1511).
+      const malformed = await crudApp.app.inject({
         method: "PATCH",
         url: `/api/v1/scim/v2/Groups/${group.id}`,
         headers: authHeaders(),
         payload: { Operations: [{ op: "replace", path: "members", value: "not-an-array" }] },
       });
-      expect(emptied.statusCode).toBe(200);
+      expect(malformed.statusCode, malformed.body).toBe(400);
+      expect(JSON.parse(malformed.body).scimType).toBe("invalidValue");
+      expect((await userRow(after.id))?.team).toBe(group.id);
+
+      // RFC 7643 2.5: null is the same state as an empty list.
+      const emptied = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Groups/${group.id}`,
+        headers: authHeaders(),
+        payload: { Operations: [{ op: "replace", path: "members", value: null }] },
+      });
+      expect(emptied.statusCode, emptied.body).toBe(200);
       expect(JSON.parse(emptied.body).members).toEqual([]);
       const afterRow = await userRow(after.id);
       expect(afterRow?.team).toBe(DEFAULT_TEAM_ID);
@@ -2256,6 +4539,709 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         status: 404,
         detail: "Group not found",
       });
+    });
+
+    it("DELETE on the Default team returns SCIM 400 and leaves the team alone", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-del-default") });
+
+      const res = await crudApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/scim/v2/Groups/${DEFAULT_TEAM_ID}`,
+        headers: authHeaders(),
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail: "Cannot delete the Default team",
+      });
+
+      const [teamRowDb] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      expect(teamRowDb).toBeDefined();
+      const memberRow = await userRow(member.id);
+      expect(memberRow?.team).toBe(DEFAULT_TEAM_ID);
+    });
+
+    it("PATCH remove member on the Default team returns SCIM 400", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-patch-del-default") });
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Groups/${DEFAULT_TEAM_ID}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "remove", path: "members", value: [{ value: member.id }] }],
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail: "Cannot remove members from the Default team",
+      });
+
+      const memberRow = await userRow(member.id);
+      expect(memberRow?.team).toBe(DEFAULT_TEAM_ID);
+    });
+
+    it("PUT remove member on the Default team returns SCIM 400", async () => {
+      await createScimUser({ userName: uniqueName("scim-put-del-default") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Groups/${DEFAULT_TEAM_ID}`,
+        headers: authHeaders(),
+        payload: {
+          displayName: "Default",
+          members: [],
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail: "Cannot remove members from the Default team",
+      });
+    });
+
+    it("returns 204 once and 404 on the loser when two concurrent DELETEs race on the same group (#2922)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-del-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-del-race-grp"),
+        members: [{ value: member.id }],
+      });
+
+      const results = await raceRowLocks("teams", 2, () =>
+        Promise.all([
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+          }),
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+          }),
+        ]),
+      );
+
+      const statuses = results.map((r) => r.statusCode).sort();
+      expect(statuses).toEqual([204, 404]);
+      const notFound = results.find((r) => r.statusCode === 404);
+      expect(JSON.parse(notFound?.body ?? "{}")).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "Group not found",
+      });
+
+      const [teamRowDb] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+      expect(teamRowDb).toBeUndefined();
+      expect((await userRow(member.id))?.team).toBe(DEFAULT_TEAM_ID);
+
+      const deletedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+            sql`${schema.auditLog.details}->>'action' = 'deleted'`,
+          ),
+        );
+      expect(deletedAuditRows).toHaveLength(1);
+    });
+
+    it("rejects DELETE with SCIM 400 when the group is renamed to Default before the row lock is acquired (#2922)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-del-def-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-del-def-race-grp"),
+        members: [{ value: member.id }],
+      });
+      await db
+        .update(schema.teams)
+        .set({ name: "OriginalDefault" })
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+
+      try {
+        const res = await raceRowLocks(
+          "teams",
+          1,
+          () =>
+            crudApp.app.inject({
+              method: "DELETE",
+              url: `/api/v1/scim/v2/Groups/${group.id}`,
+              headers: authHeaders(),
+            }),
+          (tx) =>
+            tx.update(schema.teams).set({ name: "Default" }).where(eq(schema.teams.id, group.id)),
+        );
+
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot delete the Default team",
+        });
+
+        const [teamRowDb] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(teamRowDb?.name).toBe("Default");
+        expect((await userRow(member.id))?.team).toBe(group.id);
+        const deletedAuditRows = await db
+          .select()
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+              sql`${schema.auditLog.details}->>'action' = 'deleted'`,
+            ),
+          );
+        expect(deletedAuditRows).toHaveLength(0);
+      } finally {
+        await db.delete(schema.teams).where(eq(schema.teams.id, group.id));
+        await db
+          .update(schema.teams)
+          .set({ name: "Default" })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      }
+    });
+
+    it("serializes DELETE /api/v1/scim/v2/Groups/:id with PUT /api/auth/users/:id so a member assignment is never orphaned (#2922)", async () => {
+      const adminToken = await loginAsAdmin(crudApp.app);
+      const user = await createScimUser({ userName: uniqueName("scim-del-put-user") });
+      const group = await createScimGroup({ displayName: uniqueName("scim-del-put-grp") });
+
+      const [assignRes, deleteRes] = await raceRowLocks("users", 2, async () => {
+        const assigning = crudApp.app.inject({
+          method: "PUT",
+          url: `/api/auth/users/${user.id}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { team: group.id },
+        });
+        await waitForLockWaiters(1);
+        const deleting = crudApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/scim/v2/Groups/${group.id}`,
+          headers: authHeaders(),
+        });
+        return Promise.all([assigning, deleting]);
+      });
+
+      expect(assignRes.statusCode, assignRes.body).toBe(200);
+      expect(deleteRes.statusCode, deleteRes.body).toBe(204);
+
+      const [teamRowDb] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+      expect(teamRowDb).toBeUndefined();
+      expect((await userRow(user.id))?.team).toBe(DEFAULT_TEAM_ID);
+    });
+
+    it("serializes DELETE /api/v1/scim/v2/Groups/:id with POST /api/auth/register so a newly registered member is never orphaned (#2922)", async () => {
+      const adminToken = await loginAsAdmin(crudApp.app);
+      const group = await createScimGroup({ displayName: uniqueName("scim-del-reg-grp") });
+      const regUsername = uniqueName("scim-del-reg-user");
+
+      try {
+        const [registerRes, deleteRes] = await raceRowLocks("users", 2, async () => {
+          const registering = crudApp.app.inject({
+            method: "POST",
+            url: "/api/auth/register",
+            headers: { authorization: `Bearer ${adminToken}` },
+            payload: {
+              username: regUsername,
+              password: "ValidPass1",
+              role: "user",
+              team: group.displayName,
+            },
+          });
+          await waitForLockWaiters(1);
+          const deleting = crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+          });
+          return Promise.all([registering, deleting]);
+        });
+
+        expect(registerRes.statusCode, registerRes.body).toBe(201);
+        expect(deleteRes.statusCode, deleteRes.body).toBe(204);
+
+        const [teamRowDb] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(teamRowDb).toBeUndefined();
+        const [regUser] = await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.username, regUsername));
+        expect(regUser?.team).toBe(DEFAULT_TEAM_ID);
+      } finally {
+        await db.delete(schema.users).where(eq(schema.users.username, regUsername));
+      }
+    });
+
+    it("returns SCIM 404 and leaves members untouched when a group is deleted before PUT locks the team row (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-put-del-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-put-del-race-grp"),
+      });
+
+      const res = await raceRowLocks(
+        "teams",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+            payload: {
+              displayName: uniqueName("scim-put-del-race-renamed"),
+              members: [{ value: member.id }],
+            },
+          }),
+        (tx) => tx.delete(schema.teams).where(eq(schema.teams.id, group.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "Group not found",
+      });
+      expect((await userRow(member.id))?.team).toBe(DEFAULT_TEAM_ID);
+
+      const syncedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+            sql`${schema.auditLog.details}->>'action' = 'replaced'`,
+          ),
+        );
+      expect(syncedAuditRows).toHaveLength(0);
+    });
+
+    it("returns SCIM 404 and leaves members untouched when a group is deleted before PATCH locks the team row (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-patch-del-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-patch-del-race-grp"),
+      });
+
+      const res = await raceRowLocks(
+        "teams",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [
+                {
+                  op: "replace",
+                  path: "displayName",
+                  value: uniqueName("scim-patch-del-race-renamed"),
+                },
+                { op: "add", path: "members", value: [{ value: member.id }] },
+              ],
+            },
+          }),
+        (tx) => tx.delete(schema.teams).where(eq(schema.teams.id, group.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "Group not found",
+      });
+      expect((await userRow(member.id))?.team).toBe(DEFAULT_TEAM_ID);
+
+      const syncedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+            sql`${schema.auditLog.details}->>'action' = 'patched'`,
+          ),
+        );
+      expect(syncedAuditRows).toHaveLength(0);
+    });
+
+    it("rejects PUT member replacement with SCIM 400 when the group is renamed to Default before or during the transaction (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-put-def-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-put-def-race-grp"),
+        members: [{ value: member.id }],
+      });
+      await db
+        .update(schema.teams)
+        .set({ name: "OriginalDefaultPut" })
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+
+      try {
+        // 1. Renamed to Default by a concurrent transaction before the row lock is acquired
+        const res = await raceRowLocks(
+          "teams",
+          1,
+          () =>
+            crudApp.app.inject({
+              method: "PUT",
+              url: `/api/v1/scim/v2/Groups/${group.id}`,
+              headers: authHeaders(),
+              payload: {
+                displayName: uniqueName("scim-put-def-race-skipped-rename"),
+                members: [],
+              },
+            }),
+          (tx) =>
+            tx.update(schema.teams).set({ name: "Default" }).where(eq(schema.teams.id, group.id)),
+        );
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot remove members from the Default team",
+        });
+        const [lockedTeamRow] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(lockedTeamRow?.name).toBe("Default");
+        expect((await userRow(member.id))?.team).toBe(group.id);
+
+        // 2. Renamed to Default by the PUT request itself while replacing members
+        await db
+          .update(schema.teams)
+          .set({ name: group.displayName })
+          .where(eq(schema.teams.id, group.id));
+
+        const samePutRes = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Groups/${group.id}`,
+          headers: authHeaders(),
+          payload: {
+            displayName: "Default",
+            members: [],
+          },
+        });
+
+        expect(samePutRes.statusCode, samePutRes.body).toBe(400);
+        expect(JSON.parse(samePutRes.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot remove members from the Default team",
+        });
+        const [teamRowDb] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(teamRowDb?.name).toBe(group.displayName);
+        expect((await userRow(member.id))?.team).toBe(group.id);
+
+        const syncedAuditRows = await db
+          .select()
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+              sql`${schema.auditLog.details}->>'action' = 'replaced'`,
+            ),
+          );
+        expect(syncedAuditRows).toHaveLength(0);
+      } finally {
+        await db
+          .update(schema.users)
+          .set({ team: DEFAULT_TEAM_ID })
+          .where(eq(schema.users.team, group.id));
+        await db.delete(schema.teams).where(eq(schema.teams.id, group.id));
+        await db
+          .update(schema.teams)
+          .set({ name: "Default" })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      }
+    });
+
+    it("rejects PATCH member removal with SCIM 400 when the group is renamed to Default before or during the transaction (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-patch-def-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-patch-def-race-grp"),
+        members: [{ value: member.id }],
+      });
+      await db
+        .update(schema.teams)
+        .set({ name: "OriginalDefaultPatch" })
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+
+      try {
+        // 1. Renamed to Default by a concurrent transaction before the row lock is acquired
+        const raceRes = await raceRowLocks(
+          "teams",
+          1,
+          () =>
+            crudApp.app.inject({
+              method: "PATCH",
+              url: `/api/v1/scim/v2/Groups/${group.id}`,
+              headers: authHeaders(),
+              payload: {
+                schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                Operations: [{ op: "remove", path: "members", value: [{ value: member.id }] }],
+              },
+            }),
+          (tx) =>
+            tx.update(schema.teams).set({ name: "Default" }).where(eq(schema.teams.id, group.id)),
+        );
+
+        expect(raceRes.statusCode, raceRes.body).toBe(400);
+        expect(JSON.parse(raceRes.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot remove members from the Default team",
+        });
+        expect((await userRow(member.id))?.team).toBe(group.id);
+
+        // 2. Renamed to Default by an earlier op in the same PATCH before removing or replacing members
+        await db
+          .update(schema.teams)
+          .set({ name: group.displayName })
+          .where(eq(schema.teams.id, group.id));
+
+        for (const memberOp of [
+          { op: "remove", path: "members", value: [{ value: member.id }] },
+          { op: "replace", path: "members", value: [] },
+        ]) {
+          const multiOpRes = await crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [{ op: "replace", path: "displayName", value: "Default" }, memberOp],
+            },
+          });
+
+          expect(multiOpRes.statusCode, multiOpRes.body).toBe(400);
+          expect(JSON.parse(multiOpRes.body)).toEqual({
+            schemas: [SCIM_ERROR_SCHEMA],
+            status: 400,
+            detail: "Cannot remove members from the Default team",
+          });
+          const [teamRowDb] = await db
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, group.id));
+          expect(teamRowDb?.name).toBe(group.displayName);
+          expect((await userRow(member.id))?.team).toBe(group.id);
+        }
+
+        const syncedAuditRows = await db
+          .select()
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+              sql`${schema.auditLog.details}->>'action' = 'patched'`,
+            ),
+          );
+        expect(syncedAuditRows).toHaveLength(0);
+      } finally {
+        await db
+          .update(schema.users)
+          .set({ team: DEFAULT_TEAM_ID })
+          .where(eq(schema.users.team, group.id));
+        await db.delete(schema.teams).where(eq(schema.teams.id, group.id));
+        await db
+          .update(schema.teams)
+          .set({ name: "Default" })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      }
+    });
+  });
+
+  describe("Groups leave the synthetic anonymous row alone (#4046)", () => {
+    let defaultTeamId: string;
+
+    async function anonymousTeam(): Promise<string | undefined> {
+      const [row] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+      return row?.team;
+    }
+
+    async function groupMembers(groupId: string): Promise<string[]> {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: `/api/v1/scim/v2/Groups/${groupId}`,
+        headers: authHeaders(),
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const body = JSON.parse(res.body) as { members: Array<{ value: string }> };
+      return body.members.map((member) => member.value);
+    }
+
+    async function lastSync(teamId: string, action: string): Promise<Record<string, unknown>> {
+      const [row] = await db
+        .select({ details: schema.auditLog.details })
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${teamId}`,
+            sql`${schema.auditLog.details}->>'action' = ${action}`,
+          ),
+        )
+        .orderBy(desc(schema.auditLog.createdAt))
+        .limit(1);
+      return (row?.details ?? {}) as Record<string, unknown>;
+    }
+
+    beforeAll(async () => {
+      await ensureAnonymousUser();
+      const [defaultTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.name, "Default"));
+      defaultTeamId = defaultTeam?.id ?? DEFAULT_TEAM_ID;
+      await db
+        .update(schema.users)
+        .set({ team: defaultTeamId })
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+    });
+
+    afterAll(async () => {
+      await db
+        .update(schema.users)
+        .set({ team: defaultTeamId })
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+    });
+
+    it("omits the synthetic anonymous row from GET /Groups/:id", async () => {
+      expect(await groupMembers(defaultTeamId)).not.toContain(ANONYMOUS_USER_ID);
+    });
+
+    it("omits the synthetic anonymous row from GET /Groups", async () => {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Groups?count=200",
+        headers: authHeaders(),
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      const resources = JSON.parse(res.body).Resources as Array<{
+        id: string;
+        members: Array<{ value: string }>;
+      }>;
+      const defaultGroup = resources.find((group) => group.id === defaultTeamId);
+      expect(defaultGroup).toBeDefined();
+      expect(defaultGroup?.members.map((member) => member.value)).not.toContain(ANONYMOUS_USER_ID);
+    });
+
+    it("skips the synthetic anonymous row when a group is created with it as a member", async () => {
+      const displayName = uniqueName("scim-4046-post");
+      const res = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Groups",
+        headers: authHeaders(),
+        payload: { displayName, members: [{ value: ANONYMOUS_USER_ID }] },
+      });
+
+      expect(res.statusCode, res.body).toBe(201);
+      const body = JSON.parse(res.body) as { id: string; members: unknown[] };
+      expect(body.members).toEqual([]);
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+      expect((await lastSync(body.id, "created")).skippedMembers).toEqual([ANONYMOUS_USER_ID]);
+    });
+
+    it("skips the synthetic anonymous row on a PATCH add", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-4046-patch") });
+      const real = await createScimUser({ userName: uniqueName("scim-4046-patch-real") });
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Groups/${group.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [
+            {
+              op: "add",
+              path: "members",
+              value: [{ value: ANONYMOUS_USER_ID }, { value: real.id }],
+            },
+          ],
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await groupMembers(group.id)).toEqual([real.id]);
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+      expect((await lastSync(group.id, "patched")).skippedMembers).toEqual([ANONYMOUS_USER_ID]);
+    });
+
+    it("skips the synthetic anonymous row on a PUT replace", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-4046-put") });
+      const real = await createScimUser({ userName: uniqueName("scim-4046-put-real") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Groups/${group.id}`,
+        headers: authHeaders(),
+        payload: {
+          displayName: group.displayName,
+          members: [{ value: ANONYMOUS_USER_ID }, { value: real.id }],
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await groupMembers(group.id)).toEqual([real.id]);
+      expect(await anonymousTeam()).toBe(defaultTeamId);
+    });
+
+    it("normalizes a legacy anonymous membership when a group is replaced", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-4046-legacy") });
+      await db
+        .update(schema.users)
+        .set({ team: group.id })
+        .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+
+      try {
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Groups/${group.id}`,
+          headers: authHeaders(),
+          payload: { displayName: group.displayName, members: [] },
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        // The bulk move-out still sends every row to Default, so a membership
+        // written before the addMembers guard existed does not linger unseen.
+        expect(await anonymousTeam()).toBe(defaultTeamId);
+      } finally {
+        await db
+          .update(schema.users)
+          .set({ team: defaultTeamId })
+          .where(eq(schema.users.id, ANONYMOUS_USER_ID));
+      }
     });
   });
 });

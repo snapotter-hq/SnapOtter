@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter에 기여하는 방법. 버그 리포트, 기능 요청, 풀 리퀘스트, CLA 요구사항."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: 435d2600f5c1
 i18n_hash_version: 2

@@ -10,10 +10,19 @@
  * consumer pacing.
  */
 
+import { once } from "node:events";
 import { PassThrough } from "node:stream";
+import { SafeError } from "@snapotter/shared";
 import type { FastifyRequest } from "fastify";
-import { describe, expect, it } from "vitest";
-import { multipartParts } from "../../../apps/api/src/lib/multipart-parts.js";
+import { describe, expect, it, vi } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
+import {
+  formatLimit,
+  multipartFailure,
+  multipartParts,
+  readFilePart,
+} from "../../../apps/api/src/lib/multipart-parts.js";
 
 const BOUNDARY = "----UnitBoundary1234";
 
@@ -90,6 +99,134 @@ describe("multipartParts", () => {
     expect(sizes.mask).toBe(8 * 1024);
   });
 
+  // #2156: a route that only reads some file parts (the effects route reads
+  // `backgroundImage` and nothing else) moves past the others. Busboy emits
+  // "finish" only after every file stream has ended, so an unread part left
+  // the iterator, and the request behind it, waiting forever.
+  describe("a file part the consumer doesn't read (#2156)", () => {
+    const HUNG = Symbol("hung");
+
+    /** Collect every part, or report HUNG if the iterator never finishes. */
+    async function collect(
+      request: FastifyRequest,
+      onFile: (part: { fieldname: string; file: NodeJS.ReadableStream }) => Promise<void>,
+      limits?: { fileSize?: number },
+    ): Promise<string[] | typeof HUNG> {
+      const seen: string[] = [];
+      const run = (async () => {
+        for await (const part of multipartParts(request, limits)) {
+          if (part.type === "file") {
+            seen.push(`file:${part.fieldname}`);
+            await onFile(part);
+          } else {
+            seen.push(`field:${part.fieldname}=${part.value}`);
+          }
+        }
+        return seen;
+      })();
+      let timer: NodeJS.Timeout | undefined;
+      const timeout = new Promise<typeof HUNG>((resolve) => {
+        timer = setTimeout(() => resolve(HUNG), 2000);
+      });
+      try {
+        return await Promise.race([run, timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    it("finishes when a stray file part is followed by a field", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "stray.png", content: Buffer.alloc(4 * 1024, 1) },
+        { name: "settings", content: "{}" },
+      ]);
+
+      const seen = await collect(fakeRequest(body), async () => {});
+
+      expect(seen).toEqual(["file:file", "field:settings={}"]);
+    });
+
+    it("finishes when the stray file part is empty", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "empty.png", content: "" },
+        { name: "settings", content: "{}" },
+      ]);
+
+      expect(await collect(fakeRequest(body), async () => {})).toEqual([
+        "file:file",
+        "field:settings={}",
+      ]);
+    });
+
+    it("finishes when a part was only partly read", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "big.bin", content: Buffer.alloc(512 * 1024, 2) },
+        { name: "settings", content: "{}" },
+      ]);
+
+      const seen = await collect(fakeRequest(body), async (part) => {
+        // Take the first chunk and leave the stream paused with the rest
+        // unread, as a reader that stopped early would.
+        await once(part.file, "readable");
+        part.file.read(1);
+        part.file.pause();
+      });
+
+      expect(seen).toEqual(["file:file", "field:settings={}"]);
+    });
+
+    it("still delivers a part that was read, byte for byte", async () => {
+      const body = multipartBody([
+        { name: "skipped", filename: "a.bin", content: Buffer.alloc(1024, 3) },
+        { name: "wanted", filename: "b.bin", content: Buffer.alloc(2048, 4) },
+      ]);
+      let wanted = 0;
+
+      const seen = await collect(fakeRequest(body), async (part) => {
+        if (part.fieldname === "wanted") wanted = (await drain(part.file)).length;
+      });
+
+      expect(seen).toEqual(["file:skipped", "file:wanted"]);
+      expect(wanted).toBe(2048);
+    });
+
+    it("answers 413 for an unread part that is over the size limit instead of hanging", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "huge.bin", content: Buffer.alloc(64 * 1024, 5) },
+        { name: "settings", content: "{}" },
+      ]);
+
+      const outcome = await collect(fakeRequest(body), async () => {}, { fileSize: 1024 }).catch(
+        (err: unknown) => err,
+      );
+
+      expect(outcome).not.toBe(HUNG);
+      expect(multipartFailure(outcome).status).toBe(413);
+    });
+
+    it("answers 413 when the unread part crosses the limit after the consumer moved on", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "huge.bin", content: Buffer.alloc(64 * 1024, 5) },
+        { name: "settings", content: "{}" },
+      ]);
+      // The headers and a few bytes first, the rest once the iterator has
+      // already advanced past the part, as on a slow connection.
+      const raw = new PassThrough();
+      Object.assign(raw, {
+        headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
+      });
+      raw.write(body.subarray(0, 200));
+      setTimeout(() => raw.end(body.subarray(200)), 100);
+
+      const outcome = await collect({ raw } as unknown as FastifyRequest, async () => {}, {
+        fileSize: 1024,
+      }).catch((err: unknown) => err);
+
+      expect(outcome).not.toBe(HUNG);
+      expect(multipartFailure(outcome).status).toBe(413);
+    });
+  });
+
   it("propagates malformed multipart as an error", async () => {
     const raw = new PassThrough();
     Object.assign(raw, {
@@ -129,6 +266,28 @@ describe("multipartParts", () => {
     await generator.return(undefined);
   });
 
+  it("fails an over-limit file with a 413 error, not a bare Error (#1280)", async () => {
+    // A bare Error has no status, so a route that lets it escape (the on-demand
+    // preview did) answered 500. The status must travel with the error. The
+    // message keeps "file too large" because ocrUploadErrorStatus matches on it.
+    const body = multipartBody([
+      { name: "file", filename: "big.bin", content: Buffer.alloc(4096, 1) },
+    ]);
+
+    let caught: unknown;
+    try {
+      for await (const part of multipartParts(fakeRequest(body), { fileSize: 1024 })) {
+        if (part.type === "file") await drain(part.file);
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).toMatchObject({ statusCode: 413, code: "FST_REQ_FILE_TOO_LARGE" });
+    expect((caught as Error).message).toMatch(/file too large/i);
+  });
+
   it("rejects a request with more than 100 text fields", async () => {
     const body = multipartBody(
       Array.from({ length: 101 }, (_, i) => ({ name: `field${i}`, content: "x" })),
@@ -153,6 +312,55 @@ describe("multipartParts", () => {
     }).rejects.toThrow("field value too large");
   });
 
+  it.each([
+    [
+      "too many text fields",
+      multipartBody(Array.from({ length: 101 }, (_, i) => ({ name: `f${i}`, content: "x" }))),
+    ],
+    [
+      "a text field over the cap",
+      multipartBody([{ name: "settings", content: Buffer.alloc(1024 * 1024 + 1, 0x61) }]),
+    ],
+    [
+      "more files than MAX_BATCH_SIZE",
+      multipartBody(
+        Array.from({ length: 11 }, (_, i) => ({
+          name: "file",
+          filename: `${i}.bin`,
+          content: "x",
+        })),
+      ),
+    ],
+    ["a body that isn't multipart", Buffer.from("this is not multipart at all")],
+  ])("marks %s as the client's error, a 400 (#1473)", async (_label, body) => {
+    // A bare Error reaches the error handler as a reported 500. These are all
+    // the request's fault, so the status travels with the error.
+    let caught: unknown;
+    try {
+      for await (const part of multipartParts(fakeRequest(body))) {
+        if (part.type === "file") await drain(part.file);
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).toMatchObject({ statusCode: 400 });
+  });
+
+  it("marks a multipart header with no boundary as a 400 (#1473)", async () => {
+    // A client that sets Content-Type by hand on a FormData body sends this.
+    const raw = new PassThrough();
+    Object.assign(raw, { headers: { "content-type": "multipart/form-data" } });
+    raw.end("anything");
+
+    await expect(async () => {
+      for await (const part of multipartParts({ raw } as unknown as FastifyRequest)) {
+        if (part.type === "file") await drain(part.file);
+      }
+    }).rejects.toMatchObject({ statusCode: 400 });
+  });
+
   it("honors a route-specific two-file limit", async () => {
     const body = multipartBody([
       { name: "index", filename: "ocr-runtime-index.json", content: "index" },
@@ -165,5 +373,283 @@ describe("multipartParts", () => {
         if (part.type === "file") await drain(part.file);
       }
     }).rejects.toThrow("files limit");
+  });
+});
+
+describe("readFilePart (#1473)", () => {
+  it("reads a file part into memory", async () => {
+    const body = multipartBody([{ name: "file", filename: "a.bin", content: "hello" }]);
+    for await (const part of multipartParts(fakeRequest(body))) {
+      if (part.type === "file") expect((await readFilePart(part.file)).toString()).toBe("hello");
+    }
+  });
+
+  it("keeps the 413 of a part over the size limit", async () => {
+    const body = multipartBody([
+      { name: "file", filename: "big.bin", content: Buffer.alloc(4096, 1) },
+    ]);
+    const generator = multipartParts(fakeRequest(body), { fileSize: 1024 });
+    const { value: part } = await generator.next();
+    if (part?.type !== "file") throw new Error("expected a file part");
+
+    await expect(readFilePart(part.file)).rejects.toMatchObject({ statusCode: 413 });
+    await generator.return(undefined);
+  });
+
+  /** A request whose body so far is half of one file part, and the part. */
+  async function halfSentFile() {
+    const raw = new PassThrough();
+    Object.assign(raw, {
+      headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
+    });
+    raw.write(
+      `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="a.bin"\r\n` +
+        "Content-Type: application/octet-stream\r\n\r\npartial content",
+    );
+    const generator = multipartParts({ raw } as unknown as FastifyRequest);
+    const { value: part } = await generator.next();
+    if (part?.type !== "file") throw new Error("expected a file part");
+    return { raw, generator, file: part.file };
+  }
+
+  it("marks a part the body ends in the middle of as a 400", async () => {
+    // The reader is already waiting on the part when the body stops.
+    const { raw, generator, file } = await halfSentFile();
+
+    const reading = readFilePart(file);
+    await sleep(10);
+    raw.end();
+
+    await expect(reading).rejects.toMatchObject({ statusCode: 400 });
+    await generator.return(undefined);
+  });
+
+  it("fails a part the body stopped in even when nothing was reading it yet", async () => {
+    // Busboy reports the cut on itself and ends the part as if it were
+    // complete. Reading it later must fail, not hand back the truncated bytes
+    // as if they were the whole file.
+    const { raw, generator, file } = await halfSentFile();
+    raw.end();
+    await sleep(10);
+
+    await expect(readFilePart(file)).rejects.toMatchObject({ statusCode: 400 });
+    await generator.return(undefined);
+  });
+
+  it("fails the part being read with a 400 when the client drops the connection", async () => {
+    // A dropped connection errors the request stream and never ends it, so
+    // busboy never notices. The reader used to wait on the part forever, and
+    // the upload never got to discard what it had already staged.
+    const { raw, generator, file } = await halfSentFile();
+
+    const reading = readFilePart(file).then(
+      () => "resolved",
+      (err: unknown) => err,
+    );
+    await sleep(10);
+    raw.emit("error", Object.assign(new Error("aborted"), { code: "ECONNRESET" }));
+
+    const outcome = await Promise.race([reading, sleep(1000).then(() => "still waiting")]);
+    expect(outcome).toMatchObject({ statusCode: 400, code: "ECONNRESET" });
+    await generator.return(undefined);
+  });
+
+  it("fails the next part with a 400 when the client drops the connection between parts", async () => {
+    const raw = new PassThrough();
+    Object.assign(raw, {
+      headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
+    });
+    // A whole field, then the start of the next part: busboy only emits the
+    // field once it sees the boundary after it.
+    raw.write(
+      `--${BOUNDARY}\r\nContent-Disposition: form-data; name="toolId"\r\n\r\nresize\r\n--${BOUNDARY}\r\n`,
+    );
+    const generator = multipartParts({ raw } as unknown as FastifyRequest);
+    expect((await generator.next()).value).toMatchObject({ type: "field", value: "resize" });
+
+    const next = generator.next().then(
+      () => "resolved",
+      (err: unknown) => err,
+    );
+    raw.emit("error", Object.assign(new Error("aborted"), { code: "ECONNRESET" }));
+
+    expect(await next).toMatchObject({ statusCode: 400, code: "ECONNRESET" });
+  });
+
+  it("converts a V8 buffer allocation failure in Buffer.concat into DecoderOutOfMemoryError (#3898)", async () => {
+    const body = multipartBody([{ name: "file", filename: "a.bin", content: "hello" }]);
+    const generator = multipartParts(fakeRequest(body));
+    const { value: part } = await generator.next();
+    if (part?.type !== "file") throw new Error("expected a file part");
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const concatSpy = vi.spyOn(Buffer, "concat").mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    try {
+      const err = await readFilePart(part.file).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(err).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      concatSpy.mockRestore();
+      await generator.return(undefined);
+    }
+  });
+
+  it("converts a V8 buffer allocation failure emitted on the stream into DecoderOutOfMemoryError instead of 400 (#3898)", async () => {
+    const { raw, generator, file } = await halfSentFile();
+    const v8Oom = new RangeError("Array buffer allocation failed");
+
+    const reading = readFilePart(file).catch((e: unknown) => e);
+    await sleep(10);
+    raw.emit("error", v8Oom);
+
+    const err = await reading;
+    expect(err).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(err).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+    await generator.return(undefined);
+  });
+});
+
+describe("multipartFailure (#1341)", () => {
+  async function limitError(): Promise<unknown> {
+    const body = multipartBody([
+      { name: "file", filename: "big.bin", content: Buffer.alloc(4096, 1) },
+    ]);
+    try {
+      for await (const part of multipartParts(fakeRequest(body), { fileSize: 1024 })) {
+        if (part.type === "file") await drain(part.file);
+      }
+    } catch (err) {
+      return err;
+    }
+    throw new Error("expected the over-limit read to fail");
+  }
+
+  it("answers an over-limit file with 413, naming the limit that fired", async () => {
+    // limitError() reads with a route-specific 1024-byte cap, not the global one.
+    expect(multipartFailure(await limitError())).toEqual({
+      status: 413,
+      body: { error: "File exceeds the 1 KB upload limit" },
+    });
+  });
+
+  it("names a storage-side limit carried on the error", () => {
+    // putObjectStream's maxBytes error (object-storage.ts) carries limitBytes too.
+    const err = Object.assign(new Error("Object exceeds the maximum allowed size"), {
+      statusCode: 413,
+      limitBytes: 25 * 1024 * 1024,
+    });
+    expect(multipartFailure(err).body).toEqual({ error: "File exceeds the 25 MB upload limit" });
+  });
+
+  it("falls back to MAX_UPLOAD_SIZE_MB when a 413 doesn't say its limit", () => {
+    // vitest runs with MAX_UPLOAD_SIZE_MB=10 (vitest.config.ts).
+    const err = Object.assign(new Error("too large"), { statusCode: 413 });
+    expect(multipartFailure(err)).toEqual({
+      status: 413,
+      body: { error: "File exceeds the 10 MB upload limit" },
+    });
+  });
+
+  // #2225: MAX_UPLOAD_SIZE_MB=0 (unlimited, the Docker image's default) leaves
+  // the fallback nothing to name. @fastify/multipart still caps request.file()
+  // at the body limit and throws without saying so; the answer read "the 0 KB
+  // upload limit". The other limit checks read a negative value as unlimited
+  // as well.
+  it.each([0, -1])(
+    "names no number when neither the error nor MAX_UPLOAD_SIZE_MB=%i sets a limit",
+    (mb) => {
+      const configured = env.MAX_UPLOAD_SIZE_MB;
+      env.MAX_UPLOAD_SIZE_MB = mb;
+      try {
+        const unnamed = Object.assign(new Error("request file too large"), { statusCode: 413 });
+        expect(multipartFailure(unnamed)).toEqual({
+          status: 413,
+          body: { error: "File exceeds the upload limit" },
+        });
+
+        // A cap the error carries is still named on an unlimited instance.
+        const named = Object.assign(new Error("too large"), { statusCode: 413, limitBytes: 1024 });
+        expect(multipartFailure(named).body).toEqual({
+          error: "File exceeds the 1 KB upload limit",
+        });
+      } finally {
+        env.MAX_UPLOAD_SIZE_MB = configured;
+      }
+    },
+  );
+
+  it("keeps any other parse failure a 400, with internal paths stripped", () => {
+    const failure = multipartFailure(new Error("Unexpected end of form at /tmp/uploads/abc"));
+    expect(failure.status).toBe(400);
+    expect(failure.body).toEqual({
+      error: "Failed to parse multipart request",
+      details: "Unexpected end of form at [internal]",
+    });
+  });
+
+  it("treats a non-Error throw as a 400", () => {
+    expect(multipartFailure("boom")).toEqual({
+      status: 400,
+      body: { error: "Failed to parse multipart request", details: "boom" },
+    });
+  });
+
+  // #1421: a storage fault while the upload streams in (the workspace cap,
+  // the disk floor, a full or read-only volume, an S3 outage) is the server's,
+  // not a malformed request. It goes back to the route's caller unchanged, so
+  // the global error handler answers with its status, message and code, and
+  // reports it.
+  it("rethrows a server-side fault instead of calling it a malformed request", () => {
+    const cap = new SafeError("Workspace storage limit reached", {
+      kind: "operational",
+      code: "workspace-cap",
+      statusCode: 503,
+    });
+    expect(() => multipartFailure(cap)).toThrow(cap);
+
+    const other = Object.assign(new Error("storage exploded"), { statusCode: 500 });
+    expect(() => multipartFailure(other)).toThrow(other);
+  });
+
+  it("converts a V8 buffer allocation failure into DecoderOutOfMemoryError and rethrows it (#3898)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    let caught: unknown;
+    try {
+      multipartFailure(v8Oom);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(caught).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+
+    const otherRange = new RangeError("Invalid array length");
+    expect(multipartFailure(otherRange)).toEqual({
+      status: 400,
+      body: {
+        error: "Failed to parse multipart request",
+        details: "Invalid array length",
+      },
+    });
+  });
+
+  it("formats byte limits in KB below 1 MiB and MB at or above 1 MiB (#2437)", () => {
+    expect(formatLimit(64)).toBe("1 KB");
+    expect(formatLimit(1024)).toBe("1 KB");
+    expect(formatLimit(512 * 1024 * 1024)).toBe("512 MB");
+    expect(formatLimit(1.5 * 1024 * 1024)).toBe("1.5 MB");
   });
 });

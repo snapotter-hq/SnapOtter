@@ -47,8 +47,10 @@ def _mesh_with_solutions(img_array, max_faces=50, min_confidence=0.5):
         refine_landmarks=True,
         min_detection_confidence=min_confidence,
     )
-    results = mesh.process(img_array)
-    mesh.close()
+    try:
+        results = mesh.process(img_array)
+    finally:
+        mesh.close()
 
     if not results.multi_face_landmarks:
         return []
@@ -71,9 +73,11 @@ def _mesh_with_tasks(img_array, max_faces=50, min_confidence=0.5):
         min_face_detection_confidence=min_confidence,
     )
     landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(options)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
-    result = landmarker.detect(mp_image)
-    landmarker.close()
+    try:
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
+        result = landmarker.detect(mp_image)
+    finally:
+        landmarker.close()
 
     if not result.face_landmarks:
         return []
@@ -83,10 +87,16 @@ def _mesh_with_tasks(img_array, max_faces=50, min_confidence=0.5):
 
 def _detect_face_mesh(img_array, max_faces=50, min_confidence=0.5):
     """Detect face mesh, trying legacy API first then falling back to tasks API."""
+    import mediapipe as mp
+
     try:
-        return _mesh_with_solutions(img_array, max_faces, min_confidence)
+        mp_face_mesh = mp.solutions.face_mesh
     except AttributeError:
-        return _mesh_with_tasks(img_array, max_faces, min_confidence)
+        mp_face_mesh = None
+
+    if mp_face_mesh is not None:
+        return _mesh_with_solutions(img_array, max_faces, min_confidence)
+    return _mesh_with_tasks(img_array, max_faces, min_confidence)
 
 
 def main():
@@ -109,7 +119,18 @@ def main():
 
     try:
         emit_progress(10, "Preparing image")
-        from PIL import Image
+        try:
+            from PIL import Image
+        except ImportError:
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": "Pillow is not installed. Install with: pip install Pillow",
+                    }
+                )
+            )
+            sys.exit(1)
 
         img = Image.open(input_path).convert("RGB")
         width, height = img.size
@@ -268,32 +289,8 @@ def main():
                 # Update the PIL image from the corrected array
                 img = Image.fromarray(img_array)
 
-            emit_progress(95, "Saving result")
-
-            save_kwargs = {}
-            if save_format == "JPEG":
-                save_kwargs["quality"] = quality
-            elif save_format == "WEBP":
-                save_kwargs["quality"] = quality
-
-            img.save(output_path, format=save_format, **save_kwargs)
-
-            print(
-                json.dumps(
-                    {
-                        "success": True,
-                        "facesDetected": faces_detected,
-                        "eyesCorrected": eyes_corrected,
-                        "width": width,
-                        "height": height,
-                        "format": format_label,
-                        "output_path": output_path,
-                    }
-                )
-            )
-
         except ImportError as e:
-            msg = str(e)
+            msg = str(e).strip() or type(e).__name__
             hint = "Fix with: apt-get install -y libgl1" if "libGL" in msg else "Install with: pip install mediapipe numpy opencv-python"
             print(
                 json.dumps(
@@ -305,18 +302,32 @@ def main():
             )
             sys.exit(1)
 
-    except ImportError:
+        emit_progress(95, "Saving result")
+
+        save_kwargs = {}
+        if save_format == "JPEG":
+            save_kwargs["quality"] = quality
+        elif save_format == "WEBP":
+            save_kwargs["quality"] = quality
+
+        img.save(output_path, format=save_format, **save_kwargs)
+
         print(
             json.dumps(
                 {
-                    "success": False,
-                    "error": "Pillow is not installed. Install with: pip install Pillow",
+                    "success": True,
+                    "facesDetected": faces_detected,
+                    "eyesCorrected": eyes_corrected,
+                    "width": width,
+                    "height": height,
+                    "format": format_label,
+                    "output_path": output_path,
                 }
             )
         )
-        sys.exit(1)
+
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

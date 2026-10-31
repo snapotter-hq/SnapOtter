@@ -6,34 +6,117 @@
  * MP3 (audio), or PDF (documents) previews and caches them on disk.
  */
 import { randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { createReadStream, createWriteStream, type Dirent } from "node:fs";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, extname, join, resolve, sep } from "node:path";
+import { pipeline } from "node:stream/promises";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
 import { runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
-import { isSafeMessageError } from "@snapotter/shared";
+import { connectivityClass, isClientAbort, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
+import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
-import { getStoredFilePath } from "../lib/file-storage.js";
+import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
+import { logger } from "../lib/logger.js";
+import { mp4TimescaleArgs } from "../lib/media-tool.js";
+import { readFilePart } from "../lib/multipart-parts.js";
+import {
+  normalizeOperationalWriteError,
+  STORAGE_UNAVAILABLE_MESSAGE,
+} from "../lib/object-storage.js";
+import { InputValidationError } from "../modality/contract.js";
 import { hasEffectivePermission, requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 
 const PREVIEW_DIR = ".previews";
-let previewDirReady = false;
+let previewDirReady: Promise<void> | undefined;
 
 function previewDirPath(): string {
   return join(env.FILES_STORAGE_PATH, PREVIEW_DIR);
 }
 
-async function ensurePreviewDir(): Promise<void> {
-  if (previewDirReady) return;
-  await mkdir(previewDirPath(), { recursive: true });
-  previewDirReady = true;
+/**
+ * How old a temp dir or `.part` file must be before the startup sweep treats it
+ * as orphaned. Replicas can share one DATA_DIR, so a fresh entry may belong to
+ * another live process; only something older than the longest preview run can
+ * be assumed dead. A limit of 0 means unlimited, so fall back to a day.
+ */
+function staleAfterMs(): number {
+  const encodeS = env.PREVIEW_TIMEOUT_S || 86_400;
+  const convertS = env.LIBREOFFICE_TIMEOUT_S || 120;
+  return Math.max(encodeS, convertS) * 1000;
+}
+
+async function sweepOrphanedPreviewWork(dir: string): Promise<void> {
+  const cutoff = Date.now() - staleAfterMs();
+  let entries: Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    logger.warn({ err, dir }, "Could not list preview directory for cleanup");
+    return;
+  }
+  for (const entry of entries) {
+    const isTempDir = entry.isDirectory();
+    const isPartial = entry.isFile() && entry.name.includes(".part.");
+    if (!isTempDir && !isPartial) continue;
+    const path = join(dir, entry.name);
+    try {
+      if ((await stat(path)).mtimeMs > cutoff) continue;
+      await rm(path, { recursive: isTempDir, force: true });
+    } catch (err) {
+      logger.warn({ err, path }, "Could not remove orphaned preview work");
+    }
+  }
+}
+
+/**
+ * Create the preview dir and sweep leftovers from killed runs once per process
+ * (#1320). Concurrent first requests share one promise, so none of them can
+ * sweep while another has already started writing.
+ */
+export function ensurePreviewDir(): Promise<void> {
+  previewDirReady ??= (async () => {
+    const dir = previewDirPath();
+    await mkdir(dir, { recursive: true });
+    await sweepOrphanedPreviewWork(dir);
+  })().catch((err) => {
+    previewDirReady = undefined;
+    throw normalizeOperationalWriteError(err);
+  });
+  return previewDirReady;
+}
+
+/**
+ * Remove cached preview files for a deleted user file (.mp4, .mp3, .pdf).
+ */
+export async function deletePreview(fileId: string): Promise<void> {
+  // `force` already ignores a missing preview, so anything that still throws is
+  // a real failure. It reaches the caller, which fails the delete before any
+  // row goes, the same as a stored file that can't be removed (#1455).
+  for (const ext of [".mp4", ".mp3", ".pdf"]) {
+    try {
+      await rm(previewPath(fileId, ext), { force: true });
+    } catch (err) {
+      throw normalizeOperationalWriteError(err);
+    }
+  }
 }
 
 /**
@@ -74,6 +157,91 @@ function previewErrorBody(err: unknown): { error: string; code?: string; encoder
   return { error: "Could not generate preview" };
 }
 
+/**
+ * ffmpeg's binary isn't on the box at all: no PATH entry, or FFMPEG_PATH names
+ * a file that isn't there. runFfmpeg reports both as a spawn ENOENT (#1576).
+ * Other spawn failures (EACCES, ENOEXEC) stay a 500 under #1439.
+ */
+function isMissingFfmpeg(err: unknown): boolean {
+  return isBinarySpawnFailure(err) && (err as NodeJS.ErrnoException).code === "ENOENT";
+}
+
+/**
+ * ffmpeg can't be started: none on PATH, FFMPEG_PATH names nothing, or the
+ * binary isn't executable. That is the operator's install, not the upload, so it
+ * gets the 503 ENGINE_UNAVAILABLE the tool routes answer with, and is reported.
+ * A 422 here read as a bad file, and nothing on the server ever heard about it
+ * (#1576).
+ */
+function ffmpegUnavailable(request: FastifyRequest, reply: FastifyReply) {
+  const err = new InputValidationError(
+    "Media processing is unavailable on this server because ffmpeg is not installed.",
+    503,
+    "Install ffmpeg in the container or set FFMPEG_PATH.",
+    "ENGINE_UNAVAILABLE",
+  );
+  return sendInputValidationError(reply, err, "preview", request.log);
+}
+
+/**
+ * Time limit for one preview encode, so a hung ffmpeg can't hold a request for
+ * the two-hour media job limit to render a clip capped at a minute (#1406).
+ * PREVIEW_TIMEOUT_S, 0 = unlimited.
+ */
+function previewTimeoutMs(): number {
+  return env.PREVIEW_TIMEOUT_S * 1000;
+}
+
+/**
+ * A signal that fires when the client hangs up before the response ends
+ * (#1406). Only the on-demand preview uses it: its output is thrown away, while
+ * a stored-file preview lands in the cache, so finishing that one after a
+ * proxy gives up turns the retry into a cache hit. Call release() once the
+ * encode settles.
+ */
+function abortOnDisconnect(request: FastifyRequest, reply: FastifyReply) {
+  const abort = new AbortController();
+  const onClose = () => {
+    if (!reply.raw.writableEnded) abort.abort();
+  };
+  // A hangup while the upload was still being read has already fired "close".
+  if (reply.raw.destroyed || request.raw.socket?.destroyed) abort.abort();
+  else reply.raw.once("close", onClose);
+  return {
+    signal: abort.signal,
+    clientGone: () => abort.signal.aborted,
+    release: () => reply.raw.off("close", onClose),
+  };
+}
+
+/**
+ * A Node SystemError (it carries `syscall`) means the server couldn't run the
+ * conversion at all: a spawn that failed with EMFILE or ENOMEM, a directory it
+ * couldn't read. That is a server fault to report as a 500, not a document or
+ * media file the engine rejected. LibreOffice's own failures (a non-zero exit,
+ * no output, its timeout, the memory cap killing it) and ffmpeg's carry no
+ * `syscall` and stay a 422 (#1439).
+ */
+function isServerFault(err: unknown): boolean {
+  return typeof (err as { syscall?: unknown } | null)?.syscall === "string";
+}
+
+/** Log and report a preview failure that is the server's, not the file's. */
+function reportPreviewFault(
+  err: unknown,
+  request: FastifyRequest,
+  context: Record<string, unknown>,
+  message: string,
+): void {
+  request.log.error({ err, ...context }, message);
+  void reportError(err, {
+    source: "http",
+    route: request.routeOptions?.url ?? undefined,
+    method: request.method,
+    statusCode: 500,
+  });
+}
+
 /** Best-effort removal of an unfinished preview; logged, since nothing else clears it. */
 async function removePartialPreview(
   path: string,
@@ -84,12 +252,65 @@ async function removePartialPreview(
   });
 }
 
+/** Best-effort removal of a per-request preview staging directory; logged on failure. */
+async function removeStagingDir(
+  dir: string | undefined,
+  log: { warn: (obj: object, msg: string) => void },
+): Promise<void> {
+  if (!dir) return;
+  await rm(dir, { recursive: true, force: true }).catch((err) => {
+    log.warn({ err, path: dir }, "Could not remove preview staging directory");
+  });
+}
+
 async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
   } catch {
     return false;
+  }
+}
+
+function s3PreviewStorageFault(cause: unknown): SafeError {
+  return new SafeError(STORAGE_UNAVAILABLE_MESSAGE, {
+    kind: "operational",
+    code: "storage-unavailable",
+    statusCode: 503,
+    cause,
+  });
+}
+
+function isS3ReadUnavailable(err: unknown): boolean {
+  if (!isStorageServiceFault(err)) return false;
+  const s3Answered = typeof err === "object" && err !== null && "$metadata" in err;
+  if (s3Answered || connectivityClass(err) === "net-unavailable") return true;
+  const code = (err as NodeJS.ErrnoException | null)?.code;
+  return code === "ERR_STREAM_PREMATURE_CLOSE" || code === "EIO" || isClientAbort(err);
+}
+
+async function openStoredStream(storedName: string): ReturnType<typeof streamStoredFile> {
+  try {
+    return await streamStoredFile(storedName);
+  } catch (err) {
+    if (isS3ReadUnavailable(err)) throw s3PreviewStorageFault(err);
+    throw err;
+  }
+}
+
+async function stageStoredFile(storedName: string, destPath: string): Promise<void> {
+  const source = await openStoredStream(storedName);
+  try {
+    await pipeline(source, createWriteStream(destPath));
+  } catch (err) {
+    if (!source.destroyed) {
+      if (source.listenerCount("error") === 0) source.once("error", () => {});
+      source.destroy();
+    }
+    if ((err as NodeJS.ErrnoException | null)?.path !== destPath && isS3ReadUnavailable(err)) {
+      throw s3PreviewStorageFault(err);
+    }
+    throw err;
   }
 }
 
@@ -142,11 +363,25 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
 
       // PDF: stream the original file directly
       if (isPdf) {
-        const inputPath = getStoredFilePath(file.storedName);
+        let stream: Awaited<ReturnType<typeof streamStoredFile>>;
+        try {
+          stream = await openStoredStream(file.storedName);
+        } catch (err) {
+          reportPreviewFault(
+            err,
+            request,
+            { fileId: id, storedName: file.storedName },
+            "Preview source file missing",
+          );
+          return reply.status(500).send({ error: "Could not prepare preview" });
+        }
+        stream.once("error", () => {
+          if (!reply.raw.headersSent) reply.removeHeader("Cache-Control");
+        });
         return reply
           .header("Content-Type", "application/pdf")
           .header("Cache-Control", "public, max-age=86400, immutable")
-          .send(createReadStream(inputPath));
+          .send(stream);
       }
 
       // Office documents: convert to PDF via LibreOffice
@@ -167,30 +402,70 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         }
 
         await ensurePreviewDir();
-        const inputPath = getStoredFilePath(file.storedName);
 
-        // Copy to a temp file with the original extension so LibreOffice
-        // can detect the format correctly from the extension.
-        // Restrict to an alphanumeric extension (no path separators) -- the
-        // original filename is user-controlled and feeds a filesystem path.
+        // Convert inside a per-request temp directory inside the preview dir.
+        // Multiple concurrent requests for the same uncached document each get
+        // their own input copy and output directory, so neither overwrites the
+        // other's input or picks up a partial output (#1319). Keeping the temp
+        // directory on the preview filesystem keeps the final rename atomic.
         const origExt = file.originalName.match(/\.[a-zA-Z0-9]+$/)?.[0] ?? "";
-        const tempInput = resolveWithinPreviewDir(`${id}-input${origExt}`);
-        await copyFile(inputPath, tempInput);
+        let tempDir: string | undefined;
+        const cleanupTempDir = async () => {
+          const dir = tempDir;
+          tempDir = undefined;
+          await removeStagingDir(dir, request.log);
+        };
 
         try {
-          await convertDocument(tempInput, previewDirPath(), "pdf", {
+          // Staging touches only the server's own disk and stored file: a full
+          // disk, an unwritable preview dir, or a stored file gone from storage
+          // is a 500 worth reporting, not a document LibreOffice can't read (#1404).
+          let stagedDir: string;
+          let tempInput: string;
+          try {
+            stagedDir = await mkdtemp(join(previewDirPath(), `${id}-`));
+            tempDir = stagedDir;
+            tempInput = join(stagedDir, `input${origExt}`);
+            await stageStoredFile(file.storedName, tempInput);
+          } catch (stageErr) {
+            await cleanupTempDir();
+            reportPreviewFault(
+              stageErr,
+              request,
+              { fileId: id, storedName: file.storedName },
+              "Document preview staging failed",
+            );
+            return reply.status(500).send({ error: "Could not prepare document preview" });
+          }
+
+          await convertDocument(tempInput, stagedDir, "pdf", {
             timeoutMs: (env.LIBREOFFICE_TIMEOUT_S || 120) * 1000,
           });
 
-          // convertDocument outputs next to the temp file; rename to cached path
-          const producedPath = resolveWithinPreviewDir(`${id}-input.pdf`);
-          await rename(producedPath, cachedPath);
+          // convertDocument outputs next to the temp file: input.pdf
+          const producedPath = join(stagedDir, "input.pdf");
+          try {
+            await rename(producedPath, cachedPath);
+          } catch (renameErr) {
+            await cleanupTempDir();
+            reportPreviewFault(
+              renameErr,
+              request,
+              { fileId: id, cachedPath },
+              "Document preview cache write failed",
+            );
+            return reply.status(500).send({ error: "Could not store preview" });
+          }
         } catch (err) {
+          await cleanupTempDir();
+          if (isServerFault(err)) {
+            reportPreviewFault(err, request, { fileId: id }, "Document preview could not run");
+            return reply.status(500).send({ error: "Could not generate document preview" });
+          }
           request.log.error({ err, fileId: id }, "Document preview generation failed");
           return reply.status(422).send({ error: "Could not generate document preview" });
         } finally {
-          // Clean up temp input copy
-          await rm(tempInput, { force: true }).catch(() => {});
+          await cleanupTempDir();
         }
 
         return reply
@@ -218,49 +493,95 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       // every later request served it as `immutable` (#1291). The temp name
       // ends in the real extension because ffmpeg picks the container from it.
       await ensurePreviewDir();
-      const inputPath = getStoredFilePath(file.storedName);
+      const origExt = file.originalName.match(/\.[a-zA-Z0-9]+$/)?.[0] ?? "";
+      let inputPath: string;
+      let tempDir: string | undefined;
+      const cleanupTempDir = async () => {
+        const dir = tempDir;
+        tempDir = undefined;
+        await removeStagingDir(dir, request.log);
+      };
+      // ffmpeg reports a missing input as a failed encode, which reads as a bad
+      // upload. A stored file gone from storage is the server's fault (#1439).
+      // In S3 mode, stage the object into a per-request temp dir so ffmpeg gets
+      // a seekable local file (#1575); local mode reads the stored path in place.
+      try {
+        if (env.STORAGE_MODE === "s3") {
+          tempDir = await mkdtemp(join(previewDirPath(), `${id}-`));
+          inputPath = join(tempDir, `input${origExt}`);
+          await stageStoredFile(file.storedName, inputPath);
+        } else {
+          inputPath = getStoredFilePath(file.storedName);
+          await access(inputPath);
+        }
+      } catch (err) {
+        await cleanupTempDir();
+        reportPreviewFault(
+          err,
+          request,
+          { fileId: id, storedName: file.storedName },
+          "Preview source file missing",
+        );
+        return reply.status(500).send({ error: "Could not prepare preview" });
+      }
       const partialPath = resolveWithinPreviewDir(`${id}.${randomUUID()}.part${previewExt}`);
 
       try {
-        if (isVideo) {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "30",
-            "-vf",
-            "scale='min(720,iw)':-2",
-            "-c:v",
-            softwareEncoder("h264"),
-            "-preset",
-            "ultrafast",
-            "-crf",
-            "28",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-movflags",
-            "+faststart",
-            "-y",
-            partialPath,
-          ]);
-        } else {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "60",
-            "-c:a",
-            softwareEncoder("mp3"),
-            "-b:a",
-            "128k",
-            "-y",
-            partialPath,
-          ]);
+        try {
+          if (isVideo) {
+            await runFfmpeg(
+              [
+                "-i",
+                inputPath,
+                "-t",
+                "30",
+                "-vf",
+                "scale='min(720,iw)':-2",
+                "-c:v",
+                softwareEncoder("h264"),
+                "-preset",
+                "ultrafast",
+                "-crf",
+                "28",
+                ...mp4TimescaleArgs(".mp4"),
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-movflags",
+                "+faststart",
+                "-y",
+                partialPath,
+              ],
+              { timeoutMs: previewTimeoutMs() },
+            );
+          } else {
+            await runFfmpeg(
+              [
+                "-i",
+                inputPath,
+                "-t",
+                "60",
+                "-c:a",
+                softwareEncoder("mp3"),
+                "-b:a",
+                "128k",
+                "-y",
+                partialPath,
+              ],
+              { timeoutMs: previewTimeoutMs() },
+            );
+          }
+        } finally {
+          await cleanupTempDir();
         }
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
+        if (isMissingFfmpeg(err)) return ffmpegUnavailable(request, reply);
+        if (isServerFault(err)) {
+          reportPreviewFault(err, request, { fileId: id }, "Preview encode could not run");
+          return reply.status(500).send({ error: "Could not generate preview" });
+        }
         request.log.error({ err, fileId: id }, "Preview generation failed");
         return reply.status(422).send(previewErrorBody(err));
       }
@@ -272,13 +593,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         await rename(partialPath, cachedPath);
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
-        request.log.error({ err, fileId: id, cachedPath }, "Preview cache write failed");
-        void reportError(err, {
-          source: "http",
-          route: "/api/v1/files/:id/preview",
-          method: "GET",
-          statusCode: 500,
-        });
+        reportPreviewFault(err, request, { fileId: id, cachedPath }, "Preview cache write failed");
         return reply.status(500).send({ error: "Could not store preview" });
       }
 
@@ -308,11 +623,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
 
       for await (const part of parts) {
         if (part.type !== "file") continue;
-        const chunks: Buffer[] = [];
-        for await (const chunk of part.file) {
-          chunks.push(chunk);
-        }
-        fileBuffer = Buffer.concat(chunks);
+        fileBuffer = await readFilePart(part.file);
         filename = part.filename ?? "input";
         break; // only process the first file
       }
@@ -321,7 +632,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ error: "No file provided" });
       }
 
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+      const ext = extname(filename).toLowerCase().replace(/^\./, "");
       const videoExts = new Set([
         "avi",
         "mkv",
@@ -376,46 +687,55 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       const inputPath = join(tmpdir(), `snapotter-preview-${id}.${ext}`);
       const outputExt = isVideo ? "mp4" : "mp3";
       const outputPath = join(tmpdir(), `snapotter-preview-${id}-out.${outputExt}`);
+      const disconnect = abortOnDisconnect(request, reply);
+      const encodeOptions = { timeoutMs: previewTimeoutMs(), signal: disconnect.signal };
 
       try {
         await writeFile(inputPath, fileBuffer);
 
         if (isVideo) {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "30",
-            "-vf",
-            "scale='min(720,iw)':-2",
-            "-c:v",
-            softwareEncoder("h264"),
-            "-preset",
-            "ultrafast",
-            "-crf",
-            "28",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-movflags",
-            "+faststart",
-            "-y",
-            outputPath,
-          ]);
+          await runFfmpeg(
+            [
+              "-i",
+              inputPath,
+              "-t",
+              "30",
+              "-vf",
+              "scale='min(720,iw)':-2",
+              "-c:v",
+              softwareEncoder("h264"),
+              "-preset",
+              "ultrafast",
+              "-crf",
+              "28",
+              ...mp4TimescaleArgs(".mp4"),
+              "-c:a",
+              "aac",
+              "-b:a",
+              "128k",
+              "-movflags",
+              "+faststart",
+              "-y",
+              outputPath,
+            ],
+            encodeOptions,
+          );
         } else {
-          await runFfmpeg([
-            "-i",
-            inputPath,
-            "-t",
-            "60",
-            "-c:a",
-            softwareEncoder("mp3"),
-            "-b:a",
-            "128k",
-            "-y",
-            outputPath,
-          ]);
+          await runFfmpeg(
+            [
+              "-i",
+              inputPath,
+              "-t",
+              "60",
+              "-c:a",
+              softwareEncoder("mp3"),
+              "-b:a",
+              "128k",
+              "-y",
+              outputPath,
+            ],
+            encodeOptions,
+          );
         }
 
         const outputBuffer = await readFile(outputPath);
@@ -426,9 +746,21 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           .header("Content-Length", outputBuffer.length)
           .send(outputBuffer);
       } catch (err) {
-        request.log.error({ err, filename }, "On-demand preview generation failed");
+        if (disconnect.clientGone()) {
+          request.log.info({ filename }, "On-demand preview stopped: client disconnected");
+        } else if (isMissingFfmpeg(err)) {
+          return ffmpegUnavailable(request, reply);
+        } else if (isServerFault(err)) {
+          // A temp write that failed, a spawn that couldn't start: the server's
+          // fault, not the uploaded file's (#1439).
+          reportPreviewFault(err, request, { filename }, "On-demand preview could not run");
+          return reply.status(500).send({ error: "Could not generate preview" });
+        } else {
+          request.log.error({ err, filename }, "On-demand preview generation failed");
+        }
         return reply.status(422).send(previewErrorBody(err));
       } finally {
+        disconnect.release();
         await rm(inputPath, { force: true }).catch(() => {});
         await rm(outputPath, { force: true }).catch(() => {});
       }

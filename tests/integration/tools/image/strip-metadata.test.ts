@@ -6,6 +6,7 @@
  * metadata is actually removed from the output.
  */
 
+import { gzipSync } from "node:zlib";
 import { isSafeMessageError, type SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -30,11 +31,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makePayload(
   settings: Record<string, unknown>,
@@ -399,6 +400,92 @@ describe("Inspect endpoint edge cases", () => {
     // PNG without EXIF should not have exif property
     expect(result.exif).toBeUndefined();
   });
+
+  it("sets exif: null and exifError when JPEG has a corrupt APP1 EXIF segment (#3783)", async () => {
+    const baseJpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const exifPayload = Buffer.from("Exif\0\0corrupt-tiff-header", "ascii");
+    const app1Len = Buffer.alloc(2);
+    app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+    const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+    const corruptExifJpeg = Buffer.concat([
+      baseJpeg.subarray(0, 2),
+      app1Segment,
+      baseJpeg.subarray(2),
+    ]);
+
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "corrupt-exif.jpg",
+        contentType: "image/jpeg",
+        content: corruptExifJpeg,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result).toEqual({
+      filename: "corrupt-exif.jpg",
+      fileSize: corruptExifJpeg.length,
+      exif: null,
+      exifError: "Failed to parse EXIF data",
+    });
+  });
+
+  it("sets exif: null and exifError when JPEG APP1 EXIF segment has a truncated IFD table (#3882)", async () => {
+    const baseJpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const exifPayload = Buffer.from("4578696600004d4d002a000010000000", "hex");
+    const app1Len = Buffer.alloc(2);
+    app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+    const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+    const truncatedIfdJpeg = Buffer.concat([
+      baseJpeg.subarray(0, 2),
+      app1Segment,
+      baseJpeg.subarray(2),
+    ]);
+
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "truncated-ifd.jpg",
+        contentType: "image/jpeg",
+        content: truncatedIfdJpeg,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result).toEqual({
+      filename: "truncated-ifd.jpg",
+      fileSize: truncatedIfdJpeg.length,
+      exif: null,
+      exifError: "Failed to parse EXIF data",
+    });
+  });
 });
 
 // ── Error handling ────────────────────────────────────────────────
@@ -731,8 +818,8 @@ describe("Undecodable input", () => {
     await expect(sharp(truncated).metadata()).resolves.toBeDefined();
 
     const res = await postTool({ stripAll: true }, truncated, "truncated.png", "image/png");
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).details).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(UNDECODABLE_IMAGE_MESSAGE);
   });
 });
 
@@ -760,5 +847,87 @@ describe("Opaque failure classification", () => {
     expect(isSafeMessageError(rejection)).toBe(true);
     expect((rejection as SafeError).message).toBe("Metadata strip failed");
     expect((rejection as SafeError).kind).toBe("bug");
+  });
+});
+
+// ── Inspect SVG and SVGZ sanitization (#3095) ────────────────────
+describe("Inspect SVG and SVGZ sanitization (#3095)", () => {
+  it("decompresses and sanitizes .svgz and .svg on inspect, and rejects invalid SVGZ or over-cap SVG with 400", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><script>if (1 < 2) alert(1);</script><rect width="100" height="80" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body: okBody, contentType: okCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: svgz },
+    ]);
+    const okRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: okBody,
+      headers: { "content-type": okCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(okRes.statusCode).toBe(200);
+    expect(JSON.parse(okRes.body)).toEqual({
+      filename: "icon.svgz",
+      fileSize: svgz.length,
+    });
+
+    const { body: svgBody, contentType: svgCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: rawSvg },
+    ]);
+    const svgRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: svgBody,
+      headers: { "content-type": svgCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(svgRes.statusCode).toBe(200);
+    expect(JSON.parse(svgRes.body)).toEqual({
+      filename: "icon.svg",
+      fileSize: rawSvg.length,
+    });
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const { body: badBody, contentType: badCt } = createMultipartPayload([
+      { name: "file", filename: "bad.svgz", contentType: "image/svg+xml", content: badSvgz },
+    ]);
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: badBody,
+      headers: { "content-type": badCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(badRes.statusCode).toBe(400);
+    expect(JSON.parse(badRes.body).error).toContain("valid SVG content");
+
+    const nonGzipSvgz = Buffer.from("not gzip and not an image", "utf-8");
+    const { body: nonGzipBody, contentType: nonGzipCt } = createMultipartPayload([
+      { name: "file", filename: "broken.svgz", contentType: "image/svg+xml", content: nonGzipSvgz },
+    ]);
+    const nonGzipRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: nonGzipBody,
+      headers: { "content-type": nonGzipCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(nonGzipRes.statusCode).toBe(400);
+    expect(JSON.parse(nonGzipRes.body)).toEqual({ error: "Invalid SVGZ file" });
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const { body: capBody, contentType: capCt } = createMultipartPayload([
+      { name: "file", filename: "too-many.svg", contentType: "image/svg+xml", content: overCapSvg },
+    ]);
+    const capRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: capBody,
+      headers: { "content-type": capCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(capRes.statusCode).toBe(400);
+    expect(JSON.parse(capRes.body).error).toContain("maximum element count");
   });
 });

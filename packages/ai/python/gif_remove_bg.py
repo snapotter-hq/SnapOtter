@@ -6,18 +6,52 @@ transparent (or composited) output via Pillow. Reuses remove_bg.py's model
 registration and edge-refinement helpers so the still and animated paths share
 the same matte behaviour.
 """
+import errno
 import io
 import json
 import os
+import re
 import sys
+
+_HEX_COLOR_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 MAX_REMBG_PX = int(os.environ.get("MAX_REMBG_PX", "2048"))
 _OOM_MARKERS = (
     "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
     "failed to allocate",
     "cudaerrormemoryallocation",
     "cublas_status_alloc_failed",
     "bad_alloc",
+    "memoryerror",
+)
+_HOST_OOM_MARKERS = (
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
+    "bad_alloc",
+    "memoryerror",
+)
+_MODEL_LOAD_ERROR_MARKERS = (
+    "invalidprotobuf",
+    "invalid_protobuf",
+    "protobuf parsing failed",
+    "invalidgraph",
+    "invalid_graph",
+    "no_suchfile",
+    "nosuchfile",
+    "file doesn't exist",
+    "modelproto does not have a graph",
+    "checksum",
+    "hash of downloaded file",
+    "does not match the known hash",
+    "snapotter_allow_model_download",
 )
 
 
@@ -26,8 +60,32 @@ def emit_progress(percent, stage):
 
 
 def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
     m = str(err).lower()
     return any(s in m for s in _OOM_MARKERS)
+
+
+def _is_host_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    if any(s in m for s in _HOST_OOM_MARKERS):
+        return True
+    return "defaultcpuallocator" in m and _is_oom(err)
+
+
+def _is_model_load_error(err):
+    if isinstance(err, EOFError):
+        return True
+    if isinstance(err, OSError):
+        return err.errno != errno.ENOMEM
+    m = f"{type(err).__name__} {err}".lower()
+    return any(s in m for s in _MODEL_LOAD_ERROR_MARKERS)
 
 
 def _read_frames(path):
@@ -74,30 +132,45 @@ def _scale_target(size):
     return (max(1, round(w * scale)), max(1, round(h * scale)))
 
 
-def _hex_to_rgba(value, default=(255, 255, 255, 255)):
-    if not value:
-        return default
-    s = str(value).lstrip("#")
-    try:
-        if len(s) == 3:
-            s = "".join(c * 2 for c in s)
-        if len(s) == 6:
-            return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16), 255)
-        if len(s) == 8:
-            return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16), int(s[6:8], 16))
-    except ValueError:
-        pass
-    return default
+def _hex_to_rgba(value):
+    if not isinstance(value, str):
+        raise ValueError(f"Not a hex color: {value}")
+    s = value.strip()
+    if not _HEX_COLOR_RE.fullmatch(s):
+        raise ValueError(f"Not a hex color: {value}")
+    if s.startswith("#"):
+        s = s[1:]
+    if len(s) == 3:
+        s = "".join(c * 2 for c in s)
+    return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16), 255)
+
+
+def _validate_bg_colors(settings):
+    bg_type = settings.get("backgroundType", "transparent")
+    if bg_type == "color":
+        bg_color = settings.get("backgroundColor")
+        if not bg_color:
+            raise ValueError("A color background needs a color")
+        return _hex_to_rgba(bg_color), None
+    if bg_type == "gradient":
+        c1_raw = settings.get("gradientColor1")
+        c2_raw = settings.get("gradientColor2")
+        if not c1_raw or not c2_raw:
+            raise ValueError("A gradient background needs two colors")
+        return _hex_to_rgba(c1_raw), _hex_to_rgba(c2_raw)
+    return None, None
 
 
 def _gradient(w, h, settings):
+    _, c2_rgba = _validate_bg_colors({**settings, "backgroundType": "gradient"})
+    c1_rgba = _hex_to_rgba(settings["gradientColor1"])
     import math
 
     import numpy as np
     from PIL import Image
 
-    c1 = np.array(_hex_to_rgba(settings.get("gradientColor1", "#000000")), dtype=np.float32)
-    c2 = np.array(_hex_to_rgba(settings.get("gradientColor2", "#ffffff")), dtype=np.float32)
+    c1 = np.array(c1_rgba, dtype=np.float32)
+    c2 = np.array(c2_rgba, dtype=np.float32)
     angle = math.radians(float(settings.get("gradientAngle", 0)) % 360.0)
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     proj = xx * math.cos(angle) + yy * math.sin(angle)
@@ -139,18 +212,21 @@ def _apply_shadow(base, cutout, settings):
 
 
 def _apply_effect(cutout, original, settings, bg_img):
+    c1_rgba, _ = _validate_bg_colors(settings)
+    bg_type = settings.get("backgroundType", "transparent")
+    if bg_type == "image" and bg_img is None:
+        raise ValueError("An image background needs a background image")
     from PIL import Image, ImageFilter
 
-    bg_type = settings.get("backgroundType", "transparent")
     w, h = cutout.size
     if bg_type == "color":
-        base = Image.new("RGBA", (w, h), _hex_to_rgba(settings.get("backgroundColor", "#ffffff")))
+        base = Image.new("RGBA", (w, h), c1_rgba)
     elif bg_type == "gradient":
         base = _gradient(w, h, settings)
     elif bg_type == "blur":
         radius = max(1.0, float(settings.get("blurIntensity", 20)) / 3.0)
         base = original.convert("RGBA").filter(ImageFilter.GaussianBlur(radius=radius))
-    elif bg_type == "image" and bg_img is not None:
+    elif bg_type == "image":
         base = _cover(bg_img, w, h)
     else:
         base = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -194,8 +270,39 @@ def _encode(frames, durations, loop, fmt, out_path):
         )
 
 
-def _create_session(model, providers, device):
+def _ensure_model_available(model, model_home):
+    if not os.path.exists(os.path.join(model_home, f"{model}.onnx")):
+        from offline_guard import ensure_download_allowed
+
+        ensure_download_allowed(f"Background removal model '{model}'")
+
+
+def _model_home():
+    return os.path.expanduser(
+        os.getenv("U2NET_HOME", os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".u2net"))
+    )
+
+
+def _cached_session(model, providers):
+    """Build or reuse the rembg session through the cache shared with remove_bg.
+
+    Sharing the cache matters for the budget: a session built outside it would
+    sit next to a cached BiRefNet without being counted against VRAM.
+    """
     from rembg import new_session
+
+    from session_cache import get_session, session_cost
+
+    model_path = os.path.join(_model_home(), f"{model}.onnx")
+    return get_session(
+        model,
+        providers,
+        lambda: new_session(model, providers=providers),
+        session_cost(model_path, providers),
+    )
+
+
+def _create_session(model, providers, device):
     from rembg.sessions import sessions_class
 
     from remove_bg import _register_hr_matting_session, _register_matting_session
@@ -203,15 +310,27 @@ def _create_session(model, providers, device):
     _register_matting_session(sessions_class)
     _register_hr_matting_session(sessions_class)
     try:
-        return new_session(model, providers=providers), device
+        return _cached_session(model, providers), device
     except Exception as e:
-        if "CUDAExecutionProvider" in providers:
+        if (
+            "CUDAExecutionProvider" in providers
+            and not _is_host_oom(e)
+            and not _is_model_load_error(e)
+        ):
+            from session_cache import evict_all
+
+            if _is_oom(e) and evict_all("GPU out of memory loading a session"):
+                # The cache was holding VRAM that is free now; stay on the GPU.
+                try:
+                    return _cached_session(model, providers), device
+                except Exception as retry_err:
+                    e = retry_err
             print(
                 f"[gif-remove-bg] CUDA session for '{model}' failed ({e}); falling back to CPU",
                 file=sys.stderr,
                 flush=True,
             )
-            return new_session(model, providers=["CPUExecutionProvider"]), "cpu"
+            return _cached_session(model, ["CPUExecutionProvider"]), "cpu"
         raise
 
 
@@ -266,6 +385,9 @@ def main():
 
     canceled = False
     try:
+        _validate_bg_colors(settings)
+        if settings.get("backgroundType") == "image" and not bg_path:
+            raise ValueError("An image background needs a background image")
         from PIL import Image
 
         from gpu import onnx_providers
@@ -276,6 +398,11 @@ def main():
 
         model = settings.get("model", "u2net")
         if model not in ALLOWED_MODELS:
+            # JSON so the bridge forwards it to the server log; plain text is dropped.
+            sys.stderr.write(
+                json.dumps({"warning": f"Unknown model '{model}', falling back to 'u2net'"}) + "\n"
+            )
+            sys.stderr.flush()
             model = "u2net"
 
         emit_progress(3, "Reading frames")
@@ -288,39 +415,58 @@ def main():
         bg_img = Image.open(bg_path).convert("RGBA") if bg_path else None
 
         # Offline guard for the chosen model (mirrors remove_bg.py home resolution).
-        model_home = os.path.expanduser(
-            os.getenv("U2NET_HOME", os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".u2net"))
-        )
-        if not os.path.exists(os.path.join(model_home, f"{model}.onnx")):
-            from offline_guard import ensure_download_allowed
-
-            ensure_download_allowed(f"Background removal model '{model}'")
+        model_home = _model_home()
+        _ensure_model_available(model, model_home)
 
         emit_progress(5, "Loading model")
-        providers, device = onnx_providers()
-        session, device = _create_session(model, providers, device)
+        providers, initial_device = onnx_providers()
         # Per-frame pymatting runs on the CPU whatever the session device and
         # costs seconds per frame (it dominated a 30-frame GIF at ~12s/frame
         # on an otherwise idle GPU host, #668), and its per-frame noise
         # flickers across an animation. Stills keep matting; animations never
         # use it.
         use_alpha = False
-        print(
-            f"[gif-remove-bg] session device={device} model={model}",
-            file=sys.stderr,
-            flush=True,
-        )
+        session = None
 
         # Probe frame 0 to settle the model once (OOM -> lighter model for the
         # WHOLE animation, never per-frame; switching mid-animation would
-        # flicker).
+        # flicker). Wrap both session creation and the frame-0 probe so an OOM
+        # while loading non-u2net weights or running frame 0 falls back to u2net.
         try:
+            session, device = _create_session(model, providers, initial_device)
+            print(
+                f"[gif-remove-bg] session device={device} model={model}",
+                file=sys.stderr,
+                flush=True,
+            )
             _remove_one(frames[0], session, use_alpha, settings, target, orig_size)
         except Exception as e:
-            if _is_oom(e) and model.startswith("birefnet"):
+            if _is_oom(e) and model != "u2net":
+                prev_model = model
+                detail = str(e).strip() or type(e).__name__
+                session = None
+                e.__traceback__ = None
+                from session_cache import evict_all
+
+                evict_all("out of memory")
                 model = "u2net"
+                sys.stderr.write(
+                    json.dumps(
+                        {
+                            "warning": f"[gif-remove-bg] {prev_model} ran out of memory ({detail}); retrying with u2net"
+                        }
+                    )
+                    + "\n"
+                )
+                sys.stderr.flush()
+                _ensure_model_available(model, model_home)
                 emit_progress(5, "Retrying with a lighter model")
-                session, device = _create_session(model, providers, device)
+                session, device = _create_session(model, providers, initial_device)
+                print(
+                    f"[gif-remove-bg] session device={device} model={model}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             else:
                 raise
 
@@ -342,10 +488,11 @@ def main():
                 {"success": True, "model": model, "device": device, "frames": n, "format": fmt}
             )
     except ImportError as e:
-        print(f"[gif-remove-bg] Import failed: {e}", file=sys.stderr, flush=True)
-        result = json.dumps({"success": False, "error": f"import failed: {e}"})
+        detail = str(e).strip() or type(e).__name__
+        print(json.dumps({"warning": f"[gif-remove-bg] Import failed: {detail}"}), file=sys.stderr, flush=True)
+        result = json.dumps({"success": False, "error": f"import failed: {detail}"})
     except Exception as e:  # noqa: BLE001
-        result = json.dumps({"success": False, "error": str(e)})
+        result = json.dumps({"success": False, "error": str(e).strip() or type(e).__name__})
 
     os.dup2(stdout_fd, 1)
     os.close(stdout_fd)

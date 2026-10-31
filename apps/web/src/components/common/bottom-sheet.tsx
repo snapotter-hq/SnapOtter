@@ -10,6 +10,13 @@ interface BottomSheetProps {
   title?: string;
   children: React.ReactNode;
   maxHeight?: string;
+  /**
+   * Keep the children mounted, hidden, while the sheet is closed. For content
+   * that owns state a closed sheet mustn't lose, like a running tool's request
+   * and progress (#1974). The default unmounts them, as a closed sheet always
+   * did.
+   */
+  keepMounted?: boolean;
 }
 
 export function BottomSheet({
@@ -18,6 +25,7 @@ export function BottomSheet({
   title,
   children,
   maxHeight = "70dvh",
+  keepMounted = false,
 }: BottomSheetProps) {
   const { t } = useTranslation();
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -64,24 +72,29 @@ export function BottomSheet({
     { axis: "y", filterTaps: true },
   );
 
-  if (!open) return null;
+  if (!open && !keepMounted) return null;
 
+  // The sheet stays at the same place in the tree whether it is open or not, so
+  // React keeps its children (and whatever they own) across a close.
   return (
     <>
       {/* Backdrop */}
-      <div
-        aria-hidden="true"
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-        onClick={handleDismiss}
-      />
+      {open && (
+        <div
+          aria-hidden="true"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          onClick={handleDismiss}
+        />
+      )}
 
       {/* Sheet */}
       <div
         ref={sheetRef}
+        hidden={!open}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? "bottom-sheet-title" : undefined}
-        className="fixed inset-x-0 bottom-0 z-50 bg-background border-t border-border rounded-t-2xl shadow-xl flex flex-col animate-in slide-in-from-bottom"
+        className={`fixed inset-x-0 bottom-0 z-50 bg-background border-t border-border rounded-t-2xl shadow-xl flex-col animate-in slide-in-from-bottom ${open ? "flex" : "hidden"}`}
         style={{
           maxHeight,
           transform: translateY > 0 ? `translateY(${translateY}px)` : undefined,

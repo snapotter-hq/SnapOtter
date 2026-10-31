@@ -13,8 +13,25 @@ describe("normalizeSearchQuery", () => {
   it("maps the standalone digit 2 to 'to'", () => {
     expect(normalizeSearchQuery("jpg 2 png")).toBe("jpg to png");
   });
-  it("splits joined compact forms jpg2png", () => {
+  it("splits joined compact forms jpg2png and mp42mp3", () => {
     expect(normalizeSearchQuery("jpg2png")).toBe("jpg to png");
+    expect(normalizeSearchQuery("mp42mp3")).toBe("mp4 to mp3");
+    expect(normalizeSearchQuery("mp32wav")).toBe("mp3 to wav");
+    expect(normalizeSearchQuery("m4a2mp3")).toBe("m4a to mp3");
+  });
+  // #1388 review: these split under the old letter-2-letter regex, so the
+  // known-format list has to cover them too.
+  it.each([
+    ["yaml2json", "yaml to json"],
+    ["htm2pdf", "htm to pdf"],
+    ["odp2pdf", "odp to pdf"],
+    ["tsv2csv", "tsv to csv"],
+    ["apng2gif", "apng to gif"],
+    ["srt2vtt", "srt to vtt"],
+    ["speech2text", "speech to text"],
+    ["voice2text", "voice to text"],
+  ])("splits %j", (query, expected) => {
+    expect(normalizeSearchQuery(query)).toBe(expected);
   });
   it("splits jpgtopng", () => {
     expect(normalizeSearchQuery("jpgtopng")).toBe("jpg to png");
@@ -29,10 +46,13 @@ describe("normalizeSearchQuery", () => {
     expect(normalizeSearchQuery("convert mp4 to mp3 file online")).toBe("mp4 to mp3");
   });
 
-  // #1327: the joined-form split fired on any word with "to" inside it.
-  it.each(["vectorize", "customize", "histogram", "photograph"])("leaves %j whole", (word) => {
-    expect(normalizeSearchQuery(word)).toBe(word);
-  });
+  // #1327, #1366: the joined-form split fired on any word with "to" or "2" inside it.
+  it.each(["vectorize", "customize", "histogram", "photograph", "h2o", "a2b"])(
+    "leaves %j whole",
+    (word) => {
+      expect(normalizeSearchQuery(word)).toBe(word);
+    },
+  );
 
   it("only splits a joined form between whole format tokens", () => {
     expect(normalizeSearchQuery("xjpgtopng")).toBe("xjpgtopng");
@@ -50,7 +70,7 @@ describe("normalizeSearchQuery", () => {
     let checked = 0;
     for (const preset of CONVERSION_PRESETS) {
       for (const kw of generateConversionKeywords({ from: preset.from, to: preset.to })) {
-        const joined = /^([a-z0-9]+)to([a-z0-9]+)$/.exec(kw);
+        const joined = /^([a-z0-9]+)(?:to|2)([a-z0-9]+)$/.exec(kw);
         if (!joined) continue;
         checked++;
         expect(normalizeSearchQuery(kw), `${preset.id}: ${kw}`).toBe(
@@ -70,6 +90,20 @@ describe("normalizeSearchQuery", () => {
       expect(normalizeSearchQuery(`${from}to${to}`), id).toBe(
         normalizeSearchQuery(`${from} to ${to}`),
       );
+      expect(normalizeSearchQuery(`${from}2${to}`), id).toBe(
+        normalizeSearchQuery(`${from} to ${to}`),
+      );
+    }
+  });
+
+  // #1408: a joined form only splits between known formats, so every extension
+  // a tool accepts has to be one of them.
+  it("splits joined forms for every extension a tool accepts", () => {
+    const exts = new Set(TOOLS.flatMap((t) => t.acceptedInputs).map((ext) => ext.slice(1)));
+    expect(exts.size).toBeGreaterThan(50);
+    for (const ext of exts) {
+      expect(normalizeSearchQuery(`${ext}topdf`), ext).toBe(normalizeSearchQuery(`${ext} to pdf`));
+      expect(normalizeSearchQuery(`pdf2${ext}`), ext).toBe(normalizeSearchQuery(`pdf to ${ext}`));
     }
   });
 

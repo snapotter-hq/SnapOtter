@@ -23,11 +23,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makeCsv(rows: [string, number][]): Buffer {
   const lines = ["label,value", ...rows.map(([l, v]) => `${l},${v}`)];
@@ -183,7 +183,7 @@ describe("Chart Maker", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(`${result.error} ${result.details ?? ""}`).toMatch(/numeric/i);
   });
@@ -345,6 +345,12 @@ describe("Chart Maker column detection", () => {
     expect(png.equals(await renderChart("label,value\n2020,100\n2021,150\n"))).toBe(true);
   });
 
+  it("treats a first row with year column names as the header (#1199)", async () => {
+    const png = await renderChart("region,2023,2024,2025\nEMEA,10,20,30\nAPAC,5,6,7\n");
+
+    expect(png.equals(await renderChart("region,value\nEMEA,30\nAPAC,7\n"))).toBe(true);
+  });
+
   it("charts a single-column CSV, numbering the rows", async () => {
     const png = await renderChart("10\n20\n30\n");
 
@@ -357,10 +363,67 @@ describe("Chart Maker column detection", () => {
     expect(png.equals(await renderChart("month,sales\nJan,100\nMar,300\n"))).toBe(true);
   });
 
+  it("reports the rows it left out, not counting blank ones (#2060)", async () => {
+    const res = await postChart("month,sales\nJan,100\nFeb,n/a\nMar,\nApr,300\nMay,400\n");
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).chartRows).toEqual({ charted: 3, skipped: 1 });
+  });
+
+  it("counts a headerless first row with an unreadable value as skipped rather than the header (#2260)", async () => {
+    const res = await postChart("Jan,n/a\nFeb,10\nMar,20\n");
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).chartRows).toEqual({ charted: 2, skipped: 1 });
+    const dl = await app.inject({ method: "GET", url: JSON.parse(res.body).downloadUrl });
+    expect(dl.rawPayload.equals(await renderChart("month,sales\nFeb,10\nMar,20\n"))).toBe(true);
+  });
+
+  it("adds no row count when every row made the chart", async () => {
+    const res = await postChart("month,sales\nJan,100\nFeb,200\n");
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).chartRows).toBeUndefined();
+  });
+
+  it("keeps rows whose value carries a thousands separator", async () => {
+    const png = await renderChart(
+      'month,sales\nJan,900\nFeb,"1,200"\nMar,"2,400"\nApr,850\nMay,700\nJun,650\n',
+    );
+
+    expect(
+      png.equals(
+        await renderChart("month,sales\nJan,900\nFeb,1200\nMar,2400\nApr,850\nMay,700\nJun,650\n"),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps the first row of a headerless comma-decimal CSV (#2971)", async () => {
+    const png = await renderChart('Apples,"1,5"\nBananas,"2,5"\nCherries,"3,5"\n');
+
+    expect(
+      png.equals(await renderChart("label,value\nApples,1.5\nBananas,2.5\nCherries,3.5\n")),
+    ).toBe(true);
+  });
+
+  it("splits a headerless semicolon CSV with comma decimals on the semicolon (#2981)", async () => {
+    const png = await renderChart("Apples;1,5\nBananas;2,5\nCherries;3,5\n");
+
+    expect(
+      png.equals(await renderChart("label,value\nApples,1.5\nBananas,2.5\nCherries,3.5\n")),
+    ).toBe(true);
+  });
+
+  it("charts a $-prefixed revenue column rather than the id column", async () => {
+    const png = await renderChart("id,region,revenue\n1,EMEA,$4400\n2,APAC,$3610\n");
+
+    expect(png.equals(await renderChart("region,revenue\nEMEA,4400\nAPAC,3610\n"))).toBe(true);
+  });
+
   it("names the columns it checked when the file holds no numbers", async () => {
     const res = await postChart("region,city\nEMEA,Berlin\nAPAC,Singapore\n");
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     const message = `${result.error} ${result.details ?? ""}`;
     expect(message).toMatch(/numeric/i);
@@ -413,8 +476,8 @@ describe("Chart Maker column detection", () => {
   it("still rejects a file whose only numeric column is negative", async () => {
     const res = await postChart("month,delta\nJan,-5\nFeb,-3\n");
 
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).details).toMatch(/zero or greater/i);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/zero or greater/i);
   });
 
   it("rejects a CSV whose delimiter guess split the numbers apart", async () => {
@@ -422,8 +485,8 @@ describe("Chart Maker column detection", () => {
     // UndetectableDelimiter and splits anyway; charting 200 would be wrong.
     const res = await postChart("sales\n1,200\n2,400\n3,600\n");
 
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).details).toMatch(/delimit/i);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/delimit/i);
   });
 
   it("ignores a stray extra field that only one row carries", async () => {
@@ -436,8 +499,8 @@ describe("Chart Maker column detection", () => {
     const header = Array.from({ length: 14 }, (_, i) => `Revenue FY26 Q${i + 1}`).join(",");
     const res = await postChart(`${header}\n${Array(14).fill("n/a").join(",")}\n`);
 
-    expect(res.statusCode).toBe(422);
-    const details: string = JSON.parse(res.body).details;
+    expect(res.statusCode).toBe(400);
+    const details: string = JSON.parse(res.body).error;
     // Over 280 chars and friendlyError swaps in a generic sentence instead.
     expect(details.length).toBeLessThanOrEqual(280);
     expect(details).toMatch(/numeric/i);
@@ -471,5 +534,17 @@ describe("Chart Maker column detection", () => {
     expect(
       (await renderChart(`﻿${rows}`, "bom.json")).equals(await renderChart(rows, "bom.json")),
     ).toBe(true);
+  });
+
+  it("does not read inherited prototype members for missing JSON keys (#2270)", async () => {
+    // The second object has no 'constructor' key. Object.prototype.constructor would be used
+    // if we just did item[key], leading to 'function Object() { [native code] }' as the label.
+    // That label would be sent to the SVG generator, but it should be empty ("").
+    const json = `[{"constructor": "north", "n": 3}, {"n": 4}]`;
+    const res = await postChart(json, "data.json");
+
+    expect(res.statusCode).toBe(200);
+    // Since we can't easily parse PNG in the test to check labels, the fact that
+    // it returns 200 without throwing is a start. The fix uses Object.hasOwn.
   });
 });

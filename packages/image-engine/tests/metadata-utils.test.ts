@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   getImageInfo,
   parseExif,
@@ -212,6 +212,87 @@ describe("parseExif", () => {
   it("returns empty sections (does not throw) on a malformed buffer", () => {
     const result = parseExif(Buffer.from("garbage exif bytes that will not parse"));
     expect(result).toEqual({ image: {}, photo: {}, iop: {}, gps: {} });
+  });
+
+  it("rethrows parse errors when throwOnError is true (#3783)", () => {
+    const malformed = Buffer.from("Exif\0\0corrupt-tiff-header", "ascii");
+    expect(() => parseExif(malformed, { throwOnError: true })).toThrow(/Invalid EXIF data/);
+    expect(parseExif(malformed, { throwOnError: false })).toEqual({
+      image: {},
+      photo: {},
+      iop: {},
+      gps: {},
+    });
+    expect(parseExif(Buffer.alloc(0), { throwOnError: true })).toEqual({
+      image: {},
+      photo: {},
+      iop: {},
+      gps: {},
+    });
+  });
+
+  it("rejects truncated EXIF IFD0, Photo, Iop, and GPSInfo tables when exif-reader returns null sections (#3882)", () => {
+    const truncatedIfd0 = Buffer.from("4578696600004d4d002a000010000000", "hex");
+    const truncatedPhoto = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000100000000000",
+      "hex",
+    );
+    const truncatedGps = Buffer.from(
+      "4578696600004d4d002a00000008000188250004000000010000100000000000",
+      "hex",
+    );
+    const truncatedIop = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000001a000000000001a0050004000000010000100000000000",
+      "hex",
+    );
+    const validZeroEntryIfd0 = Buffer.from("4578696600004d4d002a00000008000000000000", "hex");
+
+    for (const buf of [truncatedIfd0, truncatedPhoto, truncatedGps, truncatedIop]) {
+      expect(() => parseExif(buf, { throwOnError: true })).toThrow(
+        "Invalid EXIF data: truncated IFD",
+      );
+      expect(parseExif(buf, { throwOnError: false })).toEqual({
+        image: {},
+        photo: {},
+        iop: {},
+        gps: {},
+      });
+    }
+
+    expect(parseExif(validZeroEntryIfd0, { throwOnError: true })).toEqual({
+      image: {},
+      photo: {},
+      iop: {},
+      gps: {},
+    });
+  });
+
+  it("rethrows V8 buffer allocation RangeError while swallowing non-OOM RangeError (#3835)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const exifBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    const toStringSpy = vi.spyOn(exifBuf, "toString").mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    try {
+      expect(() => parseExif(exifBuf)).toThrow(v8Oom);
+    } finally {
+      toStringSpy.mockRestore();
+    }
+
+    const nonOomRangeBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    const rangeSpy = vi.spyOn(nonOomRangeBuf, "toString").mockImplementationOnce(() => {
+      throw new RangeError("Attempt to access memory outside buffer bounds");
+    });
+    try {
+      expect(parseExif(nonOomRangeBuf)).toEqual({
+        image: {},
+        photo: {},
+        iop: {},
+        gps: {},
+      });
+    } finally {
+      rangeSpy.mockRestore();
+    }
   });
 
   it("populates the image section from a real EXIF blob", async () => {

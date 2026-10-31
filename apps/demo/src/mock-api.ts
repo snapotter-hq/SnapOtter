@@ -1,8 +1,9 @@
+import type { Permission } from "@snapotter/shared";
 import packageJson from "../../../package.json";
 
 const DEMO_APP_VERSION = packageJson.version;
 
-const PERMISSIONS = [
+const PERMISSIONS: readonly Permission[] = [
   "tools:use",
   "files:own",
   "files:all",
@@ -17,6 +18,9 @@ const PERMISSIONS = [
   "features:manage",
   "system:health",
   "audit:read",
+  "compliance:manage",
+  "webhooks:manage",
+  "security:manage",
 ];
 
 const FEATURE_BUNDLES = [
@@ -81,7 +85,7 @@ const FEATURE_BUNDLES = [
     description: "Extract text from images and PDFs",
     status: "installed",
     installedVersion: "1.0.0",
-    estimatedSize: "~208-234 MiB download / ~409-488 MiB installed",
+    estimatedSize: "208-234 MiB",
     downloadBytes: 244_622_462,
     installedBytes: 510_762_511,
     compatibility: "compatible",
@@ -401,7 +405,7 @@ const db: {
       id: "role_user",
       name: "user",
       description: "Run tools and manage your own files and keys.",
-      permissions: ["tools:use", "files:own", "apikeys:own", "pipelines:own"],
+      permissions: ["tools:use", "files:own", "apikeys:own", "pipelines:own", "settings:read"],
       toolPermissions: null,
       isBuiltin: true,
       userCount: 5,
@@ -467,6 +471,7 @@ const db: {
     ssoBreakGlassUsername: "",
     passwordMinLength: "8",
     passwordRequireUppercase: "true",
+    passwordRequireLowercase: "true",
     passwordRequireDigit: "true",
     passwordRequireSpecial: "false",
     disabledTools: "[]",
@@ -927,6 +932,7 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
       posthogApiKey: "",
       posthogHost: "",
       posthogProxyPath: "",
+      feedbackSink: false,
       sentryDsn: "",
       sentryDsnWeb: "",
       posthogSampleRate: 0,

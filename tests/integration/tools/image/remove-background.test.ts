@@ -9,13 +9,20 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { putObject } from "../../../../apps/api/src/lib/object-storage.js";
+import { env } from "../../../../apps/api/src/config.js";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
+import { listObjects, putObject } from "../../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
+  createUserAndLogin,
   loginAsAdmin,
   type TestApp,
 } from "../../test-server.js";
@@ -33,11 +40,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Remove Background", () => {
   // ── Phase 1: Processing (AI-dependent) ───────────────────────────
@@ -91,12 +98,12 @@ describe("Remove Background", () => {
     }
   }, 60_000);
 
-  it("accepts transparent backgroundType", async () => {
+  it("accepts model setting on Phase 1", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
         name: "settings",
-        content: JSON.stringify({ backgroundType: "transparent" }),
+        content: JSON.stringify({ model: "u2net" }),
       },
     ]);
 
@@ -113,19 +120,34 @@ describe("Remove Background", () => {
     expect([202, 501]).toContain(res.statusCode);
   }, 60_000);
 
-  it("accepts color background with blur and shadow settings", async () => {
+  it.each([
+    ["transparent backgroundType", { backgroundType: "transparent" }],
+    [
+      "color background with blur and shadow settings",
+      {
+        backgroundType: "color",
+        backgroundColor: "#FF0000",
+        blurEnabled: true,
+        blurIntensity: 50,
+        shadowEnabled: true,
+        shadowOpacity: 60,
+      },
+    ],
+    [
+      "gradient background settings",
+      {
+        backgroundType: "gradient",
+        gradientColor1: "#FF0000",
+        gradientColor2: "#0000FF",
+        gradientAngle: 45,
+      },
+    ],
+  ])("rejects %s on Phase 1 and points to /effects (#2281)", async (_label, settings) => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
         name: "settings",
-        content: JSON.stringify({
-          backgroundType: "color",
-          backgroundColor: "#FF0000",
-          blurEnabled: true,
-          blurIntensity: 50,
-          shadowEnabled: true,
-          shadowOpacity: 60,
-        }),
+        content: JSON.stringify(settings),
       },
     ]);
 
@@ -139,35 +161,13 @@ describe("Remove Background", () => {
       body,
     });
 
-    expect([202, 501]).toContain(res.statusCode);
-  }, 60_000);
-
-  it("accepts gradient background settings", async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      {
-        name: "settings",
-        content: JSON.stringify({
-          backgroundType: "gradient",
-          gradientColor1: "#FF0000",
-          gradientColor2: "#0000FF",
-          gradientAngle: 45,
-        }),
-      },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/remove-background",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
-
-    expect([202, 501]).toContain(res.statusCode);
-  }, 60_000);
+    expect([400, 501]).toContain(res.statusCode);
+    if (res.statusCode === 400) {
+      const result = JSON.parse(res.body);
+      expect(result.error).toMatch(/invalid settings/i);
+      expect(result.details).toMatch(/\/effects/);
+    }
+  });
 
   it("processes JPEG input", async () => {
     const { body, contentType } = createMultipartPayload([
@@ -251,6 +251,23 @@ describe("Remove Background", () => {
     expect(result.error).toMatch(/no settings/i);
   });
 
+  it("effects route answers a malformed body with the shared multipart 400 (#1660)", async () => {
+    // A boundary that never appears in the body: the read fails, and the
+    // client can tell this from an over-limit upload, which gets 413.
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "multipart/form-data; boundary=never-sent",
+      },
+      body: '--other\r\nContent-Disposition: form-data; name="settings"\r\n\r\n{}\r\n',
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe("Failed to parse multipart request");
+  });
+
   it("effects route rejects invalid settings JSON", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "settings", content: "not json{{" },
@@ -292,6 +309,201 @@ describe("Remove Background", () => {
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/invalid settings/i);
+  });
+
+  // #2156: the route only reads a file part named backgroundImage. A part under
+  // any other name (the background image sent as `file`, the name every other
+  // tool uses) was skipped without being drained, and the request never ended.
+  it("effects route ignores a file part it doesn't read instead of hanging (#2156)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "background.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ filename: "test.png" }) },
+    ]);
+
+    const request = app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+    let timer: NodeJS.Timeout | undefined;
+    const hung = new Promise<"hung">((resolve) => {
+      timer = setTimeout(() => resolve("hung"), 10_000);
+    });
+    const res = await Promise.race([request, hung]).finally(() => clearTimeout(timer));
+
+    expect(res).not.toBe("hung");
+    // Answered by the route's own settings check, so the settings field behind
+    // the stray part was read.
+    expect((res as Awaited<typeof request>).statusCode).toBe(400);
+    expect(JSON.parse((res as Awaited<typeof request>).body).error).toMatch(/invalid settings/i);
+  }, 20_000);
+
+  // The route used to answer 422 for every failure to read the stored mask and
+  // original, a missing object and a storage fault alike (#2119).
+  async function effectsFor(settings: Record<string, unknown>) {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+  }
+
+  it("effects route answers 410 BACKGROUND_REMOVAL_EXPIRED when the stored cutout is gone (#2119)", async () => {
+    // No removal ever stored a mask for this job, the same state as one whose
+    // outputs were cleaned up between the two calls.
+    const res = await effectsFor({ jobId: randomUUID(), filename: "test.png" });
+
+    expect(res.statusCode).toBe(410);
+    expect(JSON.parse(res.body).code).toBe("BACKGROUND_REMOVAL_EXPIRED");
+    // The raw ENOENT carried the absolute data path; nothing of it leaks.
+    expect(res.body).not.toMatch(/ENOENT|outputs\//);
+  });
+
+  // Settings the compositor can't act on used to come back as a transparent or
+  // black image with a 200. They fail at the boundary now, before any stored
+  // cutout is read (#2075).
+  it.each([
+    ["a color that isn't hex", { backgroundType: "color", backgroundColor: "red" }],
+    ["a color background without a color", { backgroundType: "color" }],
+    ["a gradient missing a stop", { backgroundType: "gradient", gradientColor1: "#000000" }],
+    ["an image background without the file", { backgroundType: "image" }],
+    ["an invalid backgroundType", { backgroundType: "sparkles" }],
+    ["a blurIntensity out of range", { blurIntensity: 200 }],
+    ["a shadowOpacity out of range", { shadowOpacity: 200 }],
+    ["an invalid outputFormat", { outputFormat: "gif" }],
+  ])("effects route answers 400 for %s (#2075)", async (_label, extra) => {
+    const res = await effectsFor({ jobId: randomUUID(), filename: "test.png", ...extra });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
+  });
+
+  it("effects route reads past validation for 3-digit hex colors (#2075)", async () => {
+    const res = await effectsFor({
+      jobId: randomUUID(),
+      filename: "test.png",
+      backgroundType: "color",
+      backgroundColor: "#f00",
+    });
+
+    // Validation passed; the only thing missing is the stored cutout.
+    expect(res.statusCode).toBe(410);
+  });
+
+  it("effects route answers 400 for a filename the store would refuse (#2119)", async () => {
+    const res = await effectsFor({ jobId: randomUUID(), filename: "../../escape.png" });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("effects route rejects an invalid backgroundImage with 400 (#2827)", async () => {
+    const jobId = randomUUID();
+    await seedPhase1Cache(jobId, "test");
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "backgroundImage",
+        filename: "bg.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          jobId,
+          filename: "test.png",
+          backgroundType: "image",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/^Invalid background image:/);
+  });
+
+  it("effects route decompresses and sanitizes an .svgz backgroundImage (#2845)", async () => {
+    const jobId = randomUUID();
+    await seedPhase1Cache(jobId, "test");
+
+    const svgzBg = gzipSync(
+      Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><script>alert(1)</script><rect width="20" height="20" fill="#00ff00"/></svg>',
+      ),
+    );
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "backgroundImage",
+        filename: "bg.svgz",
+        contentType: "image/svg+xml",
+        content: svgzBg,
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          jobId,
+          filename: "test.png",
+          backgroundType: "image",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).downloadUrl).toContain("/api/v1/download/");
+  });
+
+  it("effects route lets a storage fault reading the mask reach the error handler (#2119)", async () => {
+    // A directory where the mask should be makes the read fail with EISDIR:
+    // the object exists but can't be read, which is the server's fault.
+    // Built on disk directly, since putObject refuses a nested key. Assumes
+    // the local backend, which every integration run uses.
+    const jobId = randomUUID();
+    await mkdir(join(env.WORKSPACE_PATH, "outputs", jobId, "test_mask.png"), { recursive: true });
+    await putObject(
+      `uploads/${jobId}/test_original.png`,
+      await sharp({
+        create: { width: 8, height: 8, channels: 3, background: "#888" },
+      })
+        .png()
+        .toBuffer(),
+    );
+
+    const res = await effectsFor({ jobId, filename: "test.png" });
+
+    // Status only: the test server skips the production error handler
+    // (#1243), so the body is Fastify's default. The unit suite pins ours.
+    expect(res.statusCode).toBe(500);
   });
 
   // ── Validation (always testable) ─────────────────────────────────
@@ -367,6 +579,31 @@ describe("Remove Background", () => {
     }
   });
 
+  it("rejects a malformed background color (#2075)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ backgroundType: "color", backgroundColor: "red" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([400, 501]).toContain(res.statusCode);
+    if (res.statusCode === 400) {
+      expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
+    }
+  });
+
   it("rejects blurIntensity out of range", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
@@ -415,7 +652,7 @@ describe("Remove Background", () => {
     expect([202, 501]).toContain(res.statusCode);
   }, 60_000);
 
-  it("accepts output format settings", async () => {
+  it("rejects outputFormat on Phase 1 and points to /effects (#2281)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
@@ -434,8 +671,13 @@ describe("Remove Background", () => {
       body,
     });
 
-    expect([202, 501]).toContain(res.statusCode);
-  }, 60_000);
+    expect([400, 501]).toContain(res.statusCode);
+    if (res.statusCode === 400) {
+      const result = JSON.parse(res.body);
+      expect(result.error).toMatch(/invalid settings/i);
+      expect(result.details).toMatch(/\/effects/);
+    }
+  });
 
   it("rejects edgeRefine out of range", async () => {
     const { body, contentType } = createMultipartPayload([
@@ -541,8 +783,9 @@ async function getFileDetail(id: string) {
 
 /**
  * Seed the cached Phase 1 artifacts the effects route reads: a transparent
- * subject (`_mask.png`) and the original (`_original.png`) under the job's
- * output prefix, both matching the `<base>` derived from the filename.
+ * subject (`_mask.png`) under the job's output prefix and the original
+ * (`_original.png`) under its upload prefix, which the download route never
+ * serves. Both match the `<base>` derived from the filename.
  */
 async function seedPhase1Cache(jobId: string, base: string): Promise<void> {
   const mask = await sharp({
@@ -556,7 +799,7 @@ async function seedPhase1Cache(jobId: string, base: string): Promise<void> {
     .png()
     .toBuffer();
   await putObject(`outputs/${jobId}/${base}_mask.png`, mask);
-  await putObject(`outputs/${jobId}/${base}_original.png`, original);
+  await putObject(`uploads/${jobId}/${base}_original.png`, original);
 }
 
 function effectsPayload(fields: Array<{ name: string; content: string }>) {
@@ -684,5 +927,94 @@ describe("Remove Background effects route: library saveMode", () => {
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/saveMode/i);
+  });
+});
+
+describe("Remove Background effects route: Phase 1 ownership", () => {
+  // The effects route takes Phase 1's jobId from the client, so it used to
+  // read any user's stored original and mask and write into their prefix.
+  let owner: { token: string; userId: string };
+  let intruder: { token: string; userId: string };
+
+  beforeAll(async () => {
+    owner = await createUserAndLogin(app, "rmbgowner");
+    intruder = await createUserAndLogin(app, "rmbgintruder");
+  });
+
+  async function seedOwnedPhase1(): Promise<string> {
+    const jobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: jobId,
+      userId: owner.userId,
+      toolId: "remove-background",
+      type: "single",
+      status: "completed",
+      inputRefs: [],
+      completedAt: new Date(),
+    });
+    await seedPhase1Cache(jobId, "test");
+    return jobId;
+  }
+
+  function effectsAs(token: string, jobId: string) {
+    const { body, contentType } = effectsPayload([
+      {
+        name: "settings",
+        content: JSON.stringify({
+          jobId,
+          filename: "test.png",
+          backgroundType: "color",
+          backgroundColor: "#ff0000",
+        }),
+      },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: { authorization: `Bearer ${token}`, "content-type": contentType },
+      body,
+    });
+  }
+
+  it("answers 404 to another user and writes nothing into the owner's prefix", async () => {
+    const jobId = await seedOwnedPhase1();
+
+    const res = await effectsAs(intruder.token, jobId);
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "Job not found" });
+    const keys = (await listObjects(`outputs/${jobId}/`)).map((o) => o.key);
+    expect(keys).toEqual([`outputs/${jobId}/test_mask.png`]);
+  });
+
+  it("answers 404 to a non-admin for a jobId no job row owns", async () => {
+    const jobId = randomUUID();
+    await seedPhase1Cache(jobId, "test");
+
+    const res = await effectsAs(intruder.token, jobId);
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("lets a files:all holder work on another user's job", async () => {
+    const jobId = await seedOwnedPhase1();
+
+    const res = await effectsAs(adminToken, jobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+  });
+
+  it("serves the owner and stores the result under a fresh job they own", async () => {
+    const jobId = await seedOwnedPhase1();
+
+    const res = await effectsAs(owner.token, jobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.jobId).not.toBe(jobId);
+    expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/test_nobg.png`);
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, body.jobId));
+    expect(row?.userId).toBe(owner.userId);
+    expect(row?.outputRefs).toEqual([`outputs/${body.jobId}/test_nobg.png`]);
   });
 });

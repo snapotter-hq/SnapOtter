@@ -29,6 +29,7 @@ import tarfile
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from datetime import datetime, timezone
 
 DOWNLOAD_CHUNK_BYTES = 4 * 1024 * 1024
@@ -101,14 +102,15 @@ def _existing_ancestor(path: str) -> str:
     return p or "/"
 
 
-def check_disk_space(path: str, needed_bytes: int) -> None:
+def check_disk_space(path: str, needed_bytes: int, detail: str = "") -> None:
     """Fail if insufficient disk space on the filesystem holding path."""
     usage = shutil.disk_usage(_existing_ancestor(path))
     if usage.free < needed_bytes:
         free_gb = usage.free / (1024 ** 3)
         need_gb = needed_bytes / (1024 ** 3)
+        suffix = f" ({detail})" if detail else ""
         fail(
-            f"Insufficient disk space: need {need_gb:.1f} GB, "
+            f"Insufficient disk space: need {need_gb:.1f} GB{suffix}, "
             f"have {free_gb:.1f} GB free. "
             f"Free up space and retry."
         )
@@ -122,6 +124,52 @@ def estimate_extracted(compressed: int, extracted: int) -> int:
     ~3x). This is only the early sanity bail; the accurate guard is the
     real-on-disk re-check just before the destructive venv write."""
     return extracted if extracted > 0 else compressed * 3
+
+
+def needed_download_disk_bytes(
+    ai_dir: str,
+    bundle_id: str,
+    arch: str,
+    compressed_size: int,
+    extracted_size: int,
+) -> int:
+    """Calculate additional free bytes required on ai_dir before downloading.
+
+    During download + extraction, both the compressed archive in staging/ and
+    the extracted tree in staging-<bundleId>/ coexist on disk before the archive
+    is removed. Any stale staging-<bundleId>/ directory from a crashed run is
+    deleted first so its space is reclaimed, and any bytes already on disk in
+    the resumable .tar.gz / .partial file are credited against the download
+    portion so a retry does not double-count them (#1248).
+    """
+    stale_staging_dir = os.path.join(ai_dir, f"staging-{bundle_id}")
+    if os.path.exists(stale_staging_dir):
+        shutil.rmtree(stale_staging_dir, ignore_errors=True)
+
+    extracted = estimate_extracted(compressed_size, extracted_size)
+    needed = compressed_size + extracted + 500 * 1024 * 1024  # 500 MB buffer
+    if needed <= 0:
+        return 0
+
+    staging_base = os.path.join(ai_dir, "staging")
+    tar_path = os.path.join(staging_base, f"{bundle_id}-{arch}.tar.gz")
+    # A leftover complete .tar.gz before download_and_verify starts is an orphan
+    # from a run that died during extraction; remove it so download_with_resume
+    # does not hold both .tar.gz and .tar.gz.partial on disk at once.
+    if os.path.isfile(tar_path):
+        _unlink_quietly(tar_path)
+
+    already_staged = 0
+    partial_path = tar_path + ".partial"
+    try:
+        if os.path.isfile(partial_path):
+            already_staged = os.path.getsize(partial_path)
+    except OSError:
+        pass
+    if compressed_size > 0:
+        already_staged = min(already_staged, compressed_size)
+
+    return max(0, needed - already_staged)
 
 
 def dir_size(path: str) -> int:
@@ -147,12 +195,87 @@ def same_filesystem(a: str, b: str) -> bool:
 
 # -- Venv site-packages discovery --
 
+def _probe_site_packages_dir(venv_path: str) -> tuple:
+    """Resolve venv_path's site-packages directory through its own interpreter.
+
+    Mirrors resolveVenvSitePackages in apps/api/src/lib/feature-status.ts (#1139):
+    asks <venv>/bin/python3 for sysconfig.get_paths()['purelib'], refuses a
+    resolved path outside venv_path (e.g. a symlinked system python3 with no
+    pyvenv.cfg reporting the host's site-packages), and requires the directory
+    to exist on disk. Returns (site_packages_dir, error_message).
+    """
+    venv_python = os.path.join(venv_path, "bin", "python3")
+    if not os.path.exists(venv_python):
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} could not be queried "
+            f"({venv_python} does not exist). Recreate the AI environment and retry.",
+        )
+    try:
+        result = subprocess.run(
+            [venv_python, "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} could not be queried ({e}). "
+            f"Recreate the AI environment and retry.",
+        )
+    stdout = getattr(result, "stdout", None) or ""
+    stderr = getattr(result, "stderr", None) or ""
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if result.returncode != 0 or not lines:
+        detail = stderr.strip() or f"python3 exited with status {result.returncode}"
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} could not be queried ({detail}). "
+            f"Recreate the AI environment and retry.",
+        )
+    raw_site_packages = lines[-1]
+    try:
+        is_abs = os.path.isabs(raw_site_packages)
+        site_packages = os.path.realpath(raw_site_packages) if is_abs else ""
+        resolved_venv = os.path.realpath(venv_path)
+        is_dir = os.path.isdir(site_packages) if site_packages else False
+    except (OSError, ValueError) as e:
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} returned an invalid "
+            f"site-packages path ({e}). Recreate the AI environment and retry.",
+        )
+    if not is_abs:
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} reported a non-absolute "
+            f"site-packages path ({raw_site_packages}). Recreate the AI environment and retry.",
+        )
+    if not site_packages.startswith(resolved_venv + os.sep):
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} reports a site-packages "
+            f"directory ({site_packages}) outside the environment itself. "
+            f"Recreate the AI environment and retry.",
+        )
+    if not is_dir:
+        return (
+            "",
+            f"The AI environment at {venv_path} has no site-packages directory at {site_packages}. "
+            f"Recreate the AI environment and retry.",
+        )
+    return (site_packages, "")
+
+
 def get_site_packages_dir(venv_path: str) -> str:
     """Find the site-packages directory inside a Python venv."""
-    matches = glob.glob(os.path.join(venv_path, "lib", "python*", "site-packages"))
-    if matches:
-        return matches[0]
-    return ""
+    site_packages, _err = _probe_site_packages_dir(venv_path)
+    return site_packages
+
+
+_default_get_site_packages_dir = get_site_packages_dir
 
 
 # -- SHA256 verification --
@@ -407,6 +530,9 @@ def ensure_hf_hub(venv_path: str) -> None:
         # The finder caches the venv's site-packages listing; drop it so the
         # just-installed package is visible to the import in download_with_hf_hub.
         importlib.invalidate_caches()
+    except subprocess.CalledProcessError as e:
+        err_msg = (e.stderr or "").strip()
+        emit_progress(1, f"Accelerated client unavailable (pip failed: {err_msg}); using resumable download.")
     except Exception as e:
         emit_progress(1, f"Accelerated client unavailable ({e}); using resumable download.")
 
@@ -895,9 +1021,15 @@ def move_tree(src: str, dst: str, progress_cb=None, copy_activity_cb=None) -> No
             progress_cb()
     # Remove whatever remains of src (emptied by renames, or copied originals).
     shutil.rmtree(src, ignore_errors=True)
+    if dst:
+        _displaced_onnx_dist_infos.pop(os.path.abspath(dst), None)
 
 
 # -- ONNX Runtime flavor reconciliation (GPU wins) --
+
+# Keyed by os.path.abspath(site_packages_dir) -> [(version, dist_info, meta_files_or_None)]
+_displaced_onnx_dist_infos: dict = {}
+
 
 def _onnx_dist_infos(sp_dir: str) -> tuple:
     """Return (cpu, gpu) lists of onnxruntime dist-info directory names.
@@ -915,7 +1047,34 @@ def _onnx_dist_infos(sp_dir: str) -> tuple:
     return (cpu, gpu)
 
 
-def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
+def _onnx_owned_files(sp_dir: str, dist_info: str) -> list:
+    """Relative paths owned by an onnxruntime or onnxruntime-gpu dist-info.
+
+    Reads RECORD when present; falls back to walking onnxruntime/ (and its
+    .libs directories) only when RECORD is absent, so synthetic test trees
+    that lay out METADATA without RECORD still quarantine and roll back.
+    """
+    dist_info_dir = os.path.join(sp_dir, dist_info)
+    if not os.path.isdir(dist_info_dir):
+        return []
+    recorded = distribution_files(sp_dir, dist_info)
+    if recorded or os.path.exists(os.path.join(dist_info_dir, "RECORD")):
+        return recorded
+    paths = []
+    for top in ("onnxruntime", "onnxruntime.libs", "onnxruntime_gpu.libs"):
+        top_dir = os.path.join(sp_dir, top)
+        if not os.path.isdir(top_dir):
+            continue
+        for root, _dirs, files in os.walk(top_dir):
+            for name in sorted(files):
+                rel = os.path.relpath(os.path.join(root, name), sp_dir).replace("\\", "/")
+                paths.append(rel)
+    return paths
+
+
+def reconcile_onnxruntime(
+    staging_sp: str, site_packages_dir: str, quarantine_dir: str = ""
+) -> None:
     """Never let a bundle downgrade the venv's ONNX Runtime from GPU to CPU.
 
     `onnxruntime` (CPU) and `onnxruntime-gpu` unpack into the SAME package
@@ -929,6 +1088,8 @@ def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
     """
     staging_cpu, staging_gpu = _onnx_dist_infos(staging_sp)
     venv_cpu, venv_gpu = _onnx_dist_infos(site_packages_dir)
+    if site_packages_dir:
+        _displaced_onnx_dist_infos.pop(os.path.abspath(site_packages_dir), None)
 
     if staging_cpu and (venv_gpu or staging_gpu):
         # Incoming CPU flavor while a GPU build exists: drop the CPU metadata,
@@ -951,14 +1112,137 @@ def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
         # Incoming GPU flavor over a CPU install: the GPU files win the merge;
         # clear the venv's stale CPU metadata so pip reflects reality. This also
         # makes reinstalling any GPU bundle repair a venv clobbered before this
-        # guard existed.
-        for name in venv_cpu:
-            shutil.rmtree(os.path.join(site_packages_dir, name), ignore_errors=True)
+        # guard existed. When quarantine_dir is given, hold the displaced CPU
+        # package and its dist-info in quarantine so a failed install rolls
+        # back to the working CPU build (#2612).
+        if quarantine_dir:
+            gpu_dist_info = sorted(staging_gpu)[-1]
+            _, sep, gpu_version = gpu_dist_info[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+            if not sep or not gpu_version:
+                gpu_version = gpu_dist_info
+            staged_files = [
+                rel
+                for rel in _onnx_owned_files(staging_sp, gpu_dist_info)
+                if os.path.exists(os.path.join(staging_sp, rel))
+            ]
+            replaces = {rel.split("/")[0] for rel in staged_files}
+            if os.path.isdir(os.path.join(staging_sp, "onnxruntime")):
+                replaces.update(("onnxruntime", "onnxruntime.libs"))
+            superseded = []
+            for dist_info in venv_cpu + venv_gpu:
+                _, v_sep, ver = dist_info[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+                superseded.append((ver if (v_sep and ver) else dist_info, dist_info))
+            _supersede_distributions_impl(
+                site_packages_dir,
+                [
+                    {
+                        "name": "onnxruntime-gpu",
+                        "version": gpu_version,
+                        "dist_info": gpu_dist_info,
+                        "files": staged_files,
+                        "replaces": replaces,
+                        "superseded": superseded,
+                    }
+                ],
+                quarantine_dir,
+                log_replacements=False,
+            )
+            if site_packages_dir:
+                _displaced_onnx_dist_infos[os.path.abspath(site_packages_dir)] = [
+                    (ver, di, None) for ver, di in superseded
+                ]
+        else:
+            saved = []
+            for name in venv_cpu:
+                _, sep, version = name[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+                if not sep or not version:
+                    version = name
+                di_root = os.path.join(site_packages_dir, name)
+                meta_files = {}
+                if os.path.isdir(di_root):
+                    for root, _dirs, files in os.walk(di_root):
+                        for fname in files:
+                            full = os.path.join(root, fname)
+                            rel = os.path.relpath(full, site_packages_dir).replace("\\", "/")
+                            with open(full, "rb") as f:
+                                meta_files[rel] = f.read()
+                saved.append((version, name, meta_files))
+                shutil.rmtree(di_root, ignore_errors=True)
+            if saved and site_packages_dir:
+                _displaced_onnx_dist_infos[os.path.abspath(site_packages_dir)] = saved
         sys.stderr.write(
             "[install] replacing the CPU build of onnxruntime with the GPU build; "
             "removed its stale metadata\n"
         )
         sys.stderr.flush()
+
+
+def reconcile_opencv(staging_sp: str, site_packages_dir: str) -> None:
+    """Drop orphan OpenCV metadata and .libs directories from bundle staging.
+
+    In build-bundle.sh, /opt/venv already holds cv2/ from basePackages
+    (opencv-python-headless==4.10.0.84), so Step 6's top-level diff excludes
+    cv2/. Bundles whose dependencies pulled opencv-contrib-python (via
+    mediapipe) before Step 4.7 existed therefore shipped
+    opencv_contrib_python-*.dist-info and opencv_contrib_python.libs/ WITHOUT
+    cv2/. Merging those orphan directories into a venv whose cv2.abi3.so links
+    against a different build's libpng16-*.so replaces the .libs directory while
+    leaving the old cv2.abi3.so behind, breaking every cv2 import (#1248).
+    """
+    if not os.path.isdir(staging_sp):
+        return
+    # Base OpenCV lives in /opt/venv; a bundle delta without cv2/ must never
+    # place OpenCV dist-info or .libs directories on its own.
+    if os.path.isdir(os.path.join(staging_sp, "cv2")):
+        return
+    removed = []
+    for name in os.listdir(staging_sp):
+        is_cv_dist = (
+            name.startswith(
+                (
+                    "opencv_python-",
+                    "opencv_python_headless-",
+                    "opencv_contrib_python-",
+                    "opencv_contrib_python_headless-",
+                )
+            )
+            and name.endswith(".dist-info")
+        )
+        is_cv_libs = name in (
+            "opencv_python.libs",
+            "opencv_python_headless.libs",
+            "opencv_contrib_python.libs",
+            "opencv_contrib_python_headless.libs",
+        )
+        if is_cv_dist or is_cv_libs:
+            shutil.rmtree(os.path.join(staging_sp, name), ignore_errors=True)
+            removed.append(name)
+    if removed:
+        sys.stderr.write(
+            f"[install] dropped orphan OpenCV entries from bundle delta (no cv2/ in bundle): {', '.join(sorted(removed))}\n"
+        )
+        sys.stderr.flush()
+
+
+def can_reseed_venv() -> bool:
+    """True only when the official image's baked /opt/venv and reseed script exist."""
+    return os.path.exists("/usr/local/bin/reseed-ai-venv.sh") and os.path.exists("/opt/venv")
+
+
+def _venv_python_major_minor(venv_python: str) -> str:
+    """Return 'major.minor' of venv_python, or '' if it cannot be queried."""
+    try:
+        proc = subprocess.run(
+            [venv_python, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    return ""
 
 
 # -- Distribution reconciliation (one version per distribution) --
@@ -1108,48 +1392,95 @@ def plan_reconciliation(staging_sp: str, sp_dir: str) -> list:
     """
     staged = list_distributions(staging_sp)
     installed = list_distributions(sp_dir)
+    displaced_onnx = (
+        _displaced_onnx_dist_infos.get(os.path.abspath(sp_dir), [])
+        if sp_dir
+        else []
+    )
     plan = []
     for name in sorted(staged):
         version, dist_info = sorted(staged[name])[-1]
         existing = installed.get(name, [])
         superseded = [copy for copy in existing if copy[0] != version]
+        if name == "onnxruntime-gpu":
+            if installed.get("onnxruntime") or displaced_onnx:
+                superseded = list(existing)
+            seen_di = {di for _v, di in superseded}
+            for ver, di in installed.get("onnxruntime", []):
+                if di not in seen_di:
+                    superseded.append((ver, di))
+                    seen_di.add(di)
+            for ver, di, _meta in displaced_onnx:
+                if di not in seen_di:
+                    superseded.append((ver, di))
+                    seen_di.add(di)
         if existing and not superseded:
             continue
         # RECORD describes the wheel, not the archive. A bundle's copy of
         # setuptools lists `_distutils_hack/` and `distutils-precedence.pth`
         # while carrying neither, so trusting RECORD alone would clear ground
         # that nothing is going to cover. Keep only what is really staged.
+        raw_files = (
+            _onnx_owned_files(staging_sp, dist_info)
+            if name in ("onnxruntime", "onnxruntime-gpu")
+            else distribution_files(staging_sp, dist_info)
+        )
         files = [
             rel
-            for rel in distribution_files(staging_sp, dist_info)
+            for rel in raw_files
             if os.path.exists(os.path.join(staging_sp, rel))
         ]
+        replaces = {rel.split("/")[0] for rel in files}
+        if name == "onnxruntime-gpu" and os.path.isdir(os.path.join(staging_sp, "onnxruntime")):
+            replaces.update(("onnxruntime", "onnxruntime.libs"))
         plan.append(
             {
                 "name": name,
                 "version": version,
                 "dist_info": dist_info,
                 "files": files,
-                "replaces": {rel.split("/")[0] for rel in files},
+                "replaces": replaces,
                 "superseded": superseded,
             }
         )
     return plan
 
 
-def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int:
-    """Uninstall every superseded version, holding its files for a rollback.
-
-    Files move to `quarantine_dir/<name>/<version>/` rather than being deleted
-    outright, so a failed verification can put the venv back exactly as it was
-    instead of leaving it half-way between two bundles.
-    """
+def _supersede_distributions_impl(
+    sp_dir: str,
+    plan: list,
+    quarantine_dir: str,
+    log_replacements: bool = True,
+) -> int:
     removed = 0
+    displaced_by_di = {}
+    if sp_dir:
+        for ver, di, meta in _displaced_onnx_dist_infos.pop(os.path.abspath(sp_dir), []):
+            displaced_by_di[di] = (ver, meta)
     superseded_dist_infos = {info for item in plan for _v, info in item["superseded"]}
-    shared = paths_claimed_by_others(sp_dir, superseded_dist_infos)
+    for di, (_ver, meta) in displaced_by_di.items():
+        if di in superseded_dist_infos and meta:
+            for rel, content in meta.items():
+                target = os.path.join(sp_dir, rel)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, "wb") as f:
+                    f.write(content)
+    placed_dist_infos = {item["dist_info"] for item in plan if item.get("dist_info")}
+    shared = paths_claimed_by_others(sp_dir, superseded_dist_infos | placed_dist_infos)
     for item in plan:
         for version, dist_info in item["superseded"]:
-            destination = os.path.join(quarantine_dir, item["name"], version)
+            dist_name, sep, _ = dist_info[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+            quarantine_name = (
+                canonical_dist_name(dist_name) if (sep and dist_name) else item["name"]
+            )
+            destination = os.path.join(quarantine_dir, quarantine_name, version)
+            if (
+                dist_info in displaced_by_di
+                and displaced_by_di[dist_info][1] is None
+                and not os.path.exists(os.path.join(sp_dir, dist_info))
+            ):
+                removed += 1
+                continue
             # Only clear ground the incoming copy is going to cover. A bundle
             # archive is not always a complete wheel: upscale-enhance carries
             # setuptools 74.1.3 as `setuptools/` and its dist-info, without the
@@ -1159,7 +1490,12 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
             # stopped importing, because nothing was going to write those files
             # back. Anything the incoming copy does not carry stays put.
             replaces = item["replaces"] | {dist_info}
-            for rel in distribution_files(sp_dir, dist_info):
+            owned_files = (
+                _onnx_owned_files(sp_dir, dist_info)
+                if quarantine_name in ("onnxruntime", "onnxruntime-gpu")
+                else distribution_files(sp_dir, dist_info)
+            )
+            for rel in owned_files:
                 if rel in shared or rel.split("/")[0] not in replaces:
                     continue
                 if _relocate(sp_dir, destination, rel):
@@ -1176,24 +1512,202 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
                         _relocate(sp_dir, destination, rel)
                 shutil.rmtree(leftover, ignore_errors=True)
             removed += 1
-            sys.stderr.write(
-                f"[install] replacing {item['name']} {version} with {item['version']}: "
-                f"removed the superseded version so only one stays in the venv\n"
-            )
-    if removed:
+            if log_replacements:
+                sys.stderr.write(
+                    f"[install] replacing {quarantine_name} {version} with {item['version']}: "
+                    f"removed the superseded version so only one stays in the venv\n"
+                )
+    if removed and log_replacements:
         sys.stderr.flush()
     return removed
 
 
+def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int:
+    """Uninstall every superseded version, holding its files for a rollback.
+
+    Files move to `quarantine_dir/<name>/<version>/` rather than being deleted
+    outright, so a failed verification can put the venv back exactly as it was
+    instead of leaving it half-way between two bundles.
+    """
+    return _supersede_distributions_impl(
+        sp_dir, plan, quarantine_dir, log_replacements=True
+    )
+
+
+REMEDIATION_BACKUP_DIRNAME = ".remediation"
+
+
+def _is_remediation_entry(kind: str, name: str) -> bool:
+    if kind == "onnxruntime":
+        return (
+            name in ("onnxruntime", "onnxruntime.libs", "onnxruntime_gpu.libs")
+            or (
+                name.startswith(("onnxruntime-", "onnxruntime_gpu-"))
+                and name.endswith(DIST_INFO_SUFFIX)
+            )
+        )
+    if kind == "opencv":
+        return (
+            name == "cv2"
+            or name in (
+                "opencv_python.libs",
+                "opencv_python_headless.libs",
+                "opencv_contrib_python.libs",
+                "opencv_contrib_python_headless.libs",
+            )
+            or (
+                name.startswith(
+                    (
+                        "opencv_python-",
+                        "opencv_python_headless-",
+                        "opencv_contrib_python-",
+                        "opencv_contrib_python_headless-",
+                    )
+                )
+                and name.endswith(DIST_INFO_SUFFIX)
+            )
+        )
+    return False
+
+
+def _remediation_top_entries(sp_dir: str, kind: str) -> set:
+    if not sp_dir or not os.path.isdir(sp_dir):
+        return set()
+    names = os.listdir(sp_dir)
+    matched = {n for n in names if _is_remediation_entry(kind, n)}
+    dist_infos = {n for n in matched if n.endswith(DIST_INFO_SUFFIX)}
+    if dist_infos:
+        other_claimed = {
+            rel.split("/")[0]
+            for rel in paths_claimed_by_others(sp_dir, dist_infos)
+            if rel
+        }
+        for d in dist_infos:
+            for rel in distribution_files(sp_dir, d):
+                top = rel.split("/")[0]
+                if (
+                    top
+                    and top not in other_claimed
+                    and os.path.exists(os.path.join(sp_dir, top))
+                ):
+                    matched.add(top)
+    return matched
+
+
+def snapshot_remediation_state(sp_dir: str, quarantine_dir: str, kind: str) -> None:
+    """Save the pre-remediation state of kind's packages in sp_dir under
+    quarantine_dir/.remediation/<kind>/ so a failed fallback or a later
+    failed verification can undo pip's writes and .dist-info deletions."""
+    if not sp_dir or not os.path.isdir(sp_dir) or not quarantine_dir:
+        return
+    slot_dir = os.path.join(quarantine_dir, REMEDIATION_BACKUP_DIRNAME, kind)
+    if os.path.exists(slot_dir):
+        return
+    entries_dir = os.path.join(slot_dir, "entries")
+    os.makedirs(entries_dir, exist_ok=True)
+    before_names = sorted(os.listdir(sp_dir))
+    with open(os.path.join(slot_dir, "before.json"), "w") as f:
+        json.dump(before_names, f)
+    for name in sorted(_remediation_top_entries(sp_dir, kind)):
+        src = os.path.join(sp_dir, name)
+        dst = os.path.join(entries_dir, name)
+        if os.path.isdir(src) and not os.path.islink(src):
+            shutil.copytree(src, dst, symlinks=True)
+        else:
+            shutil.copy2(src, dst, follow_symlinks=False)
+
+
+def restore_remediation_state(
+    sp_dir: str,
+    quarantine_dir: str,
+    kind: str = "",
+    remove_backup: bool = True,
+) -> None:
+    """Restore pre-remediation snapshots saved by snapshot_remediation_state."""
+    if not sp_dir or not os.path.isdir(sp_dir) or not quarantine_dir:
+        return
+    rem_root = os.path.join(quarantine_dir, REMEDIATION_BACKUP_DIRNAME)
+    if not os.path.isdir(rem_root):
+        return
+    if kind:
+        kinds = [kind]
+    else:
+        existing = os.listdir(rem_root)
+        # Restore in reverse remediation order (opencv ran after onnxruntime).
+        preferred = ["opencv", "onnxruntime"]
+        kinds = [k for k in preferred if k in existing] + sorted(
+            k for k in existing if k not in preferred
+        )
+    for k in kinds:
+        slot_dir = os.path.join(rem_root, k)
+        if not os.path.isdir(slot_dir):
+            continue
+        before_path = os.path.join(slot_dir, "before.json")
+        before_set = None
+        if os.path.exists(before_path):
+            try:
+                with open(before_path, "r") as f:
+                    before_set = set(json.load(f))
+            except (OSError, ValueError):
+                before_set = None
+        to_remove = set(_remediation_top_entries(sp_dir, k))
+        if before_set is not None:
+            for current_name in os.listdir(sp_dir):
+                if current_name not in before_set:
+                    to_remove.add(current_name)
+        entries_dir = os.path.join(slot_dir, "entries")
+        if os.path.isdir(entries_dir):
+            to_remove.update(os.listdir(entries_dir))
+        for name in sorted(to_remove):
+            target = os.path.join(sp_dir, name)
+            if os.path.isdir(target) and not os.path.islink(target):
+                shutil.rmtree(target)
+            elif os.path.exists(target) or os.path.islink(target):
+                os.unlink(target)
+        if os.path.isdir(entries_dir):
+            for name in sorted(os.listdir(entries_dir)):
+                src = os.path.join(entries_dir, name)
+                dst = os.path.join(sp_dir, name)
+                if remove_backup:
+                    try:
+                        os.replace(src, dst)
+                    except OSError as e:
+                        if getattr(e, "errno", None) != errno.EXDEV:
+                            raise
+                        shutil.move(src, dst)
+                else:
+                    if os.path.isdir(src) and not os.path.islink(src):
+                        shutil.copytree(src, dst, symlinks=True)
+                    else:
+                        shutil.copy2(src, dst, follow_symlinks=False)
+        if remove_backup:
+            shutil.rmtree(slot_dir, ignore_errors=True)
+    if remove_backup and not kind:
+        shutil.rmtree(rem_root, ignore_errors=True)
+
+
+def _format_proc_failure(proc, tool_name: str = "pip") -> str:
+    output = (getattr(proc, "stderr", None) or "").strip() or (
+        getattr(proc, "stdout", None) or ""
+    ).strip()
+    if output:
+        return "\n".join(output.splitlines()[-6:])
+    return f"{tool_name} exited with status {proc.returncode}"
+
+
 def restore_superseded(sp_dir: str, quarantine_dir: str) -> None:
     """Put every quarantined version back where it came from."""
+    if sp_dir:
+        _displaced_onnx_dist_infos.pop(os.path.abspath(sp_dir), None)
     if not os.path.isdir(quarantine_dir):
         return
-    for name in os.listdir(quarantine_dir):
+    for name in sorted(os.listdir(quarantine_dir)):
+        if name == REMEDIATION_BACKUP_DIRNAME:
+            continue
         holder = os.path.join(quarantine_dir, name)
         if not os.path.isdir(holder):
             continue
-        for version in os.listdir(holder):
+        for version in sorted(os.listdir(holder)):
             version_root = os.path.join(holder, version)
             if not os.path.isdir(version_root):
                 continue
@@ -1211,25 +1725,30 @@ def discard_placed_distributions(sp_dir: str, plan: list) -> None:
     present at the staged version never entered the plan, so a rollback cannot
     delete a version that was there before this install and is still correct.
     """
-    placed_dist_infos = {item["dist_info"] for item in plan}
+    placed_dist_infos = {item["dist_info"] for item in plan if item.get("dist_info")}
     shared = paths_claimed_by_others(sp_dir, placed_dist_infos)
     for item in plan:
         for rel in item["files"]:
             if rel in shared:
                 continue
             target = os.path.join(sp_dir, rel)
-            try:
-                if os.path.isdir(target) and not os.path.islink(target):
-                    shutil.rmtree(target, ignore_errors=True)
-                else:
+            if os.path.isdir(target) and not os.path.islink(target):
+                shutil.rmtree(target)
+            elif os.path.exists(target) or os.path.islink(target):
+                with contextlib.suppress(FileNotFoundError):
                     os.unlink(target)
-            except OSError:
-                pass
+            _discard_stale_bytecode(sp_dir, rel)
             _prune_empty_parents(sp_dir, rel)
+        dist_info = item.get("dist_info") or ""
+        if dist_info:
+            leftover = os.path.join(sp_dir, dist_info)
+            if os.path.isdir(leftover):
+                shutil.rmtree(leftover)
 
 
 def rollback_reconciliation(sp_dir: str, plan: list, quarantine_dir: str) -> None:
     """Undo a merge: drop what this bundle placed, restore what it displaced."""
+    restore_remediation_state(sp_dir, quarantine_dir)
     discard_placed_distributions(sp_dir, plan)
     restore_superseded(sp_dir, quarantine_dir)
 
@@ -1260,12 +1779,15 @@ def abandon_merge(sp_dir, plan, quarantine_dir, marker_path, bundle_id) -> None:
     breadcrumb in place if the rollback itself fails, so a venv this installer
     could not repair still gets reseeded on next boot.
     """
-    if not sp_dir or (not plan and not os.path.isdir(quarantine_dir)):
+    if not sp_dir or (not plan and not (quarantine_dir and os.path.isdir(quarantine_dir))):
         return
+    if marker_path:
+        with contextlib.suppress(OSError):
+            mark_venv_writing(marker_path, bundle_id)
     try:
-        mark_venv_writing(marker_path, bundle_id)
         rollback_reconciliation(sp_dir, plan, quarantine_dir)
-        clear_venv_writing(marker_path)
+        if marker_path:
+            clear_venv_writing(marker_path)
         sys.stderr.write("[install] rolled the venv back to its state before this bundle\n")
     except OSError as e:
         sys.stderr.write(
@@ -1277,27 +1799,385 @@ def abandon_merge(sp_dir, plan, quarantine_dir, marker_path, bundle_id) -> None:
 
 # -- Fixups (NCCL wheel) --
 
-def apply_fixups(staging_dir: str, venv_path: str) -> None:
+def _wheel_dist_identity(wheel_path: str) -> tuple:
+    """Return (canonical_name, version) for a .whl file."""
+    filename = os.path.basename(wheel_path)
+    stem = filename[: -len(".whl")] if filename.endswith(".whl") else filename
+    parts = stem.split("-")
+    fallback_name = canonical_dist_name(parts[0]) if parts and parts[0] else ""
+    fallback_version = parts[1] if len(parts) > 1 else ""
+    try:
+        if zipfile.is_zipfile(wheel_path):
+            with zipfile.ZipFile(wheel_path, "r") as zf:
+                for member in zf.namelist():
+                    top = member.split("/", 1)[0]
+                    if top.endswith(DIST_INFO_SUFFIX):
+                        name, sep, version = top[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+                        if sep and name:
+                            return (canonical_dist_name(name), version)
+    except (OSError, zipfile.BadZipFile):
+        pass
+    return (fallback_name, fallback_version)
+
+
+def _wheel_member_files(wheel_path: str) -> list:
+    """Return safe relative file paths inside a .whl zip archive."""
+    members = []
+    try:
+        if zipfile.is_zipfile(wheel_path):
+            with zipfile.ZipFile(wheel_path, "r") as zf:
+                for info in zf.infolist():
+                    if info.is_dir():
+                        continue
+                    rel = info.filename.strip().replace("\\", "/")
+                    if not rel or rel.startswith("/") or ".." in rel.split("/"):
+                        continue
+                    members.append(rel)
+    except (OSError, zipfile.BadZipFile):
+        pass
+    return members
+
+
+def _collect_installed_dist_files(sp_dir: str, dist_info: str) -> list:
+    """Return relative file paths owned by dist_info in sp_dir, including any
+    unrecorded metadata files (such as INSTALLER or REQUESTED) inside dist_info."""
+    files = [
+        rel
+        for rel in distribution_files(sp_dir, dist_info)
+        if os.path.exists(os.path.join(sp_dir, rel)) or os.path.islink(os.path.join(sp_dir, rel))
+    ]
+    seen = set(files)
+    dist_info_root = os.path.join(sp_dir, dist_info)
+    if os.path.isdir(dist_info_root):
+        for root, _dirs, entries in os.walk(dist_info_root):
+            for entry in sorted(entries):
+                rel = os.path.relpath(os.path.join(root, entry), sp_dir).replace("\\", "/")
+                if rel not in seen:
+                    seen.add(rel)
+                    files.append(rel)
+    return files
+
+
+def apply_fixups(
+    staging_dir: str,
+    venv_path: str,
+    site_packages_dir: str = "",
+    reconciliation_plan=None,
+    quarantine_dir: str = "",
+    venv_writing_marker: str = "",
+    bundle_id: str = "",
+) -> str:
     """Install any wheels from fixups/ directory (local only, no network)."""
     fixups_dir = os.path.join(staging_dir, "fixups")
     if not os.path.isdir(fixups_dir):
-        return
-    wheels = [f for f in os.listdir(fixups_dir) if f.endswith(".whl")]
+        return site_packages_dir
+    plan = reconciliation_plan if reconciliation_plan is not None else []
+    if not quarantine_dir and venv_path:
+        quarantine_dir = os.path.join(venv_path, ".superseded")
+    baseline_dist_infos = None
+    baseline_top_entries = None
+    recorded_fixup_dist_infos = set()
+    superseded_by_name = {}
+    pre_absent_wheel_files = {}
+    sync_failed = [False]
+
+    def _sync_fixup_plan() -> None:
+        if (
+            not site_packages_dir
+            or not os.path.isdir(site_packages_dir)
+            or baseline_dist_infos is None
+        ):
+            return
+        try:
+            current_dists = list_distributions(site_packages_dir)
+        except OSError as e:
+            sync_failed[0] = True
+            sys.stderr.write(
+                f"[install] could not inspect site-packages after fixup ({e}); "
+                f"the AI environment will be reseeded on next restart\n"
+            )
+            sys.stderr.flush()
+            return
+        plan_by_name = {item["name"]: item for item in plan}
+        for name in sorted(current_dists):
+            for version, dist_info in sorted(current_dists[name]):
+                if dist_info in baseline_dist_infos or dist_info in recorded_fixup_dist_infos:
+                    continue
+                files = _collect_installed_dist_files(site_packages_dir, dist_info)
+                replaces = {rel.split("/")[0] for rel in files} | {dist_info}
+                recorded_fixup_dist_infos.add(dist_info)
+                if name in plan_by_name:
+                    existing_item = plan_by_name[name]
+                    old_dist_info = existing_item.get("dist_info") or ""
+                    if old_dist_info and old_dist_info != dist_info:
+                        old_di_path = os.path.join(site_packages_dir, old_dist_info)
+                        if os.path.isdir(old_di_path):
+                            shutil.rmtree(old_di_path)
+                    merged_files = list(
+                        dict.fromkeys(
+                            [
+                                rel
+                                for rel in existing_item["files"]
+                                if os.path.exists(os.path.join(site_packages_dir, rel))
+                                or os.path.islink(os.path.join(site_packages_dir, rel))
+                            ]
+                            + files
+                        )
+                    )
+                    existing_item["version"] = version
+                    existing_item["dist_info"] = dist_info
+                    existing_item["files"] = merged_files
+                    existing_item["replaces"] = set(existing_item.get("replaces", set())) | replaces
+                else:
+                    item = {
+                        "name": name,
+                        "version": version,
+                        "dist_info": dist_info,
+                        "files": files,
+                        "replaces": replaces,
+                        "superseded": superseded_by_name.pop(name, []),
+                    }
+                    plan.append(item)
+                    plan_by_name[name] = item
+        for canon_name, candidate_rels in sorted(pre_absent_wheel_files.items()):
+            existing_rels = [
+                rel
+                for rel in candidate_rels
+                if os.path.exists(os.path.join(site_packages_dir, rel))
+                or os.path.islink(os.path.join(site_packages_dir, rel))
+            ]
+            if not existing_rels:
+                continue
+            if canon_name in plan_by_name:
+                existing_item = plan_by_name[canon_name]
+                existing_item["files"] = list(
+                    dict.fromkeys(existing_item["files"] + existing_rels)
+                )
+                existing_item["replaces"] = set(existing_item.get("replaces", set())) | {
+                    rel.split("/")[0] for rel in existing_rels if rel
+                }
+            else:
+                item = {
+                    "name": canon_name,
+                    "version": "",
+                    "dist_info": "",
+                    "files": existing_rels,
+                    "replaces": {rel.split("/")[0] for rel in existing_rels if rel},
+                    "superseded": superseded_by_name.pop(canon_name, []),
+                }
+                plan.append(item)
+                plan_by_name[canon_name] = item
+        if baseline_top_entries is not None:
+            try:
+                current_top = set(os.listdir(site_packages_dir)) - baseline_top_entries
+            except OSError as e:
+                sync_failed[0] = True
+                sys.stderr.write(
+                    f"[install] could not inspect site-packages after fixup ({e}); "
+                    f"the AI environment will be reseeded on next restart\n"
+                )
+                sys.stderr.flush()
+                return
+            covered_top = {
+                rel.split("/")[0] for item in plan for rel in item["files"] if rel
+            } | {item["dist_info"] for item in plan if item.get("dist_info")}
+            for top in sorted(current_top - covered_top):
+                plan.append(
+                    {
+                        "name": f"__fixup_unrecorded_{top}",
+                        "version": "",
+                        "dist_info": top if top.endswith(DIST_INFO_SUFFIX) else "",
+                        "files": [top],
+                        "replaces": {top},
+                        "superseded": [],
+                    }
+                )
+
+    def _abort(message: str) -> None:
+        _sync_fixup_plan()
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        had_rollback_work = bool(
+            site_packages_dir
+            and (plan or (quarantine_dir and os.path.isdir(quarantine_dir)))
+        )
+        abandon_merge(
+            site_packages_dir, plan, quarantine_dir,
+            venv_writing_marker, bundle_id,
+        )
+        if sync_failed[0] and venv_writing_marker:
+            with contextlib.suppress(OSError):
+                mark_venv_writing(venv_writing_marker, bundle_id)
+        elif venv_writing_marker and not had_rollback_work:
+            with contextlib.suppress(OSError):
+                clear_venv_writing(venv_writing_marker)
+        fail(message)
+
+    try:
+        wheels = sorted(
+            f for f in os.listdir(fixups_dir)
+            if f.endswith(".whl") and not f.startswith(".")
+        )
+    except OSError as e:
+        _abort(f"Failed to read bundle fixups directory: {e}")
+        return site_packages_dir
     if not wheels:
-        return
+        return site_packages_dir
     python_path = os.path.join(venv_path, "bin", "python3")
     if not os.path.exists(python_path):
-        return
+        _abort(
+            f"Failed to install bundle fixups: the AI environment's Python interpreter "
+            f"at {python_path} does not exist. Recreate the AI environment and retry."
+        )
+        return site_packages_dir
+    if not site_packages_dir:
+        if get_site_packages_dir is _default_get_site_packages_dir:
+            site_packages_dir, sp_err = _probe_site_packages_dir(venv_path)
+        else:
+            site_packages_dir = get_site_packages_dir(venv_path)
+            sp_err = ""
+        if not site_packages_dir:
+            _abort(
+                sp_err
+                or f"The AI environment at {venv_path} has no usable site-packages directory. "
+                f"Recreate the AI environment and retry."
+            )
+            return ""
+    if venv_writing_marker:
+        try:
+            mark_venv_writing(venv_writing_marker, bundle_id)
+        except OSError as e:
+            _abort(f"Failed to record venv write marker before installing fixups: {e}")
+            return site_packages_dir
+    if site_packages_dir and os.path.isdir(site_packages_dir):
+        try:
+            if not plan and quarantine_dir:
+                shutil.rmtree(quarantine_dir, ignore_errors=True)
+            pre_fixup_dists = list_distributions(site_packages_dir)
+            plan_by_name = {item["name"]: item for item in plan}
+            wheel_versions_by_name = {}
+            wheel_members_by_name = {}
+            for wheel in wheels:
+                wheel_path = os.path.join(fixups_dir, wheel)
+                canon_name, wheel_version = _wheel_dist_identity(wheel_path)
+                if canon_name:
+                    wheel_versions_by_name.setdefault(canon_name, []).append(wheel_version)
+                    for rel in _wheel_member_files(wheel_path):
+                        wheel_members_by_name.setdefault(canon_name, []).append(rel)
+            quarantine_plan = []
+            for canon_name, versions in sorted(wheel_versions_by_name.items()):
+                if canon_name in plan_by_name:
+                    existing_item = plan_by_name[canon_name]
+                    prior_superseded = existing_item.get("superseded") or []
+                    if prior_superseded and quarantine_dir:
+                        quarantine_plan.append(
+                            {
+                                "name": canon_name,
+                                "version": existing_item.get("version") or "",
+                                "dist_info": existing_item.get("dist_info") or "",
+                                "files": [],
+                                "replaces": {
+                                    rel.split("/")[0]
+                                    for _v, d in prior_superseded
+                                    for rel in distribution_files(site_packages_dir, d)
+                                    if rel
+                                },
+                                "superseded": prior_superseded,
+                            }
+                        )
+                    staged_di = existing_item.get("dist_info") or ""
+                    if staged_di:
+                        staged_di_path = os.path.join(site_packages_dir, staged_di)
+                        if os.path.isdir(staged_di_path):
+                            shutil.rmtree(staged_di_path)
+                    continue
+                non_empty_versions = {v for v in versions if v}
+                existing = pre_fixup_dists.get(canon_name, [])
+                superseded = [
+                    copy
+                    for copy in existing
+                    if not non_empty_versions
+                    or len(non_empty_versions) > 1
+                    or copy[0] not in non_empty_versions
+                ]
+                if not superseded:
+                    continue
+                superseded_by_name[canon_name] = superseded
+                target_version = versions[-1]
+                if quarantine_dir:
+                    quarantine_plan.append(
+                        {
+                            "name": canon_name,
+                            "version": target_version,
+                            "dist_info": f"{canon_name}-{target_version}{DIST_INFO_SUFFIX}",
+                            "files": [],
+                            "replaces": {
+                                rel.split("/")[0]
+                                for _v, d in superseded
+                                for rel in distribution_files(site_packages_dir, d)
+                                if rel
+                            },
+                            "superseded": superseded,
+                        }
+                    )
+            if quarantine_plan and quarantine_dir:
+                supersede_distributions(site_packages_dir, quarantine_plan, quarantine_dir)
+            for canon_name, member_rels in wheel_members_by_name.items():
+                pre_absent_wheel_files[canon_name] = [
+                    rel
+                    for rel in dict.fromkeys(member_rels)
+                    if not os.path.exists(os.path.join(site_packages_dir, rel))
+                    and not os.path.islink(os.path.join(site_packages_dir, rel))
+                ]
+            post_quarantine_dists = list_distributions(site_packages_dir)
+            baseline_dist_infos = {
+                dist_info
+                for copies in post_quarantine_dists.values()
+                for _ver, dist_info in copies
+            }
+            baseline_top_entries = set(os.listdir(site_packages_dir))
+        except OSError as e:
+            _abort(f"Failed to prepare bundle fixups: {e}")
+            return site_packages_dir
     for wheel in wheels:
         pkg_name = wheel.split("-")[0]
         try:
-            subprocess.run(
+            proc = subprocess.run(
                 [python_path, "-m", "pip", "install", "--no-index",
                  f"--find-links={fixups_dir}", pkg_name],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True, text=True, errors="replace", timeout=60,
             )
-        except Exception:
-            pass  # Non-fatal
+        except subprocess.TimeoutExpired:
+            _abort(
+                f"Timed out while installing fixup wheel '{pkg_name}'. "
+                f"Please retry the install."
+            )
+            return site_packages_dir
+        except OSError as e:
+            _abort(
+                f"Failed to install fixup wheel '{pkg_name}': the AI environment's Python "
+                f"interpreter at {python_path} could not be run ({e}). "
+                f"Recreate the AI environment and retry."
+            )
+            return site_packages_dir
+        if proc.returncode != 0:
+            detail = (
+                (proc.stderr or "").strip()
+                or (proc.stdout or "").strip()
+                or f"pip exited with status {proc.returncode}"
+            )
+            _abort(f"Failed to install fixup wheel '{pkg_name}': {detail}")
+            return site_packages_dir
+        _sync_fixup_plan()
+        if sync_failed[0]:
+            _abort("Failed to inspect site-packages after installing bundle fixups.")
+            return site_packages_dir
+    if venv_writing_marker:
+        try:
+            clear_venv_writing(venv_writing_marker)
+        except OSError as e:
+            _abort(f"Failed to clear venv write marker after installing fixups: {e}")
+            return site_packages_dir
+    return site_packages_dir
 
 
 # -- installed.json management --
@@ -1309,19 +2189,32 @@ def read_installed(ai_dir: str) -> dict:
         return {"bundles": {}}
     try:
         with open(path, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        with contextlib.suppress(OSError):
+            sys.stderr.write(f"[install] WARNING: Could not read installed.json ({e}); starting fresh and overwriting.\n")
+            sys.stderr.flush()
         return {"bundles": {}}
+    if not isinstance(data, dict) or not isinstance(data.get("bundles"), dict):
+        with contextlib.suppress(OSError):
+            sys.stderr.write("[install] WARNING: installed.json has invalid structure; starting fresh and overwriting.\n")
+            sys.stderr.flush()
+        return {"bundles": {}}
+    return data
 
 
 def write_installed_atomic(ai_dir: str, data: dict) -> None:
     """Write installed.json atomically (write .tmp then rename)."""
     path = os.path.join(ai_dir, "installed.json")
     tmp_path = path + ".tmp"
-    with open(tmp_path, "w") as f:
-        json.dump(data, f, indent=2)
-        f.write("\n")
-    os.rename(tmp_path, path)
+    try:
+        with open(tmp_path, "w") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+        os.rename(tmp_path, path)
+    except OSError:
+        _unlink_quietly(tmp_path)
+        raise
 
 
 # -- Main --
@@ -1431,10 +2324,16 @@ def _install() -> None:
         # estimate_extracted covers the extractedSize:0 case so the budget can't
         # collapse to just the compressed size; the accurate guard is the
         # real-on-disk re-check just before the destructive venv write below.
-        needed = compressed_size + estimate_extracted(compressed_size, extracted_size)
-        needed += 500 * 1024 * 1024  # 500 MB buffer
+        needed = needed_download_disk_bytes(
+            ai_dir, bundle_id, arch, compressed_size, extracted_size
+        )
         if needed > 0:
-            check_disk_space(ai_dir, needed)
+            detail = ""
+            if compressed_size > 0 or extracted_size > 0:
+                dl_gb = compressed_size / (1024 ** 3)
+                ext_gb = estimate_extracted(compressed_size, extracted_size) / (1024 ** 3)
+                detail = f"{dl_gb:.1f} GB download + {ext_gb:.1f} GB extracted during install"
+            check_disk_space(ai_dir, needed, detail)
 
         # Download
         os.makedirs(staging_base, exist_ok=True)
@@ -1472,6 +2371,11 @@ def _install() -> None:
             )
         fail(f"Failed to extract archive: {e}")
 
+    # Free the downloaded archive as soon as extraction finishes so it does not
+    # sit on disk during the post-extract disk check and venv/models moves.
+    if not local_path and os.path.exists(tar_path):
+        _unlink_quietly(tar_path)
+
     # -- Read bundle.json from tar --
     bundle_json_path = os.path.join(staging_dir, "bundle.json")
     if not os.path.exists(bundle_json_path):
@@ -1507,7 +2411,30 @@ def _install() -> None:
 
     # -- Move site-packages --
     emit_progress(92, "Installing packages...")
-    site_packages_dir = get_site_packages_dir(venv_path)
+    has_staging_sp = os.path.isdir(staging_sp)
+    smoke_imports = bundle.get("smokeImports") or []
+    run_smoke = bool(smoke_imports) and os.environ.get("SNAPOTTER_SKIP_INSTALL_SMOKE") != "1"
+    venv_python = os.path.join(venv_path, "bin", "python3")
+    site_packages_dir = ""
+    if has_staging_sp:
+        if get_site_packages_dir is _default_get_site_packages_dir:
+            site_packages_dir, sp_err = _probe_site_packages_dir(venv_path)
+        else:
+            site_packages_dir = get_site_packages_dir(venv_path)
+            sp_err = ""
+        if not site_packages_dir:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            fail(
+                sp_err
+                or f"The AI environment at {venv_path} has no usable site-packages directory. "
+                f"Recreate the AI environment and retry."
+            )
+    if run_smoke and not os.path.exists(venv_python):
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        fail(
+            f"Installation verification failed: the AI environment's Python interpreter "
+            f"at {venv_python} does not exist. Recreate the AI environment and retry."
+        )
     venv_writing_marker = os.path.join(ai_dir, "venv.writing")
     # Superseded versions wait here until the install is verified. It sits inside
     # the venv so every move is a same-filesystem rename rather than a copy of
@@ -1517,7 +2444,7 @@ def _install() -> None:
     reconciliation_plan = []
 
     try:
-        if os.path.isdir(staging_sp) and site_packages_dir:
+        if has_staging_sp:
             # Breadcrumb the destructive shared-venv write. If the process is
             # killed mid-move (OOM/SIGKILL/power loss), move_tree can leave the
             # venv torn, which breaks OTHER installed tools. The marker survives
@@ -1533,7 +2460,8 @@ def _install() -> None:
             # it. Running it first also means that when the CPU build is dropped
             # from staging, the general pass never sees it and so never uninstalls
             # the GPU build the venv is keeping (#490).
-            reconcile_onnxruntime(staging_sp, site_packages_dir)
+            reconcile_onnxruntime(staging_sp, site_packages_dir, quarantine_dir)
+            reconcile_opencv(staging_sp, site_packages_dir)
             reconciliation_plan = plan_reconciliation(staging_sp, site_packages_dir)
             supersede_distributions(site_packages_dir, reconciliation_plan, quarantine_dir)
             move_tree(
@@ -1543,10 +2471,355 @@ def _install() -> None:
                 copy_activity_cb=make_copy_activity_reporter(92, "Installing packages..."),
             )
             clear_venv_writing(venv_writing_marker)
+    except OSError as e:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        abandon_merge(
+            site_packages_dir, reconciliation_plan, quarantine_dir,
+            venv_writing_marker, bundle_id,
+        )
+        if getattr(e, "errno", None) == errno.ENOSPC:
+            fail("Ran out of disk space while installing the bundle. Free up space and retry.")
+        fail(f"Failed to install bundle files: {e}")
 
-        # -- Move models --
-        emit_progress(95, "Installing models...")
-        staging_models = os.path.join(staging_dir, "models")
+    # -- Apply fixups --
+    emit_progress(93, "Finalizing...")
+    site_packages_dir = (
+        apply_fixups(
+            staging_dir,
+            venv_path,
+            site_packages_dir,
+            reconciliation_plan,
+            quarantine_dir,
+            venv_writing_marker,
+            bundle_id,
+        )
+        or site_packages_dir
+    )
+
+    # -- Verify the bundle actually imports --
+    # File-copy completion does NOT prove the bundle works: an incomplete
+    # extraction or an ABI mismatch (e.g. a numpy/torch/protobuf skew) can leave
+    # every file present yet the module unimportable, so the tool "installs" but
+    # fails at first use. Import the bundle's key native libraries in the venv
+    # now; if that fails, refuse to mark the bundle installed so the user gets a
+    # clear retry instead of a silently broken tool.
+    if run_smoke:
+        emit_progress(94, "Verifying installation...")
+        if not os.path.exists(venv_python):
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            abandon_merge(
+                site_packages_dir, reconciliation_plan, quarantine_dir,
+                venv_writing_marker, bundle_id,
+            )
+            fail(
+                f"Installation verification failed: the AI environment's Python interpreter "
+                f"at {venv_python} does not exist. Recreate the AI environment and retry."
+            )
+        import_stmt = "\n".join(f"import {mod}" for mod in smoke_imports)
+        fallback_errors = []
+
+        def _abort_remediation(message: str) -> None:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            had_rollback_work = bool(
+                site_packages_dir
+                and (
+                    reconciliation_plan
+                    or (quarantine_dir and os.path.isdir(quarantine_dir))
+                )
+            )
+            abandon_merge(
+                site_packages_dir, reconciliation_plan, quarantine_dir,
+                venv_writing_marker, bundle_id,
+            )
+            if venv_writing_marker and not had_rollback_work:
+                with contextlib.suppress(OSError):
+                    clear_venv_writing(venv_writing_marker)
+            fail(message)
+
+        def _ensure_remediation_sp() -> str:
+            nonlocal site_packages_dir
+            if not site_packages_dir:
+                if get_site_packages_dir is _default_get_site_packages_dir:
+                    site_packages_dir, sp_err = _probe_site_packages_dir(venv_path)
+                else:
+                    site_packages_dir = get_site_packages_dir(venv_path)
+                    sp_err = ""
+                if not site_packages_dir:
+                    _abort_remediation(
+                        sp_err
+                        or f"The AI environment at {venv_path} has no usable site-packages directory. "
+                        f"Recreate the AI environment and retry."
+                    )
+            return site_packages_dir
+
+        def _cleanup_failed_snapshot_slot(kind: str) -> None:
+            rem_root = os.path.join(quarantine_dir, REMEDIATION_BACKUP_DIRNAME)
+            shutil.rmtree(os.path.join(rem_root, kind), ignore_errors=True)
+            for d in (rem_root, quarantine_dir):
+                with contextlib.suppress(OSError):
+                    os.rmdir(d)
+
+        def _restore_after_failed_fallback(sp_dir: str, kind: str) -> None:
+            try:
+                restore_remediation_state(
+                    sp_dir, quarantine_dir, kind, remove_backup=False
+                )
+            except OSError as restore_err:
+                fallback_errors.append(
+                    f"Failed to restore pre-fallback {kind} state ({restore_err})."
+                )
+                extra = "\n\n" + "\n\n".join(fallback_errors)
+                _abort_remediation(
+                    f"Fallback {kind} installation failed and the AI environment "
+                    f"could not be restored ({restore_err}).{extra}"
+                )
+
+        def _run_smoke_import():
+            try:
+                return subprocess.run(
+                    [venv_python, "-c", import_stmt],
+                    capture_output=True,
+                    text=True,
+                    errors="replace",
+                    timeout=300,
+                )
+            except subprocess.TimeoutExpired:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+                abandon_merge(
+                    site_packages_dir, reconciliation_plan, quarantine_dir,
+                    venv_writing_marker, bundle_id,
+                )
+                extra = ("\n\n" + "\n\n".join(fallback_errors)) if fallback_errors else ""
+                fail(f"Installation verification timed out. Please retry the install.{extra}")
+            except OSError as e:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+                abandon_merge(
+                    site_packages_dir, reconciliation_plan, quarantine_dir,
+                    venv_writing_marker, bundle_id,
+                )
+                extra = ("\n\n" + "\n\n".join(fallback_errors)) if fallback_errors else ""
+                fail(
+                    f"Installation verification failed: the AI environment's Python interpreter "
+                    f"at {venv_python} could not be run ({e}). Recreate the AI environment and retry.{extra}"
+                )
+
+        proc = _run_smoke_import()
+
+        # Auto-remediation for native linux/LXC users without CUDA libraries
+        if proc.returncode != 0 and "onnxruntime" in smoke_imports:
+            stderr_output = (proc.stderr or "")
+            # onnxruntime-gpu on CPU-only Debian/Ubuntu fails to load its C extensions
+            # resulting in missing attributes or missing libcudart/libcudnn errors.
+            if ("AttributeError" in stderr_output and "SessionOptions" in stderr_output) or "libcudart" in stderr_output or "libcudnn" in stderr_output:
+                emit_progress(94, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
+                sp_for_cleanup = _ensure_remediation_sp()
+                try:
+                    mark_venv_writing(venv_writing_marker, bundle_id)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to record venv write marker before onnxruntime fallback: {e}"
+                    )
+                try:
+                    snapshot_remediation_state(sp_for_cleanup, quarantine_dir, "onnxruntime")
+                except OSError as e:
+                    _cleanup_failed_snapshot_slot("onnxruntime")
+                    if getattr(e, "errno", None) == errno.ENOSPC:
+                        _abort_remediation(
+                            "Ran out of disk space while preparing onnxruntime fallback. "
+                            "Free up space and retry."
+                        )
+                    _abort_remediation(f"Failed to prepare onnxruntime fallback: {e}")
+
+                fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "onnxruntime==1.20.1"]
+                fix_proc = None
+                try:
+                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
+                except subprocess.TimeoutExpired:
+                    emit_progress(94, "Fallback onnxruntime installation failed")
+                    fallback_errors.append(
+                        "Fallback onnxruntime==1.20.1 installation timed out after 120s."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "onnxruntime")
+                except OSError as e:
+                    emit_progress(94, "Fallback onnxruntime installation failed")
+                    fallback_errors.append(
+                        f"Fallback onnxruntime==1.20.1 installation could not be run ({e})."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "onnxruntime")
+
+                if fix_proc is not None:
+                    if fix_proc.returncode == 0:
+                        try:
+                            if sp_for_cleanup and os.path.isdir(sp_for_cleanup):
+                                for name in os.listdir(sp_for_cleanup):
+                                    if name.startswith("onnxruntime_gpu-") and name.endswith(".dist-info"):
+                                        shutil.rmtree(os.path.join(sp_for_cleanup, name), ignore_errors=True)
+                        except OSError as e:
+                            _abort_remediation(
+                                f"Failed to clean up onnxruntime metadata after fallback: {e}"
+                            )
+                    else:
+                        emit_progress(94, "Fallback onnxruntime installation failed")
+                        pip_detail = _format_proc_failure(fix_proc, "pip")
+                        fallback_errors.append(
+                            f"Fallback onnxruntime==1.20.1 installation failed:\n{pip_detail}"
+                        )
+                        _restore_after_failed_fallback(sp_for_cleanup, "onnxruntime")
+
+                try:
+                    clear_venv_writing(venv_writing_marker)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to clear venv write marker after onnxruntime fallback: {e}"
+                    )
+
+                # Re-run smoke test after fallback
+                prev_stderr = proc.stderr or ""
+                proc = _run_smoke_import()
+                if proc.returncode != 0 and not (proc.stderr or "").strip():
+                    proc.stderr = prev_stderr
+
+        # Auto-remediation for broken cv2 (OpenCV conflict)
+        if proc.returncode != 0:
+            stderr_output = (proc.stderr or "")
+            # The bundle might contain conflicting cv2 binaries due to mediapipe vs rembg requirements
+            if "libpng16" in stderr_output or "libGL.so" in stderr_output or "cv2.abi3.so" in stderr_output:
+                emit_progress(94, "OpenCV conflict detected; applying headless fallback...")
+                sp_for_cleanup = _ensure_remediation_sp()
+                try:
+                    mark_venv_writing(venv_writing_marker, bundle_id)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to record venv write marker before opencv fallback: {e}"
+                    )
+                try:
+                    snapshot_remediation_state(sp_for_cleanup, quarantine_dir, "opencv")
+                except OSError as e:
+                    _cleanup_failed_snapshot_slot("opencv")
+                    if getattr(e, "errno", None) == errno.ENOSPC:
+                        _abort_remediation(
+                            "Ran out of disk space while preparing opencv fallback. "
+                            "Free up space and retry."
+                        )
+                    _abort_remediation(f"Failed to prepare opencv fallback: {e}")
+
+                fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
+                fix_proc = None
+                try:
+                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
+                except subprocess.TimeoutExpired:
+                    emit_progress(94, "Fallback opencv installation failed")
+                    fallback_errors.append(
+                        "Fallback opencv-contrib-python-headless==4.10.0.84 installation timed out after 120s."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "opencv")
+                except OSError as e:
+                    emit_progress(94, "Fallback opencv installation failed")
+                    fallback_errors.append(
+                        f"Fallback opencv-contrib-python-headless==4.10.0.84 installation could not be run ({e})."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "opencv")
+
+                if fix_proc is not None:
+                    if fix_proc.returncode == 0:
+                        # Clean up other opencv dist-info to prevent pip from getting confused
+                        clean_cmd = [venv_python, "-c",
+                            "import os, shutil, site; "
+                            "bad = [(sp, n) for sp in site.getsitepackages() if os.path.exists(sp) "
+                            "for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and not n.startswith('opencv_contrib_python_headless-') and n.endswith('.dist-info')]; "
+                            "for sp, n in bad: shutil.rmtree(os.path.join(sp, n), ignore_errors=True)"
+                        ]
+                        try:
+                            clean_proc = subprocess.run(clean_cmd, capture_output=True, text=True, errors="replace", timeout=60)
+                            if clean_proc.returncode != 0:
+                                clean_detail = _format_proc_failure(clean_proc, "python3")
+                                fallback_errors.append(
+                                    f"Fallback opencv metadata cleanup failed:\n{clean_detail}"
+                                )
+                        except subprocess.TimeoutExpired:
+                            fallback_errors.append(
+                                "Fallback opencv metadata cleanup timed out after 60s."
+                            )
+                        except OSError as e:
+                            fallback_errors.append(
+                                f"Fallback opencv metadata cleanup could not be run ({e})."
+                            )
+                        try:
+                            if sp_for_cleanup and os.path.isdir(sp_for_cleanup):
+                                for name in os.listdir(sp_for_cleanup):
+                                    if (
+                                        name.startswith(("opencv_python-", "opencv_contrib_python-"))
+                                        and not name.startswith("opencv_contrib_python_headless-")
+                                        and name.endswith(".dist-info")
+                                    ):
+                                        shutil.rmtree(os.path.join(sp_for_cleanup, name), ignore_errors=True)
+                        except OSError as e:
+                            _abort_remediation(
+                                f"Failed to clean up opencv metadata after fallback: {e}"
+                            )
+                    else:
+                        emit_progress(94, "Fallback opencv installation failed")
+                        pip_detail = _format_proc_failure(fix_proc, "pip")
+                        fallback_errors.append(
+                            f"Fallback opencv-contrib-python-headless==4.10.0.84 installation failed:\n{pip_detail}"
+                        )
+                        _restore_after_failed_fallback(sp_for_cleanup, "opencv")
+
+                try:
+                    clear_venv_writing(venv_writing_marker)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to clear venv write marker after opencv fallback: {e}"
+                    )
+
+                # Re-run smoke test after fallback
+                prev_stderr = proc.stderr or ""
+                proc = _run_smoke_import()
+                if proc.returncode != 0 and not (proc.stderr or "").strip():
+                    proc.stderr = prev_stderr
+
+        if proc.returncode != 0:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            abandon_merge(
+                site_packages_dir, reconciliation_plan, quarantine_dir,
+                venv_writing_marker, bundle_id,
+            )
+            tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
+            fallback_note = ""
+            if fallback_errors:
+                fallback_note = "\n\n".join(fallback_errors) + "\n\n"
+            bundle_py = str(bundle_meta.get("pythonVersion", "")).strip()
+            bundle_py_mm = ".".join(bundle_py.split(".")[:2]) if "." in bundle_py else ""
+            venv_py_mm = _venv_python_major_minor(venv_python)
+            mismatch_note = ""
+            if bundle_py_mm and venv_py_mm and bundle_py_mm != venv_py_mm:
+                mismatch_note = (
+                    f"Bundle requires Python {bundle_py_mm}, but the AI venv at "
+                    f"{venv_path} is running Python {venv_py_mm}.\n\n"
+                )
+            if can_reseed_venv():
+                recovery_hint = (
+                    "This usually means an interrupted or corrupted install. Retry the "
+                    "install; if it keeps failing, use Settings > AI Features > Reset AI "
+                    "Environment, then reinstall."
+                )
+            else:
+                recovery_hint = (
+                    "This usually means an interrupted install or a host Python/base-package "
+                    f"mismatch in {venv_path}. Retry the install, or rebuild {venv_path} "
+                    "with the Python version and basePackages from docker/feature-manifest.json."
+                )
+            fail(
+                "Installation verification failed: the bundle installed but its "
+                "libraries could not be loaded, so the tool would not work.\n"
+                f"{tail}\n\n"
+                f"{fallback_note}{mismatch_note}{recovery_hint}"
+            )
+
+    # -- Move models --
+    emit_progress(95, "Installing models...")
+    staging_models = os.path.join(staging_dir, "models")
+    try:
         if os.path.isdir(staging_models):
             os.makedirs(models_dir, exist_ok=True)
             # Model bundles are a handful of multi-GB files, so report every
@@ -1567,51 +2840,6 @@ def _install() -> None:
             fail("Ran out of disk space while installing the bundle. Free up space and retry.")
         fail(f"Failed to install bundle files: {e}")
 
-    # -- Apply fixups --
-    emit_progress(97, "Finalizing...")
-    apply_fixups(staging_dir, venv_path)
-
-    # -- Verify the bundle actually imports --
-    # File-copy completion does NOT prove the bundle works: an incomplete
-    # extraction or an ABI mismatch (e.g. a numpy/torch/protobuf skew) can leave
-    # every file present yet the module unimportable, so the tool "installs" but
-    # fails at first use. Import the bundle's key native libraries in the venv
-    # now; if that fails, refuse to mark the bundle installed so the user gets a
-    # clear retry instead of a silently broken tool.
-    smoke_imports = bundle.get("smokeImports") or []
-    if smoke_imports and os.environ.get("SNAPOTTER_SKIP_INSTALL_SMOKE") != "1":
-        emit_progress(99, "Verifying installation...")
-        venv_python = os.path.join(venv_path, "bin", "python3")
-        if os.path.exists(venv_python):
-            import_stmt = "\n".join(f"import {mod}" for mod in smoke_imports)
-            try:
-                proc = subprocess.run(
-                    [venv_python, "-c", import_stmt],
-                    capture_output=True, text=True, timeout=300,
-                )
-            except subprocess.TimeoutExpired:
-                shutil.rmtree(staging_dir, ignore_errors=True)
-                abandon_merge(
-                    site_packages_dir, reconciliation_plan, quarantine_dir,
-                    venv_writing_marker, bundle_id,
-                )
-                fail("Installation verification timed out. Please retry the install.")
-            if proc.returncode != 0:
-                shutil.rmtree(staging_dir, ignore_errors=True)
-                abandon_merge(
-                    site_packages_dir, reconciliation_plan, quarantine_dir,
-                    venv_writing_marker, bundle_id,
-                )
-                tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
-                fail(
-                    "Installation verification failed: the bundle installed but its "
-                    "libraries could not be loaded, so the tool would not work.\n"
-                    f"{tail}\n\n"
-                    "This usually means an interrupted or corrupted install. Retry the "
-                    "install; if it keeps failing, use Settings > AI Features > Reset AI "
-                    "Environment, then reinstall."
-                )
-
     # -- Write installed.json --
     emit_progress(98, "Recording installation...")
     installed = read_installed(ai_dir)
@@ -1620,7 +2848,15 @@ def _install() -> None:
         "installedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "models": model_ids,
     }
-    write_installed_atomic(ai_dir, installed)
+    try:
+        write_installed_atomic(ai_dir, installed)
+    except OSError as e:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        abandon_merge(
+            site_packages_dir, reconciliation_plan, quarantine_dir,
+            venv_writing_marker, bundle_id,
+        )
+        fail(f"Failed to record installation: {e}")
 
     # -- Cleanup --
     # The install is recorded, so the versions this bundle displaced are never
@@ -1630,7 +2866,7 @@ def _install() -> None:
         shutil.rmtree(staging_dir, ignore_errors=True)
     # Clean up downloaded tar (but not if local override)
     if not local_path and os.path.exists(tar_path):
-        os.unlink(tar_path)
+        _unlink_quietly(tar_path)
 
     # -- Done --
     emit_progress(100, "Complete")

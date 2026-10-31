@@ -1,4 +1,5 @@
 import type { ColorChannelOptions, Sharp } from "../types.js";
+import { applyRecombMatrix, type Matrix3x3 } from "../utils/recomb.js";
 
 export async function colorChannels(image: Sharp, options: ColorChannelOptions): Promise<Sharp> {
   const { red, green, blue } = options;
@@ -18,11 +19,11 @@ export async function colorChannels(image: Sharp, options: ColorChannelOptions):
   const gMul = green / 100;
   const bMul = blue / 100;
 
-  const matrix: [[number, number, number], [number, number, number], [number, number, number]] = [
+  const matrix: Matrix3x3 = [
     [rMul, 0, 0],
     [0, gMul, 0],
     [0, 0, bMul],
   ];
 
-  return image.recomb(matrix);
+  return applyRecombMatrix(image, matrix);
 }

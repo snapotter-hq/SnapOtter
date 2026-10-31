@@ -81,8 +81,10 @@ def _detect_with_solutions(img_array, min_confidence):
             model_selection=model_sel,
             min_detection_confidence=min_confidence,
         )
-        results = detector.process(img_array)
-        detector.close()
+        try:
+            results = detector.process(img_array)
+        finally:
+            detector.close()
         for detection in (results.detections or []):
             bbox = detection.location_data.relative_bounding_box
             all_faces.append({
@@ -106,9 +108,11 @@ def _detect_with_tasks(img_array, min_confidence):
         min_detection_confidence=min_confidence,
     )
     detector = mp.tasks.vision.FaceDetector.create_from_options(options)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
-    result = detector.detect(mp_image)
-    detector.close()
+    try:
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
+        result = detector.detect(mp_image)
+    finally:
+        detector.close()
 
     faces = []
     for detection in result.detections:
@@ -147,10 +151,16 @@ def _downscale_for_detection(img_array):
 
 def _detect_single_orientation(img_array, min_confidence):
     """Run face detection on a single image orientation."""
+    import mediapipe as mp
+
     try:
-        return _detect_with_solutions(img_array, min_confidence)
+        mp_face = mp.solutions.face_detection
     except AttributeError:
-        return _detect_with_tasks(img_array, min_confidence)
+        mp_face = None
+
+    if mp_face is not None:
+        return _detect_with_solutions(img_array, min_confidence)
+    return _detect_with_tasks(img_array, min_confidence)
 
 
 def _remap_faces_from_rotation(faces, rotation, orig_h, orig_w):
@@ -233,7 +243,18 @@ def main():
 
     try:
         emit_progress(10, "Preparing")
-        from PIL import Image, ImageFilter
+        try:
+            from PIL import Image, ImageFilter
+        except ImportError:
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": "Pillow is not installed. Install with: pip install Pillow",
+                    }
+                )
+            )
+            sys.exit(1)
 
         img = Image.open(input_path).convert("RGB")
 
@@ -289,29 +310,25 @@ def main():
                 )
             )
 
-        except ImportError:
+        except ImportError as e:
+            msg = str(e).strip() or type(e).__name__
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Install with: pip install mediapipe numpy opencv-python"
+            )
             print(
                 json.dumps(
                     {
                         "success": False,
-                        "error": "Face detection requires MediaPipe. Install with: pip install mediapipe",
+                        "error": f"Missing dependency: {msg}. {hint}",
                     }
                 )
             )
             sys.exit(1)
 
-    except ImportError:
-        print(
-            json.dumps(
-                {
-                    "success": False,
-                    "error": "Pillow is not installed. Install with: pip install Pillow",
-                }
-            )
-        )
-        sys.exit(1)
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

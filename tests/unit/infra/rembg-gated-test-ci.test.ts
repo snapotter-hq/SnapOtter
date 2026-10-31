@@ -201,4 +201,45 @@ describe("rembg test pins", () => {
     for (const pin of pins) expect(pin).toMatch(/^[A-Za-z0-9_.[\]-]+==[^=]+$/);
     expect(constraints.length).toBeGreaterThan(0);
   });
+
+  it("pins Pillow to 13.0.0 across sidecar requirements, bundle manifest, and Dockerfile (#3173)", () => {
+    expect(rembgTestPins("bundle").pins).toContain("Pillow==13.0.0");
+    expect(rembgTestPins("requirements").pins).toContain("Pillow==13.0.0");
+
+    for (const relPath of [
+      "packages/ai/python/requirements.txt",
+      "packages/ai/python/requirements-gpu.txt",
+      "docker/feature-manifest.json",
+      "docker/Dockerfile",
+    ]) {
+      const content = readFileSync(path.join(root, relPath), "utf8");
+      expect(content, `${relPath} must pin Pillow==13.0.0`).toContain("Pillow==13.0.0");
+      expect(content, `${relPath} must not retain vulnerable Pillow==12.3.0`).not.toContain(
+        "Pillow==12.3.0",
+      );
+    }
+  });
+
+  it("pins OpenTelemetry packages to 1.45.1 across sidecar requirements (#3639)", () => {
+    const otelPackages = [
+      "opentelemetry-api",
+      "opentelemetry-sdk",
+      "opentelemetry-exporter-otlp-proto-http",
+    ];
+    for (const relPath of [
+      "packages/ai/python/requirements.txt",
+      "packages/ai/python/requirements-gpu.txt",
+    ]) {
+      const lines = readFileSync(path.join(root, relPath), "utf8")
+        .split("\n")
+        .map((line) => line.replace(/#.*/, "").trim())
+        .filter(Boolean);
+      for (const pkg of otelPackages) {
+        expect(lines, `${relPath} must pin ${pkg}==1.45.1`).toContain(`${pkg}==1.45.1`);
+        expect(lines, `${relPath} must not retain vulnerable ${pkg}==1.28.2`).not.toContain(
+          `${pkg}==1.28.2`,
+        );
+      }
+    }
+  });
 });

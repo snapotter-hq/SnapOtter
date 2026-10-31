@@ -1,4 +1,6 @@
 node_modules
+# The image builds its own /app/.venv; a host venv must not land on top of it.
+.venv
 .git
 .turbo
 dist

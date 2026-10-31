@@ -1,10 +1,16 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
+import { load } from "js-yaml";
 import { beforeAll, describe, expect, it } from "vitest";
+import type { z } from "zod";
 import { settingsSchema as beautifySettingsSchema } from "../../../apps/api/src/lib/beautify/constants.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
 import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
+import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/content-aware-resize.js";
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
 import { registerLqipPlaceholder } from "../../../apps/api/src/routes/tools/lqip-placeholder.js";
@@ -12,6 +18,12 @@ import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optim
 import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
 import { registerRotate } from "../../../apps/api/src/routes/tools/rotate.js";
 import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.js";
+import { createDocsAdapter } from "../../../scripts/i18n/adapters/docs-md.mjs";
+import { hash } from "../../../scripts/i18n/lib/hash.mjs";
+import { deriveAxes } from "../../helpers/zod-pict.js";
+
+const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 
 const app = {
   post: () => undefined,
@@ -20,6 +32,7 @@ const app = {
 beforeAll(() => {
   registerConvert(app);
   registerCompress(app);
+  registerContentAwareResize(app);
   registerOptimizeForWeb(app);
   registerResize(app);
   registerSplit(app);
@@ -48,6 +61,10 @@ describe("Sharp-backed image settings schemas", () => {
   });
 
   it.each([
+    ["content-aware-resize", { width: 100.5 }],
+    ["content-aware-resize", { height: 80.25 }],
+    ["content-aware-resize", { width: 100, blurRadius: 2.5 }],
+    ["content-aware-resize", { width: 100, sobelThreshold: 10.5 }],
     ["optimize-for-web", { maxWidth: 640.5 }],
     ["optimize-for-web", { maxHeight: Number.POSITIVE_INFINITY }],
     ["split", { columns: 2.5 }],
@@ -63,6 +80,60 @@ describe("Sharp-backed image settings schemas", () => {
     ["gif-tools", { loop: 1.5 }],
   ])("rejects non-integer dimensions or counts for %s", (toolId, settings) => {
     expect(parses(toolId, settings)).toBe(false);
+  });
+
+  it("bounds optimize-for-web max dimensions by the resize ceiling", () => {
+    expect(parses("optimize-for-web", { maxWidth: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("optimize-for-web", { maxHeight: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("optimize-for-web", { maxWidth: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("optimize-for-web", { maxHeight: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("optimize-for-web", { maxWidth: 100_000_001 })).toBe(false);
+  });
+
+  it("bounds content-aware-resize dimensions by the resize ceiling and 25 MP pixel limit (#2204, #2997)", () => {
+    expect(parses("content-aware-resize", {})).toBe(false);
+    expect(parses("content-aware-resize", { protectFaces: true })).toBe(false);
+    expect(parses("content-aware-resize", { square: true })).toBe(true);
+    expect(parses("content-aware-resize", { width: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("content-aware-resize", { height: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("content-aware-resize", { width: 5000, height: 5000 })).toBe(true);
+    expect(parses("content-aware-resize", { width: 5000, height: 5001 })).toBe(false);
+    expect(parses("content-aware-resize", { width: 8192, height: 8192 })).toBe(false);
+    expect(
+      parses("content-aware-resize", {
+        width: MAX_RESIZE_OUTPUT_DIMENSION,
+        height: MAX_RESIZE_OUTPUT_DIMENSION,
+      }),
+    ).toBe(false);
+    expect(
+      parses("content-aware-resize", {
+        width: MAX_RESIZE_OUTPUT_DIMENSION,
+        height: MAX_RESIZE_OUTPUT_DIMENSION,
+        square: true,
+      }),
+    ).toBe(true);
+    expect(parses("content-aware-resize", { width: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("content-aware-resize", { height: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("content-aware-resize", { width: 100_000_000 })).toBe(false);
+    expect(parses("content-aware-resize", { height: 100_000_000 })).toBe(false);
+
+    const config = getToolConfig("content-aware-resize");
+    if (!config) throw new Error("content-aware-resize must be registered");
+    const overPixels = config.settingsSchema.safeParse({ width: 5000, height: 5001 });
+    expect(overPixels.success).toBe(false);
+    if (!overPixels.success) {
+      expect(overPixels.error.message).toMatch(/5000 x 5001.*25000000 pixel limit/);
+    }
+
+    const overSide = config.settingsSchema.safeParse({
+      width: MAX_RESIZE_OUTPUT_DIMENSION + 1,
+      height: 2000,
+    });
+    expect(overSide.success).toBe(false);
+    if (!overSide.success) {
+      expect(overSide.error.issues).toHaveLength(1);
+      expect(overSide.error.message).not.toMatch(/pixel limit/i);
+    }
   });
 
   it("rejects a non-finite resize percentage", () => {
@@ -84,6 +155,186 @@ describe("Sharp-backed image settings schemas", () => {
     expect(parses("lqip-placeholder", { blur: 0 })).toBe(true);
     expect(parses("lqip-placeholder", { blur: 0.3 })).toBe(true);
     expect(parses("lqip-placeholder", { blur: Number.MIN_VALUE })).toBe(false);
+  });
+
+  it("accepts only the four GIF palette sizes Sharp's encoder can represent (#1223)", () => {
+    for (const colors of [2, 4, 16, 256]) {
+      expect(parses("gif-tools", { mode: "optimize", colors })).toBe(true);
+    }
+    for (const colors of [1, 3, 8, 32, 64, 128, 255, 257]) {
+      expect(parses("gif-tools", { mode: "optimize", colors })).toBe(false);
+    }
+  });
+
+  it("keeps gif-tools optimize colors and mode parameters in OpenAPI, docs, bench.sh, and tool-contract.json aligned with the schema (#2919, #2946)", async () => {
+    const config = getToolConfig("gif-tools");
+    if (!config) throw new Error("gif-tools must be registered");
+
+    const openapi = load(
+      readFileSync(path.join(REPO_ROOT, "apps/api/src/openapi.yaml"), "utf8"),
+    ) as {
+      paths: Record<
+        string,
+        {
+          post?: {
+            requestBody?: {
+              content?: {
+                "multipart/form-data"?: {
+                  schema?: { properties?: { settings?: { description?: string } } };
+                };
+              };
+            };
+          };
+        }
+      >;
+    };
+    const settingsDesc =
+      openapi.paths["/api/v1/tools/image/gif-tools"]?.post?.requestBody?.content?.[
+        "multipart/form-data"
+      ]?.schema?.properties?.settings?.description ?? "";
+    expect(settingsDesc).toContain(
+      "- `colors` (number, default 256) - Color palette size, one of: 2, 4, 16, 256 (optimize mode)",
+    );
+    expect(settingsDesc).not.toContain("2-256");
+
+    const docsRoot = path.join(REPO_ROOT, "apps/docs");
+    const localeCodes = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en");
+    expect(localeCodes).toHaveLength(20);
+
+    const docsAdapter = createDocsAdapter({ root: docsRoot });
+    const extractedUnits = await docsAdapter.extract();
+    const expectedGifDocSourceHash = hash(
+      extractedUnits.find((u: { id: string }) => u.id === "tools/image/gif-tools.md")?.sourceText ??
+        "",
+    );
+    const expectedRestDocSourceHash = hash(
+      extractedUnits.find((u: { id: string }) => u.id === "api/rest.md")?.sourceText ?? "",
+    );
+    const stripI18nFrontmatter = (text: string): string => {
+      const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
+      if (!m) return text;
+      const kept = m[1].split("\n").filter((line) => !/^i18n_[A-Za-z0-9_]+:/.test(line));
+      return kept.length > 0 ? `---\n${kept.join("\n")}\n---\n${text.slice(m[0].length)}` : text;
+    };
+
+    const doc = readFileSync(path.join(docsRoot, "tools/image/gif-tools.md"), "utf8");
+    expect(doc).toContain(
+      "| colors | number | No | 256 | Maximum number of colors in palette (2, 4, 16, or 256) |",
+    );
+    expect(doc).not.toContain("2 to 256");
+    const docOptimizeMatches = [...doc.matchAll(/-F 'settings=(\{"mode":"optimize"[^']*\})'/g)];
+    expect(docOptimizeMatches.length).toBeGreaterThan(0);
+    for (const match of docOptimizeMatches) {
+      const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+      expect(parsed).toHaveProperty("colors");
+      expect(parses("gif-tools", parsed)).toBe(true);
+    }
+
+    for (const locale of localeCodes) {
+      const localizedDoc = readFileSync(
+        path.join(docsRoot, locale, "tools/image/gif-tools.md"),
+        "utf8",
+      );
+      const colorsRow = localizedDoc.split("\n").find((line) => line.startsWith("| colors |"));
+      expect(colorsRow, locale).toBeDefined();
+      const colorsDescription = colorsRow?.split("|")[5] ?? "";
+      const numbersInColorsDesc = [...colorsDescription.matchAll(/\d+/g)].map((m) => Number(m[0]));
+      expect(numbersInColorsDesc, locale).toEqual([2, 4, 16, 256]);
+
+      const localizedOptimizeMatches = [
+        ...localizedDoc.matchAll(/-F 'settings=(\{"mode":"optimize"[^']*\})'/g),
+      ];
+      expect(localizedOptimizeMatches.length, locale).toBeGreaterThan(0);
+      for (const match of localizedOptimizeMatches) {
+        const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+        expect(parsed, locale).toHaveProperty("colors");
+        expect(parses("gif-tools", parsed), locale).toBe(true);
+      }
+
+      expect(
+        localizedDoc.match(/^i18n_source_hash:\s*(\S+)$/m)?.[1],
+        `${locale}:tools/image/gif-tools.md sourceHash`,
+      ).toBe(expectedGifDocSourceHash);
+      expect(
+        localizedDoc.match(/^i18n_output_hash:\s*(\S+)$/m)?.[1],
+        `${locale}:tools/image/gif-tools.md outputHash`,
+      ).toBe(hash(stripI18nFrontmatter(localizedDoc)));
+      expect(localizedDoc, locale).not.toMatch(/^i18n_(stale|fallback):/m);
+    }
+
+    const gifObjectSchema = config.settingsSchema as unknown as z.ZodObject<
+      Record<string, z.ZodTypeAny> & {
+        mode: z.ZodDefault<z.ZodEnum<[string, ...string[]]>>;
+      }
+    >;
+    const expectedGifKeys = Object.keys(gifObjectSchema.shape);
+    const expectedGifModes = gifObjectSchema.shape.mode._def.innerType.options;
+    expect(expectedGifModes).toEqual([
+      "resize",
+      "optimize",
+      "speed",
+      "reverse",
+      "extract",
+      "rotate",
+    ]);
+
+    for (const relPath of [
+      "api/rest.md",
+      ...localeCodes.map((locale) => `${locale}/api/rest.md`),
+    ]) {
+      const restDoc = readFileSync(path.join(docsRoot, relPath), "utf8");
+      const gifRow = restDoc.split("\n").find((line) => line.startsWith("| `gif-tools` |"));
+      expect(gifRow, relPath).toBeDefined();
+      const keySettingsCell = gifRow?.split("|")[3] ?? "";
+      expect(keySettingsCell, relPath).not.toContain("`action`");
+      expect(keySettingsCell, relPath).not.toContain("extract-frames");
+      expect(keySettingsCell, relPath).not.toContain("add-text");
+      const documentedKeys = [...keySettingsCell.matchAll(/`([a-zA-Z]\w*)`/g)].map((m) => m[1]);
+      expect(documentedKeys, relPath).toEqual(expectedGifKeys);
+      expect(keySettingsCell, relPath).toMatch(
+        new RegExp(`[（(]${expectedGifModes.join("/")}[）)]`),
+      );
+      expect(keySettingsCell, relPath).toMatch(/[（(]2\/4\/16\/256[）)]/);
+
+      if (relPath !== "api/rest.md") {
+        expect(restDoc.match(/^i18n_source_hash:\s*(\S+)$/m)?.[1], `${relPath} sourceHash`).toBe(
+          expectedRestDocSourceHash,
+        );
+        expect(restDoc.match(/^i18n_output_hash:\s*(\S+)$/m)?.[1], `${relPath} outputHash`).toBe(
+          hash(stripI18nFrontmatter(restDoc)),
+        );
+        expect(restDoc, relPath).not.toMatch(/^i18n_(stale|fallback):/m);
+      }
+    }
+
+    const bench = readFileSync(path.join(REPO_ROOT, "tests/benchmark/bench.sh"), "utf8");
+    const benchOptimizeMatches = [
+      ...bench.matchAll(
+        /bench_tool\s+"core"\s+"image\/gif-tools"\s+"optimize-[^"]+"\s+"\$GIF"\s+'(\{[^']+\})'/g,
+      ),
+    ];
+    expect(benchOptimizeMatches.length).toBeGreaterThan(0);
+    for (const match of benchOptimizeMatches) {
+      const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+      expect(parsed).toHaveProperty("colors");
+      expect(parses("gif-tools", parsed)).toBe(true);
+    }
+
+    const contracts = JSON.parse(
+      readFileSync(path.join(REPO_ROOT, "tests/qa/tool-contract.json"), "utf8"),
+    ) as Array<{ id: string; axes: Array<{ key: string; values: unknown[] }> }>;
+    const gifContract = contracts.find((c) => c.id === "gif-tools");
+    const expectedColorsValues = deriveAxes(config.settingsSchema)
+      .find((a) => a.key === "colors")
+      ?.values.map((v) => (v === undefined ? null : v));
+    const actualColorsValues = gifContract?.axes.find((a) => a.key === "colors")?.values;
+    expect(expectedColorsValues).toEqual([2, 4, 16, 256, null]);
+    expect(actualColorsValues).toEqual(expectedColorsValues);
+    for (const value of actualColorsValues ?? []) {
+      if (value !== null) {
+        expect(parses("gif-tools", { mode: "optimize", colors: value })).toBe(true);
+      }
+    }
   });
 
   it("rejects fractional Beautify pixel geometry", () => {

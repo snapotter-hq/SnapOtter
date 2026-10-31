@@ -1,14 +1,17 @@
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import { useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 type Strategy = "blur" | "pixelate" | "solid";
 type Format = "webp" | "png" | "jpeg";
+type CopyStatus = "copied" | "failed" | null;
 
 export function LqipPlaceholderSettings() {
   const { t } = useTranslation();
@@ -21,7 +24,8 @@ export function LqipPlaceholderSettings() {
   const [strategy, setStrategy] = useState<Strategy>("blur");
   const [format, setFormat] = useState<Format>("webp");
   const [quality, setQuality] = useState(50);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copyResult, setCopyResult] = useState<{ label: string; ok: boolean } | null>(null);
+  const later = useTimeouts();
 
   const handleProcess = () => {
     const settings = { width, blur, strategy, format, quality };
@@ -42,18 +46,21 @@ export function LqipPlaceholderSettings() {
 
   const handleCopy = async (text: string, label: string) => {
     const ok = await copyToClipboard(text);
-    if (ok) {
-      setCopied(label);
-      setTimeout(() => setCopied(null), 1500);
-    }
+    setCopyResult({ label, ok });
+    later(() => setCopyResult(null), 1500, "copyResult");
   };
 
-  const dataUri = resultPayload?.dataUri as string | undefined;
-  const resultWidth = resultPayload?.width as number | undefined;
-  const resultHeight = resultPayload?.height as number | undefined;
-  const resultBytes = resultPayload?.bytes as number | undefined;
-  const resultHtml = resultPayload?.html as string | undefined;
-  const resultCss = resultPayload?.css as string | undefined;
+  /** The copy outcome to show on one block, or null while it is idle. */
+  const statusOf = (label: string): CopyStatus =>
+    copyResult?.label !== label ? null : copyResult.ok ? "copied" : "failed";
+
+  const activePayload = downloadUrl ? resultPayload : null;
+  const dataUri = activePayload?.dataUri as string | undefined;
+  const resultWidth = activePayload?.width as number | undefined;
+  const resultHeight = activePayload?.height as number | undefined;
+  const resultBytes = activePayload?.bytes as number | undefined;
+  const resultHtml = activePayload?.html as string | undefined;
+  const resultCss = activePayload?.css as string | undefined;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -215,7 +222,7 @@ export function LqipPlaceholderSettings() {
           <CopyBlock
             label="Data URI"
             value={dataUri}
-            copied={copied === "dataUri"}
+            status={statusOf("dataUri")}
             onCopy={() => handleCopy(dataUri, "dataUri")}
           />
 
@@ -224,7 +231,7 @@ export function LqipPlaceholderSettings() {
             <CopyBlock
               label="HTML"
               value={resultHtml}
-              copied={copied === "html"}
+              status={statusOf("html")}
               onCopy={() => handleCopy(resultHtml, "html")}
             />
           )}
@@ -234,7 +241,7 @@ export function LqipPlaceholderSettings() {
             <CopyBlock
               label="CSS"
               value={resultCss}
-              copied={copied === "css"}
+              status={statusOf("css")}
               onCopy={() => handleCopy(resultCss, "css")}
             />
           )}
@@ -247,12 +254,12 @@ export function LqipPlaceholderSettings() {
 function CopyBlock({
   label,
   value,
-  copied,
+  status,
   onCopy,
 }: {
   label: string;
   value: string;
-  copied: boolean;
+  status: CopyStatus;
   onCopy: () => void;
 }) {
   const { t } = useTranslation();
@@ -264,10 +271,18 @@ function CopyBlock({
           type="button"
           onClick={onCopy}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          title={status === "failed" ? t.common.copyFailed : undefined}
         >
-          {copied ? <Check className="h-3 w-3 text-success-ink" /> : <Copy className="h-3 w-3" />}
+          {status === "copied" ? (
+            <Check className="h-3 w-3 text-success-ink" />
+          ) : status === "failed" ? (
+            <X className="h-3 w-3 text-destructive" />
+          ) : (
+            <Copy className="h-3 w-3" />
+          )}
           {t.common.copy}
         </button>
+        <CopyFeedback status={status} />
       </div>
       <div className="p-2 rounded bg-muted text-xs font-mono text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
         {value}

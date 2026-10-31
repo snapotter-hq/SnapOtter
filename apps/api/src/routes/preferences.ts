@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
+import { isStorableJson } from "../lib/storable-json.js";
 import { requireAuth } from "../plugins/auth.js";
 
 const putSchema = z.record(z.string(), z.unknown());
@@ -48,15 +49,26 @@ export async function preferencesRoutes(app: FastifyInstance): Promise<void> {
       if (!parsed.success) {
         return reply.status(400).send({ error: "Invalid preferences body" });
       }
+      if (!isStorableJson(parsed.data)) {
+        return reply.status(400).send({
+          error: "Preferences can't contain NUL characters or unpaired surrogates",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
-      for (const [key, value] of Object.entries(parsed.data)) {
-        await db
-          .insert(schema.userPreferences)
-          .values({ userId: user.id, key, value: { value } })
-          .onConflictDoUpdate({
-            target: [schema.userPreferences.userId, schema.userPreferences.key],
-            set: { value: { value } },
-          });
+      const entries = Object.entries(parsed.data).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      if (entries.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const [key, value] of entries) {
+            await tx
+              .insert(schema.userPreferences)
+              .values({ userId: user.id, key, value: { value } })
+              .onConflictDoUpdate({
+                target: [schema.userPreferences.userId, schema.userPreferences.key],
+                set: { value: { value } },
+              });
+          }
+        });
       }
       return reply.send({ ok: true });
     },

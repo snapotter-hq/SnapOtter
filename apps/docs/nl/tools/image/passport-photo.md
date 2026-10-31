@@ -1,8 +1,8 @@
 ---
 description: "AI-aangedreven generator voor pasfoto's en ID-foto's met gezichtsdetectie, achtergrondverwijdering en het tegelen van printvellen."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 6800a32f93e2
+i18n_output_hash: 738b1210bf5b
 ---
 
 # Passport Photo {#passport-photo}
@@ -92,7 +92,7 @@ Snijdt de foto bij, verkleint deze en tegelt hem optioneel op een printvel. Gebr
 | documentType | string | Nee | `"passport"` | Documenttype (uit de landspecificatie) |
 | bgColor | string | Nee | `"#FFFFFF"` | Hex-code van de achtergrondkleur |
 | printLayout | string | Nee | `"none"` | Lay-out van het printpapier: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | Nee | `0` | Beperking van de maximale bestandsgrootte in KB (0 = geen limiet) |
+| maxFileSizeKb | number | Nee | `0` | Maximale bestandsgrootte in KB, waarbij 1 KB = 1000 bytes (0 = geen limiet) |
 | dpi | number | Nee | `300` | Uitvoer-DPI (72-1200) |
 | customWidthMm | number | Nee | - | Aangepaste fotobreedte in mm (overschrijft de landspecificatie) |
 | customHeightMm | number | Nee | - | Aangepaste fotohoogte in mm (overschrijft de landspecificatie) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Fout: analyse verlopen (410) {#error-analysis-expired-410}
+
+Generate werkt met de afbeelding waarvan de achtergrond is verwijderd die analyze voor `jobId` heeft opgeslagen. Opgeslagen uitvoer wordt na verloop van tijd opgeruimd, dus als er te veel tijd tussen de twee aanroepen zit, is die afbeelding weg. Roep analyze opnieuw aan met dezelfde foto en gebruik de `jobId` die het teruggeeft.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+Een `jobId` of `filename` die geen opgeslagen bestand kan aanwijzen (een padscheidingsteken, `..`, een lege string) antwoordt met 400.
+
 ---
 
 ### Base Route {#base-route}
@@ -170,4 +183,4 @@ Geeft richtlijnen om het juiste sub-endpoint te gebruiken.
 - Het veld `preview` in de analyserespons is een base64-gecodeerde PNG (max. 800px breed) voor snelle weergave.
 - Landspecificaties bevatten documentafmetingen, verhoudingen voor de hoofdhoogte en de positionering van de ooglijn op basis van officiële eisen voor pasfoto's.
 - De optie `printLayout` genereert een getegeld vel op 4x6\"- of A4-papier met een tussenruimte van 2 mm tussen de foto's.
-- Wanneer `maxFileSizeKb` is ingesteld, wordt de uitvoer iteratief gecomprimeerd om binnen de groottelimiet te passen.
+- Wanneer `maxFileSizeKb` is ingesteld, wordt de JPEG-kwaliteit van de uitvoer stapsgewijs verlaagd totdat de foto past. De pixelgrootte ligt vast door de landspecificatie, dus als de foto bij de laagste kwaliteit nog steeds niet past, retourneert `/generate` een 422 met een melding daarover, in plaats van een bestand dat groter is dan de limiet.

@@ -31,11 +31,11 @@ beforeAll(async () => {
 
   // Create a larger JPEG at max quality for compression tests
   largeJpg = await sharp(PNG).jpeg({ quality: 100 }).toBuffer();
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makePayload(
   settings: Record<string, unknown>,
@@ -282,6 +282,16 @@ describe("Error handling", () => {
     const res = await postTool({ mode: "targetSize", targetSizeKb: -10 });
     expect(res.statusCode).toBe(400);
   });
+
+  it("returns 400 when mode is targetSize and targetSizeKb is omitted or misspelled (#2615)", async () => {
+    for (const settings of [{ mode: "targetSize" }, { mode: "targetSize", targetKb: 10 }]) {
+      const res = await postTool(settings);
+      expect(res.statusCode).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe("Invalid settings");
+      expect(body.details).toMatch(/targetSizeKb/);
+    }
+  });
 });
 
 // ── Target size semantics and reporting (#1272) ───────────────────
@@ -340,9 +350,9 @@ describe("target size semantics and reporting (#1272)", () => {
       .jpeg()
       .toBuffer();
     const res = await postTool({ mode: "targetSize", targetSizeKb: 0.2 }, noiseJpg);
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details).toBe(
+    expect(body.error).toBe(
       "Couldn't get this image under 0.2 KB, even after scaling it down. Try a larger target, or crop the image first.",
     );
   });

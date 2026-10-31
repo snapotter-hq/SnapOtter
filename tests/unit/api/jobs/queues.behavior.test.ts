@@ -4,6 +4,7 @@ const queueInstances: Array<{
   name: string;
   options: Record<string, unknown>;
   close: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
   getJobCounts: ReturnType<typeof vi.fn>;
   getJobs: ReturnType<typeof vi.fn>;
 }> = [];
@@ -18,6 +19,7 @@ async function loadQueuesModule() {
         name,
         options,
         close: vi.fn().mockResolvedValue(undefined),
+        on: vi.fn(),
         getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, failed: 0 }),
         getJobs: vi.fn().mockResolvedValue([]),
       };

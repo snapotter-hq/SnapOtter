@@ -77,7 +77,7 @@ describe("installed AI job cancellation propagation", () => {
 
     expect(transcribeAudio).toHaveBeenCalledWith(
       expect.stringContaining("speech.wav"),
-      { language: "auto", signal: controller.signal },
+      { language: "auto", signal: controller.signal, toolId: "transcribe-audio" },
       expect.any(Function),
     );
   });
@@ -102,7 +102,7 @@ describe("installed AI job cancellation propagation", () => {
     );
     expect(transcribeAudio).toHaveBeenCalledWith(
       expect.stringContaining("audio-16k.wav"),
-      { language: "auto", signal: controller.signal },
+      { language: "auto", signal: controller.signal, toolId: "auto-subtitles" },
       expect.any(Function),
     );
   });
@@ -120,7 +120,7 @@ describe("installed AI job cancellation propagation", () => {
     expect(removeBackground).toHaveBeenCalledWith(
       INPUT,
       scratchDir,
-      { signal: controller.signal },
+      { signal: controller.signal, toolId },
       expect.any(Function),
     );
   });

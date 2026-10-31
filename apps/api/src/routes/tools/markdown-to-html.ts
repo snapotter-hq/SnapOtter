@@ -22,7 +22,7 @@ export function registerMarkdownToHtml(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}.html`);
       ctx.report(10, "Converting");
-      await runPandoc(inPath, outPath, { extraArgs: ["--standalone"] });
+      await runPandoc(inPath, outPath, { extraArgs: ["--standalone"], signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

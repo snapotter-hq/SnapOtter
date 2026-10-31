@@ -2,8 +2,11 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -15,6 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  AlertTriangle,
   ArrowLeftRight,
   CheckCircle2,
   File as FileIcon,
@@ -27,6 +31,9 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { quietImport } from "@/lib/chunk-reload";
+import { pdfDocumentOptions } from "@/lib/pdfjs-options";
+import { hasResultWarning } from "@/lib/result-notes";
 import type { FileEntry, PreviewKind } from "@/stores/file-store";
 
 const BROWSER_IMG_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"]);
@@ -39,10 +46,14 @@ const THUMB_H = 76;
 function imageThumbSrc(entry: FileEntry): string | null {
   if (entry.processedPreviewUrl) return entry.processedPreviewUrl;
   if (entry.processedUrl) {
-    const ext =
-      decodeURIComponent(entry.processedUrl).split("?")[0].split(".").pop()?.toLowerCase() ?? "";
+    const source = entry.processedFilename ?? entry.processedUrl;
+    const ext = decodeURIComponent(source).split("?")[0].split(".").pop()?.toLowerCase() ?? "";
     if (BROWSER_IMG_EXTS.has(ext)) return entry.processedUrl;
-    if (entry.processedUrl.startsWith("blob:") && entry.previewKind === "image")
+    if (
+      !entry.processedFilename &&
+      entry.processedUrl.startsWith("blob:") &&
+      entry.previewKind === "image"
+    )
       return entry.processedUrl;
   }
   if (entry.previewKind === "image") return entry.blobUrl;
@@ -105,41 +116,74 @@ function captureVideoFrame(src: string, onDone: (url: string | null) => void): (
   return () => settle(null);
 }
 
+const generatedThumbCache = new WeakMap<File, string>();
+
 /** Render page 1 of a PDF into a small JPEG data URL (pdf.js, lazy-imported). */
-async function renderPdfThumb(file: File, onDone: (url: string | null) => void): Promise<void> {
-  try {
-    const pdfjs = await import("pdfjs-dist");
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-      "pdfjs-dist/build/pdf.worker.min.mjs",
-      import.meta.url,
-    ).href;
-    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
-    const doc = await loadingTask.promise;
-    const page = await doc.getPage(1);
-    const base = page.getViewport({ scale: 1 });
-    const scale = Math.min(THUMB_W / base.width, THUMB_H / base.height, 2);
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
-    await page.render({ canvas, viewport }).promise;
-    onDone(canvas.toDataURL("image/jpeg", 0.8));
-    loadingTask.destroy();
-  } catch {
-    onDone(null);
-  }
+function renderPdfThumb(file: File, onDone: (url: string | null) => void): () => void {
+  let cancelled = false;
+  let destroy: (() => unknown) | undefined;
+  const dispose = () => {
+    const cleanup = destroy;
+    destroy = undefined;
+    return cleanup?.();
+  };
+  const run = async () => {
+    try {
+      const pdfjs = await quietImport(() => import("pdfjs-dist"));
+      if (cancelled) return;
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/build/pdf.worker.min.mjs",
+        import.meta.url,
+      ).href;
+      const data = new Uint8Array(await file.arrayBuffer());
+      if (cancelled) return;
+      const loadingTask = pdfjs.getDocument({
+        data,
+        ...pdfDocumentOptions(),
+      });
+      destroy = () => loadingTask.destroy();
+      const doc = await loadingTask.promise;
+      if (cancelled) return;
+      const page = await doc.getPage(1);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(THUMB_W / base.width, THUMB_H / base.height, 2);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      try {
+        await page.render({ canvas, viewport }).promise;
+      } finally {
+        page.cleanup?.();
+      }
+      if (!cancelled) onDone(canvas.toDataURL("image/jpeg", 0.8));
+    } catch {
+      if (!cancelled) onDone(null);
+    }
+  };
+  void run().finally(dispose);
+  return () => {
+    cancelled = true;
+    dispose();
+  };
 }
 
 /** Lazily produce a thumbnail data URL for video/PDF entries. */
 function useGeneratedThumb(entry: FileEntry): string | null {
   const { previewKind, blobUrl, file } = entry;
   const isPdf = file.name.toLowerCase().endsWith(".pdf");
-  const [thumb, setThumb] = useState<string | null>(null);
+  const [thumb, setThumb] = useState<string | null>(() => generatedThumbCache.get(file) ?? null);
   useEffect(() => {
+    const cached = generatedThumbCache.get(file);
+    if (cached) {
+      setThumb(cached);
+      return;
+    }
     let active = true;
     setThumb(null);
     if (previewKind === "video") {
       const cancel = captureVideoFrame(blobUrl, (u) => {
+        if (u) generatedThumbCache.set(file, u);
         if (active) setThumb(u);
       });
       return () => {
@@ -148,9 +192,14 @@ function useGeneratedThumb(entry: FileEntry): string | null {
       };
     }
     if (previewKind === "document" && isPdf) {
-      renderPdfThumb(file, (u) => {
+      const cancel = renderPdfThumb(file, (u) => {
+        if (u) generatedThumbCache.set(file, u);
         if (active) setThumb(u);
       });
+      return () => {
+        active = false;
+        cancel();
+      };
     }
     return () => {
       active = false;
@@ -195,6 +244,52 @@ function Thumb({ entry }: { entry: FileEntry }) {
   );
 }
 
+/** Shared thumbnail + status badge visuals for an in-strip tile and its drag overlay. */
+function ThumbTileVisual({
+  entry,
+  warningLabel,
+  interactiveWarning = false,
+}: {
+  entry: FileEntry;
+  warningLabel?: string;
+  interactiveWarning?: boolean;
+}) {
+  const isCompleted = entry.status === "completed";
+  const isFailed = entry.status === "failed";
+  const warning = isCompleted && hasResultWarning(entry.resultNotes);
+  return (
+    <>
+      {entry.previewLoading ? (
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+        </div>
+      ) : (
+        <Thumb entry={entry} />
+      )}
+      {isCompleted && !warning && (
+        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
+          <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+        </div>
+      )}
+      {warning && (
+        <div
+          data-result-warning={interactiveWarning ? "" : undefined}
+          aria-hidden="true"
+          title={interactiveWarning ? warningLabel : undefined}
+          className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-500 rounded-full flex items-center justify-center"
+        >
+          <AlertTriangle className="h-2.5 w-2.5 text-white" />
+        </div>
+      )}
+      {isFailed && (
+        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center">
+          <XCircle className="h-2.5 w-2.5 text-white" />
+        </div>
+      )}
+    </>
+  );
+}
+
 /** The selectable tile: thumbnail plus completed/failed status badge. */
 function ThumbTile({
   entry,
@@ -209,39 +304,38 @@ function ThumbTile({
   buttonRef?: React.Ref<HTMLButtonElement>;
   onSelect: (index: number) => void;
 }) {
-  const isCompleted = entry.status === "completed";
-  const isFailed = entry.status === "failed";
+  const { t } = useTranslation();
+  // A completed file that was scaled down to fit, or didn't reach its size
+  // target, gets a warning mark instead of the check (#1292). The mark is
+  // aria-hidden so the tile's accessible name stays the filename.
+  const warning = entry.status === "completed" && hasResultWarning(entry.resultNotes);
+  const warningLabel =
+    entry.resultNotes?.targetMet === false ? t.a11y.resultMissedTarget : t.a11y.resultResizedToFit;
   return (
-    <button
-      type="button"
-      ref={buttonRef}
-      onClick={() => onSelect(index)}
-      className={`relative shrink-0 rounded overflow-hidden transition-all ${
-        isSelected
-          ? "outline outline-2 outline-primary outline-offset-1"
-          : "hover:outline hover:outline-1 hover:outline-border"
-      }`}
-      style={{ width: 52, height: 38 }}
-      title={entry.file.name}
-    >
-      {entry.previewLoading ? (
-        <div className="w-full h-full flex items-center justify-center bg-muted">
-          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
-        </div>
-      ) : (
-        <Thumb entry={entry} />
+    <>
+      <button
+        type="button"
+        ref={buttonRef}
+        onClick={() => onSelect(index)}
+        className={`relative shrink-0 rounded overflow-hidden transition-all ${
+          isSelected
+            ? "outline outline-2 outline-primary outline-offset-1"
+            : "hover:outline hover:outline-1 hover:outline-border"
+        }`}
+        style={{ width: 52, height: 38 }}
+        title={entry.file.name}
+        aria-describedby={warning ? `result-warning-${entry.id}` : undefined}
+      >
+        <ThumbTileVisual entry={entry} warningLabel={warningLabel} interactiveWarning />
+      </button>
+      {warning && (
+        // Outside the button and referenced by aria-describedby: the tile's name
+        // stays the filename, and a screen reader still hears why it's flagged.
+        <span id={`result-warning-${entry.id}`} className="sr-only">
+          {warningLabel}
+        </span>
       )}
-      {isCompleted && (
-        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
-          <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-        </div>
-      )}
-      {isFailed && (
-        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center">
-          <XCircle className="h-2.5 w-2.5 text-white" />
-        </div>
-      )}
-    </button>
+    </>
   );
 }
 
@@ -276,7 +370,7 @@ function SortableThumbTile({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative shrink-0 ${isDragging ? "z-10 opacity-50" : ""}`}
+      className={`relative shrink-0 ${isDragging ? "opacity-40" : ""}`}
     >
       <ThumbTile
         entry={entry}
@@ -291,7 +385,8 @@ function SortableThumbTile({
         {...listeners}
         aria-label={dragLabel}
         title={dragLabel}
-        className="absolute top-0 start-0 flex h-4 w-4 items-center justify-center rounded-ee bg-background/70 text-muted-foreground cursor-grab active:cursor-grabbing hover:bg-background hover:text-foreground focus:opacity-100"
+        style={{ WebkitTouchCallout: "none" }}
+        className="absolute top-0 start-0 flex h-4 w-4 items-center justify-center rounded-ee bg-background/70 text-muted-foreground select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing hover:bg-background hover:text-foreground focus:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
         <GripVertical className="h-3 w-3" />
@@ -319,8 +414,10 @@ export function ThumbnailStrip({
 }: ThumbnailStripProps) {
   const { t } = useTranslation();
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -332,9 +429,21 @@ export function ThumbnailStrip({
     });
   }, []);
 
+  useEffect(() => {
+    if (activeId !== null && (!onReorder || !entries.some((e) => e.id === activeId))) {
+      setActiveId(null);
+    }
+  }, [activeId, entries, onReorder]);
+
   if (entries.length <= 1) return null;
 
+  function handleDragStart(event: DragStartEvent) {
+    if (!onReorder) return;
+    setActiveId(String(event.active.id));
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null);
     if (!onReorder) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -342,6 +451,12 @@ export function ThumbnailStrip({
     const to = entries.findIndex((e) => e.id === over.id);
     if (from !== -1 && to !== -1) onReorder(from, to);
   }
+
+  function handleDragCancel() {
+    setActiveId(null);
+  }
+
+  const activeEntry = activeId !== null ? (entries.find((e) => e.id === activeId) ?? null) : null;
 
   const tiles = entries.map((entry, i) => {
     const isSelected = i === selectedIndex;
@@ -377,13 +492,34 @@ export function ThumbnailStrip({
       style={{ scrollBehavior: "smooth" }}
     >
       {onReorder ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
           <SortableContext
             items={entries.map((e) => e.id)}
             strategy={horizontalListSortingStrategy}
           >
             {tiles}
           </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {activeEntry ? (
+              <div
+                data-testid="thumbnail-strip-drag-overlay"
+                aria-hidden="true"
+                className="relative shrink-0 rounded overflow-hidden outline outline-2 outline-primary outline-offset-1 shadow-lg opacity-90 select-none pointer-events-none cursor-grabbing"
+                style={{ width: 52, height: 38 }}
+              >
+                <ThumbTileVisual entry={activeEntry} />
+                <span className="absolute top-0 start-0 flex h-4 w-4 items-center justify-center rounded-ee bg-background/70 text-muted-foreground">
+                  <GripVertical className="h-3 w-3" />
+                </span>
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       ) : (
         tiles

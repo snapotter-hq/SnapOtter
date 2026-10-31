@@ -16,11 +16,11 @@ const uid = () => `sec_test_${Date.now()}_${Math.random().toString(36).slice(2, 
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // Helper: register a user, clear mustChangePassword, return credentials
 async function createUser(

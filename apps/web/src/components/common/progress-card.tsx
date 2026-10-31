@@ -1,6 +1,9 @@
+import { SafeError } from "@snapotter/shared";
 import { Loader2, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
+import { type CancelRefusalReason, CancelRefusedError } from "@/lib/cancel-refusal";
 import { useFileStore } from "@/stores/file-store";
 
 interface ProgressCardProps {
@@ -17,6 +20,11 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
   const activeJobId = useFileStore((s) => s.activeJobId);
   const cancelCurrentJob = useFileStore((s) => s.cancelCurrentJob);
   const [canceling, setCanceling] = useState(false);
+  // The last refused cancel, tied to the run it was for so a new run starts
+  // with a clean card (#1815).
+  const [refusal, setRefusal] = useState<{ jobId: string; reason: CancelRefusalReason } | null>(
+    null,
+  );
 
   if (!active) return null;
 
@@ -28,6 +36,14 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
     );
 
   const sublabel = [stage, `${elapsed}s`].filter(Boolean).join(" · ");
+
+  const refusalMessages: Record<CancelRefusalReason, string> = {
+    notCancellable: t.tools.processing.cancelUnavailable,
+    notAllowed: t.tools.processing.cancelNotAllowed,
+    failed: t.tools.processing.cancelFailed,
+  };
+  const refusalMessage =
+    refusal && refusal.jobId === activeJobId ? refusalMessages[refusal.reason] : null;
 
   return (
     <div
@@ -59,8 +75,25 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
           disabled={canceling}
           onClick={async () => {
             setCanceling(true);
+            setRefusal(null);
             try {
               await cancelCurrentJob();
+            } catch (cause) {
+              // The server said no, or never answered: the run goes on, and
+              // the user hears why. The hook already logged it and, for a
+              // fault, reported it (#1815).
+              if (cause instanceof CancelRefusedError) {
+                setRefusal({ jobId: activeJobId, reason: cause.reason });
+                return;
+              }
+              // Anything else is the hook's own teardown breaking (#1779).
+              // Report it rather than leave an unhandled rejection; the
+              // finally still re-enables the button.
+              console.error("Canceling the run failed", cause);
+              void captureHandledError(
+                new SafeError("Canceling the run failed", { kind: "bug", cause }),
+                { error_class: "bug" },
+              );
             } finally {
               setCanceling(false);
             }
@@ -71,6 +104,7 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
           {t.common.cancel}
         </button>
       )}
+      {refusalMessage && <p className="text-xs text-destructive-ink">{refusalMessage}</p>}
     </div>
   );
 }

@@ -4,7 +4,11 @@ import { join } from "node:path";
 import Fastify from "fastify";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { stripBasePath } from "../../../apps/api/src/lib/base-path.js";
-import { loadEnv } from "../../../apps/api/src/lib/env.js";
+import {
+  isHttpsUrl,
+  loadEnv,
+  warnIfExternalUrlCanonicalized,
+} from "../../../apps/api/src/lib/env.js";
 
 const config = vi.hoisted(() => ({ BASE_PATH: "" }));
 vi.mock("../../../apps/api/src/config.js", () => ({ env: config }));
@@ -66,35 +70,241 @@ describe("BASE_PATH configuration", () => {
     expect(loadEnv().BASE_PATH).toBe("/apis");
   });
 
-  describe("with OIDC enabled", () => {
-    const enableOidc = (externalUrl: string) => {
+  // Both SSO providers build their callback URLs from EXTERNAL_URL while the
+  // session cookie follows BASE_PATH, so the boot check has to cover each one
+  // on its own (#1356).
+  const enableSso = {
+    OIDC: () => {
       vi.stubEnv("OIDC_ENABLED", "true");
       vi.stubEnv("OIDC_ISSUER_URL", "https://idp.example.com");
       vi.stubEnv("OIDC_CLIENT_ID", "client");
       vi.stubEnv("OIDC_CLIENT_SECRET", "secret");
-      vi.stubEnv("EXTERNAL_URL", externalUrl);
-    };
+    },
+    SAML: () => {
+      vi.stubEnv("SAML_ENABLED", "true");
+      vi.stubEnv("SAML_IDP_SSO_URL", "https://idp.example.com/sso");
+      vi.stubEnv("SAML_IDP_CERTIFICATE", "MIIC-test-certificate");
+    },
+  };
 
-    it.each([
-      ["", "https://example.com"],
-      ["", "https://example.com/"],
-      ["/snapotter", "https://example.com/snapotter"],
-      ["/snapotter/", "https://example.com/snapotter/"],
-    ])("accepts BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
-      enableOidc(externalUrl);
-      vi.stubEnv("BASE_PATH", basePath);
-      expect(() => loadEnv()).not.toThrow();
-    });
+  describe.each(Object.keys(enableSso) as (keyof typeof enableSso)[])(
+    "with %s enabled",
+    (provider) => {
+      const configure = (basePath: string, externalUrl: string) => {
+        // Pin both flags off first so each arm runs alone, whatever the shell exports.
+        vi.stubEnv("OIDC_ENABLED", "false");
+        vi.stubEnv("SAML_ENABLED", "false");
+        enableSso[provider]();
+        vi.stubEnv("EXTERNAL_URL", externalUrl);
+        vi.stubEnv("BASE_PATH", basePath);
+      };
 
-    it.each([
-      ["/snapotter", "https://example.com"],
-      ["", "https://example.com/snapotter"],
-      ["/snapotter", "not a url"],
-    ])("rejects BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
-      enableOidc(externalUrl);
-      vi.stubEnv("BASE_PATH", basePath);
-      expect(() => loadEnv()).toThrow("EXTERNAL_URL");
-    });
+      it.each([
+        ["", "https://example.com"],
+        ["", "https://example.com/"],
+        ["/snapotter", "https://example.com/snapotter"],
+        ["/snapotter/", "https://example.com/snapotter/"],
+      ])("accepts BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).not.toThrow();
+      });
+
+      it.each([
+        ["/snapotter", "https://example.com"],
+        ["", "https://example.com/snapotter"],
+        ["/snapotter", "https://example.com/other"],
+      ])("rejects BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL path .* must match BASE_PATH/);
+      });
+
+      it("rejects an EXTERNAL_URL that is not an absolute URL", () => {
+        configure("/snapotter", "not a url");
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL must be an absolute URL/);
+      });
+
+      // Callback and logout URLs are EXTERNAL_URL plus a path, so a trailing
+      // slash would double up (#1599).
+      it.each([
+        ["", "https://example.com/", "https://example.com"],
+        ["", "https://example.com//", "https://example.com"],
+        ["/snapotter", "https://example.com/snapotter/", "https://example.com/snapotter"],
+      ])(
+        "strips the trailing slash from BASE_PATH %s with EXTERNAL_URL %s",
+        (basePath, input, output) => {
+          configure(basePath, input);
+          expect(loadEnv().EXTERNAL_URL).toBe(output);
+        },
+      );
+
+      // Appending a path after a query string or fragment lands outside the
+      // URL's path, and a non-http scheme can't receive an IdP redirect at all,
+      // so SSO could never work with these. Fail at boot instead (#1599).
+      it.each([
+        ["/snapotter", "file:///snapotter"],
+        ["/snapotter", "ftp://example.com/snapotter"],
+        ["/snapotter", "https://example.com/snapotter?x=1"],
+        ["/snapotter", "https://example.com/snapotter#top"],
+        ["", "https://example.com/?x=1"],
+        // URL parses these with an empty search and hash, but appending a path
+        // still lands after the "?" or "#".
+        ["", "https://example.com/?"],
+        ["/snapotter", "https://example.com/snapotter#"],
+      ])("rejects BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).toThrow(
+          /EXTERNAL_URL must be an http\(s\) URL with no query string or fragment/,
+        );
+      });
+
+      // Credentials in the public base URL would be copied into every
+      // redirect_uri, ACS URL, and entity ID sent to the IdP (#1775).
+      it.each([
+        ["", "https://user:pass@example.com"],
+        ["/snapotter", "https://user@example.com/snapotter"],
+        ["", "https://:pass@example.com/"],
+      ])("rejects BASE_PATH %s with credentials in EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL must not contain a username or password/);
+      });
+
+      // Every SSO consumer builds its redirect URI, ACS URL, or entity ID from
+      // EXTERNAL_URL, so non-canonical spellings of the same origin are
+      // canonicalised at boot while the path's case is preserved (#1876).
+      it.each([
+        ["", "HTTPS://Photos.Example.com", "https://photos.example.com"],
+        ["/snapotter", "HTTPS://Example.com/snapotter/", "https://example.com/snapotter"],
+        ["", "HTTP://Photos.Example.com/", "http://photos.example.com"],
+        ["", "https://photos.example.com:443", "https://photos.example.com"],
+        ["", "http://photos.example.com:80/", "http://photos.example.com"],
+        ["", "https://photos.example.com:8443/", "https://photos.example.com:8443"],
+        ["", "https://photos.example.com\\", "https://photos.example.com"],
+        ["", "https://photos.example.com/\\", "https://photos.example.com"],
+        ["/snapotter", "https://example.com/snapotter\\", "https://example.com/snapotter"],
+        ["/snapotter", "https://example.com/snapotter/\\", "https://example.com/snapotter"],
+        ["/snapotter", "https://example.com/x/../snapotter", "https://example.com/snapotter"],
+        ["", "https://bücher.example.com/", "https://xn--bcher-kva.example.com"],
+        ["/SnapOtter", "HTTPS://Example.com/SnapOtter/", "https://example.com/SnapOtter"],
+      ])(
+        "canonicalizes BASE_PATH %s with EXTERNAL_URL %s to %s",
+        (basePath, externalUrl, canonical) => {
+          configure(basePath, externalUrl);
+          expect(loadEnv().EXTERNAL_URL).toBe(canonical);
+        },
+      );
+
+      it("preserves path case when matching EXTERNAL_URL against BASE_PATH", () => {
+        configure("/snapotter", "https://example.com/SnapOtter");
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL path .* must match BASE_PATH/);
+      });
+
+      it.each([
+        ["", "HTTPS://Photos.Example.com/", "https://photos.example.com"],
+        ["", "https://photos.example.com:443", "https://photos.example.com"],
+        ["", "https://photos.example.com\\", "https://photos.example.com"],
+        ["", "https://bücher.example.com", "https://xn--bcher-kva.example.com"],
+        ["/snapotter", "https://example.com/x/../snapotter", "https://example.com/snapotter"],
+      ])(
+        "warns at boot when EXTERNAL_URL %s is canonicalized to %s",
+        (basePath, configured, canonical) => {
+          configure(basePath, configured);
+          const warn = vi.fn();
+          warnIfExternalUrlCanonicalized({ warn }, process.env, loadEnv());
+          expect(warn).toHaveBeenCalledTimes(1);
+          const trimmedConfigured = configured.trim().replace(/\/+$/, "");
+          const [fields, message] = warn.mock.calls[0] as [Record<string, unknown>, string];
+          expect(fields).toEqual({
+            configuredExternalUrl: trimmedConfigured,
+            canonicalExternalUrl: canonical,
+          });
+          expect(message).toContain(trimmedConfigured);
+          expect(message).toContain(canonical);
+          expect(message).toContain(`SAML_ENTITY_ID="${trimmedConfigured}/api/auth/saml/metadata"`);
+        },
+      );
+
+      it.each([
+        ["", "https://photos.example.com"],
+        ["", "https://photos.example.com/"],
+        ["", " https://photos.example.com/\n"],
+        ["/snapotter", "https://example.com/snapotter/"],
+      ])("does not warn when EXTERNAL_URL %j is already canonical", (basePath, configured) => {
+        configure(basePath, configured);
+        const warn = vi.fn();
+        warnIfExternalUrlCanonicalized({ warn });
+        expect(warn).not.toHaveBeenCalled();
+      });
+    },
+  );
+
+  it("leaves EXTERNAL_URL unchecked against BASE_PATH when no SSO provider is on", () => {
+    vi.stubEnv("OIDC_ENABLED", "false");
+    vi.stubEnv("SAML_ENABLED", "false");
+    vi.stubEnv("BASE_PATH", "/snapotter");
+    vi.stubEnv("EXTERNAL_URL", "https://example.com");
+    expect(() => loadEnv()).not.toThrow();
+  });
+
+  it("does not warn about EXTERNAL_URL canonicalization when SSO is off", () => {
+    vi.stubEnv("OIDC_ENABLED", "false");
+    vi.stubEnv("SAML_ENABLED", "false");
+    vi.stubEnv("EXTERNAL_URL", "HTTPS://Photos.Example.com");
+    const warn = vi.fn();
+    warnIfExternalUrlCanonicalized({ warn });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("wires the EXTERNAL_URL canonicalization warning at server boot", () => {
+    const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
+    expect(source).toContain("warnIfExternalUrlCanonicalized(app.log, process.env, env)");
+  });
+
+  // The secure-cookie check reads EXTERNAL_URL with SSO off too, so the slash
+  // is trimmed and clean http(s) URLs are canonicalized whatever else is
+  // configured, while values SSO would reject still boot as before (#1599, #1876).
+  it.each([
+    ["", ""],
+    ["https://example.com", "https://example.com"],
+    ["https://example.com/", "https://example.com"],
+    ["https://example.com/snapotter/", "https://example.com/snapotter"],
+    ["https://example.com/?x=1", "https://example.com/?x=1"],
+    [" https://example.com/\n", "https://example.com"],
+    ["https://example.com/snapotter/ ", "https://example.com/snapotter"],
+    ["HTTPS://Example.com/", "https://example.com"],
+    ["https://photos.example.com:443", "https://photos.example.com"],
+    ["https://photos.example.com\\", "https://photos.example.com"],
+    ["https://example.com/x/../snapotter", "https://example.com/snapotter"],
+    ["HTTPS://Example.com/SnapOtter/", "https://example.com/SnapOtter"],
+    // SSO rejects credentials, but with SSO off the value boots as before.
+    ["https://user:pass@example.com/", "https://user:pass@example.com"],
+  ])("normalizes EXTERNAL_URL %j without SSO", (input, output) => {
+    vi.stubEnv("OIDC_ENABLED", "false");
+    vi.stubEnv("SAML_ENABLED", "false");
+    vi.stubEnv("EXTERNAL_URL", input);
+    expect(loadEnv().EXTERNAL_URL).toBe(output);
+  });
+});
+
+// The https checks for OIDC discovery and the Secure cookie read the scheme
+// from the parsed URL, never a string prefix (#1775).
+describe("isHttpsUrl", () => {
+  it.each([
+    ["https://example.com", true],
+    ["HTTPS://example.com", true],
+    ["Https://Example.com/snapotter", true],
+    [" https://example.com\n", true],
+    ["HTTPS://example.com/?a=1", true],
+    // WHATWG reads a special scheme without slashes as that scheme.
+    ["https:example.com", true],
+    ["http://example.com", false],
+    ["HTTP://example.com", false],
+    ["httpsx://example.com", false],
+    ["ftp://example.com", false],
+    ["", false],
+    ["https//example.com", false],
+    ["https://exa mple.com", false],
+  ])("%j is https: %s", (value, expected) => {
+    expect(isHttpsUrl(value)).toBe(expected);
   });
 });
 
@@ -251,6 +461,13 @@ describe("SPA fallback disambiguation (#1275)", () => {
         "/deep/gone.js",
         "/gone.css",
         "/gone.wasm",
+        // pdf.js CMaps and fonts (#1084): an HTML 200 here reads as a corrupt CMap.
+        "/pdfjs/cmaps/gone.bcmap",
+        "/pdfjs/standard_fonts/gone.pfb",
+        // pdf.js image decoders and their JS fallbacks (#2082): a shell served
+        // as the fallback module blanks the page with no error.
+        "/pdfjs/wasm/gone.wasm",
+        "/pdfjs/wasm/gone_nowasm_fallback.js",
         // A prefix-preserving proxy with BASE_PATH unset reaches the same spots.
         "/snapotter/assets/gone.js",
         "/apps/snapotter/gone.css",
@@ -287,6 +504,101 @@ describe("SPA fallback disambiguation (#1275)", () => {
     } finally {
       await app.close();
       rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  // The forced change-password page submits a real form POST to the app root so the
+  // browser offers to save the new password (#2088). That must land on the app, not
+  // on the plain-text 404 every other non-GET miss gets.
+  it("sends the save-password form POST to the app root back to the shell", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "username=admin&password=new-Password1",
+      });
+      expect(response.statusCode).toBe(303);
+      expect(response.headers.location).toBe("/");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does the same when a urlencoded body parser is registered (SAML on)", async () => {
+    const app = Fastify();
+    // saml.ts adds this parser on the root instance, which the not-found handler shares.
+    app.addContentTypeParser(
+      "application/x-www-form-urlencoded",
+      { parseAs: "string" },
+      (_request, body, done) => done(null, body),
+    );
+    await registerStatic(app, root);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "username=admin&password=new-Password1",
+      });
+      expect(response.statusCode).toBe(303);
+      expect(response.headers.location).toBe("/");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps the deployment path when it sends that POST back to the shell", async () => {
+    const basePath = "/snapotter";
+    config.BASE_PATH = basePath;
+    const app = Fastify({ rewriteUrl: (request) => stripBasePath(request.url ?? "/", basePath) });
+    await registerStatic(app, root);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `${basePath}/`,
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "username=admin&password=x",
+      });
+      expect(response.statusCode).toBe(303);
+      expect(response.headers.location).toBe(`${basePath}/`);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("only redirects a POST: other methods on the app root still 404", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const method of ["PUT", "DELETE", "PATCH"] as const) {
+        const response = await app.inject({ method, url: "/" });
+        expect(response.statusCode, method).toBe(404);
+        expect(response.headers["content-type"], method).toContain("text/plain");
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("still 404s a POST to anywhere but the app root", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const url of ["/index.html", "/image/resize", "/files/"]) {
+        const response = await app.inject({
+          method: "POST",
+          url,
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          payload: "a=b",
+        });
+        expect(response.statusCode, url).toBe(404);
+        expect(response.headers["content-type"], url).toContain("text/plain");
+      }
+    } finally {
+      await app.close();
     }
   });
 

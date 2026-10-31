@@ -11,8 +11,11 @@ vi.stubGlobal("URL", {
 });
 
 const imagePreviewMock = vi.hoisted(() => ({
-  needsServerPreview: vi.fn(() => false),
-  fetchDecodedPreview: vi.fn(() => Promise.resolve(null)),
+  needsServerPreview: vi.fn<(_file: File) => boolean>(() => false),
+  fetchDecodedPreview: vi.fn<
+    (_file: File) => Promise<{ url: string; originalWidth: number; originalHeight: number } | null>
+  >(() => Promise.resolve(null)),
+  revokePreviewUrl: vi.fn<(_url: string) => void>(),
 }));
 
 vi.mock("@/lib/image-preview", () => imagePreviewMock);
@@ -124,6 +127,69 @@ describe("useFileStore branch coverage", () => {
       previewLoading: false,
     });
     expect(useFileStore.getState().entries[0].blobUrl).not.toBe("blob:decoded-a");
+    expect(imagePreviewMock.revokePreviewUrl).toHaveBeenCalledWith("blob:decoded-a");
+  });
+
+  it("revokes decoded preview blob URLs in setFiles and addFiles when the entry is removed before decode resolves (#3520)", async () => {
+    for (const startEntries of [
+      (file: File) => useFileStore.getState().setFiles([file]),
+      (file: File) => useFileStore.getState().addFiles([file]),
+    ]) {
+      for (const removeEntry of [
+        () => useFileStore.getState().removeFile(0),
+        () => useFileStore.getState().setFiles([]),
+        () => useFileStore.getState().reset(),
+      ]) {
+        useFileStore.getState().reset();
+        imagePreviewMock.revokePreviewUrl.mockClear();
+        imagePreviewMock.needsServerPreview.mockReturnValue(true);
+
+        let resolvePreview!: (
+          value: { url: string; originalWidth: number; originalHeight: number } | null,
+        ) => void;
+        imagePreviewMock.fetchDecodedPreview.mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolvePreview = resolve;
+          }),
+        );
+
+        startEntries(makeFile("gone.heic", 100, "image/heic"));
+        removeEntry();
+        expect(imagePreviewMock.revokePreviewUrl).not.toHaveBeenCalled();
+
+        resolvePreview({
+          url: "blob:decoded-preview",
+          originalWidth: 100,
+          originalHeight: 100,
+        });
+
+        await vi.waitFor(() => {
+          expect(imagePreviewMock.revokePreviewUrl).toHaveBeenCalledTimes(1);
+        });
+        expect(imagePreviewMock.revokePreviewUrl).toHaveBeenCalledWith("blob:decoded-preview");
+        expect(useFileStore.getState().entries).toEqual([]);
+      }
+
+      // Resolving with null after removal does not call revokePreviewUrl
+      useFileStore.getState().reset();
+      imagePreviewMock.revokePreviewUrl.mockClear();
+      imagePreviewMock.needsServerPreview.mockReturnValue(true);
+
+      let resolveNullPreview!: (
+        value: { url: string; originalWidth: number; originalHeight: number } | null,
+      ) => void;
+      imagePreviewMock.fetchDecodedPreview.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveNullPreview = resolve;
+        }),
+      );
+
+      startEntries(makeFile("gone-null.heic", 100, "image/heic"));
+      useFileStore.getState().removeFile(0);
+      resolveNullPreview(null);
+      await Promise.resolve();
+      expect(imagePreviewMock.revokePreviewUrl).not.toHaveBeenCalled();
+    }
   });
 
   it("clears previewLoading when decoded preview returns null", async () => {

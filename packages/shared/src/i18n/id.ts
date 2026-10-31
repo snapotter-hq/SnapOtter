@@ -30,6 +30,7 @@ export const id: TranslationKeys = {
     clear: "Hapus",
     copy: "Salin",
     copied: "Disalin!",
+    copyFailed: "Gagal menyalin",
     noResults: "Tidak ada hasil",
     showLess: "Tampilkan lebih sedikit",
     showMore: "Tampilkan {count} lainnya",
@@ -1101,6 +1102,11 @@ export const id: TranslationKeys = {
       name: "Atur PDF",
       description: "Susun ulang halaman dengan urutan halaman eksplisit",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Atur ulang, putar, hapus halaman, dan ambil halaman dari PDF lain dalam satu editor",
+    },
     "protect-pdf": {
       name: "Lindungi PDF",
       description: "Tambahkan proteksi kata sandi (enkripsi AES-256)",
@@ -1237,7 +1243,14 @@ export const id: TranslationKeys = {
       name: "Pembuat Pipeline",
       description: "Rangkai beberapa alat menjadi alur kerja",
     },
-    processing: { canceled: "Pemrosesan dibatalkan" },
+    processing: {
+      canceled: "Pemrosesan dibatalkan",
+      cancelUnavailable:
+        "Pemrosesan ini tidak bisa dibatalkan sekarang. Pemrosesan masih berjalan.",
+      cancelNotAllowed:
+        "Tidak bisa membatalkan: Anda sudah keluar atau tidak diizinkan menghentikan pemrosesan ini. Pemrosesan masih berjalan.",
+      cancelFailed: "Gagal membatalkan pemrosesan. Pemrosesan masih berjalan, coba lagi.",
+    },
     mediaPlayer: {
       unsupported: "Browser Anda tidak mendukung format media ini.",
     },
@@ -1263,7 +1276,6 @@ export const id: TranslationKeys = {
       paintOverObjectsToErase: "Sapukan kuas pada objek yang ingin dihapus",
     },
     "crop-canvas": {
-      original: "Asli:",
       cropPreview: "Pratinjau potongan",
       cropRegionSize: "Area potong: {width} x {height}",
       originalSize: "Asli: {width} x {height}",
@@ -1294,7 +1306,6 @@ export const id: TranslationKeys = {
       infoBar: "{width} x {height}px . kisi {cols}x{rows} . {count} ubin",
     },
     "remove-bg": {
-      original: "Asli:",
       transparent: "Transparan",
       color: "Warna",
       gradient: "Gradien",
@@ -1322,7 +1333,6 @@ export const id: TranslationKeys = {
         "Teks hasil ekstraksi akan muncul di sini setelah Anda menjalankan OCR.",
     },
     "image-enhancement": {
-      original: "Asli:",
       removesNoiseAndArtifactsUsing: "Menghapus noise dan artefak menggunakan AI",
       analyzingImage: "Menganalisis gambar...",
       imageLooksGoodFineTune: "Gambar terlihat bagus. Atur halus dengan slider intensitas.",
@@ -1334,8 +1344,6 @@ export const id: TranslationKeys = {
       enhancedSizeKb: "Ditingkatkan: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Semua",
-      group: "Grup",
       dimensions: "Dimensi",
       format: "Format",
       scanned: "Dipindai:",
@@ -1369,7 +1377,6 @@ export const id: TranslationKeys = {
       pageSize: "Ukuran halaman",
     },
     color: {
-      original: "Asli:",
       light: "Cahaya",
       brightness: "Kecerahan",
       contrast: "Kontras",
@@ -1407,6 +1414,7 @@ export const id: TranslationKeys = {
       submitBatch: "Kompres ({count} file)",
       submitTarget: "Kompres ke {size} KB",
       resizedToFit: "Diubah ukurannya menjadi {width} × {height} agar muat dalam {size} KB",
+      batchResized: "{count} dari {total} gambar diperkecil agar muat dalam {size} KB.",
       progressLabel: "Mengompresi",
       original: "Asli: {size} KB",
       processed: "Diproses: {size} KB",
@@ -1438,6 +1446,8 @@ export const id: TranslationKeys = {
       submit: "Ubah Ukuran",
       submitBatch: "Ubah Ukuran ({count} file)",
       progressLabel: "Mengubah ukuran",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
+      maxPercentageExceeded: "Gunakan skala dari 1 hingga {max}%.",
     },
     crop: {
       width: "Lebar",
@@ -1461,6 +1471,7 @@ export const id: TranslationKeys = {
       submit: "Potong",
       submitBatch: "Potong ({count} file)",
       progressLabel: "Memotong",
+      free: "Bebas",
     },
     rotate: {
       rotate90CounterClockwise: "Putar 90° berlawanan jarum jam",
@@ -1480,7 +1491,6 @@ export const id: TranslationKeys = {
       progressLabel: "Menerapkan",
     },
     convert: {
-      original: "Asli:",
       originalSizeKb: "Asli: {size} KB",
       processedSizeKb: "Diproses: {size} KB",
       targetFormat: "Format Tujuan",
@@ -1510,7 +1520,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengoptimasi",
     },
     "strip-metadata": {
-      original: "Asli:",
       iccProfile: "Memiliki ICC",
       originalSize: "Asli: {size} KB",
       processedSize: "Diproses: {size} KB",
@@ -1534,9 +1543,9 @@ export const id: TranslationKeys = {
       metadataRemoved: "Metadata dihapus: {size} KB",
       submit: "Hapus Metadata",
       progressLabel: "Menghapus metadata",
+      inspectFailed: "Gagal memeriksa metadata",
     },
     "edit-metadata": {
-      original: "Asli:",
       imageDescription: "Deskripsi gambar",
       photographerCreatorName: "Nama fotografer / pembuat",
       imageTitle: "Judul gambar",
@@ -1596,6 +1605,7 @@ export const id: TranslationKeys = {
       datesShifted: "tanggal digeser",
       submit: "Terapkan Metadata",
       progressLabel: "Menulis metadata",
+      inspectFailed: "Gagal memeriksa file",
     },
     "bulk-rename": {
       pattern: "Pola",
@@ -1606,6 +1616,7 @@ export const id: TranslationKeys = {
       renaming: "Mengganti nama...",
       submit: "Ganti Nama {count} File",
       zipDownloaded: "ZIP berhasil diunduh",
+      renameFailed: "Ganti nama gagal",
     },
     "image-to-pdf": {
       preview: "Pratinjau",
@@ -1635,10 +1646,12 @@ export const id: TranslationKeys = {
       progressLabel: "Membuat PDF",
       uploadingImages: "Mengunggah gambar...",
       processingPages: "Memproses {count} halaman...",
+      parseResponseFailed: "Gagal mengurai respons server",
+      creationFailedWithStatus: "Kami tidak dapat membuat PDF. Periksa gambar Anda dan coba lagi.",
+      networkErrorCreation: "Kesalahan jaringan saat membuat PDF",
+      requestTimedOut: "Permintaan habis waktu, server mungkin kelebihan beban",
     },
     "pdf-to-image": {
-      converting2: "Mengonversi",
-      page: "halaman",
       custom: "Kustom",
       uploadAPdfToGet: "Unggah PDF untuk memulai",
       generatingPagePreviews: "Membuat pratinjau halaman...",
@@ -1695,6 +1708,12 @@ export const id: TranslationKeys = {
       submitPlural: "Buat Favicon ({count} gambar)",
       downloadZip: "Unduh Favicon ZIP",
       progressLabel: "Membuat Favicon",
+      generationFailed: "Kami tidak dapat membuat favicon. Coba gambar lain.",
+      networkError: "Kesalahan jaringan saat membuat Favicon",
+      timeout: "Permintaan habis waktu, server mungkin kelebihan beban",
+      uploadingImages: "Mengunggah gambar...",
+      processingImagesOne: "Memproses {count} gambar...",
+      processingImagesOther: "Memproses {count} gambar...",
     },
     "adjust-colors": {
       light: "Cahaya",
@@ -1726,7 +1745,6 @@ export const id: TranslationKeys = {
       progressLabel: "Menyesuaikan warna",
     },
     sharpening: {
-      original: "Asli:",
       originalSize: "Asli: {size} KB",
       processedSize: "Diproses: {size} KB",
       method: "Metode",
@@ -1753,9 +1771,17 @@ export const id: TranslationKeys = {
       submit: "Pertajam",
       submitBatch: "Pertajam ({count} file)",
       progressLabel: "Mempertajam",
+      presetNames: {
+        light: "Ringan",
+        medium: "Sedang",
+        strong: "Kuat",
+        portrait: "Potret",
+        landscape: "Lanskap",
+        detail: "Detail",
+        print: "Cetak",
+      },
     },
     "replace-color": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       sourceColor: "Warna Sumber (yang diganti)",
@@ -1769,7 +1795,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengganti warna",
     },
     "color-blindness": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       simulationType: "Jenis Simulasi",
@@ -1779,6 +1804,41 @@ export const id: TranslationKeys = {
       submit: "Simulasi",
       submitBatch: "Simulasi ({count} file)",
       progressLabel: "Mensimulasikan buta warna",
+      types: {
+        protanopia: {
+          label: "Protanopia",
+          description: "Tidak ada sel kerucut merah. Warna merah tampak gelap. ~1% pria.",
+        },
+        protanomaly: {
+          label: "Protanomali",
+          description: "Sensitivitas merah berkurang. ~1% pria.",
+        },
+        deuteranopia: {
+          label: "Deuteranopia",
+          description: "Tidak ada sel kerucut hijau. Merah dan hijau tampak mirip. ~1% pria.",
+        },
+        deuteranomaly: {
+          label: "Deuteranomali",
+          description: "Sensitivitas hijau berkurang. Jenis paling umum. ~5% pria.",
+        },
+        tritanopia: {
+          label: "Tritanopia",
+          description: "Tidak ada sel kerucut biru. Biru dan hijau tampak mirip. Sangat jarang.",
+        },
+        tritanomaly: {
+          label: "Tritanomali",
+          description: "Sensitivitas biru berkurang. Sangat jarang.",
+        },
+        achromatopsia: {
+          label: "Akromatopsia",
+          description: "Buta warna total. Hanya melihat terang-gelap. Sangat jarang.",
+        },
+        blueConeMonochromacy: {
+          label: "Monokromasi Kerucut Biru",
+          description:
+            "Hanya sel kerucut biru yang berfungsi. Persepsi warna sangat terbatas. Sangat jarang.",
+        },
+      },
     },
     "remove-background": {
       subject: "Subjek",
@@ -1816,6 +1876,28 @@ export const id: TranslationKeys = {
       submitBatch: "Hapus Latar Belakang ({count} file)",
       progressLabel: "Menghapus latar belakang",
       cpuNote: "Menjalankan model AI. Tanpa GPU, gambar besar bisa memakan waktu.",
+      colorPresets: {
+        white: "Putih",
+        black: "Hitam",
+        red: "Merah",
+        green: "Hijau",
+        blue: "Biru",
+      },
+      gradientPresets: {
+        purple: "Ungu",
+        pink: "Merah Muda",
+        blue: "Biru",
+        green: "Hijau",
+        sunset: "Senja",
+        lavender: "Lavender",
+      },
+      effectsProcessingFailed: "Pemrosesan efek gagal",
+      effectsExpired:
+        "Penghapusan latar belakang sebelumnya sudah kedaluwarsa, jadi sedang dijalankan ulang. Terapkan efek setelah selesai.",
+      refineChanged:
+        "Subjek, kualitas, penghalusan tepi, dan dekontaminasi warna diterapkan saat latar belakang dihapus. Jalankan lagi untuk memakai pengaturan baru.",
+      backgroundImageRequired: "Pilih gambar latar belakang untuk melanjutkan.",
+      invalidHexColor: "Gunakan warna heksadesimal seperti #FF5500 atau #F50.",
     },
     "remove-gif-background": {
       quality: "Kualitas",
@@ -1854,7 +1936,6 @@ export const id: TranslationKeys = {
       download: "Unduh",
     },
     upscale: {
-      original: "Asli:",
       off: "Mati",
       originalKb: "Asli: {size} KB",
       upscaledKb: "Diperbesar: {size} KB",
@@ -1871,9 +1952,11 @@ export const id: TranslationKeys = {
       progressLabelBatch: "Memperbesar {count} gambar",
       cpuNote:
         "Upscaling AI membutuhkan banyak komputasi. Tanpa GPU, gambar besar bisa memakan waktu beberapa menit.",
+      qualityFast: "Cepat",
+      qualityBalanced: "Seimbang",
+      qualityBest: "Terbaik",
     },
     "erase-object": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       qualityFast: "Cepat",
@@ -1889,12 +1972,16 @@ export const id: TranslationKeys = {
       clear: "Hapus",
       outputFormat: "Format Output",
       quality: "Kualitas",
-      paintHint: "Cat di atas objek yang ingin Anda hapus. Gunakan Ctrl+Z untuk undo.",
+      paintHint: "Cat di atas objek yang ingin Anda hapus. Gunakan {shortcut} untuk undo.",
       lassoHint:
-        "Gambar lingkaran di sekeliling objek yang ingin Anda hapus. Gunakan Ctrl+Z untuk undo.",
+        "Gambar lingkaran di sekeliling objek yang ingin Anda hapus. Gunakan {shortcut} untuk undo.",
       submit: "Hapus Objek",
       submitBatch: "Hapus Semua ({count})",
       progressLabel: "Menghapus objek",
+      stall: "Pemrosesan habis waktu tanpa kemajuan. Coba lagi.",
+      stallBatch: "Pemrosesan habis waktu. Coba lagi.",
+      timeoutOverloaded: "Permintaan habis waktu, server mungkin kelebihan beban. Coba lagi.",
+      erasingProgress: "Menghapus {current}/{total}",
     },
     ocr: {
       copied: "Disalin",
@@ -1904,6 +1991,8 @@ export const id: TranslationKeys = {
         "Memperbaiki kontras lokal sebelum pengenalan. Cepat menerapkannya langsung; Seimbang dan Terbaik hanya mempertahankannya jika skor terkalibrasi memperbaiki hasil.",
       fastKoreanUnsupported:
         "OCR Cepat tidak mendukung bahasa Korea. Instal paket OCR Akurat lalu pilih Seimbang atau Terbaik.",
+      fastArabicUnsupported:
+        "OCR Cepat tidak mendukung bahasa Arab. Instal paket OCR Akurat lalu pilih Seimbang atau Terbaik.",
       language: "Bahasa",
       autoDetect: "Deteksi otomatis",
       extractedText: "Teks yang Diekstrak",
@@ -1912,6 +2001,9 @@ export const id: TranslationKeys = {
       submit: "Ekstrak Teks",
       submitBatch: "Ekstrak Teks ({count} file)",
       progressLabel: "Mengekstrak teks",
+      filesFailed: "{failed} dari {total} file gagal",
+      noTextDetectedInline: "(tidak ada teks terdeteksi)",
+      fileErrorInline: "(kesalahan: {message})",
     },
     "ocr-pdf": {
       quality: "Kualitas",
@@ -1925,7 +2017,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengekstrak teks dari PDF",
     },
     "blur-faces": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       blurRadius: "Radius Blur",
@@ -1938,7 +2029,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memblur wajah",
     },
     "enhance-faces": {
-      original: "Asli:",
       subtle: "Halus",
       maximum: "Maksimum",
       fewerFaces: "Lebih sedikit wajah",
@@ -1999,6 +2089,9 @@ export const id: TranslationKeys = {
       submitSubject: "Potong Cerdas",
       submitFace: "Potong Wajah",
       submitTrim: "Trim Border",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
+      cropAreaExceeded:
+        "Potongan ini melebihi batas {max} piksel. Kurangi lebar, tinggi, atau padding.",
     },
     imageEnhancement: {
       enhancementMode: "Mode Peningkatan",
@@ -2034,6 +2127,14 @@ export const id: TranslationKeys = {
         "Peningkatan Mendalam memerlukan bundel Perbesar & Tingkatkan, yang belum terpasang, jadi Anda mendapatkan peningkatan standar.",
       deepEnhanceSkippedAnimated:
         "Peningkatan Mendalam tidak berfungsi pada gambar animasi, jadi setiap frame mendapatkan peningkatan standar.",
+      batchDeepEnhanceSkipped:
+        "Peningkatan Mendalam tidak berjalan pada {count} dari {total} gambar, jadi gambar tersebut mendapatkan peningkatan standar.",
+      batchDeepEnhanceSkippedFailed:
+        "Peningkatan Mendalam gagal pada {count} dari {total} gambar, jadi gambar tersebut mendapatkan peningkatan standar.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Peningkatan Mendalam tidak berjalan pada {count} dari {total} gambar karena bundel Perbesar & Tingkatkan belum terpasang.",
+      batchDeepEnhanceSkippedAnimated:
+        "Peningkatan Mendalam melewati {count} dari {total} gambar karena gambar tersebut animasi.",
     },
     "noise-removal": {
       off: "Mati",
@@ -2065,7 +2166,6 @@ export const id: TranslationKeys = {
       progressLabelBatch: "Menghapus noise dari {count} gambar",
     },
     "red-eye-removal": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       fixedKb: "Diperbaiki: {size} KB",
       sensitivity: "Sensitivitas",
@@ -2082,7 +2182,6 @@ export const id: TranslationKeys = {
       progressLabelBatch: "Memperbaiki mata merah di {count} gambar",
     },
     "restore-photo": {
-      original: "Asli:",
       subtle: "Halus",
       strong: "Kuat",
       originalKb: "Asli: {size} KB",
@@ -2119,6 +2218,9 @@ export const id: TranslationKeys = {
       submit: "Ubah Ukuran",
       submitBatch: "Ubah Ukuran ({count} file)",
       progressLabel: "Mengubah ukuran content-aware",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
+      areaExceeded:
+        "Ubah ukuran sadar konten dibatasi {max} piksel total. Kurangi lebar atau tinggi.",
     },
     "ai-canvas-expand": {
       quality: "Kualitas",
@@ -2140,7 +2242,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memperluas kanvas",
     },
     colorize: {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       colorizedKb: "Diwarnai: {size} KB",
       aiModel: "Model AI",
@@ -2284,6 +2385,13 @@ export const id: TranslationKeys = {
       dragToAdjust: "Seret untuk menyesuaikan",
       scrollToZoom: "Gulir untuk zoom",
       photoGenerated: "Foto telah dibuat. Unduh dari panel kiri.",
+      analysisFailedWithStatus:
+        "Kami tidak dapat menganalisis foto ini. Coba foto yang lebih jelas.",
+      faceAnalysisFailed: "Analisis wajah gagal",
+      generationFailedWithStatus: "Kami tidak dapat membuat foto paspor. Silakan coba lagi.",
+      photoGenerationFailed: "Pembuatan foto gagal",
+      analysisExpired:
+        "Analisis sudah kedaluwarsa, jadi foto sedang dianalisis ulang. Buat setelah selesai.",
     },
     "transcribe-audio": {
       language: "Bahasa",
@@ -2343,7 +2451,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memburamkan latar belakang",
     },
     "watermark-text": {
-      original: "Asli:",
       applyWatermark: "Terapkan Watermark",
       tiledRepeating: "Ubin (Berulang)",
       originalKb: "Asli: {size} KB",
@@ -2366,7 +2473,6 @@ export const id: TranslationKeys = {
       progressLabel: "Menambahkan watermark",
     },
     "watermark-image": {
-      original: "Asli:",
       center: "Tengah",
       topLeft: "Kiri Atas",
       topRight: "Kanan Atas",
@@ -2385,7 +2491,6 @@ export const id: TranslationKeys = {
       submitBatch: "Terapkan Watermark ({count} file)",
     },
     "text-overlay": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       text: "Teks",
@@ -2405,7 +2510,6 @@ export const id: TranslationKeys = {
       defaultText: "Teks Anda di Sini",
     },
     compose: {
-      original: "Asli:",
       screen: "Layar",
       processing: "Memproses...",
       overlayImage: "Gambar Overlay",
@@ -2460,9 +2564,6 @@ export const id: TranslationKeys = {
       backToGallery: "Kembali ke Galeri",
     },
     info: {
-      min: "min:",
-      max: "maks:",
-      mean: "rata-rata:",
       minValue: "min:{value}",
       maxValue: "maks:{value}",
       meanValue: "rata-rata:{value}",
@@ -2499,6 +2600,7 @@ export const id: TranslationKeys = {
       similarity: "Kemiripan: {percent}%",
       submit: "Bandingkan",
       downloadDiff: "Unduh Diff",
+      comparisonFailed: "Perbandingan gagal",
     },
     "find-duplicates": {
       sensitivity: "Sensitivitas",
@@ -2528,6 +2630,10 @@ export const id: TranslationKeys = {
       threshold: "Ambang",
       submit: "Pindai Duplikat",
       scanning: "Memindai...",
+      parseResultsFailed: "Gagal mengurai hasil pemindaian",
+      networkErrorUpload:
+        "Kesalahan jaringan saat mengunggah. Coba dengan lebih sedikit file atau periksa koneksi.",
+      requestTimedOut: "Permintaan habis waktu. Coba dengan lebih sedikit file.",
     },
     "color-palette": {
       colors: "Warna",
@@ -2598,6 +2704,26 @@ export const id: TranslationKeys = {
       downloadFormat: "Format Unduhan",
       submit: "Buat Kode QR",
       download: "Unduh Kode QR",
+      styleSquare: "Persegi",
+      styleRounded: "Membulat",
+      styleDots: "Titik-titik",
+      styleClassy: "Elegan",
+      styleClassyRounded: "Elegan Bulat",
+      styleExtraRounded: "Ekstra Bulat",
+      styleDot: "Titik",
+      formatDescPng: "Terbaik untuk digital",
+      formatDescSvg: "Terbaik untuk cetak",
+      formatDescJpeg: "File lebih kecil",
+      formatDescWebp: "Format modern",
+      vcardFirstName: "Nama Depan",
+      vcardFirstNamePlaceholder: "Budi",
+      vcardLastName: "Nama Belakang",
+      vcardLastNamePlaceholder: "Santoso",
+      vcardOrganization: "Organisasi",
+      vcardOrganizationPlaceholder: "Perusahaan",
+      vcardJobTitle: "Jabatan",
+      vcardJobTitlePlaceholder: "Developer",
+      vcardWebsite: "Situs Web",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2647,6 +2773,9 @@ export const id: TranslationKeys = {
       noBarcodesFound: "Tidak ada barcode ditemukan",
       barcodesFound: "{count} barcode ditemukan",
       barcodesFoundPlural: "{count} barcode ditemukan",
+      scanningFile: "Memindai {name}...",
+      scanningFailedWithStatus: "Kami tidak dapat memindai gambar ini. Coba gambar lain.",
+      filesFailed: "{count} dari {total} file gagal",
     },
     collage: {
       sideBySide: "Berdampingan",
@@ -2667,9 +2796,6 @@ export const id: TranslationKeys = {
       mosaic: "Mosaik",
       uploadingImages: "Mengunggah gambar...",
       processingCollage: "Memproses kolase...",
-      loaded: "dimuat",
-      images: "gambar",
-      collage: "Kolase:",
       snapotter: "SnapOtter",
       background: "Latar Belakang",
       format: "Format",
@@ -2705,6 +2831,12 @@ export const id: TranslationKeys = {
       quality: "Kualitas",
       submit: "Buat Kolase",
       downloadCollage: "Unduh Kolase",
+      ratioFree: "Bebas",
+      bgWhite: "Putih",
+      bgBlack: "Hitam",
+      bgNone: "Tidak ada",
+      bgCustom: "Kustom",
+      collageFailed: "Kolase gagal dibuat",
     },
     stitch: {
       format: "Format",
@@ -2734,6 +2866,7 @@ export const id: TranslationKeys = {
       outputFormat: "Format Output",
       quality: "Kualitas",
       submit: "Jahit Gambar",
+      stitchFailed: "Penjahitan gagal",
     },
     split: {
       splitMode: "Mode Pembagian",
@@ -2762,6 +2895,21 @@ export const id: TranslationKeys = {
       submit: "Bagi Gambar",
       downloadAll: "Unduh Semua (ZIP)",
       tileWarningSmall: "Ubin akan sangat kecil ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Setengah horizontal",
+        verticalHalf: "Setengah vertikal",
+        quarters: "Perempat",
+        horizontalStrip: "Strip horizontal",
+        verticalStrip: "Strip vertikal",
+        grid9: "Kisi 9 ubin",
+        portrait6: "6 ubin potret",
+        landscape6: "6 ubin lanskap",
+        grid16: "Kisi 16 ubin",
+      },
+      keepOriginal: "Pertahankan Asli",
+      auto: "Otomatis",
+      splitFailed: "Pembagian gagal",
+      failedToSplit: "Gagal membagi {name}: {detail}",
     },
     border: {
       blur: "Blur",
@@ -2787,6 +2935,16 @@ export const id: TranslationKeys = {
       submit: "Tambah Border",
       submitBatch: "Tambah Border ({count} file)",
       progressLabel: "Menambahkan border",
+      presetNames: {
+        cleanWhite: "Putih Bersih",
+        galleryBlack: "Hitam Galeri",
+        shadow: "Bayangan",
+        rounded: "Membulat",
+        polaroid: "Polaroid",
+        vintage: "Vintage",
+        minimal: "Minimalis",
+        cinematic: "Sinematik",
+      },
     },
     beautify: {
       background: "Latar Belakang",
@@ -2803,7 +2961,6 @@ export const id: TranslationKeys = {
       text: "Teks",
       position: "Posisi",
       newTab: "Tab Baru",
-      frame: "Bingkai",
       quickPresets: "Preset Cepat",
       linear: "Linear",
       radial: "Radial",
@@ -2831,6 +2988,33 @@ export const id: TranslationKeys = {
       submit: "Percantik",
       submitBatch: "Percantik ({count} file)",
       progressLabel: "Mempercantik screenshot",
+      presetPurpleHaze: "Kabut Ungu",
+      presetFlamingo: "Flamingo",
+      presetOcean: "Samudra",
+      presetMidnight: "Tengah Malam",
+      presetMint: "Mint",
+      presetSunset: "Senja",
+      presetCleanWhite: "Putih Bersih",
+      presetNoBackground: "Tanpa Latar",
+      bgGradient: "Gradien",
+      bgSolid: "Solid",
+      bgImage: "Gambar",
+      none: "Tidak ada",
+      frameBrowser: "Browser",
+      shadowSubtle: "Halus",
+      shadowMedium: "Sedang",
+      shadowDramatic: "Dramatis",
+      shadowCustom: "Kustom",
+      socialOriginal: "Asli",
+      socialIgSquare: "IG Persegi",
+      socialIgStory: "IG Story",
+      positionTopLeft: "Kiri Atas",
+      positionTopRight: "Kanan Atas",
+      positionCenter: "Tengah",
+      positionBottomLeft: "Kiri Bawah",
+      positionBottomRight: "Kanan Bawah",
+      processingFailed: "Pemrosesan gagal",
+      processingFailedStatus: "Kami tidak dapat memproses gambar ini. Silakan coba lagi.",
     },
     "circle-crop": {
       border: "Bingkai",
@@ -2869,6 +3053,16 @@ export const id: TranslationKeys = {
       submit: "Terapkan Duotone",
       submitBatch: "Terapkan Duotone ({count} file)",
       progressLabel: "Menerapkan duotone",
+      presetNames: {
+        classic: "Klasik",
+        noir: "Noir",
+        sepia: "Sepia",
+        midnight: "Tengah Malam",
+        sunset: "Senja",
+        cyber: "Siber",
+        ocean: "Samudra",
+        forest: "Hutan",
+      },
     },
     "image-pad": {
       background: "Latar Belakang",
@@ -2881,6 +3075,7 @@ export const id: TranslationKeys = {
       submit: "Padding Gambar",
       submitBatch: "Padding Gambar ({count} file)",
       progressLabel: "Menambah padding gambar",
+      custom: "Kustom",
     },
     pixelate: {
       blockSize: "Ukuran Blok",
@@ -2982,7 +3177,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengonversi SVG",
     },
     vectorize: {
-      original: "Asli:",
       detail: "Detail",
       smoothing: "Penghalusan",
       blackWhite: "Hitam Putih",
@@ -3019,7 +3213,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memvektorisasi",
     },
     "gif-tools": {
-      original: "Asli:",
       widthPx: "Lebar (px)",
       auto: "Otomatis",
       heightPx: "Tinggi (px)",
@@ -3076,6 +3269,7 @@ export const id: TranslationKeys = {
       submit: "Proses GIF",
       submitBatch: "Proses ({count} file)",
       progressLabel: "Memproses GIF",
+      maxDimensionExceeded: "Gunakan ukuran 1 hingga {max} px.",
     },
     "image-to-base64": {
       converting: "Mengonversi...",
@@ -3110,6 +3304,7 @@ export const id: TranslationKeys = {
       includeText: "Sertakan Teks",
       submit: "Buat Barcode",
       download: "Unduh Barcode",
+      generateFailed: "Gagal membuat barcode",
     },
     "chart-maker": {
       optionalChartTitle: "Judul grafik (opsional)",
@@ -3120,6 +3315,11 @@ export const id: TranslationKeys = {
       submit: "Buat Grafik",
       submitBatch: "Buat Grafik ({count} file)",
       progressLabel: "Membuat grafik",
+      kindBar: "Batang",
+      kindLine: "Garis",
+      kindPie: "Pai",
+      rowsSkipped:
+        "Baris yang digambar: {charted}. Dilewati karena kolom nilai tidak berisi angka: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Model",
@@ -3510,12 +3710,13 @@ export const id: TranslationKeys = {
       submit: "Kompres",
       submitBatch: "Kompres ({count} file)",
       submitTarget: "Kompres ke {size}",
+      batchMissed: "{count} dari {total} file tidak bisa di bawah {target}.",
       progressLabel: "Mengompres",
       bestEffortHint:
         "Maksimum sebisa mungkin. PDF berbasis gambar mendekati ukuran ini; PDF berisi teks saja mungkin tidak menyusut ke ukuran ini.",
       targetReached: "Target {target} tercapai (hasil: {size}).",
       targetMissed:
-        "Tidak dapat mencapai {target}. Ukuran terkecil yang bisa dicapai adalah {size} karena PDF ini sebagian besar berupa teks atau vektor, yang tidak dapat diperkecil oleh kompresi gambar.",
+        "Tidak dapat mencapai {target}. Ukuran terkecil yang bisa dicapai adalah {size}.",
     },
     "rotate-pdf": {
       angle: "Sudut rotasi",
@@ -3584,6 +3785,30 @@ export const id: TranslationKeys = {
       pageLabel: "Halaman {n}",
       orderTooLong:
         "Terlalu banyak perpindahan terpisah untuk dikirim. Atur ulang dan coba dengan lebih sedikit perubahan.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maksimal {docs} PDF dan {pages} halaman keluaran.",
+      addDocument: "Tambah PDF",
+      addAll: "Tambah semua halaman",
+      allPages: "Semua dalam rencana",
+      addPage: "Tambah halaman {n}",
+      dragHint:
+        "Seret untuk mengurutkan ulang, memutar, atau menghapus halaman. Tambahkan PDF untuk mengambil halamannya.",
+      reset: "Atur ulang rencana",
+      emptyPlan: "Belum ada halaman dalam rencana. Tambahkan halaman dari dokumen di atas.",
+      docFailed: "Sebuah dokumen tidak dapat dibaca.",
+      skippedNotPdf: "{count} file dilewati: hanya PDF yang dapat ditambahkan.",
+      skippedOverLimit: "{count} PDF tidak ditambahkan: editor menampung maksimal {docs} PDF.",
+      pageLabel: "Posisi {n}",
+      planSummary: "{pages} halaman dari {docs} dokumen akan dirakit.",
+      submit: "Buat PDF ({pages} halaman)",
+      progressLabel: "Merakit",
+      rotateLeft: "Putar kiri",
+      rotateRight: "Putar kanan",
+      removePage: "Hapus halaman",
+      removeDoc: "Hapus PDF",
+      zoomIn: "Perbesar",
+      zoomOut: "Perkecil",
     },
     "protect-pdf": {
       userPassword: "Kata sandi pengguna",
@@ -3705,6 +3930,9 @@ export const id: TranslationKeys = {
         uploadHint:
           "Letakkan PNG / JPG, atau klik untuk memilih. PNG transparan bekerja paling baik.",
       },
+      exportFailed: "Tidak dapat membaca tanda tangan yang ditempatkan. Coba lagi.",
+      stall: "Pemrosesan habis waktu. Coba lagi.",
+      timeout: "Permintaan habis waktu. Coba lagi.",
     },
     "redact-pdf": {
       terms: "Istilah untuk disensor",
@@ -3718,6 +3946,9 @@ export const id: TranslationKeys = {
       submit: "Ekstrak Teks",
       submitBatch: "Ekstrak Teks ({count} file)",
       progressLabel: "Mengekstrak",
+      scannedHint:
+        "PDF ini hasil pindaian, jadi tidak ada teks yang bisa diekstrak. OCR bisa membacanya, tetapi butuh waktu lebih lama dan paket AI OCR harus terpasang.",
+      runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-to-word": {
       hint: "Terbaik untuk PDF berbasis teks; halaman pindaian memerlukan OCR",
@@ -3874,6 +4105,8 @@ export const id: TranslationKeys = {
     importFromFiles: "Impor dari File",
     saveToFiles: "Simpan ke File",
     savedToFiles: "Tersimpan ke File",
+    resultExpired: "Hasil ini sudah kedaluwarsa. Jalankan alat lagi.",
+    libraryFull: "Penyimpanan file Anda penuh. Hapus beberapa file, lalu coba lagi.",
     librarySaveTitle: "File ini berasal dari File Anda",
     librarySaveAsNew: "Simpan hasil sebagai file baru",
     librarySaveAsNewHint: "File asli tetap tersimpan di File Anda",
@@ -4093,7 +4326,7 @@ export const id: TranslationKeys = {
       dropDescription: "Seret gambar ke sini untuk memulai",
       openImageButton: "Buka Gambar",
       newDocumentButton: "Dokumen Baru",
-      pasteHint: "Atau tempel dari clipboard (Ctrl+V)",
+      pasteHint: "Atau tempel dari clipboard ({shortcut})",
     },
     mobile: {
       heading: "Disarankan Desktop",
@@ -4146,6 +4379,7 @@ export const id: TranslationKeys = {
         ratioLabel: "Rasio:",
         applyTitle: "Terapkan Crop (Enter)",
         cancelTitle: "Batalkan Crop (Escape)",
+        free: "Bebas",
       },
       dodgeBurn: {
         dodge: "Terangkan",
@@ -4162,6 +4396,9 @@ export const id: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Sampel:",
         toggleDropdown: "Buka/tutup dropdown",
+        samplePoint: "Titik (1x1)",
+        sampleAverage3: "Rata-rata 3x3",
+        sampleAverage5: "Rata-rata 5x5",
       },
       fill: {
         tolerance: "Toleransi",
@@ -4258,6 +4495,68 @@ export const id: TranslationKeys = {
         grain: "Butiran",
         resetAll: "Reset Semua",
         apply: "Terapkan",
+        autoButtons: {
+          autoTone: "Nada Otomatis",
+          autoContrast: "Kontras Otomatis",
+          autoColor: "Warna Otomatis",
+          autoEnhance: "Tingkatkan Otomatis",
+        },
+        sliders: {
+          brightness: "Kecerahan",
+          contrast: "Kontras",
+          hue: "Rona",
+          saturation: "Saturasi",
+          luminance: "Luminans",
+          exposure: "Eksposur",
+          vibrance: "Vibrance",
+          warmth: "Kehangatan",
+        },
+        filters: {
+          grayscale: "Skala Abu-abu",
+          sepia: "Sepia",
+          invert: "Balikkan",
+          solarize: "Solarisasi",
+          blur: "Blur",
+          sharpen: "Pertajam",
+          noise: "Noise",
+          pixelate: "Pikselasi",
+          emboss: "Timbul",
+          posterize: "Posterisasi",
+          threshold: "Ambang",
+          kaleidoscope: "Kaleidoskop",
+          motionBlur: "Blur Gerakan",
+          radialBlur: "Blur Radial",
+          surfaceBlur: "Blur Permukaan",
+        },
+        params: {
+          radius: "Radius",
+          amount: "Jumlah",
+          size: "Ukuran",
+          strength: "Kekuatan",
+          levels: "Level",
+          level: "Tingkat",
+          power: "Daya",
+          angle: "Sudut",
+          distance: "Jarak",
+          centerX: "Pusat X",
+          centerY: "Pusat Y",
+          threshold: "Ambang",
+          midpoint: "Titik Tengah",
+          roundness: "Kebulatan",
+          feather: "Pelembutan",
+          roughness: "Kekasaran",
+        },
+        curvePresets: {
+          linear: "Linear",
+          darken: "Gelapkan",
+          lighten: "Terangkan",
+          increaseContrast: "Tambah Kontras",
+          decreaseContrast: "Kurangi Kontras",
+          mediumContrast: "Kontras Sedang",
+          strongContrast: "Kontras Kuat",
+          crossProcess: "Cross Process",
+          negative: "Negatif",
+        },
       },
       color: {
         channelAriaLabel: "Saluran warna {channel}",
@@ -4273,12 +4572,64 @@ export const id: TranslationKeys = {
         median: "Median",
       },
       history: {
-        undoTitle: "Urungkan (Ctrl+Z)",
-        redoTitle: "Ulangi (Ctrl+Shift+Z)",
+        undoTitle: "Urungkan ({shortcut})",
+        redoTitle: "Ulangi ({shortcut})",
         empty: "Belum ada riwayat",
+        unknown: "Tidak diketahui",
+        actions: {
+          initialState: "Status Awal",
+          loadImage: "Muat Gambar",
+          loadProject: "Muat Proyek",
+          restoreAutosave: "Pulihkan Simpanan Otomatis",
+          resizeCanvas: "Ubah Ukuran Kanvas",
+          resizeImage: "Ubah Ukuran Gambar",
+          rotateCanvas: "Putar Kanvas {degrees}",
+          flipHorizontal: "Balik Horizontal",
+          flipVertical: "Balik Vertikal",
+          trimCanvas: "Pangkas Kanvas",
+          addObject: "Tambah {type}",
+          layerEffect: "Efek Layer",
+          delete: "Hapus",
+          bringToFront: "Bawa ke Depan",
+          bringForward: "Majukan",
+          sendBackward: "Mundurkan",
+          sendToBack: "Kirim ke Belakang",
+          addLayer: "Tambah Layer",
+          deleteLayer: "Hapus Layer",
+          duplicateLayer: "Duplikat Layer",
+          reorderLayers: "Ubah Urutan Layer",
+          mergeDown: "Gabung ke Bawah",
+          flattenAll: "Ratakan Semua",
+          adjust: "Sesuaikan {name}",
+          resetAdjustments: "Reset Penyesuaian",
+          levels: "Level",
+          curves: "Kurva",
+          resetLevels: "Reset Level",
+          resetCurves: "Reset Kurva",
+          resetAll: "Reset Semua",
+          toggleFilter: "Alihkan Filter {name}",
+          setFilterParam: "Atur {param} {filter}",
+          crop: "Crop",
+          cut: "Potong",
+          paste: "Tempel",
+          pasteInPlace: "Tempel di Tempat",
+          nudge: "Geser Sedikit",
+          brushStroke: "Goresan Kuas",
+          eraserStroke: "Goresan Penghapus",
+        },
+        objectTypes: {
+          line: "Garis",
+          rect: "Persegi Panjang",
+          ellipse: "Elips",
+          text: "Teks",
+          image: "Gambar",
+          arrow: "Panah",
+          polygon: "Poligon",
+          star: "Bintang",
+        },
       },
       layers: {
-        newLayerTitle: "Layer Baru (Ctrl+Shift+N)",
+        newLayerTitle: "Layer Baru ({shortcut})",
         blend: "Campuran",
         opacity: "Opasitas",
         hideLayer: "Sembunyikan layer",
@@ -4306,9 +4657,34 @@ export const id: TranslationKeys = {
           positionCenter: "Tengah",
           positionOutside: "Luar",
         },
+        blendModes: {
+          normal: "Normal",
+          multiply: "Multiply",
+          screen: "Layar",
+          overlay: "Overlay",
+          darken: "Darken",
+          lighten: "Lighten",
+          colorDodge: "Color Dodge",
+          colorBurn: "Color Burn",
+          hardLight: "Hard Light",
+          softLight: "Soft Light",
+          difference: "Difference",
+          exclusion: "Exclusion",
+          hue: "Rona",
+          saturation: "Saturasi",
+          color: "Warna",
+          luminosity: "Luminosity",
+        },
+        duplicate: "Duplikat",
+        flattenAll: "Ratakan Semua",
       },
       navigator: {
         noImageLoaded: "Tidak ada gambar dimuat",
+      },
+      tabs: {
+        layers: "Layer",
+        adjustments: "Penyesuaian",
+        history: "Riwayat",
       },
     },
     ui: {
@@ -4324,6 +4700,7 @@ export const id: TranslationKeys = {
         anchorLabel: "Jangkar:",
         anchorAriaLabel: "Jangkar {position}",
         backgroundLabel: "Latar Belakang:",
+        transparent: "Transparan",
         anchors: {
           topLeft: "kiri atas",
           topCenter: "tengah atas",
@@ -4341,6 +4718,14 @@ export const id: TranslationKeys = {
         original: "Asli: {width} x {height} px",
         note: "Menskalakan semua objek secara proporsional ke dimensi baru.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Gambar ini terlalu besar untuk diedit di browser dengan alat ini. Coba ukuran kanvas yang lebih kecil.",
+        crossOriginBlocked:
+          "Editor tidak dapat membaca piksel dari gambar yang dimuat dari situs lain. Unduh gambarnya, lalu buka filenya.",
+        sourceImageFailed:
+          "Gambar tidak dapat dimuat. Jika gambar dihosting di situs lain, situs itu harus mengizinkan akses lintas asal.",
+      },
       exportDialog: {
         heading: "Ekspor Gambar",
         previewAlt: "Pratinjau ekspor",
@@ -4354,13 +4739,18 @@ export const id: TranslationKeys = {
         exportButton: "Ekspor",
         copied: "Disalin",
         copyFailed: "Gagal menyalin",
+        exportFailed: "Gagal mengekspor. Coba lagi, atau pilih format lain.",
+        tooLarge: "Ekspor ini terlalu besar untuk dirender browser. Coba dimensi yang lebih kecil.",
         saveProject: "Simpan Proyek",
         loadProject: "Muat Proyek",
+        invalidProject: "File ini bukan proyek SnapOtter yang valid.",
       },
       autosaveRecovery: {
         message: "Memulihkan pekerjaan yang belum tersimpan dari {time}.",
         restore: "Pulihkan",
         discard: "Buang",
+        saveFailed:
+          "Tidak dapat menyimpan pekerjaan Anda di browser ini. Ekspor atau gunakan Simpan Proyek untuk menyimpan salinan.",
       },
       fillDialog: {
         heading: "Isi",
@@ -4386,6 +4776,7 @@ export const id: TranslationKeys = {
           black: "Hitam",
           transparent: "Transparan",
         },
+        presetCustom: "Kustom",
       },
       colorSwatch: {
         ariaLabel: "Warna {color}",
@@ -4395,6 +4786,25 @@ export const id: TranslationKeys = {
         noneSelected: "{label}: Tidak ada",
         setNone: "Tanpa {label}",
       },
+      contextMenu: {
+        duplicate: "Duplikat",
+        selectAll: "Pilih Semua",
+      },
+    },
+    toolbar: {
+      move: "Pindah",
+      marquee: "Marquee",
+      crop: "Crop",
+      eyedropper: "Pipet",
+      brush: "Kuas",
+      pencil: "Pensil",
+      cloneStamp: "Stempel Klon",
+      eraser: "Penghapus",
+      paintBucket: "Ember Cat",
+      gradient: "Gradien",
+      text: "Teks",
+      hand: "Tangan",
+      zoom: "Zoom",
     },
   },
   settings: {
@@ -4427,6 +4837,7 @@ export const id: TranslationKeys = {
       saveButton: "Simpan Pengaturan",
       saveSuccess: "Pengaturan disimpan.",
       saveFailed: "Gagal menyimpan pengaturan.",
+      loadFailed: "Gagal memuat preferensi Anda.",
       roleUnknown: "tidak diketahui",
     },
     system: {
@@ -4451,6 +4862,7 @@ export const id: TranslationKeys = {
       saveButton: "Simpan Pengaturan",
       saveSuccess: "Pengaturan disimpan.",
       saveFailed: "Gagal menyimpan pengaturan.",
+      loadFailed: "Gagal memuat pengaturan sistem.",
       limitsAndResources: "Batasan & Sumber Daya",
       maxFileSize: "Ukuran File Maks",
       maxBatchSize: "Ukuran Batch Maks",
@@ -4488,10 +4900,10 @@ export const id: TranslationKeys = {
       newPasswordPlaceholder: "Kata Sandi Baru",
       confirmPasswordPlaceholder: "Konfirmasi Kata Sandi Baru",
       passwordsMismatch: "Kata sandi tidak cocok",
-      passwordTooShort: "Kata sandi harus minimal 4 karakter",
       changeSuccess: "Kata sandi berhasil diubah",
       changeFailed: "Gagal mengubah kata sandi",
       currentPasswordIncorrect: "Kata sandi saat ini salah",
+      passwordChangedElsewhere: "Kata sandi Anda telah diubah di tempat lain. Masuk lagi.",
       changePasswordButton: "Ubah Kata Sandi",
       loginAttemptLimitNote: "Batas percobaan login dapat dikonfigurasi di Pengaturan Sistem.",
       twoFactorHeading: "Autentikasi Dua Faktor",
@@ -4539,6 +4951,8 @@ export const id: TranslationKeys = {
       passwordMinLengthDesc: "Jumlah karakter minimum yang diperlukan untuk kata sandi.",
       passwordRequireUppercase: "Wajib Huruf Besar",
       passwordRequireUppercaseDesc: "Wajib mengandung minimal satu huruf besar.",
+      passwordRequireLowercase: "Wajib Huruf Kecil",
+      passwordRequireLowercaseDesc: "Wajib mengandung minimal satu huruf kecil.",
       passwordRequireNumber: "Wajib Angka",
       passwordRequireNumberDesc: "Wajib mengandung minimal satu angka.",
       passwordRequireSpecial: "Wajib Karakter Khusus",
@@ -4546,6 +4960,13 @@ export const id: TranslationKeys = {
       passwordPolicyHeading: "Kebijakan Kata Sandi",
       securitySettingsSaved: "Pengaturan keamanan tersimpan",
       securitySettingsFailed: "Gagal menyimpan pengaturan keamanan",
+      adminSettingsLoadFailed: "Gagal memuat pengaturan keamanan.",
+      twoFactorStateChanged:
+        "Autentikasi dua faktor diubah di jendela lain. Muat ulang lalu coba lagi.",
+      twoFactorUnreadable:
+        "Server tidak dapat membaca pengaturan autentikasi dua faktor Anda. Hubungi administrator.",
+      ssoNeedsProvider:
+        "Penerapan SSO memerlukan penyedia OIDC atau SAML yang sudah dikonfigurasi.",
     },
     people: {
       heading: "Anggota",
@@ -4578,7 +4999,7 @@ export const id: TranslationKeys = {
       updateFailed: "Gagal memperbarui pengguna",
       cannotRemoveOwnAdmin: "Tidak dapat menghapus peran admin Anda sendiri",
       resetPasswordHeading: "Reset kata sandi untuk {username}",
-      newPasswordLabel: "Kata sandi baru (min 8 karakter)",
+      newPasswordLabel: "Kata sandi baru",
       resetPasswordButton: "Reset Kata Sandi",
       resetPasswordWarning: "Ini akan membatalkan semua sesi dan kunci API untuk pengguna ini.",
       resetSuccess: "Kata sandi berhasil direset",
@@ -4588,6 +5009,7 @@ export const id: TranslationKeys = {
       tableHeaderTeam: "Tim",
       noSearchResults: "Tidak ada anggota yang cocok dengan pencarian Anda.",
       noUsersFound: "Tidak ada pengguna ditemukan.",
+      loadFailed: "Gagal memuat pengguna.",
       authBadgeLocalOidc: "Lokal + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Edit Peran / Tim",
@@ -4600,6 +5022,13 @@ export const id: TranslationKeys = {
         "Salin kata sandi ini sekarang. Anda tidak akan bisa melihatnya setelah membuat pengguna.",
       memberCount: "{count} anggota",
       memberCountPlural: "{count} anggota",
+      usernameTaken: "Nama pengguna itu sudah dipakai",
+      lastAdmin: "Harus selalu ada setidaknya satu admin",
+      cannotDeleteSelf: "Tidak dapat menghapus akun Anda sendiri",
+      usernameInvalid:
+        "Nama pengguna harus 3 sampai 50 karakter dan hanya boleh berisi a-z, A-Z, 0-9, titik, tanda hubung, dan garis bawah",
+      roleNotFound: "Peran itu sudah tidak ada",
+      teamNotFound: "Tim itu sudah tidak ada",
     },
     teams: {
       heading: "Tim",
@@ -4621,6 +5050,7 @@ export const id: TranslationKeys = {
       tableHeaderTeamName: "Nama Tim",
       tableHeaderMembers: "Anggota",
       emptyState: "Tidak ada tim ditemukan.",
+      loadFailed: "Gagal memuat tim.",
       renameSaveButton: "Simpan",
       renameCancelButton: "Batal",
       renameAction: "Ganti Nama",
@@ -4636,6 +5066,7 @@ export const id: TranslationKeys = {
       teamRetentionHoursDesc:
         "Retensi file pemrosesan untuk tim ini. Kosongkan untuk menggunakan default global.",
       quotaSaved: "Pengaturan tim tersimpan",
+      quotaSaveFailed: "Gagal menyimpan pengaturan tim",
     },
     roles: {
       heading: "Peran",
@@ -4660,6 +5091,7 @@ export const id: TranslationKeys = {
       deleteSuccess: 'Peran "{name}" dihapus',
       deleteFailed: "Gagal menghapus peran",
       emptyState: "Tidak ada peran ditemukan.",
+      loadFailed: "Gagal memuat peran.",
       builtInBadge: "Bawaan",
       userCountBadge: "{count} pengguna",
       editRoleTitle: "Edit peran",
@@ -4673,12 +5105,17 @@ export const id: TranslationKeys = {
         users: "Pengguna",
         teams: "Tim",
         system: "Sistem",
+        enterpriseAdmin: "Administrasi Enterprise",
       },
+      nameInvalid:
+        "Nama peran harus 2 sampai 30 karakter dan hanya boleh berisi a-z, 0-9, tanda hubung, dan garis bawah",
+      permissionsRequired: "Pilih setidaknya satu izin",
     },
     auditLog: {
       heading: "Log Audit",
       allActionsFilter: "Semua tindakan",
       emptyState: "Tidak ada entri log audit.",
+      loadFailed: "Gagal memuat log audit.",
       tableHeaderTime: "Waktu",
       tableHeaderUser: "Pengguna",
       tableHeaderAction: "Tindakan",
@@ -4721,6 +5158,7 @@ export const id: TranslationKeys = {
       teamColumn: "Tim",
       storageColumn: "Penyimpanan",
       usersColumn: "Pengguna",
+      loadFailed: "Gagal memuat data penggunaan.",
     },
     apiKeys: {
       heading: "Kunci API",
@@ -4730,6 +5168,7 @@ export const id: TranslationKeys = {
       removeScopingLabel: "Hapus pembatasan izin",
       restrictPermissionsLabel: "Batasi izin (opsional)",
       expiresLabel: "Kedaluwarsa:",
+      expiresInPast: "Tanggal kedaluwarsa harus di masa mendatang.",
       clearButton: "Hapus",
       copyTitle: "Salin",
       keyWarning: "Simpan kunci ini dengan aman. Kunci tidak akan ditampilkan lagi.",
@@ -4741,6 +5180,7 @@ export const id: TranslationKeys = {
       deleteConfirm:
         "Hapus kunci API ini? Semua integrasi yang menggunakannya akan berhenti berfungsi.",
       emptyState: "Belum ada kunci API. Buat satu untuk memulai.",
+      loadFailed: "Gagal memuat kunci API.",
     },
     tools: {
       heading: "Alat",
@@ -4784,6 +5224,7 @@ export const id: TranslationKeys = {
       description: "Kelola bundel model AI untuk pemrosesan file tingkat lanjut.",
       installAll: "Instal Semua",
       diskUsage: "Penggunaan disk: {size}",
+      statusStale: "Gagal memperbarui status paket. Daftar di bawah mungkin sudah tidak terbaru.",
       sizeOnDisk: "{size} di disk",
       installed: "Terinstal",
       notInstalled: "Belum terinstal",
@@ -4814,6 +5255,8 @@ export const id: TranslationKeys = {
       resetFailed: "Reset gagal: {error}",
       resetVenvKept:
         "Lingkungan Python bersama dibiarkan apa adanya: instalasi ini tidak memiliki basis bawaan untuk membangunnya kembali. Model, cache unduhan, dan catatan instalasi sudah dihapus. Buat ulang lingkungan tersebut sendiri jika paket usang di dalamnya adalah penyebab masalahnya.",
+      importBusy: "Instalasi atau impor lain sedang berjalan. Coba lagi setelah selesai.",
+      importNoSpace: "Ruang disk server tidak cukup untuk bundel ini.",
     },
     about: {
       heading: "Tentang",
@@ -4833,6 +5276,9 @@ export const id: TranslationKeys = {
   auth: {
     login: "Masuk",
     logout: "Keluar",
+    logoutFailed: "Gagal keluar. Coba lagi.",
+    idpLogoutFailed:
+      "Anda telah keluar dari SnapOtter, tetapi sesi penyedia SSO Anda mungkin masih terbuka. Keluar juga dari sana.",
     username: "Nama pengguna",
     password: "Kata sandi",
     loginButton: "Masuk",
@@ -4862,10 +5308,22 @@ export const id: TranslationKeys = {
     verify: "Verifikasi",
     verifying: "Memverifikasi...",
     mfaInvalidCode: "Kode tidak valid. Silakan coba lagi.",
+    mfaAttemptsExhausted: "Terlalu banyak kode tidak valid. Silakan masuk lagi.",
+    mfaEnrollmentAttemptsExhausted:
+      "Terlalu banyak kode tidak valid. Masuk lagi untuk mendapatkan kode QR dan kode pemulihan baru; kode yang ditampilkan sebelumnya tidak akan berfungsi.",
+    mfaExpired: "Sesi verifikasi Anda telah berakhir. Silakan masuk lagi.",
+    mfaEnrollmentExpired:
+      "Sesi penyiapan Anda telah berakhir. Masuk lagi untuk mendapatkan kode QR dan kode pemulihan baru; kode yang ditampilkan sebelumnya tidak akan berfungsi.",
+    mfaNotConfigured: "Autentikasi dua faktor belum disiapkan. Silakan masuk lagi.",
+    mfaAlreadyEnabled: "Autentikasi dua faktor sudah aktif. Silakan masuk lagi.",
+    mfaUnreadable:
+      "Server tidak dapat membaca data autentikasi dua faktor Anda. Hubungi administrator.",
     mfaEnrollmentHeading: "Siapkan autentikasi dua faktor untuk melanjutkan",
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",
     mfaPolicyUnavailable: "Kebijakan MFA tidak dapat diperiksa. Silakan coba lagi sebentar lagi.",
+    accountDisabled: "Akun ini dinonaktifkan. Hubungi administrator.",
+    ipNotAllowed: "Alamat IP Anda tidak diizinkan. Hubungi administrator.",
     loginThrottled: "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
     loginThrottledPlural: "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
     loginThrottledUnknownWait:
@@ -4909,14 +5367,13 @@ export const id: TranslationKeys = {
   },
   changePassword: {
     title: "Ubah kata sandi Anda",
-    description:
-      "Anda perlu mengatur kata sandi baru sebelum melanjutkan. Kata sandi harus minimal 8 karakter dengan huruf besar, huruf kecil, dan angka.",
+    description: "Anda perlu mengatur kata sandi baru sebelum melanjutkan.",
     usernameLabel: "Nama pengguna",
     currentPasswordLabel: "Kata sandi saat ini",
     currentPasswordPlaceholder: "Masukkan kata sandi saat ini",
     newPasswordLabel: "Kata sandi baru",
     generateButton: "Buat kata sandi kuat",
-    newPasswordPlaceholder: "Minimal 8 karakter",
+    newPasswordPlaceholder: "Masukkan kata sandi baru",
     confirmPasswordLabel: "Konfirmasi kata sandi baru",
     confirmPasswordPlaceholder: "Ulangi kata sandi baru",
     passwordsMismatch: "Kata sandi tidak cocok",
@@ -4927,6 +5384,7 @@ export const id: TranslationKeys = {
     sidebarTitle: "Hampir selesai",
     sidebarDescription:
       "Atur kata sandi yang kuat untuk mengamankan akun Anda, lalu Anda siap memulai.",
+    sessionEnded: "Sesi Anda telah berakhir. Masuk lagi untuk mengubah kata sandi.",
   },
   automate: {
     title: "Otomasi",
@@ -4936,6 +5394,15 @@ export const id: TranslationKeys = {
     noSteps: "File Pipeline tidak memiliki langkah",
     importFailed: "Impor gagal",
     couldNotRead: "Tidak dapat membaca file Pipeline",
+    importListRefreshFailed:
+      "Pipeline berhasil diimpor, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihatnya.",
+    saveFailed: "Gagal menyimpan Pipeline",
+    deleteFailed: "Gagal menghapus Pipeline",
+    loadFailed: "Gagal memuat Pipeline tersimpan.",
+    saveListRefreshFailed:
+      "Pipeline berhasil disimpan, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihatnya.",
+    deleteListRefreshFailed:
+      "Pipeline berhasil dihapus, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihat perubahannya.",
     fileCount: "{count} file",
     fileCountPlural: "{count} file",
     importFromLibrary: "Impor dari Perpustakaan",
@@ -5021,6 +5488,7 @@ export const id: TranslationKeys = {
     fileCount: "{count} file",
     fileCountSingular: "{count} file",
     noFilesFound: "Tidak ada file ditemukan",
+    loadFailed: "Gagal memuat file Anda.",
     selectFilePrompt: "Pilih file untuk melihat detail",
     openFile: "Buka File",
     selectFile: "Pilih File",
@@ -5039,6 +5507,7 @@ export const id: TranslationKeys = {
     download: "Unduh",
     details: {
       previewFailedRetry: "Pembuatan pratinjau gagal. Coba lagi.",
+      loadFailed: "Gagal memuat file ini.",
     },
   },
   dropzone: {
@@ -5058,6 +5527,7 @@ export const id: TranslationKeys = {
     filesSelected: "{count} file dipilih",
     dropToAdd: "Lepas untuk menambahkan file",
     dropToReplace: "Lepas untuk mengganti file",
+    ignoredWhileRunning: "Proses sedang berjalan. Tunggu hingga selesai sebelum menambahkan file.",
     reorderHint:
       "Seret gambar mini untuk mengurutkan ulang, atau balik urutannya, sebelum menjalankan.",
   },
@@ -5090,6 +5560,8 @@ export const id: TranslationKeys = {
     lessThanMinute: "Kurang dari semenit lagi",
     oneMinuteLeft: "Sekitar 1 menit lagi",
     minutesLeft: "Sekitar {mins} menit lagi",
+    minutesLeftFew: "Sekitar {mins} menit lagi",
+    minutesLeftTwo: "Sekitar {mins} menit lagi",
     progressMessages: [
       "Sebentar lagi... mungkin...",
       "Hal baik butuh waktu...",
@@ -5166,6 +5638,57 @@ export const id: TranslationKeys = {
     networkError: "Kesalahan jaringan. Periksa koneksi Anda.",
     invalidCredentials: "Nama pengguna atau kata sandi salah",
     connectionError: "Kesalahan koneksi",
+    fileTooLarge:
+      "File ini terlalu besar untuk diunggah. Coba file yang lebih kecil, atau minta admin server Anda untuk menaikkan batas unggahan.",
+    featureNotInstalledForTool:
+      '{tool} memerlukan fitur "{feature}". Aktifkan di Pengaturan → Fitur AI.',
+    featureNotInstalled: 'Fitur "{feature}" belum terpasang. Aktifkan di Pengaturan → Fitur AI.',
+    featureIncompatible:
+      'Fitur "{feature}" tidak dapat dijalankan pada perangkat keras server ini.',
+    passwordTooShort: "Kata sandi minimal {minLength} karakter.",
+    passwordNeedsUppercase: "Kata sandi harus mengandung huruf besar.",
+    passwordNeedsLowercase: "Kata sandi harus mengandung huruf kecil.",
+    passwordNeedsDigit: "Kata sandi harus mengandung angka.",
+    passwordNeedsSpecial: "Kata sandi harus mengandung karakter khusus.",
+    passwordNoControlCharacters: "Kata sandi tidak boleh mengandung karakter kontrol.",
+    passwordTooLong: "Kata sandi maksimal {maxLength} karakter.",
+    passwordTooLongAdminReset:
+      "Kata sandi terlalu panjang (maks {maxLength} karakter). Seorang admin harus menyetel ulangnya.",
+    passwordNoInvalidCharacters: "Kata sandi tidak boleh mengandung karakter yang tidak valid.",
+    tooManyRequests: "Terlalu banyak percobaan. Tunggu satu menit lalu coba lagi.",
+    escalationDenied: "Tindakan itu memerlukan akses lebih dari yang dimiliki peran Anda.",
+    featureNotLicensed: "Ini memerlukan lisensi enterprise.",
+    sessionEnded: "Sesi Anda telah berakhir. Masuk lagi.",
+    forbidden: "Anda tidak memiliki izin untuk melakukan itu.",
+    invalidSetting: "Nilai tidak valid untuk {setting}.",
+    network: "Kesalahan jaringan",
+    invalidResponse: "Respons tidak valid",
+    staleVersionReload: "Aplikasi telah diperbarui. Muat ulang halaman dan coba lagi.",
+    failedWithStatus: "Kami tidak dapat menyelesaikan permintaan tersebut. Silakan coba lagi.",
+    processingFailedWithStatus:
+      "Kami tidak dapat memproses file ini. Pastikan file tidak rusak dan coba lagi.",
+    processingFailedNoDetail: "Pemrosesan gagal",
+    canceled: "Pemrosesan dibatalkan",
+    jobTrackingFailed: "Terjadi kesalahan saat melacak pekerjaan ini. Coba lagi.",
+    requestTimedOut: "Permintaan habis waktu",
+    runInterrupted: "Pemrosesan terputus. Jalankan lagi.",
+    requestFailedWithStatus:
+      "Kami tidak dapat menyelesaikan permintaan tersebut. Silakan coba lagi.",
+    invalidServerResponse: "Respons tidak valid dari server",
+    batchFailed: "Pemrosesan batch gagal",
+    batchFailedWithStatus:
+      "Kami tidak dapat menyelesaikan pemrosesan file-file ini. Coba jalankan batch lagi.",
+    allFilesFailed: "Gagal memproses semua file",
+    filesFailedSuffix_one: " (1 file gagal)",
+    filesFailedSuffix_other: " ({count} file gagal)",
+    uploadTimeout: "Waktu unggah habis. Periksa koneksi Anda atau coba file yang lebih kecil.",
+    processingInterrupted: "Pemrosesan terputus. Coba lagi saat terhubung kembali.",
+    processingInterruptedUnconfirmed:
+      "Pemrosesan terputus dan server tidak pernah mengonfirmasi pekerjaan tersebut. Coba lagi saat terhubung kembali.",
+    resultNoLongerAvailable: "Hasil yang selesai tidak lagi tersedia. Jalankan pekerjaan lagi.",
+    batchDownloadFailed: "Batch yang selesai tidak dapat diunduh. Muat ulang lalu coba lagi.",
+    fileNotFoundInBatch: "File tidak ditemukan dalam hasil batch",
+    noFilesSelected: "Tidak ada file yang dipilih",
   },
   sidebar: {
     sponsor: "Dukung kami",
@@ -5201,6 +5724,7 @@ export const id: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Dukung SnapOtter di GitHub Sponsors",
     skipToContent: "Lewati ke konten utama",
     openSidebar: "Buka bilah sisi",
@@ -5223,6 +5747,8 @@ export const id: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "Kontrol zoom",
     dragToReorder: "Seret untuk mengurutkan ulang",
+    resultResizedToFit: "Diperkecil agar muat dalam ukuran target",
+    resultMissedTarget: "Tidak mencapai ukuran target",
     reverseOrder: "Balik urutan",
     whiteBackground: "Latar belakang putih",
     blackBackground: "Latar belakang hitam",
@@ -5304,11 +5830,47 @@ export const id: TranslationKeys = {
       description: "Perbaiki, beri warna, dan perbesar foto lama atau rusak dengan AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Penghapusan Latar Belakang",
+      description: "Hapus latar belakang gambar dengan AI",
+    },
+    "face-detection": {
+      name: "Deteksi Wajah",
+      description: "Deteksi dan blur wajah, perbaiki mata merah, potong cerdas",
+    },
+    "object-eraser-colorize": {
+      name: "Penghapus Objek & Pewarnaan",
+      description: "Hapus objek dari foto dan warnai gambar hitam putih",
+    },
+    "inpaint-hq": {
+      name: "Inpainting Berkualitas Tinggi",
+      description:
+        "Penghapusan objek berbasis difusi untuk objek besar, tekstur detail, dan latar belakang terstruktur",
+    },
+    "upscale-enhance": {
+      name: "Perbesar & Tingkatkan",
+      description: "Pembesaran AI, peningkatan wajah, dan penghapusan noise",
+    },
+    "photo-restoration": {
+      name: "Restorasi Foto",
+      description: "Pulihkan foto lama atau rusak",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Ekstrak teks dari gambar dan PDF",
+    },
+    transcription: {
+      name: "Transkripsi",
+      description: "Ucapan ke teks untuk audio dan video (subtitle)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Mengimpor...",
       importCount: "Impor ({count})",
       import: "Impor",
+      importFailed: "Gagal mengimpor {failed} dari {total} file.",
     },
     metadataGrid: {
       noData: "Tidak ada data",
@@ -5321,6 +5883,19 @@ export const id: TranslationKeys = {
     waveform: {
       play: "Putar",
       pause: "Jeda",
+    },
+    languageNames: {
+      en: "Inggris",
+      de: "Jerman",
+      fr: "Prancis",
+      es: "Spanyol",
+      zh: "Tionghoa",
+      ja: "Jepang",
+      ko: "Korea",
+      ar: "Arab",
+      id: "Indonesia",
+      th: "Thai",
+      vi: "Vietnam",
     },
   },
   privacyPolicy: {

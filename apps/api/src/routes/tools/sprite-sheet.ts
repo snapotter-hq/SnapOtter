@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import sharp, { type OverlayOptions } from "sharp";
+import sharp, { type Metadata, type OverlayOptions } from "sharp";
 import { z } from "zod";
+import { asInputErrorIfUndecodable, withImageEncodeContextV2 } from "../../lib/image-error.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -32,100 +33,118 @@ export function registerSpriteSheet(app: FastifyInstance) {
     process: async () => {
       throw new Error("sprite-sheet is v2-only");
     },
-    processV2: async (ctx) => {
-      if (ctx.inputs.length < 2) {
-        throw new InputValidationError("Provide at least two images");
-      }
-
-      const settings = settingsSchema.parse(ctx.settings);
-      const n = ctx.inputs.length;
-      const cols = Math.min(settings.columns, n);
-      const rows = Math.ceil(n / cols);
-
-      // Use the FIRST image's dimensions as the cell size
-      const firstMeta = await sharp(ctx.inputs[0].buffer).metadata();
-      const cellW = firstMeta.width ?? 1;
-      const cellH = firstMeta.height ?? 1;
-
-      const pad = settings.padding;
-      const canvasW = cols * cellW + (cols - 1) * pad;
-      const canvasH = rows * cellH + (rows - 1) * pad;
-
-      const bg = parseHex(settings.background);
-      const composites: OverlayOptions[] = [];
-      const frames: Array<{
-        index: number;
-        left: number;
-        top: number;
-        width: number;
-        height: number;
-      }> = [];
-
-      for (let i = 0; i < n; i++) {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const left = col * (cellW + pad);
-        const top = row * (cellH + pad);
-
-        // Resize each image to cover the cell size (first image keeps its size)
-        let cellBuf: Buffer;
-        if (i === 0) {
-          cellBuf = ctx.inputs[i].buffer;
-        } else {
-          // PNG, so the cell is not re-encoded in its own input's container on
-          // the way onto the sheet (#1190).
-          cellBuf = await sharp(ctx.inputs[i].buffer)
-            .resize(cellW, cellH, { fit: "cover" })
-            .png()
-            .toBuffer();
+    processV2: withImageEncodeContextV2<z.infer<typeof settingsSchema>>(
+      "Sprite sheet generation failed",
+      (s) => s?.format ?? "png",
+      async (ctx) => {
+        if (ctx.inputs.length < 2) {
+          throw new InputValidationError("Provide at least two images");
         }
 
-        composites.push({ input: cellBuf, left, top });
-        frames.push({ index: i, left, top, width: cellW, height: cellH });
-      }
+        const settings = settingsSchema.parse(ctx.settings);
+        const n = ctx.inputs.length;
+        const cols = Math.min(settings.columns, n);
+        const rows = Math.ceil(n / cols);
 
-      let pipeline = sharp({
-        create: {
-          width: canvasW,
-          height: canvasH,
-          channels: 4,
-          background: { r: bg.r, g: bg.g, b: bg.b, alpha: 1 },
-        },
-      }).composite(composites);
+        // Use the FIRST image's dimensions as the cell size
+        let firstMeta: Metadata;
+        try {
+          firstMeta = await sharp(ctx.inputs[0].buffer).metadata();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(ctx.inputs[0].buffer, err);
+        }
+        const cellW = firstMeta.width ?? 1;
+        const cellH = firstMeta.height ?? 1;
 
-      const fmt = settings.format;
-      let filename: string;
-      let contentType: string;
-      if (fmt === "webp") {
-        pipeline = pipeline.webp({ quality: settings.quality });
-        filename = "sprite.webp";
-        contentType = "image/webp";
-      } else if (fmt === "jpeg") {
-        pipeline = pipeline.jpeg({ quality: settings.quality });
-        filename = "sprite.jpg";
-        contentType = "image/jpeg";
-      } else {
-        pipeline = pipeline.png();
-        filename = "sprite.png";
-        contentType = "image/png";
-      }
+        const pad = settings.padding;
+        const canvasW = cols * cellW + (cols - 1) * pad;
+        const canvasH = rows * cellH + (rows - 1) * pad;
 
-      const buffer = await pipeline.toBuffer();
+        const bg = parseHex(settings.background);
+        const composites: OverlayOptions[] = [];
+        const frames: Array<{
+          index: number;
+          left: number;
+          top: number;
+          width: number;
+          height: number;
+        }> = [];
 
-      return {
-        buffer,
-        filename,
-        contentType,
-        resultPayload: {
-          frames,
-          cols,
-          rows,
-          cellWidth: cellW,
-          cellHeight: cellH,
-          canvasWidth: canvasW,
-          canvasHeight: canvasH,
-        },
-      };
-    },
+        for (let i = 0; i < n; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const left = col * (cellW + pad);
+          const top = row * (cellH + pad);
+
+          // Resize each image to cover the cell size (first image keeps its size)
+          let cellBuf: Buffer;
+          if (i === 0) {
+            cellBuf = ctx.inputs[i].buffer;
+          } else {
+            // PNG, so the cell is not re-encoded in its own input's container on
+            // the way onto the sheet (#1190).
+            try {
+              cellBuf = await sharp(ctx.inputs[i].buffer)
+                .resize(cellW, cellH, { fit: "cover" })
+                .png()
+                .toBuffer();
+            } catch (err) {
+              throw await asInputErrorIfUndecodable(ctx.inputs[i].buffer, err);
+            }
+          }
+
+          composites.push({ input: cellBuf, left, top });
+          frames.push({ index: i, left, top, width: cellW, height: cellH });
+        }
+
+        let pipeline = sharp({
+          create: {
+            width: canvasW,
+            height: canvasH,
+            channels: 4,
+            background: { r: bg.r, g: bg.g, b: bg.b, alpha: 1 },
+          },
+        }).composite(composites);
+
+        const fmt = settings.format;
+        let filename: string;
+        let contentType: string;
+        if (fmt === "webp") {
+          pipeline = pipeline.webp({ quality: settings.quality });
+          filename = "sprite.webp";
+          contentType = "image/webp";
+        } else if (fmt === "jpeg") {
+          pipeline = pipeline.jpeg({ quality: settings.quality });
+          filename = "sprite.jpg";
+          contentType = "image/jpeg";
+        } else {
+          pipeline = pipeline.png();
+          filename = "sprite.png";
+          contentType = "image/png";
+        }
+
+        let buffer: Buffer;
+        try {
+          buffer = await pipeline.toBuffer();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(ctx.inputs[0].buffer, err);
+        }
+
+        return {
+          buffer,
+          filename,
+          contentType,
+          resultPayload: {
+            frames,
+            cols,
+            rows,
+            cellWidth: cellW,
+            cellHeight: cellH,
+            canvasWidth: canvasW,
+            canvasHeight: canvasH,
+          },
+        };
+      },
+    ),
   });
 }

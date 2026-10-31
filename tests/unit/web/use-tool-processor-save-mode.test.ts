@@ -10,6 +10,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -63,6 +64,11 @@ beforeEach(() => {
   xhrs = [];
   MockEventSource.instances = [];
   vi.stubGlobal("EventSource", MockEventSource);
+  // Unmounting mid-run asks the server to cancel the job (#2125); no server here.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+  );
   vi.stubGlobal(
     "XMLHttpRequest",
     vi.fn(() => {
@@ -349,6 +355,81 @@ describe("useToolProcessor claim tracking (nav guard)", () => {
       "/api/v1/download/job-1/plain_resize.png",
     );
     expect(useFileStore.getState().entries[0].claimed).toBe(false);
+    unmount();
+  });
+
+  it("lands the result and auto-save claim on the moved entry after a reorder (#1114)", () => {
+    const fileA = new File([new ArrayBuffer(64)], "a.pdf", { type: "application/pdf" });
+    const fileB = new File([new ArrayBuffer(64)], "b.pdf", { type: "application/pdf" });
+    useFileStore.getState().setFiles([fileA, fileB]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+    const { result, unmount } = renderHook(() => useToolProcessor("merge-pdf"));
+
+    act(() => {
+      result.current.processFiles([fileA, fileB], {});
+    });
+    act(() => {
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+    act(() => {
+      completeRun(xhrs[0], "lib-a-v2");
+    });
+
+    const { entries } = useFileStore.getState();
+    expect(entries[1].file.name).toBe("a.pdf");
+    expect(entries[1].status).toBe("completed");
+    expect(entries[1].serverFileId).toBe("lib-a-v2");
+    expect(entries[1].claimed).toBe(true);
+    expect(entries[0].file.name).toBe("b.pdf");
+    expect(entries[0].status).toBe("pending");
+    expect(entries[0].claimed).toBe(false);
+    unmount();
+  });
+
+  it("lands the SSE result and auto-save claim on the moved entry after a reorder (#1114)", () => {
+    const fileA = new File([new ArrayBuffer(64)], "a.pdf", { type: "application/pdf" });
+    const fileB = new File([new ArrayBuffer(64)], "b.pdf", { type: "application/pdf" });
+    useFileStore.getState().setFiles([fileA, fileB]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+    const { result, unmount } = renderHook(() => useToolProcessor("merge-pdf"));
+
+    act(() => {
+      result.current.processFiles([fileA, fileB], {});
+    });
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+    act(() => {
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+    act(() => {
+      MockEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: {
+            jobId: "job-1",
+            downloadUrl: "/api/v1/download/job-1/merged.pdf",
+            originalSize: 64,
+            processedSize: 32,
+            savedFileId: "lib-a-v2",
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    const { entries } = useFileStore.getState();
+    expect(entries[1].file.name).toBe("a.pdf");
+    expect(entries[1].status).toBe("completed");
+    expect(entries[1].serverFileId).toBe("lib-a-v2");
+    expect(entries[1].claimed).toBe(true);
+    expect(entries[0].file.name).toBe("b.pdf");
+    expect(entries[0].status).toBe("pending");
+    expect(entries[0].claimed).toBe(false);
     unmount();
   });
 });

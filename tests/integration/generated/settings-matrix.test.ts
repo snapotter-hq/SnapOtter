@@ -124,6 +124,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "nup-pdf": PDF_FIX,
   "booklet-pdf": PDF_FIX,
   "organize-pdf": PDF_FIX,
+  "multi-tool-pdf": PDF_FIX,
   "redact-pdf": PDF_FIX,
   "pdf-metadata": PDF_FIX,
   "pdf-page-numbers": PDF_FIX,
@@ -923,9 +924,11 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
   ],
 
   "compress-pdf": [
-    { label: "preset screen", settings: { preset: "screen" } },
-    { label: "preset ebook", settings: { preset: "ebook" } },
-    { label: "preset printer", settings: { preset: "printer" } },
+    { label: "quality mode low", settings: { mode: "quality", quality: 1 } },
+    { label: "quality mode mid", settings: { mode: "quality", quality: 50 } },
+    { label: "quality mode high", settings: { mode: "quality", quality: 100 } },
+    { label: "target size small", settings: { mode: "targetSize", targetSizeKb: 10 } },
+    { label: "target size large", settings: { mode: "targetSize", targetSizeKb: 500 } },
   ],
 
   "protect-pdf": [
@@ -972,6 +975,20 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
   "organize-pdf": [
     { label: "reverse order", settings: { order: "3,2,1" } },
     { label: "single page", settings: { order: "1" } },
+  ],
+
+  "multi-tool-pdf": [
+    {
+      label: "reorder one doc",
+      settings: {
+        items: [
+          { doc: 0, page: 3 },
+          { doc: 0, page: 1 },
+        ],
+        pageCounts: [3],
+      },
+    },
+    { label: "rotate plan", settings: { items: [{ doc: 0, page: 1, rot: 180 }], pageCounts: [3] } },
   ],
 
   "redact-pdf": [
@@ -1148,11 +1165,11 @@ describe("settings variation matrix", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     token = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   for (const [toolId, variations] of Object.entries(SETTINGS_VARIATIONS)) {
     const runnableVariations = variations.filter(

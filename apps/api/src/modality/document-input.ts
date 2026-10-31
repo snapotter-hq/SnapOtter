@@ -8,8 +8,11 @@ import {
   qpdfPageCount,
   qpdfRequiresPassword,
 } from "@snapotter/doc-engine";
+import type { FastifyBaseLogger } from "fastify";
 import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
+import { stripInternalPaths } from "../lib/errors.js";
+import { logger } from "../lib/logger.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 const ZIP_MAGIC = Buffer.from("PK");
@@ -18,6 +21,16 @@ const ZIP_MAGIC = Buffer.from("PK");
 function isQpdfTimeout(err: unknown): boolean {
   return (
     err instanceof QpdfTimeoutError || (err instanceof Error && err.name === "QpdfTimeoutError")
+  );
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && (err.name === "AbortError" || err.message === "Canceled");
+}
+
+function damagedPdfError(err: unknown): InputValidationError {
+  return new InputValidationError(
+    `Damaged PDF: ${err instanceof Error ? stripInternalPaths(err.message).slice(0, 300) : "structural check failed"}`,
   );
 }
 
@@ -30,18 +43,26 @@ function isQpdfTimeout(err: unknown): boolean {
  */
 function qpdfUnavailable(err: unknown): InputValidationError | null {
   if (!isBinarySpawnFailure(err)) return null;
-  return new InputValidationError(
+  const converted = new InputValidationError(
     "PDF processing is unavailable on this server because qpdf could not be started.",
     503,
     "Check QPDF_PATH: it must point at an executable qpdf binary, or be unset to use the one in the container.",
     "ENGINE_UNAVAILABLE",
   );
+  converted.cause = err;
+  return converted;
 }
 
 export interface PdfPathValidationOptions {
   lenient?: boolean;
   rejectPasswordProtected?: boolean;
   signal?: AbortSignal;
+  /**
+   * Request-scoped logger for the one warn this validator emits (a qpdf
+   * structural check that timed out and was skipped). Defaults to the process
+   * logger (#1547).
+   */
+  log?: Pick<FastifyBaseLogger, "warn">;
 }
 
 /** Validate a PDF in place so large callers never need a Node.js Buffer. */
@@ -51,27 +72,43 @@ export async function validatePdfPath(
 ): Promise<void> {
   opts.signal?.throwIfAborted();
   const handle = await open(filePath, "r");
+  let failed = false;
   try {
     const header = Buffer.alloc(5);
     const { bytesRead } = await handle.read(header, 0, header.length, 0);
-    if (bytesRead === 0) throw new InputValidationError("Empty file");
-    if (bytesRead < header.length || header.toString() !== "%PDF-") {
-      throw new InputValidationError("File does not start with a PDF header");
+    if (bytesRead === 0) {
+      throw new InputValidationError(
+        "This file is empty (0 bytes). Choose a valid file and try again.",
+      );
     }
+    if (bytesRead < header.length || header.toString() !== "%PDF-") {
+      throw new InputValidationError(
+        "This file isn't a valid PDF (missing PDF header). Choose a valid PDF file and try again.",
+      );
+    }
+  } catch (err) {
+    failed = true;
+    throw err;
   } finally {
-    await handle.close();
+    await handle.close().catch((closeErr: unknown) => {
+      if (!failed) throw closeErr;
+    });
   }
 
   opts.signal?.throwIfAborted();
   if (opts.lenient || !qpdfAvailable()) return;
 
+  const qpdfOpts = opts.signal ? { signal: opts.signal } : undefined;
+
   let passwordProtected: boolean;
   try {
-    passwordProtected = await qpdfRequiresPassword(filePath);
+    passwordProtected = await qpdfRequiresPassword(filePath, ...(qpdfOpts ? [qpdfOpts] : []));
   } catch (err) {
+    opts.signal?.throwIfAborted();
+    if (isAbortError(err)) throw err;
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
-    if (!isQpdfTimeout(err)) throw err;
+    if (!isQpdfTimeout(err)) throw damagedPdfError(err);
     // --requires-password only reads the encryption dictionary, so it does not
     // scale with content the way --check does: a stall here is anomalous (a
     // pathological xref forcing reconstruction, a dead disk, a crafted file),
@@ -94,26 +131,29 @@ export async function validatePdfPath(
   }
 
   try {
-    await qpdfCheck(filePath);
+    await qpdfCheck(filePath, ...(qpdfOpts ? [qpdfOpts] : []));
   } catch (err) {
+    opts.signal?.throwIfAborted();
+    if (isAbortError(err)) throw err;
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
-    if (!isQpdfTimeout(err)) {
-      throw new InputValidationError(
-        `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
-      );
-    }
+    if (!isQpdfTimeout(err)) throw damagedPdfError(err);
     // A big-but-healthy PDF on a slow host can outlive the check budget
     // (issue #920). That is inconclusive, not damage: proceed like the
     // password-protected branch above, where qpdf also cannot inspect the
     // structure. Tradeoff: a file crafted to stall qpdf passes this gate,
     // but every downstream engine (qpdf, ghostscript, LibreOffice, ...)
     // runs under its own timeout and fails loudly on a broken file.
+    // A failed stat leaves bytes out rather than logging 0, which would read
+    // as an empty PDF (an empty file is rejected before qpdf ever runs).
     const size = await stat(filePath)
-      .then((s) => s.size)
-      .catch(() => 0);
-    console.warn(
-      `[document-input] ${(err as Error).message} for ${filePath} (${size} bytes); skipping structural validation`,
+      .then((s): number | undefined => s.size)
+      .catch(() => undefined);
+    // Goes through pino so the line reaches the log file and carries the
+    // request binding when the caller has one (#1547).
+    (opts.log ?? logger).warn(
+      { err, filePath, bytes: size },
+      "document-input: qpdf structural check timed out, skipping it",
     );
   }
   opts.signal?.throwIfAborted();
@@ -121,18 +161,18 @@ export async function validatePdfPath(
   if (env.MAX_PDF_PAGES > 0) {
     let pages: number;
     try {
-      pages = await qpdfPageCount(filePath);
+      pages = await qpdfPageCount(filePath, ...(qpdfOpts ? [qpdfOpts] : []));
     } catch (err) {
+      opts.signal?.throwIfAborted();
+      if (isAbortError(err)) throw err;
       const unavailable = qpdfUnavailable(err);
       if (unavailable) throw unavailable;
-      if (isQpdfTimeout(err)) {
-        // Fail closed: the cap is a resource guard, so a file that stalls the
-        // page-count probe must not slip past it. Say so instead of a 500.
-        throw new InputValidationError(
-          `Could not count this PDF's pages within the time limit, and this server caps PDFs at ${env.MAX_PDF_PAGES} pages. Try a smaller file.`,
-        );
-      }
-      throw err;
+      if (!isQpdfTimeout(err)) throw damagedPdfError(err);
+      // Fail closed: the cap is a resource guard, so a file that stalls the
+      // page-count probe must not slip past it. Say so instead of a 500.
+      throw new InputValidationError(
+        `Could not count this PDF's pages within the time limit, and this server caps PDFs at ${env.MAX_PDF_PAGES} pages. Try a smaller file.`,
+      );
     }
     opts.signal?.throwIfAborted();
     if (pages > env.MAX_PDF_PAGES) {
@@ -158,15 +198,23 @@ export class DocumentInputHandler implements InputHandler {
       lenient?: boolean;
       rejectPasswordProtected?: boolean;
       signal?: AbortSignal;
+      log?: FastifyBaseLogger;
     },
   ): Promise<PreparedInput> {
-    if (raw.length === 0) throw new InputValidationError("Empty file");
+    opts.signal?.throwIfAborted();
+    if (raw.length === 0) {
+      throw new InputValidationError(
+        "This file is empty (0 bytes). Choose a valid file and try again.",
+      );
+    }
     const lower = filename.toLowerCase();
     // PDF-only consumers set rejectPasswordProtected. Do not let a misleading
     // client filename bypass their PDF magic and structural validation.
     if (opts.rejectPasswordProtected || lower.endsWith(".pdf")) {
       if (raw.subarray(0, 5).toString() !== "%PDF-") {
-        throw new InputValidationError("File does not start with a PDF header");
+        throw new InputValidationError(
+          "This file isn't a valid PDF (missing PDF header). Choose a valid PDF file and try again.",
+        );
       }
       // When lenient, skip qpdfCheck + page-cap (repair-pdf's input is
       // intentionally damaged). The %PDF- header check above still runs.
@@ -175,8 +223,12 @@ export class DocumentInputHandler implements InputHandler {
         await mkdir(dir, { recursive: true });
         const p = join(dir, "input.pdf");
         try {
-          await writeFile(p, raw);
+          opts.signal?.throwIfAborted();
+          await writeFile(p, raw, { signal: opts.signal });
           await validatePdfPath(p, opts);
+        } catch (err) {
+          opts.signal?.throwIfAborted();
+          throw err;
         } finally {
           await rm(dir, { recursive: true, force: true }).catch(() => {});
         }
@@ -185,7 +237,9 @@ export class DocumentInputHandler implements InputHandler {
       [".docx", ".xlsx", ".pptx", ".epub", ".odt", ".ods", ".odp"].some((e) => lower.endsWith(e))
     ) {
       if (!raw.subarray(0, 2).equals(ZIP_MAGIC)) {
-        throw new InputValidationError("File is not a valid Office/EPUB container");
+        throw new InputValidationError(
+          "This file couldn't be opened as an Office or EPUB document. It may be damaged or in a different format.",
+        );
       }
     }
     return { buffer: raw, filename };

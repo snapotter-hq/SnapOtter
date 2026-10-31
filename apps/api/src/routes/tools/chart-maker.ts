@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import sharp from "sharp";
 import { z } from "zod";
+import { withImageEncodeContextV2 } from "../../lib/image-error.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -66,9 +67,10 @@ const NUMERIC_MAJORITY = 0.5;
  */
 function noNumericColumnMessage(header: string[] | undefined, width: number): string {
   const lead = "Chart Maker needs a numeric column to plot, and ";
-  if (header?.length) {
-    const shown = header.slice(0, 6).map((name) => name.trim().slice(0, 24));
-    const rest = header.length - shown.length;
+  const named = header?.map((name) => name.trim().slice(0, 24)).filter((name) => name !== "");
+  if (named?.length) {
+    const shown = named.slice(0, 6);
+    const rest = named.length - shown.length;
     const names = shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");
     const message = `${lead}none of these have numbers: ${names}.`;
     if (message.length <= 260) return message;
@@ -76,25 +78,140 @@ function noNumericColumnMessage(header: string[] | undefined, width: number): st
   return `${lead}none of the ${width} columns in this file have numbers.`;
 }
 
+type Decimal = "." | ",";
+
+const CURRENCY_SYMBOLS = "$€£¥₹₩₽₺฿₫₪₴₦";
+/**
+ * A number the way a spreadsheet displays it: optional "(" or sign, optional
+ * currency symbol ("$", "R$", "US$"), digits with grouping, optional trailing
+ * "%" or currency symbol, optional ")". The digits group is only a candidate;
+ * readGrouped decides whether its separators make sense.
+ */
+const DECORATED = new RegExp(
+  `^(\\()?\\s*([-+−])?\\s*(?:[A-Z]{0,2}[${CURRENCY_SYMBOLS}])?\\s*([-+−])?\\s*` +
+    `([.,]?\\d(?:[\\d.,\\s']*\\d)?[.,]?)\\s*(?:%|[${CURRENCY_SYMBOLS}])?\\s*(\\))?$`,
+);
+const MAX_CELL_LENGTH = 64;
+/** Spreadsheet exports write 1E+05; keep reading it the way Number() does. */
+const SCIENTIFIC = /^[+-]?(?:\d+\.?\d*|\.\d+)[eE][+-]?\d+$/;
+/** A space or apostrophe between digit groups ("1 200", "1'200") only ever groups thousands. */
+const SPACE_GROUP = /(?<=(?<!\d)\d{1,3})[\s'](?=\d{3}(?!\d))/g;
+const GROUPED_DOT_DECIMAL = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?$|^\.\d+$/;
+const GROUPED_COMMA_DECIMAL = /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d*)?$|^,\d+$/;
+const YEAR_HEADER = /^(?:19\d{2}|20\d{2}|2100)$/;
+const MISSING_VALUE_CELL =
+  /^(?:n\/a|n\.a\.|nan|#n\/a|#value!|#ref!|#div\/0!|#name\?|#num!|#null!|[-–—]+)$/i;
+const MONTH_NAMES =
+  /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/gi;
+const WEEKDAY_NAMES =
+  /\b(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/gi;
+
+function isMinus(sign: string | undefined): boolean {
+  return sign === "-" || sign === "−";
+}
+
+/** Strip the decoration off a cell, leaving digits and "." / "," separators. */
+function undecorate(text: string): { core: string; negative: boolean } | null {
+  // The pattern has adjacent optional whitespace runs, so a long run of spaces
+  // that then fails to match backtracks quadratically. No displayed number is
+  // this long, and Number() was linear.
+  if (text.length > MAX_CELL_LENGTH) return null;
+  const match = DECORATED.exec(text);
+  if (!match) return null;
+  const [, open, sign, signAfterSymbol, digits, close] = match;
+  if (Boolean(open) !== Boolean(close)) return null;
+  if (sign && signAfterSymbol) return null;
+  return {
+    core: digits.replace(SPACE_GROUP, ""),
+    negative: Boolean(open) || isMinus(sign) || isMinus(signAfterSymbol),
+  };
+}
+
+/**
+ * Which separator is the decimal point, when this one cell says so on its own.
+ * "1,234.5" and "1.234,5" do (the later one is the point), as do repeated
+ * separators ("1,200,300") and anything that is not three digits after a lone
+ * separator. "1,200" and "4.400" do not: they read both ways.
+ */
+function decimalEvidence(core: string): Decimal | null {
+  const dots = core.split(".").length - 1;
+  const commas = core.split(",").length - 1;
+  if (dots > 0 && commas > 0) return core.lastIndexOf(".") > core.lastIndexOf(",") ? "." : ",";
+  if (dots === 0 && commas === 0) return null;
+  const sep: Decimal = dots > 0 ? "." : ",";
+  if (dots + commas > 1) return sep === "." ? "," : ".";
+  const [whole, fraction] = core.split(sep);
+  const reads = fraction.length === 3 && whole.length >= 1 && whole.length <= 3 && whole !== "0";
+  return reads ? null : sep;
+}
+
+/**
+ * One reading of the separators for a whole column. The file carries no
+ * locale, so deciding cell by cell would read "4.400" two ways in one column.
+ * Cells that settle the question vote; a column with no such cell ("1,200",
+ * "2,400") reads the en-US way, which is also what Number() always did.
+ */
+function columnDecimal(cells: unknown[]): Decimal {
+  let dots = 0;
+  let commas = 0;
+  for (const cell of cells) {
+    if (typeof cell !== "string") continue;
+    const parts = undecorate(cell.trim());
+    if (!parts) continue;
+    const evidence = decimalEvidence(parts.core);
+    if (evidence === ".") dots += 1;
+    else if (evidence === ",") commas += 1;
+  }
+  return commas > dots ? "," : ".";
+}
+
+function readGrouped(core: string, decimal: Decimal): number | null {
+  const grammar = decimal === "." ? GROUPED_DOT_DECIMAL : GROUPED_COMMA_DECIMAL;
+  if (!grammar.test(core)) return null;
+  const thousands = decimal === "." ? "," : ".";
+  return Number(core.replaceAll(thousands, "").replace(decimal, "."));
+}
+
 /**
  * Read one cell as a chart value, or null when it holds no number.
+ *
+ * Numbers written the way a spreadsheet shows them are numbers: "1,200",
+ * "$40", "85%", "(500)". `decimal` is the column's separator convention from
+ * columnDecimal; a lone cell has no column to ask and defaults to ".".
  *
  * The null cases carry the weight here. Number("") and Number(" ") are both 0,
  * so without the blank guard an empty column would win the vote below and
  * render a chart of zeros. Number("Infinity") is Infinity, which renders as a
- * degenerate SVG that Sharp drops on the floor.
+ * degenerate SVG that Sharp drops on the floor. Number("0x1F") is 31, which no
+ * spreadsheet writes: only the grammar above gets through.
  */
-function numericCell(cell: unknown): number | null {
+function numericCell(cell: unknown, decimal: Decimal = "."): number | null {
   if (typeof cell === "number") return Number.isFinite(cell) ? cell : null;
   if (typeof cell !== "string") return null;
   const trimmed = cell.trim();
   if (trimmed === "") return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
+  if (SCIENTIFIC.test(trimmed)) {
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  const parts = undecorate(trimmed);
+  if (!parts) return null;
+  const parsed = readGrouped(parts.core, decimal);
+  if (parsed === null || !Number.isFinite(parsed)) return null;
+  return parts.negative ? -parsed : parsed;
 }
 
 function toCell(value: unknown): string {
   return value === null || value === undefined ? "" : String(value);
+}
+
+/**
+ * Rows a parse dropped because their value cell held text that isn't a number
+ * (#2060). Blank cells don't count: spreadsheet exports trail them, and a
+ * blank was never a value.
+ */
+export interface SkippedRows {
+  unreadable: number;
 }
 
 /**
@@ -110,28 +227,37 @@ function toCell(value: unknown): string {
  * is genuinely ambiguous, and picking left would break the far more common
  * leading-id shape instead.
  */
-function tableToPoints({ header, rows }: Table): DataPoint[] {
-  if (rows.length === 0) return [];
 
+interface ColumnLayout {
+  decimals: Decimal[];
+  labelCol: number;
+  valueCol: number;
+  width: number;
+}
+
+function detectColumns(rows: string[][], headerWidth = 0): ColumnLayout {
   // Counted in a loop, not Math.max(...spread): the row cap is applied after
   // parsing, so a large CSV reaches here and would blow the argument limit.
-  let width = header?.length ?? 0;
+  let width = headerWidth;
   for (const row of rows) {
     if (row.length > width) width = row.length;
   }
 
+  const decimals: Decimal[] = [];
   const numericShare: number[] = [];
   const hasNegative: boolean[] = [];
   for (let col = 0; col < width; col++) {
+    const decimal = columnDecimal(rows.map((row) => row[col]));
+    decimals.push(decimal);
     let numeric = 0;
     let negative = false;
     for (const row of rows) {
-      const cell = numericCell(row[col]);
+      const cell = numericCell(row[col], decimal);
       if (cell === null) continue;
       numeric += 1;
       if (cell < 0) negative = true;
     }
-    numericShare.push(numeric / rows.length);
+    numericShare.push(rows.length > 0 ? numeric / rows.length : 0);
     hasNegative.push(negative);
   }
 
@@ -151,7 +277,6 @@ function tableToPoints({ header, rows }: Table): DataPoint[] {
     }
   }
   if (valueCol < 0) valueCol = negativeCol;
-  if (valueCol < 0) throw new ToolInputError(noNumericColumnMessage(header, width));
 
   let labelCol = -1;
   for (let col = 0; col < width; col++) {
@@ -165,14 +290,24 @@ function tableToPoints({ header, rows }: Table): DataPoint[] {
   // file has only the one column.
   if (labelCol < 0 && width > 1) labelCol = valueCol === 0 ? 1 : 0;
 
+  return { decimals, labelCol, valueCol, width };
+}
+
+function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoint[] {
+  if (rows.length === 0) return [];
+
+  const { decimals, labelCol, valueCol, width } = detectColumns(rows, header?.length ?? 0);
+  if (valueCol < 0) throw new ToolInputError(noNumericColumnMessage(header, width));
+
   const points: DataPoint[] = [];
   for (const row of rows) {
     // A row with no number in the value column is not a data row. Blank cells
-    // are the common case. Numbers written the way a spreadsheet displays them
-    // ("1,200", "$40") are not read as numbers and are dropped here too, which
-    // is issue #1198.
-    const value = numericCell(row[valueCol]);
-    if (value === null) continue;
+    // are the common case.
+    const value = numericCell(row[valueCol], decimals[valueCol]);
+    if (value === null) {
+      if (skipped && toCell(row[valueCol]).trim() !== "") skipped.unreadable += 1;
+      continue;
+    }
     points.push({
       label: labelCol < 0 ? String(points.length + 1) : toCell(row[labelCol]).trim(),
       value,
@@ -181,11 +316,98 @@ function tableToPoints({ header, rows }: Table): DataPoint[] {
   return points;
 }
 
+function labelShape(cell: string): string | null {
+  const trimmed = cell.trim();
+  if (trimmed === "") return null;
+  const shaped = trimmed
+    .toLowerCase()
+    .replace(MONTH_NAMES, "\0month")
+    .replace(WEEKDAY_NAMES, "\0weekday")
+    .replace(/\d+/g, "\0num");
+  return shaped.includes("\0") ? shaped : null;
+}
+
+/**
+ * The first row is a header when nothing in it is a number (and it does not
+ * look like a data row whose value cell is unreadable, #2260), or when a
+ * leading label column (named or left blank in the top-left corner) is
+ * followed by at least two bare four-digit year columns (`region,2023,2024,2025`,
+ * #1199). Requiring two year columns keeps a headerless two-column row whose
+ * value happens to fall in 1900..2100 (`EMEA,2025`) from being eaten as the
+ * header.
+ */
+function isHeaderRow(rows: string[][]): boolean {
+  if (rows.length <= 1) return false;
+  const row = rows[0];
+  const all = detectColumns(rows);
+  if (row.every((cell, col) => numericCell(cell, all.decimals[col]) === null)) {
+    const rest = rows.slice(1);
+    const { labelCol, valueCol } = detectColumns(rest, row.length);
+    if (valueCol < 0 || all.valueCol !== valueCol) return true;
+    if (MISSING_VALUE_CELL.test(toCell(row[valueCol]).trim())) return false;
+    if (labelCol < 0) return true;
+    const firstShape = labelShape(toCell(row[labelCol]));
+    if (firstShape === null) return true;
+    let matching = 0;
+    for (const r of rest) {
+      if (labelShape(toCell(r[labelCol])) === firstShape) matching += 1;
+    }
+    return matching <= rest.length * NUMERIC_MAJORITY;
+  }
+  if (row.length < 3 || numericCell(row[0], all.decimals[0]) !== null) return false;
+  let years = 0;
+  for (let col = 0; col < row.length; col++) {
+    const cell = row[col];
+    if (numericCell(cell, all.decimals[col]) === null) continue;
+    if (!YEAR_HEADER.test(cell.trim())) return false;
+    years += 1;
+  }
+  return years >= 2;
+}
+
+function prefersSemicolon(
+  text: string,
+  parsed: Papa.ParseResult<string[]>,
+): Papa.ParseResult<string[]> | null {
+  if (parsed.meta.delimiter !== ",") return null;
+  if (!parsed.data.some((row) => row.some((cell) => cell.includes(";")))) return null;
+  const initialHasHeader = isHeaderRow(parsed.data);
+  const initialDataRows = initialHasHeader ? parsed.data.slice(1) : parsed.data;
+  const initialLayout = detectColumns(
+    initialDataRows,
+    initialHasHeader ? parsed.data[0].length : 0,
+  );
+  const initialLabelHasSemicolon =
+    initialLayout.labelCol >= 0 &&
+    initialDataRows.some((row) => toCell(row[initialLayout.labelCol]).includes(";"));
+  if (initialLayout.valueCol >= 0 && !initialLabelHasSemicolon) return null;
+
+  const semi = Papa.parse<string[]>(text, {
+    delimiter: ";",
+    header: false,
+    skipEmptyLines: "greedy",
+  });
+  if (semi.errors.length > 0) return null;
+  const hasHeader = isHeaderRow(semi.data);
+  const dataRows = hasHeader ? semi.data.slice(1) : semi.data;
+  const { decimals, labelCol, valueCol, width } = detectColumns(
+    dataRows,
+    hasHeader ? semi.data[0].length : 0,
+  );
+  if (width <= 1 || valueCol < 0 || !semi.data.every((row) => row.length === width)) return null;
+  if (decimals[valueCol] !== "," && !dataRows.some((row) => toCell(row[valueCol]).includes(","))) {
+    return null;
+  }
+  if (labelCol >= 0 && dataRows.some((row) => toCell(row[labelCol]).includes(";"))) return null;
+  return semi;
+}
+
 function parseCsv(text: string): Table {
   // "greedy" also drops rows of bare commas, which every spreadsheet export
   // trails. Plain `true` keeps them as [""] cells that drag the numeric vote
   // below the majority and rejected the file.
-  const parsed = Papa.parse<string[]>(text, { header: false, skipEmptyLines: "greedy" });
+  const initial = Papa.parse<string[]>(text, { header: false, skipEmptyLines: "greedy" });
+  const parsed = prefersSemicolon(text, initial) ?? initial;
   const rows = parsed.data;
 
   // A one-column CSV always reports UndetectableDelimiter and Papa hands back
@@ -201,14 +423,11 @@ function parseCsv(text: string): Table {
   if (fatal.length > 0) {
     throw new ToolInputError(`CSV parse failed: ${fatal[0].message}`);
   }
-  // The first row is a header when nothing in it is a number. This replaces
-  // the old probe, which asked only whether column 2 was numeric and so read
-  // the wrong thing for every file whose numbers live elsewhere.
-  const hasHeader = rows.length > 1 && rows[0].every((cell) => numericCell(cell) === null);
+  const hasHeader = isHeaderRow(rows);
   return hasHeader ? { header: rows[0], rows: rows.slice(1) } : { rows };
 }
 
-function pointsFromJsonArray(items: unknown[]): DataPoint[] {
+function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint[] {
   if (items.length === 0) return [];
 
   const objects = items.filter(
@@ -219,7 +438,7 @@ function pointsFromJsonArray(items: unknown[]): DataPoint[] {
 
   // An explicit {label, value} shape wins: the file named its fields, so don't
   // second-guess it by sniffing the other keys.
-  if (objects.every((item) => "value" in item)) {
+  if (objects.every((item) => Object.hasOwn(item, "value"))) {
     return objects.map((item) => {
       const value = numericCell(item.value);
       if (value === null) {
@@ -230,7 +449,7 @@ function pointsFromJsonArray(items: unknown[]): DataPoint[] {
           `Chart Maker needs every "value" to be a number, and ${shown.slice(0, 60)} is not.`,
         );
       }
-      return { label: toCell(item.label).trim(), value };
+      return { label: toCell(Object.hasOwn(item, "label") ? item.label : undefined).trim(), value };
     });
   }
 
@@ -238,18 +457,23 @@ function pointsFromJsonArray(items: unknown[]): DataPoint[] {
   // an optional field would otherwise read as blank and be dropped.
   const keys = [...new Set(objects.flatMap((item) => Object.keys(item)))];
   if (keys.length === 0) throw new ToolInputError(JSON_SHAPES);
-  return tableToPoints({
-    header: keys,
-    rows: objects.map((item) => keys.map((key) => toCell(item[key]))),
-  });
+  return tableToPoints(
+    {
+      header: keys,
+      rows: objects.map((item) =>
+        keys.map((key) => toCell(Object.hasOwn(item, key) ? item[key] : undefined)),
+      ),
+    },
+    skipped,
+  );
 }
 
 function isNumericEntry(entry: { label: string; value: number | null }): entry is DataPoint {
   return entry.value !== null;
 }
 
-function pointsFromJson(raw: unknown): DataPoint[] {
-  if (Array.isArray(raw)) return pointsFromJsonArray(raw);
+function pointsFromJson(raw: unknown, skipped?: SkippedRows): DataPoint[] {
+  if (Array.isArray(raw)) return pointsFromJsonArray(raw, skipped);
   if (typeof raw !== "object" || raw === null) throw new ToolInputError(JSON_SHAPES);
 
   const entries = Object.entries(raw as Record<string, unknown>);
@@ -260,12 +484,12 @@ function pointsFromJson(raw: unknown): DataPoint[] {
 
   // Exports wrap their rows: {"data": [...]}, {"results": [...]}, and friends.
   const wrapped = entries.filter(([, value]) => Array.isArray(value));
-  if (wrapped.length === 1) return pointsFromJsonArray(wrapped[0][1] as unknown[]);
+  if (wrapped.length === 1) return pointsFromJsonArray(wrapped[0][1] as unknown[], skipped);
 
   throw new ToolInputError(JSON_SHAPES);
 }
 
-function parseInput(buf: Buffer): DataPoint[] {
+export function parseInput(buf: Buffer, skipped?: SkippedRows): DataPoint[] {
   // Strip a UTF-8 BOM. JS counts U+FEFF as whitespace so the sniff below still
   // matches, but JSON.parse rejects it, which killed every BOM'd export.
   // Papa strips it from CSV on its own.
@@ -283,10 +507,10 @@ function parseInput(buf: Buffer): DataPoint[] {
         `This file starts like JSON but does not parse: ${err instanceof Error ? err.message : "invalid JSON"}`,
       );
     }
-    return pointsFromJson(raw);
+    return pointsFromJson(raw, skipped);
   }
 
-  return tableToPoints(parseCsv(text));
+  return tableToPoints(parseCsv(text), skipped);
 }
 
 function renderBarSvg(data: DataPoint[], w: number, h: number, title: string | undefined): string {
@@ -403,61 +627,72 @@ export function registerChartMaker(app: FastifyInstance) {
     process: async () => {
       throw new Error("chart-maker is v2-only");
     },
-    processV2: async (ctx) => {
-      const settings = settingsSchema.parse(ctx.settings);
-      const input = ctx.inputs[0];
-      const base = input.filename.replace(/\.[^.]+$/, "");
+    processV2: withImageEncodeContextV2<z.infer<typeof settingsSchema>>(
+      "Chart rendering failed",
+      (s) => s?.kind ?? "bar",
+      async (ctx) => {
+        const settings = settingsSchema.parse(ctx.settings);
+        const input = ctx.inputs[0];
+        const base = input.filename.replace(/\.[^.]+$/, "");
 
-      let data: DataPoint[];
-      try {
-        data = parseInput(input.buffer);
-      } catch (err) {
-        // Every throw inside parseInput is already a ToolInputError. Blanket
-        // rewrapping anything else as one told the user their file was at
-        // fault and, because worker.ts skips logger.error for input errors,
-        // kept our own bugs out of Sentry entirely.
-        if (isToolInputError(err)) throw err;
-        if (err instanceof RangeError) {
-          throw new ToolInputError("This file is too large for Chart Maker to read as text.");
+        let data: DataPoint[];
+        const skipped: SkippedRows = { unreadable: 0 };
+        try {
+          data = parseInput(input.buffer, skipped);
+        } catch (err) {
+          // Every throw inside parseInput is already a ToolInputError. Blanket
+          // rewrapping anything else as one told the user their file was at
+          // fault and, because worker.ts skips logger.error for input errors,
+          // kept our own bugs out of Sentry entirely.
+          if (isToolInputError(err)) throw err;
+          if (err instanceof RangeError) {
+            throw new ToolInputError("This file is too large for Chart Maker to read as text.");
+          }
+          throw err;
         }
-        throw err;
-      }
 
-      if (data.length === 0) {
-        throw new ToolInputError("No data points found in input");
-      }
-      if (data.length > 100) {
-        throw new ToolInputError("Too many data points (max 100)");
-      }
+        if (data.length === 0) {
+          throw new ToolInputError("No data points found in input");
+        }
+        if (data.length > 100) {
+          throw new ToolInputError("Too many data points (max 100)");
+        }
 
-      // Every parse path above returns finite numbers or throws, so there is
-      // no NaN left to screen for here.
-      // Negative values render as invalid/degenerate SVG (negative bar heights,
-      // backward pie arcs that Sharp silently drops); reject with a clear message.
-      if (data.some((point) => point.value < 0)) {
-        throw new ToolInputError("Chart values must be zero or greater");
-      }
+        // Every parse path above returns finite numbers or throws, so there is
+        // no NaN left to screen for here.
+        // Negative values render as invalid/degenerate SVG (negative bar heights,
+        // backward pie arcs that Sharp silently drops); reject with a clear message.
+        if (data.some((point) => point.value < 0)) {
+          throw new ToolInputError("Chart values must be zero or greater");
+        }
 
-      let svg: string;
-      switch (settings.kind) {
-        case "bar":
-          svg = renderBarSvg(data, settings.width, settings.height, settings.title);
-          break;
-        case "line":
-          svg = renderLineSvg(data, settings.width, settings.height, settings.title);
-          break;
-        case "pie":
-          svg = renderPieSvg(data, settings.width, settings.height, settings.title);
-          break;
-      }
+        let svg: string;
+        switch (settings.kind) {
+          case "bar":
+            svg = renderBarSvg(data, settings.width, settings.height, settings.title);
+            break;
+          case "line":
+            svg = renderLineSvg(data, settings.width, settings.height, settings.title);
+            break;
+          case "pie":
+            svg = renderPieSvg(data, settings.width, settings.height, settings.title);
+            break;
+        }
 
-      const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+        const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
 
-      return {
-        buffer: pngBuffer,
-        filename: `${base}_chart.png`,
-        contentType: "image/png",
-      };
-    },
+        return {
+          buffer: pngBuffer,
+          filename: `${base}_chart.png`,
+          contentType: "image/png",
+          // Say how many rows were left out, so a chart missing rows doesn't
+          // look complete (#2060).
+          resultPayload:
+            skipped.unreadable > 0
+              ? { chartRows: { charted: data.length, skipped: skipped.unreadable } }
+              : undefined,
+        };
+      },
+    ),
   });
 }

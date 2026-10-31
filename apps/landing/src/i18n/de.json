@@ -187,7 +187,7 @@
   "faq.q3.q": "Brauche ich eine Internetverbindung?",
   "faq.q4.a": "Keine künstlichen Limits. Du kannst so viele Dateien verarbeiten, wie du willst, in jeder Größe. Die einzige Grenze sind die Hardware-Ressourcen deines Servers.",
   "faq.q4.q": "Gibt es Beschränkungen bei Dateigröße oder Nutzung?",
-  "faq.q5.a": "SnapOtter enthält 19 lokale KI-Tools für Hintergrundentfernung, Hochskalierung, OCR, Transkription, Gesichtserkennung, Kolorierung, Rauschentfernung, Fotorestaurierung und mehr. Alle Modelle laufen auf deiner Hardware.",
+  "faq.q5.a": "SnapOtter enthält 19 lokale KI-Tools für Hintergrundentfernung, Hochskalierung, OCR, Transkription, Gesichtserkennung, Kolorierung, Rauschentfernung, Fotorestaurierung und mehr. Alle Modelle laufen auf deiner Hardware (2 GB RAM reichen für die Nicht-KI-Tools, Fast OCR und Gesichtserkennung; CPU-KI-Bundles benötigen 4 GB+ RAM, oder 8 GB für HQ-Inpainting).",
   "faq.q5.q": "Welche KI-Funktionen sind enthalten?",
   "faq.q6.a": "Anonyme Produktanalyse ist standardmäßig aktiviert und enthält nie deine Dateien oder deren Inhalte. Schalte sie jederzeit mit einem Ein-Klick-Admin-Schalter unter Einstellungen > System > Datenschutz aus.",
   "faq.q6.q": "Erfasst SnapOtter irgendwelche Analysedaten?",

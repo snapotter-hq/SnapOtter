@@ -1,11 +1,21 @@
 import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
   __resetGateForTests,
   refreshAnalyticsGate,
 } from "../../../apps/api/src/lib/analytics-gate.js";
 import { buildTestApp, loginAsAdmin, loginAsUser, type TestApp } from "../test-server.js";
+
+// The test app never starts a PostHog client, so the route's sink answer is
+// stubbed to prove the config carries `hasFeedbackSink()` and not a copy of the
+// baked key (#2252).
+const feedbackSink = vi.hoisted(() => ({ present: false }));
+
+vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
+  const actual: Record<string, unknown> = await importOriginal();
+  return { ...actual, hasFeedbackSink: () => feedbackSink.present };
+});
 
 let testApp: TestApp;
 
@@ -24,6 +34,7 @@ afterAll(async () => {
 afterEach(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
   delete process.env.ANALYTICS_BAKED_OVERRIDE;
+  feedbackSink.present = false;
   __resetGateForTests();
 });
 
@@ -46,6 +57,7 @@ describe("GET /api/v1/config/analytics", () => {
     expect(config).toHaveProperty("enabled");
     expect(config).toHaveProperty("posthogApiKey");
     expect(config).toHaveProperty("posthogHost");
+    expect(config).toHaveProperty("feedbackSink");
     expect(config).toHaveProperty("sentryDsn");
     expect(config).toHaveProperty("sentryDsnWeb");
     expect(config).toHaveProperty("posthogSampleRate");
@@ -54,6 +66,7 @@ describe("GET /api/v1/config/analytics", () => {
     expect(typeof config.enabled).toBe("boolean");
     expect(typeof config.posthogApiKey).toBe("string");
     expect(typeof config.posthogHost).toBe("string");
+    expect(typeof config.feedbackSink).toBe("boolean");
     expect(typeof config.sentryDsn).toBe("string");
     expect(typeof config.sentryDsnWeb).toBe("string");
     expect(typeof config.posthogSampleRate).toBe("number");
@@ -71,16 +84,38 @@ describe("GET /api/v1/config/analytics", () => {
 
   it("default (bake off): effective state is disabled and secrets are blanked", async () => {
     // The committed bake is OFF and no override is set, so the effective gate is
-    // disabled regardless of any opt-out setting.
+    // disabled regardless of any opt-out setting. A live sink must not leak
+    // through the disabled branch.
+    feedbackSink.present = true;
     const res = await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" });
     const config = JSON.parse(res.body);
     expect(config.enabled).toBe(false);
     expect(config.posthogApiKey).toBe("");
     expect(config.posthogHost).toBe("");
+    expect(config.feedbackSink).toBe(false);
     expect(config.sentryDsn).toBe("");
     expect(config.sentryDsnWeb).toBe("");
     expect(config.posthogSampleRate).toBe(0);
     expect(config.instanceId).toBe("");
+  });
+
+  it("reports the server's feedback sink, not a copy of the baked key (#2252)", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
+
+    feedbackSink.present = true;
+    const withSink = JSON.parse(
+      (await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
+    );
+    expect(withSink.enabled).toBe(true);
+    expect(withSink.feedbackSink).toBe(true);
+
+    feedbackSink.present = false;
+    const withoutSink = JSON.parse(
+      (await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
+    );
+    expect(withoutSink.enabled).toBe(true);
+    expect(withoutSink.feedbackSink).toBe(false);
   });
 
   it("bake on + admin opt-out: enabled flips true -> false end to end", async () => {
@@ -108,12 +143,15 @@ describe("GET /api/v1/config/analytics", () => {
       });
       expect(put.statusCode).toBe(200);
 
-      // Effective state is now disabled, and secrets are blanked.
+      // Effective state is now disabled, and secrets are blanked. Keep the
+      // sink present so the disabled branch is what reports false.
+      feedbackSink.present = true;
       const after = JSON.parse(
         (await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
       );
       expect(after.enabled).toBe(false);
       expect(after.posthogApiKey).toBe("");
+      expect(after.feedbackSink).toBe(false);
       expect(after.instanceId).toBe("");
     } finally {
       // afterEach also restores state, but keep the override scoped tightly.

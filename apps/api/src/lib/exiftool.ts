@@ -1,10 +1,20 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import { stripInternalPaths } from "./errors.js";
+import {
+  asDecoderOutOfMemory,
+  asDecoderUnavailable,
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+  isDecoderUnavailable,
+} from "./format-decoders.js";
+import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -65,10 +75,36 @@ async function findExiftool(): Promise<string> {
     await execFileAsync("exiftool", ["-ver"], { timeout: 5_000 });
     cachedBinary = "exiftool";
     return "exiftool";
-  } catch {
-    throw new Error(
+  } catch (err) {
+    const outOfMemory = asDecoderOutOfMemory(err);
+    if (outOfMemory !== err) throw outOfMemory;
+    throw new DecoderUnavailableError(
       "ExifTool not found. Install libimage-exiftool-perl (Linux) or brew install exiftool (macOS).",
+      err,
     );
+  }
+}
+
+/**
+ * Write a buffer to a temp file exclusively (O_CREAT | O_EXCL | O_WRONLY).
+ * Prevents symlink / race-condition attacks on predictable temp paths.
+ */
+async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<void> {
+  try {
+    const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+    let fileWriteErr: unknown;
+    try {
+      await fh.writeFile(buffer);
+    } catch (err) {
+      fileWriteErr = err;
+      throw err;
+    } finally {
+      await fh.close().catch((closeErr: unknown) => {
+        if (fileWriteErr === undefined) throw closeErr;
+      });
+    }
+  } catch (err) {
+    throw normalizeOperationalWriteError(err);
   }
 }
 
@@ -78,12 +114,13 @@ async function findExiftool(): Promise<string> {
  */
 export async function inspectMetadata(buffer: Buffer, filename: string): Promise<InspectResult> {
   const bin = await findExiftool();
-  const ext = extname(filename) || ".jpg";
+  const safeExt = extname(filename).replace(/[^a-z0-9]/gi, "");
+  const suffix = safeExt ? `.${safeExt}` : ".jpg";
   const id = randomUUID();
-  const tempPath = join(tmpdir(), `exif-inspect-${id}${ext}`);
+  const tempPath = join(tmpdir(), `exif-inspect-${id}${suffix}`);
 
   try {
-    await writeFile(tempPath, buffer);
+    await writeTempExclusive(tempPath, buffer);
     const { stdout } = await execFileAsync(bin, ["-json", "-G", "-struct", "-n", tempPath], {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
@@ -136,7 +173,9 @@ export async function inspectMetadata(buffer: Buffer, filename: string): Promise
       gps: Object.keys(gps).length > 0 ? gps : null,
       keywords: uniqueKeywords,
     };
-  } catch (err) {
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(asDecoderUnavailable(asDecoderOutOfMemory(rawErr)));
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(stripInternalPaths(message));
   } finally {
@@ -156,18 +195,21 @@ export async function writeMetadata(
   if (tags.length === 0) return buffer;
 
   const bin = await findExiftool();
-  const ext = extname(filename) || ".jpg";
+  const safeExt = extname(filename).replace(/[^a-z0-9]/gi, "");
+  const suffix = safeExt ? `.${safeExt}` : ".jpg";
   const id = randomUUID();
-  const tempPath = join(tmpdir(), `exif-write-${id}${ext}`);
+  const tempPath = join(tmpdir(), `exif-write-${id}${suffix}`);
 
   try {
-    await writeFile(tempPath, buffer);
+    await writeTempExclusive(tempPath, buffer);
     await execFileAsync(bin, ["-overwrite_original", ...tags, tempPath], {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
     });
     return await readFile(tempPath);
-  } catch (err) {
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(asDecoderUnavailable(asDecoderOutOfMemory(rawErr)));
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(stripInternalPaths(message));
   } finally {
@@ -179,27 +221,43 @@ export async function readImageDimensions(
   buffer: Buffer,
   ext?: string,
 ): Promise<{ width: number; height: number } | null> {
+  let bin: string;
   try {
-    const bin = await findExiftool();
-    const suffix = ext ? `.${ext.replace(/^\./, "")}` : ".jpg";
-    const id = randomUUID();
-    const tempPath = join(tmpdir(), `exif-dim-${id}${suffix}`);
-
-    try {
-      await writeFile(tempPath, buffer);
-      const { stdout } = await execFileAsync(
-        bin,
-        ["-json", "-ImageWidth", "-ImageHeight", tempPath],
-        { timeout: 10_000 },
-      );
-      const [data] = JSON.parse(stdout);
-      if (!data?.ImageWidth || !data?.ImageHeight) return null;
-      return { width: data.ImageWidth, height: data.ImageHeight };
-    } finally {
-      await rm(tempPath, { force: true }).catch(() => {});
-    }
-  } catch {
+    bin = await findExiftool();
+  } catch (err) {
+    if (err instanceof DecoderOutOfMemoryError) throw err;
     return null;
+  }
+  const safeExt = ext?.replace(/[^a-z0-9]/gi, "");
+  const suffix = safeExt ? `.${safeExt}` : ".jpg";
+  const id = randomUUID();
+  const tempPath = join(tmpdir(), `exif-dim-${id}${suffix}`);
+
+  try {
+    await writeTempExclusive(tempPath, buffer);
+    const { stdout } = await execFileAsync(
+      bin,
+      ["-json", "-ImageWidth", "-ImageHeight", tempPath],
+      { timeout: 10_000 },
+    );
+    const [data] = JSON.parse(stdout);
+    if (
+      typeof data?.ImageWidth !== "number" ||
+      !Number.isFinite(data.ImageWidth) ||
+      data.ImageWidth <= 0 ||
+      typeof data?.ImageHeight !== "number" ||
+      !Number.isFinite(data.ImageHeight) ||
+      data.ImageHeight <= 0
+    ) {
+      return null;
+    }
+    return { width: data.ImageWidth, height: data.ImageHeight };
+  } catch (rawErr) {
+    const err = asDecoderOutOfMemory(rawErr);
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+    return null;
+  } finally {
+    await rm(tempPath, { force: true }).catch(() => {});
   }
 }
 

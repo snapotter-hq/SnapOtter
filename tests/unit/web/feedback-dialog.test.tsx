@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 
 const submitFeedback = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, accepted: true }));
@@ -14,9 +14,13 @@ vi.mock("@/lib/feedback", async (importOriginal) => {
   };
 });
 
+beforeEach(() => {
+  submitFeedback.mockReset();
+  submitFeedback.mockResolvedValue({ ok: true, accepted: true });
+});
+
 afterEach(() => {
   cleanup();
-  submitFeedback.mockClear();
 });
 
 describe("FeedbackDialog", () => {
@@ -53,6 +57,35 @@ describe("FeedbackDialog", () => {
         importantAreas: ["pdf_docs", "batch_workflows"],
       });
     });
+  });
+
+  it("tells the caller when the server declined the answer (#2252)", async () => {
+    submitFeedback.mockResolvedValueOnce({ ok: true, accepted: false });
+    const onSubmitted = vi.fn();
+    render(
+      <FeedbackDialog open source="tool_result" onClose={vi.fn()} onSubmitted={onSubmitted} />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "The result looked fine but I want to add a note" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    await waitFor(() => expect(onSubmitted).toHaveBeenCalledWith(false));
+  });
+
+  it("tells the caller when the server accepted the answer", async () => {
+    const onSubmitted = vi.fn();
+    render(
+      <FeedbackDialog open source="tool_result" onClose={vi.fn()} onSubmitted={onSubmitted} />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "The result looked great" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    await waitFor(() => expect(onSubmitted).toHaveBeenCalledWith(true));
   });
 
   it("does not submit contact fields without contact consent", async () => {

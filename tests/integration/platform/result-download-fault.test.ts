@@ -11,10 +11,13 @@
  * symmetrically; the fault cases here exercise the outputs site.
  */
 
-import { chmod } from "node:fs/promises";
+import { chmod, unlink } from "node:fs/promises";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
+import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
@@ -27,28 +30,28 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp?.cleanup();
-}, 10_000);
+});
 
-async function download(jobId: string, filename: string) {
+async function download(jobId: string, filename: string, headers: Record<string, string> = {}) {
   return testApp.app.inject({
     method: "GET",
     url: `/api/v1/download/${encodeURIComponent(jobId)}/${encodeURIComponent(filename)}`,
-    headers: { authorization: `Bearer ${adminToken}` },
+    headers: { authorization: `Bearer ${adminToken}`, ...headers },
   });
 }
 
 describe("tool-result download fault classification (local mode)", () => {
-  it("falls through to the uploads/ prefix when outputs/ has no object", async () => {
+  it("does not fall through to the uploads/ prefix when outputs/ has no object", async () => {
     const jobId = "resfault-up";
     await putObject(`uploads/${jobId}/original.png`, PNG);
     try {
       const res = await download(jobId, "original.png");
-      expect(res.statusCode).toBe(200);
-      expect(Buffer.compare(res.rawPayload, PNG)).toBe(0);
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: "File not found" });
     } finally {
       await deletePrefix(`uploads/${jobId}`);
     }
@@ -98,6 +101,236 @@ describe("tool-result download fault classification (local mode)", () => {
       expect(JSON.parse(res.body).error).toMatch(/not found/i);
     } finally {
       (env as Record<string, unknown>).STORAGE_MODE = originalMode;
+    }
+  });
+
+  // #997: when the blob vanishes between getObjectSize and getObjectStream
+  // (TTL sweeper race, manual prune), the open-time ENOENT must be caught
+  // before response headers go out and return a clean 404, not tear down
+  // mid-response or escape as an uncaught 500.
+  it("returns a clean 404 when the blob vanishes after the size probe (full and ranged)", async () => {
+    const jobId = "resfault-vanish";
+    const realGetObjectSize = objectStorage.getObjectSize;
+    const spy = vi.spyOn(objectStorage, "getObjectSize").mockImplementation(async (key: string) => {
+      const size = await realGetObjectSize(key);
+      if (key.startsWith(`outputs/${jobId}/`)) {
+        await unlink(join(env.WORKSPACE_PATH, key));
+      }
+      return size;
+    });
+
+    try {
+      await putObject(`outputs/${jobId}/full.png`, PNG);
+      const fullRes = await download(jobId, "full.png");
+      expect(fullRes.statusCode).toBe(404);
+      expect(fullRes.headers["content-disposition"]).toBeUndefined();
+      expect(fullRes.headers["content-type"]).toMatch(/application\/json/);
+      expect(JSON.parse(fullRes.body)).toEqual({ error: "File not found" });
+
+      await putObject(`outputs/${jobId}/ranged.png`, PNG);
+      const rangedRes = await download(jobId, "ranged.png", { range: "bytes=0-15" });
+      expect(rangedRes.statusCode).toBe(404);
+      expect(rangedRes.headers["content-disposition"]).toBeUndefined();
+      expect(rangedRes.headers["content-range"]).toBeUndefined();
+      expect(rangedRes.headers["content-type"]).toMatch(/application\/json/);
+      expect(JSON.parse(rangedRes.body)).toEqual({ error: "File not found" });
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+      await deletePrefix(`outputs/${jobId}`);
+    }
+  });
+
+  // #997: a blob file that is unreadable (0o000) inside a readable job
+  // directory (0o755) passes stat() in getObjectSize and fails with EACCES at
+  // getObjectStream. It must reject eagerly and rethrow as a 500 before
+  // attachment headers are set on the reply.
+  it.skipIf(isRoot)(
+    "returns 500 without attachment headers when opening the blob stream hits EACCES",
+    async () => {
+      const jobId = "resfault-stream-acc";
+      await putObject(`outputs/${jobId}/result.png`, PNG);
+      const blobPath = join(env.WORKSPACE_PATH, "outputs", jobId, "result.png");
+      await chmod(blobPath, 0o000);
+      try {
+        const fullRes = await download(jobId, "result.png");
+        expect(fullRes.statusCode).toBe(500);
+        expect(fullRes.headers["content-disposition"]).toBeUndefined();
+        expect(fullRes.headers["content-type"]).toMatch(/application\/json/);
+        expect(JSON.parse(fullRes.body).code).not.toBe("FST_ERR_REP_INVALID_PAYLOAD_TYPE");
+        expect(JSON.parse(fullRes.body).error).not.toMatch(/not found/i);
+
+        const rangedRes = await download(jobId, "result.png", { range: "bytes=0-15" });
+        expect(rangedRes.statusCode).toBe(500);
+        expect(rangedRes.headers["content-disposition"]).toBeUndefined();
+        expect(rangedRes.headers["content-range"]).toBeUndefined();
+        expect(rangedRes.headers["content-type"]).toMatch(/application\/json/);
+        expect(JSON.parse(rangedRes.body).code).not.toBe("FST_ERR_REP_INVALID_PAYLOAD_TYPE");
+        expect(JSON.parse(rangedRes.body).error).not.toMatch(/not found/i);
+      } finally {
+        await chmod(blobPath, 0o644);
+        await deletePrefix(`outputs/${jobId}`);
+      }
+    },
+  );
+
+  // #997: a literal "." filename segment over a raw HTTP path used to pass
+  // isPathTraversal and VALID_KEY, stat the job directory, and fail with
+  // EISDIR after headers. Pre-rejecting "." in isValidObjectKey returns 404
+  // before touching storage.
+  it("returns 404 for a literal '.' filename over HTTP without touching the job directory", async () => {
+    const jobId = "resfault-dot";
+    await putObject(`outputs/${jobId}/result.png`, PNG);
+    const sizeSpy = vi.spyOn(objectStorage, "getObjectSize");
+    await testApp.app.listen({ port: 0, host: "127.0.0.1" });
+    const port = (testApp.app.server.address() as AddressInfo).port;
+    try {
+      const res = await new Promise<{
+        statusCode: number;
+        headers: http.IncomingHttpHeaders;
+        body: string;
+      }>((resolve, reject) => {
+        const req = http.get(
+          {
+            host: "127.0.0.1",
+            port,
+            path: `/api/v1/download/${jobId}/.`,
+            headers: { authorization: `Bearer ${adminToken}` },
+          },
+          (incoming) => {
+            const chunks: Buffer[] = [];
+            incoming.on("data", (c: Buffer) => chunks.push(c));
+            incoming.on("end", () =>
+              resolve({
+                statusCode: incoming.statusCode ?? 0,
+                headers: incoming.headers,
+                body: Buffer.concat(chunks).toString("utf8"),
+              }),
+            );
+            incoming.on("error", reject);
+          },
+        );
+        req.on("error", reject);
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.headers["content-disposition"]).toBeUndefined();
+      expect(JSON.parse(res.body)).toEqual({ error: "File not found" });
+      expect(sizeSpy).not.toHaveBeenCalled();
+    } finally {
+      sizeSpy.mockRestore();
+      await deletePrefix(`outputs/${jobId}`);
+    }
+  });
+
+  // #996: in S3 mode, HeadObject returns a bodyless 404 NotFound for both a
+  // missing key and a vanished bucket. On the double-miss path, a HeadBucket
+  // probe distinguishes a genuine missing key (bucket returns 200 -> 404) from
+  // a missing bucket (bucket returns 404 -> 503 storage-unavailable).
+  it("disambiguates a missing key (404) from a vanished bucket (503) in S3 mode (#996)", async () => {
+    let bucketExists = false;
+    const seenRequests: string[] = [];
+    const s3Server = http.createServer((req, res) => {
+      seenRequests.push(`${req.method} ${req.url}`);
+      if (req.method === "HEAD" && (req.url === "/test-bucket" || req.url === "/test-bucket/")) {
+        res.writeHead(bucketExists ? 200 : 404);
+        res.end();
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => s3Server.listen(0, "127.0.0.1", resolve));
+    const s3Port = (s3Server.address() as AddressInfo).port;
+
+    const e = env as Record<string, unknown>;
+    const saved = {
+      STORAGE_MODE: env.STORAGE_MODE,
+      S3_BUCKET: env.S3_BUCKET,
+      S3_REGION: env.S3_REGION,
+      S3_ENDPOINT: env.S3_ENDPOINT,
+      S3_ACCESS_KEY_ID: env.S3_ACCESS_KEY_ID,
+      S3_SECRET_ACCESS_KEY: env.S3_SECRET_ACCESS_KEY,
+      S3_FORCE_PATH_STYLE: env.S3_FORCE_PATH_STYLE,
+      S3_PREFIX: env.S3_PREFIX,
+    };
+    const { loadS3Storage } = await import("@snapotter/enterprise");
+    const s3 = await loadS3Storage();
+    const cfg = {
+      bucket: "test-bucket",
+      region: "us-east-1",
+      endpoint: `http://127.0.0.1:${s3Port}`,
+      accessKeyId: "minioadmin",
+      secretAccessKey: "minioadmin",
+      forcePathStyle: true,
+      prefix: "",
+    };
+    e.STORAGE_MODE = "s3";
+    e.S3_BUCKET = cfg.bucket;
+    e.S3_REGION = cfg.region;
+    e.S3_ENDPOINT = cfg.endpoint;
+    e.S3_ACCESS_KEY_ID = cfg.accessKeyId;
+    e.S3_SECRET_ACCESS_KEY = cfg.secretAccessKey;
+    e.S3_FORCE_PATH_STYLE = cfg.forcePathStyle;
+    e.S3_PREFIX = cfg.prefix;
+    s3.configureS3(cfg);
+
+    try {
+      const vanishedRes = await download("resfault-s3-996", "result.png");
+      expect(vanishedRes.statusCode).toBe(503);
+      expect(JSON.parse(vanishedRes.body)).toMatchObject({
+        code: "storage-unavailable",
+        message: "The server's storage service is unavailable.",
+      });
+      expect(JSON.parse(vanishedRes.body).error).not.toMatch(/not found/i);
+      expect(seenRequests).toEqual([
+        "HEAD /test-bucket/outputs/resfault-s3-996/result.png",
+        "HEAD /test-bucket/",
+      ]);
+
+      seenRequests.length = 0;
+      bucketExists = true;
+      const missingKeyRes = await download("resfault-s3-996", "never-existed.png");
+      expect(missingKeyRes.statusCode).toBe(404);
+      expect(JSON.parse(missingKeyRes.body)).toEqual({ error: "File not found" });
+      expect(seenRequests).toEqual([
+        "HEAD /test-bucket/outputs/resfault-s3-996/never-existed.png",
+        "HEAD /test-bucket/",
+      ]);
+    } finally {
+      Object.assign(e, saved);
+      await new Promise<void>((resolve) => s3Server.close(() => resolve()));
+    }
+  });
+
+  // #2851: non-syscall local errors (ERR_FS_FILE_TOO_LARGE, TypeError) must
+  // reach the error handler as 500 instead of falling through to 404.
+  it("returns 500, not 404, when getObjectSize or getObjectStream rejects with a non-syscall local error (#2851)", async () => {
+    const jobId = "resfault-nosyscall";
+    await putObject(`outputs/${jobId}/result.png`, PNG);
+
+    const tooLarge = Object.assign(new RangeError("File size is greater than 2 GiB"), {
+      code: "ERR_FS_FILE_TOO_LARGE",
+    });
+    const sizeSpy = vi.spyOn(objectStorage, "getObjectSize").mockRejectedValueOnce(tooLarge);
+    try {
+      const res = await download(jobId, "result.png");
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
+    } finally {
+      sizeSpy.mockRestore();
+    }
+
+    const unexpectedBug = new TypeError("unexpected stream failure");
+    const streamSpy = vi
+      .spyOn(objectStorage, "getObjectStream")
+      .mockRejectedValueOnce(unexpectedBug);
+    try {
+      const res = await download(jobId, "result.png");
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
+    } finally {
+      streamSpy.mockRestore();
+      await deletePrefix(`outputs/${jobId}`);
     }
   });
 });

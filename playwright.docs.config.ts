@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolvePlaywrightEndpoint, resolvePlaywrightRun } from "./tests/playwright-run.js";
 
 const { runRoot } = resolvePlaywrightRun(__dirname, "docs");
-const endpoint = resolvePlaywrightEndpoint("PLAYWRIGHT_DOCS_PORT", "PLAYWRIGHT_DOCS_URL", 40_000);
+const endpoint = resolvePlaywrightEndpoint("PLAYWRIGHT_DOCS_PORT", "PLAYWRIGHT_DOCS_URL", 23_000);
 
 export default defineConfig({
   testDir: "./tests/e2e-docs",
@@ -26,7 +26,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `cd apps/docs && pnpm docs:build && exec pnpm exec vitepress preview . --host ${endpoint.host} --port ${endpoint.port}`,
+    command: `cd apps/docs && pnpm docs:build && exec node ../../tests/playwright-docs-preview.mjs . --host ${endpoint.host} --port ${endpoint.port} --strictPort`,
     url: endpoint.url,
     reuseExistingServer: false,
     // `vitepress build` renders ~3,800 pages and then runs Pagefind over them,

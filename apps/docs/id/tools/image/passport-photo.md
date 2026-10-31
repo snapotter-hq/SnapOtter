@@ -1,8 +1,8 @@
 ---
 description: "Pembuat foto paspor dan ID bertenaga AI dengan deteksi wajah, penghapusan latar belakang, dan penataan lembar cetak."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: e4dd75bbe828
+i18n_output_hash: 7f09f3917829
 ---
 
 # Passport Photo {#passport-photo}
@@ -92,7 +92,7 @@ Memotong, mengubah ukuran, dan secara opsional menata foto ke lembar cetak. Meng
 | documentType | string | No | `"passport"` | Jenis dokumen (dari spesifikasi negara) |
 | bgColor | string | No | `"#FFFFFF"` | Warna latar belakang hex |
 | printLayout | string | No | `"none"` | Tata letak kertas cetak: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | Batasan ukuran berkas maksimum dalam KB (0 = tanpa batas) |
+| maxFileSizeKb | number | No | `0` | Batas ukuran berkas maksimum dalam KB, dengan 1 KB = 1000 byte (0 = tanpa batas) |
 | dpi | number | No | `300` | DPI output (72-1200) |
 | customWidthMm | number | No | - | Lebar foto kustom dalam mm (menimpa spesifikasi negara) |
 | customHeightMm | number | No | - | Tinggi foto kustom dalam mm (menimpa spesifikasi negara) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Error: Analysis Expired (410) {#error-analysis-expired-410}
+
+Generate bekerja dari gambar yang sudah dihapus latar belakangnya dan disimpan oleh analyze untuk `jobId`. Keluaran tersimpan dibersihkan setelah beberapa waktu, jadi jika terlalu lama berlalu antara kedua panggilan, gambar itu sudah hilang. Panggil analyze lagi dengan foto yang sama dan gunakan `jobId` yang dikembalikannya.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+`jobId` atau `filename` yang tidak dapat menunjuk file tersimpan (pemisah jalur, `..`, string kosong) akan mendapat jawaban 400.
+
 ---
 
 ### Base Route {#base-route}
@@ -169,5 +182,5 @@ Mengembalikan panduan untuk menggunakan sub-endpoint yang benar.
 - Landmark dikembalikan sebagai koordinat ternormalisasi (rentang 0-1 relatif terhadap dimensi gambar).
 - Field `preview` dalam respons analisis adalah PNG yang di-encode base64 (maks lebar 800px) untuk tampilan cepat.
 - Spesifikasi negara mencakup dimensi dokumen, rasio tinggi kepala, dan penempatan garis mata berdasarkan persyaratan foto paspor resmi.
-- Opsi `printLayout` menghasilkan lembar yang ditata pada kertas 4x6\" atau A4 dengan gutter 2mm di antara foto.
-- Saat `maxFileSizeKb` diatur, output dikompresi secara iteratif agar pas dalam batas ukuran.
+- Opsi `printLayout` menghasilkan lembar yang ditata pada kertas 4x6" atau A4 dengan gutter 2mm di antara foto.
+- Saat `maxFileSizeKb` diatur, kualitas JPEG output diturunkan bertahap hingga muat. Ukuran piksel ditetapkan oleh spesifikasi negara, jadi jika foto tetap tidak muat pada kualitas terendah, `/generate` mengembalikan 422 dengan pesan yang menyatakannya, bukan berkas yang melebihi batas.

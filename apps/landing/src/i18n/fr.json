@@ -187,7 +187,7 @@
   "faq.q3.q": "Ai-je besoin d'une connexion Internet ?",
   "faq.q4.a": "Aucune limite artificielle. Vous pouvez traiter autant de fichiers que vous le souhaitez, quelle que soit leur taille. La seule contrainte, ce sont les ressources matérielles de votre serveur.",
   "faq.q4.q": "Y a-t-il des limites de taille de fichier ou d'usage ?",
-  "faq.q5.a": "SnapOtter comprend 19 outils d'IA locaux pour la suppression d'arrière-plan, l'agrandissement, l'OCR, la transcription, la détection de visages, la colorisation, la réduction du bruit, la restauration de photos et bien plus. Tous les modèles s'exécutent sur votre matériel.",
+  "faq.q5.a": "SnapOtter inclut 19 outils d'IA locaux pour la suppression d'arrière-plan, l'agrandissement, l'OCR, la transcription, la détection de visages, la colorisation, la réduction du bruit, la restauration de photos, et plus encore. Tous les modèles s'exécutent sur votre matériel (2 Go de RAM suffisent pour les outils non-IA, Fast OCR et la détection de visages ; les bundles d'IA CPU nécessitent 4 Go+ de RAM, ou 8 Go pour l'inpainting HQ).",
   "faq.q5.q": "Quelles fonctionnalités d'IA sont incluses ?",
   "faq.q6.a": "Des analyses produit anonymes sont activées par défaut et n'incluent jamais vos fichiers ni leur contenu. Désactivez-les à tout moment grâce à un simple interrupteur administrateur dans Paramètres > Système > Confidentialité.",
   "faq.q6.q": "SnapOtter collecte-t-il des données d'analyse ?",

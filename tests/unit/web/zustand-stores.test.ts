@@ -960,10 +960,12 @@ describe("useThemeStore", () => {
 // PdfToImageStore (synchronous state operations only)
 // ==========================================================================
 
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 
 describe("usePdfToImageStore", () => {
   beforeEach(() => {
+    fetchMock.mockReset();
     usePdfToImageStore.getState().reset();
   });
 
@@ -1228,6 +1230,63 @@ describe("usePdfToImageStore", () => {
     expect(usePdfToImageStore.getState().error).toBe("Failed to read PDF");
   });
 
+  it("loadPreview rejects malformed 2xx responses and clears prior preview state", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    const badPayloads: unknown[] = [
+      null,
+      [],
+      {},
+      { pageCount: 2 },
+      { thumbnails: [] },
+      { pageCount: 0, thumbnails: [] },
+      { pageCount: -1, thumbnails: [] },
+      { pageCount: 1.5, thumbnails: [] },
+      { pageCount: 1, thumbnails: [null] },
+      { pageCount: 1, thumbnails: [{ page: 0, dataUrl: "data:x" }] },
+      { pageCount: 1, thumbnails: [{ page: 1, dataUrl: "" }] },
+    ];
+
+    for (const payload of badPayloads) {
+      usePdfToImageStore.setState({
+        pageCount: 3,
+        thumbnails: [{ page: 1, dataUrl: "data:ok", width: 50, height: 50 }],
+        selectedPages: new Set([1, 2, 3]),
+        error: null,
+      });
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(payload),
+      });
+
+      await usePdfToImageStore.getState().loadPreview(file);
+
+      const s = usePdfToImageStore.getState();
+      expect(s.error).toBe("Invalid response from server");
+      expect(s.pageCount).toBeNull();
+      expect(s.thumbnails).toEqual([]);
+      expect(s.selectedPages.size).toBe(0);
+      expect(s.loadingPreview).toBe(false);
+    }
+
+    const customT: TranslationKeys = {
+      ...en,
+      errors: { ...en.errors, invalidServerResponse: "Ungültige Antwort vom Server" },
+    };
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+    });
+    await usePdfToImageStore.getState().loadPreview(file, customT);
+    expect(usePdfToImageStore.getState().error).toBe("Ungültige Antwort vom Server");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new TypeError("Failed to fetch body stream")),
+    });
+    await usePdfToImageStore.getState().loadPreview(file);
+    expect(usePdfToImageStore.getState().error).toBe("Failed to fetch body stream");
+  });
+
   // -- convert --------------------------------------------------------------
 
   it("convert sends file with settings and stores results", async () => {
@@ -1324,7 +1383,12 @@ describe("usePdfToImageStore", () => {
       capturedFormData = opts.body;
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ pages: [], zipUrl: null, zipSize: null }),
+        json: () =>
+          Promise.resolve({
+            pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }],
+            zipUrl: null,
+            zipSize: null,
+          }),
       });
     });
 
@@ -1352,7 +1416,12 @@ describe("usePdfToImageStore", () => {
       capturedFormData = opts.body;
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ pages: [], zipUrl: null, zipSize: null }),
+        json: () =>
+          Promise.resolve({
+            pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }],
+            zipUrl: null,
+            zipSize: null,
+          }),
       });
     });
 
@@ -1378,6 +1447,79 @@ describe("usePdfToImageStore", () => {
     await usePdfToImageStore.getState().convert();
 
     expect(usePdfToImageStore.getState().error).toBe("Conversion failed: 500");
+  });
+
+  it("convert rejects malformed 2xx responses and normalizes omitted zip fields to null", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({ file, pageCount: 2, selectedPages: new Set([1, 2]) });
+
+    const badPayloads: unknown[] = [
+      null,
+      [],
+      {},
+      { pages: null },
+      { pages: [] },
+      { pages: [null] },
+      { pages: [{ page: 0, downloadUrl: "/dl/1", size: 10 }] },
+      { pages: [{ page: 1.5, downloadUrl: "/dl/1", size: 10 }] },
+      { pages: [{ page: 1, downloadUrl: "", size: 10 }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1" }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: "10" }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: -1 }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }], zipUrl: "" },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }], zipSize: -1 },
+    ];
+
+    for (const payload of badPayloads) {
+      usePdfToImageStore.setState({
+        results: [{ page: 1, downloadUrl: "/dl/old", size: 50 }],
+        zipUrl: "/dl/old.zip",
+        zipSize: 50,
+        error: null,
+      });
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(payload),
+      });
+
+      await usePdfToImageStore.getState().convert();
+
+      const s = usePdfToImageStore.getState();
+      expect(s.error).toBe("Invalid response from server");
+      expect(s.results).toBeNull();
+      expect(s.zipUrl).toBeNull();
+      expect(s.zipSize).toBeNull();
+      expect(s.processing).toBe(false);
+    }
+
+    const customT: TranslationKeys = {
+      ...en,
+      errors: { ...en.errors, invalidServerResponse: "Ungültige Antwort vom Server" },
+    };
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+    });
+    await usePdfToImageStore.getState().convert(customT);
+    expect(usePdfToImageStore.getState().error).toBe("Ungültige Antwort vom Server");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new TypeError("Stream disconnected")),
+    });
+    await usePdfToImageStore.getState().convert();
+    expect(usePdfToImageStore.getState().error).toBe("Stream disconnected");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ pages: [{ page: 1, downloadUrl: "/dl/1", size: 0 }] }),
+    });
+    await usePdfToImageStore.getState().convert();
+    const okState = usePdfToImageStore.getState();
+    expect(okState.error).toBeNull();
+    expect(okState.results).toEqual([{ page: 1, downloadUrl: "/dl/1", size: 0 }]);
+    expect(okState.zipUrl).toBeNull();
+    expect(okState.zipSize).toBeNull();
   });
 });
 
@@ -1444,7 +1586,7 @@ vi.mock("@/lib/image-preview", () => ({
   revokePreviewUrl: vi.fn(),
 }));
 
-import { useCollageStore } from "@/stores/collage-store";
+import { beginCollageRun, useCollageStore } from "@/stores/collage-store";
 
 describe("useCollageStore", () => {
   beforeEach(() => {
@@ -1493,40 +1635,263 @@ describe("useCollageStore", () => {
     expect(s.cellAssignments[1]).toBe(1);
   });
 
-  it("addImages appends to existing images", () => {
+  it("addImages appends to existing images and resets selectedCell (#3687)", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     const file2 = new File(["b"], "b.png", { type: "image/png" });
     const file3 = new File(["c"], "c.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    useCollageStore.getState().setSelectedCell(2);
     useCollageStore.getState().addImages([file3]);
 
     const s = useCollageStore.getState();
     expect(s.images).toHaveLength(3);
     expect(s.templateId).toBe("3-h-equal");
+    expect(s.selectedCell).toBeNull();
   });
 
-  it("removeImage removes image by index and revokes blob URL", () => {
+  it("addImages([]) is a no-op and does not cancel active runs or mutate state (#3689)", () => {
+    const abortUpload = vi.fn();
+    const uploadRun = beginCollageRun(abortUpload);
+
+    useCollageStore.getState().addImages([]);
+
+    const initial = useCollageStore.getState();
+    expect(initial.images).toEqual([]);
+    expect(initial.phase).toBe("upload");
+    expect(abortUpload).not.toHaveBeenCalled();
+    expect(uploadRun.isCurrent()).toBe(true);
+    uploadRun.end();
+
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     const file2 = new File(["b"], "b.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    useCollageStore.getState().setCellTransform(0, { zoom: 2 });
+    useCollageStore.getState().setSelectedCell(1);
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous warning" });
+
+    const abortActive = vi.fn();
+    const activeRun = beginCollageRun(abortActive);
+    createObjectURL.mockClear();
+
+    useCollageStore.getState().addImages([]);
+
+    const after = useCollageStore.getState();
+    expect(after.images).toHaveLength(2);
+    expect(after.templateId).toBe("3-h-equal");
+    expect(after.cellAssignments).toEqual([0, 1, -1]);
+    expect(after.cellTransforms[0]?.zoom).toBe(2);
+    expect(after.selectedCell).toBe(1);
+    expect(after.phase).toBe("result");
+    expect(after.resultUrl).toBe("blob:result");
+    expect(after.resultSize).toBe(5000);
+    expect(after.originalSize).toBe(10000);
+    expect(after.jobId).toBe("job-123");
+    expect(after.error).toBe("Previous warning");
+    expect(abortActive).not.toHaveBeenCalled();
+    expect(activeRun.isCurrent()).toBe(true);
+    expect(createObjectURL).not.toHaveBeenCalled();
+    activeRun.end();
+  });
+
+  it("removeImage removes image by index and revokes blob URL and previewBlobUrl once", async () => {
+    const imagePreview = await import("@/lib/image-preview");
+    const needsMock = vi.mocked(imagePreview.needsServerPreview);
+    const fetchPreviewMock = vi.mocked(imagePreview.fetchDecodedPreview);
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+
+    needsMock.mockReturnValueOnce(true).mockReturnValueOnce(true);
+    fetchPreviewMock
+      .mockResolvedValueOnce({ url: "blob:preview-1", originalWidth: 100, originalHeight: 100 })
+      .mockResolvedValueOnce({ url: "blob:preview-2", originalWidth: 100, originalHeight: 100 });
+    createObjectURL.mockReturnValueOnce("blob:raw-1").mockReturnValueOnce("blob:raw-2");
+
+    const file1 = new File(["a"], "a.heic", { type: "image/heic" });
+    const file2 = new File(["b"], "b.heic", { type: "image/heic" });
+    useCollageStore.getState().addImages([file1, file2]);
+
+    await vi.waitFor(() => {
+      expect(useCollageStore.getState().images[0].previewBlobUrl).toBe("blob:preview-1");
+      expect(useCollageStore.getState().images[1].previewBlobUrl).toBe("blob:preview-2");
+    });
+
     revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
 
     useCollageStore.getState().removeImage(0);
 
     const s = useCollageStore.getState();
     expect(s.images).toHaveLength(1);
     expect(s.images[0].file).toBe(file2);
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:raw-1");
+    expect(revokePreviewMock).toHaveBeenCalledTimes(1);
+    expect(revokePreviewMock).toHaveBeenCalledWith("blob:preview-1");
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect(run.isCurrent()).toBe(false);
+
+    // Removing an image without previewBlobUrl does not call revokePreviewUrl
+    const pngFile = new File(["c"], "c.png", { type: "image/png" });
+    createObjectURL.mockReturnValueOnce("blob:raw-3");
+    useCollageStore.getState().addImages([pngFile]);
+    revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+
+    useCollageStore.getState().removeImage(1);
+
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:raw-3");
+    expect(revokePreviewMock).not.toHaveBeenCalled();
   });
 
-  it("removeImage resets when last image is removed", () => {
-    const file = new File(["a"], "a.png", { type: "image/png" });
+  it("removeImage clears error and selectedCell when removing a non-last image (#3558)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2, file3]);
+    useCollageStore.getState().setSelectedCell(2);
+    useCollageStore.getState().setError("Upload failed");
+
+    useCollageStore.getState().removeImage(2);
+
+    const s = useCollageStore.getState();
+    expect(s.images).toHaveLength(2);
+    expect(s.templateId).toBe("2-h-equal");
+    expect(s.cellAssignments).toEqual([0, 1]);
+    expect({ selectedCell: s.selectedCell, error: s.error }).toEqual({
+      selectedCell: null,
+      error: null,
+    });
+
+    // Also verify the last-image removal path (newImages.length === 0) clears both
+    useCollageStore.getState().removeImage(1);
+    useCollageStore.getState().setSelectedCell(0);
+    useCollageStore.getState().setError("Second failure");
+    useCollageStore.getState().removeImage(0);
+
+    const afterLast = useCollageStore.getState();
+    expect(afterLast.images).toEqual([]);
+    expect({ selectedCell: afterLast.selectedCell, error: afterLast.error }).toEqual({
+      selectedCell: null,
+      error: null,
+    });
+  });
+
+  it("removeImage resets when last image is removed without double-revoking blob or preview URLs (#3526)", async () => {
+    const imagePreview = await import("@/lib/image-preview");
+    const needsMock = vi.mocked(imagePreview.needsServerPreview);
+    const fetchPreviewMock = vi.mocked(imagePreview.fetchDecodedPreview);
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+
+    needsMock.mockReturnValueOnce(true);
+    fetchPreviewMock.mockResolvedValueOnce({
+      url: "blob:preview-last",
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    createObjectURL.mockReturnValueOnce("blob:raw-last");
+
+    const file = new File(["a"], "a.heic", { type: "image/heic" });
     useCollageStore.getState().addImages([file]);
 
+    await vi.waitFor(() => {
+      expect(useCollageStore.getState().images[0].previewBlobUrl).toBe("blob:preview-last");
+    });
+
+    revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
+
     useCollageStore.getState().removeImage(0);
+
     const s = useCollageStore.getState();
     expect(s.images).toEqual([]);
     expect(s.phase).toBe("upload");
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:raw-last");
+    expect(revokePreviewMock).toHaveBeenCalledTimes(1);
+    expect(revokePreviewMock).toHaveBeenCalledWith("blob:preview-last");
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect(run.isCurrent()).toBe(false);
+  });
+
+  it("removeImage with out-of-bounds index is a no-op and does not cancel active runs or mutate state (#3557)", async () => {
+    const imagePreview = await import("@/lib/image-preview");
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+
+    // 1. Empty images list: user-configured settings and active runs must be preserved
+    useCollageStore.setState({
+      gap: 16,
+      cornerRadius: 12,
+      backgroundColor: "#123456",
+      bgPreset: "custom",
+      aspectRatio: "16:9",
+      outputFormat: "webp",
+      quality: 75,
+      templateId: "3-h-equal",
+    });
+    const abortEmpty = vi.fn();
+    const emptyRun = beginCollageRun(abortEmpty);
+
+    useCollageStore.getState().removeImage(0);
+    useCollageStore.getState().removeImage(-1);
+
+    const afterEmpty = useCollageStore.getState();
+    expect(afterEmpty.images).toEqual([]);
+    expect(afterEmpty.gap).toBe(16);
+    expect(afterEmpty.cornerRadius).toBe(12);
+    expect(afterEmpty.backgroundColor).toBe("#123456");
+    expect(afterEmpty.bgPreset).toBe("custom");
+    expect(afterEmpty.aspectRatio).toBe("16:9");
+    expect(afterEmpty.outputFormat).toBe("webp");
+    expect(afterEmpty.quality).toBe(75);
+    expect(afterEmpty.templateId).toBe("3-h-equal");
+    expect(abortEmpty).not.toHaveBeenCalled();
+    expect(emptyRun.isCurrent()).toBe(true);
+    emptyRun.end();
+
+    // 2. Non-empty images list: out-of-bounds indices (-1, >= length) must be a no-op
+    useCollageStore.getState().reset();
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    useCollageStore.getState().setCellTransform(0, { zoom: 2 });
+    useCollageStore.getState().setSelectedCell(1);
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous warning" });
+
+    revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+    const abortActive = vi.fn();
+    const activeRun = beginCollageRun(abortActive);
+
+    useCollageStore.getState().removeImage(2);
+    useCollageStore.getState().removeImage(99);
+    useCollageStore.getState().removeImage(-1);
+
+    const afterNonEmpty = useCollageStore.getState();
+    expect(afterNonEmpty.images).toHaveLength(2);
+    expect(afterNonEmpty.templateId).toBe("3-h-equal");
+    expect(afterNonEmpty.cellAssignments).toEqual([0, 1, -1]);
+    expect(afterNonEmpty.cellTransforms[0]?.zoom).toBe(2);
+    expect(afterNonEmpty.selectedCell).toBe(1);
+    expect(afterNonEmpty.phase).toBe("result");
+    expect(afterNonEmpty.resultUrl).toBe("blob:result");
+    expect(afterNonEmpty.resultSize).toBe(5000);
+    expect(afterNonEmpty.originalSize).toBe(10000);
+    expect(afterNonEmpty.jobId).toBe("job-123");
+    expect(afterNonEmpty.error).toBe("Previous warning");
+    expect(abortActive).not.toHaveBeenCalled();
+    expect(activeRun.isCurrent()).toBe(true);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    expect(revokePreviewMock).not.toHaveBeenCalled();
+    activeRun.end();
   });
 
   it("addImages triggers async preview loading for HEIC files", async () => {
@@ -1557,33 +1922,161 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().images[0].previewBlobUrl).toBe("blob:preview-decoded");
   });
 
-  it("addImages preview callback handles image removed before resolve", async () => {
+  it("addImages preview callback revokes late preview blob URL when image is removed before resolve (#3229)", async () => {
     const imagePreview = await import("@/lib/image-preview");
     const needsMock = vi.mocked(imagePreview.needsServerPreview);
     const fetchPreviewMock = vi.mocked(imagePreview.fetchDecodedPreview);
-    needsMock.mockReturnValueOnce(true);
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
 
-    let resolvePreview!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
+    for (const [keepSecondImage, removeAction] of [
+      [false, () => useCollageStore.getState().removeImage(0)] as const,
+      [true, () => useCollageStore.getState().removeImage(0)] as const,
+      [false, () => useCollageStore.getState().clearImages()] as const,
+      [false, () => useCollageStore.getState().reset()] as const,
+    ]) {
+      useCollageStore.getState().reset();
+      revokePreviewMock.mockClear();
+      needsMock.mockReturnValueOnce(true);
+
+      let resolvePreview!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
+      fetchPreviewMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        }),
+      );
+
+      const heicFile = new File(["data"], "gone.heic", { type: "image/heic" });
+      const keepFile = new File(["png"], "keep.png", { type: "image/png" });
+      useCollageStore.getState().addImages(keepSecondImage ? [heicFile, keepFile] : [heicFile]);
+
+      // Remove the image before the preview resolves
+      removeAction();
+      expect(revokePreviewMock).not.toHaveBeenCalled();
+
+      // Resolve the preview now; it should revoke the orphaned blob URL (#3229)
+      resolvePreview({ url: "blob:late-preview", originalWidth: 100, originalHeight: 100 });
+
+      await vi.waitFor(() => {
+        expect(revokePreviewMock).toHaveBeenCalledTimes(1);
+      });
+      expect(revokePreviewMock).toHaveBeenCalledWith("blob:late-preview");
+      expect(useCollageStore.getState().images.map((i) => i.file)).toEqual(
+        keepSecondImage ? [keepFile] : [],
+      );
+    }
+
+    // Also verify a null result after removal does not call revokePreviewUrl
+    useCollageStore.getState().reset();
+    revokePreviewMock.mockClear();
+    needsMock.mockReturnValueOnce(true);
+    let resolveNullPreview!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
     fetchPreviewMock.mockReturnValueOnce(
       new Promise((resolve) => {
-        resolvePreview = resolve;
+        resolveNullPreview = resolve;
+      }),
+    );
+    const heicFile = new File(["data"], "gone-null.heic", { type: "image/heic" });
+    useCollageStore.getState().addImages([heicFile]);
+    useCollageStore.getState().removeImage(0);
+    resolveNullPreview(null);
+    await Promise.resolve();
+    expect(revokePreviewMock).not.toHaveBeenCalled();
+  });
+
+  it("reset keeps nextImageId monotonic so an in-flight preview from before reset does not attach to a newly added image (#3521)", async () => {
+    const imagePreview = await import("@/lib/image-preview");
+    const needsMock = vi.mocked(imagePreview.needsServerPreview);
+    const fetchPreviewMock = vi.mocked(imagePreview.fetchDecodedPreview);
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+    revokePreviewMock.mockClear();
+
+    let resolveStalePreview!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
+    needsMock.mockReturnValueOnce(true);
+    fetchPreviewMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStalePreview = resolve;
       }),
     );
 
-    const heicFile = new File(["data"], "gone.heic", { type: "image/heic" });
-    useCollageStore.getState().addImages([heicFile]);
+    const firstHeic = new File(["heic-1"], "first.heic", { type: "image/heic" });
+    useCollageStore.getState().addImages([firstHeic]);
+    const firstId = useCollageStore.getState().images[0].id;
 
-    // Remove the image before the preview resolves
-    useCollageStore.getState().removeImage(0);
+    // Reset while fetchDecodedPreview(firstHeic) is still in flight, then add a new image
+    useCollageStore.getState().reset();
+    revokePreviewMock.mockClear();
 
-    // Now resolve the preview -- should not crash (idx === -1 path)
-    resolvePreview({ url: "blob:late-preview", originalWidth: null, originalHeight: null });
+    const secondPng = new File(["png-2"], "second.png", { type: "image/png" });
+    useCollageStore.getState().addImages([secondPng]);
+    const secondId = useCollageStore.getState().images[0].id;
 
-    // Give the promise chain time to settle
-    await new Promise((r) => setTimeout(r, 10));
+    expect(secondId).not.toBe(firstId);
+    expect(useCollageStore.getState().images[0].previewLoading).toBe(false);
+    expect(useCollageStore.getState().images[0].previewBlobUrl).toBeUndefined();
 
-    // Store should still be in reset state
-    expect(useCollageStore.getState().images).toEqual([]);
+    // Resolve the stale preview from before reset()
+    resolveStalePreview({ url: "blob:stale-preview", originalWidth: 100, originalHeight: 100 });
+
+    await vi.waitFor(() => {
+      expect(revokePreviewMock).toHaveBeenCalledWith("blob:stale-preview");
+    });
+    expect(useCollageStore.getState().images).toHaveLength(1);
+    expect(useCollageStore.getState().images[0].file).toBe(secondPng);
+    expect(useCollageStore.getState().images[0].previewBlobUrl).toBeUndefined();
+
+    // Even if an entry with the same id holds a different File reference, i.file === file
+    // prevents the stale preview from attaching and revokes the orphaned blob URL
+    revokePreviewMock.mockClear();
+    let resolveMismatchedFilePreview!: (
+      v: import("@/lib/image-preview").DecodedPreview | null,
+    ) => void;
+    needsMock.mockReturnValueOnce(true);
+    fetchPreviewMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveMismatchedFilePreview = resolve;
+      }),
+    );
+
+    const thirdHeic = new File(["heic-3"], "third.heic", { type: "image/heic" });
+    useCollageStore.getState().addImages([thirdHeic]);
+    const thirdImg = useCollageStore.getState().images[1];
+    const replacementFile = new File(["png-4"], "replacement.png", { type: "image/png" });
+    useCollageStore.setState({
+      images: [
+        useCollageStore.getState().images[0],
+        { ...thirdImg, file: replacementFile, previewLoading: false },
+      ],
+    });
+
+    resolveMismatchedFilePreview({
+      url: "blob:mismatched-file-preview",
+      originalWidth: 50,
+      originalHeight: 50,
+    });
+
+    await vi.waitFor(() => {
+      expect(revokePreviewMock).toHaveBeenCalledWith("blob:mismatched-file-preview");
+    });
+    expect(useCollageStore.getState().images[1].file).toBe(replacementFile);
+    expect(useCollageStore.getState().images[1].previewBlobUrl).toBeUndefined();
+
+    // Null result when entry is already gone does not call revokePreviewUrl
+    useCollageStore.getState().reset();
+    revokePreviewMock.mockClear();
+    let resolveNullRemoved!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
+    needsMock.mockReturnValueOnce(true);
+    fetchPreviewMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveNullRemoved = resolve;
+      }),
+    );
+    useCollageStore
+      .getState()
+      .addImages([new File(["heic-5"], "fifth.heic", { type: "image/heic" })]);
+    useCollageStore.getState().reset();
+    resolveNullRemoved(null);
+    await Promise.resolve();
+    expect(revokePreviewMock).not.toHaveBeenCalled();
   });
 
   it("addImages preview callback handles null URL from fetchDecodedPreview", async () => {
@@ -1621,9 +2114,10 @@ describe("useCollageStore", () => {
     expect(revokeObjectURL).toHaveBeenCalledTimes(2);
   });
 
-  it("setTemplateId changes template and rebuilds assignments", () => {
+  it("setTemplateId changes template, rebuilds assignments, and resets selectedCell (#3687)", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1]);
+    useCollageStore.getState().setSelectedCell(1);
     useCollageStore.getState().setTemplateId("3-h-equal");
 
     const s = useCollageStore.getState();
@@ -1633,11 +2127,38 @@ describe("useCollageStore", () => {
     expect(s.cellAssignments[1]).toBe(-1);
     expect(s.cellAssignments[2]).toBe(-1);
     expect(s.cellTransforms).toEqual({});
+    expect(s.selectedCell).toBeNull();
+
+    // Shrinking from a 3-cell template to 2-h-equal while cell 2 is selected also resets selectedCell
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file2, file3]);
+    useCollageStore.getState().setSelectedCell(2);
+    useCollageStore.getState().setTemplateId("2-h-equal");
+
+    const afterShrink = useCollageStore.getState();
+    expect(afterShrink.templateId).toBe("2-h-equal");
+    expect(afterShrink.cellAssignments).toEqual([0, 1]);
+    expect(afterShrink.cellTransforms).toEqual({});
+    expect(afterShrink.selectedCell).toBeNull();
   });
 
-  it("setTemplateId ignores unknown template IDs", () => {
+  it("setTemplateId ignores unknown template IDs without canceling active runs or clearing results", () => {
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
+    useCollageStore.getState().setSelectedCell(1);
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous failure" });
     useCollageStore.getState().setTemplateId("nonexistent");
-    expect(useCollageStore.getState().templateId).toBe("2-h-equal");
+    const s = useCollageStore.getState();
+    expect(s.templateId).toBe("2-h-equal");
+    expect(s.selectedCell).toBe(1);
+    expect(s.phase).toBe("result");
+    expect(s.resultUrl).toBe("blob:result");
+    expect(s.error).toBe("Previous failure");
+    expect(abort).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    run.end();
   });
 
   it("setCellAssignment updates a single cell", () => {
@@ -1650,19 +2171,91 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().resultUrl).toBeNull();
   });
 
-  it("swapCells swaps assignments and transforms between two cells", () => {
+  it("setCellAssignment clears cellTransforms and resets matching selectedCell when vacating a cell (#3795)", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     const file2 = new File(["b"], "b.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1, file2]);
 
-    useCollageStore.getState().setCellTransform(0, { zoom: 2 });
+    useCollageStore.getState().setCellTransform(0, { zoom: 1.5 });
+    useCollageStore.getState().setCellTransform(1, { zoom: 2, objectFit: "contain" });
+    useCollageStore.getState().setSelectedCell(1);
 
-    useCollageStore.getState().swapCells(0, 1);
-
-    const s = useCollageStore.getState();
-    expect(s.cellAssignments[0]).toBe(1);
+    // Reassigning to a valid image index keeps cellTransforms and selectedCell intact
+    useCollageStore.getState().setCellAssignment(1, 0);
+    let s = useCollageStore.getState();
     expect(s.cellAssignments[1]).toBe(0);
     expect(s.cellTransforms[1]?.zoom).toBe(2);
+    expect(s.selectedCell).toBe(1);
+
+    // Clearing the selected cell deletes its transform key and resets selectedCell to null
+    useCollageStore.getState().setCellAssignment(1, -1);
+    s = useCollageStore.getState();
+    expect(s.cellAssignments[1]).toBe(-1);
+    expect(s.cellTransforms[1]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 1)).toBe(false);
+    expect(s.cellTransforms[0]?.zoom).toBe(1.5);
+    expect(s.selectedCell).toBeNull();
+
+    // Clearing a non-selected cell preserves selectedCell on another cell
+    useCollageStore.getState().setCellAssignment(1, 1);
+    useCollageStore.getState().setCellTransform(1, { panX: 25 });
+    useCollageStore.getState().setSelectedCell(0);
+    useCollageStore.getState().setCellAssignment(1, -1);
+    s = useCollageStore.getState();
+    expect(Object.hasOwn(s.cellTransforms, 1)).toBe(false);
+    expect(s.selectedCell).toBe(0);
+
+    // Swapping with the cleared cell does not transfer a stale transform onto cell 0
+    useCollageStore.getState().swapCells(0, 1);
+    s = useCollageStore.getState();
+    expect(s.cellAssignments).toEqual([-1, 0]);
+    expect(s.cellTransforms[0]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 0)).toBe(false);
+    expect(s.cellTransforms[1]?.zoom).toBe(1.5);
+  });
+
+  it("swapCells swaps assignments, transforms, and selectedCell without leaving undefined transform keys (#3700)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+
+    useCollageStore.getState().setCellTransform(0, { zoom: 2 });
+    useCollageStore.getState().setSelectedCell(0);
+
+    // Swap cell 0 (has transform, selected) with cell 1 (no transform)
+    useCollageStore.getState().swapCells(0, 1);
+
+    let s = useCollageStore.getState();
+    expect(s.cellAssignments).toEqual([1, 0, -1]);
+    expect(s.cellTransforms[1]?.zoom).toBe(2);
+    expect(s.cellTransforms[0]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 0)).toBe(false);
+    expect(s.selectedCell).toBe(1);
+
+    // Swap (0, 1) again when cell 1 is selected and has transform, cell 0 has none
+    useCollageStore.getState().swapCells(0, 1);
+    s = useCollageStore.getState();
+    expect(s.cellAssignments).toEqual([0, 1, -1]);
+    expect(s.cellTransforms[0]?.zoom).toBe(2);
+    expect(s.cellTransforms[1]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 1)).toBe(false);
+    expect(s.selectedCell).toBe(0);
+
+    // Unrelated selectedCell (2) and null selectedCell remain unchanged; swapping two
+    // populated transforms exchanges both entries cleanly
+    useCollageStore.getState().setCellTransform(1, { zoom: 1.5, objectFit: "contain" });
+    useCollageStore.getState().setSelectedCell(2);
+    useCollageStore.getState().swapCells(0, 1);
+    s = useCollageStore.getState();
+    expect(s.cellTransforms[0]?.zoom).toBe(1.5);
+    expect(s.cellTransforms[0]?.objectFit).toBe("contain");
+    expect(s.cellTransforms[1]?.zoom).toBe(2);
+    expect(s.selectedCell).toBe(2);
+
+    useCollageStore.getState().setSelectedCell(null);
+    useCollageStore.getState().swapCells(0, 1);
+    expect(useCollageStore.getState().selectedCell).toBeNull();
   });
 
   it("setCellTransform creates and merges transforms", () => {
@@ -1709,11 +2302,25 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().backgroundColor).toBe("transparent");
   });
 
-  it("setBgPreset with custom does not overwrite backgroundColor", () => {
+  it("setBgPreset with custom does not overwrite backgroundColor, clear result metadata, or cancel active runs", () => {
     useCollageStore.getState().setBackgroundColor("#123456");
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous failure" });
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
     useCollageStore.getState().setBgPreset("custom");
-    expect(useCollageStore.getState().bgPreset).toBe("custom");
-    expect(useCollageStore.getState().backgroundColor).toBe("#123456");
+    const s = useCollageStore.getState();
+    expect(s.bgPreset).toBe("custom");
+    expect(s.backgroundColor).toBe("#123456");
+    expect(s.phase).toBe("result");
+    expect(s.resultUrl).toBe("blob:result");
+    expect(s.resultSize).toBe(5000);
+    expect(s.originalSize).toBe(10000);
+    expect(s.jobId).toBe("job-123");
+    expect(s.error).toBe("Previous failure");
+    expect(abort).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    run.end();
   });
 
   it("setAspectRatio updates aspect ratio", () => {
@@ -1738,9 +2345,171 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().selectedCell).toBeNull();
   });
 
-  it("setPhase updates phase", () => {
+  it("setPhase updates phase and clears previous result metadata when starting processing (#3217)", () => {
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.getState().setPhase("editing");
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().resultUrl).toBe("blob:result");
+    expect(useCollageStore.getState().resultSize).toBe(5000);
+    expect(useCollageStore.getState().originalSize).toBe(10000);
+    expect(useCollageStore.getState().jobId).toBe("job-123");
+
     useCollageStore.getState().setPhase("processing");
-    expect(useCollageStore.getState().phase).toBe("processing");
+    const s = useCollageStore.getState();
+    expect(s.phase).toBe("processing");
+    expect(s.resultUrl).toBeNull();
+    expect(s.resultSize).toBeNull();
+    expect(s.originalSize).toBeNull();
+    expect(s.jobId).toBeNull();
+  });
+
+  it("clears resultUrl, resultSize, originalSize, and jobId across setting and image mutators (#3217)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+
+    const mutators: Array<[string, () => void]> = [
+      ["addImages", () => useCollageStore.getState().addImages([file3])],
+      ["removeImage", () => useCollageStore.getState().removeImage(0)],
+      ["clearImages", () => useCollageStore.getState().clearImages()],
+      ["setTemplateId", () => useCollageStore.getState().setTemplateId("3-h-equal")],
+      ["setCellAssignment", () => useCollageStore.getState().setCellAssignment(0, 1)],
+      ["swapCells", () => useCollageStore.getState().swapCells(0, 1)],
+      ["setCellTransform", () => useCollageStore.getState().setCellTransform(0, { zoom: 1.5 })],
+      ["resetCellTransform", () => useCollageStore.getState().resetCellTransform(0)],
+      ["setGap", () => useCollageStore.getState().setGap(16)],
+      ["setCornerRadius", () => useCollageStore.getState().setCornerRadius(8)],
+      ["setBackgroundColor", () => useCollageStore.getState().setBackgroundColor("#123456")],
+      ["setBgPreset(black)", () => useCollageStore.getState().setBgPreset("black")],
+      ["setAspectRatio", () => useCollageStore.getState().setAspectRatio("16:9")],
+      ["setOutputFormat", () => useCollageStore.getState().setOutputFormat("webp")],
+      ["setQuality", () => useCollageStore.getState().setQuality(80)],
+      ["reset", () => useCollageStore.getState().reset()],
+    ];
+
+    for (const [name, mutate] of mutators) {
+      if (useCollageStore.getState().images.length < 2) {
+        useCollageStore.getState().addImages([file1, file2]);
+      }
+      useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+      mutate();
+      const s = useCollageStore.getState();
+      const expectedPhase = name === "clearImages" || name === "reset" ? "upload" : "editing";
+      expect(
+        {
+          mutator: name,
+          phase: s.phase,
+          resultUrl: s.resultUrl,
+          resultSize: s.resultSize,
+          originalSize: s.originalSize,
+          jobId: s.jobId,
+        },
+        `${name} should clear all result metadata and reset phase`,
+      ).toEqual({
+        mutator: name,
+        phase: expectedPhase,
+        resultUrl: null,
+        resultSize: null,
+        originalSize: null,
+        jobId: null,
+      });
+    }
+  });
+
+  it("cancels an active run and resets phase from processing across setting and layout mutators (#3228)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+
+    const mutators: Array<[string, () => void]> = [
+      ["setTemplateId", () => useCollageStore.getState().setTemplateId("3-h-equal")],
+      ["setCellAssignment", () => useCollageStore.getState().setCellAssignment(0, 1)],
+      ["swapCells", () => useCollageStore.getState().swapCells(0, 1)],
+      ["setCellTransform", () => useCollageStore.getState().setCellTransform(0, { zoom: 1.5 })],
+      ["resetCellTransform", () => useCollageStore.getState().resetCellTransform(0)],
+      ["setGap", () => useCollageStore.getState().setGap(16)],
+      ["setCornerRadius", () => useCollageStore.getState().setCornerRadius(8)],
+      ["setBackgroundColor", () => useCollageStore.getState().setBackgroundColor("#123456")],
+      ["setBgPreset(black)", () => useCollageStore.getState().setBgPreset("black")],
+      ["setAspectRatio", () => useCollageStore.getState().setAspectRatio("16:9")],
+      ["setOutputFormat", () => useCollageStore.getState().setOutputFormat("webp")],
+      ["setQuality", () => useCollageStore.getState().setQuality(80)],
+    ];
+
+    for (const [name, mutate] of mutators) {
+      // With images loaded: processing -> editing
+      useCollageStore.getState().reset();
+      useCollageStore.getState().addImages([file1, file2]);
+      const abortWithImages = vi.fn();
+      const runWithImages = beginCollageRun(abortWithImages);
+      useCollageStore.getState().setPhase("processing");
+
+      mutate();
+
+      expect(abortWithImages, `${name} should abort active run`).toHaveBeenCalledTimes(1);
+      expect(runWithImages.isCurrent(), `${name} should invalidate run`).toBe(false);
+      expect(useCollageStore.getState().phase, `${name} with images should return to editing`).toBe(
+        "editing",
+      );
+
+      // Without images loaded: processing/result -> upload
+      useCollageStore.getState().reset();
+      const abortWithoutImages = vi.fn();
+      const runWithoutImages = beginCollageRun(abortWithoutImages);
+      useCollageStore.getState().setPhase("processing");
+
+      mutate();
+
+      expect(
+        abortWithoutImages,
+        `${name} without images should abort active run`,
+      ).toHaveBeenCalledTimes(1);
+      expect(runWithoutImages.isCurrent(), `${name} without images should invalidate run`).toBe(
+        false,
+      );
+      expect(
+        useCollageStore.getState().phase,
+        `${name} without images should return to upload`,
+      ).toBe("upload");
+    }
+  });
+
+  it("clears error across layout, setting, and image mutators (#3688)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+
+    const mutators: Array<[string, () => void]> = [
+      ["addImages", () => useCollageStore.getState().addImages([file3])],
+      ["removeImage", () => useCollageStore.getState().removeImage(0)],
+      ["clearImages", () => useCollageStore.getState().clearImages()],
+      ["setTemplateId", () => useCollageStore.getState().setTemplateId("3-h-equal")],
+      ["setCellAssignment", () => useCollageStore.getState().setCellAssignment(0, 1)],
+      ["swapCells", () => useCollageStore.getState().swapCells(0, 1)],
+      ["setCellTransform", () => useCollageStore.getState().setCellTransform(0, { zoom: 1.5 })],
+      ["resetCellTransform", () => useCollageStore.getState().resetCellTransform(0)],
+      ["setGap", () => useCollageStore.getState().setGap(16)],
+      ["setCornerRadius", () => useCollageStore.getState().setCornerRadius(8)],
+      ["setBackgroundColor", () => useCollageStore.getState().setBackgroundColor("#123456")],
+      ["setBgPreset(black)", () => useCollageStore.getState().setBgPreset("black")],
+      ["setAspectRatio", () => useCollageStore.getState().setAspectRatio("16:9")],
+      ["setOutputFormat", () => useCollageStore.getState().setOutputFormat("webp")],
+      ["setQuality", () => useCollageStore.getState().setQuality(80)],
+      ["reset", () => useCollageStore.getState().reset()],
+    ];
+
+    for (const [name, mutate] of mutators) {
+      if (useCollageStore.getState().images.length < 2) {
+        useCollageStore.getState().addImages([file1, file2]);
+      }
+      useCollageStore.getState().setError("Collage failed");
+      expect(useCollageStore.getState().error).toBe("Collage failed");
+
+      mutate();
+
+      expect(useCollageStore.getState().error, `${name} should clear error`).toBeNull();
+    }
   });
 
   it("setProgress updates progress", () => {
@@ -1765,6 +2534,20 @@ describe("useCollageStore", () => {
     const s = useCollageStore.getState();
     expect(s.error).toBe("Something went wrong");
     expect(s.phase).toBe("editing");
+  });
+
+  it("setError(null) and setError('') clear error without overwriting phase (#2712)", () => {
+    useCollageStore.getState().setError("Previous failure");
+    useCollageStore.getState().setPhase("processing");
+    useCollageStore.getState().setError(null);
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(useCollageStore.getState().phase).toBe("processing");
+
+    useCollageStore.getState().setError("Another failure");
+    useCollageStore.getState().setPhase("processing");
+    useCollageStore.getState().setError("");
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(useCollageStore.getState().phase).toBe("processing");
   });
 
   it("reset revokes all blob URLs and restores initial state", () => {
@@ -1792,7 +2575,8 @@ describe("useCollageStore", () => {
 // ==========================================================================
 
 // Mock the api module to prevent real network calls
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPut: vi.fn(),
@@ -1937,6 +2721,31 @@ describe("useSettingsStore", () => {
     expect(useSettingsStore.getState().loadError).toBe(false);
     expect(useSettingsStore.getState().disabledTools).toEqual(["resize"]);
   });
+
+  it.each(["{corrupt", "{}", "null", "42", '"resize"', "[null]", "[42]"])(
+    "fetch falls back disabledTools to [] when API returns %s (#3084)",
+    async (rawDisabledTools) => {
+      mockApiGet.mockResolvedValueOnce({
+        settings: {
+          disabledTools: rawDisabledTools,
+          enableExperimentalTools: "true",
+          defaultToolView: "fullscreen",
+          defaultTheme: "dark",
+        },
+      });
+
+      await useSettingsStore.getState().fetch();
+
+      const s = useSettingsStore.getState();
+      expect(s.disabledTools).toEqual([]);
+      expect(s.disabledTools.includes("resize")).toBe(false);
+      expect(s.experimentalEnabled).toBe(true);
+      expect(s.defaultToolView).toBe("fullscreen");
+      expect(s.defaultTheme).toBe("dark");
+      expect(s.loaded).toBe(true);
+      expect(s.loadError).toBe(false);
+    },
+  );
 });
 
 // ==========================================================================
@@ -2721,6 +3530,7 @@ describe("useAnalyticsStore", () => {
       enabled: true,
       posthogApiKey: "phc_test",
       posthogHost: "https://ph.example.com",
+      feedbackSink: true,
       sentryDsn: "https://sentry.example.com",
       sentryDsnWeb: "https://sentry.example.com/web",
       posthogSampleRate: 0.5,

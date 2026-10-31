@@ -1,8 +1,10 @@
 import { createReadStream } from "node:fs";
 import { join } from "node:path";
 import type { MultipartFile } from "@fastify/multipart";
+import type { FastifyBaseLogger } from "fastify";
 import { validatePdfPath } from "../modality/document-input.js";
 import { sanitizeFilename } from "./filename.js";
+import { logger } from "./logger.js";
 import { copyReadableToFile, deleteObject, putObjectStream } from "./object-storage.js";
 
 export interface SpooledMultipartFile {
@@ -33,20 +35,37 @@ export async function spoolMultipartFile(
 export async function storeValidatedOcrPdf(
   file: SpooledMultipartFile,
   key: string,
-  opts: { maxBytes: number; signal?: AbortSignal },
+  opts: {
+    maxBytes: number;
+    signal?: AbortSignal;
+    beforeStore?: () => Promise<void>;
+    log?: Pick<FastifyBaseLogger, "warn">;
+  },
 ): Promise<number> {
   await validatePdfPath(file.path, {
     rejectPasswordProtected: true,
     signal: opts.signal,
   });
+  await opts.beforeStore?.();
+  const stream = createReadStream(file.path);
   try {
-    const written = await putObjectStream(key, createReadStream(file.path), opts);
+    let written: number;
+    try {
+      written = await putObjectStream(key, stream, opts);
+    } finally {
+      stream.on("error", () => {});
+      if (!stream.destroyed) {
+        stream.destroy();
+      }
+    }
     if (written !== file.size) {
       throw new Error(`OCR PDF scratch file changed size (${file.size} to ${written} bytes)`);
     }
     return written;
   } catch (error) {
-    await deleteObject(key).catch(() => {});
+    await deleteObject(key).catch((err) => {
+      (opts.log ?? logger).warn({ err, key }, "Failed to delete failed OCR PDF upload");
+    });
     throw error;
   }
 }

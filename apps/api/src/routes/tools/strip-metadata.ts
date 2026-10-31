@@ -1,10 +1,21 @@
+import { extname } from "node:path";
 import { parseExif, parseGps, parseXmp, stripMetadata } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { stripInternalPaths } from "../../lib/errors.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgClientError,
+  sanitizeSvg,
+} from "../../lib/svg-sanitize.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -116,18 +127,69 @@ export function registerStripMetadata(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (!fileBuffer || fileBuffer.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
+      let inspectBuffer = fileBuffer;
+      const sanitizedUpFront =
+        extname(filename).toLowerCase() === ".svgz" || isSvgBuffer(fileBuffer);
+      if (sanitizedUpFront) {
+        try {
+          inspectBuffer = decompressSvgz(fileBuffer);
+          if (isSvgBuffer(inspectBuffer)) {
+            inspectBuffer = sanitizeSvg(inspectBuffer);
+          } else {
+            const validation = await validateImageBuffer(inspectBuffer, filename);
+            if (!validation.valid) {
+              return reply.status(400).send({ error: "Invalid SVGZ file" });
+            }
+          }
+        } catch (err) {
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: err instanceof Error ? err.message : "Invalid SVG",
+            });
+          }
+          throw asDecoderOutOfMemory(err);
+        }
+      }
+
+      let metadata: Metadata;
       try {
-        const metadata = await sharp(fileBuffer).metadata();
+        metadata = await sharp(inspectBuffer).metadata();
+      } catch (err) {
+        const oomErr = asDecoderOutOfMemory(err);
+        if (isDecoderUnavailable(oomErr)) throw oomErr;
+        request.log?.warn({ err, toolId: "strip-metadata" }, "Failed to read image metadata");
+        return reply.status(422).send({
+          error: "Failed to read image metadata",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+        });
+      }
+
+      if (!sanitizedUpFront && metadata.format === "svg") {
+        try {
+          inspectBuffer = decompressSvgz(inspectBuffer);
+          inspectBuffer = sanitizeSvg(inspectBuffer);
+        } catch (err) {
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: err instanceof Error ? err.message : "Invalid SVG",
+            });
+          }
+          throw asDecoderOutOfMemory(err);
+        }
+      }
+
+      try {
+        if (!sanitizedUpFront && metadata.format === "svg") {
+          metadata = await sharp(inspectBuffer).metadata();
+        }
 
         const result: Record<string, unknown> = {
           filename,
@@ -137,7 +199,7 @@ export function registerStripMetadata(app: FastifyInstance) {
         // Parse EXIF
         if (metadata.exif) {
           try {
-            const parsed = parseExif(metadata.exif);
+            const parsed = parseExif(metadata.exif, { throwOnError: true });
             const exifData: Record<string, unknown> = {
               ...parsed.image,
               ...parsed.photo,
@@ -154,7 +216,9 @@ export function registerStripMetadata(app: FastifyInstance) {
 
             if (Object.keys(exifData).length > 0) result.exif = exifData;
             if (Object.keys(gpsData).length > 0) result.gps = gpsData;
-          } catch {
+          } catch (err) {
+            const oomErr = asDecoderOutOfMemory(err);
+            if (isDecoderUnavailable(oomErr)) throw oomErr;
             result.exif = null;
             result.exifError = "Failed to parse EXIF data";
           }
@@ -164,7 +228,9 @@ export function registerStripMetadata(app: FastifyInstance) {
         if (metadata.icc) {
           try {
             result.icc = parseIccProfile(metadata.icc);
-          } catch {
+          } catch (err) {
+            const oomErr = asDecoderOutOfMemory(err);
+            if (isDecoderUnavailable(oomErr)) throw oomErr;
             result.icc = null;
           }
         }
@@ -173,16 +239,21 @@ export function registerStripMetadata(app: FastifyInstance) {
         if (metadata.xmp) {
           try {
             result.xmp = parseXmp(metadata.xmp);
-          } catch {
+          } catch (err) {
+            const oomErr = asDecoderOutOfMemory(err);
+            if (isDecoderUnavailable(oomErr)) throw oomErr;
             result.xmp = null;
           }
         }
 
         return reply.send(result);
       } catch (err) {
+        const oomErr = asDecoderOutOfMemory(err);
+        if (isDecoderUnavailable(oomErr)) throw oomErr;
+        request.log?.warn({ err, toolId: "strip-metadata" }, "Failed to read image metadata");
         return reply.status(422).send({
           error: "Failed to read image metadata",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

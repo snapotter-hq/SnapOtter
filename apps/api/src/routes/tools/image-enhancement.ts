@@ -4,19 +4,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { noiseRemoval } from "@snapotter/ai";
 import { analyzeImage, applyCorrections } from "@snapotter/image-engine";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
-import { autoOrient } from "../../lib/auto-orient.js";
+import type { DeepEnhanceSkipReason } from "../../lib/batch-file-notes.js";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { reportError } from "../../lib/error-report.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { logger } from "../../lib/logger.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { engineUnavailable } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -37,17 +45,11 @@ const settingsSchema = z.object({
 
 type EnhancementSettings = z.infer<typeof settingsSchema>;
 
-/**
- * Why a requested Deep Enhance pass did not run, returned to the client as
- * `resultPayload.deepEnhanceSkipped` so the panel can say so instead of
- * presenting the standard result as the deep one (#950).
- */
-export type DeepEnhanceSkipReason = "failed" | "unavailable" | "animated";
-
 export async function processImageEnhancement(
   rawBuffer: Buffer,
   settings: EnhancementSettings,
   filename: string,
+  options: { signal?: AbortSignal } = {},
 ) {
   const outputFormat = await resolveOutputFormat(rawBuffer, filename);
 
@@ -70,6 +72,8 @@ export async function processImageEnhancement(
     throw await asInputErrorIfUndecodable(rawBuffer, err);
   }
 
+  // Returned as resultPayload.deepEnhanceSkipped so the panel can say the deep
+  // pass didn't run instead of presenting the standard result as it (#950).
   let deepEnhanceSkipped: DeepEnhanceSkipReason | undefined;
 
   // The alpha channel is split out and rejoined through separate pipelines, and
@@ -150,9 +154,18 @@ export async function processImageEnhancement(
         strength: 35,
         detailPreservation: 70,
         colorNoise: 20,
+        toolId: "image-enhancement",
+        signal: options.signal,
       });
       denoised = result.buffer;
     } catch (err) {
+      // A cancel is not a failed deep pass: rethrow it so the worker settles the
+      // job as canceled instead of logging and reporting a Sharp-only success.
+      // Gate on the error itself, not just signal.aborted, so a real failure
+      // that races a cancel still gets logged and reported (#1224).
+      if (options.signal?.aborted && err instanceof Error && err.name === "AbortError") {
+        throw err;
+      }
       // isToolInstalled() only filters out bundles the install record says
       // are absent, so what lands here is a pass that was meant to run and
       // broke: a sidecar crash, an OOM, a bad scratch dir, missing or corrupt
@@ -182,9 +195,16 @@ export async function processImageEnhancement(
   // to 500 sidecar round trips for one job, and denoising each frame on its
   // own plays back as flicker. Animations get the standard pass on every frame
   // and a reason the client can show.
-  const perFrame = await runPerFrame(rawBuffer, outputFormat.format, (frame) => core(frame, false));
-  if (perFrame && settings.deepEnhance) deepEnhanceSkipped = "animated";
-  const finalBuffer = perFrame ?? (await core(rawBuffer, true));
+  let finalBuffer: Buffer;
+  try {
+    const perFrame = await runPerFrame(rawBuffer, outputFormat.format, (frame) =>
+      core(frame, false),
+    );
+    if (perFrame && settings.deepEnhance) deepEnhanceSkipped = "animated";
+    finalBuffer = perFrame ?? (await core(rawBuffer, true));
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(rawBuffer, err);
+  }
 
   return {
     buffer: finalBuffer,
@@ -220,57 +240,90 @@ export function registerImageEnhancement(app: FastifyInstance) {
               chunks.push(chunk);
             }
             fileBuffer = Buffer.concat(chunks);
-            filename = part.filename ?? "image";
+            filename = sanitizeFilename(part.filename ?? "image");
             break;
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (!fileBuffer || fileBuffer.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer, filename);
+      let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+      try {
+        validation = await validateImageBuffer(fileBuffer, filename);
+      } catch (rawErr) {
+        const err = asDecoderOutOfMemory(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "image-enhancement",
+            request.log,
+          );
+        }
+        throw rawErr;
+      }
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
-      if (validation.format === "heif") {
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file",
-            details: err instanceof Error ? err.message : String(err),
-          });
+      try {
+        const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+          log: request.log,
+        });
+        fileBuffer = prepared.buffer;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
         }
-      }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-      if (needsCliDecode(validation.format)) {
-        try {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-        } catch (err) {
-          return reply.status(422).send({
-            error: `Failed to decode ${validation.format} file`,
-            details: err instanceof Error ? err.message : String(err),
-          });
+        if (isDecoderUnavailable(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "image-enhancement",
+            request.log,
+          );
         }
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "image-enhancement" }, "Input decoding failed");
+        }
+        return reply.status(422).send({
+          error:
+            validation.format === "heif"
+              ? "Failed to decode HEIC file"
+              : `Failed to decode ${validation.format} file`,
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
       }
 
       try {
-        fileBuffer = await autoOrient(fileBuffer);
         const analysis = await analyzeImage(fileBuffer);
         return reply.send(analysis);
-      } catch (err) {
+      } catch (rawErr) {
+        const classified = await asInputErrorIfUndecodable(fileBuffer, rawErr);
+        const err = normalizeOperationalWriteError(classified);
+        if (isDecoderUnavailable(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "image-enhancement",
+            request.log,
+          );
+        }
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "image-enhancement" }, "Image analysis failed");
+        }
         return reply.status(422).send({
           error: "Analysis failed",
-          details: err instanceof Error ? err.message : String(err),
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
     },

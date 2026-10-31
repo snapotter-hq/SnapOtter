@@ -3,7 +3,7 @@
 import type Konva from "konva";
 import KonvaFilters from "konva";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Arrow,
   Ellipse,
@@ -18,7 +18,9 @@ import {
   Star,
   Text,
 } from "react-konva";
+import { toast } from "sonner";
 import useImage from "use-image";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
@@ -27,6 +29,7 @@ import type {
   FilterConfig,
   ImageAttrs,
   ObjectEffects,
+  ToolType,
 } from "@/types/editor";
 import {
   type CurvesState,
@@ -131,8 +134,21 @@ function SourceImage({
   canvasWidth: number;
   canvasHeight: number;
 }) {
-  const [image] = useImage(url);
+  // Without CORS mode a cross-origin image taints the canvas, and every pixel tool
+  // (and export) then throws on its first read. editor-page only opens a ?url=
+  // image after it has loaded with CORS, so asking for it here changes nothing for
+  // a URL that worked before (#1040).
+  const { t } = useTranslation();
+  const sourceImageFailed = useRef(t.editor.ui.captureFailure.sourceImageFailed);
+  sourceImageFailed.current = t.editor.ui.captureFailure.sourceImageFailed;
+  const [image, status] = useImage(url, "anonymous");
   const imageRef = useRef<Konva.Image>(null);
+
+  useEffect(() => {
+    if (status === "failed") {
+      toast.error(sourceImageFailed.current, { id: "editor-source-image-failed" });
+    }
+  }, [status]);
 
   // Issue #12: Apply adjustments/filters to the source image node
   const hasActiveAdjustments = Object.values(adjustments).some((v) => v !== 0);
@@ -353,8 +369,26 @@ function ImageObject({
   onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
   draggable: boolean;
 }) {
+  const { t } = useTranslation();
+  const sourceImageFailed = useRef(t.editor.ui.captureFailure.sourceImageFailed);
+  sourceImageFailed.current = t.editor.ui.captureFailure.sourceImageFailed;
   const a = obj.attrs as ImageAttrs;
-  const [image] = useImage(a.src);
+  const [loaded, status] = useImage(a.src, "anonymous");
+  useEffect(() => {
+    if (status === "failed") {
+      toast.error(sourceImageFailed.current, { id: "editor-source-image-failed" });
+    }
+  }, [status]);
+  // A pixel brush mid-stroke hands over its canvas, which it keeps painting into.
+  // Only a real canvas counts: a serialised one comes back as `{}`, which Konva
+  // would throw on at every draw.
+  const liveImage = a.image instanceof HTMLCanvasElement ? a.image : undefined;
+  // Mouse up swaps the canvas for a data URL that takes a few frames to decode.
+  // Keep showing the canvas (same pixels) until it has, or the stroke blinks out.
+  const lastLiveRef = useRef<HTMLCanvasElement | undefined>(undefined);
+  if (liveImage) lastLiveRef.current = liveImage;
+  else if (loaded) lastLiveRef.current = undefined;
+  const image = liveImage ?? loaded ?? lastLiveRef.current;
   if (!image) return null;
 
   return (
@@ -665,6 +699,36 @@ function CanvasObjectRenderer({
   }
 }
 
+// Tools whose drag state lives from mousedown to mouseup. Konva only hears a
+// release over its own canvas, so these also listen on the document (#1041,
+// #2154). The click-driven polygonal lasso is left out: its vertices come from
+// presses, not from a drag.
+const DRAG_TOOLS = new Set<ToolType>([
+  "brush",
+  "pencil",
+  "eraser",
+  "clone-stamp",
+  "dodge",
+  "burn",
+  "sponge",
+  "blur-brush",
+  "sharpen-brush",
+  "smudge",
+  "shape-rect",
+  "shape-ellipse",
+  "shape-line",
+  "shape-arrow",
+  "shape-polygon",
+  "shape-star",
+  "gradient",
+  "marquee-rect",
+  "marquee-ellipse",
+  "lasso-free",
+]);
+
+// The drag tools that commit through useSelectionTool.
+const SELECTION_DRAG_TOOLS = new Set<ToolType>(["marquee-rect", "marquee-ellipse", "lasso-free"]);
+
 // ---------------------------------------------------------------------------
 // Tool handler dispatcher
 // ---------------------------------------------------------------------------
@@ -688,7 +752,7 @@ function useActiveToolHandlers(stageRef: React.RefObject<Konva.Stage | null>) {
   const moveTool = useMoveTool();
   const selectionTool = useSelectionTool();
   const transformTool = useTransformTool();
-  const eyedropperTool = useEyedropperTool({ stageRef, sampleSize: 1 });
+  const eyedropperTool = useEyedropperTool({ stageRef });
 
   useEffect(() => {
     const typeMap: Record<string, "rect" | "ellipse" | "lasso"> = {
@@ -837,6 +901,8 @@ export function EditorCanvas({
 } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const selectionLayerRef = useRef<Konva.Layer>(null);
+  // The open drag, if any: `finish` runs the tool that started it, `cancel` just disarms.
+  const openDragRef = useRef<{ finish: () => void; cancel: () => void } | null>(null);
   const { stageRef, handleWheel, fitToScreen, handleTouchMove, handleTouchEnd } = useCanvasZoom();
 
   const zoom = useEditorStore((s) => s.zoom);
@@ -861,6 +927,14 @@ export function EditorCanvas({
   const contextMenu = useContextMenu();
 
   const { handlers, moveTool, selectionTool, transformTool } = useActiveToolHandlers(stageRef);
+
+  // The handlers of the latest committed render. A tool whose release reads React
+  // state (the marquee and lasso read their points) must end with these, not with
+  // the copy from the render its drag started in, which has none of the points yet.
+  const latestToolRef = useRef({ handlers, activeTool, selectionTool });
+  useLayoutEffect(() => {
+    latestToolRef.current = { handlers, activeTool, selectionTool };
+  });
 
   const [stageWidth, setStageWidth] = useState(800);
   const [stageHeight, setStageHeight] = useState(600);
@@ -918,8 +992,8 @@ export function EditorCanvas({
       if (!stage) return;
       const pointer = stage.getPointerPosition();
       if (!pointer) return;
-      const x = Math.round((pointer.x - panOffset.x) / zoom);
-      const y = Math.round((pointer.y - panOffset.y) / zoom);
+      const x = Math.floor((pointer.x - panOffset.x) / zoom);
+      const y = Math.floor((pointer.y - panOffset.y) / zoom);
       setCursorPosition({ x, y });
 
       // Forward to active tool
@@ -932,26 +1006,65 @@ export function EditorCanvas({
 
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // A drag whose release never arrived (focus lost mid-drag) ends before the
+      // tool starts a new one, or its object is stranded half-written.
+      openDragRef.current?.finish();
+
       // For move tool, handle stage click to deselect
       if (activeTool === "move") {
         moveTool.onStageClick(e);
       }
 
-      if (handlers) {
-        handlers.handleMouseDown(e);
-      }
+      if (!handlers) return;
+      handlers.handleMouseDown(e);
+      if (!DRAG_TOOLS.has(activeTool)) return;
+
+      // Konva only hears a release over its own canvas. Letting go over the toolbar,
+      // a panel or outside the window must end the drag too, and losing the window
+      // mid-drag sends no mouseup at all (#1041, #2154).
+      const cancel = () => {
+        openDragRef.current = null;
+        document.removeEventListener("mouseup", finish);
+        window.removeEventListener("blur", finish);
+      };
+      // The tool that started the drag ends it, even if a shortcut switched
+      // activeTool mid-drag and the current handlers now point somewhere else.
+      // A release that reads React state would see the state from mousedown, so
+      // the selection tools end through the latest render's hook (its points are
+      // the ones drawn so far, whichever tool is active now) and the others use
+      // the latest handlers while their tool is unchanged.
+      const finish = () => {
+        cancel();
+        const current = latestToolRef.current;
+        if (SELECTION_DRAG_TOOLS.has(activeTool)) {
+          current.selectionTool.onMouseUp();
+          return;
+        }
+        (current.activeTool === activeTool ? current.handlers : handlers)?.handleMouseUp(e);
+      };
+      document.addEventListener("mouseup", finish);
+      window.addEventListener("blur", finish);
+      openDragRef.current = { finish, cancel };
     },
     [handlers, activeTool, moveTool],
   );
 
   const handleMouseUp = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      const open = openDragRef.current;
+      if (open) {
+        open.finish();
+        return;
+      }
       if (handlers) {
         handlers.handleMouseUp(e);
       }
     },
     [handlers],
   );
+
+  // A drag that is still open when the canvas goes away has nothing to finish.
+  useEffect(() => () => openDragRef.current?.cancel(), []);
 
   // Issue #5: Track screen-space cursor for brush overlay
   const handleContainerMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

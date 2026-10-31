@@ -10,8 +10,9 @@ import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { qpdfAvailable } from "@snapotter/doc-engine";
+import { gsAvailable, qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
+import { FILE_NOTES_ALL_FILES } from "@snapotter/shared";
 import AdmZip from "adm-zip";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -20,12 +21,14 @@ import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
+import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
 import { objectExists } from "../../../apps/api/src/lib/object-storage.js";
 import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
+  loginAsUser,
   type TestApp,
 } from "../test-server.js";
 
@@ -53,6 +56,7 @@ const storageMock = vi.hoisted(() => ({
   // way the workspace cap does (#1161), so the route's cleanup and the
   // finalize's message pass-through are testable without filling a disk.
   putObjectFail: new Map<string, string>(),
+  putObjectError: new Map<string, () => Error>(),
   putObjectStreamFail: new Map<string, string>(),
 }));
 
@@ -102,6 +106,9 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   return {
     ...actual,
     putObject: async (key: string, data: Buffer) => {
+      for (const [prefix, buildErr] of storageMock.putObjectError) {
+        if (key.startsWith(prefix)) throw buildErr();
+      }
       for (const [prefix, message] of storageMock.putObjectFail) {
         if (key.startsWith(prefix)) throw capError(message);
       }
@@ -180,11 +187,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ── ZIP response validation ─────────────────────────────────────
 describe("ZIP response format", () => {
@@ -441,6 +448,110 @@ describe("ClientJobId passthrough", () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers["x-job-id"]).toBeDefined();
     expect((res.headers["x-job-id"] as string).length).toBeGreaterThan(0);
+  });
+
+  // A browser can resend the batch POST on a fresh connection when it gave up
+  // on the first one, and the XHR then reports whichever answer arrives. The
+  // owner's replay attaches to the batch already running: 202 hands the client
+  // to the SSE and its durable result, and nothing is inserted or processed
+  // twice (#2015, which replaced the owner's 409 from #1687).
+  it("answers 202 and attaches when the owner replays a clientJobId", async () => {
+    const clientJobId = `batch-2015-${randomUUID()}`;
+    const post = (token: string) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ width: 100 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      return app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+        body,
+      });
+    };
+
+    const first = await post(adminToken);
+    expect(first.statusCode).toBe(200);
+    const [before] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+
+    const second = await post(adminToken);
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(202);
+    expect(second.json()).toEqual({ jobId: clientJobId, async: true });
+
+    const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(after).toEqual(before);
+
+    // Someone else's job id stays a conflict: attaching would leak the result.
+    const userToken = await loginAsUser(app);
+    const foreign = await post(userToken);
+    expect(foreign.statusCode, foreign.body.slice(0, 300)).toBe(409);
+    expect(foreign.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+  });
+
+  // A free clientJobId can still collide when the route inserts its per-file
+  // child rows (${parentId}-f${n}). That is still a client id collision:
+  // settle the staged parent, remove any earlier children and uploads from
+  // this request, leave the pre-existing child row and its upload untouched,
+  // and answer 409 instead of 500 (#1724).
+  it("answers 409 when a free clientJobId collides on a child id", async () => {
+    const clientJobId = `batch-1724-${randomUUID()}`;
+    const collidingChildId = `${clientJobId}-f1`;
+    const collidingUploadKey = `uploads/${collidingChildId}/b.jpg`;
+    const { getObjectBuffer, putObject } = await import(
+      "../../../apps/api/src/lib/object-storage.js"
+    );
+    await putObject(collidingUploadKey, Buffer.from("existing-child-upload"));
+    await db.insert(schema.jobs).values({
+      id: collidingChildId,
+      toolId: "resize",
+      pool: "image",
+      type: "tool",
+      status: "completed",
+      inputRefs: [collidingUploadKey],
+      settings: { kept: true },
+    });
+    const [childBefore] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ width: 100 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [childAfter] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+    expect(childAfter).toEqual(childBefore);
+    expect((await getObjectBuffer(collidingUploadKey)).toString()).toBe("existing-child-upload");
+
+    const earlierChildRows = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, `${clientJobId}-f0`));
+    expect(earlierChildRows).toHaveLength(0);
+    expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
+
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(parentRow?.status).toBe("failed");
+    expect(parentRow?.error).toMatchObject({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+    });
   });
 });
 
@@ -749,7 +860,7 @@ describe("Legacy batch SSE wire parity", () => {
     }
 
     expect(frame).not.toBeNull();
-    const parsed = JSON.parse(frame!);
+    const parsed = JSON.parse(frame ?? "null");
 
     // Legacy semantics: completedFiles = total finished (successes + failures)
     expect(parsed.totalFiles).toBe(3);
@@ -979,8 +1090,7 @@ describe("OCR batch aggregate size limit", () => {
 
       expect(res.statusCode).toBe(413);
       const result = JSON.parse(res.body);
-      expect(result.error).toBe("Upload exceeds the allowed size");
-      expect(result.details).toMatch(/aggregate safety limit/);
+      expect(result.error).toBe("OCR batch input exceeds the 1 KB aggregate safety limit");
     } finally {
       ocrLimitsMock.override = null;
     }
@@ -1194,9 +1304,13 @@ describe("Workspace storage cap during batch processing", () => {
         body,
       });
 
-      expect(res.statusCode).toBe(422);
-      const payload = JSON.parse(res.body) as { error: string; errors: unknown[] };
+      // The cap is the instance's fault, so it answers 503 with its code like
+      // every other place a storage fault surfaces (#1161, #1421). The worker
+      // used to leave the status off the child rows, which made it a 422 (#2210).
+      expect(res.statusCode).toBe(503);
+      const payload = JSON.parse(res.body) as { error: string; code?: string; errors: unknown[] };
       expect(payload.error).toBe("Injected cap on child output");
+      expect(payload.code).toBe("workspace-cap");
       expect(payload.errors).toHaveLength(2);
 
       const frame = await waitForTerminalFrame(clientJobId);
@@ -1295,6 +1409,90 @@ describe("Workspace storage cap during batch ingress", () => {
       storageMock.putObjectFail.clear();
     }
   }, 30_000);
+
+  it("preserves earlier preFailures on the settled row and terminal frame when a later file cannot be stored (#3289)", async () => {
+    const clientJobId = randomUUID();
+    storageMock.putObjectFail.set(`uploads/${clientJobId}-f0/`, "Injected cap after empty file");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "empty.png",
+          contentType: "image/png",
+          content: Buffer.alloc(0),
+        },
+        { name: "file", filename: "b.png", content: Buffer.from(PNG) },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toContain("Injected cap after empty file");
+
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toEqual({
+        message: "Injected cap after empty file",
+        code: "workspace-cap",
+        details: [
+          { filename: "empty.png", error: "File is empty" },
+          { filename: "", error: "Injected cap after empty file" },
+        ],
+      });
+
+      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      expect(frame.status).toBe("failed");
+      expect(frame.errors).toEqual([
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "", error: "Injected cap after empty file" },
+      ]);
+    } finally {
+      storageMock.putObjectFail.clear();
+    }
+  }, 30_000);
+
+  it("masks non-SafeError 500 messages in the settled row and cached terminal frame when ingress faults (#2816)", async () => {
+    const clientJobId = randomUUID();
+    storageMock.putObjectError.set(`uploads/${clientJobId}-f0/`, () =>
+      Object.assign(new TypeError("Cannot read properties of undefined (reading 'byteLength')"), {
+        statusCode: 500,
+      }),
+    );
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(500);
+
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toEqual({
+        message: "Internal server error",
+        details: [{ filename: "", error: "Internal server error" }],
+      });
+
+      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      expect(frame.status).toBe("failed");
+      expect(frame.errors).toEqual([{ filename: "", error: "Internal server error" }]);
+    } finally {
+      storageMock.putObjectError.clear();
+    }
+  }, 30_000);
 });
 
 // ── All files fail ingress validation (#750) ────────────────────
@@ -1343,15 +1541,16 @@ describe("Batch where every file fails validation", () => {
 // ── CLI-decode fallback + all-children-failed ───────────────────
 describe("Batch where every worker job fails", () => {
   it("returns 422 with per-file errors when all enqueued children fail", async () => {
-    // A QOI header with impossible channel/colorspace bytes passes magic-byte
-    // ingress validation (CLI-decoded formats skip the Sharp probe), fails
-    // every decoder in the CLI fallback chain, is uploaded raw, and then
-    // fails in the worker. That drives the post-processing "all files
-    // failed" branch, which is unreachable via ingress validation alone.
+    // A well-formed QOI header over far too little pixel data passes ingress
+    // validation (CLI-decoded formats skip the Sharp probe, and the header is
+    // all it checks), fails every decoder in the CLI fallback chain, is
+    // uploaded raw, and then fails in the worker. That drives the
+    // post-processing "all files failed" branch, which is unreachable via
+    // ingress validation alone.
     const garbageQoi = Buffer.concat([
       Buffer.from("qoif"),
-      // width=1, height=1, channels=0xff (invalid), colorspace=0xff (invalid)
-      Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 0xff, 0xff]),
+      // width=1000, height=1000, channels=3, colorspace=0: 64 bytes can't hold it
+      Buffer.from([0, 0, 0x03, 0xe8, 0, 0, 0x03, 0xe8, 3, 0]),
       Buffer.alloc(64, 0xab),
     ]);
 
@@ -1430,5 +1629,162 @@ describe.skipIf(!qpdfAvailable())("Document batch partial failure", () => {
     const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
     expect(Object.keys(fileResults)).toEqual(["0"]);
     expect(fileResults["0"]).toMatch(/doc-ok/);
+  }, 60_000);
+});
+
+// ── X-File-Notes header (#1292) ─────────────────────────────────
+// A single target-size run says when it had to scale an image down to fit
+// (resizedTo) or couldn't reach the target (targetMet). A batch settled from
+// the ZIP said neither, so "compress 20 photos to 20 KB" could quietly shrink
+// half of them. The notes ride next to fileResults, keyed the same way.
+describe("X-File-Notes header (#1292)", () => {
+  async function noiseJpeg(w: number, h: number): Promise<Buffer> {
+    const raw = Buffer.alloc(w * h * 3);
+    let seed = 7;
+    for (let i = 0; i < raw.length; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      raw[i] = seed & 0xff;
+    }
+    return sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  }
+
+  it("reports per-file resize notes, keyed by upload index", async () => {
+    // Index 0 is a zero-byte upload that never becomes a flow child, so the
+    // notes must follow the same flow-to-upload remap as fileResults (#645).
+    const big = await noiseJpeg(3000, 2250);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      { name: "file", filename: "big.jpg", contentType: "image/jpeg", content: big },
+      { name: "file", filename: "small.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ mode: "targetSize", targetSizeKb: 20 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compress/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+    expect(Object.keys(fileResults).sort()).toEqual(["1", "2"]);
+
+    const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+    expect(notes["1"].targetKb).toBe(20);
+    expect(notes["1"].resizedTo.width).toBeLessThan(3000);
+    // Only files with something to warn about get a note, so the header stays
+    // small however large the batch: the small PNG fit and has none.
+    expect(notes["2"]).toBeUndefined();
+    expect(notes["0"]).toBeUndefined();
+
+    // The async path (SSE terminal frame, replay) reads the same map from the
+    // parent row, so a client that lost the HTTP response still gets it.
+    const parentId = res.headers["x-job-id"] as string;
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    const result = (row.progress as { result?: { fileNotes?: Record<string, unknown> } }).result;
+    expect(result?.fileNotes).toEqual(notes);
+  }, 120_000);
+
+  // The issue's headline case: a batch through a size target where one PDF is
+  // mostly text and can't get there. It used to settle as done like the rest.
+  it.skipIf(!gsAvailable())(
+    "reports a compress-pdf file that missed its target",
+    async () => {
+      const scan = readFixture(fixtures.document.pdfScanned);
+      const text = readFixture(fixtures.document.pdf3);
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "scan.pdf", contentType: "application/pdf", content: scan },
+        { name: "file", filename: "text.pdf", contentType: "application/pdf", content: text },
+        { name: "settings", content: JSON.stringify({ mode: "targetSize", targetSizeKb: 1 }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/pdf/compress-pdf/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+      const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+      // 1 KB is out of reach for both, so both carry the same miss, and a note
+      // every file shares goes out once (#1303).
+      expect(notes).toEqual({ [FILE_NOTES_ALL_FILES]: { targetMet: false, targetKb: 1 } });
+    },
+    180_000,
+  );
+
+  // #1303: a single run says when Deep Enhance didn't run (#950); a batch said
+  // nothing, so "Deep Enhance 20 photos" could return 20 standard results.
+  it("reports which files skipped Deep Enhance, and why", async () => {
+    // Per-fork data dirs start with no AI bundles, so the still reads as
+    // unavailable; the animation skips the deep pass whatever is installed.
+    expect(isToolInstalled("noise-removal")).toBe(false);
+    const gif = readFixture(fixtures.image.animated.gif);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "still.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: gif },
+      { name: "settings", content: JSON.stringify({ deepEnhance: true }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-enhancement/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+    expect(notes["0"]).toEqual({ deepEnhanceSkipped: "unavailable" });
+    expect(notes["1"]).toEqual({ deepEnhanceSkipped: "animated" });
+  }, 120_000);
+
+  it("sends a note every file shares once, and keeps the per-file map on the row", async () => {
+    // The toggle shows with no bundle installed, so "unavailable" on every
+    // file is the common case; one entry per file would grow the header with
+    // the batch until a proxy rejected it (#1303).
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ deepEnhance: true }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-enhancement/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+    expect(notes).toEqual({ [FILE_NOTES_ALL_FILES]: { deepEnhanceSkipped: "unavailable" } });
+
+    const parentId = res.headers["x-job-id"] as string;
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    const result = (row.progress as { result?: { fileNotes?: Record<string, unknown> } }).result;
+    expect(result?.fileNotes).toEqual({
+      "0": { deepEnhanceSkipped: "unavailable" },
+      "1": { deepEnhanceSkipped: "unavailable" },
+    });
+  }, 120_000);
+
+  it("sends an empty map when no file carries a note", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 80 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string))).toEqual({});
   }, 60_000);
 });

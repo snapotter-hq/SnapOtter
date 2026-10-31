@@ -1,6 +1,8 @@
 import {
   ANALYTICS_EVENTS,
   apiToolPath,
+  type FeedbackErrorCategory,
+  FILE_NOTES_ALL_FILES,
   PYTHON_SIDECAR_TOOLS,
   TOOLS,
   type ToolRunDegradedProperties,
@@ -10,10 +12,24 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
-import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import { parseFileResultsHeader, unpackBatchZip } from "@/lib/batch-zip";
+import { featureIncompatibleMessage, featureNotInstalledMessage } from "@/lib/bundle-i18n";
+import { CancelRefusedError, failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
+import { format } from "@/lib/format";
+import {
+  checkToolResult,
+  failedFrameMessage,
+  type ProgressFrame,
+  parseResultBody,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
+import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
+import { getToolName } from "@/lib/tool-i18n";
 import { generateId } from "@/lib/utils";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 
 interface ProcessResult {
   jobId: string;
@@ -34,6 +50,8 @@ interface BatchProgressFrame {
   currentFile?: string;
   /** Terminal frames carry the durable batch result (#750). */
   result?: Record<string, unknown>;
+  /** A failed frame's shared reason, such as NO_TEXT_LAYER (#4143). */
+  code?: string;
 }
 
 export interface ToolProgress {
@@ -56,6 +74,9 @@ const AI_PYTHON_TOOLS = new Set<string>(PYTHON_SIDECAR_TOOLS);
 const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-expand"]);
 
 const UPLOAD_WEIGHT = 15;
+const UPLOAD_STALL_TIMEOUT_MS = 120_000;
+const SYNC_RESPONSE_TIMEOUT_MS = 120_000;
+const LONG_RESPONSE_TIMEOUT_MS = 600_000;
 const SSE_STALL_TIMEOUT_MS = 300_000;
 
 type DegradeTrigger = ToolRunDegradedProperties["trigger"];
@@ -96,7 +117,10 @@ const MIME_BY_EXT: Record<string, string> = {
 
 export function useToolProcessor(toolId: string) {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const {
+    currentEntry,
     processing,
     error,
     processedUrl,
@@ -112,12 +136,17 @@ export function useToolProcessor(toolId: string) {
   // Extra fields the route spreads into the result envelope (e.g. histogram
   // bins, lqip dataUri, AI detection counts). Null until a job completes.
   const [resultPayload, setResultPayload] = useState<Record<string, unknown> | null>(null);
+  const resultEntryRef = useRef<{ id: string; file: File; processedUrl: string } | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
-  const activeEntryIndexRef = useRef<number | null>(null);
+  const activeEntryIdRef = useRef<string | null>(null);
+  const activeFileRef = useRef<File | null>(null);
+  const activeEntryIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const activeEntryFilesRef = useRef<ReadonlyMap<string, File> | null>(null);
   const asyncModeRef = useRef(false);
   const reconnectSSERef = useRef<(force?: boolean) => void>(() => {});
   // Save mode captured at run start (#495). Only "overwrite" re-anchors
@@ -129,6 +158,26 @@ export function useToolProcessor(toolId: string) {
   // proof the job reached the server, consulted when a dead POST degrades
   // (#722, #750).
   const sawJobEvidenceRef = useRef(false);
+  // Whether the browser finished sending the current run's request body
+  // (upload.onload, or the final progress event in Firefox, which fires
+  // upload.onload only once the response starts; #2136, #2240). Cleared once
+  // the XHR settles or the run ends.
+  const uploadedFullyRef = useRef(false);
+  // Runs stopped after their upload finished and before the server confirmed
+  // the job (#2240). Their XHR and progress stream stay open so the cancel
+  // goes out as soon as a 202 or progress frame proves the alias exists.
+  const stoppedRunsRef = useRef(
+    new Set<{
+      jobId: string;
+      toolId: string;
+      xhr: XMLHttpRequest | null;
+      es: EventSource | null;
+    }>(),
+  );
+  // Job ids whose unmount/preset-switch stop has already been handled, so a
+  // settling batch that outlives a preset switch is not canceled a second time
+  // when the panel later unmounts.
+  const stoppedJobIdsRef = useRef(new Set<string>());
   // Installed by processAllFiles so the SSE handler can settle a degraded
   // batch run from its terminal frame (#750) and the cancel path can record
   // intent or settle a run the server never saw (#767). Null outside batch
@@ -136,6 +185,7 @@ export function useToolProcessor(toolId: string) {
   // already-settled run refuses, and the caller must fall through to the
   // single-run settle instead of treating the cancel as handled.
   const batchRunRef = useRef<{
+    jobId: string;
     onTerminal: (frame: BatchProgressFrame) => void;
     markCanceled: () => void;
     cancelLocally: () => boolean;
@@ -144,11 +194,12 @@ export function useToolProcessor(toolId: string) {
     // like every other outcome (#1161). Reports whether it acted, like
     // cancelLocally: a stale closure refuses and the timer's caller falls
     // through to the single-run settle.
-    abandon: (message: string) => boolean;
+    abandon: (message: string, reason?: string, category?: FeedbackErrorCategory) => boolean;
+    onHandlerError: () => void;
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
-  const toolName = TOOLS.find((t) => t.id === toolId)?.name ?? toolId;
+  const toolName = getToolName(t, toolId, TOOLS.find((tool) => tool.id === toolId)?.name ?? toolId);
 
   // Operator-visible record of a sync wait falling back to the async path:
   // the fallback masks the network failure from the user by design, so this
@@ -167,9 +218,18 @@ export function useToolProcessor(toolId: string) {
 
   const clearActiveJob = useCallback(() => {
     activeJobIdRef.current = null;
-    activeEntryIndexRef.current = null;
+    activeEntryIdRef.current = null;
+    activeFileRef.current = null;
+    uploadedFullyRef.current = false;
     setActiveJob(null, null);
   }, [setActiveJob]);
+
+  const clearRequestTimer = useCallback(() => {
+    if (requestTimerRef.current) {
+      clearTimeout(requestTimerRef.current);
+      requestTimerRef.current = null;
+    }
+  }, []);
 
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current) {
@@ -178,15 +238,6 @@ export function useToolProcessor(toolId: string) {
     }
   }, []);
 
-  const resetStallTimer = useCallback(() => {
-    clearStallTimer();
-    stallTimerRef.current = setTimeout(() => {
-      stallTimerRef.current = null;
-      if (!activeJobIdRef.current || !asyncModeRef.current) return;
-      reconnectSSERef.current(true);
-    }, SSE_STALL_TIMEOUT_MS);
-  }, [clearStallTimer]);
-
   const clearJobEvidenceTimer = useCallback(() => {
     if (jobEvidenceTimerRef.current) {
       clearTimeout(jobEvidenceTimerRef.current);
@@ -194,19 +245,237 @@ export function useToolProcessor(toolId: string) {
     }
   }, []);
 
-  // A terminal failure must settle every entry its run left at "processing":
-  // the tool page derives the pulse from that status and gates the failure
-  // screen on "failed" (#799, #929). Same sweep as the batch failRun; the
-  // status guard leaves already-settled results alone, and sweeping instead
-  // of indexing works after clearActiveJob has nulled activeEntryIndexRef.
-  const settleProcessingEntries = useCallback((message: string) => {
-    const { entries, updateEntry } = useFileStore.getState();
-    for (let i = 0; i < entries.length; i++) {
-      if (entries[i]?.status === "processing") {
-        updateEntry(i, { status: "failed", error: message });
+  const cancelStoppedJob = useCallback(async (jobId: string, stoppedToolId: string) => {
+    try {
+      let res: Response;
+      try {
+        res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
+          method: "POST",
+          headers: formatHeaders(),
+        });
+      } catch (cause) {
+        throw failedCancelRequest(cause, stoppedToolId);
       }
+      await readCancelAnswer(res, () => false, stoppedToolId);
+    } catch (err) {
+      if (err instanceof CancelRefusedError) return;
+      reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, stoppedToolId);
     }
   }, []);
+
+  // A store that no longer carries the run (Clear all, a reset, setFiles/removeFile
+  // replacing or removing its entries, or a newer run started after an unmounted
+  // settling batch) has nothing left to settle, and an error, cancel handle, or
+  // batch ZIP written now would land on whatever the user does next (#2151,
+  // #2242, #2622, #2637).
+  const storeWasReset = useCallback(() => {
+    const state = useFileStore.getState();
+    const isBatch = batchRunRef.current?.jobId === activeJobIdRef.current;
+    const expectedActiveJobId = asyncModeRef.current || isBatch ? activeJobIdRef.current : null;
+    const entryFiles = activeEntryFilesRef.current;
+    const hasRunEntry =
+      entryFiles === null ||
+      entryFiles.size === 0 ||
+      (isBatch
+        ? state.entries.some((entry) => entryFiles.get(entry.id) === entry.file)
+        : [...entryFiles].every(([id, file]) =>
+            state.entries.some((entry) => entry.id === id && entry.file === file),
+          ));
+    if (state.processing && state.activeJobId === expectedActiveJobId && hasRunEntry) {
+      return false;
+    }
+    const stillOwnsStoreRun =
+      entryFiles !== null &&
+      entryFiles.size > 0 &&
+      state.processing &&
+      state.activeJobId === expectedActiveJobId;
+    const jobId = activeJobIdRef.current;
+    const accepted = asyncModeRef.current || sawJobEvidenceRef.current;
+    const keepRequest = !accepted && uploadedFullyRef.current;
+    uploadedFullyRef.current = false;
+    if (jobId && !stoppedJobIdsRef.current.has(jobId)) {
+      if (accepted) {
+        stoppedJobIdsRef.current.add(jobId);
+        void cancelStoppedJob(jobId, toolId);
+      } else if (keepRequest) {
+        stoppedJobIdsRef.current.add(jobId);
+        if (!eventSourceRef.current) {
+          reconnectSSERef.current(true);
+        }
+        stoppedRunsRef.current.add({
+          jobId,
+          toolId,
+          xhr: xhrRef.current,
+          es: eventSourceRef.current,
+        });
+        xhrRef.current = null;
+        eventSourceRef.current = null;
+      }
+    }
+    clearRequestTimer();
+    clearJobEvidenceTimer();
+    clearStallTimer();
+    if (elapsedRef.current) {
+      clearInterval(elapsedRef.current);
+      elapsedRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    try {
+      xhrRef.current?.abort();
+    } catch (_e) {
+      console.debug("Ignored xhr.abort error:", _e);
+    }
+    batchRunRef.current = null;
+    activeJobIdRef.current = null;
+    activeEntryIdRef.current = null;
+    activeFileRef.current = null;
+    activeEntryIdsRef.current = null;
+    activeEntryFilesRef.current = null;
+    setProgress(IDLE_PROGRESS);
+    if (stillOwnsStoreRun) {
+      const teardownError = runEndWrites([
+        ...(state.activeJobId !== null ? [() => setActiveJob(null, null)] : []),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+    }
+    return true;
+  }, [
+    cancelStoppedJob,
+    clearJobEvidenceTimer,
+    clearRequestTimer,
+    clearStallTimer,
+    setActiveJob,
+    setProcessing,
+    toolId,
+  ]);
+
+  const finishStoppedRun = useCallback(
+    (
+      stopped: {
+        jobId: string;
+        toolId: string;
+        xhr: XMLHttpRequest | null;
+        es: EventSource | null;
+      },
+      shouldCancel: boolean,
+      abortXhr: boolean,
+    ) => {
+      if (!stoppedRunsRef.current.delete(stopped)) return;
+      if (shouldCancel) {
+        void cancelStoppedJob(stopped.jobId, stopped.toolId);
+      }
+      if (stopped.es) {
+        stopped.es.onmessage = null;
+        stopped.es.onerror = null;
+        try {
+          stopped.es.close();
+        } catch {
+          // Ignore close error
+        }
+      }
+      if (stopped.xhr) {
+        stopped.xhr.onload = null;
+        stopped.xhr.onerror = null;
+        stopped.xhr.ontimeout = null;
+        stopped.xhr.upload.onprogress = null;
+        stopped.xhr.upload.onload = null;
+        if (abortXhr) {
+          try {
+            stopped.xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+        }
+      }
+    },
+    [cancelStoppedJob],
+  );
+
+  const findStoppedByXhr = useCallback((xhr: XMLHttpRequest) => {
+    for (const stopped of stoppedRunsRef.current) {
+      if (stopped.xhr === xhr) return stopped;
+    }
+    return null;
+  }, []);
+
+  const findStoppedByEs = useCallback((es: EventSource) => {
+    for (const stopped of stoppedRunsRef.current) {
+      if (stopped.es === es) return stopped;
+    }
+    return null;
+  }, []);
+
+  const resetStallTimer = useCallback(() => {
+    clearStallTimer();
+    stallTimerRef.current = setTimeout(() => {
+      stallTimerRef.current = null;
+      if (!activeJobIdRef.current || !asyncModeRef.current) return;
+      if (storeWasReset()) return;
+      reconnectSSERef.current(true);
+    }, SSE_STALL_TIMEOUT_MS);
+  }, [clearStallTimer, storeWasReset]);
+
+  // A terminal failure must settle every entry its run left at "processing":
+  // the tool page derives the pulse from that status and gates the failure
+  // screen on "failed" (#799, #929). Keyed by the entry ids captured at
+  // kickoff (#944), so reordering or a stranger entry left at "processing" by
+  // an earlier unmounted run cannot be swept with this run's message, and
+  // already-settled results are left alone.
+  //
+  // Every exit calls this last, after its run-level teardown, and it never
+  // throws: it's a store write, and when the store keeps throwing (#1354) a
+  // second throw here must not leave the run stuck at processing with the
+  // cancel button still armed (#1698, the twin of #1352's pipeline fix).
+  // The throw is reported as well as logged, or it never reaches Sentry
+  // (#1812). Each entry gets its own try, so one write that throws can't
+  // leave a batch's later entries pulsing (#1821, the twin of the pipeline's
+  // #1779), and the settle reports once, not once per entry.
+  const settleProcessingEntries = useCallback(
+    (
+      message: string,
+      category?: FeedbackErrorCategory,
+      entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current,
+      entryFiles: ReadonlyMap<string, File> | null = activeEntryFilesRef.current,
+    ) => {
+      if (!entryIds || entryIds.size === 0) return;
+      const { entries, updateEntryById } = useFileStore.getState();
+      let firstError: { cause: unknown } | null = null;
+      for (const entry of entries) {
+        if (
+          !entry ||
+          !entryIds.has(entry.id) ||
+          (entryFiles && entryFiles.get(entry.id) !== entry.file) ||
+          entry.status !== "processing"
+        ) {
+          continue;
+        }
+        try {
+          updateEntryById(entry.id, {
+            status: "failed",
+            error: message,
+            errorCategory: category ?? null,
+          });
+        } catch (err) {
+          console.error("Failing the run's entry failed", err);
+          firstError ??= { cause: err };
+        }
+      }
+      if (firstError) {
+        reportRunEndFailure("Failing a tool run's entries failed", firstError.cause, toolId);
+      }
+    },
+    [toolId],
+  );
 
   // Armed only when a dead POST degrades to the async path (#722): heartbeats
   // alone must not keep the client in "processing" forever for a job the
@@ -216,62 +485,89 @@ export function useToolProcessor(toolId: string) {
     jobEvidenceTimerRef.current = setTimeout(() => {
       jobEvidenceTimerRef.current = null;
       if (!activeJobIdRef.current) return;
-      const message =
-        "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
+      if (storeWasReset()) return;
+      const message = tRef.current.errors.processingInterruptedUnconfirmed;
       // This teardown ends whatever run armed it; a batch closure left
       // behind would swallow a later run's cancel-404 settle (#767). A batch
       // run ends through its own failure path, which clears the closure and
       // reports the outcome to batch_processed (#1161).
-      if (batchRunRef.current?.abandon(message)) return;
+      if (batchRunRef.current?.abandon(message, "unconfirmed", "upload_error")) return;
+      clearRequestTimer();
       clearStallTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      clearActiveJob();
-      settleProcessingEntries(message);
-      setError(message);
-      setProcessing(false);
       setProgress(IDLE_PROGRESS);
+      // Nothing else will end this run, so each write gets its own guard and
+      // the entries settle last (#1890). The first throw goes on to the
+      // global handler once the run is over.
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(message),
+        () => setProcessing(false),
+      ]);
+      settleProcessingEntries(message, "upload_error");
+      if (teardownError) throw teardownError.cause;
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
     clearJobEvidenceTimer,
+    clearRequestTimer,
     clearStallTimer,
     clearActiveJob,
     settleProcessingEntries,
     setError,
     setProcessing,
+    storeWasReset,
   ]);
 
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
-    if (!jobId) return;
+    if (!jobId || storeWasReset()) return;
+    // A cancel that never reached the server says nothing about the job, so
+    // the run is left to the progress stream, but the click still gets an
+    // answer: the rejection is the cancel button's to show (#1815). A throw
+    // from the teardown below is ours and must reach the caller too (#1698).
+    let res: Response;
     try {
-      const res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
+      res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
         method: "POST",
         headers: formatHeaders(),
       });
-      // Record intent only once the server acknowledged the cancel: a failed
-      // or refused POST must not repaint the run's real outcome as canceled
-      // (#767). The ack always precedes the terminal frame (the finalize
-      // still has children to drain), so labeling cannot race it.
-      if (res.ok) {
-        const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
-        if (body?.canceled === true && activeJobIdRef.current === jobId) {
-          batchRunRef.current?.markCanceled();
-        }
-      }
-      // 404 means no job exists server-side (possible in the degraded #722
-      // state when the request tail never arrived). Nothing will ever emit a
-      // frame, so settle locally as canceled instead of blaming the network
-      // 30 seconds later.
-      if (res.status === 404 && activeJobIdRef.current === jobId) {
-        // A batch upload may still be in flight; its settle path also has to
-        // abort the XHR and tear down the run's own state (#767). A refusal
-        // means the closure belongs to an earlier run: fall through and
-        // settle the live run the single-run way.
-        if (batchRunRef.current?.cancelLocally()) return;
+    } catch (cause) {
+      throw failedCancelRequest(cause, toolId);
+    }
+    // A refused cancel throws here and the run carries on: it must not be
+    // repainted as canceled (#767), but the button says why (#1815).
+    const answer = await readCancelAnswer(
+      res,
+      () => activeJobIdRef.current === jobId && !storeWasReset(),
+      toolId,
+    );
+    // Record intent only once the server acknowledged the cancel. The ack
+    // always precedes the terminal frame (the finalize still has children
+    // to drain), so labeling cannot race it.
+    if (answer === "acknowledged") {
+      batchRunRef.current?.markCanceled();
+      return;
+    }
+    // A 404 means no job exists server-side (possible in the degraded #722
+    // state when the request tail never arrived). Nothing will ever emit a
+    // frame, so settle locally as canceled instead of blaming the network
+    // 30 seconds later.
+    if (answer === "missing") {
+      // A batch upload may still be in flight; its settle path also has to
+      // abort the XHR and tear down the run's own state (#767). A refusal
+      // means the closure belongs to an earlier run: fall through and
+      // settle the live run the single-run way.
+      if (batchRunRef.current?.cancelLocally()) return;
+      // The stream closes here, so nothing else will ever end this run:
+      // each write gets its own guard, or one that throws would leave the
+      // run spinning with its cancel button already gone (#1814).
+      let teardownError: { cause: unknown } | null = null;
+      try {
+        clearRequestTimer();
         clearJobEvidenceTimer();
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -279,25 +575,31 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
-        clearActiveJob();
+        setProgress(IDLE_PROGRESS);
+        teardownError = runEndWrites([
+          clearActiveJob,
+          () => setError("Canceled"),
+          () => setProcessing(false),
+        ]);
+      } finally {
         // Same settle the batch failRun gives canceled entries: "failed"
         // with "Canceled", so the failure screen renders instead of an
-        // eternal pulse (#929).
+        // eternal pulse (#929). Last, and it never throws.
         settleProcessingEntries("Canceled");
-        setError("Canceled");
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
       }
-    } catch {
-      // Cancel request failed; SSE handler will clean up
+      // The first throw still reaches the cancel button's catch (#1698).
+      if (teardownError) throw teardownError.cause;
     }
   }, [
+    toolId,
     clearJobEvidenceTimer,
+    clearRequestTimer,
     clearStallTimer,
     clearActiveJob,
     settleProcessingEntries,
     setError,
     setProcessing,
+    storeWasReset,
   ]);
 
   // Ends a run whose SSE frame handling threw (#1287). Whatever the frame
@@ -305,32 +607,55 @@ export function useToolProcessor(toolId: string) {
   // batch closure, then fail the entries it left at "processing". A throw
   // after the run already settled leaves that outcome alone: the real error
   // (or result) it recorded beats a generic one. Settled means processing is
-  // off too: the failed-frame branch clears the job id before its own entry
-  // writes, so a throw there still has a live run to end.
+  // off too: the failed-frame branch clears the job id before setError turns
+  // processing off, so a throw between the two still has a live run to end.
   const failRunOnHandlerError = useCallback(
     (es: EventSource) => {
       if (!activeJobIdRef.current && !useFileStore.getState().processing) return;
+      // A failed run shows no result. The completion branch sets the payload
+      // only after its store writes, but its teardown can still throw after
+      // that (#1739).
+      resultEntryRef.current = null;
+      setWarning(null);
+      setResultPayload(null);
+      clearRequestTimer();
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       es.close();
       if (eventSourceRef.current === es) eventSourceRef.current = null;
-      xhrRef.current?.abort();
-      batchRunRef.current = null;
-      clearActiveJob();
-      setError(FRAME_HANDLING_FAILED);
-      setProcessing(false);
-      setProgress(IDLE_PROGRESS);
-      // Last and on its own: the store write that threw may throw again, and
-      // the run-level teardown above has to happen regardless. The caller
-      // rethrows the original error; this one is only logged.
       try {
-        settleProcessingEntries(FRAME_HANDLING_FAILED);
-      } catch (settleErr) {
-        console.error("Failing the run's entries after a frame handling error failed", settleErr);
+        xhrRef.current?.abort();
+      } catch (_e) {
+        console.debug("Ignored xhr.abort error:", _e);
       }
+      const batchRun =
+        batchRunRef.current?.jobId === activeJobIdRef.current ? batchRunRef.current : null;
+      batchRunRef.current = null;
+      setProgress(IDLE_PROGRESS);
+      // The store write that threw may throw again, so each write gets its
+      // own guard (#1890). The caller rethrows the original error, so a
+      // teardown that breaks as well is reported here (#1812).
+      const trackingFailed = tRef.current.errors.jobTrackingFailed;
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(trackingFailed),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after a frame handling error failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+      // Last, and it never throws.
+      settleProcessingEntries(trackingFailed);
+      batchRun?.onHandlerError();
     },
     [
+      toolId,
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
@@ -340,10 +665,86 @@ export function useToolProcessor(toolId: string) {
     ],
   );
 
+  // Ends a run whose kickoff threw before its request went out (#1821). No
+  // XHR handler exists yet, so nothing else would ever end it: stop the
+  // ticker, the stream and any batch closure, release the job and its cancel
+  // handle, and fail every entry the kickoff reset. Each write gets its own
+  // guard (#1791) and the entries go last (#1698). The caller rethrows the
+  // kickoff's throw, which reaches Sentry through the global handler, so only
+  // a teardown that breaks as well is reported here (#1812).
+  const endRunAtStart = useCallback(
+    (
+      entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current,
+      entryFiles: ReadonlyMap<string, File> | null = activeEntryFilesRef.current,
+    ) => {
+      clearRequestTimer();
+      clearStallTimer();
+      clearJobEvidenceTimer();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      batchRunRef.current = null;
+      setProgress(IDLE_PROGRESS);
+      const trackingFailed = tRef.current.errors.jobTrackingFailed;
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(trackingFailed),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its start failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+      settleProcessingEntries(trackingFailed, undefined, entryIds, entryFiles);
+    },
+    [
+      toolId,
+      clearRequestTimer,
+      clearStallTimer,
+      clearJobEvidenceTimer,
+      clearActiveJob,
+      settleProcessingEntries,
+      setError,
+      setProcessing,
+    ],
+  );
+
+  // Ends a kickoff that threw before it claimed the run refs (#1911). They
+  // still belong to the run that holds them, so endRunAtStart would end
+  // that run instead. Only claimed refs are a failed start's to tear down;
+  // with no live run there is nothing to spare. Behind a live run the
+  // kickoff has only reset outcome state and marked entries processing, so
+  // it fails only the entries this start touched that the live run doesn't
+  // own, and leaves the live run, its processing flag and its error slot
+  // alone (a non-null setError also turns processing off). The caller
+  // rethrows, so the start's throw is still reported.
+  const endStartBeforeClaim = useCallback(
+    (startEntryIds: ReadonlySet<string>, startEntryFiles: ReadonlyMap<string, File>) => {
+      if (!activeJobIdRef.current) {
+        endRunAtStart(startEntryIds, startEntryFiles);
+        return;
+      }
+      const liveIds = activeEntryIdsRef.current;
+      const orphanedIds = new Set([...startEntryIds].filter((id) => !liveIds?.has(id)));
+      settleProcessingEntries(
+        tRef.current.errors.jobTrackingFailed,
+        undefined,
+        orphanedIds,
+        startEntryFiles,
+      );
+    },
+    [endRunAtStart, settleProcessingEntries],
+  );
+
   const reconnectSSE = useCallback(
     (force = false) => {
       const jobId = activeJobIdRef.current;
-      if (!jobId) return;
+      if (!jobId || storeWasReset()) return;
       if (
         !force &&
         eventSourceRef.current &&
@@ -363,7 +764,30 @@ export function useToolProcessor(toolId: string) {
         if (asyncModeRef.current) resetStallTimer();
 
         es.onmessage = (event) => {
+          const stopped = findStoppedByEs(es);
+          if (stopped) {
+            let data: ProgressFrame;
+            try {
+              data = resolveServerUrls(JSON.parse(event.data));
+            } catch {
+              return;
+            }
+            if (!data || typeof data !== "object") return;
+            if (data.type === "heartbeat") return;
+            if (data.type === "batch") {
+              const frame = data as BatchProgressFrame;
+              const isTerminal = frame.status === "completed" || frame.status === "failed";
+              finishStoppedRun(stopped, !isTerminal, true);
+              return;
+            }
+            if (data.type === "single") {
+              const isTerminal = data.phase === "complete" || data.phase === "failed";
+              finishStoppedRun(stopped, !isTerminal, true);
+            }
+            return;
+          }
           if (eventSourceRef.current !== es) return;
+          if (storeWasReset()) return;
           // Only an unparseable frame is ignorable. Everything past the parse
           // is our own handling, and a throw there must end the run (#1287).
           let data: ProgressFrame;
@@ -372,6 +796,7 @@ export function useToolProcessor(toolId: string) {
           } catch {
             return;
           }
+          if (!data || typeof data !== "object") return;
           try {
             if (data.type === "heartbeat") {
               if (asyncModeRef.current) resetStallTimer();
@@ -404,10 +829,15 @@ export function useToolProcessor(toolId: string) {
               // frame always precedes the streamed ZIP, so acting on it here
               // would settle the run twice.
               if (!asyncModeRef.current) return;
+              clearRequestTimer();
               clearStallTimer();
               es.close();
               eventSourceRef.current = null;
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
               const run = batchRunRef.current;
               if (run) {
                 run.onTerminal(frame);
@@ -419,11 +849,17 @@ export function useToolProcessor(toolId: string) {
                 // still leaves them pulsing at "processing" (#929).
                 clearJobEvidenceTimer();
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
-                clearActiveJob();
-                settleProcessingEntries("Processing was interrupted. Retry when reconnected.");
-                setError("Processing was interrupted. Retry when reconnected.");
-                setProcessing(false);
+                const message = tRef.current.errors.processingInterrupted;
                 setProgress(IDLE_PROGRESS);
+                const teardownError = runEndWrites([
+                  clearActiveJob,
+                  () => setError(message),
+                  () => setProcessing(false),
+                ]);
+                settleProcessingEntries(message, "processing_error");
+                // The run has ended, so the catch below leaves it alone and
+                // passes the throw on (#1890).
+                if (teardownError) throw teardownError.cause;
               }
               return;
             }
@@ -434,7 +870,53 @@ export function useToolProcessor(toolId: string) {
             clearJobEvidenceTimer();
             if (asyncModeRef.current) resetStallTimer();
 
-            if (data.phase === "complete" && data.result) {
+            // Ends the run on the server's word: a failed frame, or a
+            // completed one with nothing to download.
+            const endFailedRun = (
+              message: string,
+              category?: FeedbackErrorCategory,
+              code?: string,
+            ) => {
+              clearRequestTimer();
+              clearStallTimer();
+              if (elapsedRef.current) clearInterval(elapsedRef.current);
+              es.close();
+              eventSourceRef.current = null;
+              // Settle the still-open POST so its late onerror/ontimeout
+              // cannot replace this specific error with a generic one.
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
+              }
+              setProgress(IDLE_PROGRESS);
+              // Each write gets its own guard and the entries settle last, so
+              // a write that throws can't leave the run at processing. The run
+              // has ended by the time the throw reaches the catch below, which
+              // passes it on (#1890).
+              const teardownError = runEndWrites([
+                clearActiveJob,
+                () => setError(message, code),
+                () => setProcessing(false),
+              ]);
+              settleProcessingEntries(message, category);
+              if (teardownError) throw teardownError.cause;
+            };
+
+            if (data.phase === "complete") {
+              // A result with nothing to download is the server's bug, the
+              // twin of a sync 2xx body with no downloadUrl (#1740), so it
+              // fails the run and gets reported (#1794). Checked before any
+              // store write: a throw from those is still ours (#1287).
+              let result: ProcessResult;
+              try {
+                result = checkToolResult<ProcessResult>(data.result);
+              } catch (err) {
+                reportMalformedResult(err, { toolId });
+                endFailedRun(tRef.current.errors.invalidServerResponse, "processing_error");
+                return;
+              }
+              clearRequestTimer();
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -442,29 +924,57 @@ export function useToolProcessor(toolId: string) {
               // The SSE settles the run; a still-open sync POST (half-dead
               // proxy, no RST) must not fire a late onerror/ontimeout over
               // this result. abort() only emits onabort, which stays silent.
-              xhrRef.current?.abort();
-              const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
-
-              const result = data.result as unknown as ProcessResult;
-              setWarning(result.warning ?? null);
-              setResultPayload(result as unknown as Record<string, unknown>);
-              if (result.savedFileId) {
-                useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {
+                console.debug("Ignored xhr.abort error:", _e);
               }
-              useFileStore.getState().updateEntry(idx, {
-                processedUrl: result.downloadUrl,
-                processedPreviewUrl: result.previewUrl ?? null,
-                processedFilename: null,
-                status: "completed",
-                originalSize: result.originalSize,
-                processedSize: result.processedSize,
-                ...(result.savedFileId && saveModeRef.current === "overwrite"
-                  ? { serverFileId: result.savedFileId }
-                  : {}),
-              });
-              // An auto-saved result is already in the library, so it was never at risk.
-              // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-              if (result.savedFileId) useFileStore.getState().markClaimed(idx);
+              const entryId = activeEntryIdRef.current;
+              const entryFile = activeFileRef.current;
+              if (
+                entryId &&
+                entryFile &&
+                useFileStore
+                  .getState()
+                  .entries.some((entry) => entry.id === entryId && entry.file === entryFile)
+              ) {
+                if (result.savedFileId) {
+                  useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+                }
+                if (
+                  useFileStore
+                    .getState()
+                    .entries.some((entry) => entry.id === entryId && entry.file === entryFile)
+                ) {
+                  useFileStore.getState().updateEntryById(entryId, {
+                    processedUrl: result.downloadUrl,
+                    processedPreviewUrl: result.previewUrl ?? null,
+                    processedFilename: null,
+                    resultNotes: pickResultNotes(result),
+                    status: "completed",
+                    originalSize: result.originalSize,
+                    processedSize: result.processedSize,
+                    ...(result.savedFileId && saveModeRef.current === "overwrite"
+                      ? { serverFileId: result.savedFileId }
+                      : {}),
+                  });
+                  // An auto-saved result is already in the library, so it was never at risk.
+                  // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+                  if (result.savedFileId) useFileStore.getState().markClaimedById(entryId);
+                  // After the store writes, as in landSyncResult: tools that
+                  // render straight from the payload (histogram, sprite sheet)
+                  // must not show a result beside the error a failed write ends
+                  // the run with (#1739). Before the teardown, so a good run
+                  // never ends processing with no payload.
+                  resultEntryRef.current = {
+                    id: entryId,
+                    file: entryFile,
+                    processedUrl: result.downloadUrl,
+                  };
+                  setWarning(result.warning ?? null);
+                  setResultPayload(result as unknown as Record<string, unknown>);
+                }
+              }
               clearActiveJob();
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -472,19 +982,11 @@ export function useToolProcessor(toolId: string) {
             }
 
             if (data.phase === "failed") {
-              clearStallTimer();
-              if (elapsedRef.current) clearInterval(elapsedRef.current);
-              es.close();
-              eventSourceRef.current = null;
-              // Settle the still-open POST so its late onerror/ontimeout
-              // cannot replace this specific error with a generic one.
-              xhrRef.current?.abort();
-              clearActiveJob();
-              const message = data.error || "Processing failed";
-              settleProcessingEntries(message);
-              setError(message);
-              setProcessing(false);
-              setProgress(IDLE_PROGRESS);
+              endFailedRun(
+                failedFrameMessage(data, tRef.current.errors.processingFailedNoDetail),
+                undefined,
+                typeof data.code === "string" && data.code.length > 0 ? data.code : undefined,
+              );
               return;
             }
 
@@ -511,6 +1013,13 @@ export function useToolProcessor(toolId: string) {
         };
 
         es.onerror = () => {
+          const stopped = findStoppedByEs(es);
+          if (stopped) {
+            es.close();
+            return;
+          }
+          if (eventSourceRef.current !== es) return;
+          if (storeWasReset()) return;
           if (!asyncModeRef.current) {
             es.close();
             if (eventSourceRef.current === es) {
@@ -524,13 +1033,18 @@ export function useToolProcessor(toolId: string) {
     },
     [
       clearActiveJob,
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       failRunOnHandlerError,
+      findStoppedByEs,
+      finishStoppedRun,
       resetStallTimer,
       settleProcessingEntries,
       setError,
       setProcessing,
+      storeWasReset,
+      toolId,
     ],
   );
 
@@ -538,11 +1052,114 @@ export function useToolProcessor(toolId: string) {
     reconnectSSERef.current = reconnectSSE;
   }, [reconnectSSE]);
 
+  // The cleanup of the effect below aborts the request and closes the stream,
+  // which ends the run. It has to settle it too: left alone the store sits at
+  // `processing` for good, and a panel that remounts (rotating a phone across the
+  // layout breakpoint swaps the whole tree) shows a run that can never end
+  // (#2125). A ref, so the cleanup runs the closures committed for the run it is
+  // stopping, not whatever the next render brings.
+  const settleStoppedRunRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    settleStoppedRunRef.current = () => {
+      const jobId = activeJobIdRef.current;
+      if (!jobId) return;
+      // A store that no longer carries the run (Clear all, a reset, or a newer
+      // run started after an unmounted settling batch) has nothing left to
+      // settle, and an error written now would land on whatever the user does
+      // next (#2637).
+      if (storeWasReset()) return;
+      clearRequestTimer();
+      // Once the server has accepted the job (a 202 response, a degraded
+      // post-upload wait, or any progress frame), the alias row exists and
+      // can be canceled immediately. After the upload finished and before
+      // acceptance, aborting and canceling immediately can beat the server's
+      // alias insert and 404, leaving the job to run anyway (#2240): keep the
+      // request and stream open so the cancel goes out when the 202 or
+      // progress frame arrives. While the upload is still in flight, aborting
+      // cuts off the body before any job exists.
+      const accepted = asyncModeRef.current || sawJobEvidenceRef.current;
+      const keepRequest = !accepted && uploadedFullyRef.current;
+      uploadedFullyRef.current = false;
+      if (!stoppedJobIdsRef.current.has(jobId)) {
+        if (accepted) {
+          stoppedJobIdsRef.current.add(jobId);
+          void cancelStoppedJob(jobId, toolId);
+        } else if (keepRequest) {
+          stoppedJobIdsRef.current.add(jobId);
+          // A sync-mode SSE error during the upload closes the stream and nulls
+          // the ref; reopen it so a progress frame emitted while a fast or
+          // batch route blocks in waitForJob still cancels the job.
+          if (!eventSourceRef.current) {
+            reconnectSSE(true);
+          }
+          stoppedRunsRef.current.add({
+            jobId,
+            toolId,
+            xhr: xhrRef.current,
+            es: eventSourceRef.current,
+          });
+          xhrRef.current = null;
+          eventSourceRef.current = null;
+        }
+      }
+      const batchRun = batchRunRef.current;
+      if (batchRun) {
+        // failRun rethrows a teardown error by design, for callers in a timer.
+        // Out of an effect cleanup it would reach the app's error boundary.
+        try {
+          if (batchRun.abandon(t.errors.runInterrupted, "panel-unmounted", "processing_error")) {
+            return;
+          }
+        } catch (cause) {
+          reportRunEndFailure("Ending a tool run after its panel unmounted failed", cause, toolId);
+          // failRun got as far as clearing the job: the run is over.
+          if (!activeJobIdRef.current) return;
+        }
+      }
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(t.errors.runInterrupted),
+        () => setProcessing(false),
+        () => settleProcessingEntries(t.errors.runInterrupted, "processing_error"),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+    };
+  });
+  // Stop an in-flight run as soon as setFiles, reset, or removeFile removes
+  // the entry (and file) the run was started on (#2242).
+  useEffect(() => {
+    return useFileStore.subscribe((state) => {
+      if (!activeJobIdRef.current) return;
+      const entryFiles = activeEntryFilesRef.current;
+      if (!entryFiles || entryFiles.size === 0) return;
+      const isBatch = batchRunRef.current?.jobId === activeJobIdRef.current;
+      const hasRunEntry = isBatch
+        ? state.entries.some((entry) => entryFiles.get(entry.id) === entry.file)
+        : [...entryFiles].every(([id, file]) =>
+            state.entries.some((entry) => entry.id === id && entry.file === file),
+          );
+      if (!hasRunEntry) {
+        try {
+          storeWasReset();
+        } catch (err) {
+          reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, toolId);
+        }
+      }
+    });
+  }, [storeWasReset, toolId]);
+
   // Reconnect SSE when tab becomes visible again (mobile tab recovery)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
       if (!activeJobIdRef.current) return;
+      if (storeWasReset()) return;
       if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
         return;
       }
@@ -554,319 +1171,609 @@ export function useToolProcessor(toolId: string) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
-      if (eventSourceRef.current) eventSourceRef.current.close();
-      if (xhrRef.current) xhrRef.current.abort();
+      if (requestTimerRef.current) clearTimeout(requestTimerRef.current);
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
+      // This runs on unmount, but also whenever reconnectSSE changes, which it
+      // does with the tool id: the conversion presets share one panel that reads
+      // the id from the route, so moving between them stops a run without an
+      // unmount (#2151). Whatever stopped it, the run is over, so settle it; a
+      // batch whose ZIP is already in hand is the one thing left to finish.
+      // Runs before closing the stream or aborting the XHR so a run stopped
+      // after its upload finished can keep them open until the 202 (#2240).
+      try {
+        settleStoppedRunRef.current();
+      } finally {
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+        if (xhrRef.current) {
+          try {
+            xhrRef.current.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhrRef.current = null;
+        }
+      }
     };
-  }, [reconnectSSE]);
+  }, [reconnectSSE, storeWasReset]);
 
   const processFiles = useCallback(
     (files: File[], settings: Record<string, unknown>, opts?: { skipLibrarySave?: boolean }) => {
       if (files.length === 0) {
-        setError("No files selected");
+        setError(t.errors.noFilesSelected);
         return;
       }
 
-      import("@/lib/analytics").then(({ track }) => {
-        track(ANALYTICS_EVENTS.TOOL_STARTED, {
-          tool_id: toolId,
-          is_batch: false,
-          file_count: files.length,
-        });
+      track(ANALYTICS_EVENTS.TOOL_STARTED, {
+        tool_id: toolId,
+        is_batch: false,
+        file_count: files.length,
       });
 
-      const capturedIndex = useFileStore.getState().selectedIndex;
-
-      setError(null);
-      setWarning(null);
-      setResultPayload(null);
-      useFileStore.getState().setLastSavedLibraryFileId(null);
-      useFileStore.getState().updateEntry(capturedIndex, {
-        processedUrl: null,
-        processedPreviewUrl: null,
-        processedFilename: null,
-        status: "processing",
-        error: null,
-      });
-      setProcessing(true);
-      setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
-      // A stale evidence timer from a previous degraded run must not fire
-      // into this run, and evidence never carries across runs (#722).
-      clearJobEvidenceTimer();
-      sawJobEvidenceRef.current = false;
-
-      const startTime = Date.now();
-      elapsedRef.current = setInterval(() => {
-        setProgress((prev) => ({
-          ...prev,
-          elapsed: Math.floor((Date.now() - startTime) / 1000),
-        }));
-      }, 1000);
-
-      const clientJobId = generateId();
-      activeJobIdRef.current = clientJobId;
-      activeEntryIndexRef.current = capturedIndex;
-      asyncModeRef.current = false;
-
-      // Open SSE for real-time progress from the server (all tools)
-      reconnectSSE(true);
-
-      // Build form data
-      const cleanSettings = { ...settings };
-      const bgImageFile = cleanSettings._bgImageFile as File | undefined;
-      delete cleanSettings._bgImageFile;
-
-      const formData = new FormData();
+      const stateAtStart = useFileStore.getState();
+      const capturedIndex = stateAtStart.selectedIndex;
+      const uploadedFile = files[capturedIndex] ?? files[0];
+      const selectedEntry = stateAtStart.entries[capturedIndex];
+      const capturedEntry =
+        selectedEntry?.file === uploadedFile
+          ? selectedEntry
+          : stateAtStart.entries.find((entry) => entry.file === uploadedFile);
+      const capturedEntryId = capturedEntry?.id ?? null;
+      const capturedFile = capturedEntry?.file ?? null;
+      const runEntryIds = new Set(capturedEntryId ? [capturedEntryId] : []);
+      const runEntryFiles = new Map<string, File>();
       if (MULTI_FILE_TOOLS.has(toolId) && files.length > 1) {
-        for (const f of files) formData.append("file", f);
-      } else {
-        formData.append("file", files[capturedIndex] ?? files[0]);
-      }
-      formData.append("settings", JSON.stringify(cleanSettings));
-      if (bgImageFile) {
-        formData.append("backgroundImage", bgImageFile);
-      }
-      formData.append("clientJobId", clientJobId);
-
-      const capturedEntry = useFileStore.getState().entries[capturedIndex];
-      saveModeRef.current = useFileStore.getState().librarySaveMode;
-      // skipLibrarySave lets a multi-phase tool suppress auto-saving an
-      // intermediate output (e.g. remove-background's Phase 1 transparent
-      // result) so the final phase owns the library save instead.
-      if (!opts?.skipLibrarySave && capturedEntry?.serverFileId) {
-        formData.append("fileId", capturedEntry.serverFileId);
-        formData.append("saveMode", saveModeRef.current);
-      }
-
-      const xhr = new XMLHttpRequest();
-      xhrRef.current = xhr;
-
-      xhr.timeout = isAiTool || LONG_RUNNING_TOOLS.has(toolId) ? 600_000 : 120_000;
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
-          setProgress((prev) => {
-            if (prev.phase !== "uploading") return prev;
-            return { ...prev, percent: uploadPercent };
-          });
-        }
-      };
-
-      let uploadedFully = false;
-      xhr.upload.onload = () => {
-        uploadedFully = true;
-        setProgress((prev) => ({
-          ...prev,
-          phase: "processing",
-          percent: UPLOAD_WEIGHT,
-          stage: "Processing...",
-        }));
-      };
-
-      // The POST socket died or timed out after the whole body left the
-      // browser: the job is running server-side under clientJobId (the sync
-      // wait is only an observer; BullMQ does not care about this socket) and
-      // SSE still delivers its result. Degrade to the async path exactly as a
-      // 202 would, instead of abandoning a live job (#722). A proxy idle
-      // timeout on the sync wait otherwise reproduces the failure on every
-      // retry while every "failed" job actually completes.
-      const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
-        if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
-        asyncModeRef.current = true;
-        trackDegrade(trigger, false);
-        setActiveJob(clientJobId, cancelCurrentJob);
-        // Force a fresh SSE: the event that got us here says the network
-        // path just died, and a half-open source keeps readyState OPEN while
-        // delivering nothing. The server replays terminal state and live
-        // queued/processing rows on connect, so the swap loses nothing.
-        reconnectSSE(true);
-        resetStallTimer();
-        // Heartbeats alone must not hold "processing" forever if the request
-        // tail never reached the server. A frame seen before the degrade
-        // already proves the job exists; queued jobs can then stay silent
-        // far longer than any timeout we could pick here.
-        if (!sawJobEvidenceRef.current) {
-          startJobEvidenceTimer();
-        }
-        return true;
-      };
-
-      // A real failure must settle the entry the kickoff reset to
-      // "processing": the tool page derives the pulse from
-      // status === "processing" and gates the failure screen on
-      // status === "failed", so an unsettled entry pulses on the untouched
-      // original forever (#799, the single-file twin of #798's failRun).
-      const failEntry = (message: string) => {
-        if (useFileStore.getState().entries[capturedIndex]?.status === "processing") {
-          useFileStore.getState().updateEntry(capturedIndex, {
-            status: "failed",
-            error: message,
-          });
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status === 202) {
-          asyncModeRef.current = true;
-          setActiveJob(clientJobId, cancelCurrentJob);
-          resetStallTimer();
-          return;
-        }
-
-        // A 502/504 whose body is not JSON is an intermediary answering for
-        // a dead sync wait, not the app: app-emitted 5xx always carries a
-        // JSON error body (html-to-image's own 504 stays precise below).
-        // Post-upload the job is live server-side, so degrade instead of
-        // erroring (#750).
-        if (xhr.status === 502 || xhr.status === 504) {
-          let appSpoke = true;
-          try {
-            JSON.parse(xhr.responseText);
-          } catch {
-            appSpoke = false;
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          const atIndex = stateAtStart.entries[i];
+          const matched =
+            atIndex?.file === f ? atIndex : stateAtStart.entries.find((entry) => entry.file === f);
+          if (matched) {
+            runEntryFiles.set(matched.id, f);
           }
-          if (!appSpoke && degradeToAsync(xhr.status === 502 ? "http-502" : "http-504")) {
+        }
+      } else if (capturedEntryId && capturedFile) {
+        runEntryFiles.set(capturedEntryId, capturedFile);
+      }
+      if (stateAtStart.entries.length > 0 && (!capturedEntryId || runEntryFiles.size === 0)) {
+        return;
+      }
+
+      // Everything up to the send runs before any XHR handler exists, so a
+      // throw here (a store listener, settings JSON.stringify can't encode)
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
+      try {
+        setError(null);
+        resultEntryRef.current = null;
+        setWarning(null);
+        setResultPayload(null);
+        useFileStore.getState().setLastSavedLibraryFileId(null);
+        if (capturedEntryId) {
+          useFileStore.getState().updateEntryById(capturedEntryId, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            processedSize: null,
+            resultNotes: null,
+            status: "processing",
+            error: null,
+          });
+        }
+
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIdRef.current = capturedEntryId;
+        activeFileRef.current = capturedFile;
+        activeEntryIdsRef.current = runEntryIds;
+        activeEntryFilesRef.current = runEntryFiles;
+        asyncModeRef.current = false;
+        if (useFileStore.getState().activeJobId !== null) {
+          setActiveJob(null, null);
+        }
+
+        setProcessing(true);
+        setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
+        // A stale evidence timer from a previous degraded run must not fire
+        // into this run, and evidence never carries across runs (#722).
+        clearRequestTimer();
+        clearJobEvidenceTimer();
+        sawJobEvidenceRef.current = false;
+        uploadedFullyRef.current = false;
+        stoppedJobIdsRef.current.delete(clientJobId);
+
+        const startTime = Date.now();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        elapsedRef.current = setInterval(() => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          setProgress((prev) => ({
+            ...prev,
+            elapsed: Math.floor((Date.now() - startTime) / 1000),
+          }));
+        }, 1000);
+
+        // Open SSE for real-time progress from the server (all tools)
+        reconnectSSE(true);
+
+        // Build form data
+        const cleanSettings = { ...settings };
+        const bgImageFile = cleanSettings._bgImageFile as File | undefined;
+        delete cleanSettings._bgImageFile;
+
+        const formData = new FormData();
+        if (MULTI_FILE_TOOLS.has(toolId) && files.length > 1) {
+          for (const f of files) formData.append("file", f);
+        } else {
+          formData.append("file", files[capturedIndex] ?? files[0]);
+        }
+        formData.append("settings", JSON.stringify(cleanSettings));
+        if (bgImageFile) {
+          formData.append("backgroundImage", bgImageFile);
+        }
+        formData.append("clientJobId", clientJobId);
+
+        saveModeRef.current = useFileStore.getState().librarySaveMode;
+        // skipLibrarySave lets a multi-phase tool suppress auto-saving an
+        // intermediate output (e.g. remove-background's Phase 1 transparent
+        // result) so the final phase owns the library save instead.
+        if (!opts?.skipLibrarySave && capturedEntry?.serverFileId) {
+          formData.append("fileId", capturedEntry.serverFileId);
+          formData.append("saveMode", saveModeRef.current);
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhrRef.current = xhr;
+
+        // Bound upload stall and post-upload response wait separately instead
+        // of setting a wall-clock xhr.timeout across the whole request, which
+        // kills slow uploads that are still making steady progress (#3779).
+        xhr.timeout = 0;
+
+        const responseTimeoutMs =
+          isAiTool || LONG_RUNNING_TOOLS.has(toolId)
+            ? LONG_RESPONSE_TIMEOUT_MS
+            : SYNC_RESPONSE_TIMEOUT_MS;
+        let uploadedFully = false;
+        let lastUploadedBytes = 0;
+        const fireRequestTimeout = () => {
+          requestTimerRef.current = null;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          try {
+            xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhr.ontimeout?.(new ProgressEvent("timeout"));
+        };
+        const armUploadStallTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireRequestTimeout, UPLOAD_STALL_TIMEOUT_MS);
+        };
+        const armResponseTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireRequestTimeout, responseTimeoutMs);
+        };
+
+        xhr.upload.onprogress = (event) => {
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
             return;
           }
-        }
-
-        if (elapsedRef.current) clearInterval(elapsedRef.current);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const result: ProcessResult = resolveServerUrls(JSON.parse(xhr.responseText));
-            setWarning(result.warning ?? null);
-            setResultPayload(result as unknown as Record<string, unknown>);
-            if (result.savedFileId) {
-              useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+          if (event.loaded > lastUploadedBytes) {
+            lastUploadedBytes = event.loaded;
+            if (!uploadedFully) {
+              armUploadStallTimer();
             }
-            useFileStore.getState().updateEntry(capturedIndex, {
-              processedUrl: result.downloadUrl,
-              processedPreviewUrl: result.previewUrl ?? null,
-              processedFilename: null,
-              status: "completed",
-              originalSize: result.originalSize,
-              processedSize: result.processedSize,
-              ...(result.savedFileId && saveModeRef.current === "overwrite"
-                ? { serverFileId: result.savedFileId }
-                : {}),
+          }
+          if (event.lengthComputable) {
+            // Firefox fires upload.onload only once the response starts, so the
+            // final progress event also counts as the body having left the
+            // browser (#2136, #2240).
+            if (event.loaded >= event.total) {
+              if (!uploadedFully) {
+                uploadedFully = true;
+                uploadedFullyRef.current = true;
+                armResponseTimer();
+                if (!eventSourceRef.current) reconnectSSE(true);
+              }
+            }
+            const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
+            setProgress((prev) => {
+              if (prev.phase !== "uploading") return prev;
+              return { ...prev, percent: uploadPercent };
             });
-            // An auto-saved result is already in the library, so it was never at risk.
-            // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-            if (result.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
-          } catch {
-            const message = "Invalid response from server";
-            setError(message);
-            failEntry(message);
           }
-        } else {
-          let message: string;
+        };
+
+        xhr.upload.onload = () => {
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
+          uploadedFully = true;
+          uploadedFullyRef.current = true;
+          armResponseTimer();
+          if (!eventSourceRef.current) reconnectSSE(true);
+          setProgress((prev) =>
+            prev.phase === "processing"
+              ? prev
+              : {
+                  ...prev,
+                  phase: "processing",
+                  percent: UPLOAD_WEIGHT,
+                  stage: "Processing...",
+                },
+          );
+        };
+
+        // The POST socket died or timed out after the whole body left the
+        // browser: the job is running server-side under clientJobId (the sync
+        // wait is only an observer; BullMQ does not care about this socket) and
+        // SSE still delivers its result. Degrade to the async path exactly as a
+        // 202 would, instead of abandoning a live job (#722). A proxy idle
+        // timeout on the sync wait otherwise reproduces the failure on every
+        // retry while every "failed" job actually completes.
+        const degradeToAsync = (trigger: DegradeTrigger) => {
+          if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
+          clearRequestTimer();
+          asyncModeRef.current = true;
+          trackDegrade(trigger, false);
+          setActiveJob(clientJobId, cancelCurrentJob);
+          // Force a fresh SSE: the event that got us here says the network
+          // path just died, and a half-open source keeps readyState OPEN while
+          // delivering nothing. The server replays terminal state and live
+          // queued/processing rows on connect, so the swap loses nothing.
+          reconnectSSE(true);
+          resetStallTimer();
+          // Heartbeats alone must not hold "processing" forever if the request
+          // tail never reached the server. A frame seen before the degrade
+          // already proves the job exists; queued jobs can then stay silent
+          // far longer than any timeout we could pick here.
+          if (!sawJobEvidenceRef.current) {
+            startJobEvidenceTimer();
+          }
+          return true;
+        };
+
+        // A real failure must settle the entry the kickoff reset to
+        // "processing": the tool page derives the pulse from
+        // status === "processing" and gates the failure screen on
+        // status === "failed", so an unsettled entry pulses on the untouched
+        // original forever (#799, the single-file twin of #798's failRun).
+        // Like settleProcessingEntries, every exit calls it last, after the
+        // run's teardown, and it logs and reports instead of throwing (#1698,
+        // #1812).
+        const failEntry = (message: string, category?: FeedbackErrorCategory) => {
           try {
-            const body = JSON.parse(xhr.responseText);
-            const parsed = parseApiError(body, xhr.status);
-            if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-              message = `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`;
-            } else {
-              message = parsed as string;
+            if (
+              capturedEntryId &&
+              capturedFile &&
+              useFileStore
+                .getState()
+                .entries.find((e) => e.id === capturedEntryId && e.file === capturedFile)
+                ?.status === "processing"
+            ) {
+              useFileStore.getState().updateEntryById(capturedEntryId, {
+                status: "failed",
+                error: message,
+                errorCategory: category ?? null,
+              });
             }
-          } catch {
-            message = `Processing failed: ${xhr.status}`;
+          } catch (err) {
+            console.error("Failing the run's entry failed", err);
+            reportRunEndFailure("Failing a sync tool run's entry failed", err, toolId);
           }
-          setError(message);
-          failEntry(message);
-        }
+        };
 
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-        clearActiveJob();
-      };
+        // Every sync exit ends the run here, so none of them can stop halfway
+        // (#1791). clearActiveJob goes first because it nulls the run's refs
+        // before its own store write, and each write gets its own guard: a
+        // store listener that throws on the error write would otherwise skip
+        // the rest and leave the entry pulsing at "processing" with the job
+        // ref still pointing at a run that's over. Failing the entry goes last
+        // (#1698). Returns the first teardown error, for the caller to rethrow
+        // so it still reaches Sentry.
+        const endSyncRun = (
+          failure: { message: string; category?: FeedbackErrorCategory; code?: string } | null,
+        ): { cause: unknown } | null => {
+          clearRequestTimer();
+          setProgress(IDLE_PROGRESS);
+          const firstError = runEndWrites([
+            clearActiveJob,
+            ...(failure ? [() => setError(failure.message, failure.code)] : []),
+            () => setProcessing(false),
+          ]);
+          if (failure) failEntry(failure.message, failure.category);
+          return firstError;
+        };
 
-      xhr.onerror = () => {
-        // This run already settled (SSE delivered its terminal frame) or a
-        // newer run took over: a late socket event must neither error a
-        // finished result nor tear down the successor's state.
-        if (activeJobIdRef.current !== clientJobId) return;
-        if (degradeToAsync("socket")) return;
-        clearStallTimer();
-        if (elapsedRef.current) clearInterval(elapsedRef.current);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-        const message = "Processing was interrupted. Retry when reconnected.";
-        setError(message);
-        failEntry(message);
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-        clearActiveJob();
-      };
+        // Writes a sync 2xx result the way the SSE completion branch does.
+        // Any throw from here is ours, not the server's (#1354).
+        const landSyncResult = (result: ProcessResult) => {
+          if (
+            !capturedEntryId ||
+            !capturedFile ||
+            !useFileStore
+              .getState()
+              .entries.some((entry) => entry.id === capturedEntryId && entry.file === capturedFile)
+          ) {
+            return;
+          }
+          if (result.savedFileId) {
+            useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+          }
+          if (
+            !useFileStore
+              .getState()
+              .entries.some((entry) => entry.id === capturedEntryId && entry.file === capturedFile)
+          ) {
+            return;
+          }
+          useFileStore.getState().updateEntryById(capturedEntryId, {
+            processedUrl: result.downloadUrl,
+            processedPreviewUrl: result.previewUrl ?? null,
+            processedFilename: null,
+            resultNotes: pickResultNotes(result),
+            status: "completed",
+            originalSize: result.originalSize,
+            processedSize: result.processedSize,
+            ...(result.savedFileId && saveModeRef.current === "overwrite"
+              ? { serverFileId: result.savedFileId }
+              : {}),
+          });
+          // An auto-saved result is already in the library, so it was never at risk.
+          // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+          if (result.savedFileId) useFileStore.getState().markClaimedById(capturedEntryId);
+          // Last: tools that render straight from the payload (histogram, sprite
+          // sheet) must not show a result beside the error a failed write ends
+          // the run with.
+          resultEntryRef.current = {
+            id: capturedEntryId,
+            file: capturedFile,
+            processedUrl: result.downloadUrl,
+          };
+          setWarning(result.warning ?? null);
+          setResultPayload(result as unknown as Record<string, unknown>);
+        };
 
-      xhr.ontimeout = () => {
-        if (activeJobIdRef.current !== clientJobId) return;
-        if (degradeToAsync("timeout")) return;
-        clearStallTimer();
-        if (elapsedRef.current) clearInterval(elapsedRef.current);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-        const message = "Request timed out - the server may be overloaded. Try again.";
-        setError(message);
-        failEntry(message);
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-        clearActiveJob();
-      };
+        xhr.onload = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, xhr.status === 202, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
+          uploadedFullyRef.current = false;
+          if (storeWasReset()) return;
 
-      xhr.open("POST", appUrl(apiToolPath(toolId)));
-      formatHeaders().forEach((value, key) => {
-        xhr.setRequestHeader(key, value);
-      });
-      xhr.send(formData);
+          if (xhr.status === 202) {
+            asyncModeRef.current = true;
+            setActiveJob(clientJobId, cancelCurrentJob);
+            if (!eventSourceRef.current) reconnectSSE(true);
+            resetStallTimer();
+            return;
+          }
+
+          // A 5xx whose body is not JSON is an intermediary answering for a
+          // dead sync wait, not the app: app-emitted 5xx always carries a
+          // JSON error body (html-to-image's own 504 stays precise below).
+          // Post-upload the job is live server-side, so degrade instead of
+          // erroring (#750, #1242).
+          if (xhr.status >= 500) {
+            let appSpoke = true;
+            try {
+              JSON.parse(xhr.responseText);
+            } catch {
+              appSpoke = false;
+            }
+            if (!appSpoke && degradeToAsync(`http-${xhr.status}`)) {
+              return;
+            }
+          }
+
+          if (elapsedRef.current) clearInterval(elapsedRef.current);
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+
+          // Only a body that isn't a result is the server's fault, and it gets
+          // reported: the user sees it, so Sentry should too (#1740). A throw
+          // while landing a good result is our own store writes failing, which
+          // must not read as "Invalid response" and must still surface (#1354,
+          // the sync twin of #1287).
+          let handlingError: { cause: unknown } | null = null;
+          let failure: {
+            message: string;
+            category?: FeedbackErrorCategory;
+            code?: string;
+          } | null = null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            let result: ProcessResult | null = null;
+            try {
+              result = parseResultBody<ProcessResult>(xhr.responseText);
+            } catch (err) {
+              failure = { message: t.errors.invalidServerResponse, category: "processing_error" };
+              reportMalformedResult(err, { status: xhr.status, toolId });
+            }
+            if (result) {
+              try {
+                landSyncResult(result);
+              } catch (cause) {
+                handlingError = { cause };
+              }
+            }
+          } else {
+            let message: string;
+            let code: string | undefined;
+            try {
+              const body = JSON.parse(xhr.responseText);
+              const bodyCode = (body as { code?: unknown } | null)?.code;
+              if (typeof bodyCode === "string" && bodyCode.length > 0) code = bodyCode;
+              // Store the canonical "Canceled" sentinel so displayStoredError
+              // translates it in the active locale, matching the batch and
+              // pipeline paths (#1436, #4009).
+              if ((body as { canceled?: boolean } | null)?.canceled === true) {
+                message = "Canceled";
+              } else {
+                const parsed = parseApiError(
+                  body,
+                  xhr.status,
+                  format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+                );
+                if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
+                  message = featureNotInstalledMessage(t, parsed, toolName);
+                } else if (typeof parsed === "object" && parsed.type === "feature_incompatible") {
+                  message = featureIncompatibleMessage(t, parsed);
+                } else {
+                  message = parsed as string;
+                }
+              }
+            } catch {
+              message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
+            }
+            // Our API's 413 and a reverse proxy's (an HTML body-size page) mean
+            // the same thing to the user, in their language (#1341).
+            if (xhr.status === 413) message = t.errors.fileTooLarge;
+            failure = {
+              message,
+              category: xhr.status === 413 ? "upload_error" : undefined,
+              ...(code ? { code } : {}),
+            };
+          }
+
+          if (handlingError) {
+            // The run is over whatever threw. A second throw from the teardown
+            // must not replace the root cause, so it's reported here instead
+            // (#1812): the other exits rethrow theirs. A throw after
+            // updateEntry (markClaimed) leaves the entry completed under the
+            // error: the result did land, so failEntry keeps it.
+            const teardownError = endSyncRun({ message: t.errors.jobTrackingFailed });
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending a sync tool run after a result handling error failed",
+                teardownError.cause,
+                toolId,
+              );
+            }
+            throw handlingError.cause;
+          }
+
+          const teardownError = endSyncRun(failure);
+          if (teardownError) throw teardownError.cause;
+        };
+
+        xhr.onerror = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
+          // This run already settled (SSE delivered its terminal frame) or a
+          // newer run took over: a late socket event must neither error a
+          // finished result nor tear down the successor's state.
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
+          uploadedFullyRef.current = false;
+          if (storeWasReset()) return;
+          if (degradeToAsync("socket")) return;
+          clearStallTimer();
+          if (elapsedRef.current) clearInterval(elapsedRef.current);
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+          // A drop after the upload finished degraded to async above, so this
+          // one cut the upload short (#1822).
+          const teardownError = endSyncRun({
+            message: t.errors.processingInterrupted,
+            category: "upload_error",
+          });
+          if (teardownError) throw teardownError.cause;
+        };
+
+        xhr.ontimeout = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
+          uploadedFullyRef.current = false;
+          if (storeWasReset()) return;
+          if (degradeToAsync("timeout")) return;
+          clearStallTimer();
+          if (elapsedRef.current) clearInterval(elapsedRef.current);
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+          const teardownError = endSyncRun({
+            message: t.errors.uploadTimeout,
+            category: "timeout",
+          });
+          if (teardownError) throw teardownError.cause;
+        };
+
+        xhr.open("POST", appUrl(apiToolPath(toolId)));
+        formatHeaders().forEach((value, key) => {
+          xhr.setRequestHeader(key, value);
+        });
+        armUploadStallTimer();
+        xhr.send(formData);
+      } catch (cause) {
+        if (claimed) endRunAtStart(runEntryIds, runEntryFiles);
+        else endStartBeforeClaim(runEntryIds, runEntryFiles);
+        throw cause;
+      }
     },
     [
       toolId,
       isAiTool,
+      endRunAtStart,
+      endStartBeforeClaim,
+      findStoppedByXhr,
+      finishStoppedRun,
       setProcessing,
       setError,
       setActiveJob,
       clearActiveJob,
       cancelCurrentJob,
+      clearRequestTimer,
       clearStallTimer,
       reconnectSSE,
       resetStallTimer,
       clearJobEvidenceTimer,
       startJobEvidenceTimer,
+      storeWasReset,
       trackDegrade,
       toolName,
+      t,
     ],
   );
 
   const processAllFiles = useCallback(
-    async (files: File[], settings: Record<string, unknown>) => {
+    async (files: File[], settings: Record<string, unknown> | Record<string, unknown>[]) => {
       if (files.length === 0) {
-        setError("No files selected");
+        setError(t.errors.noFilesSelected);
         return;
       }
-
-      import("@/lib/analytics").then(({ track }) => {
-        track(ANALYTICS_EVENTS.TOOL_STARTED, {
-          tool_id: toolId,
-          is_batch: true,
-          file_count: files.length,
-        });
-      });
 
       if (files.length === 1) {
-        processFiles(files, settings);
+        processFiles(files, Array.isArray(settings) ? settings[0] : settings);
         return;
       }
+
+      track(ANALYTICS_EVENTS.TOOL_STARTED, {
+        tool_id: toolId,
+        is_batch: true,
+        file_count: files.length,
+      });
 
       // batch_processed fires once for the batch as a unit (distinct from the N
       // per-file tool_used events), so batch usage is separable from single runs.
@@ -889,410 +1796,787 @@ export function useToolProcessor(toolId: string) {
       // status; this flag only shapes what this client shows (#767).
       let canceledByUser = false;
 
-      const { updateEntry, setBatchZip } = useFileStore.getState();
-
-      setError(null);
-      // A batch reports no per-file payload, so a previous single run's
-      // (e.g. compress's resizedTo) must not render under the batch result.
-      setResultPayload(null);
-      // Batch runs never auto-save to the library (no fileId is sent), so a
-      // previous single run's saved indicator must not survive into this one.
-      useFileStore.getState().setLastSavedLibraryFileId(null);
-      // Mirror the single-file reset: clear every entry's stale processed state
-      // before this run uploads, so a failed or absent result can't render a
-      // previous run's output under the new run's filename and size (#746).
-      // Revoke stale result blob URLs so they don't leak.
+      const { updateEntryById, setBatchZip } = useFileStore.getState();
       const priorEntries = useFileStore.getState().entries;
-      for (let i = 0; i < priorEntries.length; i++) {
-        const staleUrl = priorEntries[i]?.processedUrl;
-        if (staleUrl?.startsWith("blob:")) URL.revokeObjectURL(staleUrl);
-        updateEntry(i, {
-          processedUrl: null,
-          processedPreviewUrl: null,
-          processedFilename: null,
-          processedSize: null,
-          status: "processing",
-          error: null,
-        });
+      const capturedEntries = files.map((file, i) => {
+        const atIndex = priorEntries[i];
+        const matched =
+          atIndex?.file === file ? atIndex : priorEntries.find((entry) => entry.file === file);
+        return matched ? { id: matched.id, file } : null;
+      });
+      const runEntryIds = new Set<string>();
+      const runEntryFiles = new Map<string, File>();
+      for (const captured of capturedEntries) {
+        if (captured) {
+          runEntryIds.add(captured.id);
+          runEntryFiles.set(captured.id, captured.file);
+        }
       }
-      setProcessing(true);
-      setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
-      // A stale evidence timer from a previous degraded run must not fire
-      // into this run, and evidence never carries across runs (#722).
-      clearJobEvidenceTimer();
-      sawJobEvidenceRef.current = false;
+      if (priorEntries.length > 0 && runEntryFiles.size === 0) {
+        return;
+      }
 
-      const startTime = Date.now();
-      elapsedRef.current = setInterval(() => {
-        setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
-      }, 1000);
-
-      const clientJobId = generateId();
-      activeJobIdRef.current = clientJobId;
-      activeEntryIndexRef.current = null;
-      asyncModeRef.current = false;
-      // The cancel button lives behind the store's activeJob handle. Batch
-      // runs arm it for the whole run, sync wait included: since #750 the
-      // HTTP response is only an observer, so without this the only exit
-      // from a long unwanted batch was closing the tab, which stopped
-      // nothing server-side (#767).
-      setActiveJob(clientJobId, cancelCurrentJob);
-
-      // Tear down the run without touching the outcome state; callers set
-      // the result or error first.
-      const finishRun = () => {
-        clearJobEvidenceTimer();
-        clearStallTimer();
-        if (elapsedRef.current) clearInterval(elapsedRef.current);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-        batchRunRef.current = null;
-        clearActiveJob();
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-      };
-
-      const failRun = (message: string, reason: string) => {
-        // Entries were set to "processing" at kickoff (the reset loop above). A
-        // whole-run failure that never reached settleFromZip must settle them,
-        // or the result pane keeps pulsing on the stale original because the
-        // entry never leaves "processing" (#746).
-        const runEntries = useFileStore.getState().entries;
-        for (let i = 0; i < runEntries.length; i++) {
-          if (runEntries[i]?.status === "processing") {
-            updateEntry(i, { status: "failed", error: message });
-          }
-        }
-        setError(message);
-        finishRun();
-        // A canceled run reports the cancel, whichever path carried it in.
-        trackBatch(canceledByUser ? "canceled" : "failed", canceledByUser ? "canceled" : reason);
-      };
-
-      const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
-        setBatchZip(zipBlob, `batch-${toolId}.zip`);
-
-        // Extract files from ZIP using fflate
-        const { unzipSync } = await import("fflate");
-        const zipBuffer = new Uint8Array((await zipBlob.arrayBuffer()) as ArrayBuffer);
-        const extracted = unzipSync(zipBuffer);
-
-        const entries = useFileStore.getState().entries;
-        for (let i = 0; i < entries.length; i++) {
-          const processedName = fileResults[String(i)];
-          if (processedName && extracted[processedName]) {
-            const ext = processedName.split(".").pop()?.toLowerCase() ?? "";
-            const blobType = MIME_BY_EXT[ext];
-            const blob = new Blob(
-              [extracted[processedName] as BlobPart],
-              blobType ? { type: blobType } : undefined,
-            );
-            updateEntry(i, {
-              processedUrl: URL.createObjectURL(blob),
-              processedFilename: processedName,
-              processedSize: blob.size,
-              // Batch results come from the ZIP, not a server preview; clear any
-              // stale processedPreviewUrl so an earlier single run's preview
-              // can't win over this result (displayUrl prefers it) (#746).
-              processedPreviewUrl: null,
-              status: "completed",
-              error: null,
-            });
-          } else {
-            // After a user cancel, a missing result is the cancel doing its
-            // job, not a lookup failure.
-            updateEntry(i, {
-              // Clear the result so hasProcessed goes false and the failure
-              // screen (guarded by !hasProcessed) renders instead of a stale
-              // previous result (#746).
-              processedUrl: null,
-              processedPreviewUrl: null,
-              status: "failed",
-              error: canceledByUser ? "Canceled" : "File not found in batch results",
-            });
-          }
-        }
-
-        finishRun();
-        trackBatch(
-          canceledByUser ? "canceled" : "completed",
-          canceledByUser ? "canceled" : undefined,
-        );
-      };
-
-      // A degraded run settles here: download the durable ZIP the terminal
-      // frame points at. Retried, because the reason we are on this path is
-      // that the network just proved flaky.
-      const downloadAndSettle = async (result: Record<string, unknown>) => {
-        const url = serverUrl(String(result.downloadUrl));
-        const fileResults = (result.fileResults ?? {}) as Record<string, string>;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          if (activeJobIdRef.current !== clientJobId) return;
-          try {
-            const res = await fetch(url, { headers: formatHeaders() });
-            // A 4xx is deterministic: the result is gone or this session may
-            // not read it. Retrying cannot help, and the message must not
-            // blame the network.
-            if (res.status >= 400 && res.status < 500) {
-              if (activeJobIdRef.current !== clientJobId) return;
-              failRun(
-                res.status === 404
-                  ? "Completed result is no longer available. Run the job again."
-                  : "The finished batch could not be downloaded. Refresh and try again.",
-                `download-${res.status}`,
-              );
-              return;
-            }
-            if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
-            const blob = await res.blob();
-            if (activeJobIdRef.current !== clientJobId) return;
-            await settleFromZip(blob, fileResults);
-            return;
-          } catch {
-            if (attempt < 2) {
-              await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2_000 : 5_000));
-            }
-          }
-        }
-        if (activeJobIdRef.current !== clientJobId) return;
-        failRun("Processing was interrupted. Retry when reconnected.", "download-failed");
-      };
-
-      batchRunRef.current = {
-        markCanceled: () => {
-          canceledByUser = true;
-        },
-        cancelLocally: () => {
-          if (activeJobIdRef.current !== clientJobId) return false;
-          canceledByUser = true;
-          // The upload may still be in flight; aborting it is what actually
-          // stops ingress when no job row exists server-side yet.
-          xhrRef.current?.abort();
-          failRun("Canceled", "canceled");
-          return true;
-        },
-        abandon: (message) => {
-          if (activeJobIdRef.current !== clientJobId) return false;
-          failRun(message, "unconfirmed");
-          return true;
-        },
-        onTerminal: (frame) => {
-          if (activeJobIdRef.current !== clientJobId) return;
-          if (
-            frame.status === "completed" &&
-            frame.result &&
-            typeof frame.result.downloadUrl === "string"
-          ) {
-            void downloadAndSettle(frame.result);
-            return;
-          }
-          if (frame.status === "completed") {
-            // A batch route without a durable result (custom sub-routes like
-            // pdf-to-image): its ZIP only ever existed on the response this
-            // run lost, so the outcome matches a plain interruption.
-            failRun("Processing was interrupted. Retry when reconnected.", "no-durable-result");
-            return;
-          }
-          // Replay-synthesized failures carry their message in a blank-name
-          // errors entry (packaging failure, expired result).
-          const syntheticError = frame.errors?.find((e) => e.filename === "")?.error;
-          const allFilesFailed = frame.totalFiles > 0 && frame.failedFiles >= frame.totalFiles;
-          failRun(
-            syntheticError ??
-              (allFilesFailed ? "All files failed processing" : "Batch processing failed"),
-            !syntheticError && allFilesFailed ? "all-files-failed" : "server-failed",
-          );
-        },
-      };
-
-      // Open SSE before the upload. The unified handler in reconnectSSE also
-      // gives batch runs the visibility-change recovery path.
-      reconnectSSE(true);
-
-      const formData = new FormData();
-      for (const file of files) formData.append("file", file);
-      formData.append("settings", JSON.stringify(settings));
-      formData.append("clientJobId", clientJobId);
-
-      const xhr = new XMLHttpRequest();
-      xhrRef.current = xhr;
-      xhr.responseType = "blob";
-      // Batches legitimately hold the sync response for many minutes; the
-      // stall and evidence timers own liveness, not a wall-clock cap.
-      xhr.timeout = 0;
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
-          setProgress((prev) => {
-            if (prev.phase !== "uploading") return prev;
-            return { ...prev, percent: uploadPercent };
+      // Everything up to the send runs before any XHR handler exists, so a
+      // throw here (a store listener, settings JSON.stringify can't encode)
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
+      try {
+        setError(null);
+        // A batch's per-file notes land on each entry (#1292), not in the
+        // hook's single-run payload, so a previous single run's must not render
+        // under the batch result.
+        resultEntryRef.current = null;
+        setWarning(null);
+        setResultPayload(null);
+        // Batch runs never auto-save to the library (no fileId is sent), so a
+        // previous single run's saved indicator must not survive into this one.
+        useFileStore.getState().setLastSavedLibraryFileId(null);
+        useFileStore.getState().clearBatchZip();
+        // Mirror the single-file reset: clear every entry's stale processed state
+        // before this run uploads, so a failed or absent result can't render a
+        // previous run's output under the new run's filename and size (#746).
+        // Revoke stale result blob URLs so they don't leak.
+        for (const captured of capturedEntries) {
+          if (!captured) continue;
+          const staleUrl = priorEntries.find((entry) => entry.id === captured.id)?.processedUrl;
+          if (staleUrl?.startsWith("blob:")) URL.revokeObjectURL(staleUrl);
+          updateEntryById(captured.id, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            processedSize: null,
+            resultNotes: null,
+            status: "processing",
+            error: null,
           });
         }
-      };
 
-      let uploadedFully = false;
-      xhr.upload.onload = () => {
-        uploadedFully = true;
-        setProgress((prev) => ({
-          ...prev,
-          phase: "processing",
-          percent: UPLOAD_WEIGHT,
-          stage: "Processing...",
-        }));
-      };
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIdRef.current = null;
+        activeFileRef.current = null;
+        activeEntryIdsRef.current = runEntryIds;
+        activeEntryFilesRef.current = runEntryFiles;
+        asyncModeRef.current = false;
 
-      // Same shape as the single-run degrade (#722): a dead response after a
-      // finished upload does not mean a dead batch. The flow keeps running
-      // server-side and the terminal SSE frame carries the durable ZIP's
-      // download URL, so the run can settle without the HTTP response (#750).
-      const degradeToAsync = (trigger: DegradeTrigger) => {
-        if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
-        asyncModeRef.current = true;
-        trackDegrade(trigger, true);
-        reconnectSSE(true);
-        resetStallTimer();
-        if (!sawJobEvidenceRef.current) {
-          startJobEvidenceTimer();
-        }
-        return true;
-      };
+        setProcessing(true);
+        setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
+        // A stale evidence timer from a previous degraded run must not fire
+        // into this run, and evidence never carries across runs (#722).
+        clearRequestTimer();
+        clearJobEvidenceTimer();
+        sawJobEvidenceRef.current = false;
+        uploadedFullyRef.current = false;
+        stoppedJobIdsRef.current.delete(clientJobId);
 
-      xhr.onload = () => {
-        if (activeJobIdRef.current !== clientJobId) return;
+        const startTime = Date.now();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        elapsedRef.current = setInterval(() => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          setProgress((prev) => ({
+            ...prev,
+            elapsed: Math.floor((Date.now() - startTime) / 1000),
+          }));
+        }, 1000);
+        // The cancel button lives behind the store's activeJob handle. Batch
+        // runs arm it for the whole run, sync wait included: since #750 the
+        // HTTP response is only an observer, so without this the only exit
+        // from a long unwanted batch was closing the tab, which stopped
+        // nothing server-side (#767).
+        setActiveJob(clientJobId, cancelCurrentJob);
 
-        if (xhr.status === 202) {
-          // The server's sync wait expired while the batch keeps running;
-          // ride the SSE to the terminal frame like any degraded run. Force
-          // a fresh source: a sync-mode SSE error during the long wait nulls
-          // the ref, and the replay-on-connect recovers anything missed.
-          asyncModeRef.current = true;
-          reconnectSSE(true);
-          resetStallTimer();
-          return;
-        }
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          let fileResults: Record<string, string> = {};
-          try {
-            fileResults = JSON.parse(
-              decodeURIComponent(xhr.getResponseHeader("X-File-Results") ?? "%7B%7D"),
-            );
-          } catch {
-            // Malformed header - fall back to empty mapping, all entries marked failed
+        // Stops everything that could still act on the run: its timers, its
+        // stream and its batch closure. No store writes.
+        const releaseRun = () => {
+          clearRequestTimer();
+          clearJobEvidenceTimer();
+          clearStallTimer();
+          if (elapsedRef.current) clearInterval(elapsedRef.current);
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
           }
-          const zipBlob = xhr.response as Blob;
-          void (async () => {
+          batchRunRef.current = null;
+          setProgress(IDLE_PROGRESS);
+        };
+
+        // Tear down the run without touching the outcome state; callers set
+        // the result first. Each write gets its own guard, and the
+        // first throw is returned for the caller to rethrow once the run's
+        // outcome is reported (#1890).
+        const finishRun = () => {
+          releaseRun();
+          return runEndWrites([clearActiveJob, () => setProcessing(false)]);
+        };
+
+        // The evidence timer and the cancel 404 end a batch through here, with
+        // nothing else left to end it, so a write that throws mustn't skip the
+        // rest: the first throw is rethrown once the run is over and reported
+        // (#1814). An error write that throws without landing is different:
+        // the run stays live, as before. The SSE handler's own failure path
+        // (#1287) then ends it with a message, and on the other paths the
+        // cancel button stays armed, so a second click can still end it.
+        const failRun = (
+          message: string,
+          reason: string,
+          category?: FeedbackErrorCategory,
+          code?: string,
+        ) => {
+          let teardownError: { cause: unknown } | null = null;
+          try {
             try {
-              if (activeJobIdRef.current !== clientJobId) return;
-              await settleFromZip(zipBlob, fileResults);
-            } catch {
-              if (activeJobIdRef.current !== clientJobId) return;
-              failRun("Batch processing failed", "unzip-failed");
+              setError(message, code);
+            } catch (cause) {
+              if (useFileStore.getState().error !== message) throw cause;
+              console.error("Ending the run failed", cause);
+              teardownError = { cause };
             }
-          })();
-          return;
+            releaseRun();
+            const writeError = runEndWrites([clearActiveJob, () => setProcessing(false)]);
+            teardownError ??= writeError;
+          } finally {
+            // Entries were set to "processing" at kickoff (the reset loop
+            // above). A whole-run failure that never reached settleFromZip must
+            // settle them, or the result pane keeps pulsing on the stale
+            // original because the entry never leaves "processing" (#746).
+            //
+            // After the teardown, and logged and reported (#1812) rather than
+            // thrown: it's a store write, and when it throws (#1354) the throw
+            // must not skip the teardown or the outcome report. The evidence
+            // timer and the cancel
+            // 404 end a batch through here, so nothing else would settle the
+            // run (#1778, the batch twin of #1698). In a finally so a throwing
+            // teardown can't leave the entries pulsing either; that throw still
+            // reaches the caller. Each entry gets its own try, so one write
+            // that throws can't leave the batch's later entries pulsing
+            // (#1814, the twin of the pipeline's #1779), and the run reports
+            // once, not once per entry.
+            const runEntries = useFileStore.getState().entries;
+            let settleError: { cause: unknown } | null = null;
+            for (const entry of runEntries) {
+              if (
+                !entry ||
+                runEntryFiles.get(entry.id) !== entry.file ||
+                entry.status !== "processing"
+              ) {
+                continue;
+              }
+              try {
+                updateEntryById(entry.id, {
+                  status: "failed",
+                  error: message,
+                  errorCategory: category ?? null,
+                });
+              } catch (err) {
+                console.error("Failing the run's entry failed", err);
+                settleError ??= { cause: err };
+              }
+            }
+            if (settleError) {
+              reportRunEndFailure(
+                "Failing a batch run's entries failed",
+                settleError.cause,
+                toolId,
+              );
+            }
+          }
+          // A canceled run reports the cancel, whichever path carried it in.
+          trackBatch(canceledByUser ? "canceled" : "failed", canceledByUser ? "canceled" : reason);
+          if (teardownError) throw teardownError.cause;
+        };
+
+        // How a ZIP answer settles. A null fileResults never reaches here: the
+        // sync handler fails the batch first, and the cached-download and
+        // canceled paths coalesce it to an empty map (#4081, #4045). `status`
+        // is the HTTP status of a sync answer.
+        interface ZipSettle {
+          fileResults: Record<string, string>;
+          fileNotes: Record<string, unknown>;
+          status?: number;
         }
 
-        void (async () => {
-          let text = "";
-          try {
-            text = await (xhr.response instanceof Blob
-              ? xhr.response.text()
-              : Promise.resolve(String(xhr.response ?? "")));
-          } catch {
-            // Unreadable body; fall through to the status-based handling.
-          }
-          if (activeJobIdRef.current !== clientJobId) return;
-          let errorMsg: string;
-          let serverCanceled = false;
-          // The server's own code (workspace-cap, FEATURE_NOT_INSTALLED) beats
-          // the bare status as the failure reason: the cap and the disk floor
-          // are both 503s, and telling them apart is what the reason is for.
-          let reason = `http-${xhr.status}`;
-          try {
-            const body = JSON.parse(text);
-            // The route marks a fully canceled batch structurally; only that
-            // settles as a cancellation. A real failure after a cancel click
-            // (the cancel lost the race, a 500) keeps its own message
-            // instead of being repainted as "Canceled".
-            serverCanceled = (body as { canceled?: boolean } | null)?.canceled === true;
-            const code = (body as { code?: unknown } | null)?.code;
-            if (typeof code === "string" && code.length > 0) reason = code;
-            const parsed = parseApiError(body, xhr.status);
-            if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-              errorMsg = `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`;
-            } else {
-              errorMsg = parsed as string;
-            }
-          } catch {
-            // An unparseable 5xx body is an intermediary answering for a
-            // dead sync wait, not the app (app 5xx always carries JSON):
-            // nginx's 502/504 at its 60 s default, Cloudflare's 524 at its
-            // 100 s origin limit (#1161). The batch keeps running server-side
-            // either way, so the run rides the SSE instead of failing.
-            if (xhr.status >= 500 && degradeToAsync(`http-${xhr.status}`)) {
+        // A ZIP that won't unpack fails the run here, once, logged and
+        // reported by unpackBatchZip (#1805). Anything else that throws is our
+        // own code, and settleOrFail handles it.
+        // Set once a ZIP is in hand or being fetched: the run then finishes on
+        // its own, so an unmounted panel must not fail it and throw the
+        // results away (#2125).
+        let settling = false;
+        const settleFromZip = async (
+          zipBlob: Blob,
+          { fileResults, fileNotes, status }: ZipSettle,
+        ) => {
+          settling = true;
+          const entriesCount = useFileStore.getState().entries.length;
+          // #1240: Unpacking a massive ZIP into memory fails the client with RangeError.
+          // Above a threshold, skip extraction and just keep the ZIP as the batch result.
+          const skipExtraction = entriesCount >= 100 || zipBlob.size > 50 * 1024 * 1024;
+          let extracted: Record<string, Uint8Array> | null = null;
+
+          if (!skipExtraction) {
+            extracted = await unpackBatchZip(zipBlob, { status, toolId });
+            // The unpack awaits: a cancel or a newer run may have ended this
+            // one meanwhile, and its writes would land on that run's state.
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
+            if (!extracted) {
+              failRun(t.errors.batchFailed, "unzip-failed");
               return;
             }
-            errorMsg = `Batch processing failed: ${xhr.status}`;
+          } else {
+            // Still need to respect cancel across the async tick
+            await new Promise((r) => setTimeout(r, 0));
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
           }
-          // "Canceled" (not the route's message) so the existing i18n
-          // mapping renders it localized.
-          failRun(serverCanceled ? "Canceled" : errorMsg, reason);
-        })();
-      };
 
-      xhr.onerror = () => {
-        // Settled runs and successor runs must not be touched by late socket
-        // events (#722 run-identity guard).
-        if (activeJobIdRef.current !== clientJobId) return;
-        if (degradeToAsync("socket")) return;
-        failRun("Processing was interrupted. Retry when reconnected.", "socket");
-      };
+          // Only a ZIP that opened (or skipped unpacking) for a batch with at
+          // least one of its entries still in the store is kept as the download.
+          if (
+            useFileStore
+              .getState()
+              .entries.some((entry) => runEntryFiles.get(entry.id) === entry.file)
+          ) {
+            setBatchZip(zipBlob, `batch-${toolId}.zip`);
+          }
 
-      xhr.ontimeout = () => {
-        if (activeJobIdRef.current !== clientJobId) return;
-        if (degradeToAsync("timeout")) return;
-        failRun("Request timed out - the server may be overloaded. Try again.", "timeout");
-      };
+          for (let i = 0; i < capturedEntries.length; i++) {
+            const captured = capturedEntries[i];
+            if (
+              !captured ||
+              !useFileStore
+                .getState()
+                .entries.some((entry) => entry.id === captured.id && entry.file === captured.file)
+            ) {
+              continue;
+            }
+            const entryId = captured.id;
+            const processedName = fileResults[String(i)];
+            if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
+              let processedUrl = null;
+              let processedSize = null;
 
-      xhr.open("POST", `${appUrl(apiToolPath(toolId))}/batch`);
-      formatHeaders().forEach((value, key) => {
-        xhr.setRequestHeader(key, value);
-      });
-      xhr.send(formData);
+              if (extracted && extracted[processedName]) {
+                const ext = processedName.split(".").pop()?.toLowerCase() ?? "";
+                const blobType = MIME_BY_EXT[ext];
+                const blob = new Blob(
+                  [extracted[processedName] as BlobPart],
+                  blobType ? { type: blobType } : undefined,
+                );
+                processedUrl = URL.createObjectURL(blob);
+                processedSize = blob.size;
+              }
+
+              updateEntryById(entryId, {
+                processedUrl,
+                processedFilename: processedName,
+                processedSize,
+                // Batch results come from the ZIP, not a server preview; clear any
+                // stale processedPreviewUrl so an earlier single run's preview
+                // can't win over this result (displayUrl prefers it) (#746).
+                processedPreviewUrl: null,
+                // What a single run of this file would have said (#1292). A note
+                // shared by every file arrives once, under FILE_NOTES_ALL_FILES.
+                resultNotes: pickResultNotes(
+                  fileNotes[String(i)] ?? fileNotes[FILE_NOTES_ALL_FILES],
+                ),
+                status: "completed",
+                error: null,
+              });
+            } else {
+              // After a user cancel, a missing result is the cancel doing its
+              // job, not a lookup failure.
+              updateEntryById(entryId, {
+                // Clear the result so hasProcessed goes false and the failure
+                // screen (guarded by !hasProcessed) renders instead of a stale
+                // previous result (#746).
+                processedUrl: null,
+                processedPreviewUrl: null,
+                resultNotes: null,
+                status: "failed",
+                error: canceledByUser ? "Canceled" : t.errors.fileNotFoundInBatch,
+              });
+            }
+          }
+
+          const teardownError = finishRun();
+          trackBatch(
+            canceledByUser ? "canceled" : "completed",
+            canceledByUser ? "canceled" : undefined,
+          );
+          // Every entry has settled, so settleOrFail passes this on to the
+          // global handler instead of failing the run.
+          if (teardownError) throw teardownError.cause;
+        };
+
+        // A throw while settling is our own code (a store write, the fflate
+        // chunk), not the answer. It fails the run unless every entry already
+        // settled, which means the teardown at the end threw and the outcome
+        // on screen is the real one. Then it's rethrown, so it reaches the
+        // console and Sentry's global handler instead of disappearing (#1805,
+        // #1929).
+        const settleOrFail = async (zipBlob: Blob, settle: ZipSettle) => {
+          try {
+            await settleFromZip(zipBlob, settle);
+          } catch (cause) {
+            const unsettled = useFileStore
+              .getState()
+              .entries.some(
+                (entry) =>
+                  runEntryFiles.get(entry.id) === entry.file && entry.status === "processing",
+              );
+            if (activeJobIdRef.current === clientJobId && !storeWasReset() && unsettled) {
+              try {
+                failRun(t.errors.batchFailed, "settle-failed");
+              } catch (teardownErr) {
+                // Only the root cause is rethrown, so this one is reported
+                // here (#1812).
+                console.error("Failing the batch after a settle error failed", teardownErr);
+                reportRunEndFailure(
+                  "Failing a tool batch after a settle error failed",
+                  teardownErr,
+                  toolId,
+                );
+              }
+            }
+            throw cause;
+          }
+        };
+
+        // A degraded run settles here: download the durable ZIP the terminal
+        // frame points at. Only the download is retried, because the reason
+        // we are on this path is that the network just proved flaky; a ZIP
+        // that arrived and won't settle fails once, without blaming the
+        // network (#1805).
+        const downloadAndSettle = async (result: Record<string, unknown>) => {
+          settling = true;
+          const url = serverUrl(String(result.downloadUrl));
+          const fileResults = (result.fileResults ?? {}) as Record<string, string>;
+          const fileNotes = asNotesMap(result.fileNotes);
+          let refusedStatus: number | null = null;
+          let zipBlob: Blob | null = null;
+          for (let attempt = 0; attempt < 3 && !zipBlob; attempt++) {
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
+            try {
+              const res = await fetch(url, { headers: formatHeaders() });
+              // A 4xx is deterministic: the result is gone or this session may
+              // not read it. Retrying cannot help, and the message must not
+              // blame the network. It fails the run outside this try, so a
+              // throw from failRun's teardown isn't swallowed as a retry (#1814).
+              if (res.status >= 400 && res.status < 500) {
+                refusedStatus = res.status;
+                break;
+              }
+              if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
+              zipBlob = await res.blob();
+            } catch {
+              if (attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2_000 : 5_000));
+              }
+            }
+          }
+          if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
+          if (refusedStatus !== null) {
+            failRun(
+              refusedStatus === 404
+                ? t.errors.resultNoLongerAvailable
+                : t.errors.batchDownloadFailed,
+              `download-${refusedStatus}`,
+            );
+            return;
+          }
+          if (!zipBlob) {
+            // The upload and the server run both finished; without an explicit
+            // category, classifyFeedbackError reads "interrupted" as an upload
+            // failure (#1922).
+            failRun(t.errors.processingInterrupted, "download-failed", "processing_error");
+            return;
+          }
+          await settleOrFail(zipBlob, { fileResults, fileNotes });
+        };
+
+        batchRunRef.current = {
+          jobId: clientJobId,
+          markCanceled: () => {
+            canceledByUser = true;
+          },
+          cancelLocally: () => {
+            if (activeJobIdRef.current !== clientJobId) return false;
+            canceledByUser = true;
+            // The upload may still be in flight; aborting it is what actually
+            // stops ingress when no job row exists server-side yet.
+            try {
+              xhrRef.current?.abort();
+            } catch (_e) {
+              console.debug("Ignored xhr.abort error:", _e);
+            }
+            failRun("Canceled", "canceled");
+            return true;
+          },
+          abandon: (message, reason = "unconfirmed", category) => {
+            if (activeJobIdRef.current !== clientJobId) return false;
+            if (settling) return true;
+            failRun(message, reason, category);
+            return true;
+          },
+          onHandlerError: () => {
+            trackBatch(
+              canceledByUser ? "canceled" : "failed",
+              canceledByUser ? "canceled" : "frame-handling-failed",
+            );
+          },
+          onTerminal: (frame) => {
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
+            if (
+              frame.status === "completed" &&
+              frame.result &&
+              typeof frame.result.downloadUrl === "string"
+            ) {
+              void downloadAndSettle(frame.result);
+              return;
+            }
+            if (frame.status === "completed") {
+              // A batch route without a durable result (custom sub-routes like
+              // pdf-to-image): its ZIP only ever existed on the response this
+              // run lost, so the outcome matches a plain interruption. Tagged
+              // so "interrupted" is not misread as an upload error (#1922).
+              failRun(t.errors.processingInterrupted, "no-durable-result", "processing_error");
+              return;
+            }
+            // Replay-synthesized failures carry their message in a blank-name
+            // errors entry (packaging failure, expired result).
+            const syntheticError = frame.errors?.find((e) => e.filename === "")?.error;
+            const allFilesFailed = frame.totalFiles > 0 && frame.failedFiles >= frame.totalFiles;
+            failRun(
+              syntheticError ?? (allFilesFailed ? t.errors.allFilesFailed : t.errors.batchFailed),
+              !syntheticError && allFilesFailed ? "all-files-failed" : "server-failed",
+              undefined,
+              frame.code,
+            );
+          },
+        };
+
+        // Open SSE before the upload. The unified handler in reconnectSSE also
+        // gives batch runs the visibility-change recovery path.
+        reconnectSSE(true);
+
+        const formData = new FormData();
+        for (const file of files) formData.append("file", file);
+        formData.append("settings", JSON.stringify(settings));
+        formData.append("clientJobId", clientJobId);
+
+        const xhr = new XMLHttpRequest();
+        xhrRef.current = xhr;
+        xhr.responseType = "blob";
+        // Batches legitimately hold the sync response for many minutes; an
+        // upload stall watchdog bounds silent uploads (#3779), and the stall
+        // and evidence timers own liveness once the body is sent.
+        xhr.timeout = 0;
+
+        let uploadedFully = false;
+        let lastUploadedBytes = 0;
+        const fireUploadStallTimeout = () => {
+          requestTimerRef.current = null;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          try {
+            xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhr.ontimeout?.(new ProgressEvent("timeout"));
+        };
+        const armUploadStallTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireUploadStallTimeout, UPLOAD_STALL_TIMEOUT_MS);
+        };
+
+        xhr.upload.onprogress = (event) => {
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
+          if (event.loaded > lastUploadedBytes) {
+            lastUploadedBytes = event.loaded;
+            if (!uploadedFully) {
+              armUploadStallTimer();
+            }
+          }
+          if (event.lengthComputable) {
+            // Firefox fires upload.onload only once the response starts, so the
+            // final progress event also counts as the body having left the
+            // browser (#2136, #2240).
+            if (event.loaded >= event.total) {
+              if (!uploadedFully) {
+                uploadedFully = true;
+                uploadedFullyRef.current = true;
+                clearRequestTimer();
+                if (!eventSourceRef.current) reconnectSSE(true);
+              }
+            }
+            const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
+            setProgress((prev) => {
+              if (prev.phase !== "uploading") return prev;
+              return { ...prev, percent: uploadPercent };
+            });
+          }
+        };
+
+        xhr.upload.onload = () => {
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
+          uploadedFully = true;
+          uploadedFullyRef.current = true;
+          clearRequestTimer();
+          if (!eventSourceRef.current) reconnectSSE(true);
+          setProgress((prev) =>
+            prev.phase === "processing"
+              ? prev
+              : {
+                  ...prev,
+                  phase: "processing",
+                  percent: UPLOAD_WEIGHT,
+                  stage: "Processing...",
+                },
+          );
+        };
+
+        // Same shape as the single-run degrade (#722): a dead response after a
+        // finished upload does not mean a dead batch. The flow keeps running
+        // server-side and the terminal SSE frame carries the durable ZIP's
+        // download URL, so the run can settle without the HTTP response (#750).
+        const degradeToAsync = (trigger: DegradeTrigger) => {
+          if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
+          clearRequestTimer();
+          asyncModeRef.current = true;
+          trackDegrade(trigger, true);
+          reconnectSSE(true);
+          resetStallTimer();
+          if (!sawJobEvidenceRef.current) {
+            startJobEvidenceTimer();
+          }
+          return true;
+        };
+
+        xhr.onload = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, xhr.status === 202, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
+          uploadedFullyRef.current = false;
+          if (storeWasReset()) return;
+
+          if (xhr.status === 202) {
+            // The server's sync wait expired while the batch keeps running;
+            // ride the SSE to the terminal frame like any degraded run. Force
+            // a fresh source: a sync-mode SSE error during the long wait nulls
+            // the ref, and the replay-on-connect recovers anything missed.
+            asyncModeRef.current = true;
+            reconnectSSE(true);
+            resetStallTimer();
+            return;
+          }
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const fileResults = parseFileResultsHeader(xhr.getResponseHeader("X-File-Results"), {
+              status: xhr.status,
+              toolId,
+            });
+            // A header that was present but unreadable is not "no results":
+            // settling from an empty map would mark every file "not found in
+            // batch results" and hide the real failure (#4081, the twin of the
+            // pipeline's #4045). A canceled run keeps its cancel outcome, so it
+            // falls through and settles every entry as "Canceled" (#1929).
+            if (fileResults === null && !canceledByUser) {
+              failRun(t.errors.batchFailed, "bad-file-results");
+              return;
+            }
+            // Absent on servers from before #1292, which is no notes. A header
+            // that doesn't parse to an object only costs the notes, never the
+            // results, but it's logged: silently dropping it would settle every
+            // file as fine, the exact thing the notes exist to prevent.
+            const fileNotes = parseFileNotesHeader(xhr.getResponseHeader("X-File-Notes"));
+            void settleOrFail(xhr.response as Blob, {
+              // Only a canceled run reaches this with null, where an empty map
+              // settles the entries as "Canceled" (see above).
+              fileResults: fileResults ?? {},
+              fileNotes,
+              status: xhr.status,
+            });
+            return;
+          }
+
+          void (async () => {
+            let text = "";
+            try {
+              text = await (xhr.response instanceof Blob
+                ? xhr.response.text()
+                : Promise.resolve(String(xhr.response ?? "")));
+            } catch {
+              // Unreadable body; fall through to the status-based handling.
+            }
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
+            let errorMsg: string;
+            let serverCanceled = false;
+            // The server's own code (workspace-cap, FEATURE_NOT_INSTALLED) beats
+            // the bare status as the failure reason: the cap and the disk floor
+            // are both 503s, and telling them apart is what the reason is for.
+            let reason = `http-${xhr.status}`;
+            let serverCode: string | undefined;
+            let body: unknown;
+            let parsedJson = true;
+            try {
+              body = JSON.parse(text);
+            } catch {
+              parsedJson = false;
+            }
+            if (!parsedJson) {
+              // An unparseable 5xx body is an intermediary answering for a
+              // dead sync wait, not the app (app 5xx always carries JSON):
+              // nginx's 502/504 at its 60 s default, Cloudflare's 524 at its
+              // 100 s origin limit (#1161). The batch keeps running server-side
+              // either way, so the run rides the SSE instead of failing.
+              if (xhr.status >= 500 && degradeToAsync(`http-${xhr.status}`)) {
+                return;
+              }
+              errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
+            } else if (!body || typeof body !== "object" || Array.isArray(body)) {
+              errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
+            } else {
+              const record = body as Record<string, unknown>;
+              // The route marks a fully canceled batch structurally; only that
+              // settles as a cancellation. A real failure after a cancel click
+              // (the cancel lost the race, a 500) keeps its own message
+              // instead of being repainted as "Canceled".
+              serverCanceled = record.canceled === true;
+              const code = record.code;
+              if (typeof code === "string" && code.length > 0) {
+                reason = code;
+                serverCode = code;
+              }
+              const parsed = parseApiError(
+                record,
+                xhr.status,
+                format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+              );
+              if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
+                errorMsg = featureNotInstalledMessage(t, parsed, toolName);
+              } else if (typeof parsed === "object" && parsed.type === "feature_incompatible") {
+                errorMsg = featureIncompatibleMessage(t, parsed);
+              } else {
+                errorMsg = parsed as string;
+              }
+            }
+            // Our API's 413 and a reverse proxy's mean the same thing (#1341).
+            if (xhr.status === 413) errorMsg = t.errors.fileTooLarge;
+            // "Canceled" (not the route's message) so the existing i18n
+            // mapping renders it localized.
+            failRun(
+              serverCanceled ? "Canceled" : errorMsg,
+              reason,
+              !serverCanceled && xhr.status === 413 ? "upload_error" : undefined,
+              serverCanceled ? undefined : serverCode,
+            );
+          })();
+        };
+
+        xhr.onerror = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
+          // Settled runs and successor runs must not be touched by late socket
+          // events (#722 run-identity guard).
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
+          uploadedFullyRef.current = false;
+          if (storeWasReset()) return;
+          if (degradeToAsync("socket")) return;
+          failRun(t.errors.processingInterrupted, "socket", "upload_error");
+        };
+
+        xhr.ontimeout = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
+          uploadedFullyRef.current = false;
+          if (storeWasReset()) return;
+          if (degradeToAsync("timeout")) return;
+          failRun(t.errors.uploadTimeout, "timeout", "timeout");
+        };
+
+        xhr.open("POST", `${appUrl(apiToolPath(toolId))}/batch`);
+        formatHeaders().forEach((value, key) => {
+          xhr.setRequestHeader(key, value);
+        });
+        armUploadStallTimer();
+        xhr.send(formData);
+      } catch (cause) {
+        if (claimed) endRunAtStart(runEntryIds, runEntryFiles);
+        else endStartBeforeClaim(runEntryIds, runEntryFiles);
+        trackBatch(
+          canceledByUser ? "canceled" : "failed",
+          canceledByUser ? "canceled" : "start-failed",
+        );
+        throw cause;
+      }
     },
     [
       toolId,
       processFiles,
+      endRunAtStart,
+      endStartBeforeClaim,
+      findStoppedByXhr,
+      finishStoppedRun,
       setProcessing,
       setError,
       setActiveJob,
       cancelCurrentJob,
       clearActiveJob,
       clearJobEvidenceTimer,
+      clearRequestTimer,
       clearStallTimer,
       reconnectSSE,
       resetStallTimer,
       startJobEvidenceTimer,
+      storeWasReset,
       trackDegrade,
       toolName,
+      t,
     ],
   );
+
+  const hasResultEntry =
+    resultEntryRef.current !== null &&
+    currentEntry !== undefined &&
+    currentEntry.id === resultEntryRef.current.id &&
+    currentEntry.file === resultEntryRef.current.file &&
+    currentEntry.processedUrl === resultEntryRef.current.processedUrl;
 
   return {
     processFiles,
     processAllFiles,
     cancelCurrentJob,
     processing,
-    error: error === "Canceled" ? t.tools.processing.canceled : error,
-    warning,
+    error: displayStoredError(error, t.tools.processing.canceled),
+    warning: hasResultEntry ? warning : null,
     downloadUrl: processedUrl,
     originalSize,
     processedSize,
     progress,
-    resultPayload,
+    resultPayload: hasResultEntry ? resultPayload : null,
   };
 }

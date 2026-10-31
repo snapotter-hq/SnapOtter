@@ -1,4 +1,8 @@
-export { isMemoryAllocError, removeBackground } from "./background-removal.js";
+export {
+  isMemoryAllocError,
+  type RemoveBackgroundOptions,
+  removeBackground,
+} from "./background-removal.js";
 export {
   AnimatedRemovalCanceledError,
   animatedTimeoutMs,
@@ -9,12 +13,13 @@ export {
   removeBackgroundAnimated,
   resolveGifBgFormat,
 } from "./background-removal-animated.js";
-export type { DispatcherStatus } from "./bridge.js";
+export type { DispatcherRecycleReason, DispatcherStatus } from "./bridge.js";
 export {
   getDispatcherStatus,
   getDocsDispatcher,
   initDispatcher,
   isGpuAvailable,
+  isNvidiaDevicePresent,
   PythonDispatcher,
   runDocsScript,
   shutdownDispatcher,
@@ -26,8 +31,21 @@ export { blurFaces, detectFaces } from "./face-detection.js";
 export { enhanceFaces } from "./face-enhancement.js";
 export type { FaceLandmarkPoint, FaceLandmarks, FaceLandmarksResult } from "./face-landmarks.js";
 export { detectFaceLandmarks } from "./face-landmarks.js";
-export { missingBundleForScript, SCRIPT_BUNDLE_MAP } from "./feature-gate.js";
+export type { GpuFramework, GpuFrameworks, SidecarMemoryOptions } from "./feature-gate.js";
+export {
+  availableSidecarMemoryBytes,
+  BUNDLE_CPU_FREE_MEMORY_BYTES,
+  BUNDLE_GPU_FRAMEWORK,
+  installedBundles,
+  isFrameworkGpuAvailable,
+  missingBundleForScript,
+  SCRIPT_BUNDLE_MAP,
+  SCRIPT_GPU_FRAMEWORK,
+  SCRIPT_TOOL_LABEL,
+  sidecarMemoryRefusal,
+} from "./feature-gate.js";
 export { type InpaintQuality, inpaint } from "./inpainting.js";
+export { type AiLogger, setAiLogger } from "./log.js";
 export { noiseRemoval } from "./noise-removal.js";
 export type {
   OcrExecutionMetadata,
@@ -40,7 +58,9 @@ export type {
 export {
   extractPdfText,
   extractText,
+  FAST_ARABIC_UNSUPPORTED_REASON,
   FAST_KOREAN_UNSUPPORTED_REASON,
+  fastLanguageUnsupportedReason,
   MAX_OCR_INPUT_DIMENSION,
   MAX_OCR_INPUT_PIXELS,
 } from "./ocr.js";
@@ -92,6 +112,7 @@ export type {
 } from "./runtime-state.js";
 export {
   getOcrRuntimeCapability,
+  OCR_OPTIONAL_LANGUAGE_MODELS,
   OCR_RUNTIME_PROTOCOL_VERSION,
   readActiveRuntime,
   readCommittedOcrRuntimeActivationIdentity,
@@ -129,5 +150,6 @@ export {
 } from "./tesseract-pdf.js";
 export type { TranscribeOptions, TranscriptionResult, TranscriptSegment } from "./transcription.js";
 export { transcribeAudio } from "./transcription.js";
-export { upscale } from "./upscaling.js";
+export type { UpscaleOptions, UpscaleResult } from "./upscaling.js";
+export { MAX_CPU_UPSCALE_MP, MAX_CPU_UPSCALE_OUTPUT_MP, upscale } from "./upscaling.js";
 export { acquireVenvLock } from "./venv-lock.js";

@@ -32,11 +32,18 @@ export interface FaceLandmarksResult {
   imageHeight: number;
 }
 
+export interface DetectFaceLandmarksOptions {
+  toolId?: string;
+  signal?: AbortSignal;
+}
+
 export async function detectFaceLandmarks(
   inputBuffer: Buffer,
   onProgress?: ProgressCallback,
+  options: DetectFaceLandmarksOptions = {},
 ): Promise<FaceLandmarksResult> {
   const inputPath = join(tmpdir(), `face_landmarks_${Date.now()}.png`);
+  const { signal, toolId = "passport-photo" } = options;
 
   try {
     const pngBuffer = await sharp(inputBuffer).png().toBuffer();
@@ -44,7 +51,7 @@ export async function detectFaceLandmarks(
     const { stdout } = await runPythonWithProgress(
       "face_landmarks.py",
       [inputPath, "unused", "{}"],
-      { onProgress },
+      { onProgress, signal, toolId },
     );
 
     const result = parseStdoutJson(stdout);

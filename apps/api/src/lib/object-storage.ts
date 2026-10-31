@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream, existsSync } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
 import {
   mkdir,
+  open,
   readdir,
   rename,
   rm,
@@ -15,6 +16,7 @@ import { basename, dirname, join, normalize, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { env } from "../config.js";
+import { logger } from "./logger.js";
 
 // Processing object store: keys are "<prefix>/<jobId>/<filename>" under the
 // prefixes uploads/ and outputs/. Local backend roots at WORKSPACE_PATH
@@ -33,6 +35,7 @@ export interface ObjectInfo {
 }
 
 const VALID_KEY = /^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/[^/\0]+$/;
+const RESERVED_STAGING_KEY_SUFFIX = /\/\.snapotter-(?:st|[\u{fb05}\u{fb06}])aging$/iu;
 
 /**
  * True when a key can name a stored object at all. Exported so routes can
@@ -40,7 +43,12 @@ const VALID_KEY = /^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/[^/\0]+$/;
  * Error, which fault classification cannot tell apart from a storage fault.
  */
 export function isValidObjectKey(key: string): boolean {
-  return VALID_KEY.test(key) && !key.includes("..");
+  return (
+    VALID_KEY.test(key) &&
+    !key.includes("..") &&
+    !key.endsWith("/.") &&
+    !RESERVED_STAGING_KEY_SUFFIX.test(key)
+  );
 }
 
 function assertValidKey(key: string): void {
@@ -62,7 +70,12 @@ function isS3Enabled(): boolean {
 }
 
 import type { S3StorageModule } from "@snapotter/enterprise";
-import { SafeError } from "@snapotter/shared";
+import { connectivityClass, isClientAbort, SafeError } from "@snapotter/shared";
+import {
+  isOperationalErrno,
+  STORAGE_FULL_CODES,
+  STORAGE_NOT_WRITABLE_CODES,
+} from "./error-report.js";
 
 let s3Mod: S3StorageModule | null = null;
 // Concurrent first calls may double-configure; configureS3 is idempotent.
@@ -111,7 +124,8 @@ const WORKSPACE_SIZE_CACHE_MS = 30_000;
 /**
  * Sum the sizes of every file under `<root>/uploads` and `<root>/outputs`. Keys
  * are always `<prefix>/<jobId>/<filename>` (two levels), so a shallow job-dir
- * walk suffices. Missing or unreadable paths contribute 0.
+ * walk suffices. Missing paths and non-directory entries under `<prefix>`
+ * contribute 0; storage faults (`EACCES`, `EPERM`, `EIO`, ...) propagate.
  */
 export async function computeWorkspaceUsedBytes(root: string): Promise<number> {
   let total = 0;
@@ -119,19 +133,25 @@ export async function computeWorkspaceUsedBytes(root: string): Promise<number> {
     let jobDirs: string[];
     try {
       jobDirs = await readdir(join(root, prefix));
-    } catch {
-      continue;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") continue;
+      throw err;
     }
     for (const jobDir of jobDirs) {
       const dir = join(root, prefix, jobDir);
       let names: string[];
       try {
         names = await readdir(dir);
-      } catch {
-        continue;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException | null)?.code;
+        if (code === "ENOENT" || code === "ENOTDIR") continue;
+        throw err;
       }
       for (const name of names) {
-        const s = await stat(join(dir, name)).catch(() => null);
+        const s = await stat(join(dir, name)).catch((err: unknown) => {
+          if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+          throw err;
+        });
         if (s?.isFile()) total += s.size;
       }
     }
@@ -149,7 +169,12 @@ async function cachedWorkspaceUsedBytes(root: string): Promise<number> {
   if (workspaceSizeCache && now - workspaceSizeCache.at < WORKSPACE_SIZE_CACHE_MS) {
     return workspaceSizeCache.bytes;
   }
-  const used = await computeWorkspaceUsedBytes(root);
+  let used: number;
+  try {
+    used = await computeWorkspaceUsedBytes(root);
+  } catch (err) {
+    throw localWriteFault(err);
+  }
   workspaceSizeCache = { bytes: used, at: now };
   return used;
 }
@@ -190,6 +215,8 @@ async function assertWorkspaceSizeCap(root: string): Promise<void> {
   }
 }
 
+let statfsFailureLogged = false;
+
 /**
  * Asserts that the local storage volume has enough free space.
  * Called by putObject / putObjectStream for the local backend only.
@@ -203,7 +230,14 @@ export async function assertLocalCapacity(): Promise<void> {
   let fsStats: Awaited<ReturnType<typeof statfs>>;
   try {
     fsStats = await statfs(root);
-  } catch {
+  } catch (err) {
+    if (!statfsFailureLogged) {
+      statfsFailureLogged = true;
+      logger.warn(
+        { err, root },
+        "Failed to check free disk space for workspace; skipping floor check",
+      );
+    }
     return; // statfs unavailable (e.g. some CI envs) -- allow the write
   }
   const freeBytes = fsStats.bavail * fsStats.bsize;
@@ -216,17 +250,81 @@ export async function assertLocalCapacity(): Promise<void> {
   }
 }
 
+const MAX_STAGING_OPEN_ATTEMPTS = 8;
+
+/**
+ * Create a `.snapotter-staging/<name>.<uuid>.partial` file with `wx` after
+ * ensuring `.snapotter-staging` exists. When concurrent writes share a parent
+ * directory, one or more sibling writers' post-rename `rmdir(stagingDir)` calls
+ * can land either during `mkdir(stagingDir, { recursive: true })` (between
+ * libuv's `EEXIST` and `stat` checks, #3330) or between `mkdir(stagingDir)` and
+ * `open(stagingPath)` (#2728); re-creating `stagingDir` and retrying the open
+ * recovers without exposing partial files outside `.snapotter-staging`.
+ */
+async function writeStagedFile(
+  stagingDir: string,
+  stagingPath: string,
+  data: Buffer,
+  onOwned: () => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    let writeStarted = false;
+    try {
+      await mkdir(stagingDir, { recursive: true, mode: 0o700 });
+      signal?.throwIfAborted();
+      writeStarted = true;
+      await writeFile(stagingPath, data, { flag: "wx", mode: 0o600 });
+      onOwned();
+      return;
+    } catch (writeErr) {
+      const errno = writeErr as NodeJS.ErrnoException | null;
+      if (writeStarted && errno?.syscall !== "open") {
+        onOwned();
+      }
+      if (
+        errno?.code === "ENOENT" &&
+        (errno?.syscall === "open" || errno?.syscall === "mkdir") &&
+        attempt < MAX_STAGING_OPEN_ATTEMPTS
+      ) {
+        signal?.throwIfAborted();
+        continue;
+      }
+      throw writeErr;
+    }
+  }
+}
+
 export async function putObject(key: string, data: Buffer): Promise<void> {
   assertValidKey(key);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.putGenericObject(key, data);
+    try {
+      const s3 = await getS3();
+      await s3.putGenericObject(key, data);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
-  await assertLocalCapacity();
   const p = localPath(key);
-  await mkdir(dirname(p), { recursive: true });
-  await writeFile(p, data);
+  const stagingDir = join(dirname(p), ".snapotter-staging");
+  const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
+  let stagingOwned = false;
+  try {
+    await assertLocalCapacity();
+    await mkdir(dirname(p), { recursive: true });
+    await writeStagedFile(stagingDir, stagingPath, data, () => {
+      stagingOwned = true;
+    });
+    await rename(stagingPath, p);
+    await rmdir(stagingDir).catch(() => {});
+  } catch (err) {
+    if (stagingOwned) {
+      await unlink(stagingPath).catch(() => {});
+    }
+    await rmdir(stagingDir).catch(() => {});
+    throw localWriteFault(err);
+  }
 }
 
 export async function putObjectStream(
@@ -234,78 +332,176 @@ export async function putObjectStream(
   source: Readable,
   opts: { maxBytes?: number; signal?: AbortSignal } = {},
 ): Promise<number> {
-  assertValidKey(key);
-  opts.signal?.throwIfAborted();
+  // The first failure on the reading side: an over-limit file, a background
+  // createReadStream open failing while setup awaits run (#3326), the client's
+  // upload breaking off, or an abort. S3's multipart upload can replace it with
+  // the error from aborting itself (lib-storage throws that instead), which
+  // would pass a client's 413 off as a storage outage.
+  let sourceError: unknown = source.errored ?? undefined;
+  let destroyingSource = false;
+  const onSourceError = (err: unknown) => {
+    if (!destroyingSource) {
+      sourceError ??= err;
+    }
+  };
+  source.on("error", onSourceError);
+  const throwIfSourceErrored = () => {
+    if (!destroyingSource && source.errored) {
+      sourceError ??= source.errored;
+    }
+    if (sourceError !== undefined) {
+      throw sourceError;
+    }
+  };
+  const destroySource = () => {
+    destroyingSource = true;
+    if (!source.destroyed) {
+      source.destroy();
+    }
+  };
+  const detachSourceErrorListener = () => {
+    source.off("error", onSourceError);
+    if (destroyingSource && source.listenerCount("error") === 0) {
+      source.on("error", () => {});
+    }
+  };
+  let p = "";
+  try {
+    assertValidKey(key);
+    if (!isS3Enabled()) p = localPath(key);
+  } catch (err) {
+    destroySource();
+    detachSourceErrorListener();
+    throw err;
+  }
   const abortSource = () => {
+    destroyingSource = true;
     const reason =
       opts.signal?.reason instanceof Error
         ? opts.signal.reason
         : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
-    // An abort can arrive while local capacity/directory checks are still
-    // running, before pipeline() has attached its own error listener. Keep that
-    // early destroy from becoming an uncaught process-level stream error while
-    // preserving the caller's exact reason for consumers that do observe it.
-    if (source.listenerCount("error") === 0) source.once("error", () => {});
     source.destroy(reason);
   };
   let written = 0;
   const counter = async function* (src: AsyncIterable<Buffer>) {
-    for await (const chunk of src) {
-      opts.signal?.throwIfAborted();
-      written += chunk.length;
-      if (opts.maxBytes !== undefined && written > opts.maxBytes) {
-        throw objectSizeLimitError(opts.maxBytes);
+    try {
+      throwIfSourceErrored();
+      for await (const chunk of src) {
+        opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
+        written += chunk.length;
+        if (opts.maxBytes !== undefined && written > opts.maxBytes) {
+          throw objectSizeLimitError(opts.maxBytes);
+        }
+        let consumerContinued = false;
+        try {
+          yield chunk;
+          consumerContinued = true;
+        } finally {
+          if (!consumerContinued) {
+            destroyingSource = true;
+          }
+        }
       }
-      yield chunk;
+      throwIfSourceErrored();
+    } catch (err) {
+      if (!destroyingSource || opts.signal?.aborted) {
+        sourceError ??= err;
+      }
+      throw err;
     }
   };
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    opts.signal?.throwIfAborted();
     opts.signal?.addEventListener("abort", abortSource, { once: true });
+    let s3: S3StorageModule | undefined;
+    let streamStarted = false;
     try {
       try {
+        opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
+        s3 = await getS3();
+        opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
+        streamStarted = true;
         await s3.putGenericObjectStream(key, counter(source), opts.signal);
         opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
         return written;
       } catch (error) {
-        await s3.deleteGenericObject(key).catch(() => {});
-        throw error;
+        destroySource();
+        if (streamStarted) {
+          await s3?.deleteGenericObject(key).catch((err) => {
+            logger.warn({ err, key }, "Failed to delete partial S3 upload");
+          });
+        }
+        const isSourceFailure =
+          sourceError !== undefined && (streamStarted || error === sourceError);
+        const sourceAbortedBySignal =
+          Boolean(opts.signal?.aborted) &&
+          (sourceError === opts.signal?.reason ||
+            (sourceError as { name?: unknown } | null)?.name === "AbortError" ||
+            timeoutCause(sourceError) !== null);
+        throw isSourceFailure && !sourceAbortedBySignal
+          ? localWriteFault(sourceError)
+          : s3WriteFault(isSourceFailure ? sourceError : error);
       }
     } finally {
       opts.signal?.removeEventListener("abort", abortSource);
+      detachSourceErrorListener();
     }
   }
-  const p = localPath(key);
   const stagingDir = join(dirname(p), ".snapotter-staging");
   const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
   let stagingOwned = false;
+  let streamStarted = false;
   opts.signal?.addEventListener("abort", abortSource, { once: true });
   try {
     try {
+      opts.signal?.throwIfAborted();
+      throwIfSourceErrored();
       await assertLocalCapacity();
       opts.signal?.throwIfAborted();
+      throwIfSourceErrored();
       await mkdir(dirname(p), { recursive: true });
       opts.signal?.throwIfAborted();
-      await mkdir(stagingDir, { recursive: true, mode: 0o700 });
+      throwIfSourceErrored();
+      await writeStagedFile(
+        stagingDir,
+        stagingPath,
+        Buffer.alloc(0),
+        () => {
+          stagingOwned = true;
+        },
+        opts.signal,
+      );
       opts.signal?.throwIfAborted();
-      await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
-      stagingOwned = true;
-      opts.signal?.throwIfAborted();
-      await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
+      throwIfSourceErrored();
+      streamStarted = true;
+      const writeStream = createWriteStream(stagingPath, { flags: "r+" });
+      writeStream.once("error", destroySource);
+      await pipeline(counter(source), writeStream, {
         signal: opts.signal,
       });
       opts.signal?.throwIfAborted();
+      throwIfSourceErrored();
       await rename(stagingPath, p);
       await rmdir(stagingDir).catch(() => {});
     } catch (err) {
+      destroySource();
       if (stagingOwned) await unlink(stagingPath).catch(() => {});
       await rmdir(stagingDir).catch(() => {});
-      throw normalizeOperationalWriteError(err);
+      const isSourceFailure = sourceError !== undefined && (streamStarted || err === sourceError);
+      const sourceAbortedBySignal =
+        Boolean(opts.signal?.aborted) &&
+        (sourceError === opts.signal?.reason ||
+          (sourceError as { name?: unknown } | null)?.name === "AbortError" ||
+          timeoutCause(sourceError) !== null);
+      throw localWriteFault(isSourceFailure && !sourceAbortedBySignal ? sourceError : err);
     }
     return written;
   } finally {
     opts.signal?.removeEventListener("abort", abortSource);
+    detachSourceErrorListener();
   }
 }
 
@@ -326,16 +522,64 @@ export function isStorageServiceFault(error: unknown): boolean {
   return !s3Mod || !s3Mod.isMissingObjectError(error);
 }
 
+/**
+ * True when a read rejected because the object is not there: ENOENT on the
+ * local backend, NoSuchKey/404 in S3 mode. Anything else, including an S3
+ * error while the lazy singleton is unloaded, is not proven missing and
+ * returns false. One inherited blind spot: a HeadObject 404 (getObjectSize)
+ * looks the same for a missing key and a missing bucket (see the enterprise
+ * isMissingObjectError), so HeadObject callers that need to distinguish a
+ * vanished bucket after a miss follow up with verifyS3Bucket (#996).
+ */
+export function isMissingObjectError(error: unknown): boolean {
+  if (isS3Enabled()) return !!s3Mod && s3Mod.isMissingObjectError(error);
+  return (error as NodeJS.ErrnoException | null)?.code === "ENOENT";
+}
+
+/**
+ * Disambiguate a HeadObject 404 (getObjectSize) in S3 mode (#996). HEAD
+ * responses carry no body, so S3 and MinIO report both a missing key and a
+ * vanished bucket as 404 NotFound. When all size probes for a request miss,
+ * one HeadBucket check tells a genuine per-file 404 (resolves) from a missing
+ * or unreachable bucket (rejects with a normalized 503 storage fault). No-op
+ * on the local backend, where stat() errnos already distinguish the two.
+ */
+export async function verifyS3Bucket(): Promise<void> {
+  if (!isS3Enabled()) return;
+  try {
+    const s3 = await getS3();
+    await s3.checkConnection();
+  } catch (err) {
+    throw normalizeS3ReadFault(err);
+  }
+}
+
 export async function getObjectStream(
   key: string,
   range?: { start: number; end?: number },
 ): Promise<Readable> {
   assertValidKey(key);
+  if (
+    range !== undefined &&
+    (!Number.isSafeInteger(range.start) ||
+      range.start < 0 ||
+      (range.end !== undefined && (!Number.isSafeInteger(range.end) || range.end < range.start)))
+  ) {
+    throw Object.assign(new RangeError("Invalid byte range"), { code: "ERR_OUT_OF_RANGE" });
+  }
   if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getGenericObjectStream(key, range);
   }
-  return createReadStream(localPath(key), range ? { start: range.start, end: range.end } : {});
+  // A path-based createReadStream defers the open, so any open-time failure
+  // (a blob swept after the size probe, EACCES) only surfaces as an async
+  // "error" event after response headers are already on the wire (#997).
+  // Open eagerly so those reject here, matching streamStoredFile (#926).
+  // Range bounds are checked before open() because Node's FileHandle
+  // createReadStream increments kRefs before validating start/end, which
+  // would strand the descriptor on ERR_OUT_OF_RANGE and trip GC.
+  const handle = await open(localPath(key), "r");
+  return handle.createReadStream(range ? { start: range.start, end: range.end } : {});
 }
 
 export async function getObjectBuffer(key: string): Promise<Buffer> {
@@ -355,18 +599,203 @@ export interface CopyReadableToFileOptions {
   signal?: AbortSignal;
 }
 
-function objectSizeLimitError(maxBytes: number): Error & { statusCode: 413 } {
+function objectSizeLimitError(maxBytes: number): Error & { statusCode: 413; limitBytes: number } {
+  // limitBytes lets multipartFailure name the limit that actually fired (#1341).
   return Object.assign(new Error(`Object exceeds the maximum allowed size (${maxBytes} bytes)`), {
     statusCode: 413 as const,
+    limitBytes: maxBytes,
   });
 }
 
-function normalizeOperationalWriteError(error: unknown): unknown {
-  const code = error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
-  if (error instanceof Error && code && ["EACCES", "EDQUOT", "ENOSPC", "EROFS"].includes(code)) {
-    return Object.assign(error, { statusCode: 503 });
+function timeoutCause(error: unknown): Error | null {
+  let e: unknown = error;
+  for (let depth = 0; depth < 5 && e instanceof Error; depth++) {
+    if (e.name === "TimeoutError") return e;
+    e = e.cause;
+  }
+  return null;
+}
+
+/** True when the client caused this: a 4xx set upstream, or an abort, anywhere in the cause chain. */
+function isClientSide(error: unknown): boolean {
+  let e: unknown = error;
+  for (let depth = 0; depth < 5 && e instanceof Error; depth++) {
+    const status = (e as { statusCode?: unknown }).statusCode;
+    if (typeof status === "number" && status >= 400 && status < 500) return true;
+    if (e.name === "AbortError" && !timeoutCause(e)) return true;
+    e = e.cause;
+  }
+  return false;
+}
+
+/**
+ * The codes a storage fault carries on its 503: the server's storage can't
+ * take the write, whatever the request. Anything that answers a stored
+ * failure by its code (the batch finalize) keeps these 503 (#1421).
+ */
+export const STORAGE_FAULT_CODES: ReadonlySet<string> = new Set([
+  "workspace-cap",
+  "disk-free-floor",
+  "storage-full",
+  "storage-not-writable",
+  "storage-write-failed",
+  "storage-unavailable",
+]);
+
+/** User-facing reasons for a storage fault, one constant per kind. */
+export const STORAGE_FULL_MESSAGE = "The server's storage is full.";
+export const STORAGE_NOT_WRITABLE_MESSAGE =
+  "The server can't write to its storage: it's read-only or not allowed to write there.";
+export const STORAGE_WRITE_FAILED_MESSAGE = "The server couldn't write to its storage.";
+export const STORAGE_UNAVAILABLE_MESSAGE = "The server's storage service is unavailable.";
+
+function storageFault(message: string, code: string, cause: unknown): SafeError {
+  return new SafeError(message, { kind: "operational", code, statusCode: 503, cause });
+}
+
+/** True when the error already says whose it is, or the client caused it. */
+function alreadyClassified(error: unknown): boolean {
+  return isClientSide(error) || typeof (error as { statusCode?: unknown })?.statusCode === "number";
+}
+
+/** Ours: neither the client's nor the storage's, so a 500 the error handler reports. */
+function serverFault(error: unknown): Error {
+  const err = error instanceof Error ? error : new Error(String(error));
+  return Object.assign(err, { statusCode: 500 });
+}
+
+const ALLOWED_NOT_FOUND_KEYS: ReadonlySet<string> = new Set([
+  "name",
+  "message",
+  "stack",
+  "cause",
+  "$fault",
+  "$retryable",
+  "$metadata",
+  "$response",
+]);
+
+export function isS3MissingShape(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
+  const e = error as {
+    name?: string;
+    message?: unknown;
+    code?: unknown;
+    Code?: unknown;
+    $metadata?: { httpStatusCode?: number };
+    $response?: { headers?: Record<string, unknown> };
+  };
+  if (typeof e.code === "string" || "$responseBodyText" in error) {
+    return false;
+  }
+  if (e.name === "NoSuchKey") return true;
+  if (e.name !== "NotFound" || e.$metadata?.httpStatusCode !== 404) return false;
+  const headers = e.$response?.headers;
+  if (headers && typeof headers === "object") {
+    for (const [k, v] of Object.entries(headers)) {
+      if (
+        k.toLowerCase() === "content-type" &&
+        typeof v === "string" &&
+        /^\s*(?:text\/html|application\/xhtml\+xml)\b/i.test(v)
+      ) {
+        return false;
+      }
+    }
+  }
+  if (e.Code === "NotFound") return true;
+  if (
+    typeof e.message === "string" &&
+    e.message !== "" &&
+    e.message !== "UnknownError" &&
+    e.message !== "NotFound"
+  ) {
+    return false;
+  }
+  return Object.keys(error).every((k) => ALLOWED_NOT_FOUND_KEYS.has(k));
+}
+
+/**
+ * Normalize an S3 read or probe rejection (a service error carrying
+ * `$metadata`, an unreachable endpoint, or a reset/prematurely closed S3
+ * response stream) into a status-bearing 503 SafeError (#2808). Errors that
+ * already carry a status, belong to the client, report a missing object, or
+ * come from an unexpected code defect pass through.
+ */
+export function normalizeS3ReadFault(error: unknown): unknown {
+  if (alreadyClassified(error)) return error;
+  const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
+  if ((s3Answered && !isS3MissingShape(error)) || connectivityClass(error) === "net-unavailable") {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  if (code === "EIO" || isClientAbort(error)) {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
   }
   return error;
+}
+
+/**
+ * Normalize a local operational write errno (ENOSPC, EDQUOT, EACCES, EPERM,
+ * EROFS) or an S3 service fault into a status-bearing 503 SafeError (#1552).
+ * Errors that already carry a status or belong to the client pass through.
+ */
+export function normalizeOperationalWriteError(error: unknown): unknown {
+  if (alreadyClassified(error)) return error;
+  if (isOperationalErrno(error)) {
+    const { code } = (error ?? {}) as NodeJS.ErrnoException;
+    if (code && STORAGE_FULL_CODES.has(code)) {
+      return storageFault(STORAGE_FULL_MESSAGE, "storage-full", error);
+    }
+    if (code && STORAGE_NOT_WRITABLE_CODES.has(code)) {
+      return storageFault(STORAGE_NOT_WRITABLE_MESSAGE, "storage-not-writable", error);
+    }
+  }
+  const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
+  if ((s3Answered && !isS3MissingShape(error)) || connectivityClass(error) === "net-unavailable") {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  return error;
+}
+
+/**
+ * What a failed local write means for the request behind it. Without a
+ * status, the tool routes answered every one of these as a malformed request
+ * (a 400), and nothing was reported (#1421). The client's own faults and
+ * errors that already carry a status (the workspace cap, the disk floor, an
+ * over-limit file) pass through; a storage errno becomes a 503 naming the
+ * condition, with the errno as its cause; anything else is a 500.
+ */
+function localWriteFault(error: unknown): unknown {
+  const normalized = normalizeOperationalWriteError(error);
+  if (alreadyClassified(normalized)) return normalized;
+  const timeout = timeoutCause(error);
+  if (timeout) {
+    return storageFault(STORAGE_WRITE_FAILED_MESSAGE, "storage-write-failed", timeout);
+  }
+  const { syscall } = (error ?? {}) as NodeJS.ErrnoException;
+  if (typeof syscall === "string") {
+    return storageFault(STORAGE_WRITE_FAILED_MESSAGE, "storage-write-failed", error);
+  }
+  return serverFault(error);
+}
+
+/**
+ * The S3 counterpart: a refusal (the SDK's service errors carry `$metadata`)
+ * or an endpoint it couldn't reach is a 503 storage fault; the client's own
+ * faults pass through; anything else is ours.
+ */
+export function s3WriteFault(error: unknown): unknown {
+  const normalized = normalizeOperationalWriteError(error);
+  if (alreadyClassified(normalized)) return normalized;
+  const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
+  if (s3Answered) {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  const timeout = timeoutCause(error);
+  if (timeout) {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", timeout);
+  }
+  return serverFault(error);
 }
 
 /**
@@ -384,14 +813,34 @@ export async function copyObjectToFile(
   if (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0) {
     throw new Error("maxBytes must be a non-negative safe integer");
   }
+  assertValidKey(key);
   opts.signal?.throwIfAborted();
 
-  const declaredSize = await getObjectSize(key);
-  opts.signal?.throwIfAborted();
-  if (declaredSize > opts.maxBytes) throw objectSizeLimitError(opts.maxBytes);
+  let source: Readable;
+  try {
+    const declaredSize = await getObjectSize(key);
+    opts.signal?.throwIfAborted();
+    if (declaredSize > opts.maxBytes) throw objectSizeLimitError(opts.maxBytes);
 
-  const source = await getObjectStream(key);
-  return copyReadableToFile(source, destination, opts);
+    source = await getObjectStream(key);
+  } catch (error) {
+    if (opts.signal?.aborted && error === opts.signal.reason) throw error;
+    if (isMissingObjectError(error)) {
+      try {
+        await verifyS3Bucket();
+      } catch (probeErr) {
+        throw s3WriteFault(probeErr);
+      }
+      throw error;
+    }
+    throw isS3Enabled() ? s3WriteFault(normalizeS3ReadFault(error)) : localWriteFault(error);
+  }
+  return copyReadableToFile(
+    source,
+    destination,
+    opts,
+    isS3Enabled() ? (err) => s3WriteFault(normalizeS3ReadFault(err)) : undefined,
+  );
 }
 
 /** Atomically spool a readable to scratch with bounded memory and cleanup. */
@@ -399,29 +848,81 @@ export async function copyReadableToFile(
   source: Readable,
   destination: string,
   opts: CopyReadableToFileOptions = {},
+  classifySourceFault?: (error: unknown) => unknown,
 ): Promise<number> {
+  let sourceError: unknown = source.errored ?? undefined;
+  let destroyingSource = false;
+  const onSourceError = (err: unknown) => {
+    if (!destroyingSource) {
+      sourceError ??= err;
+    }
+  };
+  source.on("error", onSourceError);
+  const throwIfSourceErrored = () => {
+    if (!destroyingSource && source.errored) {
+      sourceError ??= source.errored;
+    }
+    if (sourceError !== undefined) {
+      throw sourceError;
+    }
+  };
+  const destroySource = () => {
+    destroyingSource = true;
+    if (!source.destroyed) {
+      source.destroy();
+    }
+  };
+  const detachSourceErrorListener = () => {
+    source.off("error", onSourceError);
+    if (destroyingSource && source.listenerCount("error") === 0) {
+      source.on("error", () => {});
+    }
+  };
   if (opts.maxBytes !== undefined && (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0)) {
+    destroySource();
+    detachSourceErrorListener();
     throw new Error("maxBytes must be a non-negative safe integer");
   }
-  opts.signal?.throwIfAborted();
   const stagingPath = `${destination}.${randomUUID()}.partial`;
   let stagingOwned = false;
+  let streamStarted = false;
   let written = 0;
   const countAndLimit = async function* (chunks: AsyncIterable<Buffer | Uint8Array | string>) {
-    for await (const chunk of chunks) {
-      opts.signal?.throwIfAborted();
-      const bytes = typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.byteLength;
-      written += bytes;
-      if (opts.maxBytes !== undefined && written > opts.maxBytes) {
-        throw objectSizeLimitError(opts.maxBytes);
+    try {
+      throwIfSourceErrored();
+      for await (const chunk of chunks) {
+        opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
+        const bytes = typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.byteLength;
+        written += bytes;
+        if (opts.maxBytes !== undefined && written > opts.maxBytes) {
+          throw objectSizeLimitError(opts.maxBytes);
+        }
+        let consumerContinued = false;
+        try {
+          yield chunk;
+          consumerContinued = true;
+        } finally {
+          if (!consumerContinued) {
+            destroyingSource = true;
+          }
+        }
       }
-      yield chunk;
+      throwIfSourceErrored();
+    } catch (err) {
+      if (!destroyingSource || opts.signal?.aborted) {
+        sourceError ??= err;
+      }
+      throw err;
     }
   };
 
   try {
+    opts.signal?.throwIfAborted();
+    throwIfSourceErrored();
     await mkdir(dirname(destination), { recursive: true });
     opts.signal?.throwIfAborted();
+    throwIfSourceErrored();
     // Create the staging inode before constructing the stream. A write stream
     // opened with `wx` may fail the pipeline before its asynchronous open has
     // completed; cleanup can then observe ENOENT and the delayed open can leave
@@ -430,15 +931,36 @@ export async function copyReadableToFile(
     await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
     stagingOwned = true;
     opts.signal?.throwIfAborted();
-    await pipeline(countAndLimit(source), createWriteStream(stagingPath, { flags: "r+" }), {
+    throwIfSourceErrored();
+    streamStarted = true;
+    const writeStream = createWriteStream(stagingPath, { flags: "r+" });
+    writeStream.once("error", destroySource);
+    await pipeline(countAndLimit(source), writeStream, {
       signal: opts.signal,
     });
     opts.signal?.throwIfAborted();
+    throwIfSourceErrored();
     await rename(stagingPath, destination);
     return written;
   } catch (error) {
+    destroySource();
     if (stagingOwned) await unlink(stagingPath).catch(() => {});
-    throw normalizeOperationalWriteError(error);
+    if (opts.signal?.aborted && error === opts.signal.reason) throw error;
+    const sourceAbortedBySignal =
+      Boolean(opts.signal?.aborted) &&
+      (sourceError === opts.signal?.reason ||
+        (sourceError as { name?: unknown } | null)?.name === "AbortError" ||
+        timeoutCause(sourceError) !== null);
+    const isSourceFailure =
+      sourceError !== undefined &&
+      (streamStarted || error === sourceError) &&
+      !sourceAbortedBySignal;
+    if (isSourceFailure && classifySourceFault) {
+      throw classifySourceFault(sourceError);
+    }
+    throw localWriteFault(isSourceFailure ? sourceError : error);
+  } finally {
+    detachSourceErrorListener();
   }
 }
 
@@ -455,19 +977,34 @@ export async function objectExists(key: string): Promise<boolean> {
   try {
     await getObjectSize(key);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    if (isMissingObjectError(err)) {
+      await verifyS3Bucket();
+      return false;
+    }
+    throw err;
   }
 }
 
 export async function deleteObject(key: string): Promise<void> {
   assertValidKey(key);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.deleteGenericObject(key);
+    try {
+      const s3 = await getS3();
+      await s3.deleteGenericObject(key);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
-  await unlink(localPath(key)).catch(() => {});
+  const p = localPath(key);
+  try {
+    await unlink(p);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code !== "ENOENT") {
+      throw localWriteFault(err);
+    }
+  }
   // A delete is the one write that frees space; a cached total that outlives
   // it would keep refusing the retry the cap message just asked for (#1161).
   workspaceSizeCache = null;
@@ -478,11 +1015,19 @@ export async function deletePrefix(prefix: string): Promise<void> {
     throw new Error(`Invalid prefix: ${prefix}`);
   }
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.deleteGenericPrefix(prefix);
+    try {
+      const s3 = await getS3();
+      await s3.deleteGenericPrefix(prefix);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
-  await rm(join(env.WORKSPACE_PATH, prefix), { recursive: true, force: true });
+  try {
+    await rm(join(env.WORKSPACE_PATH, prefix), { recursive: true, force: true });
+  } catch (err) {
+    throw localWriteFault(err);
+  }
   workspaceSizeCache = null;
 }
 
@@ -495,21 +1040,27 @@ export async function listObjects(prefix: string): Promise<ObjectInfo[]> {
     return s3.listGenericObjects(prefix);
   }
   const dir = join(env.WORKSPACE_PATH, prefix);
+  let names: string[];
   try {
-    const out: ObjectInfo[] = [];
-    for (const name of await readdir(dir)) {
-      const s = await stat(join(dir, name)).catch(() => null);
-      if (s?.isFile())
-        out.push({
-          key: `${prefix.replace(/\/?$/, "/")}${name}`,
-          size: s.size,
-          mtimeMs: s.mtimeMs,
-        });
-    }
-    return out;
-  } catch {
-    return [];
+    names = await readdir(dir);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return [];
+    throw err;
   }
+  const out: ObjectInfo[] = [];
+  for (const name of names) {
+    const s = await stat(join(dir, name)).catch((err: unknown) => {
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+      throw err;
+    });
+    if (s?.isFile())
+      out.push({
+        key: `${prefix.replace(/\/?$/, "/")}${name}`,
+        size: s.size,
+        mtimeMs: s.mtimeMs,
+      });
+  }
+  return out;
 }
 
 // Lists the top-level job directories under a prefix with their mtime so the
@@ -520,14 +1071,20 @@ export async function listJobDirs(prefix: "uploads" | "outputs"): Promise<Object
     return s3.listGenericJobDirs(prefix);
   }
   const root = join(env.WORKSPACE_PATH, prefix);
+  let names: string[];
   try {
-    const out: ObjectInfo[] = [];
-    for (const name of await readdir(root)) {
-      const s = await stat(join(root, name)).catch(() => null);
-      if (s?.isDirectory()) out.push({ key: `${prefix}/${name}`, size: 0, mtimeMs: s.mtimeMs });
-    }
-    return out;
-  } catch {
-    return [];
+    names = await readdir(root);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return [];
+    throw err;
   }
+  const out: ObjectInfo[] = [];
+  for (const name of names) {
+    const s = await stat(join(root, name)).catch((err: unknown) => {
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+      throw err;
+    });
+    if (s?.isDirectory()) out.push({ key: `${prefix}/${name}`, size: 0, mtimeMs: s.mtimeMs });
+  }
+  return out;
 }

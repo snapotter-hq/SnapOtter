@@ -11,13 +11,23 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getObjectBuffer, putObject } from "../../../../apps/api/src/lib/object-storage.js";
+import { env } from "../../../../apps/api/src/config.js";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
+import {
+  getObjectBuffer,
+  listObjects,
+  putObject,
+} from "../../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
+  createUserAndLogin,
   loginAsAdmin,
   type TestApp,
 } from "../../test-server.js";
@@ -34,11 +44,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("passport-photo/analyze", () => {
   // ── Processing (sidecar-dependent) ────────────────────────────────
@@ -318,8 +328,8 @@ describe("passport-photo/generate", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("returns 422 when jobId workspace does not exist", async () => {
-    const res = await app.inject({
+  function generateFor(jobId: string) {
+    return app.inject({
       method: "POST",
       url: "/api/v1/tools/image/passport-photo/generate",
       headers: {
@@ -327,7 +337,7 @@ describe("passport-photo/generate", () => {
         "content-type": "application/json",
       },
       payload: {
-        jobId: "00000000-0000-0000-0000-000000000000",
+        jobId,
         filename: "test.png",
         countryCode: "US",
         landmarks: {
@@ -344,9 +354,33 @@ describe("passport-photo/generate", () => {
         imageHeight: 150,
       },
     });
+  }
 
-    // 422 because the workspace directory won't exist for this fake jobId
-    expect(res.statusCode).toBe(422);
+  it("answers 410 ANALYSIS_EXPIRED when the analyze output is gone (#1674)", async () => {
+    // No analyze ever stored test_nobg.png for this job, the same state as
+    // one whose output expired between analyze and generate.
+    const res = await generateFor(randomUUID());
+
+    expect(res.statusCode).toBe(410);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("ANALYSIS_EXPIRED");
+    // The raw ENOENT carried the absolute data path; nothing of it leaks.
+    expect(res.body).not.toMatch(/ENOENT|outputs\//);
+  });
+
+  it("lets a storage fault reading the analyze output reach the error handler (#1674)", async () => {
+    // A directory where the PNG should be makes the read fail with EISDIR:
+    // the object exists but can't be read, which is the server's fault.
+    // Built on disk directly, since putObject refuses a nested key. Assumes
+    // the local backend, which every integration run uses.
+    const jobId = randomUUID();
+    await mkdir(join(env.WORKSPACE_PATH, "outputs", jobId, "test_nobg.png"), { recursive: true });
+
+    const res = await generateFor(jobId);
+
+    // Status only: the test server skips the production error handler
+    // (#1243), so the body is Fastify's default. The unit suite pins ours.
+    expect(res.statusCode).toBe(500);
   });
 });
 
@@ -400,7 +434,7 @@ describe("passport-photo/generate maxFileSizeKb (#1288)", () => {
         },
       },
     });
-    return { res, jobId };
+    return { res };
   }
 
   it("counts the cap in 1000-byte KB, the way upload portals do", async () => {
@@ -411,8 +445,9 @@ describe("passport-photo/generate maxFileSizeKb (#1288)", () => {
     // instead of betting on one exact byte count.
     const over: string[] = [];
     for (let kb = 110; kb <= 130; kb++) {
-      const { res, jobId } = await generate(kb);
+      const { res } = await generate(kb);
       expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
       const out = await getObjectBuffer(`outputs/${jobId}/photo_passport.jpg`);
       if (out.length > kb * 1000) over.push(`${kb} KB -> ${out.length} bytes`);
     }
@@ -427,5 +462,109 @@ describe("passport-photo/generate maxFileSizeKb (#1288)", () => {
     expect(body.details).toBe(
       "Couldn't get this photo under 1 KB at the required dimensions. Try a larger size limit.",
     );
+  });
+});
+
+describe("passport-photo/generate Phase 1 ownership", () => {
+  // generate takes analyze's jobId from the client, so it used to read any
+  // user's background-removed portrait and write into their prefix.
+  let owner: { token: string; userId: string };
+  let intruder: { token: string; userId: string };
+
+  beforeAll(async () => {
+    owner = await createUserAndLogin(app, "passportowner");
+    intruder = await createUserAndLogin(app, "passportintruder");
+  });
+
+  async function seedAnalysis(ownerId: string | null): Promise<string> {
+    const jobId = randomUUID();
+    if (ownerId) {
+      await db.insert(schema.jobs).values({
+        id: jobId,
+        userId: ownerId,
+        toolId: "passport-photo",
+        type: "single",
+        status: "completed",
+        inputRefs: [],
+        completedAt: new Date(),
+      });
+    }
+    const nobg = await sharp({
+      create: {
+        width: 600,
+        height: 800,
+        channels: 4,
+        background: { r: 90, g: 80, b: 70, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+    await putObject(`outputs/${jobId}/face_nobg.png`, nobg);
+    return jobId;
+  }
+
+  function generateAs(token: string, jobId: string) {
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      payload: {
+        jobId,
+        filename: "face.jpg",
+        countryCode: "US",
+        imageWidth: 600,
+        imageHeight: 800,
+        landmarks: {
+          leftEye: { x: 0.42, y: 0.4 },
+          rightEye: { x: 0.58, y: 0.4 },
+          eyeCenter: { x: 0.5, y: 0.4 },
+          chin: { x: 0.5, y: 0.62 },
+          forehead: { x: 0.5, y: 0.25 },
+          crown: { x: 0.5, y: 0.18 },
+          nose: { x: 0.5, y: 0.5 },
+          faceCenterX: 0.5,
+        },
+      },
+    });
+  }
+
+  it("answers 404 to another user and writes nothing into the owner's prefix", async () => {
+    const jobId = await seedAnalysis(owner.userId);
+
+    const res = await generateAs(intruder.token, jobId);
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "Job not found" });
+    const keys = (await listObjects(`outputs/${jobId}/`)).map((o) => o.key);
+    expect(keys).toEqual([`outputs/${jobId}/face_nobg.png`]);
+  });
+
+  it("answers 404 to a non-admin for a jobId no job row owns", async () => {
+    const jobId = await seedAnalysis(null);
+
+    const res = await generateAs(intruder.token, jobId);
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("lets a files:all holder work on another user's analysis", async () => {
+    const jobId = await seedAnalysis(owner.userId);
+
+    const res = await generateAs(adminToken, jobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+  });
+
+  it("serves the owner and stores the photo under a fresh job they own", async () => {
+    const jobId = await seedAnalysis(owner.userId);
+
+    const res = await generateAs(owner.token, jobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.jobId).not.toBe(jobId);
+    expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/face_passport.jpg`);
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, body.jobId));
+    expect(row?.userId).toBe(owner.userId);
   });
 });

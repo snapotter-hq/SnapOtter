@@ -1,6 +1,6 @@
 ---
 description: "Giảm kích thước tệp ảnh theo mức chất lượng hoặc theo kích thước tệp mục tiêu."
-i18n_source_hash: 342c5cf1f864
+i18n_source_hash: e1cc52597983
 i18n_provenance: human
 i18n_output_hash: af62b2e13a07
 ---

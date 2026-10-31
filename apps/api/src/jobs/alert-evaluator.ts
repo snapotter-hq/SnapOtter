@@ -11,11 +11,15 @@
  *   - License expiring (< 30 days remaining)
  */
 import { statfs } from "node:fs/promises";
+import { SafeError } from "@snapotter/shared";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { decryptSettingWithRotation } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
-import { getSettingString } from "../lib/settings-helpers.js";
+import { reportError } from "../lib/error-report.js";
+import { logger } from "../lib/logger.js";
+import { getSettingStrict } from "../lib/settings-helpers.js";
 
 /**
  * In-memory license check, no DB access. This evaluator runs every 60s on
@@ -28,15 +32,82 @@ async function alertsLicensed(): Promise<boolean> {
   return isEnterpriseFeatureEnabled("admin_alerts", "worker");
 }
 
+function parseBackupTimestampMs(raw: string): number | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    logger.warn(
+      { err, key: "backup_last_completed" },
+      "alert-evaluator: failed to parse stored backup_last_completed JSON",
+    );
+    return null;
+  }
+
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
+    typeof (parsed as Record<string, unknown>).timestamp !== "string"
+  ) {
+    logger.warn(
+      { key: "backup_last_completed" },
+      "alert-evaluator: stored backup_last_completed is not a valid backup record",
+    );
+    return null;
+  }
+
+  const tsMs = new Date((parsed as Record<string, unknown>).timestamp as string).getTime();
+  if (!Number.isFinite(tsMs)) {
+    logger.warn(
+      { key: "backup_last_completed" },
+      "alert-evaluator: stored backup_last_completed is not a valid backup record",
+    );
+    return null;
+  }
+
+  return tsMs;
+}
+
 export async function evaluateAlerts(): Promise<void> {
   if (!(await alertsLicensed())) return;
 
   // 1. Read webhook destinations from settings
-  const destJson = await getSettingString("webhook_destinations", "[]");
-  let destinations: { url: string; authHeader: string; enabled: boolean; type: string }[];
+  let destJson: string;
   try {
-    destinations = JSON.parse(destJson);
-  } catch {
+    destJson = (await getSettingStrict("webhook_destinations")) ?? "[]";
+  } catch (err) {
+    logger.warn(
+      { err, key: "webhook_destinations" },
+      "alert-evaluator: failed to read webhook_destinations setting",
+    );
+    return;
+  }
+  let destinations: {
+    name?: string;
+    url: string;
+    authHeader: string;
+    enabled: boolean;
+    type: string;
+  }[];
+  try {
+    const parsed: unknown = JSON.parse(destJson);
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every((d) => Boolean(d) && typeof d === "object" && !Array.isArray(d))
+    ) {
+      logger.warn(
+        { key: "webhook_destinations" },
+        "alert-evaluator: stored webhook_destinations is not a JSON array",
+      );
+      return;
+    }
+    destinations = parsed as typeof destinations;
+  } catch (err) {
+    logger.warn(
+      { err, key: "webhook_destinations" },
+      "alert-evaluator: failed to parse stored webhook_destinations JSON",
+    );
     return;
   }
 
@@ -82,18 +153,22 @@ export async function evaluateAlerts(): Promise<void> {
 
   // c. Backup staleness (> 48 hours)
   try {
-    const backupResult = await getSettingString("backup_last_completed", "");
-    if (backupResult) {
-      const lastBackup = JSON.parse(backupResult);
-      const ageHours = (Date.now() - new Date(lastBackup.timestamp).getTime()) / 3_600_000;
+    const backupResult = await getSettingStrict("backup_last_completed");
+    const backupTsMs = backupResult ? parseBackupTimestampMs(backupResult) : null;
+    if (backupTsMs !== null) {
+      const ageHours = (Date.now() - backupTsMs) / 3_600_000;
       if (ageHours > 48) {
         alerts.push({ condition: "backup_stale", ageHours, threshold: 48 });
       }
     } else {
       alerts.push({ condition: "backup_never_run" });
     }
-  } catch {
+  } catch (err) {
     // Backup check is best-effort
+    logger.warn(
+      { err, key: "backup_last_completed" },
+      "alert-evaluator: failed to read backup_last_completed setting",
+    );
   }
 
   // d. License expiration (< 30 days)
@@ -114,25 +189,69 @@ export async function evaluateAlerts(): Promise<void> {
   if (alerts.length === 0) return;
 
   // 5. Deliver to each enabled "alerts" webhook
+  let delivered = 0;
+  let currentDestJson = destJson;
   for (const dest of alertDests) {
-    let authHeader = dest.authHeader;
+    let authHeader = typeof dest.authHeader === "string" ? dest.authHeader : "";
 
     // Decrypt auth header if encrypted
     if (authHeader) {
-      try {
-        const { isEncrypted, decrypt } = await import("../lib/encryption.js");
-        if (isEncrypted(authHeader) && env.DATA_ENCRYPTION_KEY) {
-          const decrypted = await decrypt(authHeader, env.DATA_ENCRYPTION_KEY);
-          authHeader = decrypted ?? "";
-        }
-      } catch {
-        // Use raw value if decryption fails
+      const decrypted = await decryptSettingWithRotation(authHeader);
+      if (decrypted === null) {
+        logger.error(
+          { name: dest.name },
+          "alert-evaluator: stored webhook authHeader could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+        );
+        void reportError(
+          new SafeError("Failed to decrypt alert webhook auth header", {
+            kind: "operational",
+            code: "ALERT_DECRYPTION_FAILED",
+          }),
+          {
+            source: "worker",
+            pool: "system",
+            subsystem: "alert-evaluator",
+          },
+        );
+        continue;
       }
+      if (decrypted.reencrypted) {
+        dest.authHeader = decrypted.reencrypted;
+        const nextDestJson = JSON.stringify(destinations);
+        try {
+          await db
+            .update(schema.settings)
+            .set({ value: nextDestJson, updatedAt: new Date() })
+            .where(
+              and(
+                eq(schema.settings.key, "webhook_destinations"),
+                eq(schema.settings.value, currentDestJson),
+              ),
+            );
+          currentDestJson = nextDestJson;
+        } catch (err) {
+          logger.warn(
+            { err, name: dest.name, key: "webhook_destinations" },
+            "alert-evaluator: failed to persist re-encrypted webhook authHeader",
+          );
+        }
+      }
+      authHeader = decrypted.value;
     }
 
     const { deliverWebhook } = await import("../lib/webhook-delivery.js");
-    await deliverWebhook(dest.url, authHeader, alerts, { maxRetries: 1 });
+    const result = await deliverWebhook(dest.url, authHeader, alerts, { maxRetries: 1 });
+    if (result?.success !== false) {
+      delivered++;
+    } else {
+      logger.error(
+        { name: dest.name, statusCode: result.statusCode, error: result.error },
+        "alert-evaluator: webhook delivery failed",
+      );
+    }
   }
 
-  console.log(`Alert evaluation complete: ${alerts.length} alert(s) delivered`);
+  if (delivered > 0) {
+    console.log(`Alert evaluation complete: ${alerts.length} alert(s) delivered`);
+  }
 }

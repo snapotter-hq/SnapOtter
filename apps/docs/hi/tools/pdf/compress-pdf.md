@@ -1,6 +1,6 @@
 ---
 description: "एम्बेडेड इमेज को कंप्रेस करके PDF फ़ाइल का आकार घटाएं।"
-i18n_source_hash: a8bb0baaca25
+i18n_source_hash: 2e2ab70a68ed
 i18n_provenance: human
 i18n_output_hash: 7fa152a28c15
 ---

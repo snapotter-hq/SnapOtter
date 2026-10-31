@@ -2,10 +2,17 @@
 
 import type Konva from "konva";
 import { useCallback, useRef } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
-import { captureDocumentCanvas } from "../stage-capture";
+import {
+  captureDocumentContext,
+  finishStroke,
+  readDocumentPixels,
+  reportCaptureFailure,
+  strokeToDataUrl,
+} from "../stage-capture";
 
 interface StampState {
   objectId: string;
@@ -22,6 +29,7 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
   const stampRef = useRef<StampState | null>(null);
   const initialOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const setCloneSource = useEditorStore((s) => s.setCloneSource);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -46,6 +54,7 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
 
       const x = Math.floor((pointer.x - panOffset.x) / zoom);
       const y = Math.floor((pointer.y - panOffset.y) / zoom);
+      if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) return;
 
       // Alt+click sets the clone source
       if (e.evt.altKey) {
@@ -57,23 +66,35 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
       if (!cloneSource) return;
 
       // Capture a snapshot of the document pixels at document resolution.
-      const stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
+      const capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      if (!capture.ok) {
+        reportCaptureFailure(capture.reason, captureMessages);
+        return;
+      }
 
-      const stageCtx = stageCanvas.getContext("2d");
-      if (!stageCtx) return;
-
-      const sourceSnapshot = stageCtx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+      const read = readDocumentPixels(capture.ctx, canvasSize.width, canvasSize.height);
+      if (!read.ok) {
+        reportCaptureFailure(read.reason, captureMessages);
+        return;
+      }
+      const sourceSnapshot = read.imageData;
 
       // Create an offscreen canvas for the clone output
       const canvas = document.createElement("canvas");
       canvas.width = canvasSize.width;
       canvas.height = canvasSize.height;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       // Compute offset from source to destination
       let offsetX: number;
       let offsetY: number;
+      // Kept only once the first dab is on the canvas: an aborted click must not
+      // leave a later one cloning from the wrong place (#2141).
+      let newAlignedOffset: { x: number; y: number } | null = null;
 
       if (cloneAligned && initialOffsetRef.current) {
         offsetX = initialOffsetRef.current.x;
@@ -81,16 +102,19 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
       } else {
         offsetX = cloneSource.x - x;
         offsetY = cloneSource.y - y;
-        if (cloneAligned) {
-          initialOffsetRef.current = { x: offsetX, y: offsetY };
-        }
+        if (cloneAligned) newAlignedOffset = { x: offsetX, y: offsetY };
       }
 
       // Paint the first dab
       paintDab(ctx, sourceSnapshot, x, y, offsetX, offsetY, brushSize, brushOpacity, canvasSize);
 
       const id = generateId();
-      const dataUrl = canvas.toDataURL();
+      const dataUrl = strokeToDataUrl(canvas);
+      if (!dataUrl) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
+      if (newAlignedOffset) initialOffsetRef.current = newAlignedOffset;
 
       const obj: CanvasObject = {
         id,
@@ -119,7 +143,7 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
         offsetY,
       };
     },
-    [stageRef, setCloneSource],
+    [stageRef, setCloneSource, captureMessages],
   );
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -149,18 +173,10 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    if (stampRef.current) {
-      const { canvas, objectId } = stampRef.current;
-      const dataUrl = canvas.toDataURL();
-      useEditorStore
-        .getState()
-        .updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<
-          string,
-          unknown
-        >);
-    }
+    const stamp = stampRef.current;
     stampRef.current = null;
-  }, []);
+    if (stamp) finishStroke(stamp.objectId, stamp.canvas, captureMessages);
+  }, [captureMessages]);
 
   return { handleMouseDown, handleMouseMove, handleMouseUp };
 }

@@ -13,6 +13,8 @@ export interface EnhanceFacesOptions {
   strength?: number;
   onlyCenterFace?: boolean;
   sensitivity?: number;
+  toolId?: string;
+  signal?: AbortSignal;
 }
 
 export interface EnhanceFacesResult {
@@ -28,6 +30,7 @@ export async function enhanceFaces(
   options: EnhanceFacesOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<EnhanceFacesResult> {
+  const { signal, toolId = "enhance-faces", ...sidecarOptions } = options;
   const inputPath = join(outputDir, "input_enhance_faces.png");
   const outputPath = join(outputDir, "output_enhance_faces.png");
 
@@ -35,8 +38,8 @@ export async function enhanceFaces(
   await writeFile(inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "enhance_faces.py",
-    [inputPath, outputPath, JSON.stringify(options)],
-    { onProgress },
+    [inputPath, outputPath, JSON.stringify(sidecarOptions)],
+    { onProgress, signal, toolId },
   );
 
   const result = parseStdoutJson(stdout);

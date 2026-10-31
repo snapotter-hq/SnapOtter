@@ -5,14 +5,19 @@
  * single steps, invalid tools, conflicting steps, and multi-step chains.
  */
 
+import { randomUUID } from "node:crypto";
 import { qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
+  loginAsUser,
   type TestApp,
 } from "../test-server.js";
 
@@ -39,21 +44,23 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Helper to POST a pipeline execution request. */
 function executePipeline(
   image: Buffer,
   filename: string,
   pipeline: { steps: Array<{ toolId: string; settings?: Record<string, unknown> }> },
+  clientJobId?: string,
 ) {
   const { body, contentType } = createMultipartPayload([
     { name: "file", filename, content: image, contentType: "image/png" },
     { name: "pipeline", content: JSON.stringify(pipeline) },
+    ...(clientJobId ? [{ name: "clientJobId", content: clientJobId }] : []),
   ]);
   return app.inject({
     method: "POST",
@@ -194,6 +201,24 @@ describe("Multi-step pipeline chains", () => {
     expect(json.steps[0].toolId).toBe("resize");
     expect(json.steps[1].toolId).toBe("rotate");
     expect(json.steps[2].toolId).toBe("compress");
+  });
+
+  // #1303: a step records what its single run would report, such as a
+  // Deep Enhance that didn't happen, so a pipeline doesn't hide it.
+  it("records a skipped Deep Enhance on that step only", async () => {
+    const res = await executePipeline(PNG_200x150, "test.png", {
+      steps: [
+        { toolId: "image-enhancement", settings: { deepEnhance: true } },
+        { toolId: "resize", settings: { width: 100 } },
+      ],
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.stepsCompleted).toBe(2);
+    // No AI bundles in the per-fork data dir, so the deep pass is unavailable.
+    expect(json.steps[0].notes).toEqual({ deepEnhanceSkipped: "unavailable" });
+    expect(json.steps[1].notes).toBeUndefined();
   });
 
   it("chains crop then resize", async () => {
@@ -397,6 +422,45 @@ describe("Save pipeline edge cases", () => {
     });
     expect(deleteRes.statusCode).toBe(200);
   });
+
+  it("answers 500 when the database insert fails instead of a misleading 409", async () => {
+    const realInsert = db.insert.bind(db);
+    const spy = vi.spyOn(db, "insert").mockImplementation(((
+      table: Parameters<typeof db.insert>[0],
+    ) => {
+      if (table === schema.pipelines) {
+        return {
+          values: () => Promise.reject(new Error("database unavailable")),
+        } as unknown as ReturnType<typeof db.insert>;
+      }
+      return realInsert(table);
+    }) as typeof db.insert);
+
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: {
+          name: "db-error-pipeline",
+          steps: [{ toolId: "resize", settings: { width: 100 } }],
+        },
+      });
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).id).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+
+    const rows = await db
+      .select()
+      .from(schema.pipelines)
+      .where(eq(schema.pipelines.name, "db-error-pipeline"));
+    expect(rows).toHaveLength(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -422,7 +486,9 @@ describe("Pipeline save rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 
   it("rejects saving a pipeline containing unlock-pdf", async () => {
@@ -441,7 +507,9 @@ describe("Pipeline save rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 1 (unlock-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 });
 
@@ -459,7 +527,9 @@ describe("Pipeline execute rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 });
 
@@ -487,7 +557,9 @@ describe("Pipeline batch rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 1 (unlock-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 });
 
@@ -692,6 +764,166 @@ describe("Pipeline batch execution", () => {
     expect(res.headers["x-job-id"]).toBe(clientJobId);
   });
 
+  // A taken id fails the parent insert on the primary key. The owner resending
+  // the same batch (a browser retrying a POST whose response it gave up on)
+  // attaches to the run already going: 202 sends the client to the SSE and its
+  // durable result, and the existing row is left alone (#4139, which replaced
+  // the owner's 409 from #1689). Someone else's id stays a conflict.
+  it("answers 202 for the owner's replay and 409 for another user's clientJobId", async () => {
+    const clientJobId = `pipeline-batch-1689-${randomUUID()}`;
+    const post = (token = adminToken) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "dup.png", contentType: "image/png", content: PNG_200x150 },
+        {
+          name: "pipeline",
+          content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
+        },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      return app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+        body,
+      });
+    };
+
+    const first = await post();
+    expect(first.statusCode).toBe(200);
+    const [before] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+
+    const second = await post();
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(202);
+    expect(second.json()).toEqual({ jobId: clientJobId, async: true });
+
+    const foreign = await post(await loginAsUser(app));
+    expect(foreign.statusCode, foreign.body.slice(0, 300)).toBe(409);
+    expect(foreign.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(after).toEqual(before);
+  });
+
+  // Same child-id collision on /api/v1/pipeline/batch: the parent insert
+  // succeeds, file 0 stages its rows and upload, and file 1 hits 23505 on
+  // ${parentId}-f1 after inserting ${parentId}-f1-s0. Settle the parent,
+  // clean up the staged rows and upload, leave the existing row and its
+  // upload untouched, and answer 409 (#1724).
+  it("answers 409 when a free clientJobId collides on a child id", async () => {
+    const clientJobId = `pipeline-batch-1724-${randomUUID()}`;
+    const collidingChildId = `${clientJobId}-f1`;
+    const collidingUploadKey = `uploads/${collidingChildId}-s0/b.png`;
+    const { getObjectBuffer, objectExists, putObject } = await import(
+      "../../../apps/api/src/lib/object-storage.js"
+    );
+    await putObject(collidingUploadKey, Buffer.from("existing-step-upload"));
+    await db.insert(schema.jobs).values({
+      id: collidingChildId,
+      toolId: "rotate",
+      pool: "image",
+      type: "tool",
+      status: "completed",
+      inputRefs: [collidingUploadKey],
+      settings: { kept: true },
+    });
+    const [childBefore] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
+      },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [childAfter] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+    expect(childAfter).toEqual(childBefore);
+    expect((await getObjectBuffer(collidingUploadKey)).toString()).toBe("existing-step-upload");
+
+    for (const stagedId of [
+      `${clientJobId}-f0`,
+      `${clientJobId}-f0-s0`,
+      `${collidingChildId}-s0`,
+    ]) {
+      const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, stagedId));
+      expect(rows, stagedId).toHaveLength(0);
+    }
+    expect(await objectExists(`uploads/${clientJobId}-f0-s0/a.png`)).toBe(false);
+
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(parentRow?.status).toBe("failed");
+    expect(parentRow?.error).toMatchObject({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+    });
+  });
+
+  it("preserves earlier preFailures on the settled parent row when a later file faults on /api/v1/pipeline/batch (#3289)", async () => {
+    const clientJobId = `pipeline-batch-3289-${randomUUID()}`;
+    const collidingChildId = `${clientJobId}-f0`;
+    await db.insert(schema.jobs).values({
+      id: collidingChildId,
+      toolId: "rotate",
+      pool: "image",
+      type: "tool",
+      status: "completed",
+      inputRefs: [],
+      settings: {},
+    });
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "empty.png",
+        contentType: "image/png",
+        content: Buffer.alloc(0),
+      },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
+      },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(parentRow?.status).toBe("failed");
+    expect(parentRow?.error).toEqual({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+      details: [
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "", error: "Job ID already in use" },
+      ],
+    });
+  });
+
   it("pipeline batch with multi-step chain processes correctly", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "multi.png", contentType: "image/png", content: PNG_200x150 },
@@ -879,13 +1111,23 @@ describe.skipIf(!ffmpegAvailable())("Non-image pipeline (video)", () => {
 // EXECUTE INGRESS PREPROCESSING (validate/decode/sanitize branches)
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Pipeline execute ingress preprocessing", () => {
-  it("rejects a garbage buffer with an invalid-image error", async () => {
-    const res = await executePipeline(GARBAGE_IMAGE, "garbage.jpg", {
-      steps: [{ toolId: "resize", settings: { width: 100 } }],
-    });
+  it("rejects a garbage buffer with an invalid-image error without enqueuing a pipeline flow (#3913)", async () => {
+    const clientJobId = `pipeline-reject-${randomUUID()}`;
+    const res = await executePipeline(
+      GARBAGE_IMAGE,
+      "garbage.jpg",
+      {
+        steps: [{ toolId: "resize", settings: { width: 100 } }],
+      },
+      clientJobId,
+    );
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/invalid image/i);
+
+    await new Promise((r) => setTimeout(r, 100));
+    const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(rows).toHaveLength(0);
   });
 
   it("sanitizes SVG input at ingress before step validation runs", async () => {
@@ -972,13 +1214,23 @@ describe("Pipeline OCR step ingress gating", () => {
     expect(json.compatibilityReason).toBeDefined();
   });
 
-  it("rejects a garbage image through the OCR ingress preparer", async () => {
-    const res = await executePipeline(GARBAGE_IMAGE, "scan.jpg", {
-      steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
-    });
+  it("rejects a garbage image through the OCR ingress preparer without enqueuing a pipeline flow (#3913)", async () => {
+    const clientJobId = `pipeline-ocr-reject-${randomUUID()}`;
+    const res = await executePipeline(
+      GARBAGE_IMAGE,
+      "scan.jpg",
+      {
+        steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+      },
+      clientJobId,
+    );
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/invalid image/i);
+
+    await new Promise((r) => setTimeout(r, 100));
+    const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(rows).toHaveLength(0);
   });
 
   it("rejects Korean fast OCR on the batch endpoint too", async () => {
@@ -1002,6 +1254,52 @@ describe("Pipeline OCR step ingress gating", () => {
     expect(json.error).toMatch(/all files failed/i);
     expect(json.errors).toHaveLength(1);
     expect(json.errors[0].filename).toBe("junk.jpg");
+  });
+
+  it("logs a warning when OCR ingress cleanup fails (#1723)", async () => {
+    const deleteSpy = vi
+      .spyOn(objectStorage, "deleteObject")
+      .mockRejectedValue(new Error("Cleanup failed"));
+    const putSpy = vi
+      .spyOn(objectStorage, "putObject")
+      .mockRejectedValue(new Error("Storage failed"));
+
+    try {
+      const res = await executeBatch([{ filename: "good.png", content: PNG_200x150 }], {
+        steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(deleteSpy).toHaveBeenCalled();
+    } finally {
+      putSpy.mockRestore();
+      deleteSpy.mockRestore();
+    }
+  });
+
+  it("logs a warning when OCR ingress cleanup fails (#1723)", async () => {
+    // We mock deleteObject to reject to trigger the warning logic
+    const deleteSpy = vi
+      .spyOn(objectStorage, "deleteObject")
+      .mockRejectedValue(new Error("Cleanup failed"));
+    const putSpy = vi
+      .spyOn(objectStorage, "putObject")
+      .mockRejectedValue(new Error("Storage failed"));
+
+    try {
+      const res = await executeBatch([{ filename: "good.png", content: PNG_200x150 }], {
+        steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+      });
+
+      // The route should answer 500 because putObject throws and it's an unhandled storage failure
+      expect(res.statusCode).toBe(500);
+
+      // deleteObject should have been called in the finally block
+      expect(deleteSpy).toHaveBeenCalled();
+    } finally {
+      putSpy.mockRestore();
+      deleteSpy.mockRestore();
+    }
   });
 });
 
@@ -1128,6 +1426,37 @@ describe("Pipeline deterministic runtime step failure", () => {
 // BATCH INGRESS PREPROCESSING (per-file validate/decode/sanitize)
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Pipeline batch ingress preprocessing", () => {
+  it("keeps index alignment and records a pre-failure when an upload is empty (#2684)", async () => {
+    const res = await executeBatch(
+      [
+        { filename: "empty.png", content: Buffer.alloc(0) },
+        { filename: "keeper.png", content: PNG_200x150 },
+      ],
+      { steps: [{ toolId: "resize", settings: { width: 50 } }] },
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    const fileResults = parseFileResults(res);
+    expect(fileResults["0"]).toBeUndefined();
+    expect(fileResults["1"]).toBe("keeper_resize.png");
+
+    const parentId = res.headers["x-job-id"] as string;
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    expect(parentRow?.progress).toMatchObject({
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 1,
+      result: {
+        fileResults: { "1": "keeper_resize.png" },
+      },
+    });
+    expect(parentRow?.error).toEqual({
+      message: "1 file(s) failed",
+      details: [{ filename: "empty.png", error: "File is empty" }],
+    });
+  }, 30_000);
+
   it("skips invalid images as pre-failures and zips the valid ones", async () => {
     const res = await executeBatch(
       [

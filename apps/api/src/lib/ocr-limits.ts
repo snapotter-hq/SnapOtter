@@ -1,3 +1,5 @@
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
+
 /** Hard ceiling for each encoded image or PDF accepted by every OCR ingress path. */
 export const OCR_MAX_ENCODED_INPUT_BYTES = 512 * 1024 * 1024;
 
@@ -51,21 +53,16 @@ export function findOcrEncodedInputViolation(
   return null;
 }
 
-/** Preserve a useful HTTP status across Fastify and object-storage limit errors. */
-export function ocrUploadErrorStatus(error: unknown): 400 | 413 | 503 {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "statusCode" in error &&
-    error.statusCode === 503
-  ) {
-    return 503;
+/** Preserve a useful HTTP status across Fastify and object-storage limit errors, and rethrow 5xx faults. */
+export function ocrUploadErrorStatus(error: unknown): 400 | 413 {
+  const oom = asDecoderOutOfMemory(error);
+  if (oom instanceof DecoderOutOfMemoryError) throw oom;
+  const status = (error as { statusCode?: unknown } | null)?.statusCode;
+  if (typeof status === "number" && status >= 500) {
+    throw error;
   }
   if (
-    (typeof error === "object" &&
-      error !== null &&
-      "statusCode" in error &&
-      error.statusCode === 413) ||
+    status === 413 ||
     (error instanceof Error &&
       /(?:file too large|upload exceeds.*(?:maximum|limit))/i.test(error.message))
   ) {
@@ -74,8 +71,7 @@ export function ocrUploadErrorStatus(error: unknown): 400 | 413 | 503 {
   return 400;
 }
 
-export function ocrUploadErrorMessage(statusCode: 400 | 413 | 503): string {
-  if (statusCode === 503) return "Upload storage unavailable";
+export function ocrUploadErrorMessage(statusCode: 400 | 413): string {
   if (statusCode === 413) return "Upload exceeds the allowed size";
   return "Failed to parse multipart request";
 }

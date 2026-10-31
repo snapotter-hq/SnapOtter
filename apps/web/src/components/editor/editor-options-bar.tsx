@@ -1,13 +1,12 @@
 // apps/web/src/components/editor/editor-options-bar.tsx
 
-import { useState } from "react";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 import { BrushOptions } from "./options/brush-options";
 import { CloneStampOptions } from "./options/clone-stamp-options";
 import { CropOptions } from "./options/crop-options";
 import { DodgeBurnOptions } from "./options/dodge-burn-options";
-import { EyedropperOptions, type SampleSize } from "./options/eyedropper-options";
+import { EyedropperOptions } from "./options/eyedropper-options";
 import { FillOptions } from "./options/fill-options";
 import { GradientOptions } from "./options/gradient-options";
 import { MoveOptions } from "./options/move-options";
@@ -73,14 +72,14 @@ export function EditorOptionsBar() {
 
   const OptionsComponent = getOptionsComponent(activeTool);
 
-  // Eyedropper state (managed here since EyedropperOptions requires props)
-  const [eyedropperSampleSize, setEyedropperSampleSize] = useState<SampleSize>(1);
+  // The eyedropper reads its sample size and hover preview color from the store so
+  // the options bar and the canvas stay in sync without re-rendering EditorCanvas (#2155, #2300).
+  const eyedropperSampleSize = useEditorStore((s) => s.eyedropperSampleSize);
+  const setEyedropperSampleSize = useEditorStore((s) => s.setEyedropperSampleSize);
+  const eyedropperSampledColor = useEditorStore((s) => s.eyedropperSampledColor);
 
   // Transform tool API (managed here since TransformOptions requires props)
   const transformApi = useTransformTool();
-
-  // Pick sampled color from store foreground when eyedropper is active
-  const foregroundColor = useEditorStore((s) => s.foregroundColor);
 
   return (
     <div
@@ -100,7 +99,7 @@ export function EditorOptionsBar() {
           <EyedropperOptions
             sampleSize={eyedropperSampleSize}
             onSampleSizeChange={setEyedropperSampleSize}
-            sampledColor={foregroundColor}
+            sampledColor={eyedropperSampledColor}
           />
         )}
         {activeTool === "transform" && <TransformOptions api={transformApi} />}

@@ -32,7 +32,8 @@ import { LibrarySaveModeSelector } from "@/components/common/library-save-mode-s
 import { ReviewPanel } from "@/components/common/review-panel";
 import { SideBySideComparison } from "@/components/common/side-by-side-comparison";
 import { ThumbnailStrip } from "@/components/common/thumbnail-strip";
-import { ToolDropzone } from "@/components/common/tool-dropzone";
+import { formatToolAcceptedInputs, ToolDropzone } from "@/components/common/tool-dropzone";
+import { UrlImportModal } from "@/components/common/url-import-modal";
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -43,27 +44,38 @@ import type { PreviewTransform } from "@/components/tools/rotate-settings";
 import { SignCanvas, type SignCanvasRef } from "@/components/tools/sign-canvas";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { useIntakeGuard } from "@/hooks/use-intake-guard";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { recordRecentTool } from "@/hooks/use-recent-tools";
+import { track } from "@/lib/analytics";
 import { downloadBlob, formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
+import { showUnsupportedFileType } from "@/lib/intake-notice";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import {
+  DOC_CANVAS_TOOLS,
   LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
   MULTI_FILE_TOOLS,
   REORDERABLE_TOOLS,
 } from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
-import { getToolRegistryEntry } from "@/lib/tool-registry";
+import { type ComparisonPreview, getToolRegistryEntry } from "@/lib/tool-registry";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFeaturesStore } from "@/stores/features-store";
-import { type FileEntry, useFileStore } from "@/stores/file-store";
+import { displayStoredError, type FileEntry, useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
+import { useMemeStore } from "@/stores/meme-store";
+import { useMultiToolStore } from "@/stores/multi-tool-store";
+import { useOrganizeStore } from "@/stores/organize-store";
+import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useQrStore } from "@/stores/qr-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -227,7 +239,144 @@ function FileSelectionInfo({
   );
 }
 
+const TOOL_STORE_RESETS: ReadonlyArray<() => void> = [
+  () => useBase64Store.getState().reset(),
+  () => useCollageStore.getState().reset(),
+  () => useDuplicateStore.getState().reset(),
+  () => useMemeStore.getState().reset(),
+  () => usePassportPhotoStore.getState().reset(),
+  () => usePdfToImageStore.getState().reset(),
+  () => useQrStore.getState().reset(),
+  () => useSplitStore.getState().reset(),
+  () => useHtmlToImageStore.getState().reset(),
+  () => useMultiToolStore.getState().clear(),
+  () => useOrganizeStore.getState().clear(),
+];
+
+function ToolPageStoreReset({
+  toolId,
+  fromLibrary,
+  resetToolIdRef,
+}: {
+  toolId: string | undefined;
+  fromLibrary: boolean;
+  resetToolIdRef: React.RefObject<string | undefined>;
+}) {
+  const probeRef = useRef<HTMLSpanElement | null>(null);
+  const latestToolIdRef = useRef<string | undefined>(toolId);
+  latestToolIdRef.current = toolId;
+  const setupToolIdRef = useRef<string | undefined>(undefined);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: toolId triggers intentional reset on tool navigation
+  useEffect(() => {
+    const previousToolId = resetToolIdRef.current;
+    resetToolIdRef.current = toolId;
+    if (setupToolIdRef.current !== toolId) {
+      setupToolIdRef.current = toolId;
+      const teardownError = runEndWrites([
+        ...(!fromLibrary ? [() => useFileStore.getState().reset()] : []),
+        ...TOOL_STORE_RESETS,
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          previousToolId ?? toolId,
+        );
+      }
+    }
+
+    return () => {
+      if (probeRef.current?.isConnected && latestToolIdRef.current === toolId) return;
+      setupToolIdRef.current = undefined;
+      const teardownError = runEndWrites([() => useFileStore.getState().stopRuns()]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+    };
+  }, [toolId]);
+
+  return (
+    <span
+      ref={(el) => {
+        if (el) probeRef.current = el;
+      }}
+      hidden
+    />
+  );
+}
+
+/**
+ * Resets the file store and per-tool stores when ToolPage unmounts (#1122).
+ *
+ * Rendered as a sibling after ToolPageContent so React runs ToolSettings's
+ * unmount cleanups first (canceling any active server job while `processing`
+ * is still true) and then wipes the stores clean on the way out. In StrictMode,
+ * React's simulated unmount on initial mount runs while the DOM node is still
+ * connected; skipping that simulated pass preserves files pre-loaded into
+ * useFileStore before navigating here with `state: { fromLibrary: true }`.
+ */
+function ToolPageUnmountReset({
+  resetToolIdRef,
+}: {
+  resetToolIdRef: React.RefObject<string | undefined>;
+}) {
+  const probeRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(
+    () => () => {
+      if (probeRef.current?.isConnected) return;
+      const teardownError = runEndWrites([
+        () => useFileStore.getState().reset(),
+        ...TOOL_STORE_RESETS,
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          resetToolIdRef.current,
+        );
+      }
+    },
+    [resetToolIdRef],
+  );
+  return (
+    <span
+      ref={(el) => {
+        if (el) probeRef.current = el;
+      }}
+      hidden
+    />
+  );
+}
+
 export function ToolPage() {
+  const { toolId } = useParams<{ toolId: string }>();
+  const location = useLocation();
+  const fromLibrary = Boolean((location.state as { fromLibrary?: boolean } | null)?.fromLibrary);
+  const resetToolIdRef = useRef<string | undefined>(undefined);
+
+  return (
+    <>
+      <ToolPageStoreReset
+        toolId={toolId}
+        fromLibrary={fromLibrary}
+        resetToolIdRef={resetToolIdRef}
+      />
+      <ToolPageContent resetToolIdRef={resetToolIdRef} />
+      <ToolPageUnmountReset resetToolIdRef={resetToolIdRef} />
+    </>
+  );
+}
+
+function ToolPageContent({
+  resetToolIdRef,
+}: {
+  resetToolIdRef: React.RefObject<string | undefined>;
+}) {
   const { t } = useTranslation();
   const { section, toolId } = useParams<{ section: string; toolId: string }>();
   const location = useLocation();
@@ -282,7 +431,7 @@ export function ToolPage() {
   useEffect(() => {
     if (tool) {
       recordRecentTool(tool.id);
-      import("@/lib/analytics").then(({ track, setSentryTag }) => {
+      withAnalytics(({ track, setSentryTag }) => {
         // Tag Sentry so a frontend crash is filterable by which tool/section the
         // user was on (the web TAG_ALLOWLIST reserves these but nothing set them).
         setSentryTag("tool_id", tool.id);
@@ -347,12 +496,24 @@ export function ToolPage() {
   );
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [failedFeedbackOpen, setFailedFeedbackOpen] = useState(false);
+  const [bulkModalToolId, setBulkModalToolId] = useState<string | null>(null);
+  const bulkModalOpen = Boolean(tool && bulkModalToolId === tool.id);
+  const handleBulkModalOpenChange = useCallback(
+    (open: boolean) => {
+      setBulkModalToolId(open && tool ? tool.id : null);
+    },
+    [tool],
+  );
   const [previewTransform, setPreviewTransform] = useState<PreviewTransform | null>(null);
   const [previewFilter, setPreviewFilter] = useState<string>("");
   const [imageWrapperStyle, setImageWrapperStyle] = useState<React.CSSProperties | null>(null);
   const [imageWrapperChildren, setImageWrapperChildren] = useState<React.ReactNode>(null);
   const [bgPreview, setBgPreview] = useState<BgPreviewState | null>(null);
-  const failedFeedbackCategory = classifyFeedbackError(currentEntry?.error);
+  const [comparisonPreview, setComparisonPreview] = useState<ComparisonPreview | null>(null);
+  const failedFeedbackCategory = classifyFeedbackError(
+    currentEntry?.error,
+    currentEntry?.errorCategory,
+  );
 
   const [cropCrop, setCropCrop] = useState<Crop>({
     unit: "%",
@@ -367,6 +528,51 @@ export function ToolPage() {
     width: number;
     height: number;
   } | null>(null);
+  const [perFileCropState, setPerFileCropState] = useState<
+    Record<string, { crop: Crop; aspect: number | undefined }>
+  >({});
+
+  const handleCropChange = useCallback(
+    (crop: Crop) => {
+      setCropCrop(crop);
+      if (currentEntry) {
+        setPerFileCropState((prev) => ({
+          ...prev,
+          [currentEntry.id]: { crop, aspect: cropAspect },
+        }));
+      }
+    },
+    [currentEntry, cropAspect],
+  );
+
+  const handleAspectChange = useCallback(
+    (aspect: number | undefined) => {
+      setCropAspect(aspect);
+      if (currentEntry) {
+        setPerFileCropState((prev) => ({
+          ...prev,
+          [currentEntry.id]: { crop: cropCrop, aspect },
+        }));
+      }
+    },
+    [currentEntry, cropCrop],
+  );
+
+  const prevEntryIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentEntry?.id !== prevEntryIdRef.current) {
+      prevEntryIdRef.current = currentEntry?.id || null;
+      setSignStaleEntryId(null);
+      if (currentEntry && perFileCropState[currentEntry.id]) {
+        const state = perFileCropState[currentEntry.id];
+        setCropCrop(state.crop);
+        setCropAspect(state.aspect);
+      } else {
+        setCropCrop({ unit: "%", x: 0, y: 0, width: 100, height: 100 });
+        setCropAspect(undefined);
+      }
+    }
+  }, [currentEntry?.id, perFileCropState]);
 
   const cropState = useMemo(
     () => ({
@@ -391,31 +597,34 @@ export function ToolPage() {
   const signCanvasRef = useRef<SignCanvasRef | null>(null);
   const [signHasSelection, setSignHasSelection] = useState(false);
   const [signPlacementCount, setSignPlacementCount] = useState(0);
+  const [signStaleEntryId, setSignStaleEntryId] = useState<string | null>(null);
+  const handleSignPlacementsChange = useCallback(() => {
+    const { currentEntry: entry, processing } = useFileStore.getState();
+    if (entry && (entry.processedUrl || processing)) {
+      setSignStaleEntryId(entry.id);
+    }
+  }, []);
 
   // Page-level drag overlay state
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragCounter = useRef(0);
   const isMultiFileTool = toolId ? MULTI_FILE_TOOLS.has(toolId) : false;
   const canReorder = toolId ? REORDERABLE_TOOLS.has(toolId) : false;
+  // Canvas editors that manage their own document set hide the generic
+  // file-selection UI (left list/add-more, bottom file strip, pager). See
+  // DOC_CANVAS_TOOLS.
+  const docCanvas = toolId ? DOC_CANVAS_TOOLS.has(toolId) : false;
+  // Every generic multi-file affordance at once.
+  const hasBatchUi = hasMultiple && !docCanvas;
+
+  const fromLibrary = Boolean((location.state as { fromLibrary?: boolean } | null)?.fromLibrary);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: toolId triggers intentional reset on tool navigation
   useEffect(() => {
-    const fromLibrary = (location.state as { fromLibrary?: boolean } | null)?.fromLibrary;
-    if (!fromLibrary) {
-      useFileStore.getState().reset();
-    }
-
-    useBase64Store.getState().reset();
-    useCollageStore.getState().reset();
-    useDuplicateStore.getState().reset();
-    usePdfToImageStore.getState().reset();
-    useQrStore.getState().reset();
-    useSplitStore.getState().reset();
-    useHtmlToImageStore.getState().reset();
-
     setPreviewTransform(null);
     setPreviewFilter("");
     setBgPreview(null);
+    setComparisonPreview(null);
     setCropCrop({ unit: "%", x: 0, y: 0, width: 100, height: 100 });
     setCropAspect(undefined);
     setCropShowGrid(true);
@@ -424,7 +633,9 @@ export function ToolPage() {
     setEraserMaskedCount(0);
     setEraserBrushSize(30);
     setEraserSliderInitPos(null);
+    setSignStaleEntryId(null);
     setMobileSettingsOpen(false);
+    setBulkModalToolId(null);
   }, [toolId]);
 
   const toolAccept = registryEntry?.accept ?? (tool?.acceptedInputs?.join(",") || undefined);
@@ -448,13 +659,25 @@ export function ToolPage() {
   const toolAcceptDescription = useMemo(
     () =>
       toolAcceptExts && toolAcceptExts.length > 0
-        ? `${toolAcceptExts.map((e) => e.toUpperCase()).join(", ")} files only`
+        ? format(t.toolPage.acceptDescription, {
+            exts: toolAcceptExts.map((e) => e.toUpperCase()).join(", "),
+          })
         : undefined,
-    [toolAcceptExts],
+    [toolAcceptExts, t.toolPage.acceptDescription],
   );
+  const toolFormatsDisplay = useMemo(
+    () => formatToolAcceptedInputs(tool?.acceptedInputs, t.toolPage.andMore),
+    [tool?.acceptedInputs, t.toolPage.andMore],
+  );
+
+  // Drops and pastes are turned away, with a message, while a run is in flight (#2108).
+  const { running: runInFlight, allowIntake } = useIntakeGuard();
+  const allowIntakeRef = useRef(allowIntake);
+  allowIntakeRef.current = allowIntake;
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
+      if (!allowIntakeRef.current()) return;
       setEraserSliderInitPos(null);
       reset();
       setFiles(newFiles);
@@ -464,21 +687,33 @@ export function ToolPage() {
 
   const handleUrlImport = useCallback(
     (file: File) => {
+      if (!allowIntakeRef.current()) return false;
       addFiles([file]);
     },
     [addFiles],
   );
 
   const handleUndo = useCallback(() => {
+    if (!allowIntake()) return;
     undoProcessing();
     setEraserSliderInitPos(null);
-  }, [undoProcessing]);
+  }, [allowIntake, undoProcessing]);
 
   const startOver = useCallback(() => {
+    if (!allowIntake()) return;
     reset();
-  }, [reset]);
+  }, [allowIntake, reset]);
+
+  const handleClearAll = useCallback(() => {
+    if (!allowIntake()) return;
+    reset();
+    usePassportPhotoStore.getState().reset();
+    useDuplicateStore.getState().reset();
+    useSplitStore.getState().reset();
+  }, [allowIntake, reset]);
 
   const handleAddMore = useCallback(() => {
+    if (!allowIntake()) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
@@ -489,20 +724,37 @@ export function ToolPage() {
     }
     input.onchange = (e) => {
       const selected = Array.from((e.target as HTMLInputElement).files || []);
+      if (selected.length === 0) return;
       const newFiles = toolFileFilter ? selected.filter(toolFileFilter) : selected;
-      if (newFiles.length > 0) addFiles(newFiles);
+      if (newFiles.length > 0) {
+        if (!allowIntakeRef.current()) return;
+        addFiles(newFiles);
+      } else {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     };
     input.click();
-  }, [addFiles, toolAccept, toolFileFilter, acceptsAnyFile]);
+  }, [
+    addFiles,
+    toolAccept,
+    toolFileFilter,
+    acceptsAnyFile,
+    allowIntake,
+    t.dropzone.unsupportedFileType,
+  ]);
 
   // Page-level drag handlers (active when a file is already loaded)
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current++;
-    if (e.dataTransfer.types.includes("Files")) {
-      setIsDraggingOver(true);
-    }
-  }, []);
+  const handleDragEnter = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      dragCounter.current++;
+      // No "drop to replace" overlay over a run: the drop would be turned away (#2108).
+      if (e.dataTransfer.types.includes("Files") && !runInFlight) {
+        setIsDraggingOver(true);
+      }
+    },
+    [runInFlight],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -521,19 +773,38 @@ export function ToolPage() {
       const droppedFiles = Array.from(e.dataTransfer.files);
       if (droppedFiles.length === 0) return;
       const validFiles = toolFileFilter ? droppedFiles.filter(toolFileFilter) : droppedFiles;
-      if (validFiles.length === 0) return;
+      if (validFiles.length === 0) {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+        return;
+      }
+      if (!allowIntake()) return;
       if (isMultiFileTool) {
         addFiles(validFiles);
       } else {
         setFiles(validFiles);
       }
     },
-    [toolFileFilter, addFiles, setFiles, isMultiFileTool],
+    [
+      toolFileFilter,
+      addFiles,
+      setFiles,
+      isMultiFileTool,
+      allowIntake,
+      t.dropzone.unsupportedFileType,
+    ],
   );
 
-  // Document-level paste handler (skip for generator tools that don't accept file input)
+  // Document-level paste handler (only when an active, installed tool workspace with a dropzone is rendered)
+  const isToolDisabled = Boolean(tool && disabledTools.includes(tool.id));
+  const canAcceptPaste = Boolean(
+    tool &&
+      registryEntry &&
+      registryEntry.displayMode !== "no-dropzone" &&
+      !isToolDisabled &&
+      (!isAiTool || (featuresLoaded && (toolInstalled || !featureBundle))),
+  );
   useEffect(() => {
-    if (registryEntry?.displayMode === "no-dropzone") return;
+    if (!canAcceptPaste) return;
 
     const handlePaste = (e: ClipboardEvent) => {
       const pastedFiles: File[] = [];
@@ -548,26 +819,44 @@ export function ToolPage() {
         }
       }
       if (pastedFiles.length > 0) {
-        e.preventDefault();
         const filtered = toolFileFilter ? pastedFiles.filter(toolFileFilter) : pastedFiles;
         if (filtered.length > 0) {
-          if (isMultiFileTool) addFiles(filtered);
-          else setFiles(filtered);
+          e.preventDefault();
+          if (!allowIntake()) return;
+          if (isMultiFileTool) {
+            addFiles(filtered);
+          } else {
+            setEraserSliderInitPos(null);
+            setFiles(filtered);
+          }
+        } else {
+          showUnsupportedFileType(t.dropzone.unsupportedFileType);
         }
       }
     };
 
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [toolFileFilter, isMultiFileTool, addFiles, setFiles, registryEntry?.displayMode]);
+  }, [
+    canAcceptPaste,
+    toolFileFilter,
+    isMultiFileTool,
+    addFiles,
+    setFiles,
+    allowIntake,
+    t.dropzone.unsupportedFileType,
+  ]);
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
+    if (toolId) {
+      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: toolId });
+    }
     downloadBlob(batchZipBlob, batchZipFilename ?? "processed-files.zip");
     useFileStore.getState().markBatchClaimed();
-  }, [batchZipBlob, batchZipFilename]);
+  }, [batchZipBlob, batchZipFilename, toolId]);
 
-  if (tool && disabledTools.includes(tool.id)) {
+  if (isToolDisabled) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
@@ -631,18 +920,30 @@ export function ToolPage() {
   const IconComponent =
     (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? FileImage;
 
-  const hasFile = files.length > 0;
-  const hasProcessed = !!processedUrl;
+  const hasFile = (resetToolIdRef.current === toolId || fromLibrary) && files.length > 0;
+  const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
   const isProcessing = currentEntry?.status === "processing";
   const displayMode = registryEntry.displayMode;
   const isNoDropzone = displayMode === "no-dropzone";
   const isLivePreview = registryEntry.livePreview ?? false;
-  // A landed result normally swaps the image area for a view of it. interactive-sign
-  // is the exception: renderImageArea keeps the sign canvas either way, and the
-  // result is a download its own settings panel offers. Remounting on a new key
-  // would throw away the signatures the user just placed, and fading the area
-  // back in would flash the page for a view that did not change.
-  const resultOwnsImageArea = hasProcessed && displayMode !== "interactive-sign";
+  // A landed result normally swaps the image area for a view of it and opens
+  // ReviewPanel below the settings. interactive-sign and the three tools that
+  // render their own result inline (ocr, favicon, image-to-pdf) keep the input
+  // view in the main area and offer their own download/copy controls in the
+  // panel (#1111).
+  const panelOwnsResult =
+    displayMode === "interactive-sign" ||
+    toolId === "ocr" ||
+    toolId === "favicon" ||
+    toolId === "image-to-pdf";
+  const resultOwnsImageArea = hasProcessed && !panelOwnsResult;
+  // Shared between the mobile and desktop image-area divs so they reconcile in
+  // place when useMobile flips at 768px and interactive canvases survive (#2248).
+  const imageAreaKey = resultOwnsImageArea
+    ? `processed-${selectedIndex}`
+    : displayMode === "interactive-eraser"
+      ? "pending-eraser"
+      : `pending-${selectedIndex}`;
 
   // Derive processed file info: use stored filename for batch results (blob URLs),
   // fall back to parsing the download URL for single-file results
@@ -661,6 +962,12 @@ export function ToolPage() {
     (isProcessedPreviewable ? processedUrl : null) ??
     originalBlobUrl ??
     processedUrl) as string;
+  const activeComparisonPreview =
+    comparisonPreview && currentEntry?.id === comparisonPreview.entryId ? comparisonPreview : null;
+  const liveComparisonOverride =
+    resultOwnsImageArea && activeComparisonPreview?.supersedesResult
+      ? activeComparisonPreview
+      : null;
 
   // Build settings props
   const settingsProps = {
@@ -669,12 +976,14 @@ export function ToolPage() {
     onImageStyle: isLivePreview ? setImageWrapperStyle : undefined,
     onImageOverlay: isLivePreview ? (c: React.ReactNode) => setImageWrapperChildren(c) : undefined,
     onBgPreview: setBgPreview,
+    onComparisonPreview: setComparisonPreview,
     cropProps:
       displayMode === "interactive-crop"
         ? {
             cropState,
-            onCropChange: setCropCrop,
-            onAspectChange: setCropAspect,
+            perFileCropState,
+            onCropChange: handleCropChange,
+            onAspectChange: handleAspectChange,
             onGridToggle: setCropShowGrid,
           }
         : undefined,
@@ -697,6 +1006,8 @@ export function ToolPage() {
             canvasRef: signCanvasRef,
             hasSelection: signHasSelection,
             placementCount: signPlacementCount,
+            staleEntryId: signStaleEntryId,
+            onStaleEntryChange: setSignStaleEntryId,
           }
         : undefined,
   };
@@ -723,6 +1034,42 @@ export function ToolPage() {
       );
     }
 
+    const conversionCompleteCard = (
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
+            <CheckCircle2 className="h-8 w-8 text-success-ink" />
+          </div>
+          <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
+          <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
+          {processedSize != null && (
+            <p className="text-xs text-muted-foreground">
+              {processedFileType} &middot; {formatFileSize(processedSize)}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+
+    // A processed result with no renderable preview must not fall back to the
+    // original: the branches below (including media-player and document when a
+    // large batch skipped ZIP extraction) would otherwise show the untouched
+    // original under the processed filename and size (#746, #1240, #2449).
+    if (
+      !liveComparisonOverride &&
+      shouldShowConversionCard({
+        hasProcessed: resultOwnsImageArea,
+        isProcessedPreviewable,
+        processedUrl,
+        processedPreviewUrl,
+        originalBlobUrl,
+        displayMode,
+        hasImageWrapperStyle: imageWrapperStyle != null,
+      })
+    ) {
+      return conversionCompleteCard;
+    }
+
     // Media player: waveform for audio, native <video> for video
     if (displayMode === "media-player" && hasFile) {
       if (tool?.modality === "audio") {
@@ -732,13 +1079,21 @@ export function ToolPage() {
             <Suspense
               fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
             >
-              <WaveformPlayer
-                src={audioSrc}
-                // audioSrc falls back to the original, and only a result claims.
-                onDownload={playerDownloadClaim(processedUrl, () =>
-                  useFileStore.getState().claimSelected(),
-                )}
-              />
+              {/* Scrolls inside the image area when the player doesn't fit (a phone
+                  in landscape), centred only while it does, so its play button
+                  never ends up under the z-20 bars (#2192). */}
+              <div className="flex min-h-0 max-h-full w-full overflow-auto">
+                <div className="m-auto w-full">
+                  <WaveformPlayer
+                    src={audioSrc}
+                    // audioSrc falls back to the original, and only a result claims.
+                    onDownload={playerDownloadClaim(processedUrl, () => {
+                      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: tool.id });
+                      useFileStore.getState().claimSelected();
+                    })}
+                  />
+                </div>
+              </div>
             </Suspense>
           );
         }
@@ -769,7 +1124,9 @@ export function ToolPage() {
 
       if (!isNativeVideo && currentExt) {
         const previewFile = hasProcessed ? undefined : currentEntry?.file;
-        const previewSrc = hasProcessed ? (processedUrl ?? originalBlobUrl) : undefined;
+        const previewSrc = hasProcessed
+          ? (processedUrl ?? originalBlobUrl ?? undefined)
+          : undefined;
         const previewSize = hasProcessed
           ? (currentEntry?.processedSize ?? null)
           : (currentEntry?.file?.size ?? 0);
@@ -798,9 +1155,14 @@ export function ToolPage() {
 
     // Document viewer: pdf.js canvas with pagination
     if (displayMode === "document" && hasFile) {
-      // A document tool can replace the read-only viewer with an editor for a
-      // single document (organize-pdf swaps in a drag-to-reorder page grid).
-      const Panel = !hasProcessed && files.length === 1 ? registryEntry?.ResultsPanel : undefined;
+      // A document tool can replace the read-only viewer with an editor. For
+      // one file that is always eligible; the multi-tool editor ingests the
+      // extra documents itself, so it is eligible for multi-file selections
+      // too. A batch (or previously run) result keeps the read-only viewer.
+      const Panel =
+        !hasProcessed && (files.length === 1 || docCanvas)
+          ? registryEntry?.ResultsPanel
+          : undefined;
       return (
         <Suspense
           fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
@@ -811,14 +1173,26 @@ export function ToolPage() {
     }
 
     // Show error state for failed batch files (before interactive canvas blocks,
-    // which also match !hasProcessed and would show the canvas instead of the error)
-    if (hasFile && !hasProcessed && currentEntry?.status === "failed") {
+    // which also match !hasProcessed and would show the canvas instead of the error).
+    // interactive-sign keeps its canvas: its panel shows the error, and swapping
+    // the canvas out would throw away the signatures the user placed (#1969).
+    // interactive-eraser also keeps its canvas so painted masks aren't lost (#1639).
+    if (
+      hasFile &&
+      !hasProcessed &&
+      currentEntry?.status === "failed" &&
+      displayMode !== "interactive-sign" &&
+      displayMode !== "interactive-eraser"
+    ) {
       return (
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center max-w-sm">
+        // Bounded by the image area and scrolling inside it; m-auto centres the card
+        // only while it fits, so a tall one is never clipped at its top (#2192).
+        <div className="flex min-h-0 max-h-full flex-1 overflow-auto p-6">
+          <div className="m-auto text-center max-w-sm">
             <AlertCircle className="mx-auto h-10 w-10 text-destructive mb-3" />
             <p className="font-medium text-foreground mb-1">
-              {currentEntry.error || t.toolPage.processingFailed}
+              {displayStoredError(currentEntry.error, t.tools.processing.canceled) ||
+                t.toolPage.processingFailed}
             </p>
             <p className="text-sm text-muted-foreground mb-4">{t.toolPage.settingsSaved}</p>
             <div className="flex flex-col gap-2">
@@ -862,6 +1236,9 @@ export function ToolPage() {
             currentFiles={files}
             fileFilter={toolFileFilter}
             acceptDescription={toolAcceptDescription}
+            enablePaste={false}
+            bulkModalOpen={bulkModalOpen}
+            onBulkModalOpenChange={handleBulkModalOpenChange}
           />
         );
       const ResultsPanel = registryEntry.ResultsPanel;
@@ -882,7 +1259,7 @@ export function ToolPage() {
           aspect={cropAspect}
           showGrid={cropShowGrid}
           imgDimensions={cropImgDimensions}
-          onCropChange={setCropCrop}
+          onCropChange={handleCropChange}
           onImageLoad={setCropImgDimensions}
         />
       );
@@ -929,6 +1306,7 @@ export function ToolPage() {
           fileUrl={originalBlobUrl}
           onSelectionChange={setSignHasSelection}
           onCountChange={setSignPlacementCount}
+          onPlacementsChange={handleSignPlacementsChange}
         />
       );
     }
@@ -946,43 +1324,8 @@ export function ToolPage() {
       }
     }
 
-    const conversionCompleteCard = (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
-            <CheckCircle2 className="h-8 w-8 text-success-ink" />
-          </div>
-          <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
-          <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
-          {processedSize != null && (
-            <p className="text-xs text-muted-foreground">
-              {processedFileType} &middot; {formatFileSize(processedSize)}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-
-    // A processed result with no renderable preview must not fall back to the
-    // original: the branches below render displayUrl as the result, so they
-    // would otherwise show the untouched original under the processed filename
-    // and size (#746). The live-preview + imageWrapperStyle branch is excluded
-    // (WYSIWYG CSS simulation, or #713 input-overlay handling).
     if (
-      shouldShowConversionCard({
-        hasProcessed,
-        isProcessedPreviewable,
-        processedPreviewUrl,
-        originalBlobUrl,
-        displayMode,
-        hasImageWrapperStyle: imageWrapperStyle != null,
-      })
-    ) {
-      return conversionCompleteCard;
-    }
-
-    if (
-      hasProcessed &&
+      resultOwnsImageArea &&
       originalBlobUrl &&
       (displayMode === "side-by-side" || displayMode === "interactive-crop")
     ) {
@@ -996,7 +1339,7 @@ export function ToolPage() {
       );
     }
 
-    if (hasProcessed && originalBlobUrl && displayMode === "no-comparison") {
+    if (resultOwnsImageArea && originalBlobUrl && displayMode === "no-comparison") {
       return (
         <ImageViewer
           src={displayUrl}
@@ -1012,7 +1355,12 @@ export function ToolPage() {
     // overlay is an input control (pixelate's selection box) get the opposite
     // treatment: the style simulates nothing, so show the server result and
     // keep the overlay on top for the next region (#713).
-    if (hasProcessed && originalBlobUrl && displayMode === "live-preview" && imageWrapperStyle) {
+    if (
+      resultOwnsImageArea &&
+      originalBlobUrl &&
+      displayMode === "live-preview" &&
+      imageWrapperStyle
+    ) {
       const overlayIsInput = toolId ? LIVE_PREVIEW_INPUT_OVERLAY_TOOLS.has(toolId) : false;
       if (overlayIsInput) {
         // Never substitute the original for the result here: pixelate
@@ -1045,7 +1393,7 @@ export function ToolPage() {
       );
     }
 
-    if (hasProcessed && originalBlobUrl && displayMode === "live-preview") {
+    if (resultOwnsImageArea && originalBlobUrl && displayMode === "live-preview") {
       return (
         <ImageViewer
           src={displayUrl}
@@ -1056,13 +1404,21 @@ export function ToolPage() {
       );
     }
 
-    if (hasProcessed && originalBlobUrl) {
+    if (resultOwnsImageArea && originalBlobUrl) {
       return (
         <BeforeAfterSlider
           beforeSrc={originalBlobUrl}
-          afterSrc={displayUrl}
-          beforeSize={showSizeComparison ? (originalSize ?? undefined) : undefined}
-          afterSize={showSizeComparison ? (processedSize ?? undefined) : undefined}
+          afterSrc={liveComparisonOverride?.url ?? displayUrl}
+          beforeSize={
+            showSizeComparison
+              ? (liveComparisonOverride?.originalSize ?? originalSize ?? undefined)
+              : undefined
+          }
+          afterSize={
+            showSizeComparison
+              ? (liveComparisonOverride?.processedSize ?? processedSize ?? undefined)
+              : undefined
+          }
           bgPreview={bgPreview}
         />
       );
@@ -1075,6 +1431,17 @@ export function ToolPage() {
           <p className="text-sm text-muted-foreground">{t.toolPage.generatingPreview}</p>
           <p className="text-xs text-muted-foreground">{selectedFileName}</p>
         </div>
+      );
+    }
+
+    if (hasFile && originalBlobUrl && activeComparisonPreview) {
+      return (
+        <BeforeAfterSlider
+          beforeSrc={originalBlobUrl}
+          afterSrc={activeComparisonPreview.url}
+          beforeSize={showSizeComparison ? activeComparisonPreview.originalSize : undefined}
+          afterSize={showSizeComparison ? activeComparisonPreview.processedSize : undefined}
+        />
       );
     }
 
@@ -1144,6 +1511,9 @@ export function ToolPage() {
         currentFiles={files}
         fileFilter={toolFileFilter}
         acceptDescription={toolAcceptDescription}
+        enablePaste={false}
+        bulkModalOpen={bulkModalOpen}
+        onBulkModalOpenChange={handleBulkModalOpenChange}
       />
     );
   }
@@ -1152,7 +1522,7 @@ export function ToolPage() {
   function renderNavArrows() {
     return (
       <>
-        {hasMultiple && hasPrev && (
+        {hasBatchUi && hasPrev && (
           <button
             type="button"
             onClick={navigatePrev}
@@ -1162,7 +1532,7 @@ export function ToolPage() {
             <ChevronLeft className="h-4 w-4" />
           </button>
         )}
-        {hasMultiple && hasNext && (
+        {hasBatchUi && hasNext && (
           <button
             type="button"
             onClick={navigateNext}
@@ -1172,7 +1542,7 @@ export function ToolPage() {
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
-        {hasMultiple && (
+        {hasBatchUi && (
           <div
             role="status"
             aria-label={format(t.a11y.imageNOfTotal, {
@@ -1197,14 +1567,14 @@ export function ToolPage() {
   function renderSettingsContent() {
     return (
       <>
-        {!isNoDropzone && (
+        {!isNoDropzone && !docCanvas && (
           <div className="space-y-2">
             <FileSelectionInfo
               files={files}
               fileEntries={entries}
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
-              onClear={reset}
+              onClear={handleClearAll}
               onAddMore={handleAddMore}
             />
           </div>
@@ -1238,7 +1608,7 @@ export function ToolPage() {
         )}
 
         {/* Batch download — shown right after settings for easy access */}
-        {entries.length > 1 && hasProcessed && batchZipBlob && (
+        {entries.length > 1 && hasProcessed && batchZipBlob && !docCanvas && (
           <button
             type="button"
             onClick={handleDownloadAll}
@@ -1249,7 +1619,7 @@ export function ToolPage() {
           </button>
         )}
 
-        {hasProcessed && processedSize != null && (
+        {resultOwnsImageArea && (processedSize != null || batchTotal > 1) && (
           <div className="animate-fade-in">
             <ReviewPanel
               filename={processedFileName}
@@ -1271,6 +1641,22 @@ export function ToolPage() {
     );
   }
 
+  const urlImportModal = bulkModalOpen ? (
+    <UrlImportModal
+      key={tool.id}
+      onClose={() => handleBulkModalOpenChange(false)}
+      fileFilter={toolFileFilter ?? (() => true)}
+      unsupportedMessage={toolFormatsDisplay || t.dropzone.unsupportedFileType}
+      onImport={(importedFiles) => {
+        for (const file of importedFiles) {
+          if (handleUrlImport(file) === false) {
+            return false;
+          }
+        }
+      }}
+    />
+  ) : null;
+
   // Mobile layout: full-height image area with BottomSheet for settings
   if (isMobile) {
     // Full-width dropzone when no file is loaded (non-generator tools)
@@ -1286,9 +1672,12 @@ export function ToolPage() {
                 multiple
                 onFiles={handleFiles}
                 onUrlImport={handleUrlImport}
+                bulkModalOpen={bulkModalOpen}
+                onBulkModalOpenChange={handleBulkModalOpenChange}
               />
             </div>
           </div>
+          {urlImportModal}
         </AppLayout>
       );
     }
@@ -1318,8 +1707,10 @@ export function ToolPage() {
             </div>
           )}
 
-          {/* Tool header */}
-          <div className="flex items-center gap-3 p-4 border-b border-border shrink-0">
+          {/* Tool header. relative z-20 keeps it, and the Settings button, above any
+              preview content that overflows the image area (#2192); the nav arrows
+              inside the area are z-10 and the sheet and its backdrop z-40/z-50. */}
+          <div className="relative z-20 flex items-center gap-3 p-4 border-b border-border shrink-0 bg-background [@media(max-height:500px)]:hidden">
             <div className="p-2 rounded-lg bg-primary text-primary-foreground">
               <IconComponent className="h-5 w-5" />
             </div>
@@ -1338,20 +1729,23 @@ export function ToolPage() {
           {/* Main area: image viewer (full height) */}
           <section
             aria-label={t.a11y.imageArea}
-            className="flex-1 flex flex-col min-h-0 min-w-0"
-            onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
-            tabIndex={hasMultiple ? 0 : undefined}
+            // An inset focus ring: the default outline is drawn outside the section,
+            // under the z-20 header and peek bar and the clipped sides (#2192).
+            className="flex-1 flex flex-col min-h-0 min-w-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            onKeyDown={hasBatchUi ? handleImageKeyDown : undefined}
+            tabIndex={hasBatchUi ? 0 : undefined}
           >
             <div aria-live="polite" aria-atomic="true" className="sr-only">
               {liveMessage}
             </div>
             <div
+              key={imageAreaKey}
               className={`flex-1 relative flex items-center justify-center p-4 min-h-0 min-w-0${isProcessing ? " animate-pulse" : ""}`}
             >
               {renderNavArrows()}
               {renderImageArea()}
             </div>
-            {hasMultiple && (
+            {hasBatchUi && (
               <ThumbnailStrip
                 entries={entries}
                 selectedIndex={selectedIndex}
@@ -1367,7 +1761,7 @@ export function ToolPage() {
             <button
               type="button"
               onClick={() => setMobileSettingsOpen(true)}
-              className="shrink-0 border-t border-border bg-background px-4 py-3 flex items-center justify-between"
+              className="relative z-20 shrink-0 border-t border-border bg-background px-4 py-3 flex items-center justify-between"
             >
               <div className="flex items-center gap-2">
                 <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
@@ -1382,6 +1776,9 @@ export function ToolPage() {
             open={mobileSettingsOpen}
             onClose={() => setMobileSettingsOpen(false)}
             title={t.common.settings}
+            // A run's request, progress stream and timers live in the settings
+            // panel, so closing the sheet mid-run must not unmount it (#1974).
+            keepMounted
           >
             <div className="settings-container space-y-3">{renderSettingsContent()}</div>
           </BottomSheet>
@@ -1395,6 +1792,7 @@ export function ToolPage() {
             onClose={() => setFailedFeedbackOpen(false)}
           />
         </div>
+        {urlImportModal}
       </AppLayout>
     );
   }
@@ -1412,9 +1810,12 @@ export function ToolPage() {
               multiple
               onFiles={handleFiles}
               onUrlImport={handleUrlImport}
+              bulkModalOpen={bulkModalOpen}
+              onBulkModalOpenChange={handleBulkModalOpenChange}
             />
           </div>
         </div>
+        {urlImportModal}
       </AppLayout>
     );
   }
@@ -1466,26 +1867,20 @@ export function ToolPage() {
         <section
           aria-label={t.a11y.imageArea}
           className="flex-1 flex flex-col min-h-0 min-w-0"
-          onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
-          tabIndex={hasMultiple ? 0 : undefined}
+          onKeyDown={hasBatchUi ? handleImageKeyDown : undefined}
+          tabIndex={hasBatchUi ? 0 : undefined}
         >
           <div aria-live="polite" aria-atomic="true" className="sr-only">
             {liveMessage}
           </div>
           <div
-            key={
-              resultOwnsImageArea
-                ? `processed-${selectedIndex}`
-                : displayMode === "interactive-eraser"
-                  ? "pending-eraser"
-                  : `pending-${selectedIndex}`
-            }
+            key={imageAreaKey}
             className={`flex-1 relative flex items-center justify-center p-6 min-h-0 min-w-0 ${resultOwnsImageArea ? "animate-fade-in" : ""}${isProcessing ? " animate-pulse" : ""}`}
           >
             {renderNavArrows()}
             {renderImageArea()}
           </div>
-          {hasMultiple && (
+          {hasBatchUi && (
             <ThumbnailStrip
               entries={entries}
               selectedIndex={selectedIndex}
@@ -1505,6 +1900,7 @@ export function ToolPage() {
           onClose={() => setFailedFeedbackOpen(false)}
         />
       </div>
+      {urlImportModal}
     </AppLayout>
   );
 }

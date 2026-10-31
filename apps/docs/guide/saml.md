@@ -173,7 +173,7 @@ If you want to require all users to log in via SAML (or OIDC) and block local pa
 2. In **Admin Settings > Security**, toggle **SSO Enforcement** on.
 3. Set a **break-glass username**: this is the one local account that can still log in with a password, for emergency access if the IdP is unreachable.
 
-When SSO enforcement is active, any local login attempt (except for the break-glass user) returns a 403 error with the message "Local password login is disabled. Please use SSO."
+When SSO enforcement is active, only the break-glass user can sign in with a local password. Any other local login attempt is refused with the same 401 "Invalid credentials" a wrong password gets, even when the password is correct, and counts toward the login throttle.
 
 ::: tip
 Always configure a break-glass username before enabling SSO enforcement. Without it, you could be locked out of SnapOtter if your IdP goes down.

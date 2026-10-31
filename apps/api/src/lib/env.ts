@@ -1,6 +1,70 @@
 import { availableParallelism } from "node:os";
+import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import { z } from "zod";
 import { DEFAULT_TRUST_PROXY, parseTrustProxy } from "./trust-proxy.js";
+
+let supportedLocaleCodes: ReadonlySet<string> | undefined;
+
+function isSupportedLocale(value: string): boolean {
+  supportedLocaleCodes ??= new Set(SUPPORTED_LOCALES.map((locale) => locale.code));
+  return supportedLocaleCodes.has(value);
+}
+
+/**
+ * Whether a URL is https, read from the parsed scheme rather than a string
+ * prefix, which an uppercase "HTTPS://" slips past (#1775). False for a value
+ * that doesn't parse.
+ */
+export function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value.trim()).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether a URL parses with an http: or https: scheme and a non-empty host.
+ * A scheme-less value with a port ("keycloak.lan:8080/realms/x") parses with
+ * protocol "keycloak.lan:" and an empty host, so both checks are needed (#1912, #2869).
+ */
+function isHttpOrHttpsUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return (url.protocol === "http:" || url.protocol === "https:") && url.host.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Canonicalise EXTERNAL_URL to `${url.protocol}//${url.host}${url.pathname}`
+ * with trailing slashes stripped when it is an http(s) URL with no credentials,
+ * query string, or fragment (#1876). Scheme and host are lowercased (IDN hosts
+ * punycoded), default ports (:80, :443) are dropped, and backslashes and dot
+ * segments in the path are resolved, while the path's case is preserved so
+ * BASE_PATH matching does not change. Anything else keeps its trimmed,
+ * slash-stripped form so the SSO boot check still rejects it with its own
+ * message.
+ */
+function normalizeExternalUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed);
+    if (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      !url.username &&
+      !url.password &&
+      !/[?#]/.test(trimmed)
+    ) {
+      return `${url.protocol}//${url.host}${url.pathname}`.replace(/\/+$/, "");
+    }
+  } catch {
+    // Keep the trimmed form so the SSO boot check still rejects it.
+  }
+  return trimmed;
+}
 
 const envSchema = z
   .object({
@@ -64,7 +128,12 @@ const envSchema = z
     FILES_STORAGE_PATH: z.string().default("./data/files"),
     WORKSPACE_PATH: z.string().default("./tmp/workspace"),
     DEFAULT_THEME: z.enum(["light", "dark", "system"]).default("light"),
-    DEFAULT_LOCALE: z.string().default("en"),
+    DEFAULT_LOCALE: z
+      .string()
+      .default("en")
+      .refine(isSupportedLocale, () => ({
+        message: `Must be a supported locale (${SUPPORTED_LOCALES.map((locale) => locale.code).join(", ")})`,
+      })),
     DEFAULT_TOOL_VIEW: z.enum(["sidebar", "fullscreen"]).default("sidebar"),
     CORS_ORIGIN: z.string().default(""),
     MAX_USERS: z.coerce.number().default(0),
@@ -93,6 +162,7 @@ const envSchema = z
     MAX_AUDIO_DURATION_S: z.coerce.number().default(0),
     MAX_VIDEO_BITRATE_KBPS: z.coerce.number().default(0),
     LIBREOFFICE_TIMEOUT_S: z.coerce.number().default(120),
+    PREVIEW_TIMEOUT_S: z.coerce.number().default(300),
     SESSION_DURATION_HOURS: z.coerce.number().default(168),
     LOGIN_ATTEMPT_LIMIT: z.coerce.number().default(10),
     // Per-username sliding-window throttle on failed password logins: once a
@@ -114,30 +184,42 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    OIDC_ISSUER_URL: z.string().default(""),
-    OIDC_CLIENT_ID: z.string().default(""),
-    OIDC_CLIENT_SECRET: z.string().default(""),
-    OIDC_SCOPES: z.string().default("openid profile email"),
+    OIDC_ISSUER_URL: z.string().trim().default(""),
+    OIDC_CLIENT_ID: z.string().trim().default(""),
+    OIDC_CLIENT_SECRET: z.string().trim().default(""),
+    OIDC_SCOPES: z
+      .string()
+      .trim()
+      .default("openid profile email")
+      .transform((v) => v || "openid profile email"),
     OIDC_AUTO_CREATE_USERS: z
       .enum(["true", "false"])
       .default("true")
       .transform((v) => v === "true"),
-    OIDC_DEFAULT_ROLE: z.string().default("user"),
+    OIDC_DEFAULT_ROLE: z
+      .string()
+      .trim()
+      .default("user")
+      .transform((v) => v || "user"),
     OIDC_AUTO_LINK_USERS: z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    OIDC_PROVIDER_NAME: z.string().default(""),
+    OIDC_PROVIDER_NAME: z.string().trim().default(""),
     OIDC_CLOCK_TOLERANCE: z.coerce.number().min(0).max(300).default(30),
-    OIDC_USERNAME_CLAIM: z.string().default("preferred_username"),
+    OIDC_USERNAME_CLAIM: z
+      .string()
+      .trim()
+      .default("preferred_username")
+      .transform((v) => v || "preferred_username"),
     SAML_ENABLED: z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    SAML_ENTITY_ID: z.string().default(""),
-    SAML_CALLBACK_URL: z.string().default(""),
-    SAML_IDP_SSO_URL: z.string().default(""),
-    SAML_IDP_CERTIFICATE: z.string().default(""),
+    SAML_ENTITY_ID: z.string().trim().default(""),
+    SAML_CALLBACK_URL: z.string().trim().default(""),
+    SAML_IDP_SSO_URL: z.string().trim().default(""),
+    SAML_IDP_CERTIFICATE: z.string().trim().default(""),
     SAML_AUTO_CREATE_USERS: z
       .enum(["true", "false"])
       .default("true")
@@ -146,16 +228,29 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    SAML_DEFAULT_ROLE: z.string().default("user"),
-    SAML_PROVIDER_NAME: z.string().default(""),
-    SAML_USERNAME_ATTRIBUTE: z.string().default(""),
-    SAML_EMAIL_ATTRIBUTE: z.string().default("email"),
-    EXTERNAL_URL: z.string().default(""),
+    SAML_DEFAULT_ROLE: z
+      .string()
+      .trim()
+      .default("user")
+      .transform((v) => v || "user"),
+    SAML_PROVIDER_NAME: z.string().trim().default(""),
+    SAML_USERNAME_ATTRIBUTE: z.string().trim().default(""),
+    SAML_EMAIL_ATTRIBUTE: z
+      .string()
+      .trim()
+      .default("email")
+      .transform((v) => v || "email"),
+    // Callback and logout URLs append a path to this, so a trailing slash
+    // would double up into "//api/auth/..." (#1599), and non-canonical
+    // spellings (uppercase scheme or host, default port, backslash, dot
+    // segments) would give one origin several redirect URIs (#1876).
+    EXTERNAL_URL: z.string().default("").transform(normalizeExternalUrl),
     COOKIE_SECRET: z.string().default(""),
     REDIS_URL: z.string().default("redis://localhost:6379"),
     SYNC_WAIT_MS: z.coerce.number().default(8000),
     JOB_TIMEOUT_FAST_S: z.coerce.number().default(120),
     JOB_TIMEOUT_LONG_S: z.coerce.number().default(7200),
+    GDPR_EXPORT_TIMEOUT_MS: z.coerce.number().default(900_000),
     // AI bundle install watchdog. A wedged installer (dead download socket,
     // hung pip) otherwise holds the venv writer lock forever and blocks every
     // other install. STALL = max time with no progress frame before a kill;
@@ -200,6 +295,14 @@ const envSchema = z
           message: "OIDC_ISSUER_URL is required when OIDC_ENABLED=true",
           path: ["OIDC_ISSUER_URL"],
         });
+      } else if (!isHttpOrHttpsUrl(data.OIDC_ISSUER_URL)) {
+        // Plain http stays allowed for LAN and dev setups (#1879 warns at boot).
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "OIDC_ISSUER_URL must be an http(s) URL such as https://auth.example.com/realms/myrealm",
+          path: ["OIDC_ISSUER_URL"],
+        });
       }
       if (!data.OIDC_CLIENT_ID) {
         ctx.addIssue({
@@ -230,6 +333,20 @@ const envSchema = z
           message: "SAML_IDP_SSO_URL is required when SAML_ENABLED=true",
           path: ["SAML_IDP_SSO_URL"],
         });
+      } else if (!isHttpOrHttpsUrl(data.SAML_IDP_SSO_URL)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SAML_IDP_SSO_URL must be an http(s) URL such as https://idp.example.com/sso",
+          path: ["SAML_IDP_SSO_URL"],
+        });
+      }
+      if (data.SAML_CALLBACK_URL && !isHttpOrHttpsUrl(data.SAML_CALLBACK_URL)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "SAML_CALLBACK_URL must be an http(s) URL such as https://example.com/api/auth/saml/callback",
+          path: ["SAML_CALLBACK_URL"],
+        });
       }
       if (!data.SAML_IDP_CERTIFICATE) {
         ctx.addIssue({
@@ -252,7 +369,32 @@ const envSchema = z
     if ((data.OIDC_ENABLED || data.SAML_ENABLED) && data.EXTERNAL_URL) {
       let externalPath: string | null = null;
       try {
-        externalPath = new URL(data.EXTERNAL_URL).pathname.replace(/\/$/, "");
+        const url = new URL(data.EXTERNAL_URL);
+        if (url.username || url.password) {
+          // Credentials would be copied into every redirect_uri, ACS URL, and
+          // entity ID sent to the IdP (#1775).
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["EXTERNAL_URL"],
+            message:
+              "EXTERNAL_URL must not contain a username or password; use the public URL alone, such as https://example.com/snapotter",
+          });
+        } else if (
+          // A path appended after a query string or fragment never reaches the
+          // callback route, and an IdP can only redirect to http(s). The raw
+          // check also catches a bare trailing "?" or "#", which URL drops.
+          (url.protocol === "http:" || url.protocol === "https:") &&
+          !/[?#]/.test(data.EXTERNAL_URL)
+        ) {
+          externalPath = url.pathname.replace(/\/$/, "");
+        } else {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["EXTERNAL_URL"],
+            message:
+              "EXTERNAL_URL must be an http(s) URL with no query string or fragment, such as https://example.com/snapotter",
+          });
+        }
       } catch {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -302,16 +444,43 @@ const envSchema = z
 
 export type Env = z.infer<typeof envSchema>;
 
-export function loadEnv(): Env {
-  return envSchema.parse(process.env);
+export function loadEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
+  return envSchema.parse(rawEnv);
+}
+
+/**
+ * Log once at boot when SSO is on and EXTERNAL_URL was rewritten to its
+ * canonical form (#1876). Trailing slashes and surrounding whitespace are
+ * stripped either way (#1599), so only a change to the URL itself (uppercase
+ * scheme or host, an explicit :80/:443 default port, a backslash, dot
+ * segments, or an IDN host) warns. An IdP that registered the previous
+ * spelling from SP metadata or an allowlist needs the canonical URL, or
+ * SAML_ENTITY_ID pinned to the previous entity ID.
+ */
+export function warnIfExternalUrlCanonicalized(
+  log: { warn: (obj: Record<string, unknown>, msg: string) => void },
+  rawEnv: NodeJS.ProcessEnv = process.env,
+  parsedEnv: Pick<Env, "OIDC_ENABLED" | "SAML_ENABLED" | "EXTERNAL_URL"> = loadEnv(rawEnv),
+): void {
+  if (!parsedEnv.OIDC_ENABLED && !parsedEnv.SAML_ENABLED) return;
+  const configured = (rawEnv.EXTERNAL_URL ?? "").trim().replace(/\/+$/, "");
+  if (!configured || configured === parsedEnv.EXTERNAL_URL) return;
+  log.warn(
+    { configuredExternalUrl: configured, canonicalExternalUrl: parsedEnv.EXTERNAL_URL },
+    `EXTERNAL_URL "${configured}" was canonicalized to "${parsedEnv.EXTERNAL_URL}". SSO redirect URIs, SAML metadata, and post_logout_redirect_uri now use the canonical URL; update your identity provider or set SAML_ENTITY_ID="${configured}/api/auth/saml/metadata" to keep the previous SAML entity ID.`,
+  );
 }
 
 export function resolveConcurrency(env: Env): number {
-  if (env.CONCURRENT_JOBS > 0) return env.CONCURRENT_JOBS;
+  if (Number.isFinite(env.CONCURRENT_JOBS) && env.CONCURRENT_JOBS >= 1) {
+    return Math.floor(env.CONCURRENT_JOBS);
+  }
   return Math.max(2, availableParallelism() - 1);
 }
 
 export function resolveWorkerThreads(env: Env): number {
-  if (env.MAX_WORKER_THREADS > 0) return env.MAX_WORKER_THREADS;
+  if (Number.isFinite(env.MAX_WORKER_THREADS) && env.MAX_WORKER_THREADS >= 1) {
+    return Math.floor(env.MAX_WORKER_THREADS);
+  }
   return Math.max(2, availableParallelism() - 1);
 }

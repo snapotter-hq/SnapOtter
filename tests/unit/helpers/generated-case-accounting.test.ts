@@ -24,6 +24,21 @@ describe("isEngineUnavailableFailure", () => {
     },
   );
 
+  // The worker replaces a spawn failure with this fixed sentence and keeps the
+  // program name in the cause, so an async job's terminal payload has neither
+  // the binary name nor ENOENT in it. Without this, the lean docker lane fails
+  // the epub-convert cases instead of skipping them (#4099).
+  it("treats the worker's sanitized engine-unavailable payload as engine-unavailable", () => {
+    expect(
+      isEngineUnavailableFailure(
+        new Error(
+          "epub-convert: completed job job-1 returned a failure payload: " +
+            "Processing is unavailable on this server because a required engine binary could not be started.",
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it("keeps a real processing crash a failure", () => {
     expect(
       isEngineUnavailableFailure(new Error("pdfcpu exited with code 1: invalid page range")),

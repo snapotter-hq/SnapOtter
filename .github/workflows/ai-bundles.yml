@@ -9,6 +9,10 @@ on:
       release_commit:
         type: string
         required: true
+      verify_model_bundles:
+        description: Run every published model bundle against the unpublished release image
+        type: boolean
+        required: false
     secrets:
       GHCR_TOKEN:
         required: true
@@ -125,12 +129,45 @@ jobs:
             exit 1
           }
 
+  audit-ocr-release-locks:
+    name: Audit OCR runtime release locks
+    # build-ocr logs in to GHCR and builds the runtime that gets signed and
+    # shipped, so the lock audit can't run there: pip-audit and its
+    # dependencies are not hash-locked, and on that runner they could write
+    # $GITHUB_ENV or $GITHUB_PATH ahead of the GHCR_TOKEN and build steps
+    # (#1950). Jobs get fresh runners, so this one has no secrets and runs
+    # alongside preflight-gpu-runner. --strict fails the audit on any entry it
+    # cannot check (a URL pin, a package PyPI no longer lists) instead of
+    # skipping it.
+    timeout-minutes: 10
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the OCR runtime locks
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_commit }}
+          persist-credentials: false
+
+      - name: Set up pinned release Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.14"
+
+      - name: Audit exact OCR runtime dependency locks
+        run: |
+          python -m pip install --disable-pip-version-check "pip-audit==2.10.0"
+          pip-audit -r docker/ocr-runtime-requirements-amd64.txt --no-deps --disable-pip --aliases --strict
+          pip-audit -r docker/ocr-runtime-requirements-arm64.txt --no-deps --disable-pip --aliases --strict
+
   build-ocr:
     name: Build OCR (${{ matrix.target }})
     # Gated on preflight-gpu-runner: nothing here can be signed or published
     # without the NVIDIA verification, so spending 90 minutes building before
     # confirming that box is up only makes the failure slower and less obvious.
-    needs: [validate-inputs, preflight-gpu-runner]
+    needs: [validate-inputs, preflight-gpu-runner, audit-ocr-release-locks]
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -155,7 +192,7 @@ jobs:
           df -h /
 
       - name: Checkout release tag
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_commit }}
           fetch-depth: 0
@@ -173,26 +210,8 @@ jobs:
               exit 1
             }
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.11"
-
-      - name: Install pinned dependency auditor
-        run: pip install "pip-audit==2.10.0"
-
-      - name: Audit exact OCR runtime dependency lock
-        env:
-          TARGET: ${{ matrix.target }}
-        run: |
-          case "${TARGET}" in
-            linux-amd64-*) requirements="docker/ocr-runtime-requirements-amd64.txt" ;;
-            linux-arm64-*) requirements="docker/ocr-runtime-requirements-arm64.txt" ;;
-            *) echo "::error::Unknown OCR runtime target: ${TARGET}"; exit 1 ;;
-          esac
-          pip-audit -r "${requirements}" --no-deps --disable-pip --aliases
-
       - name: Download unpublished image digest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-${{ matrix.image_platform }}
           path: /tmp/image-digest
@@ -215,7 +234,7 @@ jobs:
           echo "SNAPOTTER_BUNDLE_IMAGE_DIGEST=${digest}" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -262,7 +281,7 @@ jobs:
           done
 
       - name: Upload OCR build artifact for verification
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ocr-${{ matrix.target }}
           overwrite: true
@@ -304,7 +323,7 @@ jobs:
           df -h /
 
       - name: Checkout release tag
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_commit }}
           fetch-depth: 0
@@ -323,7 +342,7 @@ jobs:
             }
 
       - name: Download unpublished image digest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-${{ matrix.image_platform }}
           path: /tmp/image-digest
@@ -345,7 +364,7 @@ jobs:
           echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -385,7 +404,7 @@ jobs:
           }
 
       - name: Download OCR build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ocr-${{ matrix.target }}
           path: /tmp/bundles
@@ -470,7 +489,7 @@ jobs:
           test -r "/tmp/ocr-quality/ocr-${TARGET}-native-cpu.quality.json"
 
       - name: Upload native OCR quality and resource report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ocr-quality-${{ matrix.target }}
           overwrite: true
@@ -630,7 +649,7 @@ jobs:
 
       - name: Upload per-target OCR security reports
         if: always() && steps.extract_runtime.outputs.ready == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ocr-security-${{ matrix.target }}
           overwrite: true
@@ -658,7 +677,7 @@ jobs:
           mkdir -p /tmp/image-digest /tmp/bundles /tmp/ocr-quality /tmp/snapotter-ocr-docker-config
 
       - name: Checkout release tag
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_commit }}
           fetch-depth: 0
@@ -683,7 +702,7 @@ jobs:
           docker info --format '{{json .Runtimes}}' | grep -q 'nvidia'
 
       - name: Download unpublished amd64 image digest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-linux-amd64
           path: /tmp/image-digest
@@ -703,14 +722,14 @@ jobs:
           echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Download amd64 OCR build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ocr-linux-amd64-cpu-py312
           path: /tmp/bundles
@@ -745,7 +764,7 @@ jobs:
           test -r /tmp/ocr-quality/ocr-linux-amd64-cpu-py312-nvidia-exposed-cpu.quality.json
 
       - name: Upload NVIDIA-exposed CPU OCR quality and resource report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ocr-quality-linux-amd64-cpu-py312-nvidia
           overwrite: true
@@ -770,7 +789,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout exact release tag for provenance verification
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_commit }}
           fetch-depth: 0
@@ -796,37 +815,62 @@ jobs:
           echo "SNAPOTTER_WORKFLOW_COMMIT=${WORKFLOW_COMMIT}" >> "$GITHUB_ENV"
 
       - name: Download exact amd64 release image digest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-linux-amd64
           path: /tmp/image-digests/linux-amd64
 
       - name: Download exact arm64 release image digest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-linux-arm64
           path: /tmp/image-digests/linux-arm64
 
-      - name: Download both verified OCR artifact sets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      # Exact artifact names, never a pattern (#1950). Every job in the run
+      # can upload an artifact, including the audit jobs running unhashed
+      # pip-audit, and a pattern with merge-multiple would let a planted
+      # artifact overwrite a real report before this job signs its hash.
+      - name: Download verified artifact ocr-linux-amd64-cpu-py312
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: ocr-linux-*-cpu-py*
+          name: ocr-linux-amd64-cpu-py312
           path: /tmp/ocr-artifacts
-          merge-multiple: true
 
-      - name: Download OCR security attestations
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - name: Download verified artifact ocr-linux-arm64-cpu-py311
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: ocr-security-*
-          path: /tmp/ocr-attestations
-          merge-multiple: true
+          name: ocr-linux-arm64-cpu-py311
+          path: /tmp/ocr-artifacts
 
-      - name: Download OCR quality and resource attestations
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - name: Download verified artifact ocr-security-linux-amd64-cpu-py312
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: ocr-quality-*
+          name: ocr-security-linux-amd64-cpu-py312
           path: /tmp/ocr-attestations
-          merge-multiple: true
+
+      - name: Download verified artifact ocr-security-linux-arm64-cpu-py311
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-security-linux-arm64-cpu-py311
+          path: /tmp/ocr-attestations
+
+      - name: Download verified artifact ocr-quality-linux-amd64-cpu-py312
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-quality-linux-amd64-cpu-py312
+          path: /tmp/ocr-attestations
+
+      - name: Download verified artifact ocr-quality-linux-arm64-cpu-py311
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-quality-linux-arm64-cpu-py311
+          path: /tmp/ocr-attestations
+
+      - name: Download verified artifact ocr-quality-linux-amd64-cpu-py312-nvidia
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-quality-linux-amd64-cpu-py312-nvidia
+          path: /tmp/ocr-attestations
 
       - name: Create canonical unsigned index and validate its archives
         env:
@@ -897,6 +941,31 @@ jobs:
                           "relativeTolerance=1%"
                       )
           # OCR_MEASURED_ESTIMATE_CONTRACT_END
+
+          # OCR_CANONICAL_NUMBER_CONTRACT_BEGIN
+          MAX_CANONICAL_INTEGER = 2**53 - 1
+
+          # The JS verifier (canonicalRuntimeJson) re-serializes the parsed index
+          # and can only reproduce integers within +/-(2**53 - 1): JSON.parse turns
+          # 1.0 into 1 and rounds bigger integers. A float or big integer here would
+          # sign an index that no install accepts (#1415).
+          def require_canonical_numbers(value, path="index"):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      require_canonical_numbers(item, f"{path}.{key}")
+              elif isinstance(value, (list, tuple)):
+                  for position, item in enumerate(value):
+                      require_canonical_numbers(item, f"{path}[{position}]")
+              elif isinstance(value, float) or (
+                  isinstance(value, int)
+                  and not isinstance(value, bool)
+                  and abs(value) > MAX_CANONICAL_INTEGER
+              ):
+                  raise SystemExit(
+                      f"OCR runtime index value {path} must be an integer within "
+                      f"+/-(2**53 - 1), got {value!r}"
+                  )
+          # OCR_CANONICAL_NUMBER_CONTRACT_END
 
           manifest_path = Path("docker/feature-manifest.json")
           try:
@@ -1118,6 +1187,7 @@ jobs:
               "schemaVersion": 1,
               "version": os.environ["VERSION"],
           }
+          require_canonical_numbers(index)
           (output / "ocr-runtime-index.unsigned.json").write_bytes(canonical(index))
           PY
 
@@ -1218,7 +1288,7 @@ jobs:
             /tmp/ocr-index/ocr-runtime-index.signature
 
       - name: Upload verified signed OCR metadata
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ocr-runtime-metadata
           overwrite: true
@@ -1247,13 +1317,13 @@ jobs:
       packages: read
     steps:
       - name: Download final signed OCR index
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ocr-runtime-metadata
           path: /tmp/ocr-index
 
       - name: Download exact unpublished image digest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-${{ matrix.image_platform }}
           path: /tmp/image-digest
@@ -1275,7 +1345,7 @@ jobs:
           echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -1325,13 +1395,45 @@ jobs:
               process.stdout.write(`PASS: image-baked trust verified ${target} for ${version}\n`);
             '
 
+  audit-hf-release-lock:
+    name: Audit hf CLI release lock
+    # CI's required audit only runs when a PR does, so an advisory published
+    # against an unchanged docker/hf-release-requirements.txt would otherwise
+    # reach a release that installs it in the job holding the HuggingFace write
+    # token (#1838). This is its own job, with no secrets, because pip-audit and
+    # its dependencies are not hash-locked: on the publish runner they could
+    # write $GITHUB_ENV, $GITHUB_PATH or the lock itself ahead of the token
+    # steps. --strict fails the audit on any entry it cannot check (a URL pin,
+    # a package PyPI no longer lists) instead of skipping it.
+    timeout-minutes: 10
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the release lock
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_commit }}
+          persist-credentials: false
+
+      - name: Set up pinned release Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.14"
+
+      - name: Audit hash-locked hf CLI lock
+        run: |
+          python -m pip install --disable-pip-version-check "pip-audit==2.10.0"
+          pip-audit -r docker/hf-release-requirements.txt --no-deps --disable-pip --aliases --strict
+
   publish:
     name: Publish verified bundles to HuggingFace
     # Uploads the full v3 set to HuggingFace and then re-downloads and hashes
     # every published object. Untimed, a stalled transfer burns the 360 minute
     # default before anyone notices.
     timeout-minutes: 60
-    needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index]
+    needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index, audit-hf-release-lock]
     # Hugging Face exposes one repository-wide branch head. Keep expensive
     # builds parallel across releases, then serialize only the short CAS write
     # boundary so two versions cannot race the shared `main` revision.
@@ -1343,7 +1445,7 @@ jobs:
       contents: read
     steps:
       - name: Check out hash-locked release tooling
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_commit }}
           fetch-depth: 0
@@ -1362,14 +1464,62 @@ jobs:
             }
 
       - name: Set up pinned release Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.14"
 
-      - name: Download all verified build and metadata artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      # One exact artifact per step, never the whole run (#1950). Every job in
+      # the run holds ACTIONS_RUNTIME_TOKEN and can upload an artifact, and the
+      # audit jobs run unhashed pip-audit, so an unscoped download would pull in
+      # anything they planted. The closure check below would ignore or reject
+      # it; naming each artifact keeps it from reaching this runner at all.
+      - name: Download verified artifact ocr-linux-amd64-cpu-py312
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          path: /tmp/artifacts
+          name: ocr-linux-amd64-cpu-py312
+          path: /tmp/artifacts/ocr-linux-amd64-cpu-py312
+
+      - name: Download verified artifact ocr-linux-arm64-cpu-py311
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-linux-arm64-cpu-py311
+          path: /tmp/artifacts/ocr-linux-arm64-cpu-py311
+
+      - name: Download verified artifact ocr-security-linux-amd64-cpu-py312
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-security-linux-amd64-cpu-py312
+          path: /tmp/artifacts/ocr-security-linux-amd64-cpu-py312
+
+      - name: Download verified artifact ocr-security-linux-arm64-cpu-py311
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-security-linux-arm64-cpu-py311
+          path: /tmp/artifacts/ocr-security-linux-arm64-cpu-py311
+
+      - name: Download verified artifact ocr-quality-linux-amd64-cpu-py312
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-quality-linux-amd64-cpu-py312
+          path: /tmp/artifacts/ocr-quality-linux-amd64-cpu-py312
+
+      - name: Download verified artifact ocr-quality-linux-arm64-cpu-py311
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-quality-linux-arm64-cpu-py311
+          path: /tmp/artifacts/ocr-quality-linux-arm64-cpu-py311
+
+      - name: Download verified artifact ocr-quality-linux-amd64-cpu-py312-nvidia
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-quality-linux-amd64-cpu-py312-nvidia
+          path: /tmp/artifacts/ocr-quality-linux-amd64-cpu-py312-nvidia
+
+      - name: Download verified artifact ocr-runtime-metadata
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ocr-runtime-metadata
+          path: /tmp/artifacts/ocr-runtime-metadata
 
       - name: Install hash-locked hf CLI
         run: |
@@ -2060,6 +2210,123 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: echo "Verified immutable existing bundle release v${VERSION}; upload skipped"
 
+  verify-model-bundles:
+    name: Verify model bundles (${{ matrix.arch }})
+    # Opt-in: release.yml does not pass verify_model_bundles yet, and publish does
+    # not depend on this job, so it cannot affect a release until the owner wires it.
+    needs: [validate-inputs, build-ocr]
+    if: inputs.verify_model_bundles
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64-gpu
+            image_platform: linux-amd64
+            runner: ubuntu-latest
+          - arch: arm64-cpu
+            image_platform: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo docker system prune -af
+          df -h /
+
+      - name: Checkout release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Download unpublished image digest
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: digests-${{ matrix.image_platform }}
+          path: /tmp/image-digest
+
+      - name: Resolve exact release image
+        env:
+          IMAGE_PLATFORM: ${{ matrix.image_platform }}
+        run: |
+          mapfile -t digest_files < <(find /tmp/image-digest -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one ${IMAGE_PLATFORM} image digest"
+            exit 1
+          }
+          digest="$(basename "${digest_files[0]}")"
+          [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid image digest artifact"
+            exit 1
+          }
+          echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      # Install every published model bundle into the exact unpublished release
+      # image and run its tool against a fixture, asserting the real output oracle
+      # (not a hardcoded import list). One bundle at a time so a runner's disk holds
+      # only a single multi-GB archive. Offline (`--network none`) so a bundle can
+      # never mask a missing dependency with a runtime download. The OCR bundle is
+      # excluded -- it has its own signed v3 runtime pipeline above.
+      - name: Run each published model bundle against the release image
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          manifest=docker/feature-manifest.json
+          bundle_repo="$(jq -r '.bundleRepo // "deepsafe/feature-bundles"' "$manifest")"
+          # Explicit list: the verifier has an oracle per bundle. ocr is excluded.
+          bundles=(background-removal face-detection object-eraser-colorize upscale-enhance photo-restoration transcription inpaint-hq)
+          for bundle in "${bundles[@]}"; do
+            jq -e --arg b "$bundle" '.bundles[$b]' "$manifest" >/dev/null || { echo "::error::${bundle} missing from manifest"; exit 1; }
+          done
+          mkdir -p /tmp/mb
+          for bundle in "${bundles[@]}"; do
+            echo "::group::verify ${bundle} (${ARCH})"
+            file="$(jq -r --arg b "$bundle" --arg a "$ARCH" '.bundles[$b].archives[$a].file' "$manifest")"
+            sha="$(jq -r --arg b "$bundle" --arg a "$ARCH" '.bundles[$b].archives[$a].sha256' "$manifest")"
+            [[ "$file" != "null" && "$sha" =~ ^[a-f0-9]{64}$ ]] || { echo "::error::missing ${ARCH} archive for ${bundle}"; exit 1; }
+            tar="/tmp/mb/${bundle}-${ARCH}.tar.gz"
+            curl --fail --location --show-error --silent --proto '=https' --tlsv1.2 --retry 3 \
+              -o "$tar" "https://huggingface.co/${bundle_repo}/resolve/main/${file}"
+            echo "${sha}  ${tar}" | sha256sum --check --strict -
+            printf '%s\n' "$sha" > "${tar}.sha256"
+            docker run --rm --network none --entrypoint bash \
+              -v "$PWD/docker/verify-model-bundle-runtime.sh:/verify-model-bundle-runtime.sh:ro" \
+              -v "/tmp/mb:/bundles:ro" \
+              -v "$PWD/tests/fixtures:/fixtures:ro" \
+              "${SNAPOTTER_BUNDLE_IMAGE}" \
+              /verify-model-bundle-runtime.sh "${bundle}" "${ARCH}"
+            rm -f "$tar" "${tar}.sha256"
+            echo "::endgroup::"
+          done
+          echo "All ${#bundles[@]} model bundles ran correctly against the release image for ${ARCH}"
+
   installed-ai-production:
     name: Verify installed AI in production image
     runs-on: ubuntu-latest
@@ -2147,14 +2414,14 @@ jobs:
 
       - name: Download current release amd64 digest
         if: inputs.release_commit != ''
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-linux-amd64
           path: ${{ runner.temp }}/installed-ai-digest
 
       - name: Download historical release amd64 digest
         if: inputs.release_commit == ''
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: digests-linux-amd64
           path: ${{ runner.temp }}/installed-ai-digest
@@ -2215,7 +2482,7 @@ jobs:
           sudo df -h "${docker_root_dir}"
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -2259,7 +2526,7 @@ jobs:
           echo "source_commit=${source_commit}" >> "${GITHUB_OUTPUT}"
 
       - name: Checkout the immutable QA harness revision
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
           fetch-depth: 1

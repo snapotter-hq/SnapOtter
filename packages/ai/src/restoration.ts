@@ -16,6 +16,7 @@ export interface RestorePhotoOptions {
   denoiseStrength?: number;
   colorize?: boolean;
   colorizeStrength?: number;
+  signal?: AbortSignal;
 }
 
 export interface RestorePhotoResult {
@@ -38,12 +39,13 @@ export async function restorePhoto(
   const inputPath = join(outputDir, "input_restore.png");
   const outputPath = join(outputDir, "output_restore.png");
 
+  const { signal, ...sidecarOptions } = options;
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
   await writeFile(inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "restore.py",
-    [inputPath, outputPath, JSON.stringify(options)],
-    { onProgress },
+    [inputPath, outputPath, JSON.stringify(sidecarOptions)],
+    { onProgress, signal },
   );
 
   const result = parseStdoutJson(stdout);

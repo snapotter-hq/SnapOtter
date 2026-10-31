@@ -1,6 +1,6 @@
 ---
 description: "將一張或多張圖片合併為 PDF 文件，並提供頁面尺寸、方向與目標檔案大小選項。"
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 0cc07a4a39ea
 ---

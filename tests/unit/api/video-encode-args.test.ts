@@ -1,7 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { videoEncodeArgsForContainer } from "../../../apps/api/src/lib/media-tool.js";
+import {
+  mp4TimescaleArgs,
+  videoEncodeArgsForContainer,
+} from "../../../apps/api/src/lib/media-tool.js";
 import { setEncoderInventoryForTests } from "../../../packages/media-engine/src/encoders.js";
 
 /**
@@ -32,6 +35,8 @@ const WITH_NVENC = new Set([
   "h264_nvenc",
   "hevc_nvenc",
   "av1_nvenc",
+  "h264_vaapi",
+  "hevc_vaapi",
 ]);
 
 describe("videoEncodeArgsForContainer", () => {
@@ -47,6 +52,8 @@ describe("videoEncodeArgsForContainer", () => {
       "medium",
       "-pix_fmt",
       "yuv420p",
+      "-video_track_timescale",
+      "90000",
     ]);
   });
 
@@ -69,12 +76,61 @@ describe("videoEncodeArgsForContainer", () => {
     ]);
   });
 
+  it("switches to VAAPI rate control and drops -pix_fmt yuv420p when h264_vaapi is resolved (#3977)", () => {
+    setEncoderInventoryForTests(WITH_NVENC);
+    process.env.SNAPOTTER_HW_ACCEL = "vaapi";
+    expect(videoEncodeArgsForContainer(".mp4")).toEqual([
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+      "-video_track_timescale",
+      "90000",
+    ]);
+    expect(videoEncodeArgsForContainer(".mkv")).toEqual([
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+    ]);
+  });
+
   it("leaves the VP9 and Theora branches alone", () => {
     setEncoderInventoryForTests(WITH_NVENC);
     process.env.SNAPOTTER_HW_ACCEL = "nvenc";
     // Neither has a hardware mapping, so their software flags are correct.
     expect(videoEncodeArgsForContainer(".webm")).toContain("-crf");
     expect(videoEncodeArgsForContainer(".ogv")).toEqual(["-c:v", "libtheora", "-q:v", "7"]);
+  });
+});
+
+/**
+ * #2426: without a fixed timescale ffmpeg derives the mp4/mov track timescale
+ * from the source's avg_frame_rate, and a long gap between frames in a VFR
+ * screen recording overflows the 32-bit stts sample delta.
+ */
+describe("mp4TimescaleArgs", () => {
+  it("pins the video track timescale for mp4, m4v and mov outputs", () => {
+    for (const ext of [".mp4", ".m4v", ".mov", ".MOV"]) {
+      expect(mp4TimescaleArgs(ext)).toEqual(["-video_track_timescale", "90000"]);
+    }
+  });
+
+  it("adds nothing for containers without the mov muxer", () => {
+    for (const ext of [".mkv", ".webm", ".avi", ".ts", ".ogv", ".mpg", ".3gp", ".3g2"]) {
+      expect(mp4TimescaleArgs(ext)).toEqual([]);
+    }
+  });
+
+  it("is part of the H.264 encode args only for mp4-family containers", () => {
+    setEncoderInventoryForTests(WITH_NVENC);
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    expect(videoEncodeArgsForContainer(".mov")).toContain("-video_track_timescale");
+    expect(videoEncodeArgsForContainer(".mkv")).not.toContain("-video_track_timescale");
   });
 });
 
@@ -100,6 +156,25 @@ describe("no API code resolves a rate-controlled video encoder by hand", () => {
     const offenders = files.filter((file) =>
       /resolveEncoder\("(h264|hevc|av1)"\)/.test(readFileSync(file, "utf8")),
     );
+    expect(offenders.map((file) => file.slice(root.length + 1))).toEqual([]);
+  });
+
+  it("delegates preserved-container video encoding to videoEncodeArgsForContainer", () => {
+    const offenders = files.filter(
+      (file) =>
+        !file.endsWith("media-tool.ts") &&
+        (/function codecForContainer\b/.test(readFileSync(file, "utf8")) ||
+          /resolveEncoder\("theora"\)/.test(readFileSync(file, "utf8"))),
+    );
+    expect(offenders.map((file) => file.slice(root.length + 1))).toEqual([]);
+  });
+
+  it("threads every route calling videoCodecArgs through withVaapiEncodeArgs (#3977)", () => {
+    const offenders = files.filter((file) => {
+      if (file.endsWith("media-tool.ts")) return false;
+      const src = readFileSync(file, "utf8");
+      return src.includes("videoCodecArgs(") && !src.includes("withVaapiEncodeArgs(");
+    });
     expect(offenders.map((file) => file.slice(root.length + 1))).toEqual([]);
   });
 });

@@ -1,14 +1,21 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  bufferRenderError,
+  discardEarlyErrors,
   flushEarlyErrors,
   resetEarlyErrorsForTests,
   startEarlyErrorCapture,
 } from "../../../apps/web/src/lib/early-errors.js";
 
-const h = vi.hoisted(() => ({ captureException: vi.fn(), client: {} as object | undefined }));
+const h = vi.hoisted(() => ({
+  captureException: vi.fn(),
+  captureReactException: vi.fn(),
+  client: {} as object | undefined,
+}));
 vi.mock("@sentry/react", () => ({
   captureException: h.captureException,
+  captureReactException: h.captureReactException,
   getClient: () => h.client,
 }));
 
@@ -52,5 +59,35 @@ describe("early error buffer", () => {
     await flushEarlyErrors();
 
     expect(h.captureException).not.toHaveBeenCalled();
+  });
+
+  it("replays a boundary-caught render crash with React's component stack", async () => {
+    const error = new Error("first paint");
+    const errorInfo = { componentStack: "\n    at ToolPage" };
+    bufferRenderError(error, errorInfo);
+
+    await flushEarlyErrors();
+
+    expect(h.captureReactException).toHaveBeenCalledWith(error, errorInfo);
+    expect(h.captureException).not.toHaveBeenCalled();
+  });
+
+  it("discards a buffered render crash when telemetry is off", async () => {
+    bufferRenderError(new Error("opted out"), { componentStack: "\n    at ToolPage" });
+
+    discardEarlyErrors();
+    await flushEarlyErrors();
+
+    expect(h.captureReactException).not.toHaveBeenCalled();
+  });
+
+  it("does not replay an in-flight flush after an opt-out", async () => {
+    bufferRenderError(new Error("just before opt-out"), { componentStack: "\n    at ToolPage" });
+
+    const flushing = flushEarlyErrors();
+    discardEarlyErrors();
+    await flushing;
+
+    expect(h.captureReactException).not.toHaveBeenCalled();
   });
 });

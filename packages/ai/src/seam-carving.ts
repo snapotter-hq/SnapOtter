@@ -3,9 +3,16 @@ import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { SafeError, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 
 const execFileAsync = promisify(execFile);
+
+function formatExceededMp(actual: number, limit: number): string {
+  const oneDec = actual.toFixed(1);
+  if (Number(oneDec) > limit) return oneDec;
+  return Math.max(limit + 0.01, Math.round(actual * 100) / 100).toFixed(2);
+}
 
 export interface SeamCarveOptions {
   width?: number;
@@ -22,29 +29,41 @@ export interface SeamCarveResult {
   height: number;
 }
 
+const CAIRE_UNAVAILABLE_MESSAGE =
+  "caire binary not found. Install via: go install github.com/esimov/caire/cmd/caire@v1.5.0";
+
 /**
  * Discover the caire binary. Checks PATH (Docker installs to /usr/local/bin)
  * and the CAIRE_PATH env var for local development.
  */
 let cachedCairePath: string | null = null;
+let cachedCaireEnvKey: string | null = null;
 
 async function findCaire(): Promise<string> {
-  if (cachedCairePath) return cachedCairePath;
+  const envKey = `${process.env.CAIRE_PATH ?? ""}\0${process.env.PATH ?? ""}`;
+  if (cachedCairePath && cachedCaireEnvKey === envKey) return cachedCairePath;
+  cachedCairePath = null;
+  cachedCaireEnvKey = null;
 
   const candidates = process.env.CAIRE_PATH ? [process.env.CAIRE_PATH, "caire"] : ["caire"];
 
+  let firstErr: unknown;
   for (const cmd of candidates) {
     try {
       await execFileAsync(cmd, ["-help"], { timeout: 5_000 });
       cachedCairePath = cmd;
+      cachedCaireEnvKey = envKey;
       return cmd;
-    } catch {
-      // try next
+    } catch (err) {
+      firstErr ??= err;
     }
   }
-  throw new Error(
-    "caire binary not found. Install via: go install github.com/esimov/caire/cmd/caire@v1.5.0",
-  );
+  throw new SafeError(CAIRE_UNAVAILABLE_MESSAGE, {
+    kind: "operational",
+    code: "ENGINE_UNAVAILABLE",
+    statusCode: 503,
+    cause: firstErr,
+  });
 }
 
 /**
@@ -58,7 +77,6 @@ export async function seamCarve(
   outputDir: string,
   options: SeamCarveOptions = {},
 ): Promise<SeamCarveResult> {
-  const cairePath = await findCaire();
   const id = randomUUID();
   const inputPath = join(outputDir, `caire-in-${id}.jpg`);
   const outputPath = join(outputDir, `caire-out-${id}.png`);
@@ -71,8 +89,8 @@ export async function seamCarve(
 
     const MAX_MP = 25;
     if (megapixels > MAX_MP) {
-      throw new Error(
-        `Image is too large for content-aware resize (${megapixels.toFixed(1)} MP, max ${MAX_MP} MP). Resize the image to a smaller size first.`,
+      throw new ToolInputError(
+        `Image is too large for content-aware resize (${formatExceededMp(megapixels, MAX_MP)} MP, max ${MAX_MP} MP). Resize the image to a smaller size first.`,
       );
     }
 
@@ -83,6 +101,23 @@ export async function seamCarve(
       const shortest = Math.min(options.width ?? width, options.height ?? height, width, height);
       targetW = shortest;
       targetH = shortest;
+    }
+
+    const MAX_PIXELS = MAX_MP * 1_000_000;
+    if (targetW * targetH > MAX_PIXELS) {
+      throw new ToolInputError(
+        `Target size ${targetW} x ${targetH} is over the ${MAX_PIXELS} pixel (${MAX_MP} MP) limit for content-aware resize`,
+      );
+    }
+
+    const MAX_ENLARGE_RATIO = 2;
+    if (
+      (width > 0 && targetW > width * MAX_ENLARGE_RATIO) ||
+      (height > 0 && targetH > height * MAX_ENLARGE_RATIO)
+    ) {
+      throw new ToolInputError(
+        `Content-aware resize can enlarge each side by at most ${MAX_ENLARGE_RATIO}x (requested ${targetW} x ${targetH} from ${width} x ${height})`,
+      );
     }
 
     const wRatio = targetW / width;
@@ -106,6 +141,7 @@ export async function seamCarve(
     }
 
     const processBuffer = await sharp(preResizedBuffer).jpeg({ quality: 95 }).toBuffer();
+    const cairePath = await findCaire();
 
     await writeFile(inputPath, processBuffer);
 
@@ -137,10 +173,20 @@ export async function seamCarve(
       // Replace the raw caire terminal output (ANSI/spinner control chars) with
       // an actionable message; keep the original as `cause` for server logs.
       if ((err as { killed?: boolean }).killed) {
-        throw new Error(
+        throw new SafeError(
           "Content-aware resize timed out on this image. Try a smaller image or a larger target size.",
-          { cause: err },
+          { kind: "operational", code: "PROCESSING_TIMEOUT", statusCode: 422, cause: err },
         );
+      }
+      if ((err as NodeJS.ErrnoException).syscall?.startsWith("spawn")) {
+        cachedCairePath = null;
+        cachedCaireEnvKey = null;
+        throw new SafeError(CAIRE_UNAVAILABLE_MESSAGE, {
+          kind: "operational",
+          code: "ENGINE_UNAVAILABLE",
+          statusCode: 503,
+          cause: err,
+        });
       }
       throw err;
     }

@@ -13,6 +13,8 @@ import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart
 import { findMissingGeneratedPrerequisite } from "../../helpers/run-generated-tool.js";
 import {
   defaultSettingsFor,
+  PAIRWISE_SETTINGS_OVERRIDES,
+  pairwiseSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
 } from "../../helpers/tool-default-settings.js";
 import { waitForGeneratedJobArtifact } from "../settle-job.js";
@@ -103,11 +105,11 @@ export function registerToolFormatMatrix(part: number): void {
     beforeAll(async () => {
       testApp = await buildTestApp();
       adminToken = await loginAsAdmin(testApp.app);
-    }, 30_000);
+    });
 
     afterAll(async () => {
       await testApp.cleanup();
-    }, 10_000);
+    });
 
     // Registry-wide assertions, not per-tool ones, so one part carries them.
     if (part === 1) {
@@ -115,6 +117,11 @@ export function registerToolFormatMatrix(part: number): void {
         const registered = new Set(getRegisteredToolIds());
         for (const toolId of Object.keys(TOOL_SETTINGS_OVERRIDES)) {
           expect(registered.has(toolId), `override for unknown tool "${toolId}"`).toBe(true);
+        }
+        for (const toolId of Object.keys(PAIRWISE_SETTINGS_OVERRIDES)) {
+          expect(registered.has(toolId), `pairwise override for unknown tool "${toolId}"`).toBe(
+            true,
+          );
         }
       });
 
@@ -129,10 +136,16 @@ export function registerToolFormatMatrix(part: number): void {
               `${toolId}: ${result.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`,
             );
           }
+          const pairwiseResult = config.settingsSchema.safeParse(pairwiseSettingsFor(toolId));
+          if (!pairwiseResult.success) {
+            invalid.push(
+              `${toolId} (pairwise): ${pairwiseResult.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`,
+            );
+          }
         }
         expect(
           invalid,
-          `tools needing TOOL_SETTINGS_OVERRIDES entries:\n${invalid.join("\n")}`,
+          `tools with invalid TOOL_SETTINGS_OVERRIDES or PAIRWISE_SETTINGS_OVERRIDES entries:\n${invalid.join("\n")}`,
         ).toEqual([]);
       });
     }

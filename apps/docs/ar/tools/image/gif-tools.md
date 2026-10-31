@@ -1,8 +1,8 @@
 ---
 description: "إعادة تحجيم وتحسين وتغيير السرعة وعكس وتدوير واستخراج إطارات من صور GIF المتحركة في أداة واحدة."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: fe96d3fe5525
+i18n_output_hash: aa8648761a25
 ---
 
 # أدوات GIF {#gif-tools}
@@ -34,7 +34,7 @@ i18n_output_hash: fe96d3fe5525
 
 | المعامل | النوع | مطلوب | الافتراضي | الوصف |
 |-----------|------|----------|---------|-------------|
-| colors | number | لا | 256 | الحد الأقصى لعدد الألوان في اللوحة (2 إلى 256) |
+| colors | number | لا | 256 | الحد الأقصى لعدد الألوان في اللوحة (2، 4، 16، أو 256) |
 | dither | number | لا | 1.0 | قوة التوزيع اللوني (0 إلى 1، حيث 0 يعطّل التوزيع اللوني) |
 | effort | number | لا | 7 | مستوى جهد التحسين (1 إلى 10، أعلى = أبطأ لكن أصغر) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### التسريع {#speed-up}

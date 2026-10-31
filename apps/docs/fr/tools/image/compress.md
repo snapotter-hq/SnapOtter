@@ -1,6 +1,6 @@
 ---
 description: "Réduisez la taille du fichier image par niveau de qualité ou vers une taille de fichier cible."
-i18n_source_hash: 342c5cf1f864
+i18n_source_hash: e1cc52597983
 i18n_provenance: human
 i18n_output_hash: 2b5f8ab95198
 ---

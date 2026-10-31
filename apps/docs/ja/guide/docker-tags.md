@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter の Docker イメージタグ、GPU ベンチマーク、バージョン固定、および AMD64 と ARM64 のマルチプラットフォーム対応。"
-i18n_source_hash: 566e20ca07fc
+i18n_source_hash: 7a040f010e63
 i18n_provenance: human
 i18n_output_hash: fb77086402fb
 i18n_hash_version: 2

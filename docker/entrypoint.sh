@@ -40,7 +40,7 @@ resolve_file_env() {
   fi
 
   # Command substitution strips trailing newlines (standard for secret files)
-  export "$var"="$(cat "$file_path")"
+  export "$var"="$(tr -d '\r' < "$file_path")"
   unset "$file_var"
 }
 

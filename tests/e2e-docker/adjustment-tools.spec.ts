@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { inflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
 
 // ─── Adjustment Tools ───────────────────────────────────────────────
@@ -28,6 +29,55 @@ const PNG_200x150 = fixture("test-200x150.png");
 const JPG_100x100 = fixture("test-100x100.jpg");
 const JPG_WITH_EXIF = fixture("test-with-exif.jpg");
 const JPG_SAMPLE = readFileSync(join(FORMATS, "sample.jpg"));
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function readFirstPngPixelRgb(png: Buffer): [number, number, number] {
+  if (png.length < 33 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw new Error("Expected a valid PNG buffer");
+  }
+  const idatChunks: Buffer[] = [];
+  let sawIhdr = false;
+  let offset = 8;
+  while (offset + 8 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (dataEnd + 4 > png.length) {
+      throw new Error(`Truncated PNG chunk: ${type}`);
+    }
+    if (type === "IHDR") {
+      if (length < 13) {
+        throw new Error("Truncated PNG IHDR chunk");
+      }
+      const bitDepth = png[dataStart + 8];
+      const colorType = png[dataStart + 9];
+      const interlace = png[dataStart + 12];
+      if (bitDepth !== 8 || (colorType !== 2 && colorType !== 6) || interlace !== 0) {
+        throw new Error(
+          `Unsupported PNG layout for first-pixel RGB read: bitDepth=${bitDepth} colorType=${colorType} interlace=${interlace}`,
+        );
+      }
+      sawIhdr = true;
+    } else if (type === "IDAT") {
+      idatChunks.push(png.subarray(dataStart, dataEnd));
+    } else if (type === "IEND") {
+      break;
+    }
+    offset = dataEnd + 4;
+  }
+  if (!sawIhdr || idatChunks.length === 0) {
+    throw new Error("PNG buffer is missing IHDR or IDAT chunks");
+  }
+  const raw = inflateSync(Buffer.concat(idatChunks));
+  if (raw.length < 4) {
+    throw new Error("Inflated PNG scanline is shorter than 1 RGB pixel");
+  }
+  if (raw[0] > 4) {
+    throw new Error(`Unexpected PNG row 0 filter type: ${raw[0]}`);
+  }
+  return [raw[1], raw[2], raw[3]];
+}
 
 // ─── Color Adjustments ──────────────────────────────────────────────
 
@@ -77,12 +127,20 @@ test.describe("Color Adjustments", () => {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
-        settings: JSON.stringify({ grayscale: true }),
+        settings: JSON.stringify({ effect: "grayscale" }),
       },
     });
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await dlRes.body()));
+    expect(r).toBe(150);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
   });
 
   test("multiple adjustments at once", async ({ request }) => {
@@ -152,14 +210,14 @@ test.describe("Sharpening", () => {
 // ─── Replace Color ──────────────────────────────────────────────────
 
 test.describe("Replace Color", () => {
-  test("replace white with black", async ({ request }) => {
+  test("replace orange with black", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
-          targetColor: "#ffffff",
-          replacementColor: "#000000",
+          sourceColor: "#ff6432",
+          targetColor: "#000000",
           tolerance: 30,
         }),
       },
@@ -168,6 +226,12 @@ test.describe("Replace Color", () => {
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
     expect(body.processedSize).toBeGreaterThan(0);
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const buffer = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(buffer)).toEqual([0, 0, 0]);
   });
 
   test("replace with low tolerance", async ({ request }) => {
@@ -176,8 +240,8 @@ test.describe("Replace Color", () => {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
-          targetColor: "#ff0000",
-          replacementColor: "#00ff00",
+          sourceColor: "#ff6432",
+          targetColor: "#00ff00",
           tolerance: 5,
         }),
       },
@@ -185,6 +249,12 @@ test.describe("Replace Color", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const buffer = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(buffer)).toEqual([0, 255, 0]);
   });
 
   test("replace with high tolerance", async ({ request }) => {
@@ -193,8 +263,8 @@ test.describe("Replace Color", () => {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({
-          targetColor: "#808080",
-          replacementColor: "#0000ff",
+          sourceColor: "#00ff01",
+          targetColor: "#0000ff",
           tolerance: 80,
         }),
       },
@@ -202,6 +272,28 @@ test.describe("Replace Color", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const jpgBuffer = Buffer.from(await dlRes.body());
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "replaced.jpg", mimeType: "image/jpeg", buffer: jpgBuffer },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeLessThan(10);
+    expect(g).toBeLessThan(10);
+    expect(b).toBeGreaterThan(240);
   });
 });
 
@@ -360,7 +452,7 @@ test.describe("Image Enhancement", () => {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
-        settings: JSON.stringify({ preset: "auto" }),
+        settings: JSON.stringify({ mode: "auto" }),
       },
     });
     expect(res.ok()).toBe(true);
@@ -369,17 +461,44 @@ test.describe("Image Enhancement", () => {
     expect(body.processedSize).toBeGreaterThan(0);
   });
 
-  test("vivid enhancement preset", async ({ request }) => {
+  test("landscape enhancement mode", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/image-enhancement", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
-        settings: JSON.stringify({ preset: "vivid" }),
+        settings: JSON.stringify({ mode: "landscape" }),
       },
     });
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "enhanced.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThanOrEqual(95);
+    expect(r).toBeLessThanOrEqual(115);
+    expect(g).toBeGreaterThan(245);
+    expect(b).toBeGreaterThanOrEqual(65);
+    expect(b).toBeLessThanOrEqual(85);
   });
 
   test("enhancement changes the image", async ({ request }) => {
@@ -387,7 +506,7 @@ test.describe("Image Enhancement", () => {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
-        settings: JSON.stringify({ preset: "auto" }),
+        settings: JSON.stringify({ mode: "auto" }),
       },
     });
     expect(res.ok()).toBe(true);

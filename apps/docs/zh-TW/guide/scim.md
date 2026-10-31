@@ -1,8 +1,8 @@
 ---
 description: "設定 SCIM 2.0 佈建，將使用者與群組從您的身分提供者同步至 SnapOtter。涵蓋 Okta、Azure AD / Entra ID 以及自訂整合。"
-i18n_source_hash: 06ee702b386e
+i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: da12b859e973
+i18n_output_hash: f7021938ee6c
 i18n_hash_version: 2
 ---
 
@@ -301,3 +301,61 @@ IdP 每分鐘傳送超過 1000 個請求。這通常在大型初始同步期間�
 ### 使用者已解除佈建但未從 UI 移除 {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE 是軟停用。已停用的使用者仍會以停用狀態顯示在管理員使用者清單中。這是刻意的設計，以便保留他們的資料。他們的角色會顯示為 `disabled:<original-role>`。
+
+### `externalId` 篩選找不到使用 OIDC 或 SAML 登入的使用者 {#recover-scim-ids-in-oidc-or-saml-users}
+
+在 SCIM 的 `externalId` 擁有自己的欄位（`users.scim_external_id`）之前，對已經由 OIDC 或 SAML 登入連結的使用者執行 SCIM `PUT` 或 `PATCH`，會把 SCIM id 寫進該使用者的登入身分。升級移轉無法分辨該值與真正的 OIDC subject 或 SAML NameID，因此會略過這些使用者。對他們來說，`filter=externalId eq "..."` 會傳回空結果，直到 IdP 送出另一次帶有 `externalId` 的更新。
+
+如果你不想等 IdP，稽核日誌可以為該 id 作證。SCIM 會寫入一筆 `SCIM_USER_PROVISIONED` 記錄，內含它建立每位使用者時所用的 `externalId`。一旦你執行的是含有 `scim_external_id` 欄位的版本，請對 SnapOtter 資料庫開啟 `psql`（[帳號復原指南](./account-recovery.md#older-images-and-fallbacks) 說明了兩種設定各自的做法），並預覽登入身分仍等於該 id 的使用者：
+
+```sql
+SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
+FROM users u
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  );
+```
+
+如果清單看起來正確，就把 id 複製到 SCIM 欄位。請在 `BEGIN;` 內執行，並在 `COMMIT;` 之前檢查傳回的資料列：
+
+```sql
+UPDATE users u
+SET scim_external_id = u.external_id, updated_at = now()
+WHERE u.auth_provider IN ('oidc', 'saml')
+  AND u.scim_external_id IS NULL
+  AND btrim(u.external_id) <> ''
+  AND EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.action = 'SCIM_USER_PROVISIONED'
+      AND a.details->>'userId' = u.id
+      AND a.details->>'externalId' = u.external_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
+```
+
+第二次執行不會比對到任何資料。更新會讓 `external_id` 保持原樣，因為某些 IdP（Okta 是其中之一）會把同一個 id 同時作為 OIDC 的 `sub` 與 SCIM 的 `externalId` 送出，對這些 IdP 而言清除它會破壞 OIDC 登入。若某位使用者的 `external_id` 確實是那個誤植的 SCIM id，它本來就已經無法通過 subject 比對。開啟 `OIDC_AUTO_LINK_USERS`（或 `SAML_AUTO_LINK_USERS`）時，他們下一次以已驗證的電子郵件登入時，無論如何都會重新連結。
+
+有些使用者仍無法觸及，要等 IdP 下一次更新才會重新取得該 id：
+
+- 登入連結取代了 SCIM id、之後又沒有收到任何 SCIM 寫入的使用者，因為他們的 `external_id` 已不再符合稽核記錄
+- 佈建記錄已被稽核保留期限清除的使用者
+- 建立後 IdP 變更了其 `externalId` 的使用者（更新記錄只記錄哪些欄位被變更，不記錄其值）
+- 兩個使用者持有同一個 id 的情況，查詢會略過他們，以免唯一索引中斷；去掉最後一個子句的預覽會列出他們，而哪一位才是該 id 的擁有者由你判斷

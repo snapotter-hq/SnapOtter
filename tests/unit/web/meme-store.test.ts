@@ -8,8 +8,12 @@ vi.stubGlobal("URL", { ...globalThis.URL, createObjectURL, revokeObjectURL });
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
-vi.mock("@/lib/api", () => ({ formatHeaders: vi.fn(() => ({})) }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  formatHeaders: vi.fn(() => ({})),
+}));
 
+import { en, type TranslationKeys } from "@snapotter/shared";
 import type { MemeTemplate } from "@/stores/meme-store";
 import {
   CATEGORIES,
@@ -325,6 +329,209 @@ describe("useMemeStore", () => {
       expect(s.error).toBe("Failed to load templates: 500");
       expect(s.loading).toBe(false);
     });
+
+    it("on non-ok response: routes body through failedAnswerMessage (#3158)", async () => {
+      fetchMock.mockReturnValueOnce(failResponse(503, { error: "Template catalog unavailable" }));
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Template catalog unavailable");
+      expect(useMemeStore.getState().loading).toBe(false);
+
+      fetchMock.mockReturnValueOnce(failResponse(500, { details: "Storage offline" }));
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Storage offline");
+
+      fetchMock.mockReturnValueOnce(failResponse(502, { error: { nested: true } }));
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Failed to load templates: 502");
+    });
+
+    it("aborts an in-flight fetchTemplates on reset() and ignores late settlement (#3158)", async () => {
+      const outcomes: Array<
+        (settled: { resolve: (res: Response) => void; reject: (err: unknown) => void }) => void
+      > = [
+        ({ reject }) => reject(new Error("Network down")),
+        ({ resolve }) =>
+          resolve({
+            ok: false,
+            status: 500,
+            json: async () => ({ error: "Boom" }),
+          } as unknown as Response),
+        ({ resolve }) =>
+          resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ version: 1, categories: ["reaction"], templates: [TEMPLATE] }),
+          } as unknown as Response),
+        ({ reject }) => reject(new DOMException("Aborted", "AbortError")),
+      ];
+
+      for (const settle of outcomes) {
+        let capturedSignal: AbortSignal | undefined;
+        let deferred!: { resolve: (res: Response) => void; reject: (err: unknown) => void };
+        fetchMock.mockImplementationOnce((_url: string, init?: RequestInit) => {
+          capturedSignal = init?.signal ?? undefined;
+          return new Promise<Response>((resolve, reject) => {
+            deferred = { resolve, reject };
+          });
+        });
+
+        const pending = useMemeStore.getState().fetchTemplates();
+        expect(capturedSignal).toBeInstanceOf(AbortSignal);
+        expect(capturedSignal?.aborted).toBe(false);
+
+        useMemeStore.getState().reset();
+        expect(capturedSignal?.aborted).toBe(true);
+        expect(useMemeStore.getState().loading).toBe(true);
+        expect(useMemeStore.getState().error).toBeNull();
+        expect(useMemeStore.getState().templates).toEqual([]);
+
+        settle(deferred);
+        await pending;
+
+        expect(useMemeStore.getState().loading).toBe(true);
+        expect(useMemeStore.getState().error).toBeNull();
+        expect(useMemeStore.getState().templates).toEqual([]);
+      }
+
+      for (const isOk of [true, false]) {
+        let resolveJson: (body: unknown) => void = () => {};
+        fetchMock.mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: isOk,
+            status: isOk ? 200 : 500,
+            json: () =>
+              new Promise((resolve) => {
+                resolveJson = resolve;
+              }),
+          } as unknown as Response),
+        );
+
+        const pending = useMemeStore.getState().fetchTemplates();
+        await Promise.resolve();
+
+        useMemeStore.getState().reset();
+        resolveJson(
+          isOk
+            ? { version: 1, categories: ["reaction"], templates: [TEMPLATE] }
+            : { error: "Boom" },
+        );
+        await pending;
+
+        expect(useMemeStore.getState().loading).toBe(true);
+        expect(useMemeStore.getState().error).toBeNull();
+        expect(useMemeStore.getState().templates).toEqual([]);
+      }
+    });
+
+    it("aborts an earlier in-flight fetchTemplates when called again and keeps loading until the latest settles (#3158)", async () => {
+      const signals: Array<AbortSignal | undefined> = [];
+      const resolvers: Array<{ resolve: (res: Response) => void; reject: (err: unknown) => void }> =
+        [];
+      fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+        signals.push(init?.signal ?? undefined);
+        return new Promise<Response>((resolve, reject) => {
+          resolvers.push({ resolve, reject });
+        });
+      });
+
+      const first = useMemeStore.getState().fetchTemplates();
+      const second = useMemeStore.getState().fetchTemplates();
+
+      expect(signals).toHaveLength(2);
+      expect(signals[0]?.aborted).toBe(true);
+      expect(signals[1]?.aborted).toBe(false);
+
+      resolvers[0]?.reject(new Error("Stale network error"));
+      await first;
+
+      expect(useMemeStore.getState().loading).toBe(true);
+      expect(useMemeStore.getState().error).toBeNull();
+      expect(useMemeStore.getState().templates).toEqual([]);
+
+      resolvers[1]?.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ version: 1, categories: ["reaction"], templates: [TEMPLATE] }),
+      } as unknown as Response);
+      await second;
+
+      expect(useMemeStore.getState().loading).toBe(false);
+      expect(useMemeStore.getState().error).toBeNull();
+      expect(useMemeStore.getState().templates).toEqual([TEMPLATE]);
+    });
+
+    it("rejects malformed 2xx template manifests with invalidServerResponse (#3142)", async () => {
+      const badManifests: unknown[] = [
+        null,
+        [],
+        {},
+        { templates: null },
+        { templates: "nope" },
+        { templates: [] },
+        { templates: [null] },
+        { templates: [{ ...TEMPLATE, id: "" }] },
+        { templates: [{ ...TEMPLATE, name: "" }] },
+        { templates: [{ ...TEMPLATE, category: "" }] },
+        { templates: [{ ...TEMPLATE, filename: "" }] },
+        { templates: [{ ...TEMPLATE, aliases: "drake" }] },
+        { templates: [{ ...TEMPLATE, aliases: [123] }] },
+        { templates: [{ ...TEMPLATE, tags: null }] },
+        { templates: [{ ...TEMPLATE, textBoxes: null }] },
+        { templates: [{ ...TEMPLATE, textBoxes: [null] }] },
+        {
+          templates: [
+            {
+              ...TEMPLATE,
+              textBoxes: [{ id: "", x: 0, y: 0, width: 50, height: 50 }],
+            },
+          ],
+        },
+        {
+          templates: [
+            {
+              ...TEMPLATE,
+              textBoxes: [{ id: "top", x: "0", y: 0, width: 50, height: 50 }],
+            },
+          ],
+        },
+      ];
+
+      for (const payload of badManifests) {
+        useMemeStore.setState({ templates: [TEMPLATE], error: null });
+        fetchMock.mockReturnValueOnce(okJson(payload));
+        await useMemeStore.getState().fetchTemplates();
+        const s = useMemeStore.getState();
+        expect(s.error).toBe(en.errors.invalidServerResponse);
+        expect(s.templates).toEqual([]);
+        expect(s.loading).toBe(false);
+      }
+
+      const customT: TranslationKeys = {
+        ...en,
+        errors: { ...en.errors, invalidServerResponse: "Ungueltige Antwort vom Server" },
+      };
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().fetchTemplates(customT);
+      expect(useMemeStore.getState().error).toBe("Ungueltige Antwort vom Server");
+      expect(useMemeStore.getState().templates).toEqual([]);
+      expect(useMemeStore.getState().loading).toBe(false);
+
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new TypeError("Stream read failed")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Stream read failed");
+    });
   });
 
   describe("generateMeme", () => {
@@ -412,6 +619,57 @@ describe("useMemeStore", () => {
       fetchMock.mockReturnValue(failResponse(500, {}));
       await useMemeStore.getState().generateMeme();
       expect(useMemeStore.getState().error).toBe("Generation failed: 500");
+    });
+
+    it("rejects malformed 2xx generate responses and stays in editor phase (#3142)", async () => {
+      const badPayloads: unknown[] = [null, [], {}, { downloadUrl: "" }, { downloadUrl: 123 }];
+
+      for (const payload of badPayloads) {
+        useMemeStore.setState({
+          phase: "editor",
+          selectedTemplate: TEMPLATE,
+          resultUrl: "/dl/old",
+          downloadUrl: "/dl/old",
+          error: null,
+        });
+        fetchMock.mockReturnValueOnce(okJson(payload));
+        await useMemeStore.getState().generateMeme();
+        const s = useMemeStore.getState();
+        expect(s.error).toBe(en.errors.invalidServerResponse);
+        expect(s.phase).toBe("editor");
+        expect(s.resultUrl).toBeNull();
+        expect(s.downloadUrl).toBeNull();
+        expect(s.generating).toBe(false);
+      }
+
+      const customT: TranslationKeys = {
+        ...en,
+        errors: { ...en.errors, invalidServerResponse: "Ungueltige Antwort vom Server" },
+      };
+      useMemeStore.setState({ phase: "editor", selectedTemplate: TEMPLATE });
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().generateMeme(customT);
+      expect(useMemeStore.getState().error).toBe("Ungueltige Antwort vom Server");
+      expect(useMemeStore.getState().phase).toBe("editor");
+      expect(useMemeStore.getState().resultUrl).toBeNull();
+      expect(useMemeStore.getState().downloadUrl).toBeNull();
+
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new TypeError("Stream disconnected")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().generateMeme();
+      expect(useMemeStore.getState().error).toBe("Stream disconnected");
+      expect(useMemeStore.getState().phase).toBe("editor");
     });
   });
 

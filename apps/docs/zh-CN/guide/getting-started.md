@@ -1,6 +1,6 @@
 ---
 description: "用一条 Docker 命令安装 SnapOtter。包含 Docker Compose 配置、从源码构建，以及完整的功能概览。"
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: 00a743d88802
 i18n_hash_version: 2
@@ -100,7 +100,7 @@ pnpm dev
 | **图像** | 112 | 缩放、裁剪、压缩、转换、背景移除、放大、OCR、水印、拼贴、上色、GIF 工具、格式预设 |
 | **视频** | 57 | 剪辑、裁剪、压缩、转换、合并、提取音频、自动字幕、视频转 GIF、缩放、防抖、格式预设 |
 | **音频** | 27 | 剪辑、合并、转换、归一化、降噪、转录、变调、淡入淡出、铃声制作、格式预设 |
-| **PDF / 文档** | 34 | 合并、拆分、压缩、OCR、水印、涂黑、Word 转 PDF、Excel 转 PDF、旋转、加密、修复 |
+| **PDF / 文档** | 35 | 合并、拆分、压缩、OCR、水印、涂黑、Word 转 PDF、Excel 转 PDF、旋转、加密、修复 |
 | **文件** | 23 | CSV 转 JSON、JSON 转 XML、合并 CSV、拆分 CSV、创建 ZIP、解压 ZIP、图表制作、YAML/JSON |
 
 ### 流水线 {#pipelines}

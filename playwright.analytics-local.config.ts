@@ -15,6 +15,7 @@ function resolveRunId(): string {
 }
 
 type E2eEndpoint = {
+  host: string;
   port: number;
   url: string;
 };
@@ -31,7 +32,7 @@ function parsePort(value: string, envName: string): number {
 }
 
 function randomPort(min: number): number {
-  return randomInt(min, min + 10_000);
+  return randomInt(min, min + 7_000);
 }
 
 function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndpoint {
@@ -68,7 +69,7 @@ function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndp
   const url = parsedUrl.origin;
   process.env[portEnvName] = String(port);
   process.env[urlEnvName] = url;
-  return { port, url };
+  return { host: parsedUrl.hostname, port, url };
 }
 
 const runId = resolveRunId();
@@ -77,8 +78,8 @@ const authFile = path.join(runRoot, "auth", "analytics-local-user.json");
 process.env.PLAYWRIGHT_RUN_ROOT = runRoot;
 process.env.PLAYWRIGHT_AUTH_FILE = authFile;
 
-const apiEndpoint = resolveEndpoint("API", 20_000);
-const webEndpoint = resolveEndpoint("WEB", 30_000);
+const apiEndpoint = resolveEndpoint("API", 15_000);
+const webEndpoint = resolveEndpoint("WEB", 23_000);
 process.env.API_URL = apiEndpoint.url;
 
 const E2E_PG_BASE_URL =
@@ -149,7 +150,7 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: "pnpm --filter @snapotter/web dev",
+      command: `pnpm --filter @snapotter/web exec vite --host ${webEndpoint.host} --port ${webEndpoint.port} --strictPort`,
       url: webEndpoint.url,
       reuseExistingServer: false,
       env: {

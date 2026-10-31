@@ -17,7 +17,6 @@ import {
   type Dirent,
   existsSync,
   readdirSync,
-  readFileSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -46,6 +45,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { trackEvent } from "../lib/analytics.js";
+import { reportError } from "../lib/error-report.js";
 import {
   clearActive,
   dequeue,
@@ -73,13 +73,16 @@ import {
   isFeatureInstalled,
   isManagedAiEnvironment,
   markUninstalled,
+  readManifest,
   releaseInstallLock,
   resetAiEnvironment,
   setInstallProgress,
   verifyBundleModels,
 } from "../lib/feature-status.js";
 import { evaluateInstallWatchdog } from "../lib/install-watchdog.js";
-import { multipartParts } from "../lib/multipart-parts.js";
+import { logErrorWithCauses } from "../lib/log-error-with-causes.js";
+import { logger } from "../lib/logger.js";
+import { multipartFailure, multipartParts } from "../lib/multipart-parts.js";
 import {
   assertOcrRuntimeInstallDiskSpace,
   downloadVerifiedRuntimeRelease,
@@ -97,7 +100,12 @@ import {
 } from "../lib/ocr-runtime-install.js";
 import { requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
-import { updateSingleFileProgress } from "./progress.js";
+import {
+  refreshFeatureInstallStream,
+  releaseFeatureInstallStream,
+  reserveFeatureInstallStream,
+  updateSingleFileProgress,
+} from "./progress.js";
 
 const venvPath = process.env.PYTHON_VENV_PATH || "/opt/venv";
 const pythonPath = `${venvPath}/bin/python3`;
@@ -153,19 +161,25 @@ async function handoffInstalledOcrRuntime(
       }
       // Both commit subprocesses may have atomically committed and then lost
       // their output. Exact committed state is the successful terminal state.
+      logErrorWithCauses(
+        logger,
+        { err: activationError },
+        "[ocr-runtime] OCR runtime handoff recovered from a double commit failure",
+        "warn",
+      );
       return;
     }
 
     if (typeof rollback.restoredGeneration === "string") {
       try {
         await probeOcrDispatcher(runtimeOptions);
-      } catch {
+      } catch (probeError) {
         try {
           await rotateOcrDispatcher(runtimeOptions);
         } catch (recoveryError) {
           throw new Error(
             "OCR runtime handoff failed; the prior descriptor was restored but its local dispatcher could not be recovered",
-            { cause: new AggregateError([activationError, recoveryError]) },
+            { cause: new AggregateError([activationError, probeError, recoveryError]) },
           );
         }
       }
@@ -255,15 +269,42 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
         duration_ms: Date.now() - installStartTime,
       });
     } catch (error) {
-      if (!finalize()) return;
+      if (!finalize()) {
+        // Only the success path finalizes first, so the runtime is installed
+        // and active; what failed is the bookkeeping after it.
+        logErrorWithCauses(
+          logger,
+          { err: error, bundleId, jobId },
+          "[ocr-runtime] OCR runtime installed, but finishing the install job failed",
+        );
+        return;
+      }
+      // The UI gets the top-level message only; the log keeps the cause chain,
+      // which for a failed handoff and rollback holds both errors (#1504).
+      logErrorWithCauses(
+        logger,
+        { err: error, bundleId, jobId },
+        "[ocr-runtime] OCR install failed",
+      );
+      void reportError(error, { source: "ai-install" });
       const errorMessage = error instanceof Error ? error.message : String(error);
       setInstallProgress(bundleId, null, errorMessage);
-      await updateSingleFileProgress({
-        jobId,
-        phase: "failed",
-        percent: 0,
-        error: errorMessage,
-      });
+      try {
+        await updateSingleFileProgress({
+          jobId,
+          phase: "failed",
+          percent: 0,
+          error: errorMessage,
+        });
+      } catch (recordError) {
+        // Nothing awaits this block, so a rejection escaping it would be
+        // unhandled, and that ends the process when no handler is installed.
+        logErrorWithCauses(
+          logger,
+          { err: recordError, bundleId, jobId },
+          "[ocr-runtime] Recording the failed OCR install failed",
+        );
+      }
     } finally {
       pump();
     }
@@ -281,6 +322,7 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
  * queue's active slot is already set to it (pump() does both before calling).
  */
 function startInstall(bundleId: string, jobId: string, installLockFd: number): void {
+  void refreshReservedInstall(jobId);
   if (bundleId === "ocr") {
     startOcrInstall(bundleId, jobId, installLockFd);
     return;
@@ -493,6 +535,11 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
               `Install failed with exit code ${code}`;
           }
         }
+        logErrorWithCauses(
+          logger,
+          { err: new Error(errorMsg), bundleId, jobId },
+          "[feature-install] Bundle installation failed",
+        );
         setInstallProgress(bundleId, null, errorMsg);
         void updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
       }
@@ -527,8 +574,7 @@ function schedulePumpRetry(): void {
   if (pumpRetryTimer) return;
   pumpRetryTimer = setTimeout(() => {
     pumpRetryTimer = undefined;
-    const error = pump();
-    if (error) console.error("[feature-install-queue] Unable to acquire install lease:", error);
+    pump();
   }, INSTALL_QUEUE_RETRY_MS);
   pumpRetryTimer.unref();
 }
@@ -571,6 +617,11 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
 function failQueuedInstall(head: NonNullable<ReturnType<typeof peekQueue>>, error: unknown): Error {
   const failure = error instanceof Error ? error : new Error(String(error));
   dequeue();
+  logErrorWithCauses(
+    logger,
+    { err: failure, bundleId: head.bundleId, jobId: head.jobId },
+    "[feature-install-queue] Install lease acquisition failed",
+  );
   setInstallProgress(head.bundleId, null, failure.message);
   void updateSingleFileProgress({
     jobId: head.jobId,
@@ -579,10 +630,7 @@ function failQueuedInstall(head: NonNullable<ReturnType<typeof peekQueue>>, erro
     error: failure.message,
   });
   queueMicrotask(() => {
-    const nextError = pump();
-    if (nextError) {
-      console.error("[feature-install-queue] Unable to acquire install lease:", nextError);
-    }
+    pump();
   });
   return failure;
 }
@@ -669,31 +717,45 @@ interface ToolBundleInstallResult {
   skipped?: boolean;
 }
 
-interface ManifestModel {
+export interface ManifestModel {
   id: string;
   path?: string;
   downloadFn?: string;
   args?: string[];
 }
 
-interface ManifestBundle {
+export interface ManifestBundle {
   models: ManifestModel[];
   targets?: Record<string, { minimumMemoryBytes?: number }>;
 }
 
-interface Manifest {
+export interface Manifest {
   bundleRepo?: string;
   bundles: Record<string, ManifestBundle>;
 }
 
-function readManifest(): Manifest | null {
-  const manifestPath = getManifestPath();
-  if (!existsSync(manifestPath)) return null;
-  try {
-    return JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
-  } catch {
-    return null;
+export { readManifest };
+
+export function collectProtectedBundleTargets(
+  manifest: Manifest,
+  bundleIdToUninstall: string,
+  isInstalled: (bundleId: string) => boolean = isFeatureInstalled,
+): { protectedFiles: Set<string>; protectedDirs: Set<string> } {
+  const protectedFiles = new Set<string>();
+  const protectedDirs = new Set<string>();
+  for (const [otherId, otherBundle] of Object.entries(manifest.bundles)) {
+    if (otherId === bundleIdToUninstall || !isInstalled(otherId)) continue;
+    for (const m of otherBundle.models ?? []) {
+      if (m.path) protectedFiles.add(m.path);
+      if (m.downloadFn === "rembg_session" && m.args?.[0]) {
+        protectedFiles.add(`rembg/${m.args[0]}.onnx`);
+      }
+      if (m.downloadFn === "hf_snapshot" && m.args?.[1]) {
+        protectedDirs.add(m.args[1]);
+      }
+    }
   }
+  return { protectedFiles, protectedDirs };
 }
 
 type SupportedOcrRuntimeTarget = Exclude<ReturnType<typeof selectOcrRuntimeTarget>, null>;
@@ -733,7 +795,35 @@ function getOcrInstallPreflightError(): { statusCode: 409 | 503; error: string }
   return null;
 }
 
-function queueBundleInstallIfNeeded(bundleId: string): EnqueuedBundleInstall | null {
+/**
+ * Drop an install reservation nothing will use. A failure here leaves a stray
+ * queued row until the startup sweep, which is no reason to fail the request.
+ */
+async function releaseReservedInstall(jobId: string): Promise<void> {
+  try {
+    await releaseFeatureInstallStream(jobId);
+  } catch (err) {
+    logger.warn({ err, jobId }, "could not release an unused feature install reservation");
+  }
+}
+
+/**
+ * Reset `created_at` on the reserved install row when a queued install begins
+ * executing (#2819). Best-effort so a transient DB error never aborts spawning
+ * the installer child, while still logging the failure.
+ */
+async function refreshReservedInstall(jobId: string): Promise<void> {
+  try {
+    await refreshFeatureInstallStream(jobId);
+  } catch (err) {
+    logger.warn({ err, jobId }, "could not refresh feature install reservation timestamp");
+  }
+}
+
+async function queueBundleInstallIfNeeded(
+  bundleId: string,
+  userId: string,
+): Promise<EnqueuedBundleInstall | null> {
   if (isFeatureInstalled(bundleId)) {
     if (bundleId === "ocr") return null;
     const modelError = verifyBundleModels(bundleId);
@@ -747,7 +837,21 @@ function queueBundleInstallIfNeeded(bundleId: string): EnqueuedBundleInstall | n
   // that lands behind another install stays queued server-side and starts
   // automatically when the running install finishes.
   const jobId = crypto.randomUUID();
-  const effectiveJobId = enqueue({ bundleId, jobId, mutationEpoch: getAiMutationEpoch() });
+  const mutationEpoch = getAiMutationEpoch();
+  // The progress stream decides who may watch by this row, so it has to exist
+  // before pump() can publish the first frame.
+  await reserveFeatureInstallStream({ jobId, bundleId, userId });
+  let effectiveJobId: string;
+  try {
+    effectiveJobId = enqueue({ bundleId, jobId, mutationEpoch });
+  } catch (err) {
+    await releaseReservedInstall(jobId);
+    throw err;
+  }
+  if (effectiveJobId !== jobId) {
+    // Joined an install that was already queued or running; its own row stands.
+    await releaseReservedInstall(jobId);
+  }
   const pumpError = pump();
   if (pumpError) throw pumpError;
 
@@ -762,7 +866,7 @@ function queueBundleInstallIfNeeded(bundleId: string): EnqueuedBundleInstall | n
 }
 
 /** Recursively calculate total size of a directory in bytes. */
-function getDirSize(dirPath: string): number {
+export function getDirSize(dirPath: string): number {
   if (!existsSync(dirPath)) return 0;
 
   let total = 0;
@@ -825,6 +929,7 @@ async function writeBoundedUpload(
 ): Promise<void> {
   const file = await open(path, "wx", 0o600);
   let total = 0;
+  let writeFailed = false;
   try {
     await options.beforeWrite?.(0);
     for await (const rawChunk of stream) {
@@ -842,10 +947,18 @@ async function writeBoundedUpload(
     }
     await file.sync();
   } catch (error) {
-    await rmAsync(path, { force: true });
+    writeFailed = true;
     throw error;
   } finally {
-    await file.close();
+    await file.close().catch(async (closeErr: unknown) => {
+      if (!writeFailed) {
+        await rmAsync(path, { force: true }).catch(() => {});
+        throw closeErr;
+      }
+    });
+    if (writeFailed) {
+      await rmAsync(path, { force: true }).catch(() => {});
+    }
   }
 }
 
@@ -945,7 +1058,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         }
       }
 
-      const result = queueBundleInstallIfNeeded(bundleId);
+      const result = await queueBundleInstallIfNeeded(bundleId, admin.id);
       if (!result) {
         return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
       }
@@ -983,7 +1096,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           }
         }
 
-        const result = queueBundleInstallIfNeeded(bundleId);
+        const result = await queueBundleInstallIfNeeded(bundleId, admin.id);
         bundles.push(result ?? { bundleId, queued: false, skipped: true });
       }
 
@@ -1050,20 +1163,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         if (manifest) {
           const manifestBundle = manifest.bundles[bundleId];
           if (manifestBundle) {
-            const protectedFiles = new Set<string>();
-            const protectedDirs = new Set<string>();
-            for (const [otherId, otherBundle] of Object.entries(manifest.bundles)) {
-              if (otherId === bundleId || !isFeatureInstalled(otherId)) continue;
-              for (const m of otherBundle.models ?? []) {
-                if (m.path) protectedFiles.add(m.path);
-                if (m.downloadFn === "rembg_session" && m.args?.[0]) {
-                  protectedFiles.add(`rembg/${m.args[0]}.onnx`);
-                }
-                if (m.downloadFn === "hf_snapshot" && m.args?.[1]) {
-                  protectedDirs.add(m.args[1]);
-                }
-              }
-            }
+            const { protectedFiles, protectedDirs } = collectProtectedBundleTargets(
+              manifest,
+              bundleId,
+            );
 
             const modelsDir = getModelsDir();
             for (const model of manifestBundle.models) {
@@ -1395,13 +1498,27 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           reply.status(507);
           return { error: errorMessage };
         }
-        if (err instanceof OfflineImportRecoveryError) {
-          reply.status(500);
-          return { error: err.message };
+        // multipartParts() marks a request the client broke (no boundary, a
+        // body that ends mid-part, a part over the size limit) with 400/413
+        // (#1473), so answer it as the client's rather than a 500 (#1539).
+        const status = (err as { statusCode?: unknown } | null)?.statusCode;
+        if (status === 400 || status === 413) {
+          const failure = multipartFailure(err);
+          reply.status(failure.status);
+          return failure.body;
         }
         // Only explicit import/input validation failures are client errors.
-        // Installer, dispatcher handoff, commit, and rollback failures are
-        // server-side faults and must remain retryable/observable as 5xx.
+        // Staging recovery, installer, dispatcher handoff, commit, and
+        // rollback failures are server-side faults and must remain
+        // retryable/observable as 5xx, so log and report them before
+        // answering.
+        logErrorWithCauses(request.log, { err }, "Offline feature import failed");
+        void reportError(err, {
+          source: "http",
+          route: "/api/v1/admin/features/import",
+          method: "POST",
+          statusCode: 500,
+        });
         reply.status(500);
         return { error: errorMessage };
       } finally {

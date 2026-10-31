@@ -9,7 +9,7 @@
  *     "audit_export" fallback, and the fail-closed catch paths.
  *   - auditLog: the EXACT values written to the DB (actorId / actorUsername /
  *     targetType / targetId coalescing chains) and the tamper-resistant HMAC
- *     branch (the DATA_ENCRYPTION_KEY gate, the tamperResistantAudit === "true"
+ *     branch (the DATA_ENCRYPTION_KEY gate, the tamperResistantAudit fail-closed
  *     gate, and the integrity UPDATE it issues).
  *   - deriveTargetType: driven through the REAL auditLog insert (the existing
  *     audit-helpers test only exercises a hand-copied reproduction, so the real
@@ -36,12 +36,34 @@ const state = vi.hoisted(() => ({
   enterpriseThrows: false,
 }));
 
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn(),
+  level: "info",
+  silent: vi.fn(),
+}));
+
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
     get DATA_ENCRYPTION_KEY() {
       return state.encryptionKey;
     },
   },
+}));
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: loggerMock,
+}));
+
+const reportErrorMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
+  reportError: reportErrorMock,
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -88,6 +110,15 @@ vi.mock("@snapotter/enterprise", () => ({
   },
 }));
 
+vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/settings-helpers.js")>();
+  return {
+    ...actual,
+    getSettingStrict: vi.fn((key: string) => actual.getSettingStrict(key)),
+  };
+});
+
 // deriveAuditHmacKey / computeHmac are real: we assert a real hex string lands in
 // the integrity UPDATE, which pins the HMAC branch end-to-end.
 
@@ -97,6 +128,8 @@ import {
   isToolAuditEnabled,
   sanitizeAuditInput,
 } from "../../../apps/api/src/lib/audit.js";
+import { reportError } from "../../../apps/api/src/lib/error-report.js";
+import { getSettingStrict } from "../../../apps/api/src/lib/settings-helpers.js";
 
 function makeLogger() {
   return {
@@ -174,6 +207,8 @@ describe("isToolAuditEnabled", () => {
   it("returns true when the setting value is exactly the string 'true'", async () => {
     state.selectRows = [[{ value: "true" }]];
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("does not treat a non-'true' setting value as enabled", async () => {
@@ -181,12 +216,16 @@ describe("isToolAuditEnabled", () => {
     state.selectRows = [[{ value: "1" }]];
     state.auditExportEnabled = false;
     await expect(isToolAuditEnabled()).resolves.toBe(false);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("falls back to the enterprise audit_export feature when the setting is absent", async () => {
     state.selectRows = [[]];
     state.auditExportEnabled = true;
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("checks the audit_export feature specifically, not some other feature", async () => {
@@ -196,27 +235,49 @@ describe("isToolAuditEnabled", () => {
     state.selectRows = [[]];
     state.auditExportEnabled = true;
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("returns false when neither the setting nor the enterprise feature enable it", async () => {
     state.selectRows = [[]];
     state.auditExportEnabled = false;
     await expect(isToolAuditEnabled()).resolves.toBe(false);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
-  it("falls through to the enterprise check when the settings query throws", async () => {
-    // The first try/catch swallows the DB error and reaches the enterprise path,
+  it("logs a warning and falls through to the enterprise check when the settings query throws (#3238)", async () => {
+    // The first try/catch logs the DB error and reaches the enterprise path,
     // which here enables audit_export -> true. Pins that the catch does not
     // short-circuit to false.
     state.selectThrows = true;
     state.auditExportEnabled = true;
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({ message: "settings query failed" }),
+        key: "auditToolOperations",
+      },
+      "Failed to read auditToolOperations setting",
+    );
   });
 
-  it("returns false when the settings query throws and enterprise is unavailable", async () => {
+  it("logs a warning and returns false when the settings query throws and enterprise is unavailable (#3238)", async () => {
     state.selectThrows = true;
     state.enterpriseThrows = true;
     await expect(isToolAuditEnabled()).resolves.toBe(false);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({ message: "settings query failed" }),
+        key: "auditToolOperations",
+      },
+      "Failed to read auditToolOperations setting",
+    );
   });
 });
 
@@ -264,12 +325,50 @@ describe("auditLog DB write values", () => {
     expect(state.insertValues[0].actorUsername).toBe("system");
   });
 
-  it("prefers targetUserId over keyId for targetId", async () => {
-    await auditLog(makeLogger() as never, "USER_DELETED", {
+  it("prefers targetUserId over newUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_CREATED", {
       targetUserId: "target-7",
-      keyId: "key-3",
+      newUserId: "new-8",
     });
     expect(state.insertValues[0].targetId).toBe("target-7");
+  });
+
+  it("falls back to newUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_CREATED", {
+      adminId: "admin-1",
+      username: "admin",
+      newUserId: "new-8",
+      newUsername: "bob",
+    });
+    expect(state.insertValues[0].targetId).toBe("new-8");
+    expect(state.insertValues[0].actorUsername).toBe("admin");
+  });
+
+  it("prefers newUserId over deletedUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_CREATED", {
+      newUserId: "new-8",
+      deletedUserId: "del-9",
+    });
+    expect(state.insertValues[0].targetId).toBe("new-8");
+  });
+
+  it("falls back to deletedUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_DELETED", {
+      adminId: "admin-1",
+      username: "admin",
+      deletedUserId: "del-9",
+      deletedUsername: "bob",
+    });
+    expect(state.insertValues[0].targetId).toBe("del-9");
+    expect(state.insertValues[0].actorUsername).toBe("admin");
+  });
+
+  it("prefers deletedUserId over keyId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_DELETED", {
+      deletedUserId: "del-9",
+      keyId: "key-3",
+    });
+    expect(state.insertValues[0].targetId).toBe("del-9");
   });
 
   it("falls back to keyId for targetId", async () => {
@@ -277,7 +376,89 @@ describe("auditLog DB write values", () => {
     expect(state.insertValues[0].targetId).toBe("key-3");
   });
 
-  it("writes targetId null when neither targetUserId nor keyId is present", async () => {
+  it("prefers keyId over roleId for targetId", async () => {
+    await auditLog(makeLogger() as never, "API_KEY_DELETED", {
+      keyId: "key-3",
+      roleId: "role-4",
+    });
+    expect(state.insertValues[0].targetId).toBe("key-3");
+  });
+
+  it("falls back to roleId for targetId", async () => {
+    await auditLog(makeLogger() as never, "ROLE_CREATED", {
+      adminId: "admin-1",
+      roleId: "role-4",
+    });
+    expect(state.insertValues[0].targetId).toBe("role-4");
+  });
+
+  it("prefers roleId over targetTeamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "ROLE_UPDATED", {
+      roleId: "role-4",
+      targetTeamId: "team-5",
+    });
+    expect(state.insertValues[0].targetId).toBe("role-4");
+  });
+
+  it("falls back to targetTeamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "GDPR_TEAM_PURGED", {
+      adminId: "admin-1",
+      targetTeamId: "team-5",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-5");
+  });
+
+  it("prefers targetTeamId over teamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "GDPR_TEAM_PURGED", {
+      targetTeamId: "team-5",
+      teamId: "team-6",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-5");
+  });
+
+  it("falls back to teamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "SCIM_GROUP_SYNCED", {
+      teamId: "team-6",
+      action: "created",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-6");
+  });
+
+  it("prefers teamId over toolId for targetId", async () => {
+    await auditLog(makeLogger() as never, "SCIM_GROUP_SYNCED", {
+      teamId: "team-6",
+      toolId: "resize",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-6");
+  });
+
+  it("falls back to toolId for targetId", async () => {
+    await auditLog(makeLogger() as never, "TOOL_EXECUTED", {
+      userId: "user-1",
+      username: "alice",
+      toolId: "resize",
+    });
+    expect(state.insertValues[0].targetId).toBe("resize");
+  });
+
+  it("prefers toolId over targetId for targetId", async () => {
+    await auditLog(makeLogger() as never, "TOOL_EXECUTED", {
+      toolId: "resize",
+      targetId: "hold-7",
+    });
+    expect(state.insertValues[0].targetId).toBe("resize");
+  });
+
+  it("falls back to targetId for targetId", async () => {
+    await auditLog(makeLogger() as never, "LEGAL_HOLD_APPLIED", {
+      adminId: "admin-1",
+      targetType: "user",
+      targetId: "hold-7",
+    });
+    expect(state.insertValues[0].targetId).toBe("hold-7");
+  });
+
+  it("writes targetId null when no target identifier is present", async () => {
     await auditLog(makeLogger() as never, "LOGOUT");
     expect(state.insertValues[0].targetId).toBeNull();
   });
@@ -313,6 +494,7 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
     ["OIDC_LOGIN_FAILED", "user"],
     ["SAML_USER_LINKED", "user"],
     ["SCIM_USER_CREATED", "user"],
+    ["SCIM_GROUP_SYNCED", "team"],
     ["MFA_ENABLED", "user"],
     ["LOGOUT", "user"],
     ["API_KEY_CREATED", "api_key"],
@@ -320,10 +502,15 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
     ["ROLE_UPDATED", "role"],
     ["SETTINGS_UPDATED", "setting"],
     ["IP_ALLOWLIST_UPDATED", "setting"],
+    ["CONFIG_EXPORTED", "setting"],
+    ["CONFIG_IMPORTED", "setting"],
     ["TOOL_EXECUTED", "tool"],
     ["BATCH_STARTED", "tool"],
     ["PIPELINE_RUN", "tool"],
     ["LEGAL_HOLD_PLACED", "compliance"],
+    ["GDPR_EXPORT_INITIATED", "compliance"],
+    ["GDPR_USER_PURGED", "compliance"],
+    ["GDPR_TEAM_PURGED", "compliance"],
     ["SIEM_FORWARD_FAILED", "integration"],
     ["WEBHOOK_DELIVERED", "integration"],
   ])("maps %s to targetType %s", async (event, expected) => {
@@ -334,6 +521,13 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
   it("maps an unknown event to a null targetType", async () => {
     await auditLog(makeLogger() as never, "SOMETHING_ELSE", {});
     expect(state.insertValues[0].targetType).toBeNull();
+  });
+
+  it("does not classify CONF_OTHER or GDP_OTHER as setting or compliance", async () => {
+    await auditLog(makeLogger() as never, "CONF_OTHER", {});
+    await auditLog(makeLogger() as never, "GDP_OTHER", {});
+    expect(state.insertValues[0].targetType).toBeNull();
+    expect(state.insertValues[1].targetType).toBeNull();
   });
 
   it("does not classify LOGIC_ONLY (LOGI prefix, not LOGIN/LOGOUT) as a user event", async () => {
@@ -358,18 +552,24 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
 // ── auditLog: DB failure resilience ──────────────────────────────────────
 
 describe("auditLog failure handling", () => {
-  it("logs a warning and returns without throwing when the insert fails", async () => {
+  it("logs an error and reports to Sentry without throwing when the insert fails", async () => {
     const logger = makeLogger();
     state.insertThrows = true;
     await expect(
       auditLog(logger as never, "SETTINGS_UPDATED", { userId: "u1" }),
     ).resolves.toBeUndefined();
-    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledTimes(1);
     // #1012: the caught error rides along under `err` (nothing else leaks in).
-    expect(logger.warn.mock.calls[0][0]).toEqual({
+    expect(logger.error.mock.calls[0][0]).toEqual({
       event: "SETTINGS_UPDATED",
       err: expect.any(Error),
     });
+
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    const [reportedErr, reportedCtx] = vi.mocked(reportError).mock.calls[0];
+    expect(reportedErr).toBeInstanceOf(Error);
+    expect((reportedErr as Error).message).toBe("DB write failed");
+    expect(reportedCtx).toEqual({ source: "http", subsystem: "audit" });
   });
 
   it("does not attempt the HMAC branch after an insert failure", async () => {
@@ -386,15 +586,18 @@ describe("auditLog failure handling", () => {
 
 describe("auditLog tamper-resistant integrity", () => {
   it("computes and stores an integrity HMAC when encryption + tamperResistant are on", async () => {
+    const logger = makeLogger();
     state.encryptionKey = "a".repeat(64);
     state.selectRows = [[{ value: "true" }]]; // tamperResistantAudit === "true"
-    await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
+    await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
 
+    expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
     expect(state.updateWhereCalled).toBe(1);
     expect(state.updateSet).toHaveLength(1);
     const integrity = state.updateSet[0].integrity;
     expect(typeof integrity).toBe("string");
     expect(integrity).toMatch(/^[0-9a-f]{64}$/); // sha256 hex
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("skips the HMAC entirely when DATA_ENCRYPTION_KEY is unset", async () => {
@@ -403,20 +606,65 @@ describe("auditLog tamper-resistant integrity", () => {
     await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
     expect(state.updateWhereCalled).toBe(0);
     expect(state.selectIdx).toBe(0); // never even queried tamperResistantAudit
+    expect(getSettingStrict).not.toHaveBeenCalled();
   });
 
-  it("skips the HMAC when tamperResistantAudit is not exactly 'true'", async () => {
+  it("skips the HMAC when tamperResistantAudit is 'false'", async () => {
+    const logger = makeLogger();
     state.encryptionKey = "a".repeat(64);
-    state.selectRows = [[{ value: "1" }]]; // not "true"
-    await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
+    state.selectRows = [[{ value: "false" }]];
+    await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
+    expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
     expect(state.updateWhereCalled).toBe(0);
+    expect(logger.warn).not.toHaveBeenCalled();
   });
+
+  it.each(["TRUE", "1", ""])(
+    "computes and stores an integrity HMAC and logs a warning when tamperResistantAudit holds corrupt value %j (#3233)",
+    async (corruptValue) => {
+      const logger = makeLogger();
+      state.encryptionKey = "a".repeat(64);
+      state.selectRows = [[{ value: corruptValue }]];
+      await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
+
+      expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
+      expect(state.updateWhereCalled).toBe(1);
+      expect(state.updateSet).toHaveLength(1);
+      expect(state.updateSet[0].integrity).toMatch(/^[0-9a-f]{64}$/);
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        { key: "tamperResistantAudit", value: corruptValue },
+        "invalid boolean setting, treating tamperResistantAudit as enabled",
+      );
+    },
+  );
 
   it("skips the HMAC when the tamperResistantAudit setting row is absent", async () => {
+    const logger = makeLogger();
     state.encryptionKey = "a".repeat(64);
     state.selectRows = [[]]; // no row
-    await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
+    await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
+    expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
     expect(state.updateWhereCalled).toBe(0);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns and still computes the integrity HMAC when reading tamperResistantAudit fails (#3233)", async () => {
+    const logger = makeLogger();
+    state.encryptionKey = "a".repeat(64);
+    state.selectThrows = true;
+
+    await expect(
+      auditLog(logger as never, "USER_CREATED", { userId: "u1" }),
+    ).resolves.toBeUndefined();
+    expect(state.updateWhereCalled).toBe(1);
+    expect(state.updateSet).toHaveLength(1);
+    expect(state.updateSet[0].integrity).toMatch(/^[0-9a-f]{64}$/);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      { event: "USER_CREATED", err: expect.any(Error) },
+      "Failed to read tamperResistantAudit setting, treating as enabled",
+    );
   });
 
   it("warns but does not throw when the HMAC update fails", async () => {

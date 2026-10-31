@@ -4,8 +4,11 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { encrypt } from "../../lib/encryption.js";
+import { decryptSettingWithRotation, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { stripInternalPaths } from "../../lib/errors.js";
+import { logger } from "../../lib/logger.js";
+import { validateFetchUrl } from "../../lib/ssrf.js";
 import { requirePermission } from "../../permissions.js";
 
 const configSchema = z.object({
@@ -18,6 +21,33 @@ const configSchema = z.object({
 export type SiemConfig = z.infer<typeof configSchema>;
 
 const SETTINGS_KEY = "siem_config";
+
+function parseSiemConfig(raw: string): SiemConfig | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      logger.warn({ key: SETTINGS_KEY }, "siem: stored siem_config is not a JSON object");
+      return null;
+    }
+    return parsed as SiemConfig;
+  } catch (err) {
+    logger.warn({ err, key: SETTINGS_KEY }, "siem: failed to parse stored siem_config JSON");
+    return null;
+  }
+}
+
+async function validateSiemWebhookUrl(url: string, reply: FastifyReply): Promise<boolean> {
+  try {
+    await validateFetchUrl(url);
+    return true;
+  } catch (err) {
+    reply.status(400).send({
+      error: "SIEM webhook URL must resolve to a public HTTP(S) destination",
+      details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+    });
+    return false;
+  }
+}
 
 export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/enterprise/siem/config
@@ -40,7 +70,8 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
         .from(schema.settings)
         .where(eq(schema.settings.key, SETTINGS_KEY));
 
-      if (!row) {
+      const config = row ? parseSiemConfig(row.value) : null;
+      if (!config) {
         return reply.send({
           webhookUrl: "",
           authHeader: "",
@@ -49,10 +80,9 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const config = JSON.parse(row.value) as SiemConfig;
       return reply.send({
         ...config,
-        authHeader: config.authHeader ? "***" : "",
+        authHeader: typeof config.authHeader === "string" && config.authHeader ? "***" : "",
       });
     },
   );
@@ -80,19 +110,45 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const config = { ...parsed.data };
-
-      // Encrypt the auth header before storage if encryption key is set
-      if (config.authHeader && env.DATA_ENCRYPTION_KEY) {
-        config.authHeader = await encrypt(config.authHeader, env.DATA_ENCRYPTION_KEY);
-      }
-
-      const value = JSON.stringify(config);
-      const now = new Date();
+      if (!(await validateSiemWebhookUrl(config.webhookUrl, reply))) return;
 
       const [existing] = await db
         .select()
         .from(schema.settings)
         .where(eq(schema.settings.key, SETTINGS_KEY));
+
+      // GET masks a non-empty authHeader as "***"; preserve the stored secret
+      // when a client echoes the mask back on update (#2531), rotating it to
+      // DATA_ENCRYPTION_KEY when stored under DATA_ENCRYPTION_KEY_PREVIOUS (#2852).
+      if (config.authHeader === "***") {
+        const existingConfig = existing ? parseSiemConfig(existing.value) : null;
+        const existingAuth =
+          typeof existingConfig?.authHeader === "string" ? existingConfig.authHeader : "";
+        if (
+          existingAuth &&
+          isEncrypted(existingAuth) &&
+          env.DATA_ENCRYPTION_KEY &&
+          env.DATA_ENCRYPTION_KEY_PREVIOUS
+        ) {
+          const decrypted = await decryptSettingWithRotation(existingAuth);
+          if (decrypted === null) {
+            request.log.warn(
+              { key: SETTINGS_KEY },
+              "siem: preserved authHeader could not be decrypted for key rotation; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+            );
+          }
+          config.authHeader = decrypted?.reencrypted ?? existingAuth;
+        } else {
+          config.authHeader = existingAuth;
+        }
+      }
+      if (config.authHeader && env.DATA_ENCRYPTION_KEY && !isEncrypted(config.authHeader)) {
+        // Encrypt the auth header before storage if encryption key is set
+        config.authHeader = await encrypt(config.authHeader, env.DATA_ENCRYPTION_KEY);
+      }
+
+      const value = JSON.stringify(config);
+      const now = new Date();
 
       if (existing) {
         await db
@@ -128,9 +184,5 @@ export async function readSiemConfig(): Promise<SiemConfig | null> {
 
   if (!row) return null;
 
-  try {
-    return JSON.parse(row.value) as SiemConfig;
-  } catch {
-    return null;
-  }
+  return parseSiemConfig(row.value);
 }

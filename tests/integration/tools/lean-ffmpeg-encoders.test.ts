@@ -91,14 +91,14 @@ beforeAll(async () => {
   if (!canRun) return;
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp?.cleanup();
   if (originalFfmpegPath === undefined) delete process.env.FFMPEG_PATH;
   else process.env.FFMPEG_PATH = originalFfmpegPath;
   if (wrapperDir) rmSync(wrapperDir, { recursive: true, force: true });
-}, 10_000);
+});
 
 interface Upload {
   filename: string;

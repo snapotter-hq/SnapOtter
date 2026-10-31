@@ -245,6 +245,88 @@ describe("editMetadata", () => {
     expect(withExif).not.toHaveBeenCalled();
   });
 
+  it("fails safely when existing EXIF has a truncated IFD0, Photo, Iop, or GPSInfo table during removal (#3882)", async () => {
+    const truncatedIfd0 = Buffer.from("4578696600004d4d002a000010000000", "hex");
+    const truncatedPhoto = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000100000000000",
+      "hex",
+    );
+    const truncatedGps = Buffer.from(
+      "4578696600004d4d002a00000008000188250004000000010000100000000000",
+      "hex",
+    );
+    const truncatedIop = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000001a000000000001a0050004000000010000100000000000",
+      "hex",
+    );
+
+    for (const exif of [truncatedIfd0, truncatedPhoto, truncatedGps, truncatedIop]) {
+      const withExif = vi.fn();
+      const fake = {
+        metadata: vi.fn().mockResolvedValue({ exif }),
+        withExif,
+      } as unknown as Sharp;
+
+      await expect(editMetadata(fake, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+      await expect(editMetadata(fake, { clearGps: true })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+      expect(withExif).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rethrows V8 buffer allocation RangeError while converting non-OOM RangeError to ToolInputError (#3885)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed: exif");
+    const exifOomBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(exifOomBuf, "toString").mockImplementation(() => {
+      throw v8Oom;
+    });
+
+    const withExifOom = vi.fn();
+    const fakeOom = {
+      metadata: vi.fn().mockResolvedValue({ exif: exifOomBuf }),
+      withExif: withExifOom,
+    } as unknown as Sharp;
+
+    await expect(editMetadata(fakeOom, { fieldsToRemove: ["Software"] })).rejects.toThrow(v8Oom);
+    await expect(editMetadata(fakeOom, { clearGps: true })).rejects.toThrow(v8Oom);
+    expect(withExifOom).not.toHaveBeenCalled();
+
+    const nonOomRangeBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonOomRangeBuf, "toString").mockImplementationOnce(() => {
+      throw new RangeError("Attempt to access memory outside buffer bounds");
+    });
+
+    const withExifRange = vi.fn();
+    const fakeRange = {
+      metadata: vi.fn().mockResolvedValue({ exif: nonOomRangeBuf }),
+      withExif: withExifRange,
+    } as unknown as Sharp;
+
+    await expect(editMetadata(fakeRange, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+      "Cannot safely edit metadata because existing EXIF data is invalid",
+    );
+    expect(withExifRange).not.toHaveBeenCalled();
+
+    const nonRangeOomMsgBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonRangeOomMsgBuf, "toString").mockImplementationOnce(() => {
+      throw new Error("Array buffer allocation failed");
+    });
+
+    const withExifNonRange = vi.fn();
+    const fakeNonRange = {
+      metadata: vi.fn().mockResolvedValue({ exif: nonRangeOomMsgBuf }),
+      withExif: withExifNonRange,
+    } as unknown as Sharp;
+
+    await expect(editMetadata(fakeNonRange, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+      "Cannot safely edit metadata because existing EXIF data is invalid",
+    );
+    expect(withExifNonRange).not.toHaveBeenCalled();
+  });
+
   it("does not change image dimensions or format", async () => {
     const buf = await (await editMetadata(richImage(), { artist: "DimCheck" })).jpeg().toBuffer();
     const meta = await sharp(buf).metadata();
@@ -366,5 +448,90 @@ describe("stripMetadata", () => {
     expect(meta.width).toBe(24);
     expect(meta.height).toBe(16);
     expect(meta.format).toBe("jpeg");
+  });
+
+  it("clears keepMetadata and withExif when stripMetadata is called after editMetadata or withMetadata (#3151)", async () => {
+    const edited = await editMetadata(richImage(), { artist: "Ada" });
+    const strippedAll = await readBack(await stripMetadata(edited, { stripAll: true }));
+    expect(strippedAll.hasExif).toBe(false);
+    expect(strippedAll.hasIcc).toBe(false);
+    expect(strippedAll.hasXmp).toBe(false);
+
+    const withMeta = richImage().withMetadata();
+    const strippedDefault = await readBack(await stripMetadata(withMeta));
+    expect(strippedDefault.hasExif).toBe(false);
+    expect(strippedDefault.hasIcc).toBe(false);
+    expect(strippedDefault.hasXmp).toBe(false);
+
+    const editedSelective = await editMetadata(richImage(), { artist: "Ada" });
+    const strippedExifOnly = await readBack(
+      await stripMetadata(editedSelective, { stripExif: true, stripIcc: false }),
+    );
+    expect(strippedExifOnly.hasExif).toBe(false);
+    expect(strippedExifOnly.hasIcc).toBe(true);
+
+    const editedGpsSelective = await editMetadata(richImage(), { artist: "Ada" });
+    const strippedGpsOnly = await readBack(
+      await stripMetadata(editedGpsSelective, { stripGps: true, stripIcc: false }),
+    );
+    expect(strippedGpsOnly.hasExif).toBe(false);
+    expect(strippedGpsOnly.hasIcc).toBe(true);
+
+    // After editMetadata with removals (which sets keepMetadata for EXIF + ICC + XMP),
+    // selective stripMetadata clears the requested ICC or XMP bit while keeping EXIF.
+    const editedWithKeepIccXmp = await editMetadata(richImage(), {
+      artist: "Ada",
+      fieldsToRemove: ["Software"],
+    });
+    const strippedIccOnly = await readBack(
+      await stripMetadata(editedWithKeepIccXmp, { stripIcc: true, stripExif: false }),
+    );
+    expect(strippedIccOnly.hasExif).toBe(true);
+    expect(strippedIccOnly.image.Artist).toBe("Ada");
+    expect(strippedIccOnly.hasIcc).toBe(false);
+    expect(strippedIccOnly.hasXmp).toBe(true);
+
+    const editedWithKeepXmp = await editMetadata(richImage(), {
+      artist: "Ada",
+      fieldsToRemove: ["Software"],
+    });
+    const strippedXmpOnly = await readBack(
+      await stripMetadata(editedWithKeepXmp, { stripXmp: true, stripExif: false }),
+    );
+    expect(strippedXmpOnly.hasExif).toBe(true);
+    expect(strippedXmpOnly.image.Artist).toBe("Ada");
+    expect(strippedXmpOnly.hasIcc).toBe(true);
+    expect(strippedXmpOnly.hasXmp).toBe(false);
+
+    // Chaining editMetadata -> stripMetadata -> editMetadata does not leak stale withExif
+    // or withExifMerge=false from the first editMetadata call.
+    const editStripEdit = await editMetadata(
+      await stripMetadata(
+        await editMetadata(richImage(), { artist: "StaleAda", fieldsToRemove: ["Software"] }),
+        { stripAll: true },
+      ),
+      { copyright: "2026 Clean" },
+    );
+    const editStripEditRead = await readBack(editStripEdit);
+    expect(editStripEditRead.image.Copyright).toBe("2026 Clean");
+    expect(editStripEditRead.image.Artist).toBe("OrigArtist");
+    expect(editStripEditRead.image.Software).toBe("OrigSoft");
+
+    // Calling stripMetadata({ stripAll: false }) (which calls .withMetadata() and sets
+    // withIccProfile = "srgb") followed by stripMetadata({ stripExif: true }) on an image
+    // that had no ICC profile does not inject a synthetic sRGB ICC profile.
+    const noIccJpg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .withExif({ IFD0: { Artist: "NoIccArtist" } })
+      .jpeg()
+      .toBuffer();
+    const keptThenSelective = await stripMetadata(
+      await stripMetadata(sharp(noIccJpg), { stripAll: false }),
+      { stripExif: true },
+    );
+    const noIccRead = await readBack(keptThenSelective);
+    expect(noIccRead.hasExif).toBe(false);
+    expect(noIccRead.hasIcc).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter thu thập dữ liệu sử dụng ẩn danh nào, khi nào nó được gửi, và cách tắt phân tích sản phẩm trên toàn phiên bản."
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: fe718032834f
 ---

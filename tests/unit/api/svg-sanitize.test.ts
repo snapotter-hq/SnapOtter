@@ -8,6 +8,8 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 import {
   decompressSvgz,
   isSvgBuffer,
+  isSvgClientError,
+  isSvgzClientError,
   sanitizeSvg,
 } from "../../../apps/api/src/lib/svg-sanitize.js";
 
@@ -355,5 +357,110 @@ describe("isSvgBuffer: prolog before the root element", () => {
   it("does not treat an HTML document with an inline <svg> as SVG", () => {
     const input = Buffer.from("<!DOCTYPE html><html><body><svg><rect/></svg></body></html>");
     expect(isSvgBuffer(input)).toBe(false);
+  });
+});
+
+describe("isSvgBuffer", () => {
+  it("identifies standard SVG", () => {
+    expect(isSvgBuffer(Buffer.from("<svg></svg>"))).toBe(true);
+  });
+
+  it("identifies SVG with DOCTYPE", () => {
+    expect(isSvgBuffer(Buffer.from("<!DOCTYPE svg><svg></svg>"))).toBe(true);
+  });
+
+  it("identifies padded SVG", () => {
+    const padded = " ".repeat(5000) + "<svg></svg>";
+    expect(isSvgBuffer(Buffer.from(padded))).toBe(true);
+  });
+
+  it("identifies heavily padded SVG with mixed whitespace", () => {
+    const padded = " \n\t\r".repeat(2000) + "<svg></svg>";
+    expect(isSvgBuffer(Buffer.from(padded))).toBe(true);
+  });
+
+  it("rejects non-SVG", () => {
+    expect(isSvgBuffer(Buffer.from("<html><body></body></html>"))).toBe(false);
+  });
+});
+
+describe("decompressSvgz", () => {
+  it("decompresses valid SVGZ", () => {
+    const compressed = gzipSync(Buffer.from("<svg></svg>"));
+    const result = decompressSvgz(compressed);
+    expect(result.toString("utf-8")).toBe("<svg></svg>");
+  });
+
+  it("throws RangeError on decompression bomb", () => {
+    // 60MB of spaces compresses to very small gzip
+    const bomb = gzipSync(Buffer.alloc(60 * 1024 * 1024, 0x20));
+    expect(() => decompressSvgz(bomb)).toThrow(RangeError);
+  });
+});
+
+describe("isSvgzClientError", () => {
+  it("recognizes statusCode 400, Z_DATA_ERROR, Z_BUF_ERROR, ERR_BUFFER_TOO_LARGE, and non-OOM RangeError as client errors", () => {
+    expect(isSvgzClientError(Object.assign(new Error("over cap"), { statusCode: 400 }))).toBe(true);
+    expect(isSvgzClientError(Object.assign(new Error("corrupt"), { code: "Z_DATA_ERROR" }))).toBe(
+      true,
+    );
+    expect(isSvgzClientError(Object.assign(new Error("truncated"), { code: "Z_BUF_ERROR" }))).toBe(
+      true,
+    );
+    expect(
+      isSvgzClientError(Object.assign(new Error("buffer cap"), { code: "ERR_BUFFER_TOO_LARGE" })),
+    ).toBe(true);
+    expect(isSvgzClientError(new RangeError("Cannot create a Buffer larger than 52428800"))).toBe(
+      true,
+    );
+  });
+
+  it("rejects non-client errors and non-objects", () => {
+    expect(isSvgzClientError(new RangeError("Array buffer allocation failed"))).toBe(false);
+    expect(isSvgzClientError(new Error("unexpected sanitizer crash"))).toBe(false);
+    expect(isSvgzClientError(Object.assign(new Error("server error"), { statusCode: 500 }))).toBe(
+      false,
+    );
+    expect(isSvgzClientError({})).toBe(false);
+    expect(isSvgzClientError(null)).toBe(false);
+    expect(isSvgzClientError(undefined)).toBe(false);
+    expect(isSvgzClientError("string error")).toBe(false);
+  });
+});
+
+describe("isSvgClientError (#3580)", () => {
+  it("recognizes isSvgzClientError matches plus non-SVG SVGZ content errors", () => {
+    expect(isSvgClientError(Object.assign(new Error("over cap"), { statusCode: 400 }))).toBe(true);
+    expect(isSvgClientError(Object.assign(new Error("corrupt"), { code: "Z_DATA_ERROR" }))).toBe(
+      true,
+    );
+    expect(isSvgClientError(Object.assign(new Error("truncated"), { code: "Z_BUF_ERROR" }))).toBe(
+      true,
+    );
+    expect(
+      isSvgClientError(Object.assign(new Error("buffer cap"), { code: "ERR_BUFFER_TOO_LARGE" })),
+    ).toBe(true);
+    expect(isSvgClientError(new RangeError("Cannot create a Buffer larger than 52428800"))).toBe(
+      true,
+    );
+    expect(
+      isSvgClientError(
+        new Error("SVGZ file does not contain valid SVG content after decompression"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects unexpected runtime faults and non-client errors", () => {
+    expect(isSvgClientError(new RangeError("Array buffer allocation failed"))).toBe(false);
+    expect(isSvgClientError(new TypeError("unexpected sanitizer fault"))).toBe(false);
+    expect(isSvgClientError(new Error("unexpected sanitizer crash"))).toBe(false);
+    expect(isSvgClientError(Object.assign(new Error("server error"), { statusCode: 500 }))).toBe(
+      false,
+    );
+    expect(isSvgClientError(Object.assign(new Error("ENOSPC"), { code: "ENOSPC" }))).toBe(false);
+    expect(isSvgClientError({})).toBe(false);
+    expect(isSvgClientError(null)).toBe(false);
+    expect(isSvgClientError(undefined)).toBe(false);
+    expect(isSvgClientError("string error")).toBe(false);
   });
 });

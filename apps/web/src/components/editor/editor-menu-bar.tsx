@@ -3,15 +3,13 @@
 import { ArrowLeft, Check, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { copyMergedToClipboard } from "@/components/editor/copy-merged";
 import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { runEditorAction } from "@/lib/editor-action";
+import { hotkeysModIsMeta } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { useEditorStore } from "@/stores/editor-store";
-
-const IS_MAC = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
-
-function mod(label: string): string {
-  return IS_MAC ? label.replace("Ctrl+", "⌘").replace("Shift+", "⇧") : label;
-}
+import { redoEditor, undoEditor, useEditorStore } from "@/stores/editor-store";
 
 export interface MenuBarCallbacks {
   onNewDocument: () => void;
@@ -23,6 +21,12 @@ export interface MenuBarCallbacks {
 }
 
 interface MenuItem {
+  /**
+   * Locale-stable slug for data-testid (menu-item-<id>) and React keys. The
+   * editor e2e suite selects on these, so they keep the values the old
+   * English-label slugs produced, whatever locale renders the label.
+   */
+  id: string;
   label: string;
   shortcut?: string;
   action?: () => void;
@@ -39,7 +43,14 @@ interface MenuDef {
 }
 
 function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
+  const { t } = useTranslation();
+  const m = t.editor.menu;
+  // The editor's shortcuts are react-hotkeys-hook bindings, so `mod` follows
+  // that library's rule (Ctrl on an iPad's mobile user agent, for one).
+  const modIsMeta = hotkeysModIsMeta();
+  const hint = (keys: string) => formatShortcut(keys, modIsMeta);
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
+  const rebaking = useEditorStore((s) => s.rebaking);
   const layers = useEditorStore((s) => s.layers);
   const activeLayerId = useEditorStore((s) => s.activeLayerId);
   const rulersVisible = useEditorStore((s) => s.rulersVisible);
@@ -59,10 +70,17 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const invertSelection = useEditorStore((s) => s.invertSelection);
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const setPanOffset = useEditorStore((s) => s.setPanOffset);
-  const rotateCanvas = useEditorStore((s) => s.rotateCanvas);
-  const flipCanvasHorizontal = useEditorStore((s) => s.flipCanvasHorizontal);
-  const flipCanvasVertical = useEditorStore((s) => s.flipCanvasVertical);
-  const trimCanvas = useEditorStore((s) => s.trimCanvas);
+  const rotateAction = useEditorStore((s) => s.rotateCanvas);
+  const flipHorizontalAction = useEditorStore((s) => s.flipCanvasHorizontal);
+  const flipVerticalAction = useEditorStore((s) => s.flipCanvasVertical);
+  const trimAction = useEditorStore((s) => s.trimCanvas);
+  // These rebuild the bitmap and can fail, leaving the editor as it was; say so.
+  const transformFailed = t.common.somethingWentWrong;
+  const rotateCanvas = (degrees: 90 | 180 | 270) =>
+    runEditorAction(rotateAction(degrees), transformFailed);
+  const flipCanvasHorizontal = () => runEditorAction(flipHorizontalAction(), transformFailed);
+  const flipCanvasVertical = () => runEditorAction(flipVerticalAction(), transformFailed);
+  const trimCanvas = () => runEditorAction(trimAction(), transformFailed);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
   const toggleRulers = useEditorStore((s) => s.toggleRulers);
   const toggleGrid = useEditorStore((s) => s.toggleGrid);
@@ -75,6 +93,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const pasteInPlace = useEditorStore((s) => s.pasteInPlace);
   const removeObjects = useEditorStore((s) => s.removeObjects);
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
+  const setSelectedObjects = useEditorStore((s) => s.setSelectedObjects);
   const bringToFront = useEditorStore((s) => s.bringToFront);
   const bringForward = useEditorStore((s) => s.bringForward);
   const sendBackward = useEditorStore((s) => s.sendBackward);
@@ -83,25 +102,47 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
   const singleLayer = layers.length <= 1;
   const undo = useCallback(() => {
-    useEditorStore.temporal.getState().undo();
+    void undoEditor();
   }, []);
   const redo = useCallback(() => {
-    useEditorStore.temporal.getState().redo();
+    void redoEditor();
   }, []);
 
+  // A row's `shortcut` must name a key use-editor-shortcuts.ts binds to that
+  // same command (#1943). Rows with no binding show no hint: Ctrl+N and Ctrl+W
+  // never reach the page in Chrome anyway, so New and Close couldn't take them.
   return [
     {
-      label: "File",
+      label: m.file.label,
       testId: "file",
       items: [
-        { label: "New", shortcut: mod("Ctrl+N"), action: callbacks.onNewDocument },
-        { label: "Open", shortcut: mod("Ctrl+O"), action: callbacks.onOpenImage },
-        { label: "Save", shortcut: mod("Ctrl+S"), action: callbacks.onSave, dividerAfter: true },
-        { label: "Export As...", shortcut: mod("Ctrl+Shift+E"), action: callbacks.onExport },
-        { label: "Quick Export as PNG", shortcut: mod("Ctrl+Shift+P"), action: callbacks.onExport },
+        { id: "new", label: m.file.new, action: callbacks.onNewDocument },
+        { id: "open", label: m.file.open, action: callbacks.onOpenImage },
         {
-          label: "Close",
-          shortcut: mod("Ctrl+W"),
+          id: "save",
+          label: m.file.save,
+          shortcut: hint("mod+S"),
+          action: callbacks.onSave,
+          disabled: rebaking,
+          dividerAfter: true,
+        },
+        {
+          id: "export-as",
+          label: m.file.exportAs,
+          // mod+shift+e is Flatten All; export listens on mod+shift+s.
+          shortcut: hint("mod+Shift+S"),
+          action: callbacks.onExport,
+          disabled: rebaking,
+        },
+        {
+          id: "quick-export-as-png",
+          label: m.file.quickExportPng,
+          action: callbacks.onExport,
+          disabled: rebaking,
+        },
+        {
+          id: "close",
+          label: m.file.close,
           disabled: !hasImage,
           action: () => {
             if (hasImage) {
@@ -117,115 +158,190 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
       ],
     },
     {
-      label: "Edit",
+      label: m.edit.label,
       testId: "edit",
       items: [
-        { label: "Undo", shortcut: mod("Ctrl+Z"), action: undo },
-        { label: "Redo", shortcut: mod("Ctrl+Shift+Z"), action: redo, dividerAfter: true },
-        { label: "Cut", shortcut: mod("Ctrl+X"), action: cutObjects },
-        { label: "Copy", shortcut: mod("Ctrl+C"), action: copyObjects },
-        { label: "Copy Merged", shortcut: mod("Ctrl+Shift+C"), action: copyObjects },
-        { label: "Paste", shortcut: mod("Ctrl+V"), action: pasteObjects },
+        { id: "undo", label: m.edit.undo, shortcut: hint("mod+Z"), action: undo },
         {
-          label: "Paste in Place",
-          shortcut: mod("Ctrl+Shift+V"),
+          id: "redo",
+          label: m.edit.redo,
+          shortcut: hint("mod+Shift+Z"),
+          action: redo,
+          dividerAfter: true,
+        },
+        { id: "cut", label: m.edit.cut, shortcut: hint("mod+X"), action: cutObjects },
+        { id: "copy", label: m.edit.copy, shortcut: hint("mod+C"), action: copyObjects },
+        {
+          id: "copy-merged",
+          label: m.edit.copyMerged,
+          shortcut: hint("mod+Shift+C"),
+          action: () => void copyMergedToClipboard(t.editor.ui.exportDialog.copyFailed),
+          disabled: rebaking,
+        },
+        { id: "paste", label: m.edit.paste, shortcut: hint("mod+V"), action: pasteObjects },
+        {
+          id: "paste-in-place",
+          label: m.edit.pasteInPlace,
+          shortcut: hint("mod+Shift+V"),
           action: pasteInPlace,
           dividerAfter: true,
         },
         {
-          label: "Delete",
+          id: "delete",
+          label: m.edit.delete,
           shortcut: "Del",
           action: () => removeObjects(selectedObjectIds),
           disabled: selectedObjectIds.length === 0,
         },
         {
-          label: "Free Transform",
-          shortcut: mod("Ctrl+T"),
+          id: "free-transform",
+          label: m.edit.freeTransform,
+          shortcut: hint("mod+Alt+T"),
           action: () => setTool("transform"),
           dividerAfter: true,
         },
         {
-          label: "Transform",
+          id: "transform",
+          label: m.edit.transform.label,
           submenu: [
-            { label: "Scale", action: () => setTool("transform") },
-            { label: "Rotate", action: () => setTool("transform") },
-            { label: "Skew", action: () => setTool("transform") },
-            { label: "Flip Horizontal", action: flipCanvasHorizontal },
-            { label: "Flip Vertical", action: flipCanvasVertical },
+            { id: "scale", label: m.edit.transform.scale, action: () => setTool("transform") },
+            { id: "rotate", label: m.edit.transform.rotate, action: () => setTool("transform") },
+            { id: "skew", label: m.edit.transform.skew, action: () => setTool("transform") },
+            {
+              id: "flip-horizontal",
+              label: m.edit.transform.flipHorizontal,
+              action: flipCanvasHorizontal,
+              disabled: rebaking,
+            },
+            {
+              id: "flip-vertical",
+              label: m.edit.transform.flipVertical,
+              action: flipCanvasVertical,
+              disabled: rebaking,
+            },
           ],
         },
       ],
     },
     {
-      label: "Image",
+      label: m.image.label,
       testId: "image",
       items: [
         {
-          label: "Image Size...",
-          shortcut: mod("Ctrl+Alt+I"),
+          id: "image-size",
+          label: m.image.imageSize,
           action: callbacks.onImageResize,
+          disabled: rebaking,
           dividerAfter: true,
         },
-        { label: "Canvas Size...", shortcut: mod("Ctrl+Alt+C"), action: callbacks.onCanvasResize },
         {
-          label: "Image Rotation",
+          id: "canvas-size",
+          label: m.image.canvasSize,
+          action: callbacks.onCanvasResize,
+          disabled: rebaking,
+        },
+        {
+          id: "image-rotation",
+          label: m.image.rotation.label,
+          disabled: rebaking,
           submenu: [
-            { label: "90° CW", action: () => rotateCanvas(90) },
-            { label: "90° CCW", action: () => rotateCanvas(270) },
-            { label: "180°", action: () => rotateCanvas(180) },
-            { label: "Flip Horizontal", action: flipCanvasHorizontal },
-            { label: "Flip Vertical", action: flipCanvasVertical },
+            {
+              id: "90-cw",
+              label: m.image.rotation.cw90,
+              action: () => rotateCanvas(90),
+              disabled: rebaking,
+            },
+            {
+              id: "90-ccw",
+              label: m.image.rotation.ccw90,
+              action: () => rotateCanvas(270),
+              disabled: rebaking,
+            },
+            {
+              id: "180",
+              label: m.image.rotation.r180,
+              action: () => rotateCanvas(180),
+              disabled: rebaking,
+            },
+            {
+              id: "flip-horizontal",
+              label: m.image.rotation.flipHorizontal,
+              action: flipCanvasHorizontal,
+              disabled: rebaking,
+            },
+            {
+              id: "flip-vertical",
+              label: m.image.rotation.flipVertical,
+              action: flipCanvasVertical,
+              disabled: rebaking,
+            },
           ],
           dividerAfter: true,
         },
-        { label: "Trim", action: trimCanvas },
+        { id: "trim", label: m.image.trim, action: trimCanvas, disabled: rebaking },
         {
-          label: "Adjustments",
+          id: "adjustments",
+          label: m.image.adjustments.label,
           submenu: [
-            { label: "Brightness/Contrast" },
-            { label: "Hue/Saturation" },
-            { label: "Color Balance" },
-            { label: "Levels" },
-            { label: "Curves" },
+            { id: "brightness-contrast", label: m.image.adjustments.brightnessContrast },
+            { id: "hue-saturation", label: m.image.adjustments.hueSaturation },
+            { id: "color-balance", label: m.image.adjustments.colorBalance },
+            { id: "levels", label: m.image.adjustments.levels },
+            { id: "curves", label: m.image.adjustments.curves },
           ],
         },
       ],
     },
     {
-      label: "Layer",
+      label: m.layer.label,
       testId: "layer",
       items: [
-        { label: "New Layer", shortcut: mod("Ctrl+Shift+N"), action: addLayer },
-        { label: "Duplicate Layer", action: () => duplicateLayer(activeLayerId) },
         {
-          label: "Delete Layer",
+          id: "new-layer",
+          label: m.layer.newLayer,
+          shortcut: hint("mod+Alt+Shift+N"),
+          action: addLayer,
+        },
+        {
+          id: "duplicate-layer",
+          label: m.layer.duplicateLayer,
+          action: () => duplicateLayer(activeLayerId),
+        },
+        {
+          id: "delete-layer",
+          label: m.layer.deleteLayer,
           action: () => removeLayer(activeLayerId),
           disabled: singleLayer,
           dividerAfter: true,
         },
         {
-          label: "Arrange",
+          id: "arrange",
+          label: m.layer.arrange.label,
           submenu: [
             {
-              label: "Bring to Front",
+              id: "bring-to-front",
+              label: m.layer.arrange.bringToFront,
               action: () => {
                 if (selectedObjectIds[0]) bringToFront(selectedObjectIds[0]);
               },
             },
             {
-              label: "Bring Forward",
+              id: "bring-forward",
+              label: m.layer.arrange.bringForward,
               action: () => {
                 if (selectedObjectIds[0]) bringForward(selectedObjectIds[0]);
               },
             },
             {
-              label: "Send Backward",
+              id: "send-backward",
+              label: m.layer.arrange.sendBackward,
               action: () => {
                 if (selectedObjectIds[0]) sendBackward(selectedObjectIds[0]);
               },
             },
             {
-              label: "Send to Back",
+              id: "send-to-back",
+              label: m.layer.arrange.sendToBack,
               action: () => {
                 if (selectedObjectIds[0]) sendToBack(selectedObjectIds[0]);
               },
@@ -234,22 +350,25 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           dividerAfter: true,
         },
         {
-          label: "Merge Down",
-          shortcut: mod("Ctrl+E"),
+          id: "merge-down",
+          label: m.layer.mergeDown,
+          shortcut: hint("mod+E"),
           action: () => mergeDown(activeLayerId),
           disabled: activeIndex <= 0,
         },
-        { label: "Flatten Image", action: flattenAll },
+        { id: "flatten-image", label: m.layer.flattenImage, action: flattenAll },
       ],
     },
     {
-      label: "Select",
+      label: m.select.label,
       testId: "select",
       items: [
         {
-          label: "All",
-          shortcut: mod("Ctrl+A"),
-          action: () =>
+          id: "all",
+          label: m.select.all,
+          shortcut: hint("mod+A"),
+          action: () => {
+            setSelectedObjects([]);
             setSelection({
               type: "rect",
               points: [
@@ -263,75 +382,134 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
                 canvasSize.height,
               ],
               bounds: { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height },
-            }),
+            });
+          },
         },
         {
-          label: "Deselect",
-          shortcut: mod("Ctrl+D"),
+          id: "deselect",
+          label: m.select.deselect,
+          shortcut: hint("mod+D"),
           action: () => setSelection(null),
           dividerAfter: true,
         },
-        { label: "Inverse", shortcut: mod("Ctrl+Shift+I"), action: invertSelection },
-        { label: "Color Range..." },
+        {
+          id: "inverse",
+          label: m.select.inverse,
+          shortcut: hint("mod+Shift+I"),
+          action: invertSelection,
+        },
+        { id: "color-range", label: m.select.colorRange },
       ],
     },
     {
-      label: "Filter",
+      label: m.filter.label,
       testId: "filter",
       items: [
         {
-          label: "Blur",
+          id: "blur",
+          label: m.filter.blur.label,
           submenu: [
-            { label: "Gaussian Blur", action: () => toggleFilter("blur") },
-            { label: "Motion Blur", action: () => toggleFilter("motionBlur") },
-            { label: "Radial Blur", action: () => toggleFilter("radialBlur") },
-            { label: "Surface Blur", action: () => toggleFilter("surfaceBlur") },
+            {
+              id: "gaussian-blur",
+              label: m.filter.blur.gaussian,
+              action: () => toggleFilter("blur"),
+            },
+            {
+              id: "motion-blur",
+              label: m.filter.blur.motion,
+              action: () => toggleFilter("motionBlur"),
+            },
+            {
+              id: "radial-blur",
+              label: m.filter.blur.radial,
+              action: () => toggleFilter("radialBlur"),
+            },
+            {
+              id: "surface-blur",
+              label: m.filter.blur.surface,
+              action: () => toggleFilter("surfaceBlur"),
+            },
           ],
         },
         {
-          label: "Sharpen",
+          id: "sharpen",
+          label: m.filter.sharpen.label,
           submenu: [
-            { label: "Sharpen", action: () => toggleFilter("sharpen") },
-            { label: "Unsharp Mask" },
+            {
+              id: "sharpen",
+              label: m.filter.sharpen.sharpen,
+              action: () => toggleFilter("sharpen"),
+            },
+            { id: "unsharp-mask", label: m.filter.sharpen.unsharpMask },
           ],
         },
         {
-          label: "Noise",
+          id: "noise",
+          label: m.filter.noise.label,
           submenu: [
-            { label: "Add Noise", action: () => toggleFilter("noise") },
-            { label: "Reduce Noise" },
+            {
+              id: "add-noise",
+              label: m.filter.noise.addNoise,
+              action: () => toggleFilter("noise"),
+            },
+            { id: "reduce-noise", label: m.filter.noise.reduceNoise },
           ],
         },
         {
-          label: "Pixelate",
+          id: "pixelate",
+          label: m.filter.pixelate.label,
           submenu: [
-            { label: "Pixelate", action: () => toggleFilter("pixelate") },
-            { label: "Mosaic" },
+            {
+              id: "pixelate",
+              label: m.filter.pixelate.pixelate,
+              action: () => toggleFilter("pixelate"),
+            },
+            { id: "mosaic", label: m.filter.pixelate.mosaic },
           ],
         },
         {
-          label: "Stylize",
+          id: "stylize",
+          label: m.filter.stylize.label,
           submenu: [
-            { label: "Emboss", action: () => toggleFilter("emboss") },
-            { label: "Solarize", action: () => toggleFilter("solarize") },
-            { label: "Posterize", action: () => toggleFilter("posterize") },
+            { id: "emboss", label: m.filter.stylize.emboss, action: () => toggleFilter("emboss") },
+            {
+              id: "solarize",
+              label: m.filter.stylize.solarize,
+              action: () => toggleFilter("solarize"),
+            },
+            {
+              id: "posterize",
+              label: m.filter.stylize.posterize,
+              action: () => toggleFilter("posterize"),
+            },
           ],
           dividerAfter: true,
         },
-        { label: "Grayscale", action: () => toggleFilter("grayscale") },
-        { label: "Sepia", action: () => toggleFilter("sepia") },
-        { label: "Invert", action: () => toggleFilter("invert") },
+        { id: "grayscale", label: m.filter.grayscale, action: () => toggleFilter("grayscale") },
+        { id: "sepia", label: m.filter.sepia, action: () => toggleFilter("sepia") },
+        { id: "invert", label: m.filter.invert, action: () => toggleFilter("invert") },
       ],
     },
     {
-      label: "View",
+      label: m.view.label,
       testId: "view",
       items: [
-        { label: "Zoom In", shortcut: mod("Ctrl+="), action: () => setZoom(zoom * 1.25) },
-        { label: "Zoom Out", shortcut: mod("Ctrl+-"), action: () => setZoom(zoom / 1.25) },
         {
-          label: "Fit on Screen",
-          shortcut: mod("Ctrl+0"),
+          id: "zoom-in",
+          label: m.view.zoomIn,
+          shortcut: hint("mod+="),
+          action: () => setZoom(zoom * 1.25),
+        },
+        {
+          id: "zoom-out",
+          label: m.view.zoomOut,
+          shortcut: hint("mod+-"),
+          action: () => setZoom(zoom / 1.25),
+        },
+        {
+          id: "fit-on-screen",
+          label: m.view.fitOnScreen,
+          shortcut: hint("mod+0"),
           action: () => {
             const editorCanvas = document.querySelector("[data-testid='editor-canvas']");
             if (!editorCanvas) return;
@@ -346,8 +524,9 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           },
         },
         {
-          label: "Actual Pixels",
-          shortcut: mod("Ctrl+1"),
+          id: "actual-pixels",
+          label: m.view.actualPixels,
+          shortcut: hint("mod+1"),
           action: () => {
             const editorCanvas = document.querySelector("[data-testid='editor-canvas']");
             if (!editorCanvas) return;
@@ -359,21 +538,25 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           },
           dividerAfter: true,
         },
-        { label: "Rulers", checked: rulersVisible, action: toggleRulers },
-        { label: "Grid", checked: gridVisible, action: toggleGrid },
-        { label: "Guides", checked: guidesVisible, action: toggleGuides },
-        { label: "Snap", checked: snappingEnabled, action: toggleSnapping, dividerAfter: true },
-        { label: "Panels", checked: rightPanelVisible, action: toggleRightPanel },
+        { id: "rulers", label: m.view.rulers, checked: rulersVisible, action: toggleRulers },
+        { id: "grid", label: m.view.grid, checked: gridVisible, action: toggleGrid },
+        { id: "guides", label: m.view.guides, checked: guidesVisible, action: toggleGuides },
+        {
+          id: "snap",
+          label: m.view.snap,
+          checked: snappingEnabled,
+          action: toggleSnapping,
+          dividerAfter: true,
+        },
+        {
+          id: "panels",
+          label: m.view.panels,
+          checked: rightPanelVisible,
+          action: toggleRightPanel,
+        },
       ],
     },
   ];
-}
-
-function toTestId(label: string): string {
-  return label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
 }
 
 function MenuItemRow({ item, onClose }: { item: MenuItem; onClose: () => void }) {
@@ -408,7 +591,7 @@ function MenuItemRow({ item, onClose }: { item: MenuItem; onClose: () => void })
               ? "text-muted-foreground"
               : "text-foreground hover:bg-accent hover:text-accent-foreground",
           )}
-          data-testid={`menu-item-${toTestId(item.label)}`}
+          data-testid={`menu-item-${item.id}`}
         >
           <span>{item.label}</span>
           <ChevronRight size={12} className="ms-4 text-muted-foreground" />
@@ -421,7 +604,7 @@ function MenuItemRow({ item, onClose }: { item: MenuItem; onClose: () => void })
             onMouseLeave={handleLeave}
           >
             {item.submenu.map((sub) => (
-              <MenuItemRow key={sub.label} item={sub} onClose={onClose} />
+              <MenuItemRow key={sub.id} item={sub} onClose={onClose} />
             ))}
           </div>
         )}
@@ -445,7 +628,7 @@ function MenuItemRow({ item, onClose }: { item: MenuItem; onClose: () => void })
           item.action?.();
           onClose();
         }}
-        data-testid={`menu-item-${toTestId(item.label)}`}
+        data-testid={`menu-item-${item.id}`}
       >
         <span className="flex items-center gap-2">
           {item.checked !== undefined && (
@@ -530,7 +713,7 @@ export function EditorMenuBar(props: MenuBarCallbacks) {
                 role="menu"
               >
                 {menu.items.map((item) => (
-                  <MenuItemRow key={item.label} item={item} onClose={close} />
+                  <MenuItemRow key={item.id} item={item} onClose={close} />
                 ))}
               </div>
             )}

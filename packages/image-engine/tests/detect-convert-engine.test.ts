@@ -1,6 +1,6 @@
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
-import { processImage } from "../src/engine.js";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { configureSharpConcurrency, processImage } from "../src/engine.js";
 import { detectFormat } from "../src/formats/detect.js";
 import { colorBlindness } from "../src/operations/color-blindness.js";
 import { convert } from "../src/operations/convert.js";
@@ -428,5 +428,21 @@ describe("processImage pipeline dispatch", () => {
     expect(g).toBe(b);
     expect(r).toBeGreaterThan(0);
     expect(r).toBeLessThan(255);
+  });
+});
+
+describe("configureSharpConcurrency (#2708)", () => {
+  const initialConcurrency = sharp.concurrency();
+
+  afterEach(() => {
+    sharp.concurrency(initialConcurrency);
+  });
+
+  it("sets and returns the libvips concurrency for the image engine", () => {
+    expect(configureSharpConcurrency(2)).toBe(2);
+    expect(sharp.concurrency()).toBe(2);
+
+    expect(configureSharpConcurrency(1)).toBe(1);
+    expect(sharp.concurrency()).toBe(1);
   });
 });

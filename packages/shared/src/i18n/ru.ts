@@ -31,6 +31,7 @@ export const ru: TranslationKeys = {
     clear: "Очистить",
     copy: "Копировать",
     copied: "Скопировано!",
+    copyFailed: "Не удалось скопировать",
     noResults: "Ничего не найдено",
     showLess: "Показать меньше",
     showMore: "Показать ещё {count}",
@@ -1103,6 +1104,11 @@ export const ru: TranslationKeys = {
       name: "Упорядочивание PDF",
       description: "Изменение порядка страниц вручную",
     },
+    "multi-tool-pdf": {
+      name: "PDF-мультиинструмент",
+      description:
+        "Изменение порядка, поворот, удаление страниц и перенос страниц из других PDF в одном редакторе",
+    },
     "protect-pdf": {
       name: "Защита PDF",
       description: "Установка пароля (шифрование AES-256)",
@@ -1239,7 +1245,13 @@ export const ru: TranslationKeys = {
       name: "Конструктор Pipeline",
       description: "Объединение нескольких инструментов в рабочий процесс",
     },
-    processing: { canceled: "Обработка отменена" },
+    processing: {
+      canceled: "Обработка отменена",
+      cancelUnavailable: "Эту обработку сейчас нельзя отменить. Она продолжается.",
+      cancelNotAllowed:
+        "Не удалось отменить: вы вышли из системы или вам нельзя останавливать эту обработку. Она продолжается.",
+      cancelFailed: "Не удалось отменить обработку. Она продолжается, попробуйте снова.",
+    },
     mediaPlayer: {
       unsupported: "Ваш браузер не поддерживает этот формат медиа.",
     },
@@ -1265,7 +1277,6 @@ export const ru: TranslationKeys = {
       paintOverObjectsToErase: "Закрасьте объекты, которые хотите удалить",
     },
     "crop-canvas": {
-      original: "Оригинал:",
       cropPreview: "Предпросмотр обрезки",
       cropRegionSize: "Область обрезки: {width} x {height}",
       originalSize: "Оригинал: {width} x {height}",
@@ -1298,7 +1309,6 @@ export const ru: TranslationKeys = {
       infoBar: "{width} x {height}px . сетка {cols}x{rows} . {count} плиток",
     },
     "remove-bg": {
-      original: "Оригинал:",
       transparent: "Прозрачный",
       color: "Цветной",
       gradient: "Градиент",
@@ -1325,7 +1335,6 @@ export const ru: TranslationKeys = {
       theExtractedTextWillAppear: "Извлечённый текст появится здесь после запуска OCR.",
     },
     "image-enhancement": {
-      original: "Оригинал:",
       removesNoiseAndArtifactsUsing: "Удаляет шум и артефакты с помощью AI",
       analyzingImage: "Анализ изображения...",
       imageLooksGoodFineTune:
@@ -1338,8 +1347,6 @@ export const ru: TranslationKeys = {
       enhancedSizeKb: "Улучшено: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Все",
-      group: "Группа",
       dimensions: "Размеры",
       format: "Формат",
       scanned: "Просканировано:",
@@ -1374,7 +1381,6 @@ export const ru: TranslationKeys = {
       pageSize: "Размер страницы",
     },
     color: {
-      original: "Оригинал:",
       light: "Свет",
       brightness: "Яркость",
       contrast: "Контраст",
@@ -1412,6 +1418,7 @@ export const ru: TranslationKeys = {
       submitBatch: "Сжать ({count} файлов)",
       submitTarget: "Сжать до {size} KB",
       resizedToFit: "Уменьшено до {width} × {height}, чтобы уложиться в {size} KB",
+      batchResized: "Уменьшено изображений: {count} из {total}, чтобы уложиться в {size} KB.",
       progressLabel: "Сжатие",
       original: "Оригинал: {size} KB",
       processed: "Обработано: {size} KB",
@@ -1443,6 +1450,8 @@ export const ru: TranslationKeys = {
       submit: "Изменить размер",
       submitBatch: "Изменить размер ({count} файлов)",
       progressLabel: "Изменение размера",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      maxPercentageExceeded: "Используйте масштаб от 1 до {max}%.",
     },
     crop: {
       width: "Ширина",
@@ -1466,6 +1475,7 @@ export const ru: TranslationKeys = {
       submit: "Обрезать",
       submitBatch: "Обрезать ({count} файлов)",
       progressLabel: "Обрезка",
+      free: "Свободно",
     },
     rotate: {
       rotate90CounterClockwise: "Повернуть на 90° против часовой стрелки",
@@ -1485,7 +1495,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Применение",
     },
     convert: {
-      original: "Оригинал:",
       originalSizeKb: "Оригинал: {size} KB",
       processedSizeKb: "Обработано: {size} KB",
       targetFormat: "Целевой формат",
@@ -1515,7 +1524,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Оптимизация",
     },
     "strip-metadata": {
-      original: "Оригинал:",
       iccProfile: "ICC",
       originalSize: "Оригинал: {size} KB",
       processedSize: "Обработано: {size} KB",
@@ -1539,9 +1547,9 @@ export const ru: TranslationKeys = {
       metadataRemoved: "Метаданные удалены: {size} KB",
       submit: "Удалить метаданные",
       progressLabel: "Удаление метаданных",
+      inspectFailed: "Не удалось прочитать метаданные",
     },
     "edit-metadata": {
-      original: "Оригинал:",
       imageDescription: "Описание изображения",
       photographerCreatorName: "Имя фотографа или автора",
       imageTitle: "Заголовок изображения",
@@ -1602,6 +1610,7 @@ export const ru: TranslationKeys = {
       datesShifted: "даты сдвинуты",
       submit: "Применить метаданные",
       progressLabel: "Запись метаданных",
+      inspectFailed: "Не удалось проанализировать файл",
     },
     "bulk-rename": {
       pattern: "Шаблон",
@@ -1612,6 +1621,7 @@ export const ru: TranslationKeys = {
       renaming: "Переименование...",
       submit: "Переименовать {count} файлов",
       zipDownloaded: "ZIP-архив успешно скачан",
+      renameFailed: "Ошибка переименования",
     },
     "image-to-pdf": {
       preview: "Предпросмотр",
@@ -1641,10 +1651,12 @@ export const ru: TranslationKeys = {
       progressLabel: "Создание PDF",
       uploadingImages: "Загрузка изображений...",
       processingPages: "Обработка {count} страниц...",
+      parseResponseFailed: "Не удалось разобрать ответ сервера",
+      creationFailedWithStatus: "Не удалось создать PDF. Проверьте изображения и попробуйте снова.",
+      networkErrorCreation: "Сетевая ошибка при создании PDF",
+      requestTimedOut: "Время ожидания истекло: сервер может быть перегружен",
     },
     "pdf-to-image": {
-      converting2: "Конвертация",
-      page: "страница",
       custom: "Пользовательское",
       uploadAPdfToGet: "Загрузите PDF, чтобы начать",
       generatingPagePreviews: "Создание предпросмотров страниц...",
@@ -1701,6 +1713,12 @@ export const ru: TranslationKeys = {
       submitPlural: "Сгенерировать Favicon ({count} изображений)",
       downloadZip: "Скачать ZIP с Favicon",
       progressLabel: "Генерация Favicon",
+      generationFailed: "Не удалось создать Favicon. Попробуйте другое изображение.",
+      networkError: "Сетевая ошибка при генерации Favicon",
+      timeout: "Время ожидания истекло: сервер может быть перегружен",
+      uploadingImages: "Загрузка изображений...",
+      processingImagesOne: "Обработка {count} изображения...",
+      processingImagesOther: "Обработка изображений: {count}...",
     },
     "adjust-colors": {
       light: "Свет",
@@ -1732,7 +1750,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Настройка цветов",
     },
     sharpening: {
-      original: "Оригинал:",
       originalSize: "Оригинал: {size} KB",
       processedSize: "Обработано: {size} KB",
       method: "Метод",
@@ -1759,9 +1776,17 @@ export const ru: TranslationKeys = {
       submit: "Повысить резкость",
       submitBatch: "Повысить резкость ({count} файлов)",
       progressLabel: "Повышение резкости",
+      presetNames: {
+        light: "Лёгкая",
+        medium: "Средняя",
+        strong: "Сильная",
+        portrait: "Портрет",
+        landscape: "Пейзаж",
+        detail: "Детализация",
+        print: "Печать",
+      },
     },
     "replace-color": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       sourceColor: "Исходный цвет (для замены)",
@@ -1775,7 +1800,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Замена цвета",
     },
     "color-blindness": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       simulationType: "Тип симуляции",
@@ -1785,6 +1809,44 @@ export const ru: TranslationKeys = {
       submit: "Симулировать",
       submitBatch: "Симулировать ({count} файлов)",
       progressLabel: "Симуляция дальтонизма",
+      types: {
+        protanopia: {
+          label: "Протанопия",
+          description: "Нет красных колбочек. Красные цвета выглядят тёмными. ~1% мужчин.",
+        },
+        protanomaly: {
+          label: "Протаномалия",
+          description: "Сниженная чувствительность к красному. ~1% мужчин.",
+        },
+        deuteranopia: {
+          label: "Дейтеранопия",
+          description: "Нет зелёных колбочек. Красный и зелёный выглядят похоже. ~1% мужчин.",
+        },
+        deuteranomaly: {
+          label: "Дейтераномалия",
+          description:
+            "Сниженная чувствительность к зелёному. Самый распространённый тип. ~5% мужчин.",
+        },
+        tritanopia: {
+          label: "Тританопия",
+          description:
+            "Нет синих колбочек. Синий и зелёный выглядят похоже. Встречается очень редко.",
+        },
+        tritanomaly: {
+          label: "Тританомалия",
+          description: "Сниженная чувствительность к синему. Встречается очень редко.",
+        },
+        achromatopsia: {
+          label: "Ахроматопсия",
+          description:
+            "Полная цветовая слепота. Различается только яркость. Встречается очень редко.",
+        },
+        blueConeMonochromacy: {
+          label: "Монохромазия синих колбочек",
+          description:
+            "Работают только синие колбочки. Цветовосприятие сильно ограничено. Встречается очень редко.",
+        },
+      },
     },
     "remove-background": {
       subject: "Объект",
@@ -1822,6 +1884,28 @@ export const ru: TranslationKeys = {
       submitBatch: "Удалить фон ({count} файлов)",
       progressLabel: "Удаление фона",
       cpuNote: "Использует модель ИИ. Без GPU обработка большого изображения может занять время.",
+      colorPresets: {
+        white: "Белый",
+        black: "Чёрный",
+        red: "Красный",
+        green: "Зелёный",
+        blue: "Синий",
+      },
+      gradientPresets: {
+        purple: "Фиолетовый",
+        pink: "Розовый",
+        blue: "Синий",
+        green: "Зелёный",
+        sunset: "Закат",
+        lavender: "Лаванда",
+      },
+      effectsProcessingFailed: "Не удалось применить эффекты",
+      effectsExpired:
+        "Срок предыдущего удаления фона истёк, поэтому оно запускается заново. Примените эффекты, когда оно завершится.",
+      refineChanged:
+        "Объект, качество, сглаживание краёв и очистка цвета применяются при удалении фона. Запустите удаление снова, чтобы использовать новые настройки.",
+      backgroundImageRequired: "Выберите фоновое изображение, чтобы продолжить.",
+      invalidHexColor: "Используйте шестнадцатеричный цвет, например #FF5500 или #F50.",
     },
     "remove-gif-background": {
       quality: "Качество",
@@ -1860,7 +1944,6 @@ export const ru: TranslationKeys = {
       download: "Скачать",
     },
     upscale: {
-      original: "Оригинал:",
       off: "Выкл.",
       originalKb: "Оригинал: {size} KB",
       upscaledKb: "Увеличено: {size} KB",
@@ -1877,9 +1960,11 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Увеличение {count} изображений",
       cpuNote:
         "Масштабирование ИИ требует много ресурсов. Без GPU обработка большого изображения может занять несколько минут.",
+      qualityFast: "Быстро",
+      qualityBalanced: "Сбалансированно",
+      qualityBest: "Наилучшее",
     },
     "erase-object": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       qualityFast: "Быстро",
@@ -1895,11 +1980,15 @@ export const ru: TranslationKeys = {
       clear: "Очистить",
       outputFormat: "Формат вывода",
       quality: "Качество",
-      paintHint: "Закрасьте объекты, которые хотите удалить. Нажмите Ctrl+Z для отмены.",
-      lassoHint: "Обведите петлёй объект, который хотите удалить. Нажмите Ctrl+Z для отмены.",
+      paintHint: "Закрасьте объекты, которые хотите удалить. Нажмите {shortcut} для отмены.",
+      lassoHint: "Обведите петлёй объект, который хотите удалить. Нажмите {shortcut} для отмены.",
       submit: "Удалить объект",
       submitBatch: "Удалить всё ({count})",
       progressLabel: "Удаление объекта",
+      stall: "Время обработки истекло без прогресса. Попробуйте снова.",
+      stallBatch: "Время обработки истекло. Попробуйте снова.",
+      timeoutOverloaded: "Время ожидания истекло: сервер может быть перегружен. Попробуйте снова.",
+      erasingProgress: "Удаление {current}/{total}",
     },
     ocr: {
       copied: "Скопировано",
@@ -1909,6 +1998,8 @@ export const ru: TranslationKeys = {
         "Улучшает локальный контраст перед распознаванием. Быстрый режим применяет его сразу; Сбалансированный и Лучший сохраняют вариант только при улучшении калиброванной оценки.",
       fastKoreanUnsupported:
         "Быстрый OCR не поддерживает корейский язык. Установите пакет точного OCR и выберите «Сбалансированный» или «Лучший».",
+      fastArabicUnsupported:
+        "Быстрый OCR не поддерживает арабский язык. Установите пакет точного OCR и выберите «Сбалансированный» или «Лучший».",
       language: "Язык",
       autoDetect: "Автоопределение",
       extractedText: "Извлечённый текст",
@@ -1917,6 +2008,9 @@ export const ru: TranslationKeys = {
       submit: "Извлечь текст",
       submitBatch: "Извлечь текст ({count} файлов)",
       progressLabel: "Извлечение текста",
+      filesFailed: "Не удалось обработать файлов: {failed} из {total}",
+      noTextDetectedInline: "(текст не обнаружен)",
+      fileErrorInline: "(ошибка: {message})",
     },
     "ocr-pdf": {
       quality: "Качество",
@@ -1930,7 +2024,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Извлечение текста из PDF",
     },
     "blur-faces": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       blurRadius: "Радиус размытия",
@@ -1943,7 +2036,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Размытие лиц",
     },
     "enhance-faces": {
-      original: "Оригинал:",
       subtle: "Лёгкая",
       maximum: "Максимальный",
       fewerFaces: "Меньше лиц",
@@ -2004,6 +2096,9 @@ export const ru: TranslationKeys = {
       submitSubject: "Умная обрезка",
       submitFace: "Обрезка по лицу",
       submitTrim: "Обрезать поля",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      cropAreaExceeded:
+        "Этот фрагмент превышает лимит в {max} пикселей. Уменьшите ширину, высоту или отступ.",
     },
     imageEnhancement: {
       enhancementMode: "Режим улучшения",
@@ -2039,6 +2134,14 @@ export const ru: TranslationKeys = {
         "Для глубокого улучшения нужен пакет увеличения и улучшения, но он не установлен, поэтому применено стандартное улучшение.",
       deepEnhanceSkippedAnimated:
         "Глубокое улучшение не работает с анимированными изображениями, поэтому к каждому кадру применено стандартное улучшение.",
+      batchDeepEnhanceSkipped:
+        "Глубокое улучшение не сработало для {count} из {total} изображений, к ним применено стандартное улучшение.",
+      batchDeepEnhanceSkippedFailed:
+        "Глубокое улучшение завершилось ошибкой для {count} из {total} изображений, к ним применено стандартное улучшение.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Глубокое улучшение не сработало для {count} из {total} изображений: пакет увеличения и улучшения не установлен.",
+      batchDeepEnhanceSkippedAnimated:
+        "Глубокое улучшение пропустило {count} из {total} изображений, потому что они анимированные.",
     },
     "noise-removal": {
       off: "Выкл.",
@@ -2070,7 +2173,6 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Удаление шума из {count} изображений",
     },
     "red-eye-removal": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       fixedKb: "Исправлено: {size} KB",
       sensitivity: "Чувствительность",
@@ -2087,7 +2189,6 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Исправление красных глаз на {count} изображениях",
     },
     "restore-photo": {
-      original: "Оригинал:",
       subtle: "Лёгкая",
       strong: "Сильное",
       originalKb: "Оригинал: {size} KB",
@@ -2124,6 +2225,9 @@ export const ru: TranslationKeys = {
       submit: "Изменить размер",
       submitBatch: "Изменить размер ({count} файлов)",
       progressLabel: "Контентно-зависимое масштабирование",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
+      areaExceeded:
+        "Изменение размера с учётом содержимого ограничено {max} пикселями в сумме. Уменьшите ширину или высоту.",
     },
     "ai-canvas-expand": {
       quality: "Качество",
@@ -2145,7 +2249,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Расширение холста",
     },
     colorize: {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       colorizedKb: "Колоризировано: {size} KB",
       aiModel: "AI-модель",
@@ -2290,6 +2393,13 @@ export const ru: TranslationKeys = {
       dragToAdjust: "Перетащите для настройки",
       scrollToZoom: "Прокрутите для масштабирования",
       photoGenerated: "Фото создано. Скачайте с левой панели.",
+      analysisFailedWithStatus: "Не удалось проанализировать фото. Попробуйте более чёткий снимок.",
+      faceAnalysisFailed: "Ошибка анализа лица",
+      generationFailedWithStatus:
+        "Не удалось создать фото на документы. Пожалуйста, попробуйте снова.",
+      photoGenerationFailed: "Ошибка создания фото",
+      analysisExpired:
+        "Срок анализа истёк, поэтому фото анализируется заново. Создайте его, когда анализ завершится.",
     },
     "transcribe-audio": {
       language: "Язык",
@@ -2347,7 +2457,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Размытие фона",
     },
     "watermark-text": {
-      original: "Оригинал:",
       applyWatermark: "Применить водяной знак",
       tiledRepeating: "Плитка (повторение)",
       originalKb: "Оригинал: {size} KB",
@@ -2370,7 +2479,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Добавление водяного знака",
     },
     "watermark-image": {
-      original: "Оригинал:",
       center: "Центр",
       topLeft: "Сверху слева",
       topRight: "Сверху справа",
@@ -2389,7 +2497,6 @@ export const ru: TranslationKeys = {
       submitBatch: "Применить водяной знак ({count} файлов)",
     },
     "text-overlay": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       text: "Текст",
@@ -2409,7 +2516,6 @@ export const ru: TranslationKeys = {
       defaultText: "Ваш текст",
     },
     compose: {
-      original: "Оригинал:",
       screen: "Экран",
       processing: "Обработка...",
       overlayImage: "Накладываемое изображение",
@@ -2464,9 +2570,6 @@ export const ru: TranslationKeys = {
       backToGallery: "Назад к галерее",
     },
     info: {
-      min: "мин:",
-      max: "макс:",
-      mean: "среднее:",
       minValue: "мин:{value}",
       maxValue: "макс:{value}",
       meanValue: "среднее:{value}",
@@ -2503,6 +2606,7 @@ export const ru: TranslationKeys = {
       similarity: "Сходство: {percent}%",
       submit: "Сравнить",
       downloadDiff: "Скачать разницу",
+      comparisonFailed: "Ошибка сравнения",
     },
     "find-duplicates": {
       sensitivity: "Чувствительность",
@@ -2532,6 +2636,10 @@ export const ru: TranslationKeys = {
       threshold: "Порог",
       submit: "Искать дубликаты",
       scanning: "Сканирование...",
+      parseResultsFailed: "Не удалось разобрать результаты сканирования",
+      networkErrorUpload:
+        "Сетевая ошибка при загрузке. Попробуйте меньше файлов или проверьте подключение.",
+      requestTimedOut: "Время ожидания истекло. Попробуйте меньше файлов.",
     },
     "color-palette": {
       colors: "Цвета",
@@ -2602,6 +2710,26 @@ export const ru: TranslationKeys = {
       downloadFormat: "Формат скачивания",
       submit: "Сгенерировать QR-код",
       download: "Скачать QR-код",
+      styleSquare: "Квадрат",
+      styleRounded: "Скруглённый",
+      styleDots: "Точки",
+      styleClassy: "Элегантный",
+      styleClassyRounded: "Элег. скругл.",
+      styleExtraRounded: "Сильно скругл.",
+      styleDot: "Точка",
+      formatDescPng: "Для экрана",
+      formatDescSvg: "Для печати",
+      formatDescJpeg: "Меньший размер",
+      formatDescWebp: "Современный формат",
+      vcardFirstName: "Имя",
+      vcardFirstNamePlaceholder: "Иван",
+      vcardLastName: "Фамилия",
+      vcardLastNamePlaceholder: "Иванов",
+      vcardOrganization: "Организация",
+      vcardOrganizationPlaceholder: "Компания",
+      vcardJobTitle: "Должность",
+      vcardJobTitlePlaceholder: "Разработчик",
+      vcardWebsite: "Веб-сайт",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2651,6 +2779,10 @@ export const ru: TranslationKeys = {
       noBarcodesFound: "Штрихкоды не найдены",
       barcodesFound: "Найден {count} штрихкод",
       barcodesFoundPlural: "Найдено {count} штрихкодов",
+      scanningFile: "Сканирование {name}...",
+      scanningFailedWithStatus:
+        "Не удалось отсканировать изображение. Попробуйте другое изображение.",
+      filesFailed: "Не удалось обработать файлов: {count} из {total}",
     },
     collage: {
       sideBySide: "Бок о бок",
@@ -2671,9 +2803,6 @@ export const ru: TranslationKeys = {
       mosaic: "Мозаика",
       uploadingImages: "Загрузка изображений...",
       processingCollage: "Обработка коллажа...",
-      loaded: "загружено",
-      images: "изображений",
-      collage: "Коллаж:",
       snapotter: "SnapOtter",
       background: "Фон",
       format: "Формат",
@@ -2709,6 +2838,12 @@ export const ru: TranslationKeys = {
       quality: "Качество",
       submit: "Создать коллаж",
       downloadCollage: "Скачать коллаж",
+      ratioFree: "Свободно",
+      bgWhite: "Белый",
+      bgBlack: "Чёрный",
+      bgNone: "Нет",
+      bgCustom: "Свой",
+      collageFailed: "Не удалось создать коллаж",
     },
     stitch: {
       format: "Формат",
@@ -2738,6 +2873,7 @@ export const ru: TranslationKeys = {
       outputFormat: "Формат вывода",
       quality: "Качество",
       submit: "Объединить изображения",
+      stitchFailed: "Ошибка объединения",
     },
     split: {
       splitMode: "Режим разделения",
@@ -2766,6 +2902,21 @@ export const ru: TranslationKeys = {
       submit: "Разделить изображение",
       downloadAll: "Скачать всё (ZIP)",
       tileWarningSmall: "Плитки будут очень маленькими ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Пополам по горизонтали",
+        verticalHalf: "Пополам по вертикали",
+        quarters: "Четверти",
+        horizontalStrip: "Горизонтальная полоса",
+        verticalStrip: "Вертикальная полоса",
+        grid9: "Сетка из 9 плиток",
+        portrait6: "6 плиток, книжная",
+        landscape6: "6 плиток, альбомная",
+        grid16: "Сетка из 16 плиток",
+      },
+      keepOriginal: "Сохранить оригинал",
+      auto: "Авто",
+      splitFailed: "Ошибка разделения",
+      failedToSplit: "Не удалось разделить {name}: {detail}",
     },
     border: {
       blur: "Размытие",
@@ -2791,6 +2942,16 @@ export const ru: TranslationKeys = {
       submit: "Добавить рамку",
       submitBatch: "Добавить рамку ({count} файлов)",
       progressLabel: "Добавление рамки",
+      presetNames: {
+        cleanWhite: "Чистый белый",
+        galleryBlack: "Галерейный чёрный",
+        shadow: "Тень",
+        rounded: "Скруглённая",
+        polaroid: "Полароид",
+        vintage: "Винтаж",
+        minimal: "Минимализм",
+        cinematic: "Кинематографичная",
+      },
     },
     beautify: {
       background: "Фон",
@@ -2807,7 +2968,6 @@ export const ru: TranslationKeys = {
       text: "Текст",
       position: "Позиция",
       newTab: "Новая вкладка",
-      frame: "Рамка",
       quickPresets: "Быстрые шаблоны",
       linear: "Линейный",
       radial: "Радиальный",
@@ -2835,6 +2995,33 @@ export const ru: TranslationKeys = {
       submit: "Украсить",
       submitBatch: "Украсить ({count} файлов)",
       progressLabel: "Украшение скриншота",
+      presetPurpleHaze: "Фиолетовая дымка",
+      presetFlamingo: "Фламинго",
+      presetOcean: "Океан",
+      presetMidnight: "Полночь",
+      presetMint: "Мята",
+      presetSunset: "Закат",
+      presetCleanWhite: "Чистый белый",
+      presetNoBackground: "Без фона",
+      bgGradient: "Градиент",
+      bgSolid: "Сплошной",
+      bgImage: "Изображение",
+      none: "Нет",
+      frameBrowser: "Браузер",
+      shadowSubtle: "Лёгкая",
+      shadowMedium: "Средняя",
+      shadowDramatic: "Драматичная",
+      shadowCustom: "Своя",
+      socialOriginal: "Оригинал",
+      socialIgSquare: "IG квадрат",
+      socialIgStory: "IG сторис",
+      positionTopLeft: "Сверху слева",
+      positionTopRight: "Сверху справа",
+      positionCenter: "Центр",
+      positionBottomLeft: "Снизу слева",
+      positionBottomRight: "Снизу справа",
+      processingFailed: "Ошибка обработки",
+      processingFailedStatus: "Не удалось обработать изображение. Пожалуйста, попробуйте снова.",
     },
     "circle-crop": {
       border: "Рамка",
@@ -2873,6 +3060,16 @@ export const ru: TranslationKeys = {
       submit: "Применить дуотон",
       submitBatch: "Применить дуотон ({count} файлов)",
       progressLabel: "Применение дуотона",
+      presetNames: {
+        classic: "Классика",
+        noir: "Нуар",
+        sepia: "Сепия",
+        midnight: "Полночь",
+        sunset: "Закат",
+        cyber: "Кибер",
+        ocean: "Океан",
+        forest: "Лес",
+      },
     },
     "image-pad": {
       background: "Фон",
@@ -2885,6 +3082,7 @@ export const ru: TranslationKeys = {
       submit: "Добавить поля",
       submitBatch: "Добавить поля ({count} файлов)",
       progressLabel: "Добавление полей",
+      custom: "Пользовательское",
     },
     pixelate: {
       blockSize: "Размер блока",
@@ -2987,7 +3185,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Конвертация SVG",
     },
     vectorize: {
-      original: "Оригинал:",
       detail: "Детализация",
       smoothing: "Сглаживание",
       blackWhite: "Чёрно-белый",
@@ -3024,7 +3221,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Векторизация",
     },
     "gif-tools": {
-      original: "Оригинал:",
       widthPx: "Ширина (px)",
       auto: "Авто",
       heightPx: "Высота (px)",
@@ -3081,6 +3277,7 @@ export const ru: TranslationKeys = {
       submit: "Обработать GIF",
       submitBatch: "Обработать ({count} файлов)",
       progressLabel: "Обработка GIF",
+      maxDimensionExceeded: "Используйте размер от 1 до {max} px.",
     },
     "image-to-base64": {
       converting: "Конвертация...",
@@ -3115,6 +3312,7 @@ export const ru: TranslationKeys = {
       includeText: "Включить текст",
       submit: "Создать штрихкод",
       download: "Скачать штрихкод",
+      generateFailed: "Не удалось создать штрихкод",
     },
     "chart-maker": {
       optionalChartTitle: "Заголовок диаграммы (необязательно)",
@@ -3125,6 +3323,11 @@ export const ru: TranslationKeys = {
       submit: "Создать диаграмму",
       submitBatch: "Создать диаграмму ({count} файлов)",
       progressLabel: "Создание диаграммы",
+      kindBar: "Столбцы",
+      kindLine: "Линия",
+      kindPie: "Круговая",
+      rowsSkipped:
+        "Строк на графике: {charted}. Пропущено, потому что в столбце значений не было числа: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Модель",
@@ -3515,12 +3718,12 @@ export const ru: TranslationKeys = {
       submit: "Сжать",
       submitBatch: "Сжать ({count} файлов)",
       submitTarget: "Сжать до {size}",
+      batchMissed: "Файлов, не уложившихся в {target}: {count} из {total}.",
       progressLabel: "Сжатие",
       bestEffortHint:
         "Максимум по возможности. PDF на основе изображений приближаются к этому размеру; PDF только с текстом могут не уменьшиться до него.",
       targetReached: "Целевой размер {target} достигнут (результат: {size}).",
-      targetMissed:
-        "Не удалось достичь {target}. Минимально возможный размер составил {size}, поскольку этот PDF состоит в основном из текста или векторной графики, которые сжатие изображений не может уменьшить.",
+      targetMissed: "Не удалось достичь {target}. Минимально возможный размер составил {size}.",
     },
     "rotate-pdf": {
       angle: "Угол поворота",
@@ -3589,6 +3792,30 @@ export const ru: TranslationKeys = {
       pageLabel: "Страница {n}",
       orderTooLong:
         "Слишком много отдельных перемещений для отправки. Сбросьте порядок и попробуйте внести меньше изменений.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Не более {docs} PDF и {pages} страниц в результате.",
+      addDocument: "Добавить PDF",
+      addAll: "Добавить все страницы",
+      allPages: "Все в плане",
+      addPage: "Добавить страницу {n}",
+      dragHint:
+        "Перетащите, чтобы изменить порядок, повернуть или удалить страницы. Добавьте PDF, чтобы взять их страницы.",
+      reset: "Сбросить план",
+      emptyPlan: "В плане пока нет страниц. Добавьте страницы из документов выше.",
+      docFailed: "Не удалось прочитать документ.",
+      skippedNotPdf: "Пропущено файлов: {count}. Можно добавлять только PDF.",
+      skippedOverLimit: "Не добавлено PDF: {count}. В редакторе может быть не более {docs} PDF.",
+      pageLabel: "Позиция {n}",
+      planSummary: "Будет собрано страниц: {pages} из {docs} документ(ов).",
+      submit: "Собрать PDF ({pages} стр.)",
+      progressLabel: "Сборка",
+      rotateLeft: "Повернуть влево",
+      rotateRight: "Повернуть вправо",
+      removePage: "Убрать страницу",
+      removeDoc: "Убрать PDF",
+      zoomIn: "Увеличить",
+      zoomOut: "Уменьшить",
     },
     "protect-pdf": {
       userPassword: "Пароль пользователя",
@@ -3710,6 +3937,9 @@ export const ru: TranslationKeys = {
         uploadHint:
           "Перетащите PNG / JPG или нажмите, чтобы выбрать. Прозрачный PNG подходит лучше всего.",
       },
+      exportFailed: "Не удалось прочитать размещённые подписи. Попробуйте снова.",
+      stall: "Время обработки истекло. Попробуйте снова.",
+      timeout: "Время ожидания истекло. Попробуйте снова.",
     },
     "redact-pdf": {
       terms: "Слова для зачернения",
@@ -3723,6 +3953,9 @@ export const ru: TranslationKeys = {
       submit: "Извлечь текст",
       submitBatch: "Извлечь текст ({count} файлов)",
       progressLabel: "Извлечение текста",
+      scannedHint:
+        "Этот PDF отсканирован, поэтому извлекать из него нечего. OCR может его прочитать, но это дольше и требует установленного ИИ-пакета OCR.",
+      runOcr: "Запустить OCR для этого PDF",
     },
     "pdf-to-word": {
       hint: "Лучше всего подходит для текстовых PDF; для сканов нужен OCR",
@@ -3879,6 +4112,8 @@ export const ru: TranslationKeys = {
     importFromFiles: "Импорт из Файлов",
     saveToFiles: "Сохранить в Файлы",
     savedToFiles: "Сохранено в Файлы",
+    resultExpired: "Срок действия этого результата истёк. Запустите инструмент снова.",
+    libraryFull: "Хранилище ваших файлов заполнено. Удалите несколько файлов и повторите попытку.",
     librarySaveTitle: "Этот файл из ваших файлов",
     librarySaveAsNew: "Сохранить результат как новый файл",
     librarySaveAsNewHint: "Оригинал останется в ваших файлах",
@@ -4100,7 +4335,7 @@ export const ru: TranslationKeys = {
       dropDescription: "Перетащите изображение сюда для начала работы",
       openImageButton: "Открыть изображение",
       newDocumentButton: "Новый документ",
-      pasteHint: "Или вставьте из буфера обмена (Ctrl+V)",
+      pasteHint: "Или вставьте из буфера обмена ({shortcut})",
     },
     mobile: {
       heading: "Рекомендуется настольный ПК",
@@ -4153,6 +4388,7 @@ export const ru: TranslationKeys = {
         ratioLabel: "Соотношение:",
         applyTitle: "Применить обрезку (Enter)",
         cancelTitle: "Отменить обрезку (Escape)",
+        free: "Свободно",
       },
       dodgeBurn: {
         dodge: "Осветлитель",
@@ -4169,6 +4405,9 @@ export const ru: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Образец:",
         toggleDropdown: "Открыть список",
+        samplePoint: "Точка (1x1)",
+        sampleAverage3: "Среднее 3x3",
+        sampleAverage5: "Среднее 5x5",
       },
       fill: {
         tolerance: "Допуск",
@@ -4264,6 +4503,68 @@ export const ru: TranslationKeys = {
         grain: "Зерно",
         resetAll: "Сбросить всё",
         apply: "Применить",
+        autoButtons: {
+          autoTone: "Автотон",
+          autoContrast: "Автоконтраст",
+          autoColor: "Автоцвет",
+          autoEnhance: "Автоулучшение",
+        },
+        sliders: {
+          brightness: "Яркость",
+          contrast: "Контраст",
+          hue: "Тон",
+          saturation: "Насыщенность",
+          luminance: "Светлота",
+          exposure: "Экспозиция",
+          vibrance: "Сочность",
+          warmth: "Теплота",
+        },
+        filters: {
+          grayscale: "Оттенки серого",
+          sepia: "Сепия",
+          invert: "Инверсия",
+          solarize: "Соляризация",
+          blur: "Размытие",
+          sharpen: "Резкость",
+          noise: "Шум",
+          pixelate: "Пикселизация",
+          emboss: "Тиснение",
+          posterize: "Постеризация",
+          threshold: "Порог",
+          kaleidoscope: "Калейдоскоп",
+          motionBlur: "Размытие в движении",
+          radialBlur: "Радиальное размытие",
+          surfaceBlur: "Поверхностное размытие",
+        },
+        params: {
+          radius: "Радиус",
+          amount: "Количество",
+          size: "Размер",
+          strength: "Сила",
+          levels: "Уровни",
+          level: "Уровень",
+          power: "Мощность",
+          angle: "Угол",
+          distance: "Расстояние",
+          centerX: "Центр X",
+          centerY: "Центр Y",
+          threshold: "Порог",
+          midpoint: "Средняя точка",
+          roundness: "Округлость",
+          feather: "Растушёвка",
+          roughness: "Шероховатость",
+        },
+        curvePresets: {
+          linear: "Линейный",
+          darken: "Затемнение",
+          lighten: "Осветление",
+          increaseContrast: "Больше контраста",
+          decreaseContrast: "Меньше контраста",
+          mediumContrast: "Средний контраст",
+          strongContrast: "Сильный контраст",
+          crossProcess: "Кросс-процесс",
+          negative: "Негатив",
+        },
       },
       color: {
         channelAriaLabel: "Цветовой канал {channel}",
@@ -4279,12 +4580,64 @@ export const ru: TranslationKeys = {
         median: "Медиана",
       },
       history: {
-        undoTitle: "Отменить (Ctrl+Z)",
-        redoTitle: "Повторить (Ctrl+Shift+Z)",
+        undoTitle: "Отменить ({shortcut})",
+        redoTitle: "Повторить ({shortcut})",
         empty: "История пуста",
+        unknown: "Неизвестно",
+        actions: {
+          initialState: "Исходное состояние",
+          loadImage: "Загрузить изображение",
+          loadProject: "Загрузить проект",
+          restoreAutosave: "Восстановить автосохранение",
+          resizeCanvas: "Изменить размер холста",
+          resizeImage: "Изменить размер изображения",
+          rotateCanvas: "Повернуть холст {degrees}",
+          flipHorizontal: "Отразить по горизонтали",
+          flipVertical: "Отразить по вертикали",
+          trimCanvas: "Обрезать холст",
+          addObject: "Добавить {type}",
+          layerEffect: "Эффект слоя",
+          delete: "Удалить",
+          bringToFront: "На передний план",
+          bringForward: "Переместить вперёд",
+          sendBackward: "Переместить назад",
+          sendToBack: "На задний план",
+          addLayer: "Добавить слой",
+          deleteLayer: "Удалить слой",
+          duplicateLayer: "Дублировать слой",
+          reorderLayers: "Изменить порядок слоёв",
+          mergeDown: "Объединить с нижним",
+          flattenAll: "Свести всё",
+          adjust: "Коррекция: {name}",
+          resetAdjustments: "Сбросить коррекцию",
+          levels: "Уровни",
+          curves: "Кривые",
+          resetLevels: "Сбросить уровни",
+          resetCurves: "Сбросить кривые",
+          resetAll: "Сбросить всё",
+          toggleFilter: "Переключить фильтр {name}",
+          setFilterParam: "{filter}: {param}",
+          crop: "Обрезать",
+          cut: "Вырезать",
+          paste: "Вставить",
+          pasteInPlace: "Вставить на место",
+          nudge: "Сдвинуть",
+          brushStroke: "Штрих кисти",
+          eraserStroke: "Штрих ластика",
+        },
+        objectTypes: {
+          line: "линию",
+          rect: "прямоугольник",
+          ellipse: "эллипс",
+          text: "текст",
+          image: "изображение",
+          arrow: "стрелку",
+          polygon: "многоугольник",
+          star: "звезду",
+        },
       },
       layers: {
-        newLayerTitle: "Новый слой (Ctrl+Shift+N)",
+        newLayerTitle: "Новый слой ({shortcut})",
         blend: "Режим",
         opacity: "Непрозр.",
         hideLayer: "Скрыть слой",
@@ -4312,9 +4665,34 @@ export const ru: TranslationKeys = {
           positionCenter: "Из центра",
           positionOutside: "Снаружи",
         },
+        blendModes: {
+          normal: "Обычный",
+          multiply: "Умножение",
+          screen: "Экран",
+          overlay: "Перекрытие",
+          darken: "Затемнение",
+          lighten: "Осветление",
+          colorDodge: "Осветление основы",
+          colorBurn: "Затемнение основы",
+          hardLight: "Жёсткий свет",
+          softLight: "Мягкий свет",
+          difference: "Разница",
+          exclusion: "Исключение",
+          hue: "Тон",
+          saturation: "Насыщенность",
+          color: "Цветность",
+          luminosity: "Яркость",
+        },
+        duplicate: "Дублировать",
+        flattenAll: "Свести всё",
       },
       navigator: {
         noImageLoaded: "Изображение не загружено",
+      },
+      tabs: {
+        layers: "Слои",
+        adjustments: "Коррекция",
+        history: "История",
       },
     },
     ui: {
@@ -4330,6 +4708,7 @@ export const ru: TranslationKeys = {
         anchorLabel: "Расположение:",
         anchorAriaLabel: "Расположение: {position}",
         backgroundLabel: "Фон:",
+        transparent: "Прозрачный",
         anchors: {
           topLeft: "сверху слева",
           topCenter: "сверху по центру",
@@ -4347,6 +4726,14 @@ export const ru: TranslationKeys = {
         original: "Оригинал: {width} x {height} px",
         note: "Все объекты масштабируются пропорционально новым размерам.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Это изображение слишком большое, чтобы браузер мог редактировать его этим инструментом. Попробуйте уменьшить размер холста.",
+        crossOriginBlocked:
+          "Редактор не может считать пиксели изображения, загруженного с другого сайта. Скачайте изображение и откройте файл.",
+        sourceImageFailed:
+          "Не удалось загрузить изображение. Если оно размещено на другом сайте, этот сайт должен разрешить междоменный доступ.",
+      },
       exportDialog: {
         heading: "Экспорт изображения",
         previewAlt: "Предпросмотр экспорта",
@@ -4360,13 +4747,19 @@ export const ru: TranslationKeys = {
         exportButton: "Экспорт",
         copied: "Скопировано",
         copyFailed: "Не удалось скопировать",
+        exportFailed: "Ошибка экспорта. Попробуйте еще раз или выберите другой формат.",
+        tooLarge:
+          "Этот экспорт слишком большой, чтобы браузер мог его создать. Попробуйте уменьшить размеры.",
         saveProject: "Сохранить проект",
         loadProject: "Загрузить проект",
+        invalidProject: "Этот файл не является допустимым проектом SnapOtter.",
       },
       autosaveRecovery: {
         message: "Восстановлена несохранённая работа от {time}.",
         restore: "Восстановить",
         discard: "Отклонить",
+        saveFailed:
+          "Не удалось сохранить работу в этом браузере. Экспортируйте её или используйте «Сохранить проект», чтобы оставить копию.",
       },
       fillDialog: {
         heading: "Заливка",
@@ -4392,6 +4785,7 @@ export const ru: TranslationKeys = {
           black: "Чёрный",
           transparent: "Прозрачный",
         },
+        presetCustom: "Пользовательский",
       },
       colorSwatch: {
         ariaLabel: "Цвет {color}",
@@ -4401,6 +4795,25 @@ export const ru: TranslationKeys = {
         noneSelected: "{label}: нет",
         setNone: "{label}: убрать",
       },
+      contextMenu: {
+        duplicate: "Дублировать",
+        selectAll: "Выделить всё",
+      },
+    },
+    toolbar: {
+      move: "Перемещение",
+      marquee: "Выделение",
+      crop: "Обрезка",
+      eyedropper: "Пипетка",
+      brush: "Кисть",
+      pencil: "Карандаш",
+      cloneStamp: "Штамп",
+      eraser: "Ластик",
+      paintBucket: "Заливка",
+      gradient: "Градиент",
+      text: "Текст",
+      hand: "Рука",
+      zoom: "Масштаб",
     },
   },
   settings: {
@@ -4433,6 +4846,7 @@ export const ru: TranslationKeys = {
       saveButton: "Сохранить настройки",
       saveSuccess: "Настройки сохранены.",
       saveFailed: "Не удалось сохранить настройки.",
+      loadFailed: "Не удалось загрузить пользовательские настройки.",
       roleUnknown: "неизвестно",
     },
     system: {
@@ -4457,6 +4871,7 @@ export const ru: TranslationKeys = {
       saveButton: "Сохранить настройки",
       saveSuccess: "Настройки сохранены.",
       saveFailed: "Не удалось сохранить настройки.",
+      loadFailed: "Не удалось загрузить системные настройки.",
       limitsAndResources: "Ограничения и ресурсы",
       maxFileSize: "Макс. размер файла",
       maxBatchSize: "Макс. размер пакета",
@@ -4494,10 +4909,10 @@ export const ru: TranslationKeys = {
       newPasswordPlaceholder: "Новый пароль",
       confirmPasswordPlaceholder: "Подтвердите новый пароль",
       passwordsMismatch: "Пароли не совпадают",
-      passwordTooShort: "Пароль должен содержать не менее 4 символов",
       changeSuccess: "Пароль успешно изменён",
       changeFailed: "Не удалось изменить пароль",
       currentPasswordIncorrect: "Текущий пароль неверен",
+      passwordChangedElsewhere: "Ваш пароль был изменён в другом месте. Войдите снова.",
       changePasswordButton: "Изменить пароль",
       loginAttemptLimitNote: "Лимиты попыток входа можно настроить в Системных настройках.",
       twoFactorHeading: "Двухфакторная аутентификация",
@@ -4546,6 +4961,8 @@ export const ru: TranslationKeys = {
       passwordMinLengthDesc: "Минимальное количество символов в пароле.",
       passwordRequireUppercase: "Требовать заглавные буквы",
       passwordRequireUppercaseDesc: "Требовать хотя бы одну заглавную букву.",
+      passwordRequireLowercase: "Требовать строчные буквы",
+      passwordRequireLowercaseDesc: "Требовать хотя бы одну строчную букву.",
       passwordRequireNumber: "Требовать цифры",
       passwordRequireNumberDesc: "Требовать хотя бы одну цифру.",
       passwordRequireSpecial: "Требовать спецсимволы",
@@ -4553,6 +4970,13 @@ export const ru: TranslationKeys = {
       passwordPolicyHeading: "Политика паролей",
       securitySettingsSaved: "Настройки безопасности сохранены",
       securitySettingsFailed: "Не удалось сохранить настройки безопасности",
+      adminSettingsLoadFailed: "Не удалось загрузить настройки безопасности.",
+      twoFactorStateChanged:
+        "Двухфакторная аутентификация изменена в другом окне. Обновите страницу и попробуйте снова.",
+      twoFactorUnreadable:
+        "Сервер не может прочитать настройки двухфакторной аутентификации. Обратитесь к администратору.",
+      ssoNeedsProvider:
+        "Чтобы включить принудительный SSO, сначала настройте провайдера OIDC или SAML.",
     },
     people: {
       heading: "Пользователи",
@@ -4585,7 +5009,7 @@ export const ru: TranslationKeys = {
       updateFailed: "Не удалось обновить пользователя",
       cannotRemoveOwnAdmin: "Нельзя снять с себя роль администратора",
       resetPasswordHeading: "Сброс пароля для {username}",
-      newPasswordLabel: "Новый пароль (мин. 8 символов)",
+      newPasswordLabel: "Новый пароль",
       resetPasswordButton: "Сбросить пароль",
       resetPasswordWarning: "Это действие аннулирует все сессии и API-ключи этого пользователя.",
       resetSuccess: "Пароль успешно сброшен",
@@ -4595,6 +5019,7 @@ export const ru: TranslationKeys = {
       tableHeaderTeam: "Команда",
       noSearchResults: "Участники не найдены.",
       noUsersFound: "Пользователи не найдены.",
+      loadFailed: "Не удалось загрузить пользователей.",
       authBadgeLocalOidc: "Локальный + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Изменить роль / команду",
@@ -4607,6 +5032,13 @@ export const ru: TranslationKeys = {
         "Скопируйте этот пароль сейчас. После создания пользователя вы не сможете его увидеть.",
       memberCount: "{count} участник",
       memberCountPlural: "{count} участников",
+      usernameTaken: "Это имя пользователя уже занято",
+      lastAdmin: "Всегда должен оставаться хотя бы один администратор",
+      cannotDeleteSelf: "Нельзя удалить собственную учётную запись",
+      usernameInvalid:
+        "Имя пользователя должно содержать от 3 до 50 символов и только a-z, A-Z, 0-9, точки, дефисы и подчёркивания",
+      roleNotFound: "Эта роль больше не существует",
+      teamNotFound: "Эта команда больше не существует",
     },
     teams: {
       heading: "Команды",
@@ -4628,6 +5060,7 @@ export const ru: TranslationKeys = {
       tableHeaderTeamName: "Название команды",
       tableHeaderMembers: "Участники",
       emptyState: "Команды не найдены.",
+      loadFailed: "Не удалось загрузить команды.",
       renameSaveButton: "Сохранить",
       renameCancelButton: "Отмена",
       renameAction: "Переименовать",
@@ -4643,6 +5076,7 @@ export const ru: TranslationKeys = {
       teamRetentionHoursDesc:
         "Срок хранения обработанных файлов для этой команды. Оставьте пустым для значения по умолчанию.",
       quotaSaved: "Настройки команды сохранены",
+      quotaSaveFailed: "Не удалось сохранить настройки команды",
     },
     roles: {
       heading: "Роли",
@@ -4667,6 +5101,7 @@ export const ru: TranslationKeys = {
       deleteSuccess: 'Роль "{name}" удалена',
       deleteFailed: "Не удалось удалить роль",
       emptyState: "Роли не найдены.",
+      loadFailed: "Не удалось загрузить роли.",
       builtInBadge: "Встроенная",
       userCountBadge: "{count} пользователь(ей)",
       editRoleTitle: "Редактировать роль",
@@ -4680,12 +5115,17 @@ export const ru: TranslationKeys = {
         users: "Пользователи",
         teams: "Команды",
         system: "Система",
+        enterpriseAdmin: "Корпоративное администрирование",
       },
+      nameInvalid:
+        "Название роли должно содержать от 2 до 30 символов и только a-z, 0-9, дефисы и подчёркивания",
+      permissionsRequired: "Выберите хотя бы одно право доступа",
     },
     auditLog: {
       heading: "Журнал аудита",
       allActionsFilter: "Все действия",
       emptyState: "Записей в журнале аудита нет.",
+      loadFailed: "Не удалось загрузить журнал аудита.",
       tableHeaderTime: "Время",
       tableHeaderUser: "Пользователь",
       tableHeaderAction: "Действие",
@@ -4728,6 +5168,7 @@ export const ru: TranslationKeys = {
       teamColumn: "Команда",
       storageColumn: "Хранилище",
       usersColumn: "Пользователи",
+      loadFailed: "Не удалось загрузить данные об использовании.",
     },
     apiKeys: {
       heading: "API-ключи",
@@ -4737,6 +5178,7 @@ export const ru: TranslationKeys = {
       removeScopingLabel: "Убрать ограничение прав",
       restrictPermissionsLabel: "Ограничить права (необязательно)",
       expiresLabel: "Истекает:",
+      expiresInPast: "Дата истечения должна быть в будущем.",
       clearButton: "Очистить",
       copyTitle: "Копировать",
       keyWarning: "Сохраните этот ключ в безопасном месте. Он больше не будет показан.",
@@ -4748,6 +5190,7 @@ export const ru: TranslationKeys = {
       deleteConfirm:
         "Удалить этот API-ключ? Все интеграции, использующие его, перестанут работать.",
       emptyState: "API-ключей пока нет. Сгенерируйте один для начала.",
+      loadFailed: "Не удалось загрузить API-ключи.",
     },
     tools: {
       heading: "Инструменты",
@@ -4792,6 +5235,7 @@ export const ru: TranslationKeys = {
       description: "Управление пакетами AI-моделей для расширенной обработки файлов.",
       installAll: "Установить все",
       diskUsage: "Использование диска: {size}",
+      statusStale: "Не удалось обновить состояние пакетов. Список ниже может быть устаревшим.",
       sizeOnDisk: "{size} на диске",
       installed: "Установлено",
       notInstalled: "Не установлено",
@@ -4822,6 +5266,9 @@ export const ru: TranslationKeys = {
       resetFailed: "Ошибка сброса: {error}",
       resetVenvKept:
         "Общее окружение Python оставлено на месте: в этой установке нет встроенной базы, из которой его можно пересобрать. Модели, кэш загрузок и записи об установке очищены. Пересоздайте это окружение самостоятельно, если проблема в устаревшем пакете внутри него.",
+      importBusy:
+        "Уже выполняется другая установка или импорт. Повторите попытку после завершения.",
+      importNoSpace: "На сервере недостаточно места на диске для этого пакета.",
     },
     about: {
       heading: "О программе",
@@ -4841,6 +5288,9 @@ export const ru: TranslationKeys = {
   auth: {
     login: "Вход",
     logout: "Выйти",
+    logoutFailed: "Не удалось выйти. Попробуйте ещё раз.",
+    idpLogoutFailed:
+      "Вы вышли из SnapOtter, но сессия у провайдера SSO может оставаться открытой. Выйдите из неё тоже.",
     username: "Имя пользователя",
     password: "Пароль",
     loginButton: "Войти",
@@ -4870,10 +5320,22 @@ export const ru: TranslationKeys = {
     verify: "Подтвердить",
     verifying: "Проверка...",
     mfaInvalidCode: "Неверный код. Попробуйте ещё раз.",
+    mfaAttemptsExhausted: "Слишком много неверных кодов. Войдите снова.",
+    mfaEnrollmentAttemptsExhausted:
+      "Слишком много неверных кодов. Войдите снова, чтобы получить новый QR-код и новые коды восстановления; показанные ранее работать не будут.",
+    mfaExpired: "Сеанс проверки истёк. Войдите снова.",
+    mfaEnrollmentExpired:
+      "Сеанс настройки истёк. Войдите снова, чтобы получить новый QR-код и новые коды восстановления; показанные ранее работать не будут.",
+    mfaNotConfigured: "Двухфакторная аутентификация не настроена. Войдите снова.",
+    mfaAlreadyEnabled: "Двухфакторная аутентификация уже включена. Войдите снова.",
+    mfaUnreadable:
+      "Сервер не может прочитать данные двухфакторной аутентификации. Обратитесь к администратору.",
     mfaEnrollmentHeading: "Настройте двухфакторную аутентификацию, чтобы продолжить",
     mfaEnrollmentRequired:
       "Ваша организация требует многофакторную аутентификацию. Настройте MFA в параметрах учётной записи.",
     mfaPolicyUnavailable: "Не удалось проверить политику MFA. Повторите попытку чуть позже.",
+    accountDisabled: "Эта учётная запись отключена. Обратитесь к администратору.",
+    ipNotAllowed: "Ваш IP-адрес не разрешён. Обратитесь к администратору.",
     loginThrottled: "Слишком много попыток входа. Повторите попытку через {minutes} мин.",
     loginThrottledPlural: "Слишком много попыток входа. Повторите попытку через {minutes} мин.",
     loginThrottledUnknownWait:
@@ -4917,14 +5379,13 @@ export const ru: TranslationKeys = {
   },
   changePassword: {
     title: "Смена пароля",
-    description:
-      "Необходимо установить новый пароль перед продолжением. Пароль должен содержать не менее 8 символов, включая заглавные, строчные буквы и цифру.",
+    description: "Необходимо установить новый пароль перед продолжением.",
     usernameLabel: "Имя пользователя",
     currentPasswordLabel: "Текущий пароль",
     currentPasswordPlaceholder: "Введите текущий пароль",
     newPasswordLabel: "Новый пароль",
     generateButton: "Сгенерировать надёжный пароль",
-    newPasswordPlaceholder: "Не менее 8 символов",
+    newPasswordPlaceholder: "Введите новый пароль",
     confirmPasswordLabel: "Подтвердите новый пароль",
     confirmPasswordPlaceholder: "Повторите новый пароль",
     passwordsMismatch: "Пароли не совпадают",
@@ -4935,6 +5396,7 @@ export const ru: TranslationKeys = {
     sidebarTitle: "Почти готово",
     sidebarDescription:
       "Установите надёжный пароль для защиты Вашей учётной записи, и можно начинать.",
+    sessionEnded: "Сеанс завершён. Войдите снова, чтобы сменить пароль.",
   },
   automate: {
     title: "Автоматизация",
@@ -4944,6 +5406,15 @@ export const ru: TranslationKeys = {
     noSteps: "В файле Pipeline нет шагов",
     importFailed: "Импорт не удался",
     couldNotRead: "Не удалось прочитать файл Pipeline",
+    importListRefreshFailed:
+      "Pipeline импортирован, но список сохранённых не обновился. Обновите страницу, чтобы увидеть его.",
+    saveFailed: "Не удалось сохранить Pipeline",
+    deleteFailed: "Не удалось удалить Pipeline",
+    loadFailed: "Не удалось загрузить сохранённые Pipeline.",
+    saveListRefreshFailed:
+      "Pipeline сохранён, но список сохранённых не обновился. Обновите страницу, чтобы увидеть его.",
+    deleteListRefreshFailed:
+      "Pipeline удалён, но список сохранённых не обновился. Обновите страницу, чтобы увидеть изменение.",
     fileCount: "{count} файл",
     fileCountPlural: "{count} файлов",
     importFromLibrary: "Импорт из библиотеки",
@@ -5029,6 +5500,7 @@ export const ru: TranslationKeys = {
     fileCount: "{count} файлов",
     fileCountSingular: "{count} файл",
     noFilesFound: "Файлы не найдены",
+    loadFailed: "Не удалось загрузить ваши файлы.",
     selectFilePrompt: "Выберите файл для просмотра информации",
     openFile: "Открыть файл",
     selectFile: "Выбрать файл",
@@ -5047,6 +5519,7 @@ export const ru: TranslationKeys = {
     download: "Скачать",
     details: {
       previewFailedRetry: "Не удалось сгенерировать предпросмотр. Попробуйте снова.",
+      loadFailed: "Не удалось загрузить этот файл.",
     },
   },
   dropzone: {
@@ -5066,6 +5539,7 @@ export const ru: TranslationKeys = {
     filesSelected: "Выбрано файлов: {count}",
     dropToAdd: "Отпустите, чтобы добавить файлы",
     dropToReplace: "Отпустите, чтобы заменить файл",
+    ignoredWhileRunning: "Идёт обработка. Дождитесь её завершения, прежде чем добавлять файлы.",
     reorderHint: "Перетащите миниатюры, чтобы изменить порядок, или обратите его, перед запуском.",
   },
   reviewPanel: {
@@ -5095,8 +5569,10 @@ export const ru: TranslationKeys = {
       "Некоторые файлы моделей отсутствуют или повреждены. Восстановление загрузит их заново.",
     repairButton: "Восстановить {name}",
     lessThanMinute: "Осталось менее минуты",
-    oneMinuteLeft: "Осталось ~1 минута",
+    oneMinuteLeft: "Осталось ~{mins} минута",
     minutesLeft: "Осталось ~{mins} минут",
+    minutesLeftFew: "Осталось ~{mins} минуты",
+    minutesLeftTwo: "Осталось ~{mins} минут",
     progressMessages: [
       "Почти готово... наверное...",
       "Хорошие вещи требуют времени...",
@@ -5173,6 +5649,57 @@ export const ru: TranslationKeys = {
     networkError: "Сетевая ошибка. Проверьте подключение.",
     invalidCredentials: "Неверное имя пользователя или пароль",
     connectionError: "Ошибка подключения",
+    fileTooLarge:
+      "Этот файл слишком большой для загрузки. Попробуйте файл меньшего размера или попросите администратора сервера увеличить лимит загрузки.",
+    featureNotInstalledForTool:
+      "Для «{tool}» нужна функция «{feature}». Включите её в Настройки → AI-функции.",
+    featureNotInstalled:
+      "Функция «{feature}» не установлена. Включите её в Настройки → AI-функции.",
+    featureIncompatible: "Функция «{feature}» не может работать на оборудовании этого сервера.",
+    passwordTooShort: "Пароль слишком короткий (минимум: {minLength}).",
+    passwordNeedsUppercase: "Пароль должен содержать заглавную букву.",
+    passwordNeedsLowercase: "Пароль должен содержать строчную букву.",
+    passwordNeedsDigit: "Пароль должен содержать цифру.",
+    passwordNeedsSpecial: "Пароль должен содержать специальный символ.",
+    passwordNoControlCharacters: "Пароль не должен содержать управляющие символы.",
+    passwordTooLong: "Пароль слишком длинный (максимум: {maxLength}).",
+    passwordTooLongAdminReset:
+      "Пароль слишком длинный (макс. {maxLength} символов). Администратор должен его сбросить.",
+    passwordNoInvalidCharacters: "Пароль не должен содержать недопустимые символы.",
+    tooManyRequests: "Слишком много попыток. Подождите минуту и попробуйте снова.",
+    escalationDenied: "Для этого нужно больше прав, чем есть у вашей роли.",
+    featureNotLicensed: "Для этого нужна корпоративная лицензия.",
+    sessionEnded: "Ваш сеанс завершён. Войдите снова.",
+    forbidden: "У вас нет прав на это действие.",
+    invalidSetting: "Недопустимое значение параметра «{setting}».",
+    network: "Сетевая ошибка",
+    invalidResponse: "Некорректный ответ",
+    staleVersionReload: "Приложение обновлено. Перезагрузите страницу и повторите попытку.",
+    failedWithStatus: "Не удалось выполнить запрос. Пожалуйста, попробуйте снова.",
+    processingFailedWithStatus:
+      "Не удалось обработать этот файл. Убедитесь, что файл не повреждён, и попробуйте снова.",
+    processingFailedNoDetail: "Ошибка обработки",
+    canceled: "Обработка отменена",
+    jobTrackingFailed: "Что-то пошло не так при отслеживании этой задачи. Попробуйте снова.",
+    requestTimedOut: "Время ожидания истекло",
+    runInterrupted: "Обработка была прервана. Запустите её снова.",
+    requestFailedWithStatus: "Не удалось выполнить запрос. Пожалуйста, попробуйте снова.",
+    invalidServerResponse: "Некорректный ответ от сервера",
+    batchFailed: "Пакетная обработка завершилась с ошибкой",
+    batchFailedWithStatus:
+      "Не удалось завершить пакетную обработку. Попробуйте запустить её снова.",
+    allFilesFailed: "Ошибка обработки всех файлов",
+    filesFailedSuffix_one: " (1 файл с ошибкой)",
+    filesFailedSuffix_other: " (файлов с ошибкой: {count})",
+    uploadTimeout:
+      "Время ожидания загрузки истекло. Проверьте подключение или попробуйте файл меньшего размера.",
+    processingInterrupted: "Обработка была прервана. Повторите попытку при восстановлении связи.",
+    processingInterruptedUnconfirmed:
+      "Обработка была прервана, и сервер так и не подтвердил задание. Повторите попытку при восстановлении связи.",
+    resultNoLongerAvailable: "Готовый результат больше не доступен. Запустите задание ещё раз.",
+    batchDownloadFailed: "Не удалось скачать готовый пакет. Обновите страницу и попробуйте снова.",
+    fileNotFoundInBatch: "Файл не найден в результатах пакетной обработки",
+    noFilesSelected: "Файлы не выбраны",
   },
   sidebar: {
     sponsor: "Поддержите нас",
@@ -5208,6 +5735,7 @@ export const ru: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Поддержать SnapOtter на GitHub Sponsors",
     skipToContent: "Перейти к основному содержимому",
     openSidebar: "Открыть боковую панель",
@@ -5230,6 +5758,8 @@ export const ru: TranslationKeys = {
     imageControls: "Управление предпросмотром",
     zoomControls: "Управление масштабом",
     dragToReorder: "Перетащите для изменения порядка",
+    resultResizedToFit: "Уменьшено, чтобы уложиться в целевой размер",
+    resultMissedTarget: "Целевой размер не достигнут",
     reverseOrder: "Обратить порядок",
     whiteBackground: "Белый фон",
     blackBackground: "Чёрный фон",
@@ -5312,11 +5842,47 @@ export const ru: TranslationKeys = {
         "Восстановите, раскрасьте и увеличьте старое или повреждённое фото с помощью ИИ.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Удаление фона",
+      description: "Удаление фона с изображений с помощью ИИ",
+    },
+    "face-detection": {
+      name: "Обнаружение лиц",
+      description: "Поиск и размытие лиц, удаление красных глаз, умная обрезка",
+    },
+    "object-eraser-colorize": {
+      name: "Удаление объектов и колоризация",
+      description: "Удаление объектов с фото и колоризация чёрно-белых изображений",
+    },
+    "inpaint-hq": {
+      name: "Высококачественный инпейнтинг",
+      description:
+        "Удаление объектов на основе диффузии для крупных объектов, детальных текстур и сложных фонов",
+    },
+    "upscale-enhance": {
+      name: "Увеличение и улучшение",
+      description: "Увеличение с помощью ИИ, улучшение лиц и удаление шума",
+    },
+    "photo-restoration": {
+      name: "Восстановление фотографий",
+      description: "Восстановление старых или повреждённых фотографий",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Извлечение текста из изображений и PDF",
+    },
+    transcription: {
+      name: "Транскрипция",
+      description: "Речь в текст для аудио и видео (субтитры)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Импорт...",
       importCount: "Импортировать ({count})",
       import: "Импорт",
+      importFailed: "Не удалось импортировать {failed} из {total} файлов.",
     },
     metadataGrid: {
       noData: "Нет данных",
@@ -5329,6 +5895,19 @@ export const ru: TranslationKeys = {
     waveform: {
       play: "Воспроизвести",
       pause: "Пауза",
+    },
+    languageNames: {
+      en: "Английский",
+      de: "Немецкий",
+      fr: "Французский",
+      es: "Испанский",
+      zh: "Китайский",
+      ja: "Японский",
+      ko: "Корейский",
+      ar: "Арабский",
+      id: "Индонезийский",
+      th: "Тайский",
+      vi: "Вьетнамский",
     },
   },
   privacyPolicy: {

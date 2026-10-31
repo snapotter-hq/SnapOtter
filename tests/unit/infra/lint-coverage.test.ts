@@ -45,6 +45,12 @@ const LINTABLE_EXTENSIONS = new Set([...CODE_EXTENSIONS, "json", "jsonc", "svg",
  */
 const FIXTURE_DATA = /^tests\/fixtures\/[^/]+\//;
 
+/**
+ * Worktree scratch files (commit messages, monitor loops, diffs, issue drafts)
+ * created at the repository root during development must never be committed (#2454).
+ */
+const ROOT_SCRATCH_FILE = /^(?:i\d+-.*|.*\.patch|file-issue\.txt|humanize-script\.js)$/;
+
 interface PackageJson {
   name?: string;
   scripts?: Record<string, string>;
@@ -139,5 +145,12 @@ describe("lint gate coverage", () => {
       return !paths.some((token) => covers(token, file));
     });
     expect(uncovered).toEqual([]);
+  });
+
+  it("tracks no worktree scratch files at the repository root (#2454)", () => {
+    const scratch = trackedFiles().filter(
+      (file) => !file.includes("/") && ROOT_SCRATCH_FILE.test(file),
+    );
+    expect(scratch).toEqual([]);
   });
 });

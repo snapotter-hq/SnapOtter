@@ -185,12 +185,47 @@ export function decompressSvgz(buffer: Buffer): Buffer {
   return decompressed;
 }
 
+/**
+ * True when an error thrown from decompressSvgz() or sanitizeSvg() is a client
+ * input rejection (400) rather than an unexpected sanitizer crash (500):
+ *  - statusCode === 400 from sanitizeSvg() size/element caps
+ *  - Z_DATA_ERROR / Z_BUF_ERROR from malformed or truncated gzip streams
+ *  - RangeError (ERR_BUFFER_TOO_LARGE) when gunzipSync hits MAX_SVGZ_DECOMPRESSED_SIZE,
+ *    excluding V8 "Array buffer allocation failed" OOMs (#3675)
+ */
+export function isSvgzClientError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  return (
+    (err as { statusCode?: number }).statusCode === 400 ||
+    (err as { code?: string }).code === "Z_DATA_ERROR" ||
+    (err as { code?: string }).code === "Z_BUF_ERROR" ||
+    (err as { code?: string }).code === "ERR_BUFFER_TOO_LARGE" ||
+    (err instanceof RangeError && !err.message.startsWith("Array buffer allocation failed"))
+  );
+}
+
+/**
+ * True when an error thrown from decompressSvgz() or sanitizeSvg() on an image
+ * intake path is a client SVG/SVGZ rejection (400) rather than an unexpected
+ * runtime fault (500), including a gzip stream whose decompressed payload is
+ * not SVG content.
+ */
+export function isSvgClientError(err: unknown): boolean {
+  return (
+    isSvgzClientError(err) ||
+    (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+  );
+}
+
 const SVG_PROLOG_COMMENT = /^<!--[\s\S]*?-->\s*/;
 const SVG_PROLOG_PI = /^<\?[\s\S]*?\?>\s*/;
 const SVG_PROLOG_DOCTYPE = new RegExp(`^${DOCTYPE_SOURCE}\\s*`, "i");
 // The first element must be an <svg>, optionally namespace-prefixed
 // (`<svg:svg>`); the trailing `[\s/>]` stops it matching `<svgfoo>`.
 const SVG_ROOT_ELEMENT = /^<(?:[A-Za-z_][\w.-]*:)?svg[\s/>]/i;
+
+/** How far into a buffer isSvgBuffer() looks for the root element. */
+export const SVG_SNIFF_BYTES = 4096;
 
 /**
  * Check whether a buffer looks like SVG content.
@@ -202,7 +237,21 @@ const SVG_ROOT_ELEMENT = /^<(?:[A-Za-z_][\w.-]*:)?svg[\s/>]/i;
  * DOCTYPE and misfire on an HTML document that merely embeds an inline `<svg>`.
  */
 export function isSvgBuffer(buffer: Buffer): boolean {
-  let head = buffer.subarray(0, 4096).toString("utf-8").trim();
+  let start = 0;
+  while (
+    start < buffer.length &&
+    (buffer[start] === 0x20 ||
+      buffer[start] === 0x09 ||
+      buffer[start] === 0x0a ||
+      buffer[start] === 0x0d ||
+      buffer[start] === 0x0c)
+  ) {
+    start++;
+  }
+  let head = buffer
+    .subarray(start, start + SVG_SNIFF_BYTES)
+    .toString("utf-8")
+    .trim();
   let prev: string;
   do {
     prev = head;

@@ -17,6 +17,7 @@ import { Link, useLocation } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
+import { withAnalytics } from "@/lib/lazy-analytics";
 import { cn } from "@/lib/utils";
 import { ImageEditIcon } from "../common/image-edit-icon";
 import { OtterLogo } from "../common/otter-logo";
@@ -300,7 +301,7 @@ function SponsorButton({ isDark, compact = false }: { isDark: boolean; compact?:
   const { t } = useTranslation();
 
   const handleClick = () => {
-    import("@/lib/analytics").then(({ track }) => {
+    withAnalytics(({ track }) => {
       track(ANALYTICS_EVENTS.SPONSOR_CLICKED);
     });
   };

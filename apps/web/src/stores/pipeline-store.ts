@@ -1,6 +1,30 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { generateId } from "@/lib/utils";
+
+const safeSessionStorage: StateStorage = {
+  getItem: (name) => {
+    try {
+      return sessionStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      sessionStorage.setItem(name, value);
+    } catch {
+      // Storage blocked or full
+    }
+  },
+  removeItem: (name) => {
+    try {
+      sessionStorage.removeItem(name);
+    } catch {
+      // Storage blocked
+    }
+  },
+};
 
 export interface PipelineStep {
   id: string;
@@ -83,7 +107,7 @@ export const usePipelineStore = create<PipelineState>()(
     }),
     {
       name: "snapotter-pipeline",
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => safeSessionStorage),
       partialize: (state) => ({
         steps: state.steps,
         expandedStepId: state.expandedStepId,

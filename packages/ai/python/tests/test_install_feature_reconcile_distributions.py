@@ -44,7 +44,7 @@ def write_dist(sp, name, version, files, extra_record=()):
 
 def merge(installer, staging, venv_sp, quarantine):
     """The sequence _install runs, so the tests cannot drift from production."""
-    installer.reconcile_onnxruntime(str(staging), str(venv_sp))
+    installer.reconcile_onnxruntime(str(staging), str(venv_sp), str(quarantine))
     plan = installer.plan_reconciliation(str(staging), str(venv_sp))
     installer.supersede_distributions(str(venv_sp), plan, str(quarantine))
     installer.move_tree(str(staging), str(venv_sp))
@@ -126,6 +126,152 @@ def test_an_incoming_gpu_onnxruntime_replaces_the_cpu_build(tmp_path):
     assert (venv_sp / "onnxruntime" / "capi" / "onnxruntime_pybind11_state.so").read_text() == "gpu"
     assert dist_infos(venv_sp, "onnxruntime-") == []
     assert dist_infos(venv_sp, "onnxruntime_gpu-") == ["onnxruntime_gpu-1.20.1.dist-info"]
+
+
+def test_a_refused_gpu_onnxruntime_install_restores_the_displaced_cpu_build(tmp_path):
+    """If a GPU bundle fails verification after replacing CPU onnxruntime,
+    rollback must restore the CPU package files and onnxruntime-*.dist-info
+    rather than leaving site-packages with no onnxruntime at all (#2612)."""
+    installer = load_installer()
+    staging, venv_sp, quarantine = trees(tmp_path)
+    write_dist(
+        venv_sp, "onnxruntime", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "cpu",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "cpu",
+            "onnxruntime/capi/cpu_only_helper.py": "cpu-helper",
+            "onnxruntime.libs/libgomp.so": "cpu-gomp",
+        },
+    )
+    (venv_sp / "onnxruntime-1.20.1.dist-info" / "INSTALLER").write_text("pip\n")
+    write_dist(
+        staging, "onnxruntime_gpu", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "gpu",
+            f"onnxruntime/capi/{CUDA_PROVIDER_LIB}": "cuda",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "gpu",
+        },
+    )
+    write_dist(staging, "rembg", "2.0.62", {"rembg/__init__.py": "rembg"})
+
+    plan = merge(installer, staging, venv_sp, quarantine)
+    assert not (venv_sp / "onnxruntime" / "capi" / "cpu_only_helper.py").exists()
+    assert not (venv_sp / "onnxruntime.libs").exists()
+
+    installer.rollback_reconciliation(str(venv_sp), plan, str(quarantine))
+
+    assert dist_infos(venv_sp, "onnxruntime-") == ["onnxruntime-1.20.1.dist-info"]
+    assert dist_infos(venv_sp, "onnxruntime_gpu-") == []
+    assert (venv_sp / "onnxruntime" / "__init__.py").read_text() == "cpu"
+    assert (venv_sp / "onnxruntime" / "capi" / "onnxruntime_pybind11_state.so").read_text() == "cpu"
+    assert (venv_sp / "onnxruntime" / "capi" / "cpu_only_helper.py").read_text() == "cpu-helper"
+    assert (venv_sp / "onnxruntime.libs" / "libgomp.so").read_text() == "cpu-gomp"
+    assert (venv_sp / "onnxruntime-1.20.1.dist-info" / "INSTALLER").read_text() == "pip\n"
+    assert not (venv_sp / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
+    assert not (venv_sp / "rembg").exists()
+    assert not os.path.exists(quarantine)
+
+
+def test_gpu_onnxruntime_rollback_also_works_via_two_arg_reconcile_or_direct_plan(tmp_path):
+    """Callers that invoke reconcile_onnxruntime(staging, venv_sp) without
+    quarantine_dir (or call plan_reconciliation + supersede_distributions
+    directly) still quarantine CPU onnxruntime and restore it on rollback (#2612)."""
+    installer = load_installer()
+
+    # 1. Two-arg reconcile_onnxruntime followed by plan_reconciliation + supersede_distributions
+    sub1 = tmp_path / "two-arg"
+    sub1.mkdir()
+    staging1, venv_sp1, quarantine1 = trees(sub1)
+    write_dist(
+        venv_sp1, "onnxruntime", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "cpu",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "cpu",
+        },
+    )
+    write_dist(
+        staging1, "onnxruntime_gpu", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "gpu",
+            f"onnxruntime/capi/{CUDA_PROVIDER_LIB}": "cuda",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "gpu",
+        },
+    )
+    installer.reconcile_onnxruntime(str(staging1), str(venv_sp1))
+    plan1 = installer.plan_reconciliation(str(staging1), str(venv_sp1))
+    installer.supersede_distributions(str(venv_sp1), plan1, str(quarantine1))
+    installer.move_tree(str(staging1), str(venv_sp1))
+    installer.rollback_reconciliation(str(venv_sp1), plan1, str(quarantine1))
+
+    assert dist_infos(venv_sp1, "onnxruntime-") == ["onnxruntime-1.20.1.dist-info"]
+    assert dist_infos(venv_sp1, "onnxruntime_gpu-") == []
+    assert (venv_sp1 / "onnxruntime" / "__init__.py").read_text() == "cpu"
+    assert not (venv_sp1 / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
+
+    # 2. Direct plan_reconciliation + supersede_distributions without reconcile_onnxruntime
+    sub2 = tmp_path / "direct-plan"
+    sub2.mkdir()
+    staging2, venv_sp2, quarantine2 = trees(sub2)
+    write_dist(
+        venv_sp2, "onnxruntime", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "cpu",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "cpu",
+        },
+    )
+    write_dist(
+        staging2, "onnxruntime_gpu", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "gpu",
+            f"onnxruntime/capi/{CUDA_PROVIDER_LIB}": "cuda",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "gpu",
+        },
+    )
+    plan2 = installer.plan_reconciliation(str(staging2), str(venv_sp2))
+    installer.supersede_distributions(str(venv_sp2), plan2, str(quarantine2))
+    installer.move_tree(str(staging2), str(venv_sp2))
+    installer.rollback_reconciliation(str(venv_sp2), plan2, str(quarantine2))
+
+    assert dist_infos(venv_sp2, "onnxruntime-") == ["onnxruntime-1.20.1.dist-info"]
+    assert dist_infos(venv_sp2, "onnxruntime_gpu-") == []
+    assert (venv_sp2 / "onnxruntime" / "__init__.py").read_text() == "cpu"
+    assert not (venv_sp2 / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
+
+    # 3. Previously clobbered venv holding both CPU and GPU dist-infos at the same version
+    sub3 = tmp_path / "dual-meta"
+    sub3.mkdir()
+    staging3, venv_sp3, quarantine3 = trees(sub3)
+    write_dist(
+        venv_sp3, "onnxruntime_gpu", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "cpu",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "cpu",
+        },
+    )
+    write_dist(
+        venv_sp3, "onnxruntime", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "cpu",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "cpu",
+        },
+    )
+    write_dist(
+        staging3, "onnxruntime_gpu", "1.20.1",
+        {
+            "onnxruntime/__init__.py": "gpu",
+            f"onnxruntime/capi/{CUDA_PROVIDER_LIB}": "cuda",
+            "onnxruntime/capi/onnxruntime_pybind11_state.so": "gpu",
+        },
+    )
+    plan3 = merge(installer, staging3, venv_sp3, quarantine3)
+    assert len(plan3) == 1
+    assert (venv_sp3 / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
+    installer.rollback_reconciliation(str(venv_sp3), plan3, str(quarantine3))
+    assert not (venv_sp3 / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
+    assert (venv_sp3 / "onnxruntime" / "__init__.py").read_text() == "cpu"
+
+
+
 
 
 # -- what the uninstall is allowed to touch --

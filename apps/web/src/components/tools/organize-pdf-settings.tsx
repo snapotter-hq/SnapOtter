@@ -15,11 +15,7 @@ export function OrganizePdfSettings() {
     useToolProcessor("organize-pdf");
 
   const [order, setOrder] = useState("1-z");
-  const { file: orderedFile, pageOrder, pageCount, clear } = useOrganizeStore();
-
-  // The arranged order outlives the grid (it unmounts while a result shows),
-  // so drop it when the tool itself goes away.
-  useEffect(() => clear, [clear]);
+  const { file: orderedFile, pageOrder, pageCount } = useOrganizeStore();
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;

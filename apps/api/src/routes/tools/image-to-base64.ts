@@ -1,13 +1,22 @@
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   outputFormat: z.enum(["original", "jpeg", "png", "webp", "avif", "jxl"]).default("original"),
@@ -57,7 +66,7 @@ export function registerImageToBase64(app: FastifyInstance) {
     "/api/v1/tools/image/image-to-base64",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const files: Array<{ buffer: Buffer; filename: string }> = [];
-      let settings = {};
+      let settingsRaw = "";
 
       try {
         const parts = request.parts();
@@ -72,22 +81,26 @@ export function registerImageToBase64(app: FastifyInstance) {
               filename: basename(part.filename ?? "image"),
             });
           } else if (part.fieldname === "settings") {
-            try {
-              settings = JSON.parse(part.value as string);
-            } catch {
-              // ignore invalid JSON, use defaults
-            }
+            settingsRaw = part.value as string;
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (files.length === 0) {
         return reply.status(400).send({ error: "No image files provided" });
+      }
+
+      // An empty field means the defaults, like the tool factory; anything
+      // else has to parse, or a mistyped settings string would silently
+      // produce a default-encoded result that looks right and isn't (#2224).
+      let settings: unknown;
+      try {
+        settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
       const parsed = settingsSchema.safeParse(settings);
@@ -103,30 +116,68 @@ export function registerImageToBase64(app: FastifyInstance) {
       const errors: FileError[] = [];
 
       for (const { buffer, filename } of files) {
+        let unexpectedSvgFault = false;
+        const sanitizeSvgBuffer = (buf: Buffer): Buffer => {
+          try {
+            return sanitizeSvg(decompressSvgz(buf));
+          } catch (err) {
+            if (!isSvgClientError(err)) {
+              unexpectedSvgFault = true;
+            }
+            throw asDecoderOutOfMemory(err);
+          }
+        };
         try {
           const originalSize = buffer.length;
 
           let decoded = buffer;
           const validation = await validateImageBuffer(buffer, filename);
-          if (validation.valid && validation.format === "heif") {
+          if (!validation.valid) {
+            errors.push({ filename, error: validation.reason });
+            continue;
+          }
+          if (validation.format === "heif") {
             decoded = await decodeHeic(decoded);
           }
-          if (validation.valid && needsCliDecode(validation.format)) {
+          if (needsCliDecode(validation.format)) {
             try {
-              const fileExt = filename.split(".").pop()?.toLowerCase();
+              const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
               decoded = await decodeToSharpCompat(decoded, validation.format, fileExt);
-            } catch {
-              await sharp(decoded).metadata();
+            } catch (rawDecodeErr) {
+              const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+              if (
+                decodeErr instanceof DecoderOutOfMemoryError ||
+                (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+              ) {
+                throw decodeErr;
+              }
+              try {
+                const meta = await sharp(decoded).metadata();
+                if (meta.format !== "svg") {
+                  await sharp(decoded).resize(1).raw().toBuffer();
+                }
+              } catch (rawProbeErr) {
+                const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                if (probeErr instanceof DecoderOutOfMemoryError) {
+                  throw probeErr;
+                }
+                throw decodeErr;
+              }
             }
           }
-          if (validation.valid && validation.format === "svg") {
-            decoded = decompressSvgz(decoded);
-            decoded = sanitizeSvg(decoded);
+          let isSvg = validation.format === "svg";
+          if (isSvg) {
+            decoded = sanitizeSvgBuffer(decoded);
           }
           let pipeline = sharp(decoded);
 
           // Get original metadata for dimensions
           const metadata = await pipeline.metadata();
+          if (!isSvg && metadata.format === "svg") {
+            isSvg = true;
+            decoded = sanitizeSvgBuffer(decoded);
+            pipeline = sharp(decoded);
+          }
           let width = metadata.width ?? 0;
           let height = metadata.height ?? 0;
 
@@ -143,7 +194,7 @@ export function registerImageToBase64(app: FastifyInstance) {
           // Determine output format and encode
           let outputBuffer: Buffer;
           let mimeType: string;
-          const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+          const ext = extname(filename).toLowerCase().replace(/^\./, "");
           const isHeic = ["heic", "heif", "hif"].includes(ext);
 
           if (opts.outputFormat !== "original") {
@@ -177,8 +228,8 @@ export function registerImageToBase64(app: FastifyInstance) {
           } else if (isHeic) {
             outputBuffer = await pipeline.jpeg({ quality: opts.quality }).toBuffer();
             mimeType = "image/jpeg";
-          } else if (ext === "svg" || ext === "svgz") {
-            outputBuffer = buffer;
+          } else if (isSvg) {
+            outputBuffer = decoded;
             mimeType = "image/svg+xml";
           } else if (opts.maxWidth > 0 || opts.maxHeight > 0) {
             // Resize requested - must go through Sharp pipeline
@@ -215,10 +266,15 @@ export function registerImageToBase64(app: FastifyInstance) {
             base64,
             dataUri: `data:${mimeType};base64,${base64}`,
           });
-        } catch (err) {
+        } catch (rawErr) {
+          if (unexpectedSvgFault) throw rawErr;
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           errors.push({
             filename,
-            error: err instanceof Error ? err.message : "Failed to process image",
+            error: stripInternalPaths(
+              err instanceof Error ? err.message : "Failed to process image",
+            ),
           });
         }
       }

@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, hkdf as hkdfCb, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
+import { env } from "../config.js";
 
 const hkdf = promisify(hkdfCb);
 
@@ -53,6 +54,43 @@ export async function decrypt(
   if (result !== null) return result;
   if (previousKeyHex) return tryDecrypt(previousKeyHex);
   return null;
+}
+
+export interface DecryptedSetting {
+  value: string;
+  reencrypted?: string;
+}
+
+/**
+ * Decrypt a stored setting or secret using DATA_ENCRYPTION_KEY (with fallback
+ * to DATA_ENCRYPTION_KEY_PREVIOUS during key rotation). Plaintext values pass
+ * through unchanged. An encrypted value returns null when no key is configured
+ * or when neither key can authenticate the ciphertext.
+ */
+export async function decryptSetting(value: string): Promise<string | null> {
+  if (!isEncrypted(value)) return value;
+  if (!env.DATA_ENCRYPTION_KEY) return null;
+  return decrypt(value, env.DATA_ENCRYPTION_KEY, env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined);
+}
+
+/**
+ * Decrypt a stored setting or secret and, when it only opens with
+ * DATA_ENCRYPTION_KEY_PREVIOUS (mid-rotation), re-encrypt it under
+ * DATA_ENCRYPTION_KEY so the caller can persist the rotated ciphertext (#2843).
+ */
+export async function decryptSettingWithRotation(value: string): Promise<DecryptedSetting | null> {
+  if (!isEncrypted(value)) return { value };
+  if (!env.DATA_ENCRYPTION_KEY) return null;
+
+  const current = await decrypt(value, env.DATA_ENCRYPTION_KEY);
+  if (current !== null) return { value: current };
+
+  if (!env.DATA_ENCRYPTION_KEY_PREVIOUS) return null;
+  const rotated = await decrypt(value, env.DATA_ENCRYPTION_KEY_PREVIOUS);
+  if (rotated === null) return null;
+
+  const reencrypted = await encrypt(rotated, env.DATA_ENCRYPTION_KEY);
+  return { value: rotated, reencrypted };
 }
 
 export function isEncrypted(value: string): boolean {

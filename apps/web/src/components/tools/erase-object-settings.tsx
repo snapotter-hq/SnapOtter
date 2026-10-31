@@ -1,14 +1,35 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, Lasso, Loader2, Paintbrush, Redo, Sparkles, Trash2, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { formatHeaders } from "@/lib/api";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { bundleName } from "@/lib/bundle-i18n";
+import { cancelAbandonedJob, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
+import {
+  FeedbackCategoryError,
+  type FeedbackErrorCategory,
+  feedbackCategoryOf,
+} from "@/lib/feedback";
 import { format, formatFileSize } from "@/lib/format";
-import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import {
+  checkToolResult,
+  frameFailure,
+  type JobFailure,
+  jobFailureMessage,
+  type ProgressFrame,
+  parseResultBody,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { useRunProgress } from "@/lib/run-progress";
 import { generateId } from "@/lib/utils";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import type { EraserCanvasRef } from "./eraser-canvas";
@@ -34,8 +55,21 @@ const SSE_STALL_TIMEOUT_MS = 5 * 60_000;
 interface ProgressHandlers {
   onProgress?: (percent: number) => void;
   onComplete: (result: Record<string, unknown>) => void;
-  onFailed: (error: string) => void;
+  onFailed: (failure: JobFailure) => void;
   onStall: () => void;
+}
+
+/** A live progress subscription. */
+export interface ProgressSubscription {
+  /** End it: close the stream and drop the stall timer. Safe to call twice. */
+  stop: () => void;
+  /**
+   * Count something outside the stream as a sign of life and restart the stall
+   * timer, the way a heartbeat does. The request's upload progress calls it, so
+   * an image still uploading while the stream is quiet isn't called stalled
+   * (#1959). Does nothing once the subscription has ended.
+   */
+  touch: () => void;
 }
 
 /**
@@ -45,16 +79,17 @@ interface ProgressHandlers {
  * flaky network, proxy buffering) the UI hung forever at the last percent
  * (~25%) even though the backend job had finished and saved its result.
  *
- * This reconnects on tab refocus -- the progress endpoint replays the terminal
+ * This reconnects on tab refocus (the progress endpoint replays the terminal
  * frame from Redis and, after that cache expires, from the durable job record,
- * so a job that completed while SSE was dead still resolves -- and arms a stall
- * timeout that fails gracefully instead of hanging. Returns a cleanup the
- * caller must invoke on sync completion, error, or unmount.
+ * so a job that completed while SSE was dead still resolves). It also arms a stall
+ * timeout that fails gracefully instead of hanging. The caller must `stop()`
+ * it on sync completion, error, or unmount, and should `touch()` it while the
+ * upload is moving.
  */
 export function subscribeEraseObjectJobProgress(
   clientJobId: string,
   handlers: ProgressHandlers,
-): () => void {
+): ProgressSubscription {
   let es: EventSource | null = null;
   let stall: ReturnType<typeof setTimeout> | null = null;
   let done = false;
@@ -76,8 +111,11 @@ export function subscribeEraseObjectJobProgress(
   };
 
   const resetStall = () => {
+    // A late touch after the run ended must not arm a stall that would end it twice.
+    if (done) return;
     if (stall) clearTimeout(stall);
     stall = setTimeout(() => {
+      if (done) return;
       cleanup();
       handlers.onStall();
     }, SSE_STALL_TIMEOUT_MS);
@@ -93,6 +131,7 @@ export function subscribeEraseObjectJobProgress(
       return;
     }
     es.onmessage = (event) => {
+      if (done) return;
       // Only an unparseable frame is ignorable. A throw past the parse is our
       // own handling failing, and it must end the run (#1287).
       let data: ProgressFrame;
@@ -101,6 +140,22 @@ export function subscribeEraseObjectJobProgress(
       } catch {
         return;
       }
+      // A completed frame with nothing to download is the server's bug, the
+      // twin of a sync 2xx body with no downloadUrl (#1740): the worker builds
+      // every result with one. It ends the run outside the catch below, so a
+      // throw while showing the error can't relabel it as ours (#1830).
+      let completed: Record<string, unknown> | null = null;
+      if (data.type === "single" && data.phase === "complete") {
+        try {
+          completed = checkToolResult<Record<string, unknown>>(data.result);
+        } catch (err) {
+          cleanup();
+          // Reported first: a throw from onFailed's store writes must not lose it.
+          reportMalformedResult(err, { toolId: "erase-object" });
+          handlers.onFailed({ reason: "invalidResponse" });
+          return;
+        }
+      }
       try {
         if (data.type === "heartbeat") {
           resetStall();
@@ -108,14 +163,14 @@ export function subscribeEraseObjectJobProgress(
         }
         if (data.type !== "single") return;
         resetStall();
-        if (data.phase === "complete" && data.result) {
+        if (completed) {
           cleanup();
-          handlers.onComplete(data.result);
+          handlers.onComplete(completed);
           return;
         }
         if (data.phase === "failed") {
           cleanup();
-          handlers.onFailed(typeof data.error === "string" ? data.error : "Processing failed");
+          handlers.onFailed(frameFailure(data.error, data.details, data.code));
           return;
         }
         if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
@@ -124,9 +179,15 @@ export function subscribeEraseObjectJobProgress(
         // with it, so nothing else would ever settle the run.
         cleanup();
         try {
-          handlers.onFailed(FRAME_HANDLING_FAILED);
-        } catch {
+          handlers.onFailed({ reason: "trackingFailed" });
+        } catch (teardownErr) {
           // onFailed may be what threw; the original error is rethrown below.
+          console.error("Ending the run after a stream handling error failed", teardownErr);
+          reportRunEndFailure(
+            "Ending an Erase Object run after a stream handling error failed",
+            teardownErr,
+            "erase-object",
+          );
         }
         throw err;
       }
@@ -139,7 +200,18 @@ export function subscribeEraseObjectJobProgress(
   document.addEventListener("visibilitychange", onVisible);
   open();
   resetStall();
-  return cleanup;
+  return { stop: cleanup, touch: resetStall };
+}
+
+/**
+ * Cancels the job when the stream failed because handling a frame threw. A
+ * failed frame and a completed frame with no result don't cancel, since both
+ * arrive with the server already done with the job.
+ */
+function cancelIfHandlingFailed(failure: JobFailure, clientJobId: string) {
+  if ("reason" in failure && failure.reason === "trackingFailed") {
+    void cancelAbandonedJob(clientJobId, "erase-object");
+  }
 }
 
 interface EraseObjectSettingsProps {
@@ -164,22 +236,23 @@ export function EraseObjectSettings({
   maskedFileCount,
 }: EraseObjectSettingsProps) {
   const { t } = useTranslation();
-  const { files, entries, processing, error, setProcessing, setError, currentEntry } =
-    useFileStore();
-  const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [progressStage, setProgressStage] = useState<string | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progressCleanupRef = useRef<(() => void) | null>(null);
-
-  // Tear down any live progress subscription if the component unmounts mid-job.
-  useEffect(() => {
-    return () => {
-      progressCleanupRef.current?.();
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-    };
-  }, []);
+  const { files, processing, error, setProcessing, setError, currentEntry } = useFileStore();
+  // A bare unmount leaves a run to finish, as the batch always has: the panel also
+  // unmounts when the window crosses the layout breakpoint, and closing the stream
+  // then left a 202 run that could never end, with `processing` set for good
+  // (#2304). Keeping progress in shared state lets a remounted panel show the live
+  // phase, percent, stage, and elapsed counter (#2315).
+  const {
+    progressPhase,
+    progressPercent,
+    progressStage,
+    elapsed,
+    startRunProgress,
+    clearRunProgressTimer,
+    setProgressPhase,
+    setProgressPercent,
+    setProgressStage,
+  } = useRunProgress();
 
   const [outputFormat, setOutputFormat] = useState("png");
   const [quality, setQuality] = useState(95);
@@ -195,22 +268,25 @@ export function EraseObjectSettings({
   const hqInstalling = useFeaturesStore((s) => s.installing[HQ_BUNDLE_ID]);
   const hqQueued = useFeaturesStore((s) => s.queued.includes(HQ_BUNDLE_ID));
   const hqInstallError = useFeaturesStore((s) => s.errors[HQ_BUNDLE_ID]);
+  const hqDisplayedError = hqInstallError ?? hqBundle?.error;
   const needsHqPack = qualityMode === "hq" && !hqInstalled;
   const isAdmin = hasPermission("features:manage");
   const hqSizeBytes = hqBundle?.missingDownloadBytes ?? hqBundle?.downloadBytes;
   const hqSize = hqSizeBytes ? formatFileSize(hqSizeBytes) : (hqBundle?.estimatedSize ?? "5-7 GB");
 
   const processOneFile = (
-    entryIndex: number,
+    entryId: string,
     file: File,
     maskBlob: Blob,
     onProgress: (percent: number) => void,
+    onStoppable: (stop: () => void) => void,
   ): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       const clientJobId = generateId();
 
       const applyResult = (r: Record<string, unknown>) => {
-        useFileStore.getState().updateEntry(entryIndex, {
+        if (settled) return;
+        useFileStore.getState().updateEntryById(entryId, {
           processedUrl: r.downloadUrl as string,
           processedPreviewUrl: (r.previewUrl as string) ?? null,
           processedFilename: null,
@@ -220,15 +296,75 @@ export function EraseObjectSettings({
         });
       };
 
-      const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
-        onProgress,
-        onComplete: (r) => {
-          applyResult(r);
-          resolve();
+      // The request outlives a progress stream that gave up on it (a failed
+      // frame, or the stall timer, which runs from before the upload starts).
+      // Abort it then, and drop whatever it answers after, or a late 2xx
+      // flips the failed file back to completed once the batch has moved on
+      // (#1893).
+      const xhr = new XMLHttpRequest();
+      let abandoned = false;
+      let settled = false;
+      const abandonedJob = trackAbandonedJob(clientJobId, "erase-object");
+      const watchdog = createXhrWatchdog(xhr, 600_000, () => !abandoned && !settled);
+      const resolveOnce = () => {
+        watchdog.clear();
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const rejectOnce = (err: Error) => {
+        watchdog.clear();
+        if (settled) return;
+        settled = true;
+        reject(err);
+      };
+      const abandon = (err: Error) => {
+        abandoned = true;
+        rejectOnce(err);
+        xhr.abort();
+      };
+
+      const subscription = subscribeEraseObjectJobProgress(clientJobId, {
+        onProgress: (percent) => {
+          if (abandoned || settled) return;
+          abandonedJob.onAccepted();
+          watchdog.onUploadLoad();
+          onProgress(percent);
         },
-        onFailed: (err) => reject(new Error(err)),
-        onStall: () =>
-          reject(new Error("Processing timed out. The result may have saved -- check your files.")),
+        onComplete: (r) => {
+          if (abandoned || settled) return;
+          applyResult(r);
+          resolveOnce();
+        },
+        onFailed: (failure) => {
+          if (abandoned || settled) return;
+          abandoned = true;
+          cancelIfHandlingFailed(failure, clientJobId);
+          abandon(new Error(jobFailureMessage(failure, t.errors)));
+        },
+        onStall: () => {
+          if (abandoned || settled) return;
+          abandoned = true;
+          abandonedJob.cancelOnStall();
+          abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout"));
+        },
+      });
+      const stopProgress = subscription.stop;
+      // Drops this file where it stands. The error only settles the promise:
+      // the batch has already decided to write nothing more for it.
+      onStoppable(() => {
+        // First, so a teardown step that throws can't leave the job running.
+        const keepRequest = !settled && abandonedJob.keepRequestOnStop();
+        try {
+          stopProgress();
+        } finally {
+          if (keepRequest) {
+            abandoned = true;
+            rejectOnce(new Error("Erase Object batch stopped"));
+          } else {
+            abandon(new Error("Erase Object batch stopped"));
+          }
+        }
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -240,48 +376,100 @@ export function EraseObjectSettings({
       formData.append("quality", String(quality));
       formData.append("qualityMode", qualityMode);
 
-      const xhr = new XMLHttpRequest();
-      xhr.timeout = 600_000;
+      // The stall timer is armed before the upload starts, and on a quiet
+      // stream only this keeps it from cutting off an image that is still
+      // uploading (#1959). The XHR watchdog bounds upload stalls at 120s and
+      // the post-upload response wait at 600s (#3870).
+      xhr.upload.onprogress = (e) => {
+        subscription.touch();
+        abandonedJob.onUploadProgress(e);
+        watchdog.onUploadProgress(e);
+      };
+      xhr.upload.onload = () => {
+        abandonedJob.onUploadLoad();
+        watchdog.onUploadLoad();
+      };
       xhr.onload = () => {
-        if (xhr.status === 202) return;
+        watchdog.clear();
+        if (xhr.status === 202) abandonedJob.onAccepted();
+        if (abandoned || settled || xhr.status === 202) return;
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
+          // Only a body that isn't a result is the server's fault, and it gets
+          // reported (#1740). A throw while landing a good one is our own store
+          // write failing: it fails this file the way the progress stream's
+          // handling error does, and still surfaces (#1734, after #1354).
+          let result: Record<string, unknown>;
           try {
-            applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
-            resolve();
-          } catch {
-            reject(new Error("Invalid response"));
+            result = parseResultBody<Record<string, unknown>>(xhr.responseText);
+          } catch (err) {
+            rejectOnce(new FeedbackCategoryError(t.errors.invalidResponse, "processing_error"));
+            reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
+            return;
           }
-        } else {
           try {
-            const body = JSON.parse(xhr.responseText);
-            reject(
-              new Error(
-                typeof body.error === "string"
-                  ? body.error
-                  : typeof body.details === "string"
-                    ? body.details
-                    : `Failed: ${xhr.status}`,
+            applyResult(result);
+          } catch (err) {
+            rejectOnce(
+              new FeedbackCategoryError(
+                jobFailureMessage({ reason: "trackingFailed" }, t.errors),
+                "processing_error",
               ),
             );
-          } catch {
-            reject(new Error(`Processing failed: ${xhr.status}`));
+            throw err;
           }
+          resolveOnce();
+        } else {
+          let message: string;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            message = failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              format(t.errors.failedWithStatus, { status: xhr.status }),
+            );
+          } catch {
+            message = failedAnswerMessage(
+              t,
+              null,
+              xhr.status,
+              format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+            );
+          }
+          const category = xhr.status === 413 ? "upload_error" : undefined;
+          rejectOnce(category ? new FeedbackCategoryError(message, category) : new Error(message));
         }
       };
       xhr.onerror = () => {
+        watchdog.clear();
+        if (abandoned || settled) return;
         stopProgress();
-        reject(new Error("Network error"));
+        rejectOnce(new FeedbackCategoryError(t.errors.network, "upload_error"));
       };
       xhr.ontimeout = () => {
+        watchdog.clear();
+        if (abandoned || settled) return;
         stopProgress();
-        reject(new Error("Request timed out"));
+        rejectOnce(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
       };
-      xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
-      for (const [key, value] of formatHeaders()) {
-        xhr.setRequestHeader(key, value);
+      try {
+        xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
+        for (const [key, value] of formatHeaders()) {
+          xhr.setRequestHeader(key, value);
+        }
+        watchdog.send(formData);
+      } catch (err) {
+        try {
+          stopProgress();
+        } finally {
+          if (err instanceof Error) {
+            rejectOnce(err);
+          } else {
+            rejectOnce(new FeedbackCategoryError(t.errors.network, "upload_error"));
+          }
+        }
       }
-      xhr.send(formData);
     });
   };
 
@@ -292,11 +480,30 @@ export function EraseObjectSettings({
     // Library file this single-file run derives from (#565). Batch runs
     // (handleProcessAll) never auto-save, matching the standard processor.
     const capturedEntry = useFileStore.getState().entries[capturedIndex];
+    const capturedEntryId = capturedEntry.id;
+    const runFile = capturedEntry.file;
     const saveMode = useFileStore.getState().librarySaveMode;
+    const startStopCount = useFileStore.getState().stopCount;
     useFileStore.getState().setLastSavedLibraryFileId(null);
 
     const maskBlob = await eraserRef.current.exportMask();
     if (!maskBlob) return;
+    // The store may have been replaced or the tool route left while the mask
+    // exported, and the watch below only sees writes made after it subscribes:
+    // starting now would send a file nobody is looking at and land its answer on
+    // the next tool's (#1975, #1994).
+    if (
+      useFileStore.getState().stopCount !== startStopCount ||
+      !useFileStore.getState().entries.some((e) => e.file === runFile)
+    ) {
+      return;
+    }
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "erase-object",
+      is_batch: false,
+      file_count: 1,
+    });
 
     // Record where the user painted so the comparison slider starts at that location
     const maskCenter = eraserRef.current.getMaskCenter();
@@ -304,24 +511,51 @@ export function EraseObjectSettings({
       onMaskCenter(maskCenter);
     }
 
-    setError(null);
-    setProcessing(true);
-    setProgressPhase("uploading");
-    setProgressPercent(0);
-    setElapsed(0);
+    const clearStaleProcessed = () => {
+      const target = useFileStore.getState().entries.find((e) => e.id === capturedEntryId);
+      if (
+        !target ||
+        (target.processedUrl === null &&
+          target.processedPreviewUrl === null &&
+          target.processedFilename === null &&
+          target.processedSize === null &&
+          target.status === "pending" &&
+          target.error === null)
+      ) {
+        return;
+      }
+      if (target.processedUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(target.processedUrl);
+      }
+      if (target.processedPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(target.processedPreviewUrl);
+      }
+      useFileStore.getState().updateEntryById(capturedEntryId, {
+        processedUrl: null,
+        processedPreviewUrl: null,
+        processedFilename: null,
+        processedSize: null,
+        status: "pending",
+        error: null,
+      });
+    };
 
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    setError(null);
+    clearStaleProcessed();
+    setProcessing(true);
+    const runTimer = startRunProgress();
 
     const clientJobId = generateId();
 
+    let settled = false;
+    let landed = false;
     const applyResult = (r: Record<string, unknown>) => {
+      if (settled) return;
+      settled = true;
       if (r.savedFileId) {
         useFileStore.getState().setLastSavedLibraryFileId(r.savedFileId as string);
       }
-      useFileStore.getState().updateEntry(capturedIndex, {
+      useFileStore.getState().updateEntryById(capturedEntryId, {
         processedUrl: r.downloadUrl as string,
         processedPreviewUrl: (r.previewUrl as string) ?? null,
         processedFilename: null,
@@ -333,46 +567,187 @@ export function EraseObjectSettings({
           : {}),
       });
       // An auto-saved result is already in the library, so it was never at risk.
-      // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-      if (r.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
+      // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+      if (r.savedFileId) useFileStore.getState().markClaimedById(capturedEntryId);
+      landed = true;
     };
 
+    // The store watch below ends with the run. Every terminal handler calls
+    // endWatch first, before any store write that could throw, so a failing
+    // write can't leave a dead run's watch behind to abort someone else's.
+    let unwatchFiles: (() => void) | null = null;
+    let watchdog: XhrWatchdog | null = null;
+    const endWatch = () => {
+      unwatchFiles?.();
+      unwatchFiles = null;
+    };
     const finishUi = () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      watchdog?.clear();
+      endWatch();
+      clearRunProgressTimer(runTimer);
       setProcessing(false);
       setProgressPhase("idle");
       setProgressStage(null);
     };
+    // Ends the run with an error message. The message and the teardown are both
+    // store writes, so each is guarded on its own: one that throws must not leave
+    // the run stuck at processing. The first throw is rethrown so it reaches
+    // Sentry's global handler; a second one is reported, since nothing else would
+    // carry it (#2134). Once per run: the progress stream calls onFailed again as a
+    // tracking failure when the first call throws, and that retry must neither
+    // replace the server's message nor report the same ending a second time.
+    let runEndedWithError = false;
+    const endRunWithError = (
+      message: string,
+      before?: () => void,
+      reportedByCaller = false,
+      category?: FeedbackErrorCategory | null,
+    ) => {
+      if (runEndedWithError) return;
+      runEndedWithError = true;
+      settled = true;
+      let first: { cause: unknown } | null = null;
+      let second: { cause: unknown } | null = null;
+      for (const step of [
+        ...(before ? [before] : []),
+        clearStaleProcessed,
+        () => setError(message),
+        () => {
+          useFileStore.getState().updateEntryById(capturedEntryId, {
+            status: "failed",
+            error: message,
+            errorCategory: category ?? null,
+          });
+        },
+        finishUi,
+      ]) {
+        try {
+          step();
+        } catch (err) {
+          if (first) {
+            console.error(
+              reportedByCaller
+                ? "Ending the run after a stream handling error failed"
+                : "Ending the run with an error failed",
+              err,
+            );
+            second ??= { cause: err };
+          } else {
+            first = { cause: err };
+          }
+        }
+      }
+      if (second && !reportedByCaller) {
+        reportRunEndFailure(
+          "Ending an Erase Object run with an error failed",
+          second.cause,
+          "erase-object",
+        );
+      }
+      if (first) throw first.cause;
+    };
 
-    const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
+    // Same as the batch path (#1893): a stream that gave up on the run aborts
+    // its request, and anything the request answers after that is dropped.
+    const xhr = new XMLHttpRequest();
+    let abandoned = false;
+    const abandonedJob = trackAbandonedJob(clientJobId, "erase-object");
+    watchdog = createXhrWatchdog(xhr, 600_000, () => !abandoned && !settled);
+    const abandonRequest = () => {
+      watchdog?.clear();
+      settled = true;
+      abandoned = true;
+      xhr.abort();
+    };
+    const dropRequest = () => {
+      watchdog?.clear();
+      if (abandonedJob.keepRequestOnStop()) {
+        settled = true;
+        abandoned = true;
+        return;
+      }
+      abandonRequest();
+    };
+
+    const subscription = subscribeEraseObjectJobProgress(clientJobId, {
       onProgress: (percent) => {
+        if (abandoned || settled) return;
+        abandonedJob.onAccepted();
+        watchdog?.onUploadLoad();
         setProgressPhase("processing");
         setProgressPercent(15 + (percent / 100) * 85);
       },
       onComplete: (r) => {
-        progressCleanupRef.current = null;
+        if (abandoned || settled) return;
+        endWatch();
         applyResult(r);
         finishUi();
       },
-      onFailed: (err) => {
-        progressCleanupRef.current = null;
-        setError(err);
-        finishUi();
+      onFailed: (failure) => {
+        endWatch();
+        if (landed || runEndedWithError) return;
+        const isTrackingFailure = "reason" in failure && failure.reason === "trackingFailed";
+        if (settled && !isTrackingFailure) return;
+        cancelIfHandlingFailed(failure, clientJobId);
+        // The stream has already let go of the run, so a throw from the abort or
+        // the message write must not skip finishUi and leave the run at
+        // processing for good (#1830, #1961). It still surfaces, after the teardown.
+        endRunWithError(
+          jobFailureMessage(failure, t.errors),
+          abandonRequest,
+          isTrackingFailure,
+          "processing_error",
+        );
       },
       onStall: () => {
-        progressCleanupRef.current = null;
-        setError(
-          "Processing timed out with no progress. The result may have saved to your files -- otherwise, try again.",
-        );
-        finishUi();
+        if (abandoned || settled || runEndedWithError) return;
+        endWatch();
+        abandonedJob.cancelOnStall();
+        endRunWithError(t.toolSettings["erase-object"].stall, abandonRequest, false, "timeout");
       },
     });
-    progressCleanupRef.current = stopProgress;
+    const stopProgress = subscription.stop;
+
+    // Leaving the tool route bumps stopCount (#1994), leaving for another tool
+    // resets the file store, and opening library files replaces it. Either way
+    // this run is over and its answer would land on entries that belong to
+    // someone else, so the request is dropped, as the batch does (#1894). This
+    // keys on the store rather than on unmount because the panel also unmounts
+    // when the layout swaps across the breakpoint, and that must not end the
+    // run (#1974, #2304).
+    unwatchFiles = useFileStore.subscribe((state) => {
+      if (
+        abandoned ||
+        (state.stopCount === startStopCount && state.entries.some((e) => e.file === runFile))
+      ) {
+        return;
+      }
+      // This runs inside whoever replaced the files (the tool page's reset,
+      // the library's setFiles): a throw here must not break their update, and
+      // each step gets its own guard so one that throws can't leave the run at
+      // processing. The first error is reported once.
+      let stopError: { cause: unknown } | null = null;
+      for (const step of [dropRequest, stopProgress, finishUi]) {
+        try {
+          step();
+        } catch (err) {
+          console.error("Stopping an Erase Object run whose file left failed", err);
+          stopError ??= { cause: err };
+        }
+      }
+      if (stopError) {
+        reportRunEndFailure(
+          "Stopping an Erase Object run whose file left failed",
+          stopError.cause,
+          "erase-object",
+        );
+      }
+    });
 
     const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
 
     const formData = new FormData();
-    formData.append("file", entries[capturedIndex].file);
+    formData.append("file", runFile);
     formData.append("mask", maskFile);
     formData.append("clientJobId", clientJobId);
     formData.append("format", outputFormat);
@@ -383,126 +758,417 @@ export function EraseObjectSettings({
       formData.append("saveMode", saveMode);
     }
 
-    const xhr = new XMLHttpRequest();
-    xhr.timeout = 600_000;
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
+      // See the batch path: upload bytes moving keep the stall timer from
+      // cutting the upload off (#1959).
+      subscription.touch();
+      abandonedJob.onUploadProgress(e);
+      watchdog?.onUploadProgress(e);
+      if (e.lengthComputable && !abandoned && !settled) {
         setProgressPercent((e.loaded / e.total) * 15);
       }
     };
     xhr.upload.onload = () => {
+      abandonedJob.onUploadLoad();
+      watchdog?.onUploadLoad();
+      // Firefox fires this after a stop, once the answer starts: the run is over,
+      // and a new one may be on the panel by now.
+      if (abandoned || settled) return;
       setProgressPhase("processing");
       setProgressPercent(15);
     };
     xhr.onload = () => {
+      watchdog?.clear();
       // 202 = async: the progress subscription drives completion via SSE.
-      if (xhr.status === 202) return;
+      if (xhr.status === 202) abandonedJob.onAccepted();
+      if (abandoned || settled || xhr.status === 202) return;
 
+      endWatch();
       stopProgress();
-      progressCleanupRef.current = null;
 
       if (xhr.status >= 200 && xhr.status < 300) {
+        // Same split as the batch path in processOneFile (#1734).
+        let result: Record<string, unknown> | null = null;
         try {
-          applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
-        } catch {
-          setError("Invalid response");
+          result = parseResultBody<Record<string, unknown>>(xhr.responseText);
+        } catch (err) {
+          // Reported first: a throw from the store write below must not lose it.
+          reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
+          endRunWithError(t.errors.invalidResponse, undefined, false, "processing_error");
+          return;
+        }
+        if (result) {
+          try {
+            applyResult(result);
+          } catch (err) {
+            // Both are store writes, so each is guarded on its own: a second
+            // throw from setError must not leave the run stuck at processing.
+            let teardownError: { cause: unknown } | null = null;
+            for (const teardown of [
+              clearStaleProcessed,
+              () => setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors)),
+              () => {
+                useFileStore.getState().updateEntryById(capturedEntryId, {
+                  status: "failed",
+                  error: jobFailureMessage({ reason: "trackingFailed" }, t.errors),
+                  errorCategory: "processing_error",
+                });
+              },
+              finishUi,
+            ]) {
+              try {
+                teardown();
+              } catch (teardownErr) {
+                console.error("Ending the run after a result handling error failed", teardownErr);
+                teardownError ??= { cause: teardownErr };
+              }
+            }
+            // Once per run, with the first throw: the console alone never
+            // reaches Sentry (#1882).
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending an Erase Object run after a result handling error failed",
+                teardownError.cause,
+                "erase-object",
+              );
+            }
+            throw err;
+          }
         }
       } else {
+        // Parse inside the try, write outside it: the catch is for a body that
+        // does not parse, not for a store write that throws (#2109).
+        let message: string;
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(
-            typeof body.error === "string"
-              ? body.error
-              : typeof body.details === "string"
-                ? body.details
-                : `Failed: ${xhr.status}`,
+          message = failedAnswerMessage(
+            t,
+            body,
+            xhr.status,
+            format(t.errors.failedWithStatus, { status: xhr.status }),
           );
         } catch {
-          setError(`Processing failed: ${xhr.status}`);
+          message = failedAnswerMessage(
+            t,
+            null,
+            xhr.status,
+            format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+          );
         }
+        const category = xhr.status === 413 ? "upload_error" : undefined;
+        endRunWithError(message, undefined, false, category);
+        return;
       }
       finishUi();
     };
     xhr.onerror = () => {
+      watchdog?.clear();
+      if (abandoned || settled) return;
+      endWatch();
       stopProgress();
-      progressCleanupRef.current = null;
-      setError("Network error");
-      finishUi();
+      endRunWithError(t.errors.network, undefined, false, "upload_error");
     };
     xhr.ontimeout = () => {
+      watchdog?.clear();
+      if (abandoned || settled) return;
+      endWatch();
       stopProgress();
-      progressCleanupRef.current = null;
-      setError("Request timed out - the server may be overloaded. Try again.");
-      finishUi();
+      endRunWithError(
+        t.toolSettings["erase-object"].timeoutOverloaded,
+        undefined,
+        false,
+        "timeout",
+      );
     };
-    xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
-    formatHeaders().forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    xhr.send(formData);
+    try {
+      xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
+      formatHeaders().forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+      watchdog.send(formData);
+    } catch (err) {
+      watchdog?.clear();
+      if (abandoned || settled) {
+        stopProgress();
+        return;
+      }
+      endWatch();
+      const category = err instanceof Error ? undefined : "upload_error";
+      endRunWithError(
+        err instanceof Error ? err.message : t.errors.network,
+        stopProgress,
+        false,
+        category,
+      );
+    }
   };
 
   const handleProcessAll = async () => {
     if (!eraserRef.current) return;
 
+    const startStopCount = useFileStore.getState().stopCount;
     const masks = await eraserRef.current.exportAllMasks();
     if (masks.size === 0) return;
+    if (useFileStore.getState().stopCount !== startStopCount) return;
 
     const { entries: currentEntries } = useFileStore.getState();
 
-    // Map blobUrl -> entry index
-    const blobToIndex = new Map<string, number>();
-    for (let i = 0; i < currentEntries.length; i++) {
-      blobToIndex.set(currentEntries[i].blobUrl, i);
-    }
+    // Map blobUrl -> entry
+    const blobToEntry = new Map(currentEntries.map((entry) => [entry.blobUrl, entry]));
 
-    const work: { index: number; file: File; maskBlob: Blob }[] = [];
+    const work: { entryId: string; file: File; maskBlob: Blob }[] = [];
     for (const [blobUrl, maskBlob] of masks) {
-      const idx = blobToIndex.get(blobUrl);
-      if (idx !== undefined) {
-        work.push({ index: idx, file: currentEntries[idx].file, maskBlob });
+      const entry = blobToEntry.get(blobUrl);
+      if (entry) {
+        work.push({ entryId: entry.id, file: entry.file, maskBlob });
       }
     }
     if (work.length === 0) return;
 
-    setError(null);
-    setProcessing(true);
-    setProgressPhase("uploading");
-    setProgressPercent(0);
-    setElapsed(0);
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "erase-object",
+      is_batch: work.length > 1,
+      file_count: work.length,
+    });
 
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
-
-    for (let wi = 0; wi < work.length; wi++) {
-      const { index, file, maskBlob } = work[wi];
-      const basePercent = (wi / work.length) * 100;
-      const sliceWeight = 100 / work.length;
-
-      setProgressPhase("processing");
-      setProgressPercent(basePercent);
-      setProgressStage(`Erasing ${wi + 1}/${work.length}`);
-
-      useFileStore.getState().updateEntry(index, { status: "processing", error: null });
-
-      try {
-        await processOneFile(index, file, maskBlob, (pct) => {
-          setProgressPercent(basePercent + (pct / 100) * sliceWeight);
-        });
-      } catch (err) {
-        useFileStore.getState().updateEntry(index, {
-          status: "failed",
-          error: err instanceof Error ? err.message : "Processing failed",
-        });
+    // Leaving the tool route bumps stopCount (#1994), leaving for another tool
+    // resets the file store, and opening library files replaces it. Either way
+    // the batch stops there: the file in flight is dropped, no more are sent,
+    // and nothing is written to entries that now belong to someone else (#1894).
+    // This keys on the store rather than on unmount because the panel also
+    // unmounts when the layout swaps across the breakpoint, and that must not
+    // end the run.
+    const isWorkEntryPresent = (
+      entryId: string,
+      file: File,
+      entries = useFileStore.getState().entries,
+    ) => entries.some((e) => e.id === entryId && e.file === file);
+    let activeWorkIndex = 0;
+    let activeWorkEntry: { entryId: string; file: File } | null = null;
+    let activeEntryAborted = false;
+    let filesGone = false;
+    let stopInFlight: (() => void) | null = null;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (filesGone) return;
+      const hasRemainingWork =
+        state.stopCount === startStopCount &&
+        work
+          .slice(activeWorkIndex)
+          .some((w) => isWorkEntryPresent(w.entryId, w.file, state.entries));
+      if (hasRemainingWork) {
+        if (
+          activeWorkEntry &&
+          !isWorkEntryPresent(activeWorkEntry.entryId, activeWorkEntry.file, state.entries)
+        ) {
+          activeEntryAborted = true;
+          activeWorkEntry = null;
+          const stop = stopInFlight;
+          stopInFlight = null;
+          try {
+            stop?.();
+          } catch (err) {
+            reportRunEndFailure(
+              "Stopping an Erase Object batch whose files left failed",
+              err,
+              "erase-object",
+            );
+          }
+        }
+        return;
       }
+      filesGone = true;
+      activeWorkEntry = null;
+      const stop = stopInFlight;
+      stopInFlight = null;
+      // This runs inside whoever replaced the files or left the route: a throw
+      // here must not break their update.
+      let stopError: { cause: unknown } | null = null;
+      for (const step of [
+        () => stop?.(),
+        () => {
+          if (useFileStore.getState().processing) setProcessing(false);
+        },
+        () => setProgressPhase("idle"),
+        () => {
+          for (const { entryId } of work) {
+            if (
+              useFileStore.getState().entries.find((e) => e.id === entryId)?.status === "processing"
+            ) {
+              useFileStore.getState().updateEntryById(entryId, { status: "pending" });
+            }
+          }
+        },
+      ]) {
+        try {
+          step();
+        } catch (err) {
+          stopError ??= { cause: err };
+        }
+      }
+      if (stopError) {
+        reportRunEndFailure(
+          "Stopping an Erase Object batch whose files left failed",
+          stopError.cause,
+          "erase-object",
+        );
+      }
+    });
+
+    const revokeEntryBlobs = (targetId: string) => {
+      const currentTarget = useFileStore.getState().entries.find((e) => e.id === targetId);
+      if (currentTarget?.processedUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(currentTarget.processedUrl);
+      }
+      if (currentTarget?.processedPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(currentTarget.processedPreviewUrl);
+      }
+    };
+
+    // A store write that throws anywhere in here (#1354) ends the batch: a
+    // store that can't record a file's outcome gets no more files sent to it.
+    // The teardown below runs whatever threw, so the run can't stay at
+    // processing with its elapsed counter ticking (#1810).
+    let batchError: { cause: unknown } | null = null;
+    let runTimer: ReturnType<typeof setInterval> | null = null;
+    try {
+      setError(null);
+      if (!filesGone) {
+        setProcessing(true);
+        runTimer = startRunProgress();
+      }
+
+      for (let wi = 0; wi < work.length; wi++) {
+        activeWorkIndex = wi;
+        if (filesGone) break;
+        const { entryId, file, maskBlob } = work[wi];
+        if (!isWorkEntryPresent(entryId, file)) continue;
+        const basePercent = (wi / work.length) * 100;
+        const sliceWeight = 100 / work.length;
+
+        setProgressPhase("processing");
+        setProgressPercent(basePercent);
+        setProgressStage(
+          format(t.toolSettings["erase-object"].erasingProgress, {
+            current: wi + 1,
+            total: work.length,
+          }),
+        );
+
+        revokeEntryBlobs(entryId);
+        useFileStore.getState().updateEntryById(entryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "processing",
+          error: null,
+        });
+
+        activeWorkEntry = { entryId, file };
+        activeEntryAborted = false;
+        try {
+          await processOneFile(
+            entryId,
+            file,
+            maskBlob,
+            (pct) => {
+              if (filesGone || activeEntryAborted) return;
+              setProgressPercent(basePercent + (pct / 100) * sliceWeight);
+            },
+            (stop) => {
+              stopInFlight = stop;
+            },
+          );
+        } catch (err) {
+          if (filesGone) break;
+          if (activeEntryAborted || !isWorkEntryPresent(entryId, file)) continue;
+          revokeEntryBlobs(entryId);
+          useFileStore.getState().updateEntryById(entryId, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            processedSize: null,
+            status: "failed",
+            error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+            errorCategory: feedbackCategoryOf(err),
+          });
+        } finally {
+          activeWorkEntry = null;
+          stopInFlight = null;
+        }
+      }
+    } catch (cause) {
+      batchError = { cause };
     }
 
-    if (elapsedRef.current) clearInterval(elapsedRef.current);
-    setProcessing(false);
-    setProgressPhase("idle");
-    setProgressStage(null);
+    // Each teardown write in its own guard, so one that throws can't skip
+    // the rest. The first error is rethrown once the run is over, where
+    // Sentry's global handler picks it up. A teardown throw behind a batch
+    // error would be lost to that rethrow, so it's reported here instead,
+    // once (#1812).
+    const trackingFailed = jobFailureMessage({ reason: "trackingFailed" }, t.errors);
+    let teardownError: { cause: unknown } | null = null;
+    for (const teardown of [
+      unsubscribe,
+      () => {
+        clearRunProgressTimer(runTimer);
+      },
+      // A stopped batch's store watch already cleared processing when the stop
+      // fired, so don't write it again after the await where a next run may
+      // have started (#1994).
+      () => {
+        if (!filesGone) setProcessing(false);
+      },
+      () => {
+        if (!filesGone) setProgressPhase("idle");
+      },
+      () => {
+        if (!filesGone) setProgressStage(null);
+      },
+      // A batch that stopped early says so, as the single-file run does.
+      () => {
+        if (batchError) setError(trackingFailed);
+      },
+      // Last, after the run has ended (#1781): a file the stopped batch left
+      // at "processing" would pulse for good. Fails only this batch's files.
+      () => {
+        if (!batchError) return;
+        for (const { entryId } of work) {
+          if (
+            useFileStore.getState().entries.find((e) => e.id === entryId)?.status === "processing"
+          ) {
+            revokeEntryBlobs(entryId);
+            useFileStore.getState().updateEntryById(entryId, {
+              processedUrl: null,
+              processedPreviewUrl: null,
+              processedFilename: null,
+              processedSize: null,
+              status: "failed",
+              error: trackingFailed,
+              errorCategory: null,
+            });
+          }
+        }
+      },
+    ]) {
+      try {
+        teardown();
+      } catch (err) {
+        console.error("Ending an Erase Object batch failed", err);
+        teardownError ??= { cause: err };
+      }
+    }
+    if (batchError) {
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending an Erase Object batch after a store error failed",
+          teardownError.cause,
+          "erase-object",
+        );
+      }
+      throw batchError.cause;
+    }
+    if (teardownError) throw teardownError.cause;
   };
 
   const hasFile = files.length > 0;
@@ -603,7 +1269,10 @@ export function EraseObjectSettings({
                 {hqInstalling || hqQueued
                   ? t.settings.aiFeatures.installing
                   : format(t.features.enableButton, {
-                      name: hqBundle?.name ?? "High-Quality Inpainting",
+                      name: bundleName(
+                        t,
+                        hqBundle ?? { id: HQ_BUNDLE_ID, name: t.featureBundles["inpaint-hq"].name },
+                      ),
                     })}
               </button>
             ) : (
@@ -611,7 +1280,9 @@ export function EraseObjectSettings({
                 {t.features.notEnabledDescription}
               </p>
             )}
-            {hqInstallError && <p className="mt-1 text-xs text-destructive">{hqInstallError}</p>}
+            {hqDisplayedError && (
+              <p className="mt-1 text-xs text-destructive">{hqDisplayedError}</p>
+            )}
           </div>
         )}
       </div>
@@ -707,9 +1378,13 @@ export function EraseObjectSettings({
       {/* Hint */}
       {hasFile && !hasStrokes && (
         <p className="text-[10px] text-muted-foreground">
-          {mode === "lasso"
-            ? t.toolSettings["erase-object"].lassoHint
-            : t.toolSettings["erase-object"].paintHint}
+          {format(
+            mode === "lasso"
+              ? t.toolSettings["erase-object"].lassoHint
+              : t.toolSettings["erase-object"].paintHint,
+            // The canvas undoes on Cmd+Z and Ctrl+Z alike, so the OS rule picks the name.
+            { shortcut: formatShortcut("mod+z") },
+          )}
         </p>
       )}
 

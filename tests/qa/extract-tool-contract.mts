@@ -20,15 +20,27 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { FastifyInstance } from "fastify";
+import { phase1SettingsSchema } from "../../apps/api/src/routes/tools/remove-background.js";
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "../../packages/shared/src/constants.js";
 import { deriveAxes, type PictAxis } from "../helpers/zod-pict.js";
 
-process.env.DATA_DIR ||= "/tmp/qa-tool-contract";
-process.env.DATABASE_URL ||= "postgres://snapotter:snapotter@localhost:5432/snapotter";
-process.env.REDIS_URL ||= "redis://127.0.0.1:6379";
-process.env.AUTH_ENABLED ||= "true";
+/**
+ * Returns the Zod schema that governs single-file HTTP requests to a tool's
+ * primary route (`POST /api/v1/tools/:modality/:toolId`).
+ *
+ * `remove-background` registers `pipelineSettingsSchema` in `toolRegistry` for
+ * pipelines and batch runs, while its HTTP route (Phase 1) only accepts
+ * `phase1SettingsSchema` (#2281, #2985).
+ */
+export function httpSettingsSchemaFor(
+  toolId: string,
+  registeredSchema: Parameters<typeof deriveAxes>[0] | undefined,
+): Parameters<typeof deriveAxes>[0] | undefined {
+  return toolId === "remove-background" ? phase1SettingsSchema : registeredSchema;
+}
 
 export interface ToolContract {
   id: string;
@@ -51,8 +63,11 @@ export interface ToolContract {
 
 interface FieldBounds {
   min?: number;
+  minInclusive?: boolean;
   max?: number;
-  kind: "number" | "enum" | "boolean" | "other";
+  maxInclusive?: boolean;
+  values?: unknown[];
+  kind: "number" | "enum" | "boolean" | "literal-union" | "other";
 }
 
 /**
@@ -67,7 +82,9 @@ interface ZodDefLike {
   innerType?: ZodNodeLike;
   in?: ZodNodeLike;
   shape?: () => Record<string, ZodNodeLike>;
-  checks?: Array<{ kind: string; value?: number }>;
+  checks?: Array<{ kind: string; value?: number; inclusive?: boolean }>;
+  options?: ZodNodeLike[];
+  value?: unknown;
 }
 
 interface ZodNodeLike {
@@ -94,6 +111,27 @@ function unwrapNode(node: ZodNodeLike): ZodNodeLike {
   return current;
 }
 
+function collectLiteralUnionValues(node: ZodNodeLike): unknown[] | null {
+  const inner = unwrapNode(node);
+  const def = inner._def;
+  if (!def) return null;
+  if (def.typeName === "ZodLiteral") {
+    return [def.value];
+  }
+  if (def.typeName === "ZodUnion") {
+    const options = def.options ?? [];
+    if (options.length === 0) return null;
+    const collected: unknown[] = [];
+    for (const option of options) {
+      const sub = collectLiteralUnionValues(option);
+      if (!sub) return null;
+      collected.push(...sub);
+    }
+    return [...new Set(collected)];
+  }
+  return null;
+}
+
 /**
  * Reads the bounds a field actually declares.
  *
@@ -103,7 +141,7 @@ function unwrapNode(node: ZodNodeLike): ZodNodeLike {
  * min and max checks or they accuse the container of accepting things it is
  * supposed to accept.
  */
-function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
+export function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
   const bounds = new Map<string, FieldBounds>();
   const root = unwrapNode(schema as ZodNodeLike);
   const shape = root._def?.shape;
@@ -115,14 +153,41 @@ function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
     if (typeName === "ZodNumber") {
       const entry: FieldBounds = { kind: "number" };
       for (const check of inner._def?.checks ?? []) {
-        if (check.kind === "min") entry.min = check.value;
-        if (check.kind === "max") entry.max = check.value;
+        if (check.kind === "min" && check.value !== undefined) {
+          const inc = check.inclusive !== false;
+          if (
+            entry.min === undefined ||
+            check.value > entry.min ||
+            (check.value === entry.min && !inc)
+          ) {
+            entry.min = check.value;
+            entry.minInclusive = inc;
+          }
+        }
+        if (check.kind === "max" && check.value !== undefined) {
+          const inc = check.inclusive !== false;
+          if (
+            entry.max === undefined ||
+            check.value < entry.max ||
+            (check.value === entry.max && !inc)
+          ) {
+            entry.max = check.value;
+            entry.maxInclusive = inc;
+          }
+        }
       }
       bounds.set(key, entry);
     } else if (typeName === "ZodEnum" || typeName === "ZodNativeEnum") {
       bounds.set(key, { kind: "enum" });
     } else if (typeName === "ZodBoolean") {
       bounds.set(key, { kind: "boolean" });
+    } else if (typeName === "ZodUnion" || typeName === "ZodLiteral") {
+      const values = collectLiteralUnionValues(inner);
+      if (values && values.length > 0) {
+        bounds.set(key, { kind: "literal-union", values });
+      } else {
+        bounds.set(key, { kind: "other" });
+      }
     } else {
       bounds.set(key, { kind: "other" });
     }
@@ -131,7 +196,7 @@ function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
 }
 
 /** Settings values the live schema is obliged to refuse. */
-function invalidProbesFor(
+export function invalidProbesFor(
   axes: PictAxis[],
   bounds: Map<string, FieldBounds>,
 ): ToolContract["invalidProbes"] {
@@ -141,12 +206,70 @@ function invalidProbesFor(
     if (!field) continue;
     if (field.kind === "number") {
       if (field.min !== undefined) {
-        probes.push({ key: axis.key, value: field.min - 1, why: "below declared min" });
+        probes.push({
+          key: axis.key,
+          value: field.minInclusive === false ? field.min : field.min - 1,
+          why: "below declared min",
+        });
       }
       if (field.max !== undefined) {
-        probes.push({ key: axis.key, value: field.max + 1, why: "above declared max" });
+        probes.push({
+          key: axis.key,
+          value: field.maxInclusive === false ? field.max : field.max + 1,
+          why: "above declared max",
+        });
       }
       probes.push({ key: axis.key, value: "not-a-number", why: "wrong type" });
+      continue;
+    }
+    if (field.kind === "literal-union") {
+      const values = field.values ?? [];
+      if (
+        values.length > 0 &&
+        values.every((v): v is number => typeof v === "number" && Number.isFinite(v))
+      ) {
+        const nums = [...new Set(values)].sort((a, b) => a - b);
+        const memberSet = new Set(nums);
+        const min = nums[0];
+        const max = nums[nums.length - 1];
+        const allInt = nums.every(Number.isInteger);
+        const midpoint = (a: number, b: number) => (allInt ? Math.round((a + b) / 2) : (a + b) / 2);
+
+        probes.push({ key: axis.key, value: min - 1, why: "below declared min" });
+        probes.push({ key: axis.key, value: max + 1, why: "above declared max" });
+
+        let excludedMid: number | undefined;
+        const overallMid = midpoint(min, max);
+        if (!memberSet.has(overallMid)) {
+          excludedMid = overallMid;
+        } else {
+          for (let i = 0; i < nums.length - 1; i++) {
+            const gapMid = midpoint(nums[i], nums[i + 1]);
+            if (!memberSet.has(gapMid)) {
+              excludedMid = gapMid;
+              break;
+            }
+          }
+        }
+        if (excludedMid !== undefined) {
+          probes.push({ key: axis.key, value: excludedMid, why: "excluded midpoint" });
+        }
+        probes.push({ key: axis.key, value: "not-a-number", why: "wrong type" });
+      } else {
+        const memberSet = new Set(values);
+        let outsider = "__snapotter_qa_not_a_member__";
+        while (memberSet.has(outsider)) {
+          outsider = `${outsider}_`;
+        }
+        const hasNumber = values.some((v) => typeof v === "number");
+        const wrongType = !hasNumber ? 12345 : { invalid: true };
+        probes.push({
+          key: axis.key,
+          value: outsider,
+          why: "enum outsider",
+        });
+        probes.push({ key: axis.key, value: wrongType, why: "wrong type" });
+      }
       continue;
     }
     if (field.kind === "enum") {
@@ -162,6 +285,11 @@ function invalidProbesFor(
 }
 
 async function main(): Promise<void> {
+  process.env.DATA_DIR ||= "/tmp/qa-tool-contract";
+  process.env.DATABASE_URL ||= "postgres://snapotter:snapotter@localhost:5432/snapotter";
+  process.env.REDIS_URL ||= "redis://127.0.0.1:6379";
+  process.env.AUTH_ENABLED ||= "true";
+
   const repo = join(import.meta.dirname, "..", "..");
   const fastifyModule = await import(
     join(repo, "apps", "api", "node_modules", "fastify", "fastify.js")
@@ -192,12 +320,13 @@ async function main(): Promise<void> {
           skipStructuralValidation?: boolean;
         }
       | undefined;
+    const settingsSchema = httpSettingsSchemaFor(tool.id, config?.settingsSchema);
     let axes: PictAxis[] = [];
     let bounds = new Map<string, FieldBounds>();
-    if (config?.settingsSchema) {
-      bounds = readFieldBounds(config.settingsSchema);
+    if (settingsSchema) {
+      bounds = readFieldBounds(settingsSchema);
       try {
-        axes = deriveAxes(config.settingsSchema);
+        axes = deriveAxes(settingsSchema);
       } catch (error) {
         // A Zod upgrade that breaks axis derivation must be visible, not silent.
         console.error(`axis derivation failed for ${tool.id}: ${(error as Error).message}`);
@@ -242,7 +371,11 @@ async function main(): Promise<void> {
   process.exit(process.exitCode ?? 0);
 }
 
-main().catch((error) => {
-  console.error("FATAL:", error);
-  process.exit(2);
-});
+const isMain =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (isMain) {
+  main().catch((error) => {
+    console.error("FATAL:", error);
+    process.exit(2);
+  });
+}

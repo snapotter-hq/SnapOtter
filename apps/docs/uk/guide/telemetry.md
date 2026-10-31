@@ -1,6 +1,6 @@
 ---
 description: "Які анонімні дані про використання збирає SnapOtter, коли вони надсилаються та як вимкнути аналітику продукту для всього екземпляра."
-i18n_source_hash: 5d72dedaeb23
+i18n_source_hash: 4f5f7e96309e
 i18n_provenance: human
 i18n_output_hash: 27b4caa2a081
 ---

@@ -1,13 +1,15 @@
 // apps/web/src/pages/editor-page.tsx
-import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, apiToolPath, SafeError } from "@snapotter/shared";
 import { Monitor } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { CanvasResizeDialog } from "@/components/editor/common/canvas-resize-dialog";
 import {
   AutosaveRecoveryBanner,
   ExportDialog,
   saveEditorState,
+  subscribeExportJobProgress,
   useAutosave,
 } from "@/components/editor/common/export-dialog";
 import { FillDialog } from "@/components/editor/common/fill-dialog";
@@ -25,13 +27,32 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { captureHandledError } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
-import { useEditorStore } from "@/stores/editor-store";
+import { withAnalytics } from "@/lib/lazy-analytics";
+import {
+  checkToolResult,
+  jobFailureMessage,
+  MalformedResultError,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
+import { cancelPendingRebakes, useEditorStore } from "@/stores/editor-store";
 
 const SERVER_DECODED_EXTS = new Set(["psd", "tga", "exr", "hdr"]);
+const EDITOR_OPEN_TOOL_ID = "editor-open";
+
+function isDocumentReplacementAction(action: { id: string }): boolean {
+  return (
+    action.id === "loadImage" || action.id === "loadProject" || action.id === "restoreAutosave"
+  );
+}
 
 export function EditorPage() {
   const { t } = useTranslation();
+  // Read at failure time: the ?url= effect below must not re-run on a locale change.
+  const sourceImageFailed = useRef(t.editor.ui.captureFailure.sourceImageFailed);
+  sourceImageFailed.current = t.editor.ui.captureFailure.sourceImageFailed;
   usePageTitle(t.sidebar.editor);
   const isMobile = useMobile();
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
@@ -42,30 +63,120 @@ export function EditorPage() {
   const [showImageResize, setShowImageResize] = useState(false);
   const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const [showNewDocument, setShowNewDocument] = useState(false);
+  const isModalOpen =
+    showExport || showCanvasResize || showImageResize || fillDialogOpen || showNewDocument;
+  const stopOpenRef = useRef<() => void>(() => {});
+  const openRunRef = useRef(0);
+
+  const closeDocumentModals = useCallback(() => {
+    setShowExport(false);
+    setShowCanvasResize(false);
+    setShowImageResize(false);
+    setFillDialogOpen(false);
+    setShowNewDocument(false);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, prev) => {
+      if (
+        state._historyVersion !== prev._historyVersion ||
+        state.sourceImageUrl !== prev.sourceImageUrl
+      ) {
+        openRunRef.current += 1;
+        stopOpenRef.current();
+        stopOpenRef.current = () => {};
+      }
+      if (
+        (state.sourceImageUrl === null && prev.sourceImageUrl !== null) ||
+        (state.lastAction !== prev.lastAction &&
+          ((state._historyVersion > prev._historyVersion &&
+            isDocumentReplacementAction(state.lastAction)) ||
+            (state._historyVersion < prev._historyVersion &&
+              isDocumentReplacementAction(prev.lastAction))))
+      ) {
+        closeDocumentModals();
+      }
+    });
+    return () => {
+      unsubscribe();
+      openRunRef.current += 1;
+      stopOpenRef.current();
+    };
+  }, [closeDocumentModals]);
 
   // Autosave recovery
   const { recoveryData, dismissRecovery, restoreRecovery } = useAutosave();
 
+  const handleManualSave = useCallback(() => {
+    if (useEditorStore.getState().rebaking) return;
+    void saveEditorState({
+      manual: true,
+      errorMessage: t.editor.ui.autosaveRecovery.saveFailed,
+    });
+  }, [t.editor.ui.autosaveRecovery.saveFailed]);
+
+  const handleOpenExport = useCallback(() => {
+    if (useEditorStore.getState().rebaking) return;
+    setShowExport(true);
+  }, []);
+
   // Issue #10: Shortcuts belong at page level, not canvas level
   useEditorShortcuts({
-    onSave: () => saveEditorState(),
-    onExport: () => setShowExport(true),
+    onSave: handleManualSave,
+    onExport: handleOpenExport,
     onFillDialog: () => setFillDialogOpen(true),
+    disabled: isModalOpen,
   });
 
   useEffect(() => {
-    import("@/lib/analytics").then(({ track }) => track(ANALYTICS_EVENTS.EDITOR_OPENED, {}));
+    withAnalytics(({ track }) => track(ANALYTICS_EVENTS.EDITOR_OPENED, {}));
   }, []);
 
   // Listen for fill-dialog custom event (dispatched from Shift+Backspace shortcut)
   useEffect(() => {
-    const handler = () => setFillDialogOpen(true);
+    const handler = () => {
+      if (isModalOpen) return;
+      setFillDialogOpen(true);
+    };
     window.addEventListener("snapotter:open-fill-dialog", handler);
     return () => window.removeEventListener("snapotter:open-fill-dialog", handler);
-  }, []);
+  }, [isModalOpen]);
+
+  const loadBlobImage = useCallback(
+    (blob: Blob, runId: number, fromServer = false) => {
+      if (openRunRef.current !== runId) return;
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        if (openRunRef.current !== runId) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        closeDocumentModals();
+        loadImage(url, img.naturalWidth, img.naturalHeight);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        if (openRunRef.current !== runId) return;
+        toast.error(sourceImageFailed.current, { id: "editor-source-image-failed" });
+        if (fromServer) {
+          console.error("Failed to decode server-converted image in browser");
+          void captureHandledError(
+            new SafeError("Editor source image could not be decoded", {
+              kind: "operational",
+            }),
+            { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+          );
+        }
+      };
+      img.src = url;
+    },
+    [closeDocumentModals, loadImage],
+  );
 
   const handlePaste = useCallback(
     (e: ClipboardEvent) => {
+      if (isModalOpen) return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const item of items) {
@@ -73,21 +184,270 @@ export function EditorPage() {
           e.preventDefault();
           const blob = item.getAsFile();
           if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const img = new Image();
-          img.onload = () => loadImage(url, img.naturalWidth, img.naturalHeight);
-          img.src = url;
+          const runId = ++openRunRef.current;
+          stopOpenRef.current();
+          stopOpenRef.current = () => {};
+          cancelPendingRebakes();
+          loadBlobImage(blob, runId);
           return;
         }
       }
     },
-    [loadImage],
+    [isModalOpen, loadBlobImage],
   );
 
   useEffect(() => {
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
   }, [handlePaste]);
+
+  const handleOpenFile = useCallback(
+    async (file: File) => {
+      const runId = ++openRunRef.current;
+      stopOpenRef.current();
+      cancelPendingRebakes();
+      const isCurrent = () => openRunRef.current === runId;
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (SERVER_DECODED_EXTS.has(ext)) {
+        const controller = new AbortController();
+        stopOpenRef.current = () => {
+          controller.abort();
+        };
+
+        const fetchDecodedImage = async (downloadUrl: string) => {
+          let imgRes: Response;
+          try {
+            imgRes = await fetch(downloadUrl, {
+              headers: formatHeaders(),
+              signal: controller.signal,
+            });
+          } catch (err) {
+            if (!isCurrent()) return;
+            stopOpenRef.current = () => {};
+            console.error("Failed to fetch decoded file from server:", err);
+            toast.error(sourceImageFailed.current);
+            void captureHandledError(
+              new SafeError("Editor source image download failed", {
+                kind: "operational",
+                cause: err,
+              }),
+              { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+            );
+            return;
+          }
+          if (!isCurrent()) return;
+          if (!imgRes.ok) {
+            stopOpenRef.current = () => {};
+            console.error("Failed to fetch decoded file from server:", imgRes.status);
+            toast.error(sourceImageFailed.current);
+            void captureHandledError(
+              new SafeError("Editor source image download failed", {
+                kind: "operational",
+                statusCode: imgRes.status,
+              }),
+              { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+            );
+            return;
+          }
+          let blob: Blob;
+          try {
+            blob = await imgRes.blob();
+          } catch (err) {
+            if (!isCurrent()) return;
+            stopOpenRef.current = () => {};
+            console.error("Failed to read decoded file from server:", err);
+            toast.error(sourceImageFailed.current);
+            void captureHandledError(
+              new SafeError("Editor source image download failed", {
+                kind: "operational",
+                cause: err,
+              }),
+              { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+            );
+            return;
+          }
+          if (!isCurrent()) return;
+          stopOpenRef.current = () => {};
+          if (blob.size === 0) {
+            console.error("Server returned an empty decoded image");
+            toast.error(sourceImageFailed.current);
+            void captureHandledError(
+              new SafeError("Editor source image download was empty", {
+                kind: "operational",
+              }),
+              { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+            );
+            return;
+          }
+          loadBlobImage(blob, runId, true);
+        };
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("settings", JSON.stringify({ format: "png" }));
+        let res: Response;
+        try {
+          res = await fetch(appUrl(apiToolPath("convert")), {
+            method: "POST",
+            headers: formatHeaders(),
+            body: formData,
+            signal: controller.signal,
+          });
+        } catch (err) {
+          if (!isCurrent()) return;
+          stopOpenRef.current = () => {};
+          console.error("Failed to decode file via server:", err);
+          toast.error(sourceImageFailed.current);
+          void captureHandledError(
+            new SafeError("Server-side image decode request failed", {
+              kind: "operational",
+              cause: err,
+            }),
+            { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+          );
+          return;
+        }
+        if (!isCurrent()) return;
+
+        if (!res.ok) {
+          const body = typeof res.json === "function" ? await res.json().catch(() => null) : null;
+          if (!isCurrent()) return;
+          stopOpenRef.current = () => {};
+          const message = failedAnswerMessage(t, body, res.status, sourceImageFailed.current);
+          console.error("Failed to decode file via server:", res.status, body);
+          toast.error(message);
+          void captureHandledError(
+            new SafeError("Server-side image decode failed", {
+              kind: "operational",
+              statusCode: res.status,
+            }),
+            { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+          );
+          return;
+        }
+
+        let rawBody: unknown;
+        try {
+          rawBody = resolveServerUrls(await res.json());
+        } catch (err) {
+          if (!isCurrent()) return;
+          stopOpenRef.current = () => {};
+          console.error("Failed to decode file via server:", err);
+          reportMalformedResult(new MalformedResultError("notAnObject"), {
+            status: res.status,
+            toolId: EDITOR_OPEN_TOOL_ID,
+          });
+          toast.error(t.errors.invalidResponse);
+          return;
+        }
+        if (!isCurrent()) return;
+
+        const isAsyncAccepted =
+          res.status === 202 ||
+          (typeof rawBody === "object" &&
+            rawBody !== null &&
+            !Array.isArray(rawBody) &&
+            (rawBody as Record<string, unknown>).async === true);
+
+        if (isAsyncAccepted) {
+          const rawJobId = (rawBody as Record<string, unknown> | null)?.jobId;
+          const jobId = typeof rawJobId === "string" ? rawJobId.trim() : "";
+          if (!jobId) {
+            stopOpenRef.current = () => {};
+            console.error("Server-side image decode answered 202 without a jobId");
+            reportMalformedResult(new MalformedResultError("missingResultField"), {
+              status: res.status,
+              toolId: EDITOR_OPEN_TOOL_ID,
+            });
+            toast.error(t.errors.invalidResponse);
+            return;
+          }
+          if (typeof EventSource !== "function") {
+            stopOpenRef.current = () => {};
+            console.error("Server-side image decode answered before the file was ready");
+            toast.error(sourceImageFailed.current);
+            void captureHandledError(
+              new SafeError("Server-side image decode progress stream unavailable", {
+                kind: "operational",
+              }),
+              { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+            );
+            return;
+          }
+          let failedOnce = false;
+          const subscription = subscribeExportJobProgress(
+            jobId,
+            {
+              onComplete: (result) => {
+                if (!isCurrent()) return;
+                void fetchDecodedImage(result.downloadUrl);
+              },
+              onFailed: (failure) => {
+                if (failedOnce || !isCurrent()) return;
+                failedOnce = true;
+                stopOpenRef.current = () => {};
+                const isTrackingBug = "reason" in failure && failure.reason === "trackingFailed";
+                console.error("Failed to decode file via server:", failure);
+                toast.error(jobFailureMessage(failure, t.errors));
+                if (isTrackingBug) {
+                  void captureHandledError(
+                    new SafeError("Editor image open failed", { kind: "bug" }),
+                    { error_class: "bug", tool_id: EDITOR_OPEN_TOOL_ID },
+                  );
+                }
+              },
+              onStall: () => {
+                if (!isCurrent()) return;
+                stopOpenRef.current = () => {};
+                toast.error(t.errors.timeout);
+                void captureHandledError(
+                  new SafeError("Server-side image decode timed out waiting for job progress", {
+                    kind: "operational",
+                  }),
+                  { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+                );
+              },
+            },
+            EDITOR_OPEN_TOOL_ID,
+          );
+          if (!subscription.opened) {
+            subscription.stop();
+            stopOpenRef.current = () => {};
+            console.error("Server-side image decode answered before the file was ready");
+            toast.error(sourceImageFailed.current);
+            void captureHandledError(
+              new SafeError("Server-side image decode progress stream unavailable", {
+                kind: "operational",
+              }),
+              { error_class: "operational", tool_id: EDITOR_OPEN_TOOL_ID },
+            );
+            return;
+          }
+          stopOpenRef.current = () => {
+            controller.abort();
+            subscription.stop();
+          };
+          return;
+        }
+
+        let result: { downloadUrl: string };
+        try {
+          result = checkToolResult<{ downloadUrl: string }>(rawBody);
+        } catch (err) {
+          stopOpenRef.current = () => {};
+          console.error("Server-side image decode returned no download URL");
+          reportMalformedResult(err, { status: res.status, toolId: EDITOR_OPEN_TOOL_ID });
+          toast.error(t.errors.invalidResponse);
+          return;
+        }
+        await fetchDecodedImage(result.downloadUrl);
+        return;
+      }
+      stopOpenRef.current = () => {};
+      loadBlobImage(file, runId);
+    },
+    [loadBlobImage, t],
+  );
 
   const handleOpenImage = useCallback(() => {
     const input = document.createElement("input");
@@ -96,49 +456,35 @@ export function EditorPage() {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (SERVER_DECODED_EXTS.has(ext)) {
-        try {
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("settings", JSON.stringify({ format: "png" }));
-          const res = await fetch(appUrl(apiToolPath("convert")), {
-            method: "POST",
-            body: formData,
-          });
-          if (!res.ok) throw new Error("Server decode failed");
-          const json = resolveServerUrls(await res.json());
-          if (json.downloadUrl) {
-            const imgRes = await fetch(json.downloadUrl);
-            const blob = await imgRes.blob();
-            const url = URL.createObjectURL(blob);
-            const img = new Image();
-            img.onload = () => loadImage(url, img.naturalWidth, img.naturalHeight);
-            img.src = url;
-          }
-        } catch (err) {
-          console.error("Failed to decode file via server:", err);
-        }
-        return;
-      }
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => loadImage(url, img.naturalWidth, img.naturalHeight);
-      img.src = url;
+      await handleOpenFile(file);
     };
     input.click();
-  }, [loadImage]);
+  }, [handleOpenFile]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const url = params.get("url");
     if (url) {
+      const runId = ++openRunRef.current;
+      stopOpenRef.current();
+      stopOpenRef.current = () => {};
+      cancelPendingRebakes();
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => loadImage(url, img.naturalWidth, img.naturalHeight);
+      img.onload = () => {
+        if (openRunRef.current !== runId) return;
+        closeDocumentModals();
+        loadImage(url, img.naturalWidth, img.naturalHeight);
+      };
+      // Without CORS headers the browser refuses the image outright, and the
+      // editor used to stay on the welcome screen without a word.
+      img.onerror = () => {
+        if (openRunRef.current !== runId) return;
+        toast.error(sourceImageFailed.current, { id: "editor-source-image-failed" });
+      };
       img.src = url;
     }
-  }, [loadImage]);
+  }, [closeDocumentModals, loadImage]);
 
   if (isMobile) {
     return (
@@ -174,8 +520,8 @@ export function EditorPage() {
       <EditorMenuBar
         onNewDocument={() => setShowNewDocument(true)}
         onOpenImage={handleOpenImage}
-        onExport={() => setShowExport(true)}
-        onSave={() => saveEditorState()}
+        onExport={handleOpenExport}
+        onSave={handleManualSave}
         onCanvasResize={() => setShowCanvasResize(true)}
         onImageResize={() => setShowImageResize(true)}
       />
@@ -202,7 +548,12 @@ export function EditorPage() {
             onCanvasResize={() => setShowCanvasResize(true)}
             onImageResize={() => setShowImageResize(true)}
           />
-          {!sourceImageUrl && <WelcomeScreen />}
+          {!sourceImageUrl && (
+            <WelcomeScreen
+              onOpenFile={handleOpenFile}
+              onNewDocument={() => setShowNewDocument(true)}
+            />
+          )}
         </div>
         <EditorRightPanel />
       </div>

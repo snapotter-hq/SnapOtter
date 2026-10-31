@@ -1,8 +1,8 @@
 ---
 description: "Generatore di foto tessera e per documenti basato sull'AI con rilevamento del volto, rimozione dello sfondo e composizione su foglio di stampa."
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: e7ae0364beed
+i18n_output_hash: 93aa8881734e
 ---
 
 # Passport Photo {#passport-photo}
@@ -92,7 +92,7 @@ Ritaglia, ridimensiona e facoltativamente compone la foto su un foglio di stampa
 | documentType | string | No | `"passport"` | Tipo di documento (dalle specifiche del paese) |
 | bgColor | string | No | `"#FFFFFF"` | Colore di sfondo in esadecimale |
 | printLayout | string | No | `"none"` | Layout della carta da stampa: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | Vincolo di dimensione massima del file in KB (0 = nessun limite) |
+| maxFileSizeKb | number | No | `0` | Vincolo di dimensione massima del file in KB, dove 1 KB = 1000 byte (0 = nessun limite) |
 | dpi | number | No | `300` | DPI di output (72-1200) |
 | customWidthMm | number | No | - | Larghezza personalizzata della foto in mm (sovrascrive le specifiche del paese) |
 | customHeightMm | number | No | - | Altezza personalizzata della foto in mm (sovrascrive le specifiche del paese) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Error: Analysis Expired (410) {#error-analysis-expired-410}
+
+La generazione lavora sull'immagine con lo sfondo rimosso che l'analisi ha memorizzato per `jobId`. Gli output memorizzati vengono eliminati dopo un certo periodo, quindi se passa troppo tempo tra le due chiamate quell'immagine non è più disponibile. Esegui di nuovo l'analisi con la stessa foto e usa il `jobId` che restituisce.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+Un `jobId` o `filename` che non può indicare un file memorizzato (un separatore di percorso, `..`, una stringa vuota) restituisce 400.
+
 ---
 
 ### Base Route {#base-route}
@@ -170,4 +183,4 @@ Restituisce indicazioni su quale sotto-endpoint corretto usare.
 - Il campo `preview` nella risposta di analisi è un PNG codificato in base64 (max 800px di larghezza) per una visualizzazione rapida.
 - Le specifiche dei paesi includono le dimensioni del documento, i rapporti di altezza della testa e il posizionamento della linea degli occhi in base ai requisiti ufficiali delle foto per il passaporto.
 - L'opzione `printLayout` genera un foglio composto su carta 4x6\" o A4 con margini di 2mm tra le foto.
-- Quando è impostato `maxFileSizeKb`, l'output viene compresso iterativamente per rientrare nel limite di dimensione.
+- Quando è impostato `maxFileSizeKb`, la qualità JPEG dell'output viene abbassata passo dopo passo finché rientra nel limite. La dimensione in pixel è fissata dalle specifiche del paese, quindi se la foto non rientra nel limite nemmeno alla qualità più bassa, `/generate` restituisce 422 con un messaggio che lo spiega, anziché un file oltre il limite.

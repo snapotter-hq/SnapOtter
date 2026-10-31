@@ -4,6 +4,7 @@ import {
   createTotp,
   hashRecoveryCodes,
   isMfaRequiredForUser,
+  matchTotpStep,
   resolveExternalLoginMfaOutcome,
   verifyRecoveryCode,
   verifyTotpCode,
@@ -84,6 +85,36 @@ describe("MFA", () => {
       const code = totp.generate();
       expect(verifyTotpCode(secret.base32, code)).toBe(true);
     });
+
+    it("refuses a code whose time step is at or before lastAcceptedStep and accepts a later step (#2327)", () => {
+      const totp = createTotp("testuser");
+      const secret = totp.secret.base32;
+      const now = 1_700_000_010_000;
+      const currentStep = totp.counter({ timestamp: now });
+      const prevCode = totp.generate({ timestamp: now - 30_000 });
+      const currentCode = totp.generate({ timestamp: now });
+      const nextCode = totp.generate({ timestamp: now + 30_000 });
+
+      expect(verifyTotpCode(secret, currentCode, null, now)).toBe(true);
+      expect(verifyTotpCode(secret, currentCode, currentStep - 1, now)).toBe(true);
+      expect(verifyTotpCode(secret, currentCode, currentStep, now)).toBe(false);
+      expect(verifyTotpCode(secret, prevCode, currentStep, now)).toBe(false);
+      expect(verifyTotpCode(secret, nextCode, currentStep, now)).toBe(true);
+    });
+
+    it("matchTotpStep returns counter + delta across the [-1, +1] window and null outside it (#2327)", () => {
+      const totp = createTotp("testuser");
+      const secret = totp.secret.base32;
+      const now = 1_700_000_010_000;
+      const step = totp.counter({ timestamp: now });
+
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now - 30_000 }), now)).toBe(step - 1);
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now }), now)).toBe(step);
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now + 30_000 }), now)).toBe(step + 1);
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now - 60_000 }), now)).toBeNull();
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now + 60_000 }), now)).toBeNull();
+      expect(matchTotpStep(secret, "000000", now)).toBeNull();
+    });
   });
 
   describe("hashRecoveryCodes", () => {
@@ -118,6 +149,21 @@ describe("MFA", () => {
       const hashList = hashRecoveryCodes(codes);
       const result = verifyRecoveryCode("bbbb2222", hashList);
       expect(result.valid).toBe(true);
+    });
+
+    it("accepts a recovery code typed in capitals or with separators (#2050)", () => {
+      const hashList = hashRecoveryCodes(["a3f9c01b", "bbbb2222"]);
+
+      for (const typed of ["A3F9C01B", "a3f9-c01b", " A3F9 C01B ", "A3F9-c01B"]) {
+        expect(verifyRecoveryCode(typed, hashList).valid, typed).toBe(true);
+      }
+    });
+
+    it("still rejects a code that differs after normalizing", () => {
+      const hashList = hashRecoveryCodes(["a3f9c01b"]);
+
+      expect(verifyRecoveryCode("a3f9c01c", hashList).valid).toBe(false);
+      expect(verifyRecoveryCode("A3F9-C01", hashList).valid).toBe(false);
     });
 
     it("rejects an invalid recovery code", () => {

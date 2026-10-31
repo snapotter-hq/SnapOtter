@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: baabbfa6c423
+i18n_output_hash: d5b5dfbc164f
 i18n_hash_version: 2
 ---
 # 계정 복구 {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 정책이 여전히 해당 사용자에게 MFA를 요구한다면, 다음에는 등록 벽에 막히게 되므로
 `reset-mfa-policy`도 실행한 뒤 로그인하고 설정에서 다시 등록하세요.
 
+## 잊어버린 비밀번호 재설정 {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+`[password]`를 생략하면 CLI가 생성된 임시 비밀번호를 출력합니다. 어느 쪽이든 사용자의 활성 세션, API 키, 로그인 실패 제한 창이 초기화되며, SnapOtter는 다음 로그인 시 비밀번호 변경을 요구합니다.
+
+## 관리자 계정 부트스트랩 {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+기존 관리자 계정으로 로그인할 수 없을 때 사용하세요. `[username]`의 기본값은 `DEFAULT_USERNAME`(`admin`)이며, `[password]`를 생략하면 첫 로그인 시 반드시 변경해야 하는 임시 비밀번호가 출력됩니다.
+
+## 제한되거나 비활성화된 사용자 잠금 해제 {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+이 명령은 Redis의 `LOGIN_THROTTLED` 창을 지우고, 사용자가 비활성화된 경우 계정의 역할을 복원합니다.
+
 ## 이전 이미지와 대체 방법 {#older-images-and-fallbacks}
 
 `snapotter-admin` 래퍼가 존재하기 전에 빌드된 이미지에서는 스크립트를
@@ -51,7 +75,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 어떤 버전에서든 최후의 수단으로 데이터베이스에서 정책을 설정하세요. 올인원

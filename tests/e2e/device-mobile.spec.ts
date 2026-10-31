@@ -7,7 +7,30 @@
  *
  * All tests are tagged @mobile so the device projects' grep filter picks them up.
  */
-import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+
+import { execFileSync } from "node:child_process";
+import path from "node:path";
+import { expect, getE2eRunRoot, test, uploadTestImage, waitForProcessing } from "./helpers";
+
+// Six Letter pages: enough thumbnails to be taller than a phone's preview area.
+const ORGANIZE_PDF_FIXTURE = path.join(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  "document",
+  "valid",
+  "multipage-6.pdf",
+);
+
+// A5 pages (419 x 595 pt): drawn at the old fixed 1.5x they are 629 x 893 px.
+const SIGN_PDF_FIXTURE = path.join(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  "document",
+  "valid",
+  "test-3page.pdf",
+);
 
 // ---------------------------------------------------------------------------
 // Core flow: load -> navigate -> upload -> process -> download
@@ -51,6 +74,747 @@ test.describe("@mobile Core flow", () => {
       .filter({ hasText: /download/i })
       .first();
     await expect(downloadBtn).toBeVisible({ timeout: 15_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1974: the run lives in the settings panel, so closing the sheet mid-run used
+// to unmount the panel, abort the request, and leave the page at processing.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Settings sheet during a run", () => {
+  test("closing the sheet mid-run lets the run finish", async ({ loggedInPage: page }) => {
+    // Hold the answer back so the sheet can be closed while the request is out.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/v1/tools/image/resize", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    const peekBar = page.getByRole("button", { name: "Process", exact: true });
+    await peekBar.click();
+    await page.getByRole("spinbutton", { name: /width/i }).fill("50");
+    const requestSent = page.waitForRequest("**/api/v1/tools/image/resize");
+    await page
+      .getByRole("button", { name: /^resize$/i })
+      .last()
+      .click();
+    await requestSent;
+
+    await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+    await expect(page.locator("[role='dialog']")).toBeHidden();
+    release();
+
+    // The run finished behind the closed sheet: reopening shows its result
+    // rather than a panel stuck at processing.
+    await peekBar.click();
+    await expect(page.getByTestId("resize-download")).toBeVisible({ timeout: 15_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2176: the side-by-side result (two stacked cards) is taller than the preview
+// area on a short phone. It used to spill over the "Process" peek bar and the
+// Settings button, so nothing could reopen the sheet and reach the download.
+// Pixel 7 is tall enough to hide it, so this runs at an iPhone 14 viewport on
+// every mobile project, where the layout fails the same way in any engine.
+// ---------------------------------------------------------------------------
+test.describe("@mobile A result taller than the preview area", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("leaves the peek bar and the Settings button tappable", async ({ loggedInPage: page }) => {
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    const peekBar = page.getByRole("button", { name: "Process", exact: true });
+    await peekBar.click();
+    await page.getByRole("spinbutton", { name: /width/i }).fill("50");
+    await page
+      .getByRole("button", { name: /^resize$/i })
+      .last()
+      .click();
+    await expect(page.getByTestId("resize-download")).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+    await expect(page.locator("[role='dialog']")).toBeHidden();
+
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await peekBar.click({ trial: true, timeout: 5_000 });
+    // Scoped to the page: the bottom navigation has a Settings button too.
+    await page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+  });
+
+  test("sizes both before and after images exactly to the slider container", async ({
+    loggedInPage: page,
+  }) => {
+    // 2261: before/after slider size mismatch
+    await page.goto("/image/compress");
+
+    // Create and upload a portrait image (width: 400, height: 800)
+    const portraitPath = path.join(getE2eRunRoot(), "portrait.png");
+    const script = [
+      "const sharp = require('sharp');",
+      `sharp({create:{width:400,height:800,channels:4,background:{r:255,g:0,b:0,alpha:1}}}).png().toFile(${JSON.stringify(portraitPath)})`,
+    ].join(" ");
+    execFileSync("node", ["-e", script]);
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(portraitPath);
+
+    // Wait for processing to finish and slider to appear
+    const peekBar = page.getByRole("button", { name: "Process", exact: true });
+    await peekBar.click();
+
+    // Fill target size for compress tool
+    await page.getByRole("spinbutton", { name: /Target Size/i }).fill("500");
+
+    await page.getByTestId("compress-submit").click();
+    await expect(page.getByRole("slider", { name: /before\/after/i })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // Compare bounding boxes
+    const slider = page.getByRole("slider", { name: /before\/after/i });
+    const beforeImg = slider.locator("img[alt='Original']");
+    const afterImg = slider.locator("img[alt='Processed']");
+
+    const sliderBox = await slider.boundingBox();
+    const beforeBox = await beforeImg.boundingBox();
+    const afterBox = await afterImg.boundingBox();
+
+    expect(sliderBox).not.toBeNull();
+    expect(beforeBox).not.toBeNull();
+    expect(afterBox).not.toBeNull();
+
+    // The images should match the container's box exactly (since they use absolute positioning + inset-0 + w-full h-full)
+    expect(beforeBox!.width).toBeCloseTo(sliderBox!.width - 2, 1);
+    expect(beforeBox!.height).toBeCloseTo(sliderBox!.height - 2, 1);
+    expect(afterBox!.width).toBeCloseTo(sliderBox!.width - 2, 1);
+    expect(afterBox!.height).toBeCloseTo(sliderBox!.height - 2, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2190: the Sign PDF page was drawn at a fixed 1.5x, wider and taller than the
+// preview area on a phone. It covered the "Process" peek bar and the Settings
+// button, and the part left of the viewport couldn't be scrolled to, so a phone
+// user could neither place a signature nor reach the download.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Sign PDF on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("fits the page in the preview and leaves the settings controls tappable", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/sign-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(SIGN_PDF_FIXTURE);
+
+    const canvas = page.getByTestId("sign-pdf-canvas");
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // Wait for pdf.js to size the page: the canvas is 300x150 until it renders.
+    await expect
+      .poll(async () => (await canvas.boundingBox())?.height ?? 0, { timeout: 15_000 })
+      .toBeGreaterThan(160);
+
+    // The page is as wide as the area, not the old fixed 1.5x (629px for this A5 page).
+    const box = await canvas.boundingBox();
+    expect(box?.width ?? Infinity).toBeLessThanOrEqual(390);
+
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await page
+      .getByRole("button", { name: "Process", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+    await page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2191: the Organize PDF grid grew to fit its pages instead of scrolling inside
+// the preview area. With four or more pages it covered the "Process" peek bar and
+// the Settings button, so the sheet could not be opened to run the tool at all,
+// and the "Reset order" toolbar scrolled out of reach above the viewport.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Organize PDF on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("scrolls its page grid inside the preview and leaves the settings controls tappable", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/organize-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    // Six Letter pages: the grid is taller than the preview area.
+    const reset = page.getByTestId("organize-reset");
+    await expect(reset).toBeVisible({ timeout: 15_000 });
+    const lastPage = page.getByRole("button", { name: /page 6/i }).first();
+    await expect(lastPage).toBeAttached();
+
+    // The toolbar stays inside the viewport instead of scrolling away above it.
+    const box = await reset.boundingBox();
+    expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+
+    // The grid scrolls inside the preview: the last page can be brought into view
+    // and ends above the peek bar, not under it.
+    await lastPage.scrollIntoViewIfNeeded();
+    const lastBox = await lastPage.boundingBox();
+    const peekBox = await page.getByRole("button", { name: "Process", exact: true }).boundingBox();
+    expect((lastBox?.y ?? Infinity) + (lastBox?.height ?? 0)).toBeLessThanOrEqual(
+      (peekBox?.y ?? 0) + 1,
+    );
+
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await page
+      .getByRole("button", { name: "Process", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+    await page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+  });
+
+  test("reorders pages when a card is press-and-held and dragged on touch (#2256)", async ({
+    loggedInPage: page,
+    browserName,
+  }) => {
+    await page.goto("/pdf/organize-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    const page1 = page.getByTestId("organize-page-1");
+    const page2 = page.getByTestId("organize-page-2");
+    const reset = page.getByTestId("organize-reset");
+    await expect(page1).toBeVisible({ timeout: 15_000 });
+    await expect(page2).toBeVisible({ timeout: 15_000 });
+    await expect(reset).toBeDisabled();
+
+    const box1 = await page1.boundingBox();
+    const box2 = await page2.boundingBox();
+    expect(box1).not.toBeNull();
+    expect(box2).not.toBeNull();
+    if (!box1 || !box2) return;
+
+    const startX = Math.round(box1.x + box1.width / 2);
+    const startY = Math.round(box1.y + box1.height / 2);
+    const endX = Math.round(box2.x + box2.width / 2);
+    const endY = Math.round(box2.y + box2.height / 2);
+
+    if (browserName === "chromium") {
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: startX, y: startY, id: 0 }],
+        });
+        await page.waitForTimeout(300);
+        const steps = 8;
+        for (let i = 1; i <= steps; i += 1) {
+          const x = Math.round(startX + ((endX - startX) * i) / steps);
+          const y = Math.round(startY + ((endY - startY) * i) / steps);
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [{ x, y, id: 0 }],
+          });
+          await page.waitForTimeout(16);
+        }
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+      } finally {
+        await cdp.detach().catch(() => {});
+      }
+    } else {
+      // Playwright WebKit has no CDP Input.dispatchTouchEvent equivalent, so replay
+      // the browser's touch-plus-pointercancel event sequence against the live DOM.
+      await page.evaluate(
+        async ({ sx, sy, ex, ey }) => {
+          const target = document.querySelector(
+            '[data-testid="organize-page-1"]',
+          ) as HTMLElement | null;
+          if (!target) throw new Error("organize-page-1 missing");
+          const dispatchTouch = (
+            type: "touchstart" | "touchmove" | "touchend",
+            x: number,
+            y: number,
+          ) => {
+            const point = { identifier: 0, target, clientX: x, clientY: y, pageX: x, pageY: y };
+            const active = type === "touchend" ? [] : [point];
+            const ev = Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
+              touches: active,
+              targetTouches: active,
+              changedTouches: [point],
+              clientX: x,
+              clientY: y,
+            });
+            target.dispatchEvent(ev);
+          };
+          target.dispatchEvent(
+            new PointerEvent("pointerdown", {
+              bubbles: true,
+              cancelable: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+              button: 0,
+              clientX: sx,
+              clientY: sy,
+            }),
+          );
+          dispatchTouch("touchstart", sx, sy);
+          await new Promise((r) => setTimeout(r, 300));
+          target.dispatchEvent(
+            new PointerEvent("pointercancel", {
+              bubbles: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+            }),
+          );
+          const steps = 8;
+          for (let i = 1; i <= steps; i += 1) {
+            const x = Math.round(sx + ((ex - sx) * i) / steps);
+            const y = Math.round(sy + ((ey - sy) * i) / steps);
+            dispatchTouch("touchmove", x, y);
+            await new Promise((r) => setTimeout(r, 16));
+          }
+          dispatchTouch("touchend", ex, ey);
+        },
+        { sx: startX, sy: startY, ex: endX, ey: endY },
+      );
+    }
+
+    await expect(reset).toBeEnabled({ timeout: 5_000 });
+    const orderedTestIds = await page
+      .locator('[data-testid^="organize-page-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid")));
+    expect(orderedTestIds.slice(0, 2)).toEqual(["organize-page-2", "organize-page-1"]);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    await expect(page.locator("#op-order")).toHaveValue("2,1,3-z");
+  });
+
+  test("caps auto-scroll at the end of the grid when dragging a card to the bottom edge (#2257)", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/organize-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    const page1 = page.getByTestId("organize-page-1");
+    await expect(page1).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("organize-page-6")).toBeAttached();
+
+    const initialMetrics = await page1.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      const rect = scroller.getBoundingClientRect();
+      return {
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+        maxScroll: scroller.scrollHeight - scroller.clientHeight,
+        bottomX: Math.round(rect.left + rect.width / 2),
+        bottomY: Math.round(rect.bottom - 10),
+      };
+    });
+    expect(initialMetrics.maxScroll).toBeGreaterThan(0);
+
+    const box1 = await page1.boundingBox();
+    expect(box1).not.toBeNull();
+    if (!box1) return;
+
+    await page.mouse.move(
+      Math.round(box1.x + box1.width / 2),
+      Math.round(box1.y + box1.height / 2),
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      Math.round(box1.x + box1.width / 2),
+      Math.round(box1.y + box1.height / 2) + 10,
+      { steps: 2 },
+    );
+    await page.mouse.move(initialMetrics.bottomX, initialMetrics.bottomY, { steps: 10 });
+    await expect(page.getByTestId("organize-drag-overlay")).toBeVisible();
+
+    // Poll until auto-scroll reaches the bottom of the grid, then hold briefly to confirm it does not overshoot.
+    await expect
+      .poll(
+        () =>
+          page1.evaluate((el) => {
+            const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+            return scroller ? Math.round(scroller.scrollTop) : 0;
+          }),
+        { timeout: 5_000 },
+      )
+      .toBeGreaterThanOrEqual(initialMetrics.maxScroll - 2);
+    await page.waitForTimeout(250);
+
+    const scrolledMetrics = await page1.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      return {
+        scrollTop: scroller.scrollTop,
+        scrollHeight: scroller.scrollHeight,
+      };
+    });
+    expect(scrolledMetrics.scrollHeight).toBe(initialMetrics.scrollHeight);
+    expect(scrolledMetrics.scrollTop).toBeLessThanOrEqual(initialMetrics.maxScroll + 1);
+
+    await page.mouse.up();
+    await expect(page.getByTestId("organize-drag-overlay")).toHaveCount(0);
+    await expect(page.getByTestId("organize-reset")).toBeEnabled();
+    const orderedTestIds = await page
+      .locator('[data-testid^="organize-page-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid")));
+    expect(orderedTestIds[orderedTestIds.length - 1]).toBe("organize-page-1");
+  });
+
+  test("caps Multi-Tool PDF auto-scroll at the end of the grid when dragging a card to the bottom edge (#2968)", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/multi-tool-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    const page0 = page.getByTestId("multi-tool-page-0");
+    await expect(page0).toBeVisible({ timeout: 15_000 });
+    await expect(page0.locator("img")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("multi-tool-page-5")).toBeAttached();
+    const page0Thumb = await page0.locator("img").getAttribute("src");
+    expect(page0Thumb).toBeTruthy();
+
+    const initialMetrics = await page0.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      const rect = scroller.getBoundingClientRect();
+      return {
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+        maxScroll: scroller.scrollHeight - scroller.clientHeight,
+        bottomX: Math.round(rect.left + rect.width / 2),
+        bottomY: Math.round(rect.bottom - 10),
+      };
+    });
+    expect(initialMetrics.maxScroll).toBeGreaterThan(0);
+
+    const box0 = await page0.boundingBox();
+    expect(box0).not.toBeNull();
+    if (!box0) return;
+
+    const startX = Math.round(box0.x + box0.width / 2);
+    const startY = Math.round(box0.y + 60);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX, startY + 10, { steps: 2 });
+    await page.mouse.move(initialMetrics.bottomX, initialMetrics.bottomY, { steps: 10 });
+    await expect(page.getByTestId("multi-tool-drag-overlay")).toBeVisible();
+
+    await expect
+      .poll(
+        () =>
+          page0.evaluate((el) => {
+            const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+            return scroller ? Math.round(scroller.scrollTop) : 0;
+          }),
+        { timeout: 5_000 },
+      )
+      .toBeGreaterThanOrEqual(initialMetrics.maxScroll - 2);
+    await page.waitForTimeout(250);
+
+    const scrolledMetrics = await page0.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      return {
+        scrollTop: scroller.scrollTop,
+        scrollHeight: scroller.scrollHeight,
+      };
+    });
+    expect(scrolledMetrics.scrollHeight).toBe(initialMetrics.scrollHeight);
+    expect(scrolledMetrics.scrollTop).toBeLessThanOrEqual(initialMetrics.maxScroll + 1);
+
+    await page.mouse.up();
+    await expect(page.getByTestId("multi-tool-drag-overlay")).toHaveCount(0);
+    await expect(page.getByTestId("multi-tool-page-5").locator("img")).toHaveAttribute(
+      "src",
+      page0Thumb ?? "",
+    );
+  });
+});
+
+test.describe("@mobile Automate pipeline on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("reorders pipeline steps when a grip is press-and-held and dragged on touch (#2596)", async ({
+    loggedInPage: page,
+    browserName,
+  }) => {
+    await page.goto("/automate");
+    const addToolFab = page.getByRole("button", { name: /add tool/i });
+    await expect(addToolFab).toBeVisible({ timeout: 15_000 });
+
+    await addToolFab.click();
+    const search = page.getByPlaceholder("Search tools...");
+    await expect(search).toBeVisible({ timeout: 5_000 });
+    await search.fill("Resize Image");
+    await page
+      .getByRole("button", { name: /resize image/i })
+      .first()
+      .click();
+    await expect(page.getByTitle("Remove")).toHaveCount(1, { timeout: 5_000 });
+
+    await addToolFab.click();
+    await expect(search).toBeVisible({ timeout: 5_000 });
+    await search.fill("Compress Image");
+    await page
+      .getByRole("button", { name: /compress image/i })
+      .first()
+      .click();
+    await expect(page.getByTitle("Remove")).toHaveCount(2, { timeout: 5_000 });
+
+    // Collapse the newly added step so both sortable cards have compact header height.
+    await page.getByText("Compress Image").first().click();
+
+    const handles = page.locator('span[aria-roledescription="sortable"]');
+    await expect(handles).toHaveCount(2);
+
+    const box1 = await handles.nth(0).boundingBox();
+    const box2 = await handles.nth(1).boundingBox();
+    expect(box1).not.toBeNull();
+    expect(box2).not.toBeNull();
+    if (!box1 || !box2) return;
+
+    const startX = Math.round(box1.x + box1.width / 2);
+    const startY = Math.round(box1.y + box1.height / 2);
+    const endX = Math.round(box2.x + box2.width / 2);
+    const endY = Math.round(box2.y + box2.height / 2 + 12);
+
+    if (browserName === "chromium") {
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: startX, y: startY, id: 0 }],
+        });
+        await page.waitForTimeout(300);
+        const steps = 8;
+        for (let i = 1; i <= steps; i += 1) {
+          const x = Math.round(startX + ((endX - startX) * i) / steps);
+          const y = Math.round(startY + ((endY - startY) * i) / steps);
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [{ x, y, id: 0 }],
+          });
+          await page.waitForTimeout(16);
+        }
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+      } finally {
+        await cdp.detach().catch(() => {});
+      }
+    } else {
+      await page.evaluate(
+        async ({ sx, sy, ex, ey }) => {
+          const target = document.querySelector(
+            'span[aria-roledescription="sortable"]',
+          ) as HTMLElement | null;
+          if (!target) throw new Error("sortable grip missing");
+          const dispatchTouch = (
+            type: "touchstart" | "touchmove" | "touchend",
+            x: number,
+            y: number,
+          ) => {
+            const point = { identifier: 0, target, clientX: x, clientY: y, pageX: x, pageY: y };
+            const active = type === "touchend" ? [] : [point];
+            const ev = Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
+              touches: active,
+              targetTouches: active,
+              changedTouches: [point],
+              clientX: x,
+              clientY: y,
+            });
+            target.dispatchEvent(ev);
+          };
+          target.dispatchEvent(
+            new PointerEvent("pointerdown", {
+              bubbles: true,
+              cancelable: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+              button: 0,
+              clientX: sx,
+              clientY: sy,
+            }),
+          );
+          dispatchTouch("touchstart", sx, sy);
+          await new Promise((r) => setTimeout(r, 300));
+          target.dispatchEvent(
+            new PointerEvent("pointercancel", {
+              bubbles: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+            }),
+          );
+          const steps = 8;
+          for (let i = 1; i <= steps; i += 1) {
+            const x = Math.round(sx + ((ex - sx) * i) / steps);
+            const y = Math.round(sy + ((ey - sy) * i) / steps);
+            dispatchTouch("touchmove", x, y);
+            await new Promise((r) => setTimeout(r, 16));
+          }
+          dispatchTouch("touchend", ex, ey);
+        },
+        { sx: startX, sy: startY, ex: endX, ey: endY },
+      );
+    }
+
+    await expect
+      .poll(async () =>
+        page
+          .locator('span[aria-roledescription="sortable"]')
+          .evaluateAll((els) =>
+            els.map((el) => el.parentElement?.querySelector("span.text-sm")?.textContent?.trim()),
+          ),
+      )
+      .toEqual([expect.stringMatching(/compress/i), expect.stringMatching(/resize/i)]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2192: more phone views were taller than the preview area and covered the
+// "Process" peek bar or the Settings button. The bars now stack above the preview
+// content, and the views that overflowed are bounded.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Small phones keep the settings controls tappable", () => {
+  async function expectControlsTappable(page: import("@playwright/test").Page) {
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await page
+      .getByRole("button", { name: "Process", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+    const settingsBtn = page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true });
+    if (await settingsBtn.isVisible()) {
+      await settingsBtn.click({ trial: true, timeout: 5_000 });
+    }
+  }
+
+  // The bars stack above the preview, so a view that still spills under one passes
+  // the trial clicks. These check that the view itself stays between the bars.
+  async function headerBottom(page: import("@playwright/test").Page) {
+    const headerBtn = page.locator("#main-content h1").locator("xpath=..");
+    if (await headerBtn.isVisible()) {
+      const header = await headerBtn.boundingBox();
+      return (header?.y ?? 0) + (header?.height ?? 0);
+    }
+    return 0;
+  }
+
+  test.describe("QR code preview", () => {
+    test.use({ viewport: { width: 360, height: 560 } });
+
+    test("an empty QR preview does not cover the peek bar", async ({ loggedInPage: page }) => {
+      await page.goto("/image/qr-generate");
+      await expect(page.getByTestId("qr-preview")).toBeVisible({ timeout: 15_000 });
+
+      await expectControlsTappable(page);
+      const preview = await page.getByTestId("qr-preview").boundingBox();
+      expect((preview?.y ?? -1) + 1).toBeGreaterThanOrEqual(await headerBottom(page));
+      // Nothing is cut off sideways: the code fits its scroll box without scrolling.
+      const overflowX = await page.getByTestId("qr-preview").evaluate((el) => {
+        const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+        return scroller ? scroller.scrollWidth - scroller.clientWidth : -1;
+      });
+      expect(overflowX).toBe(0);
+    });
+  });
+
+  test.describe("a failed run", () => {
+    test.use({ viewport: { width: 320, height: 480 } });
+
+    test("the failed-file card does not cover the controls", async ({ loggedInPage: page }) => {
+      await page.route("**/api/v1/tools/image/resize", (route) =>
+        route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error:
+              "Processing failed because the server could not decode this image. It may be corrupt, truncated, or in a format the converter does not support. Try a different file, a smaller size, or export it again from the program that made it.",
+          }),
+        }),
+      );
+      await page.goto("/image/resize");
+      await uploadTestImage(page);
+      await page.getByRole("button", { name: "Process", exact: true }).click();
+      await page.getByRole("spinbutton", { name: /width/i }).fill("50");
+      await page
+        .getByRole("button", { name: /^resize$/i })
+        .last()
+        .click();
+      await expect(page.getByText(/could not decode this image/i).first()).toBeVisible({
+        timeout: 15_000,
+      });
+      await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+      await expect(page.locator("[role='dialog']")).toBeHidden();
+
+      await expectControlsTappable(page);
+      // The card starts below the header and its last button can be scrolled to
+      // above the peek bar, instead of being clipped or covered.
+      const message = await page
+        .getByText(/could not decode this image/i)
+        .first()
+        .boundingBox();
+      expect((message?.y ?? -1) + 1).toBeGreaterThanOrEqual(await headerBottom(page));
+      const lastButton = page
+        .getByRole("button", { name: /report an issue|report issue/i })
+        .first();
+      await lastButton.scrollIntoViewIfNeeded();
+      const last = await lastButton.boundingBox();
+      const peek = await page.getByRole("button", { name: "Process", exact: true }).boundingBox();
+      expect((last?.y ?? Infinity) + (last?.height ?? 0)).toBeLessThanOrEqual((peek?.y ?? 0) + 1);
+    });
   });
 });
 

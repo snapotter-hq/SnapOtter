@@ -477,9 +477,11 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await page.getByTestId("compose-submit").click();
 
-      await expect(page.getByText(/Processing failed|Invalid image|error/i)).toBeVisible({
-        timeout: 15_000,
-      });
+      // Scope to the preview card: the settings panel repeats the copy and the
+      // sr-only live region announces "Processing failed" (#4097).
+      await expect(
+        page.locator("section[aria-label='Preview area']").getByText(/Invalid image|error/i),
+      ).toBeVisible({ timeout: 15_000 });
     });
   });
 

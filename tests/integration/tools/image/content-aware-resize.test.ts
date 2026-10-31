@@ -2,10 +2,11 @@
  * Integration tests for the content-aware resize (seam carving via caire) API endpoint.
  *
  * This tool uses the caire Go binary. In environments where caire is not
- * installed the route will return 422. Tests gracefully handle both scenarios
- * while still verifying route existence and input validation.
+ * installed the route returns 503 ENGINE_UNAVAILABLE. Tests gracefully handle
+ * both scenarios while still verifying route existence and input validation.
  */
 
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -27,11 +28,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Content-Aware Resize", () => {
   it("route exists and responds to POST", async () => {
@@ -53,8 +54,11 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    // 200 = caire available, 422 = caire not found
-    expect([200, 422]).toContain(res.statusCode);
+    // 200 = caire available, 503 = caire not found (ENGINE_UNAVAILABLE)
+    expect([200, 503]).toContain(res.statusCode);
+    if (res.statusCode === 503) {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+    }
   }, 60_000);
 
   it("rejects fractional values for caire's integer-only flags", async () => {
@@ -133,13 +137,15 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    // Accept 200 (caire available) or 422 (caire not available)
-    expect([200, 422]).toContain(res.statusCode);
+    // Accept 200 (caire available) or 503 (caire not available)
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
       expect(resBody.downloadUrl).toBeDefined();
       expect(resBody.width).toBe(150);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -159,12 +165,14 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
       expect(resBody.downloadUrl).toBeDefined();
       expect(resBody.height).toBe(120);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -184,13 +192,15 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    // 200 = caire enlarged successfully, 422 = caire not available
-    expect([200, 422]).toContain(res.statusCode);
+    // 200 = caire enlarged successfully, 503 = caire not available
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
       expect(resBody.downloadUrl).toBeDefined();
       expect(resBody.width).toBe(300);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -218,12 +228,14 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
       expect(resBody.downloadUrl).toBeDefined();
       expect(resBody.width).toBe(150);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -243,13 +255,15 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
       expect(resBody.downloadUrl).toBeDefined();
       // Square mode produces equal width and height
       expect(resBody.width).toBe(resBody.height);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -363,12 +377,14 @@ describe("Content-Aware Resize", () => {
         body,
       });
 
-      // HEIC decode or caire may not be available
-      expect([200, 422]).toContain(res.statusCode);
+      // HEIC decode or caire may not be available (503 ENGINE_UNAVAILABLE)
+      expect([200, 503]).toContain(res.statusCode);
 
       if (res.statusCode === 200) {
         const resBody = JSON.parse(res.body);
         expect(resBody.downloadUrl).toBeDefined();
+      } else {
+        expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
       }
     },
     60_000,
@@ -393,13 +409,15 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
       expect(resBody.downloadUrl).toBeDefined();
       expect(resBody.width).toBe(120);
       expect(resBody.height).toBe(100);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -419,7 +437,7 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
@@ -431,6 +449,8 @@ describe("Content-Aware Resize", () => {
       expect(resBody).toHaveProperty("height");
       expect(resBody.originalSize).toBeGreaterThan(0);
       expect(resBody.processedSize).toBeGreaterThan(0);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -471,11 +491,13 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
       expect(resBody.downloadUrl).toBeDefined();
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -495,7 +517,7 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const resBody = JSON.parse(res.body);
@@ -506,6 +528,8 @@ describe("Content-Aware Resize", () => {
       });
       expect(dlRes.statusCode).toBe(200);
       expect(dlRes.rawPayload.length).toBeGreaterThan(0);
+    } else {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
   }, 60_000);
 
@@ -525,7 +549,10 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
+    if (res.statusCode === 503) {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+    }
   }, 60_000);
 
   it("processes a 1x1 pixel image", async () => {
@@ -547,8 +574,11 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    // 1x1 may fail if caire can't shrink further, or succeed
-    expect([200, 422]).toContain(res.statusCode);
+    // 1x1 may fail with 422 if caire can't shrink further, 503 if caire is absent, or 200
+    expect([200, 422, 503]).toContain(res.statusCode);
+    if (res.statusCode === 503) {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+    }
   }, 60_000);
 
   it("processes a large stress image", async () => {
@@ -570,7 +600,10 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
+    if (res.statusCode === 503) {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+    }
   }, 120_000);
 
   it("processes WebP input", async () => {
@@ -592,7 +625,10 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
+    if (res.statusCode === 503) {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+    }
   }, 60_000);
 
   it("rejects width of 0", async () => {
@@ -633,6 +669,41 @@ describe("Content-Aware Resize", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it.each([
+    ["width past the resize ceiling", { width: MAX_RESIZE_OUTPUT_DIMENSION + 1 }],
+    ["height past the resize ceiling", { height: MAX_RESIZE_OUTPUT_DIMENSION + 1 }],
+    [
+      "both dimensions past the resize ceiling",
+      { width: MAX_RESIZE_OUTPUT_DIMENSION + 1, height: MAX_RESIZE_OUTPUT_DIMENSION + 1 },
+    ],
+    ["huge width", { width: 100_000_000 }],
+    ["huge height", { height: 100_000_000 }],
+    ["pair over the 25 MP pixel limit", { width: 5000, height: 5001 }],
+    ["8192 x 8192 pair over the 25 MP pixel limit", { width: 8192, height: 8192 }],
+    [
+      "both dimensions at the resize ceiling",
+      { width: MAX_RESIZE_OUTPUT_DIMENSION, height: MAX_RESIZE_OUTPUT_DIMENSION },
+    ],
+  ])("rejects %s with 400 (#2204, #2997)", async (_label, settings) => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
+  });
+
   it("handles square mode with width also specified", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
@@ -652,7 +723,10 @@ describe("Content-Aware Resize", () => {
       body,
     });
 
-    expect([200, 422]).toContain(res.statusCode);
+    expect([200, 503]).toContain(res.statusCode);
+    if (res.statusCode === 503) {
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+    }
   }, 60_000);
 
   it("rejects request without settings field", async () => {
@@ -672,5 +746,30 @@ describe("Content-Aware Resize", () => {
 
     // No settings means no width/height/square => 400
     expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects pipeline step with empty content-aware-resize settings at ingress (#2997)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [{ toolId: "content-aware-resize", settings: {} }],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
   });
 });

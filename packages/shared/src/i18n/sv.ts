@@ -30,6 +30,7 @@ export const sv: TranslationKeys = {
     clear: "Rensa",
     copy: "Kopiera",
     copied: "Kopierat!",
+    copyFailed: "Kopiering misslyckades",
     noResults: "Inga resultat hittades",
     showLess: "Visa mindre",
     showMore: "Visa {count} till",
@@ -1099,6 +1100,11 @@ export const sv: TranslationKeys = {
       name: "Organisera PDF",
       description: "Ordna om sidor med en angiven sidordning",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Ordna om, rotera och ta bort sidor och hämta sidor från andra PDF:er i en och samma editor",
+    },
     "protect-pdf": {
       name: "Skydda PDF",
       description: "Lägg till lösenordsskydd (AES-256-kryptering)",
@@ -1236,7 +1242,13 @@ export const sv: TranslationKeys = {
       name: "Pipeline-byggare",
       description: "Kedja samman flera verktyg till ett arbetsflöde",
     },
-    processing: { canceled: "Bearbetningen avbruten" },
+    processing: {
+      canceled: "Bearbetningen avbruten",
+      cancelUnavailable: "Den här bearbetningen kan inte avbrytas just nu. Den fortsätter.",
+      cancelNotAllowed:
+        "Det gick inte att avbryta: du är utloggad eller får inte stoppa den här bearbetningen. Den fortsätter.",
+      cancelFailed: "Det gick inte att avbryta bearbetningen. Den fortsätter, försök igen.",
+    },
     mediaPlayer: {
       unsupported: "Din webbläsare stöder inte detta medieformat.",
     },
@@ -1262,7 +1274,6 @@ export const sv: TranslationKeys = {
       paintOverObjectsToErase: "Måla över objekt som ska raderas",
     },
     "crop-canvas": {
-      original: "Original:",
       cropPreview: "Förhandsvisning av beskärning",
       cropRegionSize: "Beskärningsområde: {width} x {height}",
       originalSize: "Original: {width} x {height}",
@@ -1295,7 +1306,6 @@ export const sv: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} rutnät . {count} plattor",
     },
     "remove-bg": {
-      original: "Original:",
       transparent: "Transparent",
       color: "Färg",
       gradient: "Tonad",
@@ -1322,7 +1332,6 @@ export const sv: TranslationKeys = {
       theExtractedTextWillAppear: "Den extraherade texten visas här när du har kört OCR.",
     },
     "image-enhancement": {
-      original: "Original:",
       removesNoiseAndArtifactsUsing: "Tar bort brus och artefakter med AI",
       analyzingImage: "Analyserar bild...",
       imageLooksGoodFineTune: "Bilden ser bra ut. Finjustera med intensitetsreglaget.",
@@ -1334,8 +1343,6 @@ export const sv: TranslationKeys = {
       enhancedSizeKb: "Förstärkt: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Alla",
-      group: "Grupp",
       dimensions: "Dimensioner",
       format: "Format",
       scanned: "Skannade:",
@@ -1370,7 +1377,6 @@ export const sv: TranslationKeys = {
       pageSize: "Sidstorlek",
     },
     color: {
-      original: "Original:",
       light: "Ljus",
       brightness: "Ljusstyrka",
       contrast: "Kontrast",
@@ -1408,6 +1414,7 @@ export const sv: TranslationKeys = {
       submitBatch: "Komprimera ({count} filer)",
       submitTarget: "Komprimera till {size} KB",
       resizedToFit: "Förminskad till {width} × {height} för att rymmas inom {size} KB",
+      batchResized: "{count} av {total} bilder förminskades för att rymmas inom {size} KB.",
       progressLabel: "Komprimerar",
       original: "Original: {size} KB",
       processed: "Bearbetat: {size} KB",
@@ -1439,6 +1446,8 @@ export const sv: TranslationKeys = {
       submit: "Ändra storlek",
       submitBatch: "Ändra storlek ({count} filer)",
       progressLabel: "Ändrar storlek",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      maxPercentageExceeded: "Använd en skala från 1 till {max} %.",
     },
     crop: {
       width: "Bredd",
@@ -1462,6 +1471,7 @@ export const sv: TranslationKeys = {
       submit: "Beskära",
       submitBatch: "Beskära ({count} filer)",
       progressLabel: "Beskärar",
+      free: "Fri",
     },
     rotate: {
       rotate90CounterClockwise: "Rotera 90° moturs",
@@ -1481,7 +1491,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Tillämpar",
     },
     convert: {
-      original: "Original:",
       originalSizeKb: "Original: {size} KB",
       processedSizeKb: "Bearbetat: {size} KB",
       targetFormat: "Målformat",
@@ -1511,7 +1520,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Optimerar",
     },
     "strip-metadata": {
-      original: "Original:",
       iccProfile: "Har ICC",
       originalSize: "Original: {size} KB",
       processedSize: "Bearbetat: {size} KB",
@@ -1535,9 +1543,9 @@ export const sv: TranslationKeys = {
       metadataRemoved: "Metadata borttagen: {size} KB",
       submit: "Ta bort metadata",
       progressLabel: "Tar bort metadata",
+      inspectFailed: "Kunde inte granska metadata",
     },
     "edit-metadata": {
-      original: "Original:",
       imageDescription: "Bildbeskrivning",
       photographerCreatorName: "Fotografens eller skaparens namn",
       imageTitle: "Bildtitel",
@@ -1597,6 +1605,7 @@ export const sv: TranslationKeys = {
       datesShifted: "datum flyttade",
       submit: "Tillämpa metadata",
       progressLabel: "Skriver metadata",
+      inspectFailed: "Kunde inte granska filen",
     },
     "bulk-rename": {
       pattern: "Mönster",
@@ -1607,6 +1616,7 @@ export const sv: TranslationKeys = {
       renaming: "Byter namn...",
       submit: "Byt namn på {count} filer",
       zipDownloaded: "ZIP nedladdad",
+      renameFailed: "Namnbytet misslyckades",
     },
     "image-to-pdf": {
       preview: "Förhandsvisning",
@@ -1636,10 +1646,13 @@ export const sv: TranslationKeys = {
       progressLabel: "Skapar PDF",
       uploadingImages: "Laddar upp bilder...",
       processingPages: "Bearbetar {count} sidor...",
+      parseResponseFailed: "Kunde inte tolka serverns svar",
+      creationFailedWithStatus:
+        "Det gick inte att skapa PDF-filen. Kontrollera dina bilder och försök igen.",
+      networkErrorCreation: "Nätverksfel när PDF-filen skapades",
+      requestTimedOut: "Tidsgränsen för begäran överskreds: servern kan vara överbelastad",
     },
     "pdf-to-image": {
-      converting2: "Konverterar",
-      page: "sida",
       custom: "Anpassad",
       uploadAPdfToGet: "Ladda upp en PDF för att komma igång",
       generatingPagePreviews: "Genererar sidförhandsvisningar...",
@@ -1696,6 +1709,12 @@ export const sv: TranslationKeys = {
       submitPlural: "Generera favicons ({count} bilder)",
       downloadZip: "Ladda ner favicons-ZIP",
       progressLabel: "Genererar favicons",
+      generationFailed: "Det gick inte att skapa faviconen. Prova en annan bild.",
+      networkError: "Nätverksfel vid generering av favicon",
+      timeout: "Tidsgränsen för begäran överskreds: servern kan vara överbelastad",
+      uploadingImages: "Laddar upp bilder...",
+      processingImagesOne: "Bearbetar {count} bild...",
+      processingImagesOther: "Bearbetar {count} bilder...",
     },
     "adjust-colors": {
       light: "Ljus",
@@ -1727,7 +1746,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Justerar färger",
     },
     sharpening: {
-      original: "Original:",
       originalSize: "Original: {size} KB",
       processedSize: "Bearbetat: {size} KB",
       method: "Metod",
@@ -1754,9 +1772,17 @@ export const sv: TranslationKeys = {
       submit: "Skärpa",
       submitBatch: "Skärpa ({count} filer)",
       progressLabel: "Skärper",
+      presetNames: {
+        light: "Lätt",
+        medium: "Medel",
+        strong: "Stark",
+        portrait: "Porträtt",
+        landscape: "Landskap",
+        detail: "Detalj",
+        print: "Tryck",
+      },
     },
     "replace-color": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       sourceColor: "Källfärg (att ersätta)",
@@ -1770,7 +1796,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Ersätter färg",
     },
     "color-blindness": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       simulationType: "Simuleringstyp",
@@ -1780,6 +1805,40 @@ export const sv: TranslationKeys = {
       submit: "Simulera",
       submitBatch: "Simulera ({count} filer)",
       progressLabel: "Simulerar färgblindhet",
+      types: {
+        protanopia: {
+          label: "Protanopi",
+          description: "Inga röda tappar. Rött ser mörkt ut. ~1 % av männen.",
+        },
+        protanomaly: {
+          label: "Protanomali",
+          description: "Nedsatt rödkänslighet. ~1 % av männen.",
+        },
+        deuteranopia: {
+          label: "Deuteranopi",
+          description: "Inga gröna tappar. Rött och grönt ser likadana ut. ~1 % av männen.",
+        },
+        deuteranomaly: {
+          label: "Deuteranomali",
+          description: "Nedsatt grönkänslighet. Vanligaste typen. ~5 % av männen.",
+        },
+        tritanopia: {
+          label: "Tritanopi",
+          description: "Inga blå tappar. Blått och grönt ser likadana ut. Mycket sällsynt.",
+        },
+        tritanomaly: {
+          label: "Tritanomali",
+          description: "Nedsatt blåkänslighet. Mycket sällsynt.",
+        },
+        achromatopsia: {
+          label: "Akromatopsi",
+          description: "Fullständig färgblindhet. Ser endast luminans. Mycket sällsynt.",
+        },
+        blueConeMonochromacy: {
+          label: "Blåtappsmonokromasi",
+          description: "Endast blå tappar fungerar. Mycket begränsat färgseende. Mycket sällsynt.",
+        },
+      },
     },
     "remove-background": {
       subject: "Motiv",
@@ -1817,6 +1876,28 @@ export const sv: TranslationKeys = {
       submitBatch: "Ta bort bakgrund ({count} filer)",
       progressLabel: "Tar bort bakgrund",
       cpuNote: "Använder en AI-modell. Utan GPU kan en stor bild ta en stund.",
+      colorPresets: {
+        white: "Vit",
+        black: "Svart",
+        red: "Röd",
+        green: "Grön",
+        blue: "Blå",
+      },
+      gradientPresets: {
+        purple: "Lila",
+        pink: "Rosa",
+        blue: "Blå",
+        green: "Grön",
+        sunset: "Solnedgång",
+        lavender: "Lavendel",
+      },
+      effectsProcessingFailed: "Bearbetningen av effekter misslyckades",
+      effectsExpired:
+        "Den tidigare bakgrundsborttagningen har gått ut, så den körs igen. Tillämpa effekterna när den är klar.",
+      refineChanged:
+        "Motiv, kvalitet, kantutjämning och färgdekontaminering tillämpas när bakgrunden tas bort. Kör borttagningen igen för att använda de nya inställningarna.",
+      backgroundImageRequired: "Välj en bakgrundsbild för att fortsätta.",
+      invalidHexColor: "Använd en hex-färg som #FF5500 eller #F50.",
     },
     "remove-gif-background": {
       quality: "Kvalitet",
@@ -1856,7 +1937,6 @@ export const sv: TranslationKeys = {
       download: "Ladda ner",
     },
     upscale: {
-      original: "Original:",
       off: "Av",
       originalKb: "Original: {size} KB",
       upscaledKb: "Uppskalad: {size} KB",
@@ -1872,9 +1952,11 @@ export const sv: TranslationKeys = {
       progressLabel: "Uppskalar bild",
       progressLabelBatch: "Uppskalar {count} bilder",
       cpuNote: "AI-uppskalning är beräkningsintensiv. Utan GPU kan en stor bild ta flera minuter.",
+      qualityFast: "Snabb",
+      qualityBalanced: "Balanserad",
+      qualityBest: "Bäst",
     },
     "erase-object": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       qualityFast: "Snabb",
@@ -1890,11 +1972,16 @@ export const sv: TranslationKeys = {
       clear: "Rensa",
       outputFormat: "Utdataformat",
       quality: "Kvalitet",
-      paintHint: "Måla över objekten du vill ta bort. Använd Ctrl+Z för att ångra.",
-      lassoHint: "Rita en ögla runt objektet du vill ta bort. Använd Ctrl+Z för att ångra.",
+      paintHint: "Måla över objekten du vill ta bort. Använd {shortcut} för att ångra.",
+      lassoHint: "Rita en ögla runt objektet du vill ta bort. Använd {shortcut} för att ångra.",
       submit: "Radera objekt",
       submitBatch: "Radera alla ({count})",
       progressLabel: "Raderar objekt",
+      stall: "Bearbetningen tog för lång tid utan framsteg. Försök igen.",
+      stallBatch: "Bearbetningen tog för lång tid. Försök igen.",
+      timeoutOverloaded:
+        "Tidsgränsen för begäran överskreds: servern kan vara överbelastad. Försök igen.",
+      erasingProgress: "Raderar {current}/{total}",
     },
     ocr: {
       copied: "Kopierat",
@@ -1904,6 +1991,8 @@ export const sv: TranslationKeys = {
         "Förbättrar lokal kontrast före igenkänning. Snabb använder den direkt; Balanserad och Bäst behåller varianten bara när den kalibrerade poängen förbättrar resultatet.",
       fastKoreanUnsupported:
         "Snabb OCR stöder inte koreanska. Installera paketet för exakt OCR och välj Balanserad eller Bäst.",
+      fastArabicUnsupported:
+        "Snabb OCR stöder inte arabiska. Installera paketet för exakt OCR och välj Balanserad eller Bäst.",
       language: "Språk",
       autoDetect: "Automatisk detektion",
       extractedText: "Extraherad text",
@@ -1912,6 +2001,9 @@ export const sv: TranslationKeys = {
       submit: "Extrahera text",
       submitBatch: "Extrahera text ({count} filer)",
       progressLabel: "Extraherar text",
+      filesFailed: "{failed} av {total} filer misslyckades",
+      noTextDetectedInline: "(ingen text hittades)",
+      fileErrorInline: "(fel: {message})",
     },
     "ocr-pdf": {
       quality: "Kvalitet",
@@ -1925,7 +2017,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Extraherar text från PDF",
     },
     "blur-faces": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       blurRadius: "Oskärpningsradie",
@@ -1938,7 +2029,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Gör ansikten oskarpa",
     },
     "enhance-faces": {
-      original: "Original:",
       subtle: "Diskret",
       maximum: "Maximal",
       fewerFaces: "Färre ansikten",
@@ -1999,6 +2089,9 @@ export const sv: TranslationKeys = {
       submitSubject: "Smart beskärning",
       submitFace: "Ansiktsbeskärning",
       submitTrim: "Trimma kanter",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      cropAreaExceeded:
+        "Det här utsnittet överskrider gränsen på {max} pixlar. Minska bredden, höjden eller utfyllnaden.",
     },
     imageEnhancement: {
       enhancementMode: "Förstärkningsmetod",
@@ -2034,6 +2127,14 @@ export const sv: TranslationKeys = {
         "Djupförstärkning kräver paketet Uppskalning & Förstärkning, som inte är installerat, så du fick standardförstärkningen.",
       deepEnhanceSkippedAnimated:
         "Djupförstärkning fungerar inte på animerade bilder, så varje bildruta fick standardförstärkningen.",
+      batchDeepEnhanceSkipped:
+        "Djupförstärkningen kördes inte på {count} av {total} bilder, så de fick standardförstärkningen.",
+      batchDeepEnhanceSkippedFailed:
+        "Djupförstärkningen misslyckades på {count} av {total} bilder, så de fick standardförstärkningen.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Djupförstärkningen kördes inte på {count} av {total} bilder eftersom paketet Uppskalning & Förstärkning inte är installerat.",
+      batchDeepEnhanceSkippedAnimated:
+        "Djupförstärkningen hoppade över {count} av {total} bilder eftersom de är animerade.",
     },
     "noise-removal": {
       off: "Av",
@@ -2065,7 +2166,6 @@ export const sv: TranslationKeys = {
       progressLabelBatch: "Tar bort brus från {count} bilder",
     },
     "red-eye-removal": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       fixedKb: "Korrigerad: {size} KB",
       sensitivity: "Känslighet",
@@ -2082,7 +2182,6 @@ export const sv: TranslationKeys = {
       progressLabelBatch: "Korrigerar röda ögon i {count} bilder",
     },
     "restore-photo": {
-      original: "Original:",
       subtle: "Diskret",
       strong: "Stark",
       originalKb: "Original: {size} KB",
@@ -2119,6 +2218,9 @@ export const sv: TranslationKeys = {
       submit: "Ändra storlek",
       submitBatch: "Ändra storlek ({count} filer)",
       progressLabel: "Innehållsmedveten storleksändring",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
+      areaExceeded:
+        "Innehållsmedveten storleksändring är begränsad till {max} pixlar totalt. Minska bredden eller höjden.",
     },
     "ai-canvas-expand": {
       quality: "Kvalitet",
@@ -2140,7 +2242,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Utvidgar duk",
     },
     colorize: {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       colorizedKb: "Färglagd: {size} KB",
       aiModel: "AI-modell",
@@ -2285,6 +2386,11 @@ export const sv: TranslationKeys = {
       dragToAdjust: "Dra för att justera",
       scrollToZoom: "Scrolla för att zooma",
       photoGenerated: "Foto genererat. Ladda ner från vänstra panelen.",
+      analysisFailedWithStatus: "Det gick inte att analysera fotot. Prova ett tydligare foto.",
+      faceAnalysisFailed: "Ansiktsanalysen misslyckades",
+      generationFailedWithStatus: "Det gick inte att skapa passfotot. Försök igen.",
+      photoGenerationFailed: "Fotogenereringen misslyckades",
+      analysisExpired: "Analysen har gått ut, så fotot analyseras igen. Generera när den är klar.",
     },
     "transcribe-audio": {
       language: "Språk",
@@ -2342,7 +2448,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Gör bakgrunden oskarp",
     },
     "watermark-text": {
-      original: "Original:",
       applyWatermark: "Tillämpa vattenstämpel",
       tiledRepeating: "Plattsatt (upprepande)",
       originalKb: "Original: {size} KB",
@@ -2365,7 +2470,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Lägger till vattenstämpel",
     },
     "watermark-image": {
-      original: "Original:",
       center: "Mitten",
       topLeft: "Uppe till vänster",
       topRight: "Uppe till höger",
@@ -2384,7 +2488,6 @@ export const sv: TranslationKeys = {
       submitBatch: "Tillämpa vattenstämpel ({count} filer)",
     },
     "text-overlay": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       text: "Text",
@@ -2404,7 +2507,6 @@ export const sv: TranslationKeys = {
       defaultText: "Din text här",
     },
     compose: {
-      original: "Original:",
       screen: "Skärm",
       processing: "Bearbetar...",
       overlayImage: "Överlagringsbild",
@@ -2459,9 +2561,6 @@ export const sv: TranslationKeys = {
       backToGallery: "Tillbaka till galleriet",
     },
     info: {
-      min: "min:",
-      max: "max:",
-      mean: "medel:",
       minValue: "min:{value}",
       maxValue: "max:{value}",
       meanValue: "medel:{value}",
@@ -2498,6 +2597,7 @@ export const sv: TranslationKeys = {
       similarity: "Likhet: {percent}%",
       submit: "Jämför",
       downloadDiff: "Ladda ner differens",
+      comparisonFailed: "Jämförelsen misslyckades",
     },
     "find-duplicates": {
       sensitivity: "Känslighet",
@@ -2527,6 +2627,10 @@ export const sv: TranslationKeys = {
       threshold: "Tröskelvärde",
       submit: "Skanna efter dubletter",
       scanning: "Skannar...",
+      parseResultsFailed: "Kunde inte tolka skanningsresultaten",
+      networkErrorUpload:
+        "Nätverksfel vid uppladdning. Försök med färre filer eller kontrollera din anslutning.",
+      requestTimedOut: "Tidsgränsen för begäran överskreds. Försök med färre filer.",
     },
     "color-palette": {
       colors: "Färger",
@@ -2597,6 +2701,26 @@ export const sv: TranslationKeys = {
       downloadFormat: "Nedladdningsformat",
       submit: "Generera QR-kod",
       download: "Ladda ner QR-kod",
+      styleSquare: "Kvadrat",
+      styleRounded: "Rundad",
+      styleDots: "Prickar",
+      styleClassy: "Elegant",
+      styleClassyRounded: "Elegant rund",
+      styleExtraRounded: "Extra rund",
+      styleDot: "Prick",
+      formatDescPng: "Bäst för digitalt",
+      formatDescSvg: "Bäst för tryck",
+      formatDescJpeg: "Mindre fil",
+      formatDescWebp: "Modernt format",
+      vcardFirstName: "Förnamn",
+      vcardFirstNamePlaceholder: "Sven",
+      vcardLastName: "Efternamn",
+      vcardLastNamePlaceholder: "Svensson",
+      vcardOrganization: "Organisation",
+      vcardOrganizationPlaceholder: "Företag",
+      vcardJobTitle: "Befattning",
+      vcardJobTitlePlaceholder: "Utvecklare",
+      vcardWebsite: "Webbplats",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2646,6 +2770,9 @@ export const sv: TranslationKeys = {
       noBarcodesFound: "Inga streckkoder hittades",
       barcodesFound: "{count} streckkod hittad",
       barcodesFoundPlural: "{count} streckkoder hittade",
+      scanningFile: "Skannar {name}...",
+      scanningFailedWithStatus: "Det gick inte att skanna bilden. Prova en annan bild.",
+      filesFailed: "{count} av {total} filer misslyckades",
     },
     collage: {
       sideBySide: "Sida vid sida",
@@ -2666,9 +2793,6 @@ export const sv: TranslationKeys = {
       mosaic: "Mosaik",
       uploadingImages: "Laddar upp bilder...",
       processingCollage: "Bearbetar collage...",
-      loaded: "inlästa",
-      images: "bilder",
-      collage: "Collage:",
       snapotter: "SnapOtter",
       background: "Bakgrund",
       format: "Format",
@@ -2704,6 +2828,12 @@ export const sv: TranslationKeys = {
       quality: "Kvalitet",
       submit: "Skapa collage",
       downloadCollage: "Ladda ner collage",
+      ratioFree: "Fri",
+      bgWhite: "Vit",
+      bgBlack: "Svart",
+      bgNone: "Ingen",
+      bgCustom: "Anpassad",
+      collageFailed: "Det gick inte att skapa collaget",
     },
     stitch: {
       format: "Format",
@@ -2733,6 +2863,7 @@ export const sv: TranslationKeys = {
       outputFormat: "Utdataformat",
       quality: "Kvalitet",
       submit: "Sammanfoga bilder",
+      stitchFailed: "Sammanfogningen misslyckades",
     },
     split: {
       splitMode: "Delningsmetod",
@@ -2761,6 +2892,21 @@ export const sv: TranslationKeys = {
       submit: "Dela bild",
       downloadAll: "Ladda ner alla (ZIP)",
       tileWarningSmall: "Plattorna blir mycket små ({width}x{height}px)",
+      presetHints: {
+        horizontalHalf: "Horisontell halva",
+        verticalHalf: "Vertikal halva",
+        quarters: "Fjärdedelar",
+        horizontalStrip: "Horisontell remsa",
+        verticalStrip: "Vertikal remsa",
+        grid9: "Rutnät med 9 plattor",
+        portrait6: "6 plattor stående",
+        landscape6: "6 plattor liggande",
+        grid16: "Rutnät med 16 plattor",
+      },
+      keepOriginal: "Behåll original",
+      auto: "Automatisk",
+      splitFailed: "Delningen misslyckades",
+      failedToSplit: "Kunde inte dela {name}: {detail}",
     },
     border: {
       blur: "Oskärpa",
@@ -2786,6 +2932,16 @@ export const sv: TranslationKeys = {
       submit: "Lägg till ram",
       submitBatch: "Lägg till ram ({count} filer)",
       progressLabel: "Lägger till ram",
+      presetNames: {
+        cleanWhite: "Rent vitt",
+        galleryBlack: "Gallerisvart",
+        shadow: "Skugga",
+        rounded: "Rundad",
+        polaroid: "Polaroid",
+        vintage: "Vintage",
+        minimal: "Minimal",
+        cinematic: "Filmisk",
+      },
     },
     beautify: {
       background: "Bakgrund",
@@ -2802,7 +2958,6 @@ export const sv: TranslationKeys = {
       text: "Text",
       position: "Position",
       newTab: "Ny flik",
-      frame: "Ram",
       quickPresets: "Snabbmallar",
       linear: "Linjär",
       radial: "Radial",
@@ -2830,6 +2985,33 @@ export const sv: TranslationKeys = {
       submit: "Försköna",
       submitBatch: "Försköna ({count} filer)",
       progressLabel: "Förskönar skärmklipp",
+      presetPurpleHaze: "Lila dis",
+      presetFlamingo: "Flamingo",
+      presetOcean: "Hav",
+      presetMidnight: "Midnatt",
+      presetMint: "Mint",
+      presetSunset: "Solnedgång",
+      presetCleanWhite: "Rent vitt",
+      presetNoBackground: "Ingen bakgrund",
+      bgGradient: "Tonad",
+      bgSolid: "Enfärgad",
+      bgImage: "Bild",
+      none: "Ingen",
+      frameBrowser: "Webbläsare",
+      shadowSubtle: "Diskret",
+      shadowMedium: "Medel",
+      shadowDramatic: "Dramatisk",
+      shadowCustom: "Anpassad",
+      socialOriginal: "Original",
+      socialIgSquare: "IG kvadrat",
+      socialIgStory: "IG Story",
+      positionTopLeft: "Uppe till vänster",
+      positionTopRight: "Uppe till höger",
+      positionCenter: "Mitten",
+      positionBottomLeft: "Nere till vänster",
+      positionBottomRight: "Nere till höger",
+      processingFailed: "Bearbetningen misslyckades",
+      processingFailedStatus: "Det gick inte att bearbeta bilden. Försök igen.",
     },
     "circle-crop": {
       border: "Ram",
@@ -2868,6 +3050,16 @@ export const sv: TranslationKeys = {
       submit: "Använd tvåton",
       submitBatch: "Använd tvåton ({count} filer)",
       progressLabel: "Tillämpar tvåton",
+      presetNames: {
+        classic: "Klassisk",
+        noir: "Noir",
+        sepia: "Sepia",
+        midnight: "Midnatt",
+        sunset: "Solnedgång",
+        cyber: "Cyber",
+        ocean: "Hav",
+        forest: "Skog",
+      },
     },
     "image-pad": {
       background: "Bakgrund",
@@ -2880,6 +3072,7 @@ export const sv: TranslationKeys = {
       submit: "Fyll ut bild",
       submitBatch: "Fyll ut bild ({count} filer)",
       progressLabel: "Fyller ut bild",
+      custom: "Anpassad",
     },
     pixelate: {
       blockSize: "Blockstorlek",
@@ -2981,7 +3174,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Konverterar SVG",
     },
     vectorize: {
-      original: "Original:",
       detail: "Detalj",
       smoothing: "Utjämning",
       blackWhite: "Svartvitt",
@@ -3018,7 +3210,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Vektoriserar",
     },
     "gif-tools": {
-      original: "Original:",
       widthPx: "Bredd (px)",
       auto: "Automatisk",
       heightPx: "Höjd (px)",
@@ -3075,6 +3266,7 @@ export const sv: TranslationKeys = {
       submit: "Bearbeta GIF",
       submitBatch: "Bearbeta ({count} filer)",
       progressLabel: "Bearbetar GIF",
+      maxDimensionExceeded: "Använd en storlek från 1 till {max} px.",
     },
     "image-to-base64": {
       converting: "Konverterar...",
@@ -3108,6 +3300,7 @@ export const sv: TranslationKeys = {
       includeText: "Inkludera text",
       submit: "Generera streckkod",
       download: "Ladda ner streckkod",
+      generateFailed: "Kunde inte generera streckkod",
     },
     "chart-maker": {
       optionalChartTitle: "Valfri diagramtitel",
@@ -3118,6 +3311,11 @@ export const sv: TranslationKeys = {
       submit: "Skapa diagram",
       submitBatch: "Skapa diagram ({count} filer)",
       progressLabel: "Skapar diagram",
+      kindBar: "Stapel",
+      kindLine: "Linje",
+      kindPie: "Cirkel",
+      rowsSkipped:
+        "Rader i diagrammet: {charted}. Hoppades över eftersom värdekolumnen saknade ett tal: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modell",
@@ -3508,12 +3706,12 @@ export const sv: TranslationKeys = {
       submit: "Komprimera",
       submitBatch: "Komprimera ({count} filer)",
       submitTarget: "Komprimera till {size}",
+      batchMissed: "{count} av {total} filer kom inte under {target}.",
       progressLabel: "Komprimerar",
       bestEffortHint:
         "Bästa möjliga maximum. Bildbaserade PDF:er kommer nära; PDF:er med enbart text krymper kanske inte till denna storlek.",
       targetReached: "Målet på {target} uppnåddes (resultat: {size}).",
-      targetMissed:
-        "Kunde inte nå {target}. Minsta möjliga storlek var {size} eftersom denna PDF mestadels består av text eller vektorer, som bildkomprimering inte kan krympa.",
+      targetMissed: "Kunde inte nå {target}. Minsta möjliga storlek var {size}.",
     },
     "rotate-pdf": {
       angle: "Rotationsvinkel",
@@ -3582,6 +3780,31 @@ export const sv: TranslationKeys = {
       pageLabel: "Sida {n}",
       orderTooLong:
         "För många separata flyttar att skicka. Återställ och försök med färre ändringar.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Högst {docs} PDF-filer och {pages} sidor i resultatet.",
+      addDocument: "Lägg till PDF",
+      addAll: "Lägg till alla sidor",
+      allPages: "Alla i planen",
+      addPage: "Lägg till sida {n}",
+      dragHint:
+        "Dra för att ordna, rotera eller ta bort sidor. Lägg till PDF:er för att hämta deras sidor.",
+      reset: "Återställ planen",
+      emptyPlan: "Inga sidor i planen än. Lägg till sidor från dokumenten ovan.",
+      docFailed: "Ett dokument kunde inte läsas.",
+      skippedNotPdf: "{count} fil(er) hoppades över: endast PDF-filer kan läggas till.",
+      skippedOverLimit:
+        "{count} PDF-fil(er) lades inte till: redigeraren rymmer högst {docs} PDF-filer.",
+      pageLabel: "Position {n}",
+      planSummary: "{pages} sida/sidor från {docs} dokument kommer att sammanställas.",
+      submit: "Skapa PDF ({pages} sidor)",
+      progressLabel: "Sammanställer",
+      rotateLeft: "Rotera vänster",
+      rotateRight: "Rotera höger",
+      removePage: "Ta bort sidan",
+      removeDoc: "Ta bort PDF",
+      zoomIn: "Zooma in",
+      zoomOut: "Zooma ut",
     },
     "protect-pdf": {
       userPassword: "Användarlösenord",
@@ -3703,6 +3926,9 @@ export const sv: TranslationKeys = {
         uploadHint:
           "Släpp en PNG / JPG eller klicka för att välja. En transparent PNG fungerar bäst.",
       },
+      exportFailed: "Kunde inte läsa de placerade signaturerna. Försök igen.",
+      stall: "Bearbetningen tog för lång tid. Försök igen.",
+      timeout: "Tidsgränsen för begäran överskreds. Försök igen.",
     },
     "redact-pdf": {
       terms: "Termer att maskera",
@@ -3716,6 +3942,9 @@ export const sv: TranslationKeys = {
       submit: "Extrahera text",
       submitBatch: "Extrahera text ({count} filer)",
       progressLabel: "Extraherar",
+      scannedHint:
+        "Den här PDF:en är skannad, så det finns ingen text att extrahera. OCR kan läsa den, men det tar längre tid och kräver att OCR-AI-paketet är installerat.",
+      runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-to-word": {
       hint: "Bäst för textbaserade PDF-filer; skannade sidor kräver OCR",
@@ -3872,6 +4101,8 @@ export const sv: TranslationKeys = {
     importFromFiles: "Importera från Filer",
     saveToFiles: "Spara till Filer",
     savedToFiles: "Sparad till Filer",
+    resultExpired: "Resultatet har gått ut. Kör verktyget igen.",
+    libraryFull: "Din fillagring är full. Ta bort några filer och försök igen.",
     librarySaveTitle: "Den här filen kommer från dina Filer",
     librarySaveAsNew: "Spara resultatet som en ny fil",
     librarySaveAsNewHint: "Originalet finns kvar i dina Filer",
@@ -4092,7 +4323,7 @@ export const sv: TranslationKeys = {
       dropDescription: "Släpp en bild här för att börja",
       openImageButton: "Öppna bild",
       newDocumentButton: "Nytt dokument",
-      pasteHint: "Eller klistra in från urklipp (Ctrl+V)",
+      pasteHint: "Eller klistra in från urklipp ({shortcut})",
     },
     mobile: {
       heading: "Dator rekommenderas",
@@ -4145,6 +4376,7 @@ export const sv: TranslationKeys = {
         ratioLabel: "Förhållande:",
         applyTitle: "Tillämpa beskärning (Enter)",
         cancelTitle: "Avbryt beskärning (Escape)",
+        free: "Fri",
       },
       dodgeBurn: {
         dodge: "Ljusa upp",
@@ -4161,6 +4393,9 @@ export const sv: TranslationKeys = {
       eyedropper: {
         sampleLabel: "Sampling:",
         toggleDropdown: "Växla rullgardinsmeny",
+        samplePoint: "Punkt (1x1)",
+        sampleAverage3: "3x3 medelvärde",
+        sampleAverage5: "5x5 medelvärde",
       },
       fill: {
         tolerance: "Tolerans",
@@ -4257,6 +4492,68 @@ export const sv: TranslationKeys = {
         grain: "Kornighet",
         resetAll: "Återställ allt",
         apply: "Tillämpa",
+        autoButtons: {
+          autoTone: "Autoton",
+          autoContrast: "Autokontrast",
+          autoColor: "Autofärg",
+          autoEnhance: "Autoförbättra",
+        },
+        sliders: {
+          brightness: "Ljusstyrka",
+          contrast: "Kontrast",
+          hue: "Färgton",
+          saturation: "Mättnad",
+          luminance: "Luminans",
+          exposure: "Exponering",
+          vibrance: "Lyster",
+          warmth: "Värme",
+        },
+        filters: {
+          grayscale: "Gråtoner",
+          sepia: "Sepia",
+          invert: "Invertera",
+          solarize: "Solarisera",
+          blur: "Oskärpning",
+          sharpen: "Skärpa",
+          noise: "Brus",
+          pixelate: "Pixelera",
+          emboss: "Relief",
+          posterize: "Posterisera",
+          threshold: "Tröskelvärde",
+          kaleidoscope: "Kalejdoskop",
+          motionBlur: "Rörelseoskärpning",
+          radialBlur: "Radial oskärpning",
+          surfaceBlur: "Ytoskärpning",
+        },
+        params: {
+          radius: "Radie",
+          amount: "Styrka",
+          size: "Storlek",
+          strength: "Intensitet",
+          levels: "Nivåer",
+          level: "Nivå",
+          power: "Kraft",
+          angle: "Vinkel",
+          distance: "Avstånd",
+          centerX: "Centrum X",
+          centerY: "Centrum Y",
+          threshold: "Tröskelvärde",
+          midpoint: "Mittpunkt",
+          roundness: "Rundhet",
+          feather: "Mjuk kant",
+          roughness: "Grovhet",
+        },
+        curvePresets: {
+          linear: "Linjär",
+          darken: "Mörkare",
+          lighten: "Ljusare",
+          increaseContrast: "Öka kontrast",
+          decreaseContrast: "Minska kontrast",
+          mediumContrast: "Medelkontrast",
+          strongContrast: "Stark kontrast",
+          crossProcess: "Korsframkallning",
+          negative: "Negativ",
+        },
       },
       color: {
         channelAriaLabel: "Färgkanal {channel}",
@@ -4272,12 +4569,64 @@ export const sv: TranslationKeys = {
         median: "Median",
       },
       history: {
-        undoTitle: "Ångra (Ctrl+Z)",
-        redoTitle: "Gör om (Ctrl+Shift+Z)",
+        undoTitle: "Ångra ({shortcut})",
+        redoTitle: "Gör om ({shortcut})",
         empty: "Ingen historik ännu",
+        unknown: "Okänd",
+        actions: {
+          initialState: "Ursprungligt läge",
+          loadImage: "Öppna bild",
+          loadProject: "Öppna projekt",
+          restoreAutosave: "Återställ autosparat",
+          resizeCanvas: "Ändra dukstorlek",
+          resizeImage: "Ändra bildstorlek",
+          rotateCanvas: "Rotera duk {degrees}",
+          flipHorizontal: "Vänd horisontellt",
+          flipVertical: "Vänd vertikalt",
+          trimCanvas: "Trimma duk",
+          addObject: "Lägg till {type}",
+          layerEffect: "Lagereffekt",
+          delete: "Radera",
+          bringToFront: "Längst fram",
+          bringForward: "Ett steg framåt",
+          sendBackward: "Ett steg bakåt",
+          sendToBack: "Längst bak",
+          addLayer: "Lägg till lager",
+          deleteLayer: "Radera lager",
+          duplicateLayer: "Duplicera lager",
+          reorderLayers: "Ändra lagerordning",
+          mergeDown: "Sammanfoga nedåt",
+          flattenAll: "Platta till allt",
+          adjust: "Justera {name}",
+          resetAdjustments: "Återställ justeringar",
+          levels: "Nivåer",
+          curves: "Kurvor",
+          resetLevels: "Återställ nivåer",
+          resetCurves: "Återställ kurvor",
+          resetAll: "Återställ allt",
+          toggleFilter: "Växla filter {name}",
+          setFilterParam: "Ställ in {filter} {param}",
+          crop: "Beskär",
+          cut: "Klipp ut",
+          paste: "Klistra in",
+          pasteInPlace: "Klistra in på plats",
+          nudge: "Flytta stegvis",
+          brushStroke: "Penseldrag",
+          eraserStroke: "Suddgummidrag",
+        },
+        objectTypes: {
+          line: "Linje",
+          rect: "Rektangel",
+          ellipse: "Ellips",
+          text: "Text",
+          image: "Bild",
+          arrow: "Pil",
+          polygon: "Polygon",
+          star: "Stjärna",
+        },
       },
       layers: {
-        newLayerTitle: "Nytt lager (Ctrl+Shift+N)",
+        newLayerTitle: "Nytt lager ({shortcut})",
         blend: "Blandning",
         opacity: "Opacitet",
         hideLayer: "Dölj lager",
@@ -4305,9 +4654,34 @@ export const sv: TranslationKeys = {
           positionCenter: "Centrerad",
           positionOutside: "Utanför",
         },
+        blendModes: {
+          normal: "Normal",
+          multiply: "Multiplicera",
+          screen: "Skärm",
+          overlay: "Överlagring",
+          darken: "Mörkare",
+          lighten: "Ljusare",
+          colorDodge: "Färgskugga",
+          colorBurn: "Färgbränning",
+          hardLight: "Hårt ljus",
+          softLight: "Mjukt ljus",
+          difference: "Differens",
+          exclusion: "Uteslutning",
+          hue: "Färgton",
+          saturation: "Mättnad",
+          color: "Färg",
+          luminosity: "Luminositet",
+        },
+        duplicate: "Duplicera",
+        flattenAll: "Platta till allt",
       },
       navigator: {
         noImageLoaded: "Ingen bild laddad",
+      },
+      tabs: {
+        layers: "Lager",
+        adjustments: "Justeringar",
+        history: "Historik",
       },
     },
     ui: {
@@ -4323,6 +4697,7 @@ export const sv: TranslationKeys = {
         anchorLabel: "Ankare:",
         anchorAriaLabel: "Ankare {position}",
         backgroundLabel: "Bakgrund:",
+        transparent: "Transparent",
         anchors: {
           topLeft: "uppe till vänster",
           topCenter: "uppe i mitten",
@@ -4340,6 +4715,14 @@ export const sv: TranslationKeys = {
         original: "Original: {width} x {height} px",
         note: "Skalar alla objekt proportionellt till de nya måtten.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Den här bilden är för stor för att webbläsaren ska kunna redigera den med det här verktyget. Prova en mindre dukstorlek.",
+        crossOriginBlocked:
+          "Redigeraren kan inte läsa pixlarna i en bild som lästs in från en annan webbplats. Ladda ned bilden och öppna filen.",
+        sourceImageFailed:
+          "Det gick inte att läsa in bilden. Om den ligger på en annan webbplats måste den webbplatsen tillåta åtkomst mellan ursprung.",
+      },
       exportDialog: {
         heading: "Exportera bild",
         previewAlt: "Förhandsvisning av export",
@@ -4353,13 +4736,19 @@ export const sv: TranslationKeys = {
         exportButton: "Exportera",
         copied: "Kopierat",
         copyFailed: "Kopiering misslyckades",
+        exportFailed: "Exporten misslyckades. Försök igen eller välj ett annat format.",
+        tooLarge:
+          "Den här exporten är för stor för att webbläsaren ska kunna skapa den. Prova mindre mått.",
         saveProject: "Spara projekt",
         loadProject: "Öppna projekt",
+        invalidProject: "Den här filen är inte ett giltigt SnapOtter-projekt.",
       },
       autosaveRecovery: {
         message: "Återställde osparat arbete från {time}.",
         restore: "Återställ",
         discard: "Förkasta",
+        saveFailed:
+          "Det gick inte att spara ditt arbete i den här webbläsaren. Exportera eller använd Spara projekt för att behålla en kopia.",
       },
       fillDialog: {
         heading: "Fyll",
@@ -4385,6 +4774,7 @@ export const sv: TranslationKeys = {
           black: "Svart",
           transparent: "Transparent",
         },
+        presetCustom: "Anpassad",
       },
       colorSwatch: {
         ariaLabel: "Färg {color}",
@@ -4394,6 +4784,25 @@ export const sv: TranslationKeys = {
         noneSelected: "{label}: Ingen",
         setNone: "Ingen {label}",
       },
+      contextMenu: {
+        duplicate: "Duplicera",
+        selectAll: "Markera alla",
+      },
+    },
+    toolbar: {
+      move: "Flytta",
+      marquee: "Markeringsram",
+      crop: "Beskär",
+      eyedropper: "Pipett",
+      brush: "Pensel",
+      pencil: "Penna",
+      cloneStamp: "Klonstämpel",
+      eraser: "Suddgummi",
+      paintBucket: "Färgpyts",
+      gradient: "Övertoning",
+      text: "Text",
+      hand: "Hand",
+      zoom: "Zoom",
     },
   },
   settings: {
@@ -4426,6 +4835,7 @@ export const sv: TranslationKeys = {
       saveButton: "Spara inställningar",
       saveSuccess: "Inställningar sparade.",
       saveFailed: "Kunde inte spara inställningar.",
+      loadFailed: "Kunde inte läsa in användarinställningar.",
       roleUnknown: "okänd",
     },
     system: {
@@ -4450,6 +4860,7 @@ export const sv: TranslationKeys = {
       saveButton: "Spara inställningar",
       saveSuccess: "Inställningar sparade.",
       saveFailed: "Kunde inte spara inställningar.",
+      loadFailed: "Kunde inte läsa in systeminställningar.",
       limitsAndResources: "Gränser & Resurser",
       maxFileSize: "Max filstorlek",
       maxBatchSize: "Max batchstorlek",
@@ -4487,10 +4898,10 @@ export const sv: TranslationKeys = {
       newPasswordPlaceholder: "Nytt lösenord",
       confirmPasswordPlaceholder: "Bekräfta nytt lösenord",
       passwordsMismatch: "Lösenorden matchar inte",
-      passwordTooShort: "Lösenordet måste vara minst 4 tecken",
       changeSuccess: "Lösenordet ändrat",
       changeFailed: "Kunde inte ändra lösenordet",
       currentPasswordIncorrect: "Nuvarande lösenord är felaktigt",
+      passwordChangedElsewhere: "Ditt lösenord har ändrats någon annanstans. Logga in igen.",
       changePasswordButton: "Byt lösenord",
       loginAttemptLimitNote: "Inloggningsförsöksgränser kan konfigureras i Systeminställningar.",
       twoFactorHeading: "Tvåfaktorsautentisering",
@@ -4539,6 +4950,8 @@ export const sv: TranslationKeys = {
       passwordMinLengthDesc: "Minsta antal tecken som krävs för lösenord.",
       passwordRequireUppercase: "Kräv versal",
       passwordRequireUppercaseDesc: "Kräv minst en stor bokstav.",
+      passwordRequireLowercase: "Kräv gemen",
+      passwordRequireLowercaseDesc: "Kräv minst en liten bokstav.",
       passwordRequireNumber: "Kräv siffra",
       passwordRequireNumberDesc: "Kräv minst en siffra.",
       passwordRequireSpecial: "Kräv specialtecken",
@@ -4546,6 +4959,13 @@ export const sv: TranslationKeys = {
       passwordPolicyHeading: "Lösenordspolicy",
       securitySettingsSaved: "Säkerhetsinställningar sparade",
       securitySettingsFailed: "Kunde inte spara säkerhetsinställningar",
+      adminSettingsLoadFailed: "Kunde inte läsa in säkerhetsinställningar.",
+      twoFactorStateChanged:
+        "Tvåfaktorsautentiseringen ändrades i ett annat fönster. Ladda om och försök igen.",
+      twoFactorUnreadable:
+        "Servern kan inte läsa dina inställningar för tvåfaktorsautentisering. Kontakta en administratör.",
+      ssoNeedsProvider:
+        "SSO-krav kräver att en OIDC- eller SAML-leverantör har konfigurerats först.",
     },
     people: {
       heading: "Personer",
@@ -4578,7 +4998,7 @@ export const sv: TranslationKeys = {
       updateFailed: "Kunde inte uppdatera användare",
       cannotRemoveOwnAdmin: "Du kan inte ta bort din egen administratörsroll",
       resetPasswordHeading: "Återställ lösenord för {username}",
-      newPasswordLabel: "Nytt lösenord (minst 8 tecken)",
+      newPasswordLabel: "Nytt lösenord",
       resetPasswordButton: "Återställ lösenord",
       resetPasswordWarning:
         "Detta ogiltigförklarar alla sessioner och API-nycklar för denna användare.",
@@ -4589,6 +5009,7 @@ export const sv: TranslationKeys = {
       tableHeaderTeam: "Team",
       noSearchResults: "Inga medlemmar matchar din sökning.",
       noUsersFound: "Inga användare hittades.",
+      loadFailed: "Kunde inte läsa in användare.",
       authBadgeLocalOidc: "Lokal + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Redigera Roll / Team",
@@ -4601,6 +5022,13 @@ export const sv: TranslationKeys = {
         "Kopiera detta lösenord nu. Du kan inte se det efter att användaren har skapats.",
       memberCount: "{count} medlem",
       memberCountPlural: "{count} medlemmar",
+      usernameTaken: "Det användarnamnet är redan upptaget",
+      lastAdmin: "Det måste alltid finnas minst en administratör",
+      cannotDeleteSelf: "Du kan inte ta bort ditt eget konto",
+      usernameInvalid:
+        "Användarnamnet måste vara 3 till 50 tecken och får bara innehålla a-z, A-Z, 0-9, punkter, bindestreck och understreck",
+      roleNotFound: "Den rollen finns inte längre",
+      teamNotFound: "Det teamet finns inte längre",
     },
     teams: {
       heading: "Team",
@@ -4622,6 +5050,7 @@ export const sv: TranslationKeys = {
       tableHeaderTeamName: "Teamnamn",
       tableHeaderMembers: "Medlemmar",
       emptyState: "Inga team hittades.",
+      loadFailed: "Kunde inte läsa in team.",
       renameSaveButton: "Spara",
       renameCancelButton: "Avbryt",
       renameAction: "Byt namn",
@@ -4636,6 +5065,7 @@ export const sv: TranslationKeys = {
       teamRetentionHoursDesc:
         "Bevarande av bearbetningsfiler för detta team. Lämna tomt för att använda globalt standardvärde.",
       quotaSaved: "Teaminställningar sparade",
+      quotaSaveFailed: "Kunde inte spara teaminställningar",
     },
     roles: {
       heading: "Roller",
@@ -4660,6 +5090,7 @@ export const sv: TranslationKeys = {
       deleteSuccess: 'Roll "{name}" raderad',
       deleteFailed: "Kunde inte radera roll",
       emptyState: "Inga roller hittades.",
+      loadFailed: "Kunde inte läsa in roller.",
       builtInBadge: "Inbyggd",
       userCountBadge: "{count} användare",
       editRoleTitle: "Redigera roll",
@@ -4673,12 +5104,17 @@ export const sv: TranslationKeys = {
         users: "Användare",
         teams: "Team",
         system: "System",
+        enterpriseAdmin: "Företagsadministration",
       },
+      nameInvalid:
+        "Rollnamnet måste vara 2 till 30 tecken och får bara innehålla a-z, 0-9, bindestreck och understreck",
+      permissionsRequired: "Välj minst en behörighet",
     },
     auditLog: {
       heading: "Granskningslogg",
       allActionsFilter: "Alla åtgärder",
       emptyState: "Inga granskningsloggposter.",
+      loadFailed: "Kunde inte läsa in granskningsloggen.",
       tableHeaderTime: "Tid",
       tableHeaderUser: "Användare",
       tableHeaderAction: "Åtgärd",
@@ -4721,6 +5157,7 @@ export const sv: TranslationKeys = {
       teamColumn: "Team",
       storageColumn: "Lagring",
       usersColumn: "Användare",
+      loadFailed: "Kunde inte läsa in användningsdata.",
     },
     apiKeys: {
       heading: "API-nycklar",
@@ -4730,6 +5167,7 @@ export const sv: TranslationKeys = {
       removeScopingLabel: "Ta bort behörighetsavgränsning",
       restrictPermissionsLabel: "Begränsa behörigheter (valfritt)",
       expiresLabel: "Går ut:",
+      expiresInPast: "Utgångsdatumet måste ligga i framtiden.",
       clearButton: "Rensa",
       copyTitle: "Kopiera",
       keyWarning: "Förvara denna nyckel säkert. Den visas inte igen.",
@@ -4740,6 +5178,7 @@ export const sv: TranslationKeys = {
       deleteKeyTitle: "Radera nyckel",
       deleteConfirm: "Radera denna API-nyckel? Integrationer som använder den slutar fungera.",
       emptyState: "Inga API-nycklar än. Generera en för att börja.",
+      loadFailed: "Kunde inte läsa in API-nycklar.",
     },
     tools: {
       heading: "Verktyg",
@@ -4783,6 +5222,7 @@ export const sv: TranslationKeys = {
       description: "Hantera AI-modellpaket för avancerad filbehandling.",
       installAll: "Installera alla",
       diskUsage: "Diskanvändning: {size}",
+      statusStale: "Det gick inte att uppdatera paketstatusen. Listan nedan kan vara inaktuell.",
       sizeOnDisk: "{size} på disk",
       installed: "Installerad",
       notInstalled: "Inte installerad",
@@ -4813,6 +5253,8 @@ export const sv: TranslationKeys = {
       resetFailed: "Återställning misslyckades: {error}",
       resetVenvKept:
         "Den delade Python-miljön lämnades orörd: den här installationen har ingen medföljande bas att bygga om den från. Modeller, nedladdningscachen och installationsposterna rensades. Skapa om miljön själv om ett föråldrat paket i den är problemet.",
+      importBusy: "En annan installation eller import pågår redan. Försök igen när den är klar.",
+      importNoSpace: "Servern har inte tillräckligt med diskutrymme för det här paketet.",
     },
     about: {
       heading: "Om",
@@ -4832,6 +5274,9 @@ export const sv: TranslationKeys = {
   auth: {
     login: "Logga in",
     logout: "Logga ut",
+    logoutFailed: "Det gick inte att logga ut. Försök igen.",
+    idpLogoutFailed:
+      "Du har loggats ut från SnapOtter, men din session hos SSO-leverantören kan fortfarande vara öppen. Logga ut där också.",
     username: "Användarnamn",
     password: "Lösenord",
     loginButton: "Logga in",
@@ -4861,10 +5306,22 @@ export const sv: TranslationKeys = {
     verify: "Verifiera",
     verifying: "Verifierar...",
     mfaInvalidCode: "Ogiltig kod. Försök igen.",
+    mfaAttemptsExhausted: "För många ogiltiga koder. Logga in igen.",
+    mfaEnrollmentAttemptsExhausted:
+      "För många ogiltiga koder. Logga in igen för att få en ny QR-kod och nya återställningskoder; de som visades tidigare fungerar inte.",
+    mfaExpired: "Din verifieringssession har gått ut. Logga in igen.",
+    mfaEnrollmentExpired:
+      "Din installationssession har gått ut. Logga in igen för att få en ny QR-kod och nya återställningskoder; de som visades tidigare fungerar inte.",
+    mfaNotConfigured: "Tvåfaktorsautentisering är inte konfigurerad. Logga in igen.",
+    mfaAlreadyEnabled: "Tvåfaktorsautentisering är redan aktiverad. Logga in igen.",
+    mfaUnreadable:
+      "Servern kan inte läsa dina uppgifter för tvåfaktorsautentisering. Kontakta en administratör.",
     mfaEnrollmentHeading: "Konfigurera tvåfaktorsautentisering för att fortsätta",
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",
     mfaPolicyUnavailable: "MFA-policyn kunde inte kontrolleras. Försök igen om en stund.",
+    accountDisabled: "Det här kontot är inaktiverat. Kontakta en administratör.",
+    ipNotAllowed: "Din IP-adress är inte tillåten. Kontakta en administratör.",
     loginThrottled: "För många inloggningsförsök. Försök igen om {minutes} minut.",
     loginThrottledPlural: "För många inloggningsförsök. Försök igen om {minutes} minuter.",
     loginThrottledUnknownWait:
@@ -4908,14 +5365,13 @@ export const sv: TranslationKeys = {
   },
   changePassword: {
     title: "Byt lösenord",
-    description:
-      "Du måste ange ett nytt lösenord innan du kan fortsätta. Ditt lösenord måste vara minst 8 tecken med versaler, gemener och en siffra.",
+    description: "Du måste ange ett nytt lösenord innan du kan fortsätta.",
     usernameLabel: "Användarnamn",
     currentPasswordLabel: "Nuvarande lösenord",
     currentPasswordPlaceholder: "Ange nuvarande lösenord",
     newPasswordLabel: "Nytt lösenord",
     generateButton: "Generera starkt lösenord",
-    newPasswordPlaceholder: "Minst 8 tecken",
+    newPasswordPlaceholder: "Ange nytt lösenord",
     confirmPasswordLabel: "Bekräfta nytt lösenord",
     confirmPasswordPlaceholder: "Upprepa nytt lösenord",
     passwordsMismatch: "Lösenorden matchar inte",
@@ -4925,6 +5381,7 @@ export const sv: TranslationKeys = {
     changeButton: "Byt lösenord",
     sidebarTitle: "Nästan klar",
     sidebarDescription: "Välj ett starkt lösenord för att säkra ditt konto, sedan är du igång.",
+    sessionEnded: "Din session har avslutats. Logga in igen för att byta lösenord.",
   },
   automate: {
     title: "Automatisera",
@@ -4934,6 +5391,15 @@ export const sv: TranslationKeys = {
     noSteps: "Pipelinefil har inga steg",
     importFailed: "Import misslyckades",
     couldNotRead: "Kunde inte läsa pipelinefil",
+    importListRefreshFailed:
+      "Pipelinen importerades, men den sparade listan uppdaterades inte. Ladda om sidan för att se den.",
+    saveFailed: "Kunde inte spara pipeline",
+    deleteFailed: "Kunde inte radera pipeline",
+    loadFailed: "Kunde inte läsa in sparade pipelines.",
+    saveListRefreshFailed:
+      "Pipelinen sparades, men den sparade listan uppdaterades inte. Ladda om sidan för att se den.",
+    deleteListRefreshFailed:
+      "Pipelinen raderades, men den sparade listan uppdaterades inte. Ladda om sidan för att se ändringen.",
     fileCount: "{count} fil",
     fileCountPlural: "{count} filer",
     importFromLibrary: "Importera från bibliotek",
@@ -5019,6 +5485,7 @@ export const sv: TranslationKeys = {
     fileCount: "{count} filer",
     fileCountSingular: "{count} fil",
     noFilesFound: "Inga filer hittades",
+    loadFailed: "Kunde inte läsa in dina filer.",
     selectFilePrompt: "Välj en fil för att visa detaljer",
     openFile: "Öppna fil",
     selectFile: "Välj fil",
@@ -5037,6 +5504,7 @@ export const sv: TranslationKeys = {
     download: "Ladda ner",
     details: {
       previewFailedRetry: "Förhandsvisningen kunde inte skapas. Försök igen.",
+      loadFailed: "Kunde inte läsa in den här filen.",
     },
   },
   dropzone: {
@@ -5056,6 +5524,7 @@ export const sv: TranslationKeys = {
     filesSelected: "{count} filer valda",
     dropToAdd: "Släpp för att lägga till filer",
     dropToReplace: "Släpp för att ersätta fil",
+    ignoredWhileRunning: "En körning pågår. Vänta tills den är klar innan du lägger till filer.",
     reorderHint: "Dra miniatyrerna för att ändra ordning, eller vänd ordningen, innan du kör.",
   },
   reviewPanel: {
@@ -5086,6 +5555,8 @@ export const sv: TranslationKeys = {
     lessThanMinute: "Mindre än en minut kvar",
     oneMinuteLeft: "~1 minut kvar",
     minutesLeft: "~{mins} minuter kvar",
+    minutesLeftFew: "~{mins} minuter kvar",
+    minutesLeftTwo: "~{mins} minuter kvar",
     progressMessages: [
       "Nästan klart... förmodligen...",
       "Bra saker tar tid...",
@@ -5162,6 +5633,56 @@ export const sv: TranslationKeys = {
     networkError: "Nätverksfel. Kontrollera din anslutning.",
     invalidCredentials: "Ogiltigt användarnamn eller lösenord",
     connectionError: "Anslutningsfel",
+    fileTooLarge:
+      "Den här filen är för stor för att laddas upp. Prova en mindre fil eller be serveradministratören att höja uppladdningsgränsen.",
+    featureNotInstalledForTool:
+      '{tool} kräver funktionen "{feature}". Aktivera den under Inställningar → AI-funktioner.',
+    featureNotInstalled:
+      'Funktionen "{feature}" är inte installerad. Aktivera den under Inställningar → AI-funktioner.',
+    featureIncompatible: 'Funktionen "{feature}" kan inte köras på den här serverns hårdvara.',
+    passwordTooShort: "Lösenordet måste vara minst {minLength} tecken långt.",
+    passwordNeedsUppercase: "Lösenordet måste innehålla en stor bokstav.",
+    passwordNeedsLowercase: "Lösenordet måste innehålla en liten bokstav.",
+    passwordNeedsDigit: "Lösenordet måste innehålla en siffra.",
+    passwordNeedsSpecial: "Lösenordet måste innehålla ett specialtecken.",
+    passwordNoControlCharacters: "Lösenordet får inte innehålla styrtecken.",
+    passwordTooLong: "Lösenordet får vara högst {maxLength} tecken långt.",
+    passwordTooLongAdminReset:
+      "Lösenordet är för långt (max {maxLength} tecken). En administratör måste återställa det.",
+    passwordNoInvalidCharacters: "Lösenordet får inte innehålla ogiltiga tecken.",
+    tooManyRequests: "För många försök. Vänta en minut och försök igen.",
+    escalationDenied: "Det kräver mer åtkomst än din roll har.",
+    featureNotLicensed: "Det här kräver en enterprise-licens.",
+    sessionEnded: "Din session har upphört. Logga in igen.",
+    forbidden: "Du har inte behörighet att göra det.",
+    invalidSetting: "Ogiltigt värde för {setting}.",
+    network: "Nätverksfel",
+    invalidResponse: "Ogiltigt svar",
+    staleVersionReload: "Appen har uppdaterats. Ladda om sidan och försök igen.",
+    failedWithStatus: "Det gick inte att slutföra begäran. Försök igen.",
+    processingFailedWithStatus:
+      "Det gick inte att bearbeta den här filen. Kontrollera att filen inte är skadad och försök igen.",
+    processingFailedNoDetail: "Bearbetningen misslyckades",
+    canceled: "Bearbetningen avbruten",
+    jobTrackingFailed: "Något gick fel vid spårningen av jobbet. Försök igen.",
+    requestTimedOut: "Tidsgränsen för begäran överskreds",
+    runInterrupted: "Bearbetningen avbröts. Kör den igen.",
+    requestFailedWithStatus: "Det gick inte att slutföra begäran. Försök igen.",
+    invalidServerResponse: "Ogiltigt svar från servern",
+    batchFailed: "Satsbearbetning misslyckades",
+    batchFailedWithStatus: "Det gick inte att slutföra satsbearbetningen. Försök köra den igen.",
+    allFilesFailed: "Det gick inte att bearbeta alla filer",
+    filesFailedSuffix_one: " (1 fil misslyckades)",
+    filesFailedSuffix_other: " ({count} filer misslyckades)",
+    uploadTimeout:
+      "Tidsgränsen för uppladdningen har överskridits. Kontrollera din anslutning eller försök med en mindre fil.",
+    processingInterrupted: "Bearbetningen avbröts. Försök igen när du är ansluten.",
+    processingInterruptedUnconfirmed:
+      "Bearbetningen avbröts och servern bekräftade aldrig jobbet. Försök igen när du är ansluten.",
+    resultNoLongerAvailable: "Det färdiga resultatet är inte längre tillgängligt. Kör jobbet igen.",
+    batchDownloadFailed: "Den färdiga satsen kunde inte laddas ner. Uppdatera och försök igen.",
+    fileNotFoundInBatch: "Filen hittades inte i satsresultaten",
+    noFilesSelected: "Inga filer valda",
   },
   sidebar: {
     sponsor: "Stöd oss",
@@ -5197,6 +5718,7 @@ export const sv: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Stöd SnapOtter på GitHub Sponsors",
     skipToContent: "Hoppa till huvudinnehåll",
     openSidebar: "Öppna sidopanel",
@@ -5219,6 +5741,8 @@ export const sv: TranslationKeys = {
     imageControls: "Förhandsvisningskontroller",
     zoomControls: "Zoomkontroller",
     dragToReorder: "Dra för att ändra ordning",
+    resultResizedToFit: "Förminskad för att rymmas inom målstorleken",
+    resultMissedTarget: "Nådde inte målstorleken",
     reverseOrder: "Omvänd ordning",
     whiteBackground: "Vit bakgrund",
     blackBackground: "Svart bakgrund",
@@ -5301,11 +5825,47 @@ export const sv: TranslationKeys = {
       description: "Reparera, färglägg och skala upp ett gammalt eller skadat foto med AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Bakgrundsborttagning",
+      description: "Ta bort bakgrunden från bilder med AI",
+    },
+    "face-detection": {
+      name: "Ansiktsdetektering",
+      description: "Hitta och gör ansikten oskarpa, korrigera röda ögon, smart beskärning",
+    },
+    "object-eraser-colorize": {
+      name: "Objektraderare & färgläggning",
+      description: "Radera objekt från foton och färglägg svartvita bilder",
+    },
+    "inpaint-hq": {
+      name: "Högkvalitativ inpainting",
+      description:
+        "Diffusionsbaserad objektborttagning för stora objekt, detaljerade texturer och strukturerade bakgrunder",
+    },
+    "upscale-enhance": {
+      name: "Uppskalning & förbättring",
+      description: "AI-uppskalning, ansiktsförstärkning och brusborttagning",
+    },
+    "photo-restoration": {
+      name: "Fotorestaurering",
+      description: "Restaurera gamla eller skadade foton",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Extrahera text från bilder och PDF-filer",
+    },
+    transcription: {
+      name: "Transkribering",
+      description: "Tal till text för ljud och video (undertexter)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importerar...",
       importCount: "Importera ({count})",
       import: "Importera",
+      importFailed: "Kunde inte importera {failed} av {total} filer.",
     },
     metadataGrid: {
       noData: "Ingen data",
@@ -5318,6 +5878,19 @@ export const sv: TranslationKeys = {
     waveform: {
       play: "Spela upp",
       pause: "Pausa",
+    },
+    languageNames: {
+      en: "Engelska",
+      de: "Tyska",
+      fr: "Franska",
+      es: "Spanska",
+      zh: "Kinesiska",
+      ja: "Japanska",
+      ko: "Koreanska",
+      ar: "Arabiska",
+      id: "Indonesiska",
+      th: "Thailändska",
+      vi: "Vietnamesiska",
     },
   },
   privacyPolicy: {

@@ -2,7 +2,13 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
-import { test as base, expect, type Page } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+  type PageAssertionsToHaveScreenshotOptions,
+} from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // login() — fill the login form and submit (for tests that need fresh login)
@@ -227,6 +233,26 @@ export async function putPreferences(
 }
 
 /**
+ * expectNoPinnedSection() — call right before a screenshot of the home page.
+ * Every spec shares one admin, and pinned tools are a server-side preference
+ * of that admin, so a pin left by another spec puts a Pinned section in the
+ * shot (#1706). This names that cause instead of leaving a bare pixel diff.
+ * It asks the server as well as the page, because the page fetches pins after
+ * mount and an empty DOM alone could mean "not loaded yet".
+ */
+export async function expectNoPinnedSection(page: Page): Promise<void> {
+  const leak = "another spec left a pinned tool on the shared admin (#1706)";
+  const token = await getAuthToken(page);
+  const res = await page.request.get("/api/v1/preferences", {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  });
+  expect(res.status(), "GET /api/v1/preferences").toBe(200);
+  const body = (await res.json()) as { preferences?: { pinnedTools?: unknown } };
+  expect(body.preferences?.pinnedTools ?? [], leak).toEqual([]);
+  await expect(page.getByRole("heading", { name: /^Pinned$/i }), leak).toHaveCount(0);
+}
+
+/**
  * changePasswordViaApi() — revert a password change without driving the UI.
  * The current session token survives a password change (the API only revokes
  * other sessions), so tests that successfully change the admin password MUST
@@ -251,6 +277,14 @@ export const test = base.extend<{ loggedInPage: Page }>({
     // invocation owns a fresh database, so this fixture must not mutate shared
     // system settings before every test.
     await page.goto("/");
+    // "load" fires before the lazy home page mounts, and its search box
+    // first renders as "Search 0 tools..." until settings arrive. A fill in
+    // that window was occasionally dropped in macOS WebKit (#1875), so hand
+    // tests a home page that shows a non-zero tool count.
+    await expect(
+      page.locator("[data-search-input]"),
+      "loggedInPage: the home page never showed a non-zero tool count in its search box",
+    ).toHaveAttribute("placeholder", /[1-9]/);
     await use(page);
   },
 });
@@ -290,6 +324,35 @@ export async function openSettings(page: Page): Promise<void> {
     await page.getByTestId("open-settings").click();
   }
   await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
+}
+
+// ---------------------------------------------------------------------------
+// maskAppVersion(): screenshot options that hide the app version (#1862)
+// ---------------------------------------------------------------------------
+// The version renders in the Settings General and About tabs. It changes with
+// every release and says nothing about layout, so with a zero-pixel budget it
+// would turn those shots red on each version bump. Mask it instead. (The help
+// dialog shows it too, below the fold of its screenshot, so that shot leaves
+// it alone.) The visibility check comes first so a renamed
+// or dropped test id fails here rather than quietly masking nothing.
+//
+// A mask covers its element's box, and a version string's box is as wide as
+// its text, so app-version-mask.css pins it to one width while the screenshot
+// is taken. toHaveScreenshot only takes a stylesheet by path: it has no
+// inline `style` option and silently ignores one passed through a spread.
+// Typing the result as toHaveScreenshot's own options makes a misspelled
+// option a type error here.
+export type AppVersionMask = Pick<PageAssertionsToHaveScreenshotOptions, "mask" | "stylePath">;
+
+const APP_VERSION_STYLESHEET = path.join(process.cwd(), "tests", "e2e", "app-version-mask.css");
+
+export async function maskAppVersion(scope: Page | Locator): Promise<AppVersionMask> {
+  const version = scope.getByTestId("app-version");
+  await expect(
+    version,
+    'the app version (data-testid="app-version") is missing, so the screenshot can no longer mask it',
+  ).toBeVisible();
+  return { mask: [version], stylePath: APP_VERSION_STYLESHEET };
 }
 
 export { expect };

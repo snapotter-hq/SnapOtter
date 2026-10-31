@@ -1,6 +1,6 @@
 ---
 description: "सब्जेक्ट-, फ़ेस-, और एन्ट्रॉपी-अवेयर क्रॉपिंग जो Sharp और AI फ़ेस डिटेक्शन का उपयोग करके छवियों को बुद्धिमानी से फ़्रेम करती है।"
-i18n_source_hash: acbe1439c6d8
+i18n_source_hash: 9e22502f85bd
 i18n_provenance: human
 i18n_output_hash: 1bcc0731dfac
 ---

@@ -15,6 +15,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // Canned sync-wait failures, keyed by pool: lets the route's catch branch
@@ -28,23 +30,51 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 const enqueueMock = vi.hoisted(() => ({
   throwByPool: new Map<string, string>(),
   markCanceled: false,
+  timeoutOnce: false,
+  onAfterInsertAlias: null as
+    | ((args: { jobId: string; clientJobId: string }) => Promise<void>)
+    | null,
+  onAfterEnqueueJob: null as ((jobId: string) => Promise<void>) | null,
 }));
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/jobs/enqueue.js")>();
   return {
     ...actual,
+    insertToolJobAlias: async (...args: Parameters<typeof actual.insertToolJobAlias>) => {
+      const result = await actual.insertToolJobAlias(...args);
+      if (enqueueMock.onAfterInsertAlias) {
+        await enqueueMock.onAfterInsertAlias({
+          jobId: args[0].jobId,
+          clientJobId: args[0].clientJobId,
+        });
+      }
+      return result;
+    },
+    enqueueToolJob: async (...args: Parameters<typeof actual.enqueueToolJob>) => {
+      const job = await actual.enqueueToolJob(...args);
+      if (enqueueMock.onAfterEnqueueJob) {
+        await enqueueMock.onAfterEnqueueJob(args[0].jobId);
+      }
+      return job;
+    },
     waitForJob: async (...args: Parameters<typeof actual.waitForJob>) => {
+      if (enqueueMock.timeoutOnce) {
+        enqueueMock.timeoutOnce = false;
+        return null;
+      }
       const message = enqueueMock.throwByPool.get(args[0]);
       if (message) {
-        if (enqueueMock.markCanceled) {
-          const { db, schema } = await import("../../../apps/api/src/db/index.js");
-          const { eq } = await import("drizzle-orm");
-          await db
-            .update(schema.jobs)
-            .set({ status: "canceled", completedAt: new Date() })
-            .where(eq(schema.jobs.id, args[1]));
-        }
+        const { db, schema } = await import("../../../apps/api/src/db/index.js");
+        const { eq } = await import("drizzle-orm");
+        await db
+          .update(schema.jobs)
+          .set(
+            enqueueMock.markCanceled
+              ? { status: "canceled", completedAt: new Date() }
+              : { status: "failed", completedAt: new Date(), error: { message } },
+          )
+          .where(eq(schema.jobs.id, args[1]));
         throw new Error(message);
       }
       return actual.waitForJob(...args);
@@ -52,11 +82,12 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
   };
 });
 
-const { eq } = await import("drizzle-orm");
+const { and, eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { getQueue } = await import("../../../apps/api/src/jobs/queues.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
+const { objectExists } = await import("../../../apps/api/src/lib/object-storage.js");
 const { fixtures, readFixture } = await import("../../fixtures/index.js");
 const { buildTestApp, createMultipartPayload, createUserAndLogin, loginAsAdmin } = await import(
   "../test-server.js"
@@ -66,6 +97,7 @@ const PNG = readFixture(fixtures.image.base.png200);
 
 let testApp: Awaited<ReturnType<typeof buildTestApp>>;
 let app: (typeof testApp)["app"];
+let baseUrl: string;
 let adminToken: string;
 
 type JobRow = typeof schema.jobs.$inferSelect;
@@ -111,11 +143,14 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+  await app.listen({ port: 0, host: "127.0.0.1" });
+  const addr = app.server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${addr.port}`;
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("route-stamped alias metadata (#808)", () => {
   it("stamps the alias pointer and owner on a factory tool route", async () => {
@@ -160,8 +195,14 @@ describe("route-stamped alias metadata (#808)", () => {
     expect(res.statusCode).toBeGreaterThanOrEqual(400);
     expect(res.statusCode).toBeLessThan(500);
 
+    const frame = await waitForTerminalFrame(clientJobId, 10_000);
+    expect(frame.error).toBe("Canceled");
+
     const alias = await jobRow(clientJobId);
     expect(alias?.type).toBe("single");
+    expect(alias?.status).toBe("canceled");
+    expect(alias?.completedAt).not.toBeNull();
+    expect(alias?.error).toEqual({ message: "Canceled" });
     expect(alias?.userId).not.toBeNull();
     expect(typeof ((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       "string",
@@ -191,24 +232,123 @@ describe("route-stamped alias metadata (#808)", () => {
     });
     expect(res.statusCode).toBe(400);
 
+    const frame = await waitForTerminalFrame(clientJobId, 10_000);
+    expect(frame.error).toBe("Canceled");
+
     const alias = await jobRow(clientJobId);
     expect(alias?.type).toBe("single");
+    expect(alias?.status).toBe("canceled");
+    expect(alias?.completedAt).not.toBeNull();
+    expect(alias?.error).toEqual({ message: "Canceled" });
     expect(alias?.userId).not.toBeNull();
     expect(typeof ((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       "string",
     );
   });
 
-  it("re-points the alias at the newest artifact when a clientJobId is reused", async () => {
+  it("preserves a reused clientJobId's earlier state when a later request rejects before enqueue (#2617)", async () => {
+    const clientJobId = randomUUID();
+    await runResize(clientJobId, adminToken);
+    const before = await jobRow(clientJobId);
+    const firstArtifact = ((before?.settings ?? {}) as { artifactJobId?: string }).artifactJobId;
+    expect(before?.status).toBe("completed");
+    expect(typeof firstArtifact).toBe("string");
+
+    // 1. Factory route rejects after insertToolJobAlias (invalid settings)
+    const { body: badResizeBody, contentType: badResizeCt } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "not json" },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const resizeRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize",
+      headers: { "content-type": badResizeCt, authorization: `Bearer ${adminToken}` },
+      body: badResizeBody,
+    });
+    expect(resizeRes.statusCode).toBe(400);
+
+    // 2. Custom route rejects after insertToolJobAlias (invalid saveMode)
+    const { body: badOcrBody, contentType: badOcrCt } = createMultipartPayload([
+      { name: "file", filename: "scan.png", contentType: "image/png", content: PNG },
+      { name: "saveMode", content: "invalid" },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const ocrRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/ocr",
+      headers: { "content-type": badOcrCt, authorization: `Bearer ${adminToken}` },
+      body: badOcrBody,
+    });
+    expect(ocrRes.statusCode).toBe(400);
+
+    const after = await jobRow(clientJobId);
+    expect(after?.status).toBe("completed");
+    expect(((after?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
+      firstArtifact,
+    );
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
+  });
+
+  it("re-points the alias at the newest artifact and clears the terminal replay key when a clientJobId is reused (#2740)", async () => {
     const clientJobId = randomUUID();
     await runResize(clientJobId, adminToken);
     const first = await jobRow(clientJobId);
     const firstArtifact = ((first?.settings ?? {}) as { artifactJobId?: string }).artifactJobId;
     expect(typeof firstArtifact).toBe("string");
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
 
-    // Clear run 1's terminal frame so runResize waits on run 2's own.
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
-    await runResize(clientJobId, adminToken);
+    const queue = getQueue("image");
+    await queue.pause();
+    enqueueMock.timeoutOnce = true;
+    let ssePromise: ReturnType<typeof app.inject> | undefined;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+      expect(res.statusCode).toBe(202);
+
+      // Re-pointing the alias cleared run 1's cached terminal frame in Redis (#2740).
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+
+      // Opening the SSE stream while run 2 is queued must replay run 2's
+      // nonterminal progress and stay open for run 2's completion (#2740).
+      ssePromise = app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${clientJobId}/progress`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      enqueueMock.timeoutOnce = false;
+      await queue.resume();
+    }
+
+    await waitForTerminalFrame(clientJobId);
+    const sseRes = await ssePromise;
+    const sseFrames = (sseRes?.body ?? "")
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>)
+      .filter((frame) => frame.type !== "heartbeat");
+    expect(sseFrames[0]).toMatchObject({
+      jobId: clientJobId,
+      type: "single",
+      phase: "processing",
+    });
+    expect(sseFrames.at(-1)).toMatchObject({
+      jobId: clientJobId,
+      type: "single",
+      phase: "complete",
+    });
 
     const reused = await jobRow(clientJobId);
     const secondArtifact = ((reused?.settings ?? {}) as { artifactJobId?: string }).artifactJobId;
@@ -216,27 +356,159 @@ describe("route-stamped alias metadata (#808)", () => {
     expect(secondArtifact).not.toBe(firstArtifact);
   });
 
-  it("does not let a second user take over an alias row by reusing its id", async () => {
+  it("does not let a second user take over or write to an alias row by reusing its id (#895)", async () => {
     const owner = await createUserAndLogin(app, `single-cancel-owner-${Date.now()}`);
     const clientJobId = randomUUID();
     await runResize(clientJobId, owner.token);
     const before = await jobRow(clientJobId);
+    const progressBefore = before?.progress;
     const pointerBefore = ((before?.settings ?? {}) as { artifactJobId?: string }).artifactJobId;
     expect(before?.userId).toBe(owner.userId);
 
     // A second user submits their own run under the first user's id. The
-    // run may proceed (colliding channels were always latest-run-wins), but
-    // the alias row's owner and pointer must survive: transferring them
-    // would strip the first user's cancel authorization.
+    // alias claim is refused, so the run falls back to its own server jobId
+    // and leaves the first user's channel and Redis terminal key untouched (#895, #2740).
+    const terminalBefore = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(terminalBefore).not.toBeNull();
     const attacker = await createUserAndLogin(app, `single-cancel-reuse-${Date.now()}`);
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
-    await runResize(clientJobId, attacker.token);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 25 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${attacker.token}` },
+      body,
+    });
+    expect([200, 202]).toContain(res.statusCode);
+    const { jobId: attackerJobId } = JSON.parse(res.body) as { jobId: string };
+    expect(attackerJobId).not.toBe(clientJobId);
+    await waitForTerminalFrame(attackerJobId);
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBe(terminalBefore);
 
     const after = await jobRow(clientJobId);
     expect(after?.userId).toBe(owner.userId);
+    expect(after?.status).toBe("completed");
+    expect(after?.progress).toEqual(progressBefore);
     expect(((after?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       pointerBefore,
     );
+  });
+
+  it("does not clobber a same-owner batch parent row or return its id on 202 when a factory route collides (#895)", async () => {
+    const owner = await createUserAndLogin(app, `single-batch-collide-${Date.now()}`);
+    const clientJobId = randomUUID();
+    const initialProgress = {
+      percent: 50,
+      totalFiles: 2,
+      completedFiles: 1,
+      failedFiles: 0,
+    };
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner.userId,
+      type: "batch",
+      status: "processing",
+      progress: initialProgress,
+      inputRefs: [],
+      settings: { flowChildCount: 2, stepCount: 1 },
+    });
+
+    enqueueMock.timeoutOnce = true;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize",
+        headers: { "content-type": contentType, authorization: `Bearer ${owner.token}` },
+        body,
+      });
+      expect(res.statusCode).toBe(202);
+      const payload = JSON.parse(res.body) as {
+        jobId: string;
+        progressJobId?: string;
+        artifactJobId?: string;
+        async: boolean;
+      };
+      expect(payload).toEqual({ jobId: expect.any(String), async: true });
+      expect(payload.jobId).not.toBe(clientJobId);
+
+      await waitForTerminalFrame(payload.jobId);
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+
+      const parent = await jobRow(clientJobId);
+      expect(parent?.type).toBe("batch");
+      expect(parent?.status).toBe("processing");
+      expect(parent?.progress).toEqual(initialProgress);
+      expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
+    } finally {
+      enqueueMock.timeoutOnce = false;
+    }
+  });
+
+  it("does not clobber a same-owner batch parent row or return its id on 202 when a custom route collides (#2651)", async () => {
+    const owner = await createUserAndLogin(app, `single-custom-collide-${Date.now()}`);
+    const clientJobId = randomUUID();
+    const initialProgress = {
+      percent: 50,
+      totalFiles: 2,
+      completedFiles: 1,
+      failedFiles: 0,
+    };
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner.userId,
+      type: "batch",
+      status: "processing",
+      progress: initialProgress,
+      inputRefs: [],
+      settings: { flowChildCount: 2, stepCount: 1 },
+    });
+
+    const queue = getQueue("ai");
+    await queue.pause();
+    let enqueuedJobId: string | undefined;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "scan.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/ocr",
+        headers: { "content-type": contentType, authorization: `Bearer ${owner.token}` },
+        body,
+      });
+      expect(res.statusCode).toBe(202);
+      const payload = JSON.parse(res.body) as {
+        jobId: string;
+        progressJobId?: string;
+        artifactJobId?: string;
+        async: boolean;
+      };
+      enqueuedJobId = payload.artifactJobId ?? payload.jobId;
+      expect(payload).toEqual({ jobId: expect.any(String), async: true });
+      expect(payload.jobId).not.toBe(clientJobId);
+
+      const parent = await jobRow(clientJobId);
+      expect(parent?.type).toBe("batch");
+      expect(parent?.status).toBe("processing");
+      expect(parent?.progress).toEqual(initialProgress);
+      expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
+    } finally {
+      if (enqueuedJobId) {
+        const queuedJob = await queue.getJob(enqueuedJobId);
+        await queuedJob?.remove().catch(() => {});
+      }
+      await queue.resume();
+    }
   });
 });
 
@@ -363,6 +635,111 @@ describe("concurrent-job limit with alias rows (#808)", () => {
         .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
     }
   });
+
+  it("fails closed with 500 instead of skipping the cap when reading maxConcurrentJobsPerUser or rateLimitPerUser throws (#2545)", async () => {
+    function breakSettingRead(targetKey: string) {
+      const originalSelect = db.select.bind(db);
+      return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+        const selection = args[0] as Record<string, unknown> | undefined;
+        // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+        const builder = (originalSelect as any)(...args);
+        if (selection && "value" in selection) {
+          const origFrom = builder.from.bind(builder);
+          builder.from = (...fromArgs: unknown[]) => {
+            const query = origFrom(...fromArgs);
+            const origWhere = query.where.bind(query);
+            query.where = (...whereArgs: unknown[]) => {
+              const filtered = origWhere(...whereArgs);
+              if (filtered.toSQL().params.includes(targetKey)) {
+                throw new Error(`simulated settings store failure for ${targetKey}`);
+              }
+              return filtered;
+            };
+            return query;
+          };
+        }
+        return builder;
+      });
+    }
+
+    const user = await createUserAndLogin(app, `single-cancel-strict-${Date.now()}`);
+    const seededJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: seededJobId,
+      userId: user.userId,
+      type: "tool",
+      status: "queued",
+      inputRefs: [],
+    });
+    await db
+      .insert(schema.settings)
+      .values({ key: "maxConcurrentJobsPerUser", value: "1" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "1" } });
+
+    try {
+      const maxConcurrentSpy = breakSettingRead("maxConcurrentJobsPerUser");
+      try {
+        const { body, contentType } = createMultipartPayload([
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+          { name: "clientJobId", content: randomUUID() },
+        ]);
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/resize",
+          headers: { "content-type": contentType, authorization: `Bearer ${user.token}` },
+          body,
+        });
+        expect(res.statusCode).toBe(500);
+      } finally {
+        maxConcurrentSpy.mockRestore();
+      }
+
+      const toolJobs = await db
+        .select({ id: schema.jobs.id })
+        .from(schema.jobs)
+        .where(and(eq(schema.jobs.userId, user.userId), eq(schema.jobs.type, "tool")));
+      expect(toolJobs.map((r) => r.id)).toEqual([seededJobId]);
+
+      await db
+        .update(schema.settings)
+        .set({ value: "0" })
+        .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
+      await db
+        .insert(schema.settings)
+        .values({ key: "rateLimitPerUser", value: "1" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "1" } });
+
+      const rateLimitSpy = breakSettingRead("rateLimitPerUser");
+      try {
+        const { body, contentType } = createMultipartPayload([
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+        ]);
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/resize",
+          headers: { "content-type": contentType, authorization: `Bearer ${user.token}` },
+          body,
+        });
+        expect(res.statusCode).toBe(500);
+      } finally {
+        rateLimitSpy.mockRestore();
+      }
+
+      const toolJobsAfterRateLimitFault = await db
+        .select({ id: schema.jobs.id })
+        .from(schema.jobs)
+        .where(and(eq(schema.jobs.userId, user.userId), eq(schema.jobs.type, "tool")));
+      expect(toolJobsAfterRateLimitFault.map((r) => r.id)).toEqual([seededJobId]);
+    } finally {
+      await db
+        .update(schema.settings)
+        .set({ value: "0" })
+        .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
+      await db.delete(schema.settings).where(eq(schema.settings.key, "rateLimitPerUser"));
+    }
+  });
 });
 
 describe("sync response for a canceled run", () => {
@@ -418,6 +795,83 @@ describe("sync response for a canceled run", () => {
       expect(parsed.canceled).toBeUndefined();
     } finally {
       enqueueMock.throwByPool.delete("image");
+      await queue.resume();
+    }
+  });
+});
+
+describe("client disconnect before 202 on OCR (#2238)", () => {
+  function postOcrRaw(clientJobId: string): http.ClientRequest {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "scan.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const req = http.request(`${baseUrl}/api/v1/tools/image/ocr`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+        "content-length": body.length,
+      },
+    });
+    req.on("error", () => {});
+    req.end(body);
+    return req;
+  }
+
+  it("discards the upload, settles the alias row, and skips enqueueing when the socket dies pre-enqueue", async () => {
+    const clientJobId = randomUUID();
+    let capturedJobId = "";
+    let req: http.ClientRequest | undefined;
+
+    enqueueMock.onAfterInsertAlias = async ({ jobId, clientJobId: cid }) => {
+      if (cid !== clientJobId) return;
+      capturedJobId = jobId;
+      req?.destroy();
+      await new Promise((r) => setTimeout(r, 100));
+    };
+
+    try {
+      req = postOcrRaw(clientJobId);
+      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      expect(frame.error).toBe("Canceled");
+
+      const alias = await jobRow(clientJobId);
+      expect(alias?.status).toBe("canceled");
+      expect(capturedJobId).not.toBe("");
+      expect(await jobRow(capturedJobId)).toBeUndefined();
+      expect(await objectExists(`uploads/${capturedJobId}/scan.png`)).toBe(false);
+    } finally {
+      enqueueMock.onAfterInsertAlias = null;
+    }
+  });
+
+  it("cancels the enqueued job when the socket dies during enqueue", async () => {
+    const clientJobId = randomUUID();
+    let capturedJobId = "";
+    let req: http.ClientRequest | undefined;
+    const queue = getQueue("ai");
+    await queue.pause();
+
+    enqueueMock.onAfterEnqueueJob = async (jobId) => {
+      capturedJobId = jobId;
+      req?.destroy();
+      await new Promise((r) => setTimeout(r, 100));
+    };
+
+    try {
+      req = postOcrRaw(clientJobId);
+      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      expect(frame.error).toBe("Canceled");
+
+      expect(capturedJobId).not.toBe("");
+      const artifact = await jobRow(capturedJobId);
+      expect(artifact?.status).toBe("canceled");
+      const alias = await jobRow(clientJobId);
+      expect(alias?.status).toBe("canceled");
+    } finally {
+      enqueueMock.onAfterEnqueueJob = null;
       await queue.resume();
     }
   });

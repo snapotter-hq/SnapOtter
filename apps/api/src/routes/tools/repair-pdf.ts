@@ -23,7 +23,7 @@ export function registerRepairPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_repaired.pdf`);
       ctx.report(10, "Repairing");
-      await qpdfRepair(inPath, outPath);
+      await qpdfRepair(inPath, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

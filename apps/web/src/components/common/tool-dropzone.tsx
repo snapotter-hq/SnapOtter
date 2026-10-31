@@ -15,19 +15,38 @@ interface ToolDropzoneProps {
   accept?: string;
   fileFilter?: (file: File) => boolean;
   multiple?: boolean;
+  enablePaste?: boolean;
   onFiles: (files: File[]) => void;
-  onUrlImport?: (file: File) => void;
+  onUrlImport?: (file: File) => boolean | undefined;
+  bulkModalOpen?: boolean;
+  onBulkModalOpenChange?: (open: boolean) => void;
 }
 
 const FORMATS_LIMIT = 8;
+
+export function formatToolAcceptedInputs(
+  inputs: readonly string[] | undefined,
+  andMoreLabel: string,
+): string | null {
+  if (!inputs || inputs.length === 0) return null;
+  const formatted = inputs.map((ext) => ext.replace(/^\./, "").toUpperCase());
+  if (formatted.length <= FORMATS_LIMIT) {
+    return formatted.join(", ");
+  }
+  const visible = formatted.slice(0, FORMATS_LIMIT).join(", ");
+  return `${visible} ${format(andMoreLabel, { count: formatted.length - FORMATS_LIMIT })}`;
+}
 
 export function ToolDropzone({
   tool,
   accept,
   fileFilter,
   multiple,
+  enablePaste = false,
   onFiles,
   onUrlImport,
+  bulkModalOpen,
+  onBulkModalOpenChange,
 }: ToolDropzoneProps) {
   const { t } = useTranslation();
 
@@ -37,16 +56,10 @@ export function ToolDropzone({
   const isMultiFile = MULTI_FILE_TOOLS.has(tool.id);
   const resolvedMultiple = multiple ?? isMultiFile;
 
-  const formatsDisplay = useMemo(() => {
-    const inputs = tool.acceptedInputs;
-    if (!inputs || inputs.length === 0) return null;
-    const formatted = inputs.map((ext) => ext.replace(/^\./, "").toUpperCase());
-    if (formatted.length <= FORMATS_LIMIT) {
-      return formatted.join(", ");
-    }
-    const visible = formatted.slice(0, FORMATS_LIMIT).join(", ");
-    return `${visible} ${format(t.toolPage.andMore, { count: formatted.length - FORMATS_LIMIT })}`;
-  }, [tool.acceptedInputs, t.toolPage.andMore]);
+  const formatsDisplay = useMemo(
+    () => formatToolAcceptedInputs(tool.acceptedInputs, t.toolPage.andMore),
+    [tool.acceptedInputs, t.toolPage.andMore],
+  );
 
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-lg px-4 py-8">
@@ -72,6 +85,9 @@ export function ToolDropzone({
         fileFilter={fileFilter}
         acceptDescription={formatsDisplay ?? undefined}
         cameraCapture={toolAcceptsCameraPhotos(tool.acceptedInputs)}
+        enablePaste={enablePaste}
+        bulkModalOpen={bulkModalOpen}
+        onBulkModalOpenChange={onBulkModalOpenChange}
       />
 
       {/* Import from library */}

@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter mit Docker in einem einzigen Befehl installieren. Enthält Docker-Compose-Einrichtung, Bauen aus dem Quellcode und eine vollständige Funktionsübersicht."
-i18n_source_hash: 8040133a6982
+i18n_source_hash: 5bc863dc7351
 i18n_provenance: machine
 i18n_output_hash: c7c22489510f
 i18n_hash_version: 2
@@ -100,7 +100,7 @@ pnpm dev
 | **Bild** | 112 | Größe ändern, zuschneiden, komprimieren, konvertieren, Hintergrund entfernen, hochskalieren, OCR, Wasserzeichen, Collage, kolorieren, GIF-Tools, Format-Vorlagen |
 | **Video** | 57 | Trimmen, zuschneiden, komprimieren, konvertieren, zusammenführen, Audio extrahieren, Auto-Untertitel, Video zu GIF, Größe ändern, stabilisieren, Format-Vorlagen |
 | **Audio** | 27 | Trimmen, zusammenführen, konvertieren, normalisieren, Rauschunterdrückung, transkribieren, Tonhöhenverschiebung, Ein-/Ausblenden, Klingelton-Ersteller, Format-Vorlagen |
-| **PDF / Dokument** | 34 | Zusammenführen, teilen, komprimieren, OCR, Wasserzeichen, schwärzen, Word zu PDF, Excel zu PDF, drehen, schützen, reparieren |
+| **PDF / Dokument** | 35 | Zusammenführen, teilen, komprimieren, OCR, Wasserzeichen, schwärzen, Word zu PDF, Excel zu PDF, drehen, schützen, reparieren |
 | **Dateien** | 23 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP entpacken, Diagramm-Ersteller, YAML/JSON |
 
 ### Pipelines {#pipelines}

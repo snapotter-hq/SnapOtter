@@ -1,73 +1,39 @@
 import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
-import { ToolInputError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { zipSync } from "fflate";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
+import { isOperationalErrno } from "../../lib/error-report.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  isDecoderUnavailable,
+} from "../../lib/format-decoders.js";
 import {
   assertGifWorkload,
   MAX_GIF_TOTAL_PIXELS,
   resolveGifResizeDimensions,
 } from "../../lib/gif-limits.js";
-import { withImageEncodeContext } from "../../lib/image-error.js";
+import {
+  asInputErrorIfUndecodable,
+  DESCRIPTOR_ENVIRONMENT_MESSAGE,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  UNDECODABLE_IMAGE_MESSAGE,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
+import { logger } from "../../lib/logger.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { engineUnavailable, isPixelSafetyError } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
-
-/**
- * Assemble multiple single-frame GIF buffers into one animated GIF.
- *
- * Sharp 0.33.x cannot set the page-height metadata on images constructed
- * from raw pixel data, so re-encoding reversed frames through sharp's
- * `.gif()` produces a single tall frame instead of an animation.
- *
- * This helper works at the GIF89a binary level: it takes the header,
- * logical screen descriptor, and global color table from the first frame,
- * adds a NETSCAPE2.0 looping extension, then appends the graphic control
- * extension + image data blocks from every frame.
- */
-function assembleAnimatedGif(frameGifs: Buffer[], loop: number): Buffer {
-  const first = frameGifs[0];
-
-  // Parse the Logical Screen Descriptor to find the Global Color Table size
-  const packed = first[10]; // byte 10 = packed field in LSD
-  const hasGCT = (packed & 0x80) !== 0;
-  const gctSize = hasGCT ? 3 * (1 << ((packed & 0x07) + 1)) : 0;
-  const headerEnd = 13 + gctSize; // 6 (sig) + 7 (LSD) + GCT
-
-  // Header + LSD + GCT from the first frame
-  const header = first.subarray(0, headerEnd);
-
-  // NETSCAPE2.0 application extension for looping
-  const loopLo = loop & 0xff;
-  const loopHi = (loop >> 8) & 0xff;
-  const loopExt = Buffer.from([
-    0x21,
-    0xff,
-    0x0b, // application extension introducer
-    ...Buffer.from("NETSCAPE2.0"),
-    0x03,
-    0x01,
-    loopLo,
-    loopHi, // sub-block: loop count
-    0x00, // block terminator
-  ]);
-
-  const parts: Buffer[] = [header, loopExt];
-
-  // Extract frame data (everything between the header/GCT and the trailer)
-  for (const gif of frameGifs) {
-    const p = gif[10];
-    const hasTable = (p & 0x80) !== 0;
-    const tableSize = hasTable ? 3 * (1 << ((p & 0x07) + 1)) : 0;
-    const dataStart = 13 + tableSize;
-    const dataEnd = gif.length - 1; // exclude 0x3B trailer
-    if (dataEnd > dataStart) {
-      parts.push(gif.subarray(dataStart, dataEnd));
-    }
-  }
-
-  parts.push(Buffer.from([0x3b])); // GIF trailer
-  return Buffer.concat(parts);
-}
 
 const settingsSchema = z.object({
   mode: z.enum(["resize", "optimize", "speed", "reverse", "extract", "rotate"]).default("resize"),
@@ -78,7 +44,11 @@ const settingsSchema = z.object({
   percentage: z.number().finite().min(1).max(500).optional(),
 
   // Optimize
-  colors: z.number().int().min(2).max(256).default(256),
+  colors: z
+    .union([z.literal(2), z.literal(4), z.literal(16), z.literal(256)], {
+      errorMap: () => ({ message: "Colors must be 2, 4, 16, or 256" }),
+    })
+    .default(256),
   dither: z.number().min(0).max(1).default(1.0),
   effort: z.number().int().min(1).max(10).default(7),
 
@@ -102,10 +72,40 @@ const settingsSchema = z.object({
 });
 
 async function inspectGifWorkload(inputBuffer: Buffer) {
-  const metadata = await sharp(inputBuffer, {
-    animated: true,
-    limitInputPixels: false,
-  }).metadata();
+  let metadata: Metadata;
+  try {
+    metadata = await sharp(inputBuffer, {
+      animated: true,
+      limitInputPixels: false,
+    }).metadata();
+  } catch (rawErr) {
+    const oom = asDecoderOutOfMemory(rawErr);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    if (rawErr instanceof Error && isOperationalErrno(rawErr)) throw rawErr;
+    const normalized = normalizeOperationalWriteError(rawErr);
+    if (
+      isToolInputError(normalized) ||
+      isSafeMessageError(normalized) ||
+      isDecoderUnavailable(normalized) ||
+      hasServerErrorStatus(normalized)
+    ) {
+      throw normalized;
+    }
+    const err = await asInputErrorIfUndecodable(inputBuffer, rawErr);
+    if (
+      isToolInputError(err) ||
+      isSafeMessageError(err) ||
+      hasServerErrorStatus(err) ||
+      (err instanceof Error && isOperationalErrno(err))
+    ) {
+      throw err;
+    }
+    logger.info({ err: rawErr }, "undecodable image input rejected");
+    if (isPixelSafetyError(err)) {
+      throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: rawErr });
+    }
+    throw new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: rawErr });
+  }
   return { metadata, workload: assertGifWorkload(metadata) };
 }
 
@@ -139,8 +139,9 @@ export function registerGifTools(app: FastifyInstance) {
             fileBuffer = Buffer.concat(chunks);
           }
         }
-      } catch {
-        return reply.status(400).send({ error: "Failed to parse request" });
+      } catch (err) {
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (!fileBuffer || fileBuffer.length === 0) {
@@ -161,7 +162,11 @@ export function registerGifTools(app: FastifyInstance) {
           fileSize: fileBuffer.length,
           duration: delay.reduce((sum: number, d: number) => sum + d, 0),
         });
-      } catch {
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(reply, engineUnavailable(err), "gif-tools", request.log);
+        }
         return reply.status(422).send({ error: "Could not read image metadata" });
       }
     },
@@ -172,8 +177,27 @@ export function registerGifTools(app: FastifyInstance) {
     toolId: "gif-tools",
     settingsSchema,
     preValidate: async ({ inputs, settings }) => {
-      const { workload } = await inspectGifWorkload(inputs[0].buffer);
-      assertGifResizeOutput(workload, settings);
+      try {
+        const { workload } = await inspectGifWorkload(inputs[0].buffer);
+        assertGifResizeOutput(workload, settings);
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          throw engineUnavailable(err);
+        }
+        if (err instanceof Error && isOperationalErrno(err)) {
+          const code = String((err as NodeJS.ErrnoException).code);
+          throw engineUnavailable(
+            new SafeError(DESCRIPTOR_ENVIRONMENT_MESSAGE, {
+              kind: "operational",
+              code,
+              statusCode: 503,
+              cause: err,
+            }),
+          );
+        }
+        throw err;
+      }
     },
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "GIF processing failed",
@@ -181,200 +205,205 @@ export function registerGifTools(app: FastifyInstance) {
       async (inputBuffer, settings, filename) => {
         const baseName = filename.replace(/\.[^.]+$/, "");
         const loop = settings.loop;
-        const { metadata, workload: inputWorkload } = await inspectGifWorkload(inputBuffer);
-        assertGifResizeOutput(inputWorkload, settings);
 
-        switch (settings.mode) {
-          case "resize": {
-            const output = resolveGifResizeDimensions(inputWorkload, settings);
+        try {
+          const { metadata, workload: inputWorkload } = await inspectGifWorkload(inputBuffer);
+          assertGifResizeOutput(inputWorkload, settings);
 
-            const image = sharp(inputBuffer, {
-              animated: true,
-              limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-            });
+          switch (settings.mode) {
+            case "resize": {
+              const output = resolveGifResizeDimensions(inputWorkload, settings);
 
-            if (settings.percentage !== undefined) {
-              image.resize(output.width, output.height, { fit: "inside" });
-            } else if (settings.width || settings.height) {
-              image.resize(settings.width, settings.height, { fit: "inside" });
+              const image = sharp(inputBuffer, {
+                animated: true,
+                limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+              });
+
+              if (settings.percentage !== undefined) {
+                image.resize(output.width, output.height, { fit: "inside" });
+              } else if (settings.width || settings.height) {
+                image.resize(settings.width, settings.height, { fit: "inside" });
+              }
+
+              // Resampling invents colours between the ones the source held, and
+              // Sharp's writer would otherwise express them in the palette it
+              // read the input with, so a resized GIF came back in the wrong
+              // colours (#1190).
+              const buffer = await image.gif({ loop, reuse: false }).toBuffer();
+              return { buffer, filename, contentType: "image/gif" };
             }
 
-            // Resampling invents colours between the ones the source held, and
-            // Sharp's writer would otherwise express them in the palette it
-            // read the input with, so a resized GIF came back in the wrong
-            // colours (#1190).
-            //
-            // Only this mode. The reverse and rotate modes hand their frames to
-            // assembleAnimatedGif, which splices them keeping the first frame's
-            // colour table, so a fresh palette per frame would leave every
-            // later frame indexed against a table that no longer describes it.
-            const buffer = await image.gif({ loop, reuse: false }).toBuffer();
-            return { buffer, filename, contentType: "image/gif" };
-          }
-
-          case "optimize": {
-            const buffer = await sharp(inputBuffer, {
-              animated: true,
-              limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-            })
-              .gif({
-                effort: settings.effort,
-                colours: settings.colors,
-                dither: settings.dither,
-                loop,
-              })
-              .toBuffer();
-            return { buffer, filename, contentType: "image/gif" };
-          }
-
-          case "speed": {
-            const origDelays = metadata.delay ?? Array(inputWorkload.frames).fill(100);
-            const newDelays = origDelays.map((d: number) =>
-              Math.max(20, Math.round(d / settings.speedFactor)),
-            );
-
-            const buffer = await sharp(inputBuffer, {
-              animated: true,
-              limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-            })
-              .gif({ delay: newDelays, loop })
-              .toBuffer();
-            return { buffer, filename, contentType: "image/gif" };
-          }
-
-          case "reverse": {
-            const pageCount = inputWorkload.frames;
-            const delays = [...(metadata.delay ?? Array(pageCount).fill(100))];
-
-            if (pageCount <= 1) {
+            case "optimize": {
               const buffer = await sharp(inputBuffer, {
+                animated: true,
+                limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+              })
+                .gif({
+                  effort: settings.effort,
+                  colours: settings.colors,
+                  dither: settings.dither,
+                  loop,
+                })
+                .toBuffer();
+              return { buffer, filename, contentType: "image/gif" };
+            }
+
+            case "speed": {
+              const origDelays = metadata.delay ?? Array(inputWorkload.frames).fill(100);
+              const newDelays = origDelays.map((d: number) =>
+                Math.max(20, Math.round(d / settings.speedFactor)),
+              );
+
+              const buffer = await sharp(inputBuffer, {
+                animated: true,
+                limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+              })
+                .gif({ delay: newDelays, loop })
+                .toBuffer();
+              return { buffer, filename, contentType: "image/gif" };
+            }
+
+            case "reverse": {
+              const pageCount = inputWorkload.frames;
+              const delays = [...(metadata.delay ?? Array(pageCount).fill(100))];
+
+              if (pageCount <= 1) {
+                const buffer = await sharp(inputBuffer, {
+                  limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+                })
+                  .gif({ loop })
+                  .toBuffer();
+                return { buffer, filename, contentType: "image/gif" };
+              }
+
+              delays.reverse();
+
+              // Apply optional speed adjustment (used when "Also adjust speed" is checked)
+              if (settings.speedFactor !== 1.0) {
+                for (let i = 0; i < delays.length; i++) {
+                  delays[i] = Math.max(20, Math.round(delays[i] / settings.speedFactor));
+                }
+              }
+
+              // Decode each frame to PNG in reverse order and rejoin into an
+              // animated GIF so Sharp quantises the animation across all frames
+              // instead of splicing later frames onto the first frame's colour
+              // table (#1221).
+              const frames: Buffer[] = [];
+              for (let i = pageCount - 1; i >= 0; i--) {
+                const frameBuf = await sharp(inputBuffer, {
+                  page: i,
+                  limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+                })
+                  .png()
+                  .toBuffer();
+                frames.push(frameBuf);
+              }
+
+              const buffer = await sharp(frames, { join: { across: 1, animated: true } })
+                .gif({ delay: delays, loop })
+                .toBuffer();
+              return { buffer, filename, contentType: "image/gif" };
+            }
+
+            case "extract": {
+              if (settings.extractMode === "single") {
+                if (settings.frameNumber >= inputWorkload.frames) {
+                  throw new ToolInputError("Requested GIF frame does not exist");
+                }
+                const frame = sharp(inputBuffer, {
+                  page: settings.frameNumber,
+                  limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+                });
+                const ext = settings.extractFormat;
+                const buffer =
+                  ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
+                const outName = `${baseName}_frame${settings.frameNumber}.${ext}`;
+                return {
+                  buffer,
+                  filename: outName,
+                  contentType: ext === "webp" ? "image/webp" : "image/png",
+                };
+              }
+
+              // Range or All
+              const pageCount = inputWorkload.frames;
+              const start = settings.extractMode === "all" ? 0 : settings.frameStart;
+              const end =
+                settings.extractMode === "all"
+                  ? pageCount - 1
+                  : Math.min(settings.frameEnd ?? pageCount - 1, pageCount - 1);
+
+              if (start >= pageCount || end < start) {
+                throw new ToolInputError("Requested GIF frame range does not exist");
+              }
+
+              const ext = settings.extractFormat;
+              const files: Record<string, Uint8Array> = {};
+
+              for (let i = start; i <= end; i++) {
+                const frame = sharp(inputBuffer, {
+                  page: i,
+                  limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+                });
+                const buf =
+                  ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
+                files[`frame_${String(i).padStart(4, "0")}.${ext}`] = new Uint8Array(buf);
+              }
+
+              const zipData = zipSync(files);
+              const zipBuffer = Buffer.from(zipData);
+              return {
+                buffer: zipBuffer,
+                filename: `${baseName}_frames.zip`,
+                contentType: "application/zip",
+              };
+            }
+
+            case "rotate": {
+              const pageCount = inputWorkload.frames;
+              const delays = metadata.delay ?? Array(pageCount).fill(100);
+
+              // Sharp cannot rotate multi-page images directly, so transform
+              // each frame as PNG and rejoin the animation (#1221).
+              const frames: Buffer[] = [];
+              for (let i = 0; i < pageCount; i++) {
+                let frame = sharp(inputBuffer, {
+                  page: i,
+                  limitInputPixels: MAX_GIF_TOTAL_PIXELS,
+                });
+                if (settings.angle) {
+                  frame = frame.rotate(settings.angle);
+                }
+                if (settings.flipV) {
+                  frame = frame.flip();
+                }
+                if (settings.flipH) {
+                  frame = frame.flop();
+                }
+                frames.push(await frame.png().toBuffer());
+              }
+
+              const joined =
+                pageCount > 1
+                  ? sharp(frames, { join: { across: 1, animated: true } })
+                  : sharp(frames[0]);
+              const buffer = await joined.gif({ delay: delays, loop }).toBuffer();
+              return { buffer, filename, contentType: "image/gif" };
+            }
+
+            default: {
+              const buffer = await sharp(inputBuffer, {
+                animated: true,
                 limitInputPixels: MAX_GIF_TOTAL_PIXELS,
               })
                 .gif({ loop })
                 .toBuffer();
               return { buffer, filename, contentType: "image/gif" };
             }
-
-            delays.reverse();
-
-            // Apply optional speed adjustment (used when "Also adjust speed" is checked)
-            if (settings.speedFactor !== 1.0) {
-              for (let i = 0; i < delays.length; i++) {
-                delays[i] = Math.max(20, Math.round(delays[i] / settings.speedFactor));
-              }
-            }
-
-            // Extract each frame as a single-frame GIF with the correct delay,
-            // then combine into a multi-frame GIF at the binary level.
-            // This avoids going through raw pixel data, which loses the
-            // page-height metadata that sharp/libvips needs for animation.
-            const frameGifs: Buffer[] = [];
-            for (let i = pageCount - 1; i >= 0; i--) {
-              const frameBuf = await sharp(inputBuffer, {
-                page: i,
-                limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-              })
-                .gif({ delay: [delays[pageCount - 1 - i]], loop })
-                .toBuffer();
-              frameGifs.push(frameBuf);
-            }
-
-            const buffer = assembleAnimatedGif(frameGifs, loop);
-            return { buffer, filename, contentType: "image/gif" };
           }
-
-          case "extract": {
-            if (settings.extractMode === "single") {
-              if (settings.frameNumber >= inputWorkload.frames) {
-                throw new ToolInputError("Requested GIF frame does not exist");
-              }
-              const frame = sharp(inputBuffer, {
-                page: settings.frameNumber,
-                limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-              });
-              const ext = settings.extractFormat;
-              const buffer =
-                ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
-              const outName = `${baseName}_frame${settings.frameNumber}.${ext}`;
-              return {
-                buffer,
-                filename: outName,
-                contentType: ext === "webp" ? "image/webp" : "image/png",
-              };
-            }
-
-            // Range or All
-            const pageCount = inputWorkload.frames;
-            const start = settings.extractMode === "all" ? 0 : settings.frameStart;
-            const end =
-              settings.extractMode === "all"
-                ? pageCount - 1
-                : Math.min(settings.frameEnd ?? pageCount - 1, pageCount - 1);
-
-            if (start >= pageCount || end < start) {
-              throw new ToolInputError("Requested GIF frame range does not exist");
-            }
-
-            const ext = settings.extractFormat;
-            const files: Record<string, Uint8Array> = {};
-
-            for (let i = start; i <= end; i++) {
-              const frame = sharp(inputBuffer, {
-                page: i,
-                limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-              });
-              const buf =
-                ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
-              files[`frame_${String(i).padStart(4, "0")}.${ext}`] = new Uint8Array(buf);
-            }
-
-            const zipData = zipSync(files);
-            const zipBuffer = Buffer.from(zipData);
-            return {
-              buffer: zipBuffer,
-              filename: `${baseName}_frames.zip`,
-              contentType: "application/zip",
-            };
-          }
-
-          case "rotate": {
-            const pageCount = inputWorkload.frames;
-            const delays = metadata.delay ?? Array(pageCount).fill(100);
-
-            // Sharp cannot rotate multi-page images directly, so process
-            // each frame individually and reassemble the animation.
-            const frameGifs: Buffer[] = [];
-            for (let i = 0; i < pageCount; i++) {
-              let frame = sharp(inputBuffer, {
-                page: i,
-                limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-              });
-              if (settings.angle) {
-                frame = frame.rotate(settings.angle);
-              }
-              if (settings.flipV) {
-                frame = frame.flip();
-              }
-              if (settings.flipH) {
-                frame = frame.flop();
-              }
-              const frameBuf = await frame.gif({ delay: [delays[i]], loop }).toBuffer();
-              frameGifs.push(frameBuf);
-            }
-
-            const buffer = pageCount > 1 ? assembleAnimatedGif(frameGifs, loop) : frameGifs[0];
-            return { buffer, filename, contentType: "image/gif" };
-          }
-
-          default: {
-            const buffer = await sharp(inputBuffer, {
-              animated: true,
-              limitInputPixels: MAX_GIF_TOTAL_PIXELS,
-            })
-              .gif({ loop })
-              .toBuffer();
-            return { buffer, filename, contentType: "image/gif" };
-          }
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
       },
     ),

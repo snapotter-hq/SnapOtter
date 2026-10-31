@@ -26,7 +26,9 @@ export function registerBookletPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_booklet.pdf`);
       ctx.report(10, "Creating booklet");
-      await pdfcpuBooklet(inPath, settings.perSheet as BookletValue, outPath);
+      await pdfcpuBooklet(inPath, settings.perSheet as BookletValue, outPath, {
+        signal: ctx.signal,
+      });
       ctx.report(90, "Done");
 
       return {

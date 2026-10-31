@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter 向けに SAML 2.0 シングルサインオンをセットアップします。Okta、Azure AD / Entra ID、Google Workspace、その他の SAML ID プロバイダー向けのステップバイステップガイド。"
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 039fb6c7ee38
+i18n_output_hash: 9cea7f00b65f
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ IdP には SnapOtter から 3 つの値が必要です:
 2. **Admin Settings > Security** で、**SSO Enforcement** をオンに切り替えます。
 3. **break-glass ユーザー名** を設定します。これは、IdP に到達できない場合の緊急アクセス用に、引き続きパスワードでログインできる唯一のローカルアカウントです。
 
-SSO の強制が有効な場合、（break-glass ユーザーを除く）ローカルログインの試行は「Local password login is disabled. Please use SSO.」というメッセージとともに 403 エラーを返します。
+SSO の強制が有効な場合、ローカルパスワードでサインインできるのは break-glass ユーザーだけです。それ以外のローカルログインの試行は、パスワードが正しい場合でも、誤ったパスワードと同じ 401「Invalid credentials」で拒否され、ログインのスロットル対象として数えられます。
 
 ::: tip 
 SSO の強制を有効にする前に、必ず break-glass ユーザー名を設定してください。それがないと、IdP がダウンした場合に SnapOtter からロックアウトされる可能性があります。

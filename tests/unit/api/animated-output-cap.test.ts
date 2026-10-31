@@ -25,7 +25,10 @@ vi.mock("@snapotter/image-engine", async (importOriginal) => ({
 
 import { runPerFrame } from "../../../apps/api/src/lib/animated-image.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
+import { registerGifWebp } from "../../../apps/api/src/routes/tools/gif-webp.js";
 import { registerImagePad } from "../../../apps/api/src/routes/tools/image-pad.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 async function threeFrameGif(size = 8): Promise<Buffer> {
   // Distinct luminance per frame, or the GIF encoder merges identical frames.
@@ -40,6 +43,21 @@ async function threeFrameGif(size = 8): Promise<Buffer> {
   );
   return sharp(frames, { join: { animated: true } })
     .gif({ delay: [100, 100, 100], loop: 0 })
+    .toBuffer();
+}
+
+async function threeFrameWebp(size = 8): Promise<Buffer> {
+  const frames = await Promise.all(
+    [40, 120, 200].map((v) =>
+      sharp({
+        create: { width: size, height: size, channels: 3, background: { r: v, g: v, b: v } },
+      })
+        .png()
+        .toBuffer(),
+    ),
+  );
+  return sharp(frames, { join: { animated: true } })
+    .webp({ delay: [100, 100, 100], loop: 0 })
     .toBuffer();
 }
 
@@ -100,5 +118,242 @@ describe("a real per-frame tool hits the output cap as a 400 (#1183)", () => {
     expect(isToolInputError(error)).toBe(true);
     expect((error as { statusCode?: number }).statusCode).toBe(400);
     expect((error as Error).message).toMatch(/too large/);
+  });
+});
+
+describe("gif-webp and convert enforce assertGifWorkload on animated input (#2528)", () => {
+  beforeAll(() => {
+    const fakeApp = { post: () => undefined } as unknown as FastifyInstance;
+    registerGifWebp(fakeApp);
+    registerConvert(fakeApp);
+  });
+
+  it("rejects an animated GIF exceeding total pixel cap in gif-webp", async () => {
+    // 3 x 64x64 = 12,288 total pixels > 10,000 cap (single frame is 4,096 <= 10,000).
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const error = await gifWebp
+      ?.process(await threeFrameGif(64), settings, "anim.gif")
+      .catch((e: unknown) => e);
+
+    expect(isToolInputError(error)).toBe(true);
+    expect((error as { statusCode?: number }).statusCode).toBe(400);
+    expect((error as Error).message).toMatch(/GIF input must not exceed .* total pixels/i);
+  });
+
+  it("rejects an animated WebP exceeding total pixel cap in gif-webp", async () => {
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const error = await gifWebp
+      ?.process(await threeFrameWebp(64), settings, "anim.webp")
+      .catch((e: unknown) => e);
+
+    expect(isToolInputError(error)).toBe(true);
+    expect((error as { statusCode?: number }).statusCode).toBe(400);
+    expect((error as Error).message).toMatch(
+      /Animated WebP input must not exceed .* total pixels/i,
+    );
+  });
+
+  it("rejects an animated GIF exceeding total pixel cap in convert to webp", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "webp" });
+
+    const error = await convertTool
+      ?.process(await threeFrameGif(64), settings, "anim.gif")
+      .catch((e: unknown) => e);
+
+    expect(isToolInputError(error)).toBe(true);
+    expect((error as { statusCode?: number }).statusCode).toBe(400);
+    expect((error as Error).message).toMatch(/GIF input must not exceed .* total pixels/i);
+  });
+
+  it("rejects an animated GIF exceeding total pixel cap in convert to webp even when filename extension is .png (#2549)", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "webp" });
+
+    const error = await convertTool
+      ?.process(await threeFrameGif(64), settings, "anim.png")
+      .catch((e: unknown) => e);
+
+    expect(isToolInputError(error)).toBe(true);
+    expect((error as { statusCode?: number }).statusCode).toBe(400);
+    expect((error as Error).message).toMatch(/GIF input must not exceed .* total pixels/i);
+  });
+
+  it("rejects an animated WebP exceeding total pixel cap in convert to gif", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "gif" });
+
+    const error = await convertTool
+      ?.process(await threeFrameWebp(64), settings, "anim.webp")
+      .catch((e: unknown) => e);
+
+    expect(isToolInputError(error)).toBe(true);
+    expect((error as { statusCode?: number }).statusCode).toBe(400);
+    expect((error as Error).message).toMatch(
+      /Animated WebP input must not exceed .* total pixels/i,
+    );
+  });
+
+  it("still allows converting a multi-frame GIF to a still format when a single frame fits", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "png" });
+
+    const result = await convertTool?.process(await threeFrameGif(64), settings, "anim.gif");
+
+    expect(result?.contentType).toBe("image/png");
+    const meta = await sharp(result?.buffer).metadata();
+    expect(meta.width).toBe(64);
+    expect(meta.height).toBe(64);
+  });
+
+  it("resizes an animated GIF in gif-webp using anim.width when under the workload cap", async () => {
+    // 3 x 16x16 = 768 total pixels <= 10,000 cap; 50% resize -> 8x8 across 3 frames.
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({ resizePercent: 50 });
+
+    const result = await gifWebp?.process(await threeFrameGif(16), settings, "anim.gif");
+
+    expect(result?.contentType).toBe("image/webp");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.pages).toBe(3);
+    expect(meta.width).toBe(8);
+    expect(meta.pageHeight).toBe(8);
+  });
+
+  it("resizes a single-frame GIF in gif-webp when resizePercent < 100", async () => {
+    const stillGif = await sharp({
+      create: { width: 40, height: 20, channels: 3, background: { r: 80, g: 80, b: 80 } },
+    })
+      .gif()
+      .toBuffer();
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({ resizePercent: 50 });
+
+    const result = await gifWebp?.process(stillGif, settings, "still.gif");
+
+    expect(result?.contentType).toBe("image/webp");
+    const meta = await sharp(result?.buffer).metadata();
+    expect(meta.width).toBe(20);
+    expect(meta.height).toBe(10);
+  });
+
+  it("clamps target width to at least 1px when resizing a tiny GIF in gif-webp", async () => {
+    const tinyGif = await threeFrameGif(4);
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({ resizePercent: 10 });
+
+    const result = await gifWebp?.process(tinyGif, settings, "tiny.gif");
+
+    expect(result?.contentType).toBe("image/webp");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.pages).toBe(3);
+    expect(meta.width).toBe(1);
+    expect(meta.pageHeight).toBe(1);
+  });
+
+  it("preserves animation frames when converting an under-cap animated WebP to GIF in convert", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "gif" });
+
+    const result = await convertTool?.process(await threeFrameWebp(16), settings, "anim.webp");
+
+    expect(result?.contentType).toBe("image/gif");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.pages).toBe(3);
+    expect(meta.width).toBe(16);
+    expect(meta.pageHeight).toBe(16);
+  });
+
+  it("does not enforce assertGifWorkload across pages of multipage.tiff when converting to webp (#2549)", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "webp" });
+
+    const result = await convertTool?.process(
+      readFixture(fixtures.image.multipageTiff),
+      settings,
+      "multipage.tiff",
+    );
+
+    expect(result?.contentType).toBe("image/webp");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.pages ?? 1).toBe(1);
+    expect(meta.width).toBe(800);
+    expect(meta.height).toBe(600);
+  });
+
+  it("converts an animated GIF with a stale .png pipeline filename to WebP in gif-webp (#3047)", async () => {
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const result = await gifWebp?.process(await threeFrameGif(16), settings, "step0.png");
+
+    expect(result?.contentType).toBe("image/webp");
+    expect(result?.filename).toBe("step0.webp");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.format).toBe("webp");
+    expect(meta.pages).toBe(3);
+  });
+
+  it("converts an animated WebP with a stale .gif pipeline filename to GIF in gif-webp (#3047)", async () => {
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const result = await gifWebp?.process(await threeFrameWebp(16), settings, "step0.gif");
+
+    expect(result?.contentType).toBe("image/gif");
+    expect(result?.filename).toBe("step0.gif");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.format).toBe("gif");
+    expect(meta.pages).toBe(3);
+  });
+
+  it("converts an extensionless single-frame WebP and resizes via meta.width in gif-webp (#3047)", async () => {
+    const stillWebp = await sharp({
+      create: { width: 40, height: 20, channels: 3, background: { r: 80, g: 80, b: 80 } },
+    })
+      .webp()
+      .toBuffer();
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({ resizePercent: 50 });
+
+    const result = await gifWebp?.process(stillWebp, settings, "animation");
+
+    expect(result?.contentType).toBe("image/gif");
+    expect(result?.filename).toBe("animation.gif");
+    const meta = await sharp(result?.buffer).metadata();
+    expect(meta.format).toBe("gif");
+    expect(meta.width).toBe(20);
+    expect(meta.height).toBe(10);
+  });
+
+  it("rejects a PNG buffer disguised with a .gif filename in gif-webp (#3047)", async () => {
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const error = await gifWebp
+      ?.process(readFixture(fixtures.image.base.png200), settings, "fake.gif")
+      .catch((e: unknown) => e);
+
+    expect((error as Error)?.name).toBe("InputValidationError");
+    expect((error as Error)?.message).toMatch(/only gif and webp inputs are supported/i);
   });
 });

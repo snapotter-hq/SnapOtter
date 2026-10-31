@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { BG_REMOVAL_MODELS } from "../../../packages/shared/src/constants.js";
 
 /**
  * Background-removal model names live in TypeScript (the web quality map, the
@@ -77,5 +78,10 @@ describe("background-removal model names", () => {
     const allowed = new Set(allowedModels());
     const unknown = referenced.filter((r) => !allowed.has(r.name));
     expect(unknown, "remove_bg.py would silently swap these for a default model").toEqual([]);
+  });
+
+  it("matches BG_REMOVAL_MODELS from @snapotter/shared", () => {
+    const allowed = new Set(allowedModels());
+    expect(new Set(BG_REMOVAL_MODELS)).toEqual(allowed);
   });
 });

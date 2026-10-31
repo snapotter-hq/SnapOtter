@@ -153,7 +153,7 @@ run_batch_bench() {
   admission_file=$(mktemp)
   artifact_file=$(mktemp)
 
-  local curl_args=(-s --max-time 180 -X POST "${BASE_URL}/api/v1/tools/image/resize")
+  local curl_args=(-s --max-time 180 -X POST "${BASE_URL}/api/v1/tools/image/resize/batch")
 
   for i in $(seq 1 "$count"); do
     curl_args+=(-F "file=@${F}/image/valid/test-200x150.png")

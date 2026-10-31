@@ -1,13 +1,21 @@
 import {
-  FAST_KOREAN_UNSUPPORTED_REASON,
+  fastLanguageUnsupportedReason,
   getOcrRuntimeCapability,
+  OCR_OPTIONAL_LANGUAGE_MODELS,
   type OcrRuntimeCapability,
   type OcrRuntimeQuality,
 } from "@snapotter/ai";
+import { InputValidationError } from "../modality/contract.js";
 
 export type OcrIngressQuality = "fast" | OcrRuntimeQuality;
 
-export const OCR_FAST_KOREAN_GUIDANCE = FAST_KOREAN_UNSUPPORTED_REASON;
+const OCR_LANGUAGE_NOT_INSTALLED_GUIDANCE =
+  "This language is not in the installed OCR pack. Update the Accurate OCR pack in Settings > AI Features, then run it again.";
+
+const FAST_LANGUAGE_REASON_CODES = new Map<string, string>([
+  ["ko", "fast-korean-unsupported"],
+  ["ar", "fast-arabic-unsupported"],
+]);
 
 export type OcrIngressResolution =
   | {
@@ -71,11 +79,15 @@ export function resolveOcrIngressSettings(
           : undefined
       : undefined;
 
+  const language =
+    typeof parsedSettings.language === "string" ? parsedSettings.language : undefined;
+  const fastUnsupportedReason = fastLanguageUnsupportedReason(language);
+
   let capability: OcrRuntimeCapability | undefined;
   let quality = explicitQuality ?? legacyQuality;
   if (!quality) {
     capability = readCapability();
-    if (parsedSettings.language === "ko") {
+    if (fastUnsupportedReason) {
       quality =
         capability.available && capability.qualities.includes("best")
           ? "best"
@@ -96,13 +108,13 @@ export function resolveOcrIngressSettings(
   const settingsWithQuality = { ...normalizedSettings, quality };
 
   if (quality === "fast") {
-    if (parsedSettings.language === "ko") {
+    if (fastUnsupportedReason && language) {
       return {
         ok: false,
         code: "FEATURE_INCOMPATIBLE",
-        reason: "fast-korean-unsupported",
+        reason: FAST_LANGUAGE_REASON_CODES.get(language) ?? "fast-language-unsupported",
         requestedQuality: "fast",
-        guidance: OCR_FAST_KOREAN_GUIDANCE,
+        guidance: fastUnsupportedReason,
       };
     }
     return { ok: true, settings: settingsWithQuality };
@@ -111,6 +123,19 @@ export function resolveOcrIngressSettings(
   capability ??= readCapability();
   if (capability.available) {
     if (capability.qualities.includes(quality)) {
+      if (
+        language !== undefined &&
+        Object.hasOwn(OCR_OPTIONAL_LANGUAGE_MODELS, language) &&
+        !capability.installedLanguages.includes(language)
+      ) {
+        return {
+          ok: false,
+          code: "FEATURE_NOT_INSTALLED",
+          reason: "language-not-installed",
+          requestedQuality: quality,
+          guidance: OCR_LANGUAGE_NOT_INSTALLED_GUIDANCE,
+        };
+      }
       return { ok: true, settings: settingsWithQuality };
     }
 
@@ -131,4 +156,19 @@ export function resolveOcrIngressSettings(
     reason: capability.reason,
     requestedQuality: quality,
   };
+}
+
+/**
+ * The accurate OCR runtime was there when the file was uploaded and is gone by
+ * the time the worker looks. That is the operator's install, not the caller's
+ * file, so it is a 503 with a code: the route and a batch of these answer it as
+ * a server-side failure instead of a 422 that blames the upload (#2181).
+ */
+export function ocrRuntimeUnavailable(quality: OcrRuntimeQuality): InputValidationError {
+  return new InputValidationError(
+    `OCR ${quality} runtime is no longer available`,
+    503,
+    "Repair or reinstall OCR in Settings > AI Features, then run it again.",
+    "ENGINE_UNAVAILABLE",
+  );
 }

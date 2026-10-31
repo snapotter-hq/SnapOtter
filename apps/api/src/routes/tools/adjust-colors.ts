@@ -5,11 +5,14 @@ import {
   colorChannels,
   grayscale,
   invert,
+  type Sharp,
   sepia,
 } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor, runPerFrame } from "../../lib/animated-image.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -33,15 +36,14 @@ const settingsSchema = z.object({
   effect: z.enum(["none", "grayscale", "sepia", "invert"]).default("none"),
 });
 
+type Matrix3x3 = [[number, number, number], [number, number, number], [number, number, number]];
+
 /**
  * Build a 3x3 recomb matrix for color temperature + tint shift.
  * Temperature: cool (blue) <-> warm (orange) on the blue-orange axis.
  * Tint: green <-> magenta on the green-magenta axis.
  */
-function colorTempTintMatrix(
-  temp: number,
-  tintVal: number,
-): [[number, number, number], [number, number, number], [number, number, number]] {
+function colorTempTintMatrix(temp: number, tintVal: number): Matrix3x3 {
   const t = temp / 100;
   const n = tintVal / 100;
   return [
@@ -49,6 +51,67 @@ function colorTempTintMatrix(
     [0, 1 + t * 0.05 - n * 0.15, 0],
     [0, 0, 1 - t * 0.15 + n * 0.1],
   ];
+}
+
+type RecombCarrier = { options?: { recombMatrix?: unknown } };
+
+function readRecombMatrix(image: Sharp): Matrix3x3 | null {
+  const flat = (image as unknown as RecombCarrier).options?.recombMatrix;
+  if (flat === undefined) return null;
+  if (!Array.isArray(flat) || flat.length !== 9 || !flat.every((n) => typeof n === "number")) {
+    throw new Error("Expected Sharp options.recombMatrix to be a 9-number array");
+  }
+  return [
+    [flat[0], flat[1], flat[2]],
+    [flat[3], flat[4], flat[5]],
+    [flat[6], flat[7], flat[8]],
+  ];
+}
+
+export function multiplyMatrix3x3(a: Matrix3x3, b: Matrix3x3): Matrix3x3 {
+  return [
+    [
+      a[0][0] * b[0][0] + a[0][1] * b[1][0] + a[0][2] * b[2][0],
+      a[0][0] * b[0][1] + a[0][1] * b[1][1] + a[0][2] * b[2][1],
+      a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2] * b[2][2],
+    ],
+    [
+      a[1][0] * b[0][0] + a[1][1] * b[1][0] + a[1][2] * b[2][0],
+      a[1][0] * b[0][1] + a[1][1] * b[1][1] + a[1][2] * b[2][1],
+      a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2] * b[2][2],
+    ],
+    [
+      a[2][0] * b[0][0] + a[2][1] * b[1][0] + a[2][2] * b[2][0],
+      a[2][0] * b[0][1] + a[2][1] * b[1][1] + a[2][2] * b[2][1],
+      a[2][0] * b[0][2] + a[2][1] * b[1][2] + a[2][2] * b[2][2],
+    ],
+  ];
+}
+
+/**
+ * Sharp stores a single recombMatrix slot per pipeline instance, so calling
+ * .recomb() a second or third time overwrites the earlier matrix (#2608).
+ * Multiply the new 3x3 matrix with any previous one so temperature/tint,
+ * channel multipliers, and sepia compose in sequence.
+ */
+async function chainRecomb(
+  image: Sharp,
+  apply: (img: Sharp) => Promise<Sharp> | Sharp,
+): Promise<Sharp> {
+  const prev = readRecombMatrix(image);
+  const carrier = image as unknown as RecombCarrier;
+  if (carrier.options) {
+    carrier.options.recombMatrix = undefined;
+  }
+  const nextImage = await apply(image);
+  const next = readRecombMatrix(nextImage);
+  if (!next) {
+    throw new Error("Expected recomb step to populate Sharp options.recombMatrix");
+  }
+  if (prev) {
+    return nextImage.recomb(multiplyMatrix3x3(next, prev));
+  }
+  return nextImage;
 }
 
 /**
@@ -63,93 +126,148 @@ async function processColorAdjustments(
   filename: string,
 ) {
   const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+  const hasColorModulate = settings.saturation !== 0 || settings.hue !== 0;
+  const hasPreRecomb = settings.brightness !== 0 || settings.contrast !== 0 || hasColorModulate;
+  const hasRecomb =
+    settings.temperature !== 0 ||
+    settings.tint !== 0 ||
+    settings.red !== 100 ||
+    settings.green !== 100 ||
+    settings.blue !== 100 ||
+    settings.effect === "sepia";
+  const needsPreRecombMaterialize = (hasRecomb || settings.effect === "grayscale") && hasPreRecomb;
+  const needsPostRecombMaterialize =
+    hasRecomb &&
+    (settings.exposure > 0 || settings.effect === "grayscale" || settings.effect === "invert");
+  const needsRecombMaterialize = needsPreRecombMaterialize || needsPostRecombMaterialize;
 
   // Everything here works pixel by pixel except sharpening, which samples
   // neighbouring rows and so reaches into the next frame of Sharp's stacked
-  // strip. That one setting goes frame by frame; the rest keep the cheaper
-  // single pass over the whole animation (#1083).
-  if (settings.sharpness > 0) {
-    const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
-      const result = await processColorAdjustments(frame, settings, filename);
-      return result.buffer;
-    });
-    if (perFrame) {
-      return { buffer: perFrame, filename, contentType: outputFormat.contentType };
+  // strip, and intermediate PNG materialisation (needsRecombMaterialize), which
+  // would flatten a multi-frame strip into a single tall frame. Those go frame
+  // by frame; the rest keep the cheaper single pass over the whole animation
+  // (#1083, #3120, #3133, #3469, #3473).
+  if (settings.sharpness > 0 || needsRecombMaterialize) {
+    try {
+      const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
+        const result = await processColorAdjustments(frame, settings, filename);
+        return result.buffer;
+      });
+      if (perFrame) {
+        return { buffer: perFrame, filename, contentType: outputFormat.contentType };
+      }
+    } catch (err) {
+      throw await asInputErrorIfUndecodable(inputBuffer, err);
     }
   }
 
-  let image = openAnimated(inputBuffer, await readAnimationFor(inputBuffer, outputFormat.format));
+  let buffer: Buffer;
+  try {
+    let image = openAnimated(inputBuffer, await readAnimationFor(inputBuffer, outputFormat.format));
 
-  // Light
-  if (settings.brightness !== 0) {
-    image = await adjustBrightness(image, { value: settings.brightness });
-  }
-  if (settings.contrast !== 0) {
-    image = await adjustContrast(image, { value: settings.contrast });
-  }
-  if (settings.exposure !== 0) {
-    // Sharp's gamma() accepts values between 1.0 and 3.0.
-    // Positive exposure → brighten midtones → apply gamma > 1.0 on output.
-    // Negative exposure → darken midtones → apply gamma > 1.0 on input.
-    // Map -100..+100 to a gamma range of 1.0..3.0 applied on the correct side.
-    const strength = Math.abs(settings.exposure) / 100;
-    const g = 1 + strength * 2; // 1.0..3.0
-    if (settings.exposure > 0) {
-      // Brighten: linearize at gamma 1.0, encode at higher gamma
-      image = image.gamma(1, g);
-    } else {
-      // Darken: linearize at higher gamma, encode at gamma 1.0
+    // Light
+    if (settings.brightness !== 0) {
+      image = await adjustBrightness(image, { value: settings.brightness });
+    }
+    if (settings.contrast !== 0) {
+      image = await adjustContrast(image, { value: settings.contrast });
+    }
+    if (settings.exposure < 0) {
+      // Sharp's gamma() accepts values between 1.0 and 3.0.
+      // Negative exposure -> darken midtones -> apply gamma > 1.0 on input.
+      const strength = Math.abs(settings.exposure) / 100;
+      const g = 1 + strength * 2; // 1.0..3.0
       image = image.gamma(g, 1);
     }
-  }
 
-  // Color
-  if (settings.saturation !== 0 || settings.hue !== 0) {
-    const modOpts: { saturation?: number; hue?: number } = {};
-    if (settings.saturation !== 0) modOpts.saturation = 1 + settings.saturation / 100;
-    if (settings.hue !== 0) modOpts.hue = settings.hue;
-    image = image.modulate(modOpts);
-  }
-  if (settings.temperature !== 0 || settings.tint !== 0) {
-    image = image.recomb(colorTempTintMatrix(settings.temperature, settings.tint));
-  }
+    // Color
+    if (hasColorModulate) {
+      const modOpts: { saturation?: number; hue?: number } = {};
+      if (settings.saturation !== 0) modOpts.saturation = 1 + settings.saturation / 100;
+      if (settings.hue !== 0) modOpts.hue = settings.hue;
+      image = image.modulate(modOpts);
+    }
 
-  // Detail
-  if (settings.sharpness > 0) {
-    image = await adjustSharpen(image, { value: settings.sharpness });
-  }
+    // Sharp's C++ pipeline executes sharp::greyscale (pipeline.cc:388) and
+    // sharp::Recomb (pipeline.cc:678) before sharp::Modulate (brightness,
+    // saturation, hue) and sharp::Linear (contrast). Materialise pre-recomb
+    // adjustments before recomb or grayscale (#3133, #3469, #3473) so those
+    // stages run on the adjusted 8-bit uchar pixels.
+    if (needsPreRecombMaterialize) {
+      image = sharp(await image.png().toBuffer());
+    }
 
-  // Channels
-  if (settings.red !== 100 || settings.green !== 100 || settings.blue !== 100) {
-    image = await colorChannels(image, {
-      red: settings.red,
-      green: settings.green,
-      blue: settings.blue,
-    });
-  }
+    if (settings.temperature !== 0 || settings.tint !== 0) {
+      image = image.recomb(colorTempTintMatrix(settings.temperature, settings.tint));
+    }
 
-  // Effects
-  switch (settings.effect) {
-    case "grayscale":
-      image = await grayscale(image);
-      break;
-    case "sepia":
-      image = await sepia(image);
-      break;
-    case "invert":
-      image = await invert(image);
-      break;
-  }
+    // Detail
+    if (settings.sharpness > 0) {
+      image = await adjustSharpen(image, { value: settings.sharpness });
+    }
 
-  const buffer = await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+    // Channels
+    if (settings.red !== 100 || settings.green !== 100 || settings.blue !== 100) {
+      image = await chainRecomb(image, (img) =>
+        colorChannels(img, {
+          red: settings.red,
+          green: settings.green,
+          blue: settings.blue,
+        }),
+      );
+    }
+
+    if (settings.effect === "sepia") {
+      image = await chainRecomb(image, (img) => sepia(img));
+    }
+
+    // vips_recomb (temperature/tint, colorChannels, sepia) outputs 32-bit float
+    // bands (0..255) and runs after .grayscale() in Sharp's internal pipeline.
+    // Materialising through PNG casts back to 8-bit uchar before gammaOut
+    // (positive exposure), grayscale, invert, or LZW TIFF output (#2586, #3120).
+    if (needsPostRecombMaterialize) {
+      image = sharp(await image.png().toBuffer());
+    }
+
+    if (settings.exposure > 0) {
+      // Positive exposure -> brighten midtones -> apply gamma > 1.0 on output.
+      const strength = settings.exposure / 100;
+      const g = 1 + strength * 2; // 1.0..3.0
+      image = image.gamma(1, g);
+    }
+
+    // Effects
+    switch (settings.effect) {
+      case "grayscale":
+        image = await grayscale(image);
+        break;
+      case "invert":
+        image = await invert(image);
+        break;
+    }
+
+    const finalImage =
+      outputFormat.format === "tiff" && !needsPostRecombMaterialize
+        ? sharp(await image.png().toBuffer())
+        : image;
+    buffer = await finalImage.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
+  }
   return { buffer, filename, contentType: outputFormat.contentType };
 }
+
+const guardedProcessColorAdjustments = withImageEncodeContext<z.infer<typeof settingsSchema>>(
+  "Color adjustment failed",
+  (s) => s?.effect ?? "none",
+  processColorAdjustments,
+);
 
 export function registerColorAdjustments(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "adjust-colors",
     settingsSchema,
-    process: processColorAdjustments,
+    process: guardedProcessColorAdjustments,
   });
   // Backwards-compatible alias routes consolidated into adjust-colors. These
   // ids are not catalog TOOLS, so pass the section explicitly (all image).
@@ -159,7 +277,7 @@ export function registerColorAdjustments(app: FastifyInstance) {
       toolId,
       section: "image",
       settingsSchema,
-      process: processColorAdjustments,
+      process: guardedProcessColorAdjustments,
     });
   }
 }

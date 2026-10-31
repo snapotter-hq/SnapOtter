@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import {
@@ -9,8 +10,12 @@ import {
   computeWorkspaceUsedBytes,
   deleteObject,
   isOverWorkspaceCap,
+  putObject,
+  putObjectStream,
   workspaceHeadroomBytes,
 } from "../../../apps/api/src/lib/object-storage.js";
+
+const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
 
 describe("isOverWorkspaceCap", () => {
   it("is disabled (never over) when maxGb is 0", () => {
@@ -47,13 +52,115 @@ describe("computeWorkspaceUsedBytes", () => {
     expect(await computeWorkspaceUsedBytes(root)).toBe(0);
     expect(await computeWorkspaceUsedBytes(join(root, "nope"))).toBe(0);
   });
+
+  it.skipIf(isRoot)(
+    "propagates a permission fault when a prefix root or job directory is unreadable (#2753)",
+    async () => {
+      root = await mkdtemp(join(tmpdir(), "snapotter-wscap-perm-"));
+      const jobDir = join(root, "outputs", "job1");
+      await mkdir(jobDir, { recursive: true });
+      await writeFile(join(jobDir, "big.bin"), Buffer.alloc(2048));
+
+      await chmod(jobDir, 0o000);
+      try {
+        await expect(computeWorkspaceUsedBytes(root)).rejects.toMatchObject({
+          code: expect.stringMatching(/^(EACCES|EPERM)$/),
+        });
+      } finally {
+        await chmod(jobDir, 0o755).catch(() => {});
+      }
+
+      const outputsRoot = join(root, "outputs");
+      await chmod(outputsRoot, 0o000);
+      try {
+        await expect(computeWorkspaceUsedBytes(root)).rejects.toMatchObject({
+          code: expect.stringMatching(/^(EACCES|EPERM)$/),
+        });
+      } finally {
+        await chmod(outputsRoot, 0o755).catch(() => {});
+      }
+    },
+  );
+
+  it("propagates non-ENOENT readdir and stat faults while ignoring ENOENT mid-walk (#2753)", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-wscap-eio-"));
+    await mkdir(join(root, "uploads", "kept-job"), { recursive: true });
+    await mkdir(join(root, "uploads", "vanished-job"), { recursive: true });
+    await mkdir(join(root, "uploads", "fault-job"), { recursive: true });
+    await writeFile(join(root, "uploads", "kept-job", "kept.bin"), Buffer.alloc(1200));
+    await writeFile(join(root, "uploads", "kept-job", "vanished.bin"), Buffer.alloc(500));
+    await writeFile(join(root, "uploads", "kept-job", "fault.bin"), Buffer.alloc(300));
+
+    const prefixEio = Object.assign(new Error("EIO: i/o error, scandir prefix"), {
+      code: "EIO",
+      syscall: "scandir",
+    });
+    const jobDirEio = Object.assign(new Error("EIO: i/o error, scandir job"), {
+      code: "EIO",
+      syscall: "scandir",
+    });
+    const vanishedDir = Object.assign(new Error("ENOENT: no such file or directory, scandir"), {
+      code: "ENOENT",
+      syscall: "scandir",
+    });
+    const vanishedFile = Object.assign(new Error("ENOENT: no such file or directory, stat"), {
+      code: "ENOENT",
+      syscall: "stat",
+    });
+    const statEio = Object.assign(new Error("EIO: i/o error, stat"), {
+      code: "EIO",
+      syscall: "stat",
+    });
+
+    let failPrefixReaddir = true;
+    let failJobDirReaddir = false;
+    let failStat = false;
+
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        readdir: async (p: Parameters<typeof actual.readdir>[0]) => {
+          const pathStr = String(p);
+          if (failPrefixReaddir && pathStr.endsWith("/uploads")) throw prefixEio;
+          if (pathStr.endsWith("/vanished-job")) throw vanishedDir;
+          if (failJobDirReaddir && pathStr.endsWith("/fault-job")) throw jobDirEio;
+          return actual.readdir(p);
+        },
+        stat: async (p: Parameters<typeof actual.stat>[0]) => {
+          const pathStr = String(p);
+          if (pathStr.endsWith("/vanished.bin")) throw vanishedFile;
+          if (failStat && pathStr.endsWith("/fault.bin")) throw statEio;
+          return actual.stat(p);
+        },
+      };
+    });
+
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(isolatedStorage.computeWorkspaceUsedBytes(root)).rejects.toBe(prefixEio);
+
+      failPrefixReaddir = false;
+      failJobDirReaddir = true;
+      await expect(isolatedStorage.computeWorkspaceUsedBytes(root)).rejects.toBe(jobDirEio);
+
+      failJobDirReaddir = false;
+      expect(await isolatedStorage.computeWorkspaceUsedBytes(root)).toBe(1500);
+
+      failStat = true;
+      await expect(isolatedStorage.computeWorkspaceUsedBytes(root)).rejects.toBe(statEio);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
+  });
 });
 
 // assertLocalCapacity wires the aggregate size cap and the free-space floor to
-// the real WORKSPACE_PATH. This file never calls putObject, so the module's
-// 30s workspace-size cache starts empty; each test picks a base timestamp far
-// past any prior one so its first check recomputes rather than reusing a stale
-// cached total.
+// the real WORKSPACE_PATH. Each test picks a base timestamp far past any prior
+// one so its first check recomputes rather than reusing a cached total from an
+// earlier test.
 describe("assertLocalCapacity capacity guard", () => {
   const originalWorkspace = env.WORKSPACE_PATH;
   const originalMaxGb = env.MAX_WORKSPACE_SIZE_GB;
@@ -175,6 +282,104 @@ describe("assertLocalCapacity capacity guard", () => {
     await deleteObject("outputs/job1/big.bin");
     await expect(assertLocalCapacity()).resolves.toBeUndefined();
   });
+
+  it.skipIf(isRoot)(
+    "surfaces a 503 storage-not-writable SafeError and does not cache 0 when an outputs dir is unreadable (#2753)",
+    async () => {
+      root = await mkdtemp(join(tmpdir(), "snapotter-cap-unreadable-"));
+      const jobDir = join(root, "outputs", "job1");
+      await mkdir(jobDir, { recursive: true });
+      await writeFile(join(jobDir, "big.bin"), Buffer.alloc(2 * 1024 * 1024));
+      (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+      (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+      vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+      await chmod(jobDir, 0o000);
+      try {
+        const expectedFault = {
+          isSafeMessage: true,
+          kind: "operational",
+          statusCode: 503,
+          code: "storage-not-writable",
+          cause: expect.objectContaining({
+            code: expect.stringMatching(/^(EACCES|EPERM)$/),
+          }),
+        };
+        await expect(assertLocalCapacity()).rejects.toMatchObject(expectedFault);
+        await expect(putObject("uploads/job2/in.bin", Buffer.from("x"))).rejects.toMatchObject(
+          expectedFault,
+        );
+        await expect(
+          putObjectStream("uploads/job2/in.bin", Readable.from([Buffer.from("x")])),
+        ).rejects.toMatchObject(expectedFault);
+      } finally {
+        await chmod(jobDir, 0o755).catch(() => {});
+      }
+
+      // Within the same 30s cache window, restoring permissions must still trip
+      // workspace-cap because the failed walk did not cache 0 bytes.
+      await expect(assertLocalCapacity()).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: "workspace-cap",
+      });
+    },
+  );
+
+  it("surfaces a 503 storage-write-failed SafeError on simulated EIO in assertLocalCapacity, putObject, putObjectStream, and workspaceHeadroomBytes (#2753)", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-cap-eio-"));
+    await mkdir(join(root, "outputs", "job1"), { recursive: true });
+    await writeFile(join(root, "outputs", "job1", "big.bin"), Buffer.alloc(2 * 1024 * 1024));
+
+    const scandirEio = Object.assign(new Error("EIO: i/o error, scandir"), {
+      code: "EIO",
+      syscall: "scandir",
+    });
+
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        readdir: async () => {
+          throw scandirEio;
+        },
+      };
+    });
+
+    try {
+      const isolatedConfig = await import("../../../apps/api/src/config.js");
+      const prevWs = isolatedConfig.env.WORKSPACE_PATH;
+      const prevCap = isolatedConfig.env.MAX_WORKSPACE_SIZE_GB;
+      (isolatedConfig.env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+      (isolatedConfig.env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+      try {
+        const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        const expectedFault = {
+          isSafeMessage: true,
+          kind: "operational",
+          statusCode: 503,
+          code: "storage-write-failed",
+          cause: scandirEio,
+        };
+        await expect(isolatedStorage.assertLocalCapacity()).rejects.toMatchObject(expectedFault);
+        await expect(
+          isolatedStorage.putObject("uploads/job2/in.bin", Buffer.from("x")),
+        ).rejects.toMatchObject(expectedFault);
+        await expect(
+          isolatedStorage.putObjectStream("uploads/job2/in.bin", Readable.from([Buffer.from("x")])),
+        ).rejects.toMatchObject(expectedFault);
+        await expect(isolatedStorage.workspaceHeadroomBytes()).rejects.toMatchObject(expectedFault);
+      } finally {
+        (isolatedConfig.env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = prevWs;
+        (isolatedConfig.env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = prevCap;
+      }
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
+  });
 });
 
 // The batch route asks for the remaining headroom before it reads an upload,
@@ -247,4 +452,36 @@ describe("workspaceHeadroomBytes", () => {
 
     expect(await workspaceHeadroomBytes()).toBe(0);
   });
+
+  it.skipIf(isRoot)(
+    "surfaces a 503 storage-not-writable SafeError instead of reporting full headroom when a job dir is unreadable (#2753)",
+    async () => {
+      root = await mkdtemp(join(tmpdir(), "snapotter-headroom-unreadable-"));
+      const jobDir = join(root, "outputs", "job1");
+      await mkdir(jobDir, { recursive: true });
+      await writeFile(join(jobDir, "big.bin"), Buffer.alloc(2 * 1024 * 1024));
+      (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+      (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+      vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+      await chmod(jobDir, 0o000);
+      try {
+        await expect(workspaceHeadroomBytes()).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          statusCode: 503,
+          code: "storage-not-writable",
+          cause: expect.objectContaining({
+            code: expect.stringMatching(/^(EACCES|EPERM)$/),
+          }),
+        });
+      } finally {
+        await chmod(jobDir, 0o755).catch(() => {});
+      }
+
+      // Failed walk was not cached as 0: once readable again in the same window,
+      // headroom reflects the 2 MiB on disk.
+      expect(await workspaceHeadroomBytes()).toBe(0);
+    },
+  );
 });

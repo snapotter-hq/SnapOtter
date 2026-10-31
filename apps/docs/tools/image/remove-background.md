@@ -16,20 +16,12 @@ AI-powered background removal with optional effects (blur, shadow, gradient, cus
 
 ## Parameters {#parameters}
 
+Phase 1 removes the background and caches the transparent PNG mask and original image. Background replacement, blur, drop shadow, and output format conversion are applied in [Phase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (or when running `remove-background` as a pipeline step or batch job); passing those fields to Phase 1 returns 400.
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | Image file (multipart) |
 | model | string | No | - | AI model variant to use |
-| backgroundType | string | No | `"transparent"` | One of: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | - | Hex color for solid background |
-| gradientColor1 | string | No | - | First gradient color |
-| gradientColor2 | string | No | - | Second gradient color |
-| gradientAngle | number | No | - | Gradient angle in degrees |
-| blurEnabled | boolean | No | - | Enable background blur effect |
-| blurIntensity | number | No | - | Blur intensity (0-100) |
-| shadowEnabled | boolean | No | - | Enable drop shadow on subject |
-| shadowOpacity | number | No | - | Shadow opacity (0-100) |
-| outputFormat | string | No | - | Output format: `png`, `webp`, or `avif` |
 | edgeRefine | integer | No | - | Edge refinement level (0-3) |
 | decontaminate | boolean | No | - | Remove color bleed from edges |
 
@@ -38,7 +30,7 @@ AI-powered background removal with optional effects (blur, shadow, gradient, cus
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -69,7 +61,6 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
     "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "downloadUrl": "/api/v1/download/{jobId}/photo_mask.png",
     "maskUrl": "/api/v1/download/{jobId}/photo_mask.png",
-    "originalUrl": "/api/v1/download/{jobId}/photo_original.png",
     "originalSize": 245000,
     "processedSize": 180000,
     "filename": "photo.jpg",
@@ -89,24 +80,24 @@ Re-applies background effects without re-running the AI model. Uses cached mask 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | JSON with effect settings (see below) |
-| backgroundImage | file | No | - | Custom background image (when backgroundType is `image`) |
+| backgroundImage | file | Required when `backgroundType` is `image` | - | Custom background image |
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| jobId | string | Yes | Job ID from Phase 1 |
-| filename | string | Yes | Original filename from Phase 1 |
-| backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | Hex color for solid background |
-| gradientColor1 | string | No | First gradient color |
-| gradientColor2 | string | No | Second gradient color |
-| gradientAngle | number | No | Gradient angle in degrees |
-| blurEnabled | boolean | No | Enable background blur |
-| blurIntensity | number | No | Blur intensity (0-100) |
-| shadowEnabled | boolean | No | Enable drop shadow |
-| shadowOpacity | number | No | Shadow opacity (0-100) |
-| outputFormat | string | No | `png`, `webp`, or `avif` |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Yes | - | Job ID from Phase 1 |
+| filename | string | Yes | - | Original filename from Phase 1 |
+| backgroundType | string | No | `"transparent"` | One of: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Required when `backgroundType` is `color` | - | Hex color: `#RRGGBB` or `#RGB` (the `#` is optional) |
+| gradientColor1 | string | Required when `backgroundType` is `gradient` | - | First gradient color, hex like `backgroundColor` |
+| gradientColor2 | string | Required when `backgroundType` is `gradient` | - | Second gradient color, hex like `backgroundColor` |
+| gradientAngle | number | No | - | Gradient angle in degrees |
+| blurEnabled | boolean | No | - | Blur the original background behind the subject (`backgroundType: "blur"` implies it) |
+| blurIntensity | number | No | - | Blur intensity (0-100) |
+| shadowEnabled | boolean | No | - | Enable drop shadow on subject |
+| shadowOpacity | number | No | `35` | Shadow opacity (0-100), used when `shadowEnabled` is true |
+| outputFormat | string | No | `"png"` | Output format: `png`, `webp`, or `avif` |
 
 ### Example Request {#example-request-1}
 
@@ -124,6 +115,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
   "processedSize": 195000
 }
 ```
+
+#### Error: Background Removal Expired (410) {#error-background-removal-expired-410}
+
+The effects endpoint works from the mask and original that Phase 1 stored for `jobId`. Stored outputs are cleaned up after a while, so if too much time passes between the two calls, they are gone. Run Phase 1 again with the same image and use the `jobId` it returns.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+A `jobId` or `filename` that can't name a stored file (a path separator, `..`, an empty string) answers 400.
 
 ## Notes {#notes}
 

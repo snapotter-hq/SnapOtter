@@ -140,7 +140,7 @@ export function BeforeAfterSlider({
         aria-valuemin={0}
         aria-valuemax={100}
         tabIndex={0}
-        className="relative w-full overflow-hidden rounded-lg border border-border select-none touch-none"
+        className="relative flex w-full min-h-0 overflow-hidden rounded-lg border border-border select-none touch-none"
         style={{ cursor: isDragging ? (isMobile ? "ns-resize" : "ew-resize") : "default" }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

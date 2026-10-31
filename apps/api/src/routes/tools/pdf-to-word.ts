@@ -22,7 +22,7 @@ export function registerPdfToWord(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}.docx`);
       ctx.report(10, "Converting");
-      await pdfToWordPy(inPath, outPath);
+      await pdfToWordPy(inPath, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

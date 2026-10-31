@@ -72,16 +72,25 @@ export function levelsLut(v: LevelsValues): number[] {
 /** Build a 256-entry LUT for one Curves channel via natural cubic spline. */
 export function curveLut(points: CurvePoint[]): number[] {
   const lut = new Array<number>(256).fill(0);
-  if (points.length < 2) {
+  const sorted = points
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+    .sort((a, b) => a.x - b.x);
+  const deduped: CurvePoint[] = [];
+  for (const pt of sorted) {
+    if (deduped.length > 0 && deduped[deduped.length - 1].x === pt.x) {
+      deduped[deduped.length - 1] = pt;
+    } else {
+      deduped.push(pt);
+    }
+  }
+  const n = deduped.length;
+  if (n < 2) {
     for (let i = 0; i < 256; i++) lut[i] = i;
     return lut;
   }
 
-  const sorted = [...points].sort((a, b) => a.x - b.x);
-  const n = sorted.length;
-
   if (n === 2) {
-    const [p0, p1] = sorted;
+    const [p0, p1] = deduped;
     const dx = p1.x - p0.x;
     for (let i = 0; i < 256; i++) {
       if (i <= p0.x) {
@@ -97,8 +106,8 @@ export function curveLut(points: CurvePoint[]): number[] {
     return lut;
   }
 
-  const xs = sorted.map((p) => p.x);
-  const ys = sorted.map((p) => p.y);
+  const xs = deduped.map((p) => p.x);
+  const ys = deduped.map((p) => p.y);
   const h: number[] = [];
   const alpha: number[] = [0];
 

@@ -36,7 +36,7 @@ function parsePort(value: string, envName: string): number {
 }
 
 function randomPort(floor: number): number {
-  return randomInt(floor, floor + 10_000);
+  return randomInt(floor, floor + 7_000);
 }
 
 export function resolvePlaywrightEndpoint(

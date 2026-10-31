@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: aa42f6d4ddbe
-i18n_source_hash: 899149b272e4
+i18n_output_hash: ab8f7378cbbd
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | Auth | 現在のセッションを検証 |
 | `POST` | `/api/auth/change-password` | Auth | 自分のパスワードを変更（他のすべてのセッションと API キーを無効化） |
 | `GET` | `/api/auth/users` | Admin | すべてのユーザーを一覧表示 |
-| `POST` | `/api/auth/register` | Admin | 新しいユーザーを作成 |
-| `PUT` | `/api/auth/users/:id` | Admin | ユーザーのロールまたはチームを更新 |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | ユーザーのパスワードをリセット |
-| `DELETE` | `/api/auth/users/:id` | Admin | ユーザーを削除 |
+| `POST` | `/api/auth/register` | Admin（`users:manage`；提案ロールの権限） | 新しいユーザーを作成 |
+| `PUT` | `/api/auth/users/:id` | Admin（`users:manage`；対象への権限） | ユーザーのロールまたはチームを更新 |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin（`users:manage`；対象への権限） | ユーザーのパスワードをリセット |
+| `DELETE` | `/api/auth/users/:id` | Admin（`users:manage`；対象への権限） | ユーザーを削除 |
 | `GET` | `/api/v1/config/auth` | Public | 認証が有効かどうかを確認（`{ authEnabled: bool }`） |
 | `POST` | `/api/auth/mfa/enroll` | Auth | TOTP MFA 登録を開始。エンタープライズの `mfa` 機能が必要 |
 | `POST` | `/api/auth/mfa/verify` | Auth | TOTP コードで MFA 登録を確定 |
 | `POST` | `/api/auth/mfa/complete` | Public | 保留中の MFA ログインチャレンジを完了 |
 | `POST` | `/api/auth/mfa/disable` | Auth | 現在のユーザーの MFA を無効化 |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin（`users:manage`） | ユーザーの MFA をリセット |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin（`users:manage`；対象への権限） | ユーザーの MFA をリセット |
 | `GET` | `/api/auth/oidc/login` | Public | OIDC が有効なとき OIDC ログインを開始 |
 | `GET` | `/api/auth/oidc/callback` | Public | OIDC 認可コールバック |
 | `GET` | `/api/auth/saml/metadata` | Public | SAML が有効なときの SAML SP メタデータ XML |
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | ツール ID | 名前 | AI モデル | 主な設定 |
 |---------|------|---------|-------------|
-| `remove-background` | 背景の削除 | rembg（BiRefNet / U2-Net） | `model`, `backgroundType`（transparent/color/gradient/blur/image）, `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | 背景の削除 | rembg（BiRefNet / U2-Net） | フェーズ 1: `model`, `edgeRefine`（0-3）, `decontaminate`。フェーズ 2（`/api/v1/tools/image/remove-background/effects`）、`/batch`、およびパイプライン: `backgroundType`（transparent/color/gradient/blur、`/effects` ではさらに image）, `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat`（png/webp/avif） |
 | `upscale` | 画像のアップスケール | RealESRGAN | `scale`（2/4）, `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | オブジェクト消しゴム | LaMa（ONNX） | マスクは 2 番目のファイルパートとして送信（フィールド名 `mask`）, `format`, `quality` |
 | `ocr` | OCR / テキスト抽出 | Tesseract (高速); RapidOCR + PP-OCR ONNX (バランス/ベスト) | `quality` (高速/バランス/最高)、`language`、`enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG からラスター | `format`（png/jpeg/webp/avif/tiff/gif/heif）, `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | 画像から SVG | `colorMode`（bw/color）, `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode`（none/polygon/spline） |
-| `gif-tools` | GIF ツール | `action`（resize/optimize/reverse/speed/extract-frames/rotate/add-text）, アクション固有のパラメータ |
+| `gif-tools` | GIF ツール | `mode`（resize/optimize/speed/reverse/extract/rotate）, `width`, `height`, `percentage`, `colors`（2/4/16/256）, `dither`, `effort`, `speedFactor`, `extractMode`（single/range/all）, `frameNumber`, `frameStart`, `frameEnd`, `extractFormat`（png/webp）, `angle`（90/180/270）, `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP コンバーター | `quality`（1-100）, `lossless`（bool）, `resizePercent`（10-100） |
 
 ### 動画ツール {#video-tools}
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin（`teams:manage`） | チームを一覧表示 |
 | `POST` | `/api/v1/teams` | Admin（`teams:manage`） | チームを作成 |
-| `PUT` | `/api/v1/teams/:id` | Admin（`teams:manage`） | チームを名前変更 |
+| `PUT` | `/api/v1/teams/:id` | Admin（`teams:manage`） | チームを更新（少なくとも 1 つのフィールドが必要） |
 | `DELETE` | `/api/v1/teams/:id` | Admin（`teams:manage`） | チームを削除（デフォルトチームやメンバーがいるチームは削除不可） |
 
 ## 設定 {#settings}
@@ -559,6 +559,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ## ロール {#roles}
 
 細分化されたパーミッションを持つカスタムロール管理。
+
+ロールの作成と変更には権限包含の制約が適用されます。提案されたロールや現在のロールは、操作主体の階層を上回ること、実効パーミッションを超えること、またはツールスコープを広げることはできません。API キーのスコープもこの検証の対象となります。カスタムロールの削除には、所属メンバーのフォールバックとして使用される組み込みの `user` ロールを割り当てる権限も必要です。
 
 | メソッド | パス | アクセス | 説明 |
 |--------|------|--------|-------------|
@@ -651,8 +653,8 @@ arm64 の `linux-arm64-cpu-py311` アーカイブを使用します。別のタ�
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin（`security:manage`） | 自己ロックアウト防止付きで CIDR 許可リストを更新 |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin（`compliance:manage`） | ユーザーおよびチームのリーガルホールドを一覧表示 |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin（`compliance:manage`） | ユーザーまたはチームにリーガルホールドを適用または解除 |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin（`users:manage`） | SCIM ベアラートークンを生成（一度だけ返される） |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin（`users:manage`） | 現在の SCIM ベアラートークンを失効 |
+| `POST` | `/api/v1/enterprise/scim/token` | 完全な組み込み管理者 | SCIM ベアラートークンを生成（一度だけ返される） |
+| `DELETE` | `/api/v1/enterprise/scim/token` | 完全な組み込み管理者 | 現在の SCIM ベアラートークンを失効 |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin（`webhooks:manage`） | SIEM 転送設定を読み取る |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin（`webhooks:manage`） | SIEM 転送設定を更新 |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin（`webhooks:manage`） | Webhook の宛先を一覧表示 |
@@ -662,15 +664,15 @@ arm64 の `linux-arm64-cpu-py311` アーカイブを使用します。別のタ�
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin（`webhooks:manage`） | テスト用の Webhook ペイロードを送信 |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin（`compliance:manage`） | GDPR ユーザーエクスポートジョブを開始 |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin（`compliance:manage`） | GDPR エクスポートのステータスとダウンロード URL を読み取る |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin（`compliance:manage`） | 確認後にユーザーのデータを完全に消去 |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin（`compliance:manage`） | 確認後にチームのデータを完全に消去 |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin（`compliance:manage`；対象への権限） | 確認後にユーザーのデータを完全に消去 |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin（`compliance:manage`；全メンバーへの権限） | 確認後にチームのデータを完全に消去 |
 | `GET` | `/api/v1/admin/version` | Admin（`system:health`） | アプリ、ビルド、Node、スキーマのバージョンメタデータを読み取る |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin（`system:health`） | パッケージされたマイグレーションと適用済みマイグレーションを比較 |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin（`system:health`） | アップグレードのレディネスチェックを実行 |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM のディスカバリエンドポイントは公開されています。ユーザーおよびグループのエンドポイントには、上で生成した SCIM ベアラートークンが必要です。
+SCIM のディスカバリエンドポイントは公開されています。ユーザーおよびグループのエンドポイントには、上で生成した SCIM ベアラートークンが必要です。従来のバージョンなしトークンは無効であり、完全な組み込み管理者によって `so_scim_v2_...` トークンとして再発行する必要があります。
 
 | メソッド | パス | アクセス | 説明 |
 |--------|------|--------|-------------|

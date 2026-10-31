@@ -1,8 +1,8 @@
 ---
 description: "ローカル開発環境のセットアップ、コマンド、コード規約、そして SnapOtter に新しいツールを追加する方法。"
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 097bdc7a0a9e
+i18n_output_hash: a91e6fdbef95
 i18n_hash_version: 2
 ---
 
@@ -206,6 +206,28 @@ const MyToolSettings = lazy(() =>
 ### 4. テスト {#_4-tests}
 
 e2e テストが確実に対象にできるよう、アクションボタンに `data-testid` 属性を追加します（上記のとおり）。
+
+### 5. ビジュアルベースライン {#_5-visual-baselines}
+
+スクリーンショットテストは変化したピクセルを 1 つも許容しません。新しいツールを追加すると描画内容が変わります。ホームページとカタログのツール数、グリッドの新しいカード、そしてベースラインができるまで `tests/e2e/gui-visual-tools.spec.ts` が "snapshot doesn't exist" で失敗するツール自身のページです。夜間のビジュアル比較をグリーンに保つため、ベースラインはツールと同じ PR で更新してください。
+
+CI は `linux`（`ubuntu-latest`）と `darwin`（`macos-latest`）の両方のベースラインを生成します。ブランチをプッシュし、そのブランチで更新を実行します：
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+各 OS ジョブは `visual-baselines-linux-<run-id>-<attempt>` または `visual-baselines-darwin-<run-id>-<attempt>` アーティファクトをアップロードし、再生成した PNG を含むドラフト PR（`chore/visual-baselines-linux-...` と `chore/visual-baselines-darwin-...`）を `main` 向けに作成します。各ドラフト PR の本文に `gh run download` コマンドがあるので、チェックアウトのルートで両方とも実行して PNG をブランチに取り込み、コミットしてからドラフト PR をクローズしてください。変わるはずのスクリーンショットを `changed` が拾わない場合は、代わりに `update_snapshots=all` を使います。実行にはリポジトリへの書き込み権限が必要です。ブランチがフォークにある場合は、ベースラインの更新が必要だと PR に書いてください。メンテナーが実行します。
+
+Mac では、手元で素早く確認したい場合に `darwin` のベースラインをローカルで更新することもできます：
+
+```bash
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+いずれの場合も、コミットする前に新規または変更された PNG をすべて開いて確認してください。ベースラインは、壊れていてもいなくても、描画された内容をそのまま記録します。
+
+リリースではこの作業は不要です。アプリのバージョンは表示されるすべてのスクリーンショットでマスクされるため、バージョンを上げてもベースラインは変わりません。
 
 ## Docker ビルド {#docker-builds}
 

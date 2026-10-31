@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
+import { ANONYMOUS_USER_ID, isAnonymousUserId } from "../../lib/anonymous-user.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { requirePermission } from "../../permissions.js";
@@ -38,6 +39,12 @@ export async function registerLegalHoldRoutes(app: FastifyInstance): Promise<voi
       const { targetType, targetId, hold } = parsed.data;
 
       if (targetType === "user") {
+        // Refuse a new hold on the synthetic row, but let a hold written before
+        // this guard existed be released: it otherwise exempts the row's
+        // leftover storage from retention forever (#4047).
+        if (isAnonymousUserId(targetId) && hold) {
+          return reply.status(404).send({ error: "User not found" });
+        }
         const [existing] = await db
           .select({ id: schema.users.id })
           .from(schema.users)
@@ -87,7 +94,7 @@ export async function registerLegalHoldRoutes(app: FastifyInstance): Promise<voi
     const heldUsers = await db
       .select({ id: schema.users.id, username: schema.users.username })
       .from(schema.users)
-      .where(eq(schema.users.legalHold, true));
+      .where(and(eq(schema.users.legalHold, true), ne(schema.users.id, ANONYMOUS_USER_ID)));
 
     const heldTeams = await db
       .select({ id: schema.teams.id, name: schema.teams.name })

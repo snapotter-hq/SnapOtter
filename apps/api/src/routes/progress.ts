@@ -16,6 +16,8 @@ import { db, schema } from "../db/index.js";
 import { createRedisSubscriberConnection, sharedRedis } from "../jobs/connection.js";
 import { bullPrefix } from "../jobs/types.js";
 import { getSecurityHeaders } from "../lib/csp.js";
+import { hasEffectivePermission } from "../permissions.js";
+import { type AuthUser, requireAuth } from "../plugins/auth.js";
 
 // ── Exported interfaces (unchanged) ────────────────────────────
 
@@ -28,6 +30,18 @@ export interface JobProgress {
   failedFiles: number;
   /** Names of files that failed, with error messages. */
   errors: Array<{ filename: string; error: string }>;
+  /**
+   * Failed frames only: the shared fault the whole batch failed on, such as
+   * ENGINE_UNAVAILABLE, so a client reads the same reason the HTTP reply gives
+   * (#2178). Absent when the failure had no single cause.
+   */
+  code?: string;
+  /**
+   * Operator hint that goes with `code` ("Check QPDF_PATH ..."). The blank-name
+   * `errors` entry already reads "<message>: <hint>", so a client shows that
+   * entry or the hint beside the message, not both.
+   */
+  details?: string;
   /** Current file being processed (if any). */
   currentFile?: string;
   /**
@@ -53,6 +67,12 @@ export interface SingleFileProgress {
   stage?: string;
   percent: number;
   error?: string;
+  /** Machine-readable reason for a failed frame, such as ENGINE_UNAVAILABLE. */
+  code?: string;
+  /** Operator hint that goes with `code` ("Check QPDF_PATH ..."). */
+  details?: string;
+  /** HTTP status for rejected input, which a route waiting on the job answers (#1742). */
+  httpStatus?: number;
   result?: Record<string, unknown>;
 }
 
@@ -116,18 +136,24 @@ export function buildSingleFileReplayEvent(row: SingleFileReplayRow): SingleFile
     };
   }
 
-  const error =
-    isRecord(row.error) && typeof row.error.message === "string"
+  const storedMessage =
+    isRecord(row.error) && typeof row.error.message === "string" && row.error.message.trim()
       ? row.error.message
-      : row.status === "canceled"
-        ? "Canceled"
-        : "Processing failed";
+      : "";
+  const error = storedMessage || (row.status === "canceled" ? "Canceled" : "");
+  const storedCode =
+    isRecord(row.error) && typeof row.error.code === "string" ? row.error.code : "";
+  const code = storedCode || (row.status === "canceled" ? "CANCELED" : "");
+  const details =
+    isRecord(row.error) && typeof row.error.details === "string" ? row.error.details : "";
   return {
     jobId: row.jobId,
     type: "single",
     phase: "failed",
     percent,
-    error,
+    ...(error && { error }),
+    ...(code && { code }),
+    ...(details && { details }),
   };
 }
 
@@ -199,14 +225,25 @@ export function buildBatchReplayEvent(row: BatchReplayRow): JobProgress & { type
   const errors = storedBatchErrors(row.error);
   if (errors.length === 0) {
     const message =
-      isRecord(row.error) && typeof row.error.message === "string"
+      isRecord(row.error) && typeof row.error.message === "string" && row.error.message.trim()
         ? row.error.message
         : row.status === "canceled"
           ? "Canceled"
-          : "Processing failed";
-    errors.push({ filename: "", error: message });
+          : "";
+    if (message) {
+      errors.push({ filename: "", error: message });
+    }
   }
-  return { ...base, status: "failed", errors };
+  // A shared fault's reason and hint (#2178), as the live frame carried them.
+  const code = isRecord(row.error) && typeof row.error.code === "string" ? row.error.code : "";
+  const hint = isRecord(row.error) && typeof row.error.hint === "string" ? row.error.hint : "";
+  return {
+    ...base,
+    status: "failed",
+    errors,
+    ...(code && { code }),
+    ...(hint && { details: hint }),
+  };
 }
 
 // ── Redis channels / keys ──────────────────────────────────────
@@ -237,59 +274,91 @@ function enqueuePersist(jobId: string, fn: () => Promise<void>): Promise<void> {
 }
 
 async function persistJobProgress(progress: JobProgress): Promise<void> {
-  try {
-    const progressJsonb = buildPersistedJobProgress(progress);
-    const isTerminalFrame = progress.status === "completed" || progress.status === "failed";
-    const [existing] = await db
-      .select({ id: schema.jobs.id })
-      .from(schema.jobs)
-      .where(eq(schema.jobs.id, progress.jobId));
+  const progressJsonb = buildPersistedJobProgress(progress);
+  const isTerminalFrame = progress.status === "completed" || progress.status === "failed";
+  const [existing] = await db
+    .select({ id: schema.jobs.id })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, progress.jobId));
 
-    if (existing) {
-      await db
-        .update(schema.jobs)
-        .set({
-          status: progress.status,
-          progress: progressJsonb,
-          error:
-            progress.errors.length > 0
-              ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
-              : null,
-          completedAt: isTerminalFrame ? new Date() : null,
-        })
-        // Same resurrect guard as the single-file persist: child outcomes are
-        // published fire and forget, so a late nonterminal frame must not
-        // overwrite the terminal state the finalize already committed.
-        .where(
-          isTerminalFrame
-            ? eq(schema.jobs.id, progress.jobId)
-            : and(
-                eq(schema.jobs.id, progress.jobId),
-                notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
-              ),
-        );
-    } else {
-      await db.insert(schema.jobs).values({
-        id: progress.jobId,
-        type: "batch",
+  if (existing) {
+    await db
+      .update(schema.jobs)
+      .set({
         status: progress.status,
         progress: progressJsonb,
-        inputRefs: [],
         error:
           progress.errors.length > 0
             ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
             : null,
-      });
-    }
-  } catch {
-    // DB persistence is best-effort; don't break real-time SSE
+        completedAt: isTerminalFrame ? new Date() : null,
+      })
+      // Same resurrect guard as the single-file persist: child outcomes are
+      // published fire and forget, so a late nonterminal frame must not
+      // overwrite the terminal state the finalize already committed.
+      .where(
+        isTerminalFrame
+          ? eq(schema.jobs.id, progress.jobId)
+          : and(
+              eq(schema.jobs.id, progress.jobId),
+              notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+            ),
+      );
+  } else {
+    await db.insert(schema.jobs).values({
+      id: progress.jobId,
+      type: "batch",
+      status: progress.status,
+      progress: progressJsonb,
+      inputRefs: [],
+      error:
+        progress.errors.length > 0
+          ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
+          : null,
+    });
   }
 }
 
+/**
+ * The persisted form of a failed frame's error. The terminal frame is written
+ * after the worker's own failure write, so it has to carry the code and
+ * details too or it overwrites them with a bare message (#1403).
+ */
+function singleFileErrorRow(progress: Omit<SingleFileProgress, "type">): {
+  message: string;
+  code?: string;
+  details?: string;
+  httpStatus?: number;
+} {
+  return {
+    message: progress.error ?? "",
+    ...(progress.code && { code: progress.code }),
+    ...(progress.details && { details: progress.details }),
+    ...(progress.httpStatus !== undefined && { httpStatus: progress.httpStatus }),
+  };
+}
+
+export type SingleFileProgressInput = Omit<SingleFileProgress, "type"> & {
+  /**
+   * When set, the durable write requires the row's settings.artifactJobId to
+   * still equal this job id (#3408). If a newer single-tool run re-pointed the
+   * clientJobId alias row in the meantime, the stale run's write and
+   * announcement are skipped so the live run's channel is left untouched.
+   */
+  expectedArtifactJobId?: string;
+  /**
+   * When set, the durable write requires the row's settings.pipelineFlowId to
+   * still equal this flow id (#2741). If a newer pipeline run re-pointed the
+   * clientJobId alias row in the meantime, the stale run's write and
+   * announcement are skipped so the live run's channel is left untouched.
+   */
+  expectedPipelineFlowId?: string;
+};
+
 async function persistSingleFileProgress(
-  progress: Omit<SingleFileProgress, "type">,
+  progress: SingleFileProgressInput,
   executor: Pick<typeof db, "select" | "insert" | "update"> = db,
-): Promise<void> {
+): Promise<boolean> {
   const status =
     progress.phase === "complete"
       ? "completed"
@@ -297,6 +366,9 @@ async function persistSingleFileProgress(
         ? "failed"
         : "processing";
   const progressJsonb = buildPersistedSingleFileProgress(progress);
+  const hasExpectedPointer = Boolean(
+    progress.expectedArtifactJobId || progress.expectedPipelineFlowId,
+  );
   const [existing] = await executor
     .select({ id: schema.jobs.id })
     .from(schema.jobs)
@@ -304,12 +376,12 @@ async function persistSingleFileProgress(
 
   if (existing) {
     const isTerminalFrame = status === "completed" || status === "failed";
-    await executor
+    const res = await executor
       .update(schema.jobs)
       .set({
         status,
         progress: progressJsonb,
-        error: progress.error ? { message: progress.error } : null,
+        error: progress.error ? singleFileErrorRow(progress) : null,
         completedAt: isTerminalFrame ? new Date() : null,
       })
       // Progress is published fire and forget, so a nonterminal frame can still
@@ -320,44 +392,72 @@ async function persistSingleFileProgress(
       // per-job persist queue, so they cannot rely on ordering the way the
       // completion path does.
       .where(
-        isTerminalFrame
-          ? eq(schema.jobs.id, progress.jobId)
-          : and(
-              eq(schema.jobs.id, progress.jobId),
-              notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
-            ),
+        and(
+          eq(schema.jobs.id, progress.jobId),
+          isTerminalFrame
+            ? undefined
+            : notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          progress.expectedArtifactJobId
+            ? sql`${schema.jobs.settings}->>'artifactJobId' = ${progress.expectedArtifactJobId}`
+            : undefined,
+          progress.expectedPipelineFlowId
+            ? sql`${schema.jobs.settings}->>'pipelineFlowId' = ${progress.expectedPipelineFlowId}`
+            : undefined,
+        ),
       );
-  } else {
-    await executor.insert(schema.jobs).values({
-      id: progress.jobId,
-      type: "single",
-      status,
-      progress: progressJsonb,
-      inputRefs: [],
-      error: progress.error ? { message: progress.error } : null,
-    });
+    return hasExpectedPointer
+      ? ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0
+      : true;
   }
+  if (hasExpectedPointer) {
+    return false;
+  }
+  await executor.insert(schema.jobs).values({
+    id: progress.jobId,
+    type: "single",
+    status,
+    progress: progressJsonb,
+    inputRefs: [],
+    error: progress.error ? singleFileErrorRow(progress) : null,
+  });
+  return true;
 }
 
 async function persistDurable(
-  payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
-): Promise<void> {
+  payload:
+    | (JobProgress & { type: "batch" })
+    | (SingleFileProgress & {
+        expectedArtifactJobId?: string;
+        expectedPipelineFlowId?: string;
+      }),
+): Promise<boolean> {
   if (payload.type === "single") {
     const { type: _, ...rest } = payload;
-    await persistSingleFileProgress(rest);
-  } else {
-    await persistJobProgress(payload);
+    return persistSingleFileProgress(rest);
   }
+  await persistJobProgress(payload);
+  return true;
 }
 
 // ── Publish (Redis pub/sub + terminal cache + durable persist) ──
 
+function isTerminalPayload(
+  payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
+): boolean {
+  return payload.type === "single"
+    ? payload.phase === "complete" || payload.phase === "failed"
+    : payload.status === "completed" || payload.status === "failed";
+}
+
+/** Delete cached terminal replay frames so SSE reconnects consult the durable DB row. */
+export async function clearTerminalReplayKey(...jobIds: string[]): Promise<void> {
+  if (jobIds.length === 0) return;
+  await sharedRedis().del(...jobIds.map(terminalKey));
+}
+
 function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): void {
   const json = JSON.stringify(payload);
-  const isTerminal =
-    payload.type === "single"
-      ? payload.phase === "complete" || payload.phase === "failed"
-      : payload.status === "completed" || payload.status === "failed";
+  const isTerminal = isTerminalPayload(payload);
 
   // Terminal events write the replay cache BEFORE publishing, so a client
   // connecting right after the live event always finds the terminal key.
@@ -377,10 +477,38 @@ function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgres
   });
 }
 
-function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): Promise<void> {
-  announce(payload);
+function publish(
+  payload:
+    | (JobProgress & { type: "batch" })
+    | (SingleFileProgress & {
+        expectedArtifactJobId?: string;
+        expectedPipelineFlowId?: string;
+      }),
+): Promise<void> {
+  const isTerminal = isTerminalPayload(payload);
+  const wirePayload: (JobProgress & { type: "batch" }) | SingleFileProgress =
+    payload.type === "single"
+      ? (({ expectedArtifactJobId: _a, expectedPipelineFlowId: _p, ...rest }) => rest)(payload)
+      : payload;
+  const guardBeforeAnnounce =
+    isTerminal ||
+    Boolean(
+      payload.type === "single" &&
+        (payload.expectedArtifactJobId || payload.expectedPipelineFlowId),
+    );
+  if (!guardBeforeAnnounce) {
+    announce(wirePayload);
+  }
 
-  const durable = enqueuePersist(payload.jobId, () => persistDurable(payload));
+  let applied = false;
+  const persisted = enqueuePersist(payload.jobId, async () => {
+    applied = await persistDurable(payload);
+  });
+  const durable = guardBeforeAnnounce
+    ? persisted.then(() => {
+        if (applied) announce(wirePayload);
+      })
+    : persisted;
   // Nonterminal producers intentionally ignore best-effort persistence. Attach
   // a rejection observer so those calls never become unhandled; terminal
   // producers can still await the original promise and fail closed.
@@ -391,18 +519,18 @@ function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress
 // ── Public API (unchanged signatures) ──────────────────────────
 
 /**
- * Create or update progress for a batch job.
+ * Create or update progress for a batch job. Resolves after the durable DB
+ * write settles and rejects if it failed, so a route that owns the row can
+ * await its terminal frame (#1688); nonterminal callers can ignore it.
  */
-export function updateJobProgress(progress: JobProgress): void {
+export function updateJobProgress(progress: JobProgress): Promise<void> {
   const event = { ...progress, type: "batch" } as JobProgress & { type: "batch" };
-  void publish(event);
+  return publish(event);
 }
 
 /** Publish progress and resolve after its best-effort durable DB write settles. */
-export function updateSingleFileProgress(
-  progress: Omit<SingleFileProgress, "type">,
-): Promise<void> {
-  const event: SingleFileProgress = { ...progress, type: "single" };
+export function updateSingleFileProgress(progress: SingleFileProgressInput): Promise<void> {
+  const event = { ...progress, type: "single" as const };
   return publish(event);
 }
 
@@ -414,19 +542,27 @@ type ProgressTransaction = Pick<typeof db, "select" | "insert" | "update">;
  * earlier nonterminal writes, so late progress cannot overwrite completion.
  */
 export async function updateSingleFileProgressAtomically(
-  progress: Omit<SingleFileProgress, "type">,
+  progress: SingleFileProgressInput,
   mutateAuthoritative: (tx: ProgressTransaction) => Promise<void>,
 ): Promise<void> {
-  const event: SingleFileProgress = { ...progress, type: "single" };
-  const { type: _, ...persisted } = event;
+  const { expectedArtifactJobId, expectedPipelineFlowId, ...frameFields } = progress;
+  const event: SingleFileProgress = { ...frameFields, type: "single" };
+  let applied = false;
   await enqueuePersist(progress.jobId, () =>
     db.transaction(async (tx) => {
       const executor = tx as unknown as ProgressTransaction;
       await mutateAuthoritative(executor);
-      await persistSingleFileProgress(persisted, executor);
+      applied = await persistSingleFileProgress(
+        {
+          ...frameFields,
+          ...(expectedArtifactJobId && { expectedArtifactJobId }),
+          ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+        },
+        executor,
+      );
     }),
   );
-  announce(event);
+  if (applied) announce(event);
 }
 
 export interface CompleteBatchJobArgs {
@@ -556,14 +692,18 @@ export interface FailBatchJobArgs {
    * can answer a capacity failure with the same 503 and code its own
    * ingress checks use (#1161). */
   code?: string;
+  /** The operator hint that goes with `code` ("Check QPDF_PATH ..."). It rides
+   * on the terminal frame and its replay beside `code` (#2178). */
+  details?: string;
 }
 
 /**
  * Terminal batch failure. Guarded so a late safety-net call (the worker's
  * failed handler) can never downgrade an already-committed completion; the
  * frame is only announced when this call actually owned the transition.
+ * Returns whether the guarded update matched a live row (#1555).
  */
-export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
+export async function failBatchJob(args: FailBatchJobArgs): Promise<boolean> {
   const frame: JobProgress & { type: "batch" } = {
     jobId: args.jobId,
     type: "batch",
@@ -572,6 +712,8 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
     completedFiles: args.completedFiles,
     failedFiles: args.failedFiles,
     errors: args.errors,
+    ...(args.code && { code: args.code }),
+    ...(args.details && { details: args.details }),
   };
   let applied = false;
   await enqueuePersist(args.jobId, async () => {
@@ -584,6 +726,8 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
         error: {
           message: args.message,
           ...(args.code ? { code: args.code } : {}),
+          // `details` on this column is the per-file errors, so the hint has its own key.
+          ...(args.details ? { hint: args.details } : {}),
           ...(args.errors.length > 0 ? { details: args.errors } : {}),
         },
       })
@@ -596,11 +740,17 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
     applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
   });
   if (applied) announce(frame);
+  return applied;
 }
 
 export interface FailSingleJobArgs {
   jobId: string;
   message: string;
+  code?: string;
+  details?: string;
+  httpStatus?: number;
+  expectedArtifactJobId?: string;
+  expectedPipelineFlowId?: string;
 }
 
 /**
@@ -617,6 +767,9 @@ export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<voi
     phase: "failed",
     percent: 0,
     error: args.message,
+    ...(args.code && { code: args.code }),
+    ...(args.details && { details: args.details }),
+    ...(args.httpStatus !== undefined && { httpStatus: args.httpStatus }),
   };
   let applied = false;
   await enqueuePersist(args.jobId, async () => {
@@ -626,12 +779,18 @@ export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<voi
         status: "failed",
         completedAt: new Date(),
         progress: { percent: 0 },
-        error: { message: args.message },
+        error: singleFileErrorRow(frame),
       })
       .where(
         and(
           eq(schema.jobs.id, args.jobId),
           notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          args.expectedArtifactJobId
+            ? sql`${schema.jobs.settings}->>'artifactJobId' = ${args.expectedArtifactJobId}`
+            : undefined,
+          args.expectedPipelineFlowId
+            ? sql`${schema.jobs.settings}->>'pipelineFlowId' = ${args.expectedPipelineFlowId}`
+            : undefined,
         ),
       );
     applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
@@ -646,10 +805,14 @@ export interface CancelSingleJobArgs {
    * settings.artifactJobId to still equal this id. A single-tool cancel
    * resolves the pointer before it settles; if a new run re-pointed the
    * channel in between, the row belongs to a run the user never canceled
-   * and must be left alone (#886). Alias-less callers (pipeline finalize)
-   * omit it.
+   * and must be left alone (#886).
    */
   expectedArtifactJobId?: string;
+  /**
+   * When set, the guarded write additionally requires the row's
+   * settings.pipelineFlowId to still equal this id (#2741).
+   */
+  expectedPipelineFlowId?: string;
 }
 
 /**
@@ -667,6 +830,7 @@ export async function cancelSingleJobGuarded(args: CancelSingleJobArgs): Promise
     phase: "failed",
     percent: 0,
     error: "Canceled",
+    code: "CANCELED",
   };
   let applied = false;
   await enqueuePersist(args.jobId, async () => {
@@ -685,6 +849,9 @@ export async function cancelSingleJobGuarded(args: CancelSingleJobArgs): Promise
           args.expectedArtifactJobId
             ? sql`${schema.jobs.settings}->>'artifactJobId' = ${args.expectedArtifactJobId}`
             : undefined,
+          args.expectedPipelineFlowId
+            ? sql`${schema.jobs.settings}->>'pipelineFlowId' = ${args.expectedPipelineFlowId}`
+            : undefined,
         ),
       );
     applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
@@ -702,10 +869,7 @@ export function publishEphemeral(
   payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
 ): void {
   const json = JSON.stringify(payload);
-  const isTerminal =
-    payload.type === "single"
-      ? payload.phase === "complete" || payload.phase === "failed"
-      : payload.status === "completed" || payload.status === "failed";
+  const isTerminal = isTerminalPayload(payload);
 
   const announce = isTerminal
     ? sharedRedis()
@@ -753,6 +917,121 @@ function ensureSubscriber(): void {
   });
 }
 
+// ── SSE access ─────────────────────────────────────────────────
+
+type StreamAccess = "allowed" | "denied" | "missing";
+
+/**
+ * Who may watch a job: its owner, or a user with files:all, the same rule
+ * the cancel route applies. The last frame carries the result's download
+ * link, so an ownerless row is files:all only too. "missing" means the row
+ * doesn't exist yet: the web client opens the stream before its upload lands.
+ */
+async function streamAccess(
+  row: { userId: string | null; settings: unknown },
+  user: AuthUser,
+): Promise<Exclude<StreamAccess, "missing">> {
+  if (row.userId && row.userId === user.id) return "allowed";
+  if (await hasEffectivePermission(user, "files:all")) return "allowed";
+  // Installs are shared: a second admin who clicks install joins the running
+  // job, so anyone allowed to manage features may watch it.
+  if (isFeatureInstallRow(row.settings) && (await hasEffectivePermission(user, "features:manage")))
+    return "allowed";
+  return "denied";
+}
+
+async function jobStreamAccess(
+  jobId: string,
+  user: AuthUser,
+): Promise<{ access: StreamAccess; hasRow: boolean }> {
+  const [row] = await db
+    .select({ userId: schema.jobs.userId, settings: schema.jobs.settings })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, jobId));
+  if (!row) {
+    // files:all may watch any job, so there's no owner to wait for. Some
+    // frames never get a row at all (publishEphemeral doesn't persist).
+    return {
+      access: (await hasEffectivePermission(user, "files:all")) ? "allowed" : "missing",
+      hasRow: false,
+    };
+  }
+  return { access: await streamAccess(row, user), hasRow: true };
+}
+
+function isFeatureInstallRow(settings: unknown): boolean {
+  return isRecord(settings) && typeof settings.featureInstall === "string";
+}
+
+/**
+ * Write the jobs row for a feature install before its first progress frame,
+ * so the stream can tell who may watch it. Without it the row only appears
+ * once the first frame is persisted, with no owner and no marker.
+ */
+export async function reserveFeatureInstallStream(args: {
+  jobId: string;
+  bundleId: string;
+  userId: string;
+}): Promise<void> {
+  await db
+    .insert(schema.jobs)
+    .values({
+      id: args.jobId,
+      userId: args.userId,
+      type: "single",
+      status: "queued",
+      inputRefs: [],
+      settings: { featureInstall: args.bundleId },
+    })
+    .onConflictDoNothing();
+}
+
+/** Drop a reserved install row that the install queue didn't use. */
+export async function releaseFeatureInstallStream(jobId: string): Promise<void> {
+  await db
+    .delete(schema.jobs)
+    .where(
+      and(
+        eq(schema.jobs.id, jobId),
+        eq(schema.jobs.status, "queued"),
+        sql`${schema.jobs.settings}->>'featureInstall' IS NOT NULL`,
+      ),
+    );
+}
+
+/**
+ * Reset `created_at` on a reserved install row when the queue starts executing
+ * it after waiting behind earlier installs (#2819). Routed through the per-job
+ * persist queue so it stays ordered ahead of the installer's progress and
+ * terminal writes.
+ */
+export function refreshFeatureInstallStream(jobId: string): Promise<void> {
+  const refreshed = enqueuePersist(jobId, async () => {
+    await db
+      .update(schema.jobs)
+      .set({ createdAt: sql`now()` })
+      .where(
+        and(
+          eq(schema.jobs.id, jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          sql`${schema.jobs.settings}->>'featureInstall' IS NOT NULL`,
+        ),
+      );
+  });
+  void refreshed.catch(() => {});
+  return refreshed;
+}
+
+/** Frames held for a stream whose job row hasn't appeared yet. */
+const MAX_HELD_FRAMES = 200;
+/**
+ * A few publishers announce a frame a moment before the row it belongs to is
+ * written, so a held frame gets re-checked on this timer as well as on the
+ * next frame.
+ */
+const HELD_RECHECK_MS = 500;
+const HELD_RECHECK_LIMIT = 20;
+
 // ── SSE endpoint ───────────────────────────────────────────────
 
 export async function registerProgressRoutes(app: FastifyInstance): Promise<void> {
@@ -763,7 +1042,21 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
     "/api/v1/jobs/:jobId/progress",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
+      // /api/v1/jobs/ is a public prefix, so this route checks for itself.
+      const user = requireAuth(request, reply);
+      if (!user) return;
+
       const { jobId } = request.params;
+
+      const initialAccess = await jobStreamAccess(jobId, user);
+      let access = initialAccess.access;
+      let hasJobRow = initialAccess.hasRow;
+      if (access === "denied") {
+        return reply.status(404).send({ error: "Job not found" });
+      }
+      // The client may have left during that lookup. Its close event has
+      // already fired, so nothing below would ever clean up after it.
+      if (request.raw.destroyed || reply.raw.destroyed) return;
 
       // Take over the response from Fastify for SSE streaming
       reply.hijack();
@@ -802,9 +1095,190 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       // published after the cache read but before listener registration can be
       // missed forever even though both transport layers behaved correctly.
       let ended = false;
+      let deliveredFrame = false;
+
+      const endStream = () => {
+        ended = true;
+        clearInterval(keepaliveInterval);
+        if (heldRecheckTimer) clearTimeout(heldRecheckTimer);
+        removeListener();
+        reply.raw.end();
+      };
+
+      // Frames that arrive before the job row exists wait here until the row
+      // shows whose job it is. Heartbeats keep the connection alive meanwhile.
+      const held: string[] = [];
+      let heldReceived = 0;
+      let checking = false;
+      let heldRechecks = 0;
+      let heldRecheckTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const settleAccess = (verdict: StreamAccess) => {
+        if (ended || access !== "missing") return;
+        access = verdict;
+        if (verdict === "allowed") {
+          for (const json of held.splice(0)) {
+            deliver(json);
+            if (ended) return;
+          }
+        } else if (verdict === "denied") {
+          held.length = 0;
+          endStream();
+        }
+      };
+
+      const replayRow = (row: typeof schema.jobs.$inferSelect) => {
+        // A live (queued/processing) single-file row replays a nonterminal
+        // frame: a reconnecting client must be able to tell "the job exists
+        // and is working" apart from "no such job", and heartbeats carry no
+        // evidence. Queued jobs publish nothing until the worker picks them
+        // up, so without this replay a busy pool looks identical to a job
+        // that never existed, and a client that degraded a dead upload
+        // socket to the async path gives up on it (#722).
+        if (
+          !deliveredFrame &&
+          row.type !== "batch" &&
+          (row.status === "queued" || row.status === "processing")
+        ) {
+          const progress: Record<string, unknown> = isRecord(row.progress) ? row.progress : {};
+          const storedPercent = progress.percent;
+          const synthetic: SingleFileProgress = {
+            jobId,
+            type: "single",
+            phase: "processing",
+            percent:
+              typeof storedPercent === "number" && Number.isFinite(storedPercent)
+                ? storedPercent
+                : 0,
+            ...(typeof progress.stage === "string" ? { stage: progress.stage } : {}),
+          };
+          deliveredFrame = true;
+          sendFrame(JSON.stringify(synthetic));
+        }
+        // Live batch parents replay a nonterminal frame for the same reason
+        // the single path does (#722): a client that degraded a dead batch
+        // POST needs proof the batch exists, and heartbeats carry none. The
+        // finalize can also take a while after the last child (ZIP packaging),
+        // where this replay is the only evidence available (#750).
+        if (
+          !deliveredFrame &&
+          row.type === "batch" &&
+          (row.status === "queued" || row.status === "processing")
+        ) {
+          deliveredFrame = true;
+          sendFrame(
+            JSON.stringify(
+              buildBatchReplayEvent({
+                jobId,
+                status: row.status,
+                progress: row.progress,
+                error: row.error,
+              }),
+            ),
+          );
+        }
+        if (row.status === "completed" || row.status === "failed" || row.status === "canceled") {
+          const replayEvent =
+            row.type !== "batch"
+              ? buildSingleFileReplayEvent({
+                  jobId,
+                  status: row.status,
+                  progress: row.progress,
+                  error: row.error,
+                })
+              : buildBatchReplayEvent({
+                  jobId,
+                  status: row.status,
+                  progress: row.progress,
+                  error: row.error,
+                });
+          callback(JSON.stringify(replayEvent));
+        }
+      };
+
+      const scheduleRecheck = () => {
+        if (
+          ended ||
+          checking ||
+          heldRecheckTimer ||
+          hasJobRow ||
+          (access === "allowed" && deliveredFrame)
+        ) {
+          return;
+        }
+        heldRechecks++;
+        heldRecheckTimer = setTimeout(() => {
+          heldRecheckTimer = null;
+          void recheckHeld();
+        }, HELD_RECHECK_MS);
+      };
+
+      const recheckHeld = async () => {
+        if (checking || ended || hasJobRow || (access === "allowed" && deliveredFrame)) return;
+        if (heldRecheckTimer) {
+          clearTimeout(heldRecheckTimer);
+          heldRecheckTimer = null;
+        }
+        checking = true;
+        const receivedBefore = heldReceived;
+        try {
+          const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+          if (ended) return;
+          if (row) {
+            if (access === "missing") {
+              settleAccess(await streamAccess(row, user));
+              if (ended) return;
+            }
+            hasJobRow = true;
+            if (access === "allowed") {
+              replayRow(row);
+              if (ended) return;
+            }
+          }
+        } catch (err) {
+          // DB unavailable: keep holding and try again below.
+          request.log.warn({ err, jobId }, "progress stream: access check failed");
+        } finally {
+          checking = false;
+        }
+        if (ended || hasJobRow || (access === "allowed" && deliveredFrame)) return;
+        if (heldReceived > receivedBefore) {
+          void recheckHeld();
+        } else if (heldRechecks >= HELD_RECHECK_LIMIT) {
+          // Still no row to say whose job this is (or whether it exists at all).
+          // End the stream rather than hold the connection behind heartbeats
+          // forever; a live client reconnects and the connect-time replay picks
+          // up whatever has landed by then.
+          request.log.warn(
+            { jobId, heldFrames: held.length },
+            "progress stream: no job row appeared for held frames",
+          );
+          endStream();
+        } else {
+          scheduleRecheck();
+        }
+      };
 
       const callback: FrameCallback = (json: string) => {
         if (ended) return;
+        if (access === "allowed") {
+          deliver(json);
+          return;
+        }
+        if (heldReceived === 0) heldRechecks = 0;
+        if (held.length >= MAX_HELD_FRAMES) held.shift();
+        held.push(json);
+        heldReceived++;
+        void recheckHeld();
+      };
+
+      const deliver = (json: string) => {
+        if (ended) return;
+        deliveredFrame = true;
+        if (access === "allowed" && heldRecheckTimer) {
+          clearTimeout(heldRecheckTimer);
+          heldRecheckTimer = null;
+        }
         sendFrame(json);
 
         // End the stream on terminal events
@@ -819,12 +1293,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
               (parsed.phase === "complete" || parsed.phase === "failed")) ||
             (parsed.type === "batch" &&
               (parsed.status === "completed" || parsed.status === "failed"));
-          if (isTerminal) {
-            ended = true;
-            clearInterval(keepaliveInterval);
-            removeListener();
-            reply.raw.end();
-          }
+          if (isTerminal) endStream();
         } catch {
           // Parse failure; keep streaming
         }
@@ -847,6 +1316,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       request.raw.on("close", () => {
         ended = true;
         clearInterval(keepaliveInterval);
+        if (heldRecheckTimer) clearTimeout(heldRecheckTimer);
         removeListener();
       });
 
@@ -869,75 +1339,24 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       try {
         const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
         if (ended) return;
-        // A live (queued/processing) single-file row replays a nonterminal
-        // frame: a reconnecting client must be able to tell "the job exists
-        // and is working" apart from "no such job", and heartbeats carry no
-        // evidence. Queued jobs publish nothing until the worker picks them
-        // up, so without this replay a busy pool looks identical to a job
-        // that never existed, and a client that degraded a dead upload
-        // socket to the async path gives up on it (#722).
-        if (
-          row &&
-          row.type !== "batch" &&
-          (row.status === "queued" || row.status === "processing")
-        ) {
-          const progress: Record<string, unknown> = isRecord(row.progress) ? row.progress : {};
-          const storedPercent = progress.percent;
-          const synthetic: SingleFileProgress = {
-            jobId,
-            type: "single",
-            phase: "processing",
-            percent:
-              typeof storedPercent === "number" && Number.isFinite(storedPercent)
-                ? storedPercent
-                : 0,
-            ...(typeof progress.stage === "string" ? { stage: progress.stage } : {}),
-          };
-          sendFrame(JSON.stringify(synthetic));
-        }
-        // Live batch parents replay a nonterminal frame for the same reason
-        // the single path does (#722): a client that degraded a dead batch
-        // POST needs proof the batch exists, and heartbeats carry none. The
-        // finalize can also take a while after the last child (ZIP packaging),
-        // where this replay is the only evidence available (#750).
-        if (
-          row &&
-          row.type === "batch" &&
-          (row.status === "queued" || row.status === "processing")
-        ) {
-          sendFrame(
-            JSON.stringify(
-              buildBatchReplayEvent({
-                jobId,
-                status: row.status,
-                progress: row.progress,
-                error: row.error,
-              }),
-            ),
-          );
-        }
-        if (
-          row &&
-          (row.status === "completed" || row.status === "failed" || row.status === "canceled")
-        ) {
-          const replayEvent =
-            row.type !== "batch"
-              ? buildSingleFileReplayEvent({
-                  jobId,
-                  status: row.status,
-                  progress: row.progress,
-                  error: row.error,
-                })
-              : buildBatchReplayEvent({
-                  jobId,
-                  status: row.status,
-                  progress: row.progress,
-                  error: row.error,
-                });
-          callback(JSON.stringify(replayEvent));
+        if (row) {
+          // The row may have appeared since the connect-time check. Its owner
+          // decides whether this stream sees anything, replay included.
+          if (access === "missing") {
+            settleAccess(await streamAccess(row, user));
+            if (ended) return;
+          }
+          hasJobRow = true;
+          if (access === "allowed") {
+            replayRow(row);
+            if (ended) return;
+          }
         }
       } catch {
         // DB unavailable; the listener continues with live updates.
+      }
+      if (!ended && !hasJobRow && (access === "missing" || !deliveredFrame)) {
+        scheduleRecheck();
       }
     },
   );

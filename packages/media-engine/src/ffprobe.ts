@@ -25,6 +25,34 @@ export interface ProbeOptions {
   timeoutMs?: number; // default 15s
 }
 
+/**
+ * An ffprobe invocation outlived its time budget and was killed. Distinct from
+ * a parse failure or a missing engine.
+ */
+export class FfprobeTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FfprobeTimeoutError";
+  }
+}
+
+function ffprobeSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `ffprobe exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 function abortError(): Error {
   const error = new Error("ffprobe canceled");
   error.name = "AbortError";
@@ -69,7 +97,7 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
     };
     const onAbort = () => fail(abortError());
     const timer = setTimeout(() => {
-      fail(new Error(`ffprobe timed out after ${Math.round(timeoutMs / 1000)}s`));
+      fail(new FfprobeTimeoutError(`ffprobe timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
     opts.signal?.addEventListener("abort", onAbort, { once: true });
     if (opts.signal?.aborted) onAbort();
@@ -89,11 +117,17 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
       if (settled) return;
       settled = true;
       cleanup();
-      if (code === 0) resolvePromise(out);
-      else {
-        const probeErr = new Error(`ffprobe exited ${code ?? signal}: ${err.slice(-1000)}`);
-        reject(markIfInputError(probeErr, err));
+      if (code === 0) {
+        resolvePromise(out);
+        return;
       }
+      const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
+      if (code === null || code === 126 || code === 127) {
+        reject(ffprobeSpawnFailure(bin, code, signal, detail));
+        return;
+      }
+      const probeErr = new Error(`ffprobe exited ${code}: ${err.slice(-1000)}`);
+      reject(markIfInputError(probeErr, err));
     });
   });
   const parsed = JSON.parse(stdout) as {

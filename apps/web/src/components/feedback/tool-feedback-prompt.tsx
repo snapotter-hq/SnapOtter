@@ -1,7 +1,8 @@
 import { MessageSquare, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import {
+  canRecordFeedback,
   type FeedbackErrorCategory,
   type FeedbackSentiment,
   promptVariantForSource,
@@ -96,30 +97,35 @@ export function ToolFeedbackPrompt({
   const analyticsLoaded = useAnalyticsStore((s) => s.configLoaded);
   const [visible, setVisible] = useState(false);
   const [dialogSentiment, setDialogSentiment] = useState<FeedbackSentiment | undefined>();
+  const [dialogDeclined, setDialogDeclined] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [thanks, setThanks] = useState(false);
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
+  const quickSubmittingRef = useRef(false);
   const source = jobStatus === "failed" ? "failed_job" : "tool_result";
 
+  const recordable = analyticsLoaded && canRecordFeedback(analyticsConfig);
+
   useEffect(() => {
-    if (!analyticsLoaded || !analyticsConfig?.enabled) return;
+    if (!recordable) return;
     const show = shouldShowPrompt(toolId);
     if (show) {
       markPromptShown();
       trackFeedbackPromptShown(source);
     }
     setVisible(show);
-  }, [analyticsLoaded, analyticsConfig?.enabled, toolId, source]);
+  }, [recordable, toolId, source]);
 
-  if (!analyticsLoaded || !analyticsConfig?.enabled) return null;
+  if (!recordable) return null;
   if (!visible && !thanks && !dialogOpen) return null;
 
   async function handleQuickSentiment(sentiment: FeedbackSentiment) {
+    if (quickSubmittingRef.current) return;
     if (sentiment === "great") {
-      markPromptHandled(toolId);
-      setVisible(false);
-      setThanks(true);
+      quickSubmittingRef.current = true;
+      setQuickSubmitting(true);
       try {
-        await submitFeedback({
+        const response = await submitFeedback({
           source,
           surveyId: surveyIdForSource(source),
           promptVariant: promptVariantForSource(source),
@@ -129,29 +135,53 @@ export function ToolFeedbackPrompt({
           jobStatus,
           errorCategory,
         });
+        if (!response.accepted) {
+          // Nothing took the answer. Open directly on the handoff instead of
+          // thanking for a dropped answer (#2252).
+          setDialogDeclined(true);
+          setDialogSentiment(sentiment);
+          setDialogOpen(true);
+          return;
+        }
+        markPromptHandled(toolId);
+        setVisible(false);
+        setThanks(true);
       } catch {
-        // Explicit feedback is best-effort; keep the user flow calm.
+        // The answer was not confirmed. Open the dialog so the user can retry
+        // or use the handoff, instead of leaving a dead click.
+        setDialogDeclined(false);
+        setDialogSentiment(sentiment);
+        setDialogOpen(true);
+      } finally {
+        quickSubmittingRef.current = false;
+        setQuickSubmitting(false);
       }
       return;
     }
 
+    setDialogDeclined(false);
     setDialogSentiment(sentiment);
     setDialogOpen(true);
   }
 
   function handleDismiss() {
+    if (quickSubmittingRef.current) return;
     markPromptHandled(toolId);
     trackFeedbackPromptDismissed(source, "close");
     setVisible(false);
   }
 
   function handleDontAskAgain() {
+    if (quickSubmittingRef.current) return;
     disablePrompts();
     trackFeedbackPromptDismissed(source, "dont_ask_again");
     setVisible(false);
   }
 
-  function handleSubmitted() {
+  function handleSubmitted(accepted: boolean) {
+    // A declined answer is shown with the handoff inside the dialog; do not
+    // thank for it here or start the cooldown (#2252).
+    if (!accepted) return;
     markPromptHandled(toolId);
     setVisible(false);
     setThanks(true);
@@ -170,8 +200,9 @@ export function ToolFeedbackPrompt({
             <button
               type="button"
               onClick={handleDismiss}
+              disabled={quickSubmitting}
               aria-label={t.feedback.dismissPrompt}
-              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-background"
+              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-background disabled:opacity-50"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -182,8 +213,9 @@ export function ToolFeedbackPrompt({
                 key={sentiment}
                 type="button"
                 onClick={() => handleQuickSentiment(sentiment)}
+                disabled={quickSubmitting}
                 className={cn(
-                  "rounded-md border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground",
+                  "rounded-md border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-50",
                   sentiment === "great" && "hover:border-emerald-500/60",
                 )}
               >
@@ -194,7 +226,8 @@ export function ToolFeedbackPrompt({
           <button
             type="button"
             onClick={handleDontAskAgain}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            disabled={quickSubmitting}
+            className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             {t.feedback.dontAskAgain}
           </button>
@@ -210,7 +243,11 @@ export function ToolFeedbackPrompt({
         jobStatus={jobStatus}
         errorCategory={errorCategory}
         initialSentiment={dialogSentiment}
-        onClose={() => setDialogOpen(false)}
+        initialDeclined={dialogDeclined}
+        onClose={() => {
+          setDialogOpen(false);
+          setDialogDeclined(false);
+        }}
         onSubmitted={handleSubmitted}
       />
     </>

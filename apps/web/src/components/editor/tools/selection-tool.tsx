@@ -1,9 +1,11 @@
 import type Konva from "konva";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Circle, Ellipse, Group, Line, Rect, Shape } from "react-konva";
+import { useTranslation } from "@/contexts/i18n-context";
+import { quietImport } from "@/lib/chunk-reload";
 import { useEditorStore } from "@/stores/editor-store";
 import type { SelectionMode, SelectionState } from "@/types/editor";
-import { captureDocumentCanvas } from "../stage-capture";
+import { captureDocumentContext, readDocumentPixels, reportCaptureFailure } from "../stage-capture";
 
 type SelectionType = "rect" | "ellipse" | "lasso";
 
@@ -23,13 +25,17 @@ function useMarchingAnts(layerRef: React.RefObject<Konva.Layer | null>) {
     if (!layer) return;
 
     // Dynamically import Konva for Animation
-    import("konva").then((KonvaModule) => {
-      const anim = new KonvaModule.default.Animation(() => {
-        dashOffsetRef.current -= MARCH_SPEED;
-      }, layer);
-      animRef.current = anim;
-      anim.start();
-    });
+    // The marching-ants animation is cosmetic: a konva chunk gone after a deploy
+    // must not reload the editor under the user's work (#4141).
+    quietImport(() => import("konva"))
+      .then((KonvaModule) => {
+        const anim = new KonvaModule.default.Animation(() => {
+          dashOffsetRef.current -= MARCH_SPEED;
+        }, layer);
+        animRef.current = anim;
+        anim.start();
+      })
+      .catch(() => {});
 
     return () => {
       animRef.current?.stop();
@@ -56,8 +62,8 @@ function floodFillMask(
     () => Array(width).fill(false) as boolean[],
   );
 
-  const sx = Math.round(startX);
-  const sy = Math.round(startY);
+  const sx = Math.floor(startX);
+  const sy = Math.floor(startY);
   if (sx < 0 || sx >= width || sy < 0 || sy >= height) return mask;
 
   const idx = (sy * width + sx) * 4;
@@ -282,10 +288,12 @@ export function isNearFirstVertex(
 /**
  * Lets the editor shortcuts (registered in EditorPage) reach the polygonal lasso
  * inside EditorCanvas, the way editorStageRefHolder exposes the stage. `close`
- * reports whether a polygon was in progress, so Enter can stop there instead of
- * falling through to its crop behaviour.
+ * and `cancel` report whether a polygon was in progress, so Enter and Escape can
+ * stop there instead of falling through to crop or deselect behaviours.
  */
-export const polygonalLassoRefHolder: { current: { close: () => boolean } | null } = {
+export const polygonalLassoRefHolder: {
+  current: { close: () => boolean; cancel: () => boolean } | null;
+} = {
   current: null,
 };
 
@@ -338,6 +346,7 @@ export function useSelectionTool(): SelectionToolApi {
 
   const activeTool = useEditorStore((s) => s.activeTool);
   const selectionMode = useEditorStore((s) => s.selectionMode);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const setSelection = useEditorStore((s) => s.setSelection);
   const canvasSize = useEditorStore((s) => s.canvasSize);
@@ -520,6 +529,12 @@ export function useSelectionTool(): SelectionToolApi {
     setPolygonCloseTarget(null);
   }, []);
 
+  const cancelPolygon = useCallback((): boolean => {
+    if (!isDrawingRef.current || polyVerticesRef.current.length === 0) return false;
+    resetPolygon();
+    return true;
+  }, [resetPolygon]);
+
   // The one exit for every close gesture (Enter, double-click, clicking the
   // first vertex), so they all merge into the selection the same way. A polygon
   // is in progress while its vertex list is non-empty, and only this tool fills it.
@@ -534,13 +549,13 @@ export function useSelectionTool(): SelectionToolApi {
     return true;
   }, [resetPolygon, finalizeLasso]);
 
-  // Expose the close gesture to the keyboard shortcuts registered in EditorPage.
+  // Expose the close and cancel gestures to the keyboard shortcuts registered in EditorPage.
   useEffect(() => {
-    polygonalLassoRefHolder.current = { close: closePolygon };
+    polygonalLassoRefHolder.current = { close: closePolygon, cancel: cancelPolygon };
     return () => {
       polygonalLassoRefHolder.current = null;
     };
-  }, [closePolygon]);
+  }, [closePolygon, cancelPolygon]);
 
   // Switching tools mid-polygon discards it, so Enter cannot later close an
   // invisible polygon under another tool.
@@ -694,12 +709,25 @@ export function useSelectionTool(): SelectionToolApi {
 
   const magicWandSelect = useCallback(
     (stage: Konva.Stage, x: number, y: number, tolerance: number, contiguous: boolean) => {
-      // Capture the document at document resolution, ignoring zoom/pan.
-      const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const imageData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
-      const mask = floodFillMask(imageData, x, y, tolerance, contiguous);
+      const sx = Math.floor(x);
+      const sy = Math.floor(y);
+      if (sx < 0 || sx >= canvasSize.width || sy < 0 || sy >= canvasSize.height) return;
+
+      // Capture the document at document resolution, ignoring zoom/pan. A capture
+      // that can't be read selects nothing and says why, rather than flood-filling
+      // the zeros of a dead canvas into a whole-document selection (#2139).
+      const capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      if (!capture.ok) {
+        reportCaptureFailure(capture.reason, captureMessages);
+        return;
+      }
+      const pixels = readDocumentPixels(capture.ctx, canvasSize.width, canvasSize.height);
+      if (!pixels.ok) {
+        reportCaptureFailure(pixels.reason, captureMessages);
+        return;
+      }
+      const imageData = pixels.imageData;
+      const mask = floodFillMask(imageData, sx, sy, tolerance, contiguous);
       const bounds = maskToBounds(mask);
       if (!bounds) return;
 
@@ -713,7 +741,7 @@ export function useSelectionTool(): SelectionToolApi {
 
       mergeSelection({ type: "wand", points: [], bounds, mask: flatMask }, selectionMode);
     },
-    [selectionMode, mergeSelection, canvasSize],
+    [selectionMode, mergeSelection, canvasSize, captureMessages],
   );
 
   return {

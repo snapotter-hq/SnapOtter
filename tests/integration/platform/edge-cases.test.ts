@@ -5,7 +5,8 @@
  * extreme filenames, missing/empty settings, and unknown fields.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -31,11 +32,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ZERO-BYTE AND EMPTY FILES
@@ -56,7 +57,7 @@ describe("Zero-byte / empty file uploads", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toBeDefined();
+    expect(json.error).toBe("Invalid image: File is empty");
   });
 
   it("rejects a null-byte-only buffer with 400", async () => {
@@ -74,6 +75,8 @@ describe("Zero-byte / empty file uploads", () => {
     });
 
     expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid image: File contains no image data");
   });
 });
 
@@ -95,6 +98,9 @@ describe("1x1 pixel image handling", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/tiny_resize\.png$/);
   });
 
   it("crops a 1x1 image gracefully", async () => {
@@ -110,8 +116,10 @@ describe("1x1 pixel image handling", () => {
       body,
     });
 
-    // Should succeed or fail gracefully (not crash)
-    expect([200, 422]).toContain(res.statusCode);
+    // 0 + 1 <= 1 passes the crop bounds check and returns a 1x1 PNG
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".png");
   });
 
   it("rotates a 1x1 image gracefully", async () => {
@@ -128,6 +136,9 @@ describe("1x1 pixel image handling", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/tiny_rotate\.png$/);
   });
 });
 
@@ -155,6 +166,9 @@ describe("Wrong file extension (magic byte detection)", () => {
 
     // Should detect PNG via magic bytes and process successfully
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/actually-a-png_resize\.png$/);
   });
 });
 
@@ -177,6 +191,12 @@ describe("Extreme filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    const sanitizedFilename = outFilename.replace(/_resize(?=\.png$)/, "");
+    expect(Buffer.byteLength(sanitizedFilename, "utf8")).toBe(200);
+    expect(outFilename).toBe(`${"a".repeat(196)}_resize.png`);
   });
 
   it("handles a Unicode filename without crashing", async () => {
@@ -193,6 +213,10 @@ describe("Extreme filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    expect(outFilename).toBe("画像テスト_resize.png");
   });
 
   it("handles special characters in filename", async () => {
@@ -214,6 +238,10 @@ describe("Extreme filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    expect(outFilename).toBe("test file (1) [copy]_resize.png");
   });
 
   it("sanitizes path traversal in filename", async () => {
@@ -239,6 +267,8 @@ describe("Extreme filenames", () => {
     const json = JSON.parse(res.body);
     // Download URL should not contain path traversal
     expect(json.downloadUrl).not.toContain("..");
+    expect(json.downloadUrl).not.toContain("etc/passwd");
+    expect(json.downloadUrl).toMatch(/\/passwd_resize\.png$/);
   });
 });
 
@@ -246,8 +276,7 @@ describe("Extreme filenames", () => {
 // SETTINGS EDGE CASES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Settings field edge cases", () => {
-  it("uses defaults when no settings field is provided", async () => {
-    // Resize without settings — should use Zod defaults or return 400
+  it("rejects resize with 400 when no settings field is provided", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
     ]);
@@ -259,13 +288,15 @@ describe("Settings field edge cases", () => {
       body,
     });
 
-    // Resize with no width/height/percentage passes Zod validation (all fields
-    // are optional with defaults), but Sharp may fail at processing time (422).
-    // Either way, should not crash.
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Resize requires at least one of width, height, or percentage, so the
+    // default empty settings object is rejected by Zod validation with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("At least one of width, height, or percentage is required");
   });
 
-  it("uses defaults when settings is empty JSON object", async () => {
+  it("rejects resize with 400 when settings is an empty JSON object", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
       { name: "settings", content: "{}" },
@@ -278,9 +309,47 @@ describe("Settings field edge cases", () => {
       body,
     });
 
-    // Empty settings should use Zod defaults — resize with no dimensions
-    // may still succeed (no-op) or fail gracefully
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Resize requires at least one of width, height, or percentage, so an
+    // empty settings object is rejected by Zod validation with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("At least one of width, height, or percentage is required");
+  });
+
+  it("populates default settings when no settings field is provided", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compress",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".png");
+  });
+
+  it("populates default settings when settings is an empty JSON object", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compress",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".png");
   });
 
   it("handles null values in settings gracefully", async () => {
@@ -296,8 +365,11 @@ describe("Settings field edge cases", () => {
       body,
     });
 
-    // Zod should either strip nulls or reject them — should not crash
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // width and height are optional numbers (not nullable), so Zod rejects null with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toMatch(/width.*number/i);
   });
 
   it("strips or rejects extra unknown fields in settings", async () => {
@@ -318,6 +390,9 @@ describe("Settings field edge cases", () => {
 
     // Zod default behavior strips unknown keys — should succeed
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/test_resize\.png$/);
   });
 });
 
@@ -339,6 +414,9 @@ describe("1x1 pixel image through additional tools", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/tiny_compress\.png$/);
   });
 
   it("gets info for a 1x1 image", async () => {
@@ -363,7 +441,7 @@ describe("1x1 pixel image through additional tools", () => {
   it("converts a 1x1 PNG to JPEG without crashing", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ format: "jpeg" }) },
+      { name: "settings", content: JSON.stringify({ format: "jpg" }) },
     ]);
 
     const res = await app.inject({
@@ -373,11 +451,19 @@ describe("1x1 pixel image through additional tools", () => {
       body,
     });
 
-    expect([200, 400]).toContain(res.statusCode);
-    if (res.statusCode === 400) {
-      const json = JSON.parse(res.body);
-      expect(json.error).toBeDefined();
-    }
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".jpg");
+
+    const downloadRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(downloadRes.statusCode).toBe(200);
+    expect(downloadRes.rawPayload[0]).toBe(0xff);
+    expect(downloadRes.rawPayload[1]).toBe(0xd8);
+    expect(downloadRes.rawPayload[2]).toBe(0xff);
   });
 });
 
@@ -405,92 +491,9 @@ describe("Unicode and special filenames", () => {
 
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toBeDefined();
-  });
-
-  it("handles CJK characters in filename", async () => {
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "写真.png",
-        content: PNG_200x150,
-        contentType: "image/png",
-      },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-  });
-
-  it("handles spaces and special chars in filename", async () => {
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "my photo (2).png",
-        content: PNG_200x150,
-        contentType: "image/png",
-      },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-  });
-
-  it("handles a very long filename (255 chars)", async () => {
-    const longName = `${"a".repeat(251)}.png`;
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: longName, content: PNG_200x150, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    // Should succeed — sanitizeFilename may truncate but not crash
-    expect(res.statusCode).toBe(200);
-  });
-
-  it("sanitizes path traversal in filename", async () => {
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "../../../etc/passwd.png",
-        content: PNG_200x150,
-        contentType: "image/png",
-      },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    // Download URL must not contain traversal sequences
-    expect(json.downloadUrl).not.toContain("..");
-    expect(json.downloadUrl).not.toContain("etc/passwd");
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    expect(outFilename).toBe("\u{1F3A8}photo_resize.png");
   });
 
   it("handles filename with no extension", async () => {
@@ -513,6 +516,9 @@ describe("Unicode and special filenames", () => {
 
     // Should process via magic byte detection regardless of extension
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/noextension_resize$/);
   });
 
   it("handles filename that is only dots", async () => {
@@ -534,6 +540,11 @@ describe("Unicode and special filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).not.toContain("..");
+    // sanitizeFilename("....png") preserves .png and falls back the dot-only stem to "upload" (#3917)
+    expect(json.downloadUrl).toMatch(/\/upload_resize\.png$/);
   });
 });
 
@@ -555,7 +566,7 @@ describe("Zero-byte file to info and border tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toBeDefined();
+    expect(json.error).toBe("No image file provided");
   });
 
   it("rejects a zero-byte file to /api/v1/tools/image/sharpening with 400", async () => {
@@ -573,7 +584,7 @@ describe("Zero-byte file to info and border tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toBeDefined();
+    expect(json.error).toBe("Invalid image: File is empty");
   });
 });
 
@@ -582,36 +593,75 @@ describe("Zero-byte file to info and border tools", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe("1x1 pixel image through rotate with flip", () => {
   it("rotates and flips a 1x1 image horizontally", async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ angle: 0, flipHorizontal: true }) },
-    ]);
+    const flopSpy = vi.spyOn(sharp.prototype, "flop");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
+        { name: "settings", content: JSON.stringify({ angle: 0, horizontal: true }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/rotate",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/rotate",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
 
-    // 0-degree rotation with flip is valid
-    expect([200, 400]).toContain(res.statusCode);
+      // 0-degree rotation with horizontal flip runs Sharp flop() and returns a valid 1x1 PNG
+      expect(res.statusCode).toBe(200);
+      expect(flopSpy).toHaveBeenCalledTimes(1);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toContain(".png");
+
+      const downloadRes = await app.inject({
+        method: "GET",
+        url: json.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(downloadRes.statusCode).toBe(200);
+      const meta = await sharp(downloadRes.rawPayload).metadata();
+      expect(meta.format).toBe("png");
+      expect(meta.width).toBe(1);
+      expect(meta.height).toBe(1);
+    } finally {
+      flopSpy.mockRestore();
+    }
   });
 
   it("rotates and flips a 1x1 image vertically", async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ angle: 0, flipVertical: true }) },
-    ]);
+    const flipSpy = vi.spyOn(sharp.prototype, "flip");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
+        { name: "settings", content: JSON.stringify({ angle: 0, vertical: true }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/rotate",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/rotate",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
 
-    expect([200, 400]).toContain(res.statusCode);
+      // 0-degree rotation with vertical flip runs Sharp flip() and returns a valid 1x1 PNG
+      expect(res.statusCode).toBe(200);
+      expect(flipSpy).toHaveBeenCalledTimes(1);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toContain(".png");
+
+      const downloadRes = await app.inject({
+        method: "GET",
+        url: json.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(downloadRes.statusCode).toBe(200);
+      const meta = await sharp(downloadRes.rawPayload).metadata();
+      expect(meta.format).toBe("png");
+      expect(meta.width).toBe(1);
+      expect(meta.height).toBe(1);
+    } finally {
+      flipSpy.mockRestore();
+    }
   });
 });
 
@@ -684,6 +734,9 @@ describe("Wrong extension — additional format mismatches", () => {
 
     // Sharp detects real format via magic bytes
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/actually-jpeg_resize\.jpg$/);
   });
 
   it("handles WebP data uploaded with .png extension gracefully", async () => {
@@ -707,6 +760,9 @@ describe("Wrong extension — additional format mismatches", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/actually-webp_resize\.webp$/);
   });
 });
 
@@ -730,13 +786,15 @@ describe("Settings with extreme values", () => {
       body,
     });
 
-    // May be rejected by validation (400), fail at processing (422), or
-    // even succeed if Sharp clamps — the key assertion is that it does not crash
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Rejected by Zod validation (400) because width exceeds MAX_RESIZE_OUTPUT_DIMENSION
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("16383");
   });
 
   it("handles deeply nested JSON in settings without crashing", async () => {
-    // Build 50-level deep object — should be rejected or flattened by Zod
+    // Build 50-level deep object; Zod strips unknown keys
     let nested: Record<string, unknown> = { width: 100 };
     for (let i = 0; i < 50; i++) {
       nested = { [`level${i}`]: nested };
@@ -754,9 +812,12 @@ describe("Settings with extreme values", () => {
       body,
     });
 
-    // Zod strips unknown keys; width is not present at top level so validation
-    // may fail or default to empty settings. Must not crash.
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Zod strips unknown keys; width is not present at top level so the
+    // dimension refinement rejects the payload with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("At least one of width, height, or percentage is required");
   });
 
   it("handles settings with very large JSON string (100KB)", async () => {
@@ -779,5 +840,7 @@ describe("Settings with extreme values", () => {
 
     // Settings payload exceeds the 64KB security limit
     expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Settings payload too large (max 64KB)");
   });
 });

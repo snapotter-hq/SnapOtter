@@ -51,6 +51,20 @@ afterEach(() => {
 });
 
 describe("inpaint", () => {
+  describe("cancellation (#2092)", () => {
+    it("hands the abort signal to the sidecar call", async () => {
+      const { signal } = new AbortController();
+
+      await inpaint(FAKE_INPUT, FAKE_MASK, FAKE_OUTPUT_DIR, undefined, "fast", { signal });
+
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "inpaint.py",
+        expect.any(Array),
+        expect.objectContaining({ signal }),
+      );
+    });
+  });
+
   describe("request serialization", () => {
     it("calls inpaint.py with input, mask, and output paths", async () => {
       await inpaint(FAKE_INPUT, FAKE_MASK, FAKE_OUTPUT_DIR);

@@ -47,7 +47,7 @@ After acknowledging your report, we will keep you informed of our progress towar
 
 - **Password hashing**: scrypt with 32-byte random salt and 64-byte derived key
 - **Timing-safe comparison**: All credential verification uses `crypto.timingSafeEqual` to prevent timing attacks
-- **Password policy**: Minimum 8 characters with uppercase, lowercase, and numeric requirements
+- **Password policy**: Defaults to 8 characters with uppercase, lowercase, and numeric requirements; admins can change each rule (length 1 to 128) in Settings > Security
 - **Session management**: Cryptographically random UUIDs, configurable expiration (`SESSION_DURATION_HOURS`), automatic cleanup of expired sessions
 - **Credential rotation**: Password changes invalidate all other sessions and revoke all API keys for the affected user
 - **Brute-force protection**: Per-endpoint rate limiting on the login route (`LOGIN_ATTEMPT_LIMIT`)

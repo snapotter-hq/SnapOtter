@@ -81,6 +81,14 @@ components:
               error:
                 type: string
                 example: Rate limit exceeded
+    PayloadTooLarge:
+      description: A file in the upload is over the server's upload limit (`MAX_UPLOAD_SIZE_MB`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: File exceeds the 100 MB upload limit
   schemas:
     Error:
       type: object
@@ -178,7 +186,7 @@ components:
             - fast
             - balanced
             - best
-          description: OCR tier that could not be honored; Fast is reported when Korean is explicitly requested with Fast or the legacy Tesseract alias
+          description: OCR tier that could not be honored; Fast is reported when Korean or Arabic is explicitly requested with Fast or the legacy Tesseract alias
         compatibilityReason:
           type: string
           description: Machine-readable runtime compatibility reason, when available
@@ -305,6 +313,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/content-aware-resize:
     post:
       operationId: contentAwareResize
@@ -365,6 +375,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/crop:
     post:
       operationId: cropImage
@@ -415,6 +427,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/rotate:
     post:
       operationId: rotateImage
@@ -463,6 +477,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/convert:
     post:
       operationId: convertFormat
@@ -510,6 +526,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/compress:
     post:
       operationId: compressImage
@@ -538,7 +556,7 @@ paths:
                     JSON string with options:
                     - `mode` (string, default "quality") - One of: quality, targetSize
                     - `quality` (number 1-100, optional) - Compression quality level
-                    - `targetSizeKb` (number, optional) - Target file size in kilobytes
+                    - `targetSizeKb` (number, optional) - Target file size in KB, where 1 KB = 1000 bytes. The response then adds `targetKb`, plus `resizedTo` ({width, height}) when the image had to be scaled down to fit
       responses:
         '200':
           description: Processed image
@@ -558,6 +576,308 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/image/compress-image-to-20kb:
+    post:
+      operationId: compressImageTo20KbTool
+      tags:
+        - Tools
+      summary: ضغط صورة إلى 20 KB
+      description: |
+        ضغط صورة إلى حجم مستهدف 20 KB
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 20.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '200':
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/image/compress-image-to-50kb:
+    post:
+      operationId: compressImageTo50KbTool
+      tags:
+        - Tools
+      summary: ضغط صورة إلى 50 KB
+      description: |
+        ضغط صورة إلى حجم مستهدف 50 KB
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 50.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '200':
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/image/compress-image-to-100kb:
+    post:
+      operationId: compressImageTo100KbTool
+      tags:
+        - Tools
+      summary: ضغط صورة إلى 100 KB
+      description: |
+        ضغط صورة إلى حجم مستهدف 100 KB
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 100.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '200':
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/image/compress-image-to-200kb:
+    post:
+      operationId: compressImageTo200KbTool
+      tags:
+        - Tools
+      summary: ضغط صورة إلى 200 KB
+      description: |
+        ضغط صورة إلى حجم مستهدف 200 KB
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 200.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '200':
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/image/compress-image-to-500kb:
+    post:
+      operationId: compressImageTo500KbTool
+      tags:
+        - Tools
+      summary: ضغط صورة إلى 500 KB
+      description: |
+        ضغط صورة إلى حجم مستهدف 500 KB
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 500.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '200':
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/image/strip-metadata:
     post:
       operationId: stripMetadata
@@ -608,6 +928,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/border:
     post:
       operationId: addBorder
@@ -664,6 +986,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/beautify:
     post:
       operationId: beautifyScreenshot
@@ -737,6 +1061,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/adjust-colors:
     post:
       operationId: adjustColors
@@ -795,6 +1121,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/sharpening:
     post:
       operationId: sharpenImage
@@ -853,6 +1181,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/optimize-for-web:
     post:
       operationId: optimizeForWeb
@@ -904,6 +1234,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/optimize-for-web/preview:
     post:
       operationId: optimizeForWebPreview
@@ -959,6 +1291,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -1023,6 +1357,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/image-enhancement/analyze:
     post:
       operationId: analyzeImageEnhancement
@@ -1067,6 +1403,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Analysis failed
           content:
@@ -1110,6 +1448,8 @@ paths:
                     - `quality` (number, default 90) - Output quality (1-100)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -1136,6 +1476,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -1183,6 +1525,8 @@ paths:
                     - `quality` (number 1-100, default 90) - Output quality
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -1209,6 +1553,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -1259,6 +1605,8 @@ paths:
                     - `colorizeStrength` (number 0-100, default 85) - Colorization strength
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -1285,6 +1633,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -1324,6 +1674,8 @@ paths:
                   description: Photo with a clear, front-facing face
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -1416,6 +1768,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: No face detected or analysis failed
           content:
@@ -1604,6 +1958,8 @@ paths:
                     - `model` (string, default "auto") - One of: auto, ddcolor, opencv
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -1630,6 +1986,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -1677,6 +2035,8 @@ paths:
                     - `sensitivity` (number 0-1, default 0.5) - Face detection sensitivity
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -1703,6 +2063,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -1807,6 +2169,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/watermark-text:
     post:
       operationId: addTextWatermark
@@ -1858,6 +2222,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/text-overlay:
     post:
       operationId: addTextOverlay
@@ -1910,6 +2276,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/replace-color:
     post:
       operationId: replaceColor
@@ -1959,6 +2327,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/color-blindness:
     post:
       operationId: simulateColorBlindness
@@ -2005,6 +2375,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/gif-tools:
     post:
       operationId: processGif
@@ -2035,7 +2407,7 @@ paths:
                     - `width` (number 1-16384, optional) - Target width in pixels (resize mode)
                     - `height` (number 1-16384, optional) - Target height in pixels (resize mode)
                     - `percentage` (number 1-500, optional) - Scale by percentage (resize mode)
-                    - `colors` (number 2-256, default 256) - Color palette size (optimize mode)
+                    - `colors` (number, default 256) - Color palette size, one of: 2, 4, 16, 256 (optimize mode)
                     - `dither` (number 0-1, default 1.0) - Dither amount (optimize mode)
                     - `effort` (number 1-10, default 7) - Compression effort (optimize mode)
                     - `speedFactor` (number 0.1-10, default 1.0) - Speed multiplier (speed mode)
@@ -2067,6 +2439,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/gif-tools/info:
     post:
       operationId: getGifInfo
@@ -2122,6 +2496,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/smart-crop:
     post:
       operationId: smartCrop
@@ -2179,6 +2555,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/vectorize:
     post:
       operationId: vectorizeImage
@@ -2232,6 +2610,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/svg-to-raster:
     post:
       operationId: svgToRaster
@@ -2283,6 +2663,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/svg-to-raster/batch:
     post:
       operationId: svgToRasterBatch
@@ -2312,6 +2694,8 @@ paths:
                   description: Same settings as single-file endpoint
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Optional client-generated job ID for progress tracking
       responses:
         '200':
@@ -2333,6 +2717,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: All files failed processing
           content:
@@ -2413,6 +2799,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -2506,6 +2894,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdf-to-image/info:
     post:
       operationId: getPdfInfo
@@ -2543,6 +2933,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdf-to-image/preview:
     post:
       operationId: previewPdfPages
@@ -2594,6 +2986,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/split:
     post:
       operationId: splitImage
@@ -2646,6 +3040,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/bulk-rename:
     post:
       operationId: bulkRename
@@ -2696,6 +3092,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/favicon:
     post:
       operationId: generateFavicon
@@ -2738,6 +3136,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/watermark-image:
     post:
       operationId: addImageWatermark
@@ -2791,6 +3191,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/compose:
     post:
       operationId: composeImages
@@ -2845,6 +3247,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/meme-generator:
     post:
       operationId: generateMeme
@@ -2915,6 +3319,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3141,6 +3547,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3198,6 +3606,8 @@ paths:
                   description: Output quality
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -3224,6 +3634,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3277,6 +3689,8 @@ paths:
                     At least one extend direction must be greater than 0.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -3303,6 +3717,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3370,6 +3786,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/stitch:
     post:
       operationId: stitchImages
@@ -3427,6 +3845,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/remove-gif-background:
     post:
       operationId: removeGifBackground
@@ -3453,7 +3873,7 @@ paths:
                   type: string
                   description: |
                     JSON string with options:
-                    - `model` (string, optional) - AI model name
+                    - `model` (string, optional) - AI model name (one of: u2net, isnet-general-use, bria-rmbg, birefnet-general-lite, birefnet-portrait, birefnet-general, birefnet-matting, birefnet-hr-matting)
                     - `outputFormat` (string, optional) - One of: webp, apng, gif
                     - `backgroundType` (string, optional) - One of: transparent, color, gradient, blur, image
                     - `backgroundColor` (string, optional) - Hex color for the color background
@@ -3471,6 +3891,8 @@ paths:
                   description: Background image, required when backgroundType is "image"
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -3497,6 +3919,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '501':
           description: Feature not installed
           content:
@@ -3529,18 +3953,14 @@ paths:
                   type: string
                   description: |
                     JSON string with options:
-                    - `model` (string, optional) - AI model name
-                    - `backgroundType` (string, optional) - One of: transparent, color, gradient, blur, image
-                    - `backgroundColor` (string, optional) - Hex color to replace removed background with
-                    - `gradientColor1` (string, optional) - First gradient color
-                    - `gradientColor2` (string, optional) - Second gradient color
-                    - `gradientAngle` (number, optional) - Gradient angle in degrees
-                    - `blurEnabled` (boolean, optional) - Enable background blur effect
-                    - `blurIntensity` (number 0-100, optional) - Blur strength
-                    - `shadowEnabled` (boolean, optional) - Enable drop shadow
-                    - `shadowOpacity` (number 0-100, optional) - Shadow opacity
+                    - `model` (string, optional) - AI model name (one of: u2net, isnet-general-use, bria-rmbg, birefnet-general-lite, birefnet-portrait, birefnet-general, birefnet-matting, birefnet-hr-matting)
+                    - `edgeRefine` (integer 0-3, optional) - Edge refinement level
+                    - `decontaminate` (boolean, optional) - Remove background color spill
+                    Background and effect settings belong on `POST /api/v1/tools/image/remove-background/effects` (or `/batch` and pipelines).
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -3567,6 +3987,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3617,6 +4039,7 @@ paths:
                     - `blurIntensity` (number 0-100) - Blur strength
                     - `shadowEnabled` (boolean) - Enable drop shadow
                     - `shadowOpacity` (number 0-100) - Shadow opacity
+                    - `outputFormat` (string, optional) - One of: png, webp, avif
       responses:
         '200':
           description: Image with applied effects
@@ -3643,6 +4066,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/transparency-fixer:
     post:
       operationId: fixTransparency
@@ -3679,6 +4104,8 @@ paths:
                     - `removeWatermark` (boolean, default false) - Apply median filter to reduce watermark artifacts before matting
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -3705,6 +4132,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3751,6 +4180,8 @@ paths:
                     - `quality` (number, default 95) - Output quality (1-100)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -3777,6 +4208,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3819,6 +4252,8 @@ paths:
                     - `sensitivity` (number 0-1, default 0.5) - Face detection sensitivity
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -3845,6 +4280,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -3889,11 +4326,13 @@ paths:
                   description: |
                     JSON string with options:
                     - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko, ar. Korean and Arabic are unsupported by fast and the legacy tesseract alias
                     - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
                     - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
       responses:
         '202':
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
@@ -3927,7 +4366,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
-          description: Encoded OCR input exceeds the hard 512 MiB safety limit
+          description: The image is over the upload limit (`MAX_UPLOAD_SIZE_MB`, never more than 512 MiB for OCR).
           content:
             application/json:
               schema:
@@ -4039,6 +4478,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -4096,6 +4537,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/barcode-read:
     post:
       operationId: readBarcode
@@ -4193,6 +4636,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -4294,6 +4739,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -4510,6 +4957,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Failed to read image metadata
           content:
@@ -4583,6 +5032,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/edit-metadata/inspect:
     post:
       operationId: inspectMetadataExifTool
@@ -4625,6 +5076,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Failed to read image metadata
           content:
@@ -4697,6 +5150,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          description: A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`). For `ocr` and `ocr-pdf`, files are also capped at 512 MiB each and 512 MiB together.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/pipeline/execute:
     post:
       operationId: executePipeline
@@ -4757,6 +5216,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          description: The file is over the upload limit (`MAX_UPLOAD_SIZE_MB`). A file sent before the `pipeline` field, or any file when the first step is OCR, is also capped at 512 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Processing failed
           content:
@@ -4988,6 +5453,8 @@ paths:
                     - `steps[].settings` (object, optional) - Tool-specific settings
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Optional client-provided job ID for progress tracking via SSE
       responses:
         '200':
@@ -5001,6 +5468,10 @@ paths:
               schema:
                 type: string
               description: Percent-encoded JSON mapping of input index to output filename (decode with decodeURIComponent before JSON.parse)
+            X-File-Notes:
+              schema:
+                type: string
+              description: 'Percent-encoded JSON mapping of input index to a warning about that file''s result, keyed like X-File-Results. Only files with something to warn about appear: `resizedTo` ({width, height}) when compress scaled an image down to fit, or `targetMet: false` when target-size compress-pdf couldn''t get under the target, each with its `targetKb`; `deepEnhanceSkipped` (`failed`, `unavailable` or `animated`) when image-enhancement''s Deep Enhance didn''t run. When every file with a result carries the same note, it is sent once under the key `*` instead. `{}` when no file has a warning.'
           content:
             application/zip:
               schema:
@@ -5018,6 +5489,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          description: 'A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`). Files sent before the `pipeline` field, and every file when the first step is OCR, are also held to OCR''s caps: 512 MiB each and 512 MiB together.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/upload:
     post:
       operationId: uploadImage
@@ -5072,6 +5549,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/download/{jobId}/{filename}:
     get:
       operationId: downloadProcessedImage
@@ -5142,6 +5621,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/files:
     get:
       operationId: listFiles
@@ -5305,6 +5786,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          description: A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`), or storing it would take the account over its storage quota.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Storage quota exceeded. Used 1030.0MB of 1024.0MB
+                code: STORAGE_QUOTA_EXCEEDED
   /api/v1/files/save-result:
     post:
       operationId: saveProcessingResult
@@ -5363,6 +5853,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`), or storing it would take the account over its storage quota.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Storage quota exceeded. Used 1030.0MB of 1024.0MB
+                code: STORAGE_QUOTA_EXCEEDED
   /api/v1/files/{id}:
     get:
       operationId: getFile
@@ -6370,6 +6869,7 @@ paths:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               required:
                 - name
               properties:
@@ -6416,7 +6916,7 @@ paths:
       operationId: updateTeam
       tags:
         - Teams
-      summary: إعادة تسمية فريق
+      summary: تحديث فريق
       description: يتطلب إذن teams:manage.
       security:
         - bearerAuth: []
@@ -6433,11 +6933,25 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - name
+              additionalProperties: false
+              minProperties: 1
               properties:
                 name:
                   type: string
+                storageQuota:
+                  type:
+                    - integer
+                    - 'null'
+                  minimum: 1
+                  maximum: 9007199254740991
+                  description: Team-wide limit on library storage, in bytes, counted across all members. null removes the limit.
+                retentionHours:
+                  type:
+                    - integer
+                    - 'null'
+                  minimum: 1
+                  maximum: 2147483647
+                  description: Hours to keep the team's job results before they are deleted. null uses the instance default (FILE_MAX_AGE_HOURS). Only applies when the team_retention_overrides enterprise feature is on.
       responses:
         '200':
           description: Team updated
@@ -6448,6 +6962,12 @@ paths:
                 properties:
                   ok:
                     type: boolean
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Authentication required
           content:
@@ -6540,7 +7060,6 @@ paths:
         - System
       summary: تقدم المهمة (SSE)
       description: تدفق Server-Sent Events لتتبع المهام طويلة التشغيل. يرسل إطارات الملفات المفردة والدُفعات ونبضات الاتصال، ويُغلق فوراً بعد حدث نهائي للمهمة.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -6641,6 +7160,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '404':
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck
@@ -6702,6 +7233,12 @@ paths:
                     type: string
                   posthogHost:
                     type: string
+                  feedbackSink:
+                    type: boolean
+                    description: |
+                      Whether the server has a PostHog client that can actually
+                      take feedback. False when analytics is off or when the
+                      client failed to start, even if a PostHog key is baked.
                   sentryDsn:
                     type: string
                   sentryDsnWeb:
@@ -7413,6 +7950,8 @@ paths:
                     - `quality` (string, default "balanced") - One of: high, balanced, small
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -7439,6 +7978,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -7475,6 +8016,8 @@ paths:
                     - `resolution` (string, default "original") - One of: original, 1080p, 720p, 480p
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -7501,6 +8044,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -7555,6 +8100,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/mute-video:
     post:
       operationId: muteVideo
@@ -7596,6 +8143,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/video-to-gif:
     post:
       operationId: videoToGif
@@ -7628,6 +8177,8 @@ paths:
                     - `durationS` (number 0-60, default 5) - Duration in seconds
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -7654,6 +8205,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -7708,6 +8261,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/crop-video:
     post:
       operationId: cropVideo
@@ -7757,6 +8312,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/rotate-video:
     post:
       operationId: rotateVideo
@@ -7803,6 +8360,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/change-fps:
     post:
       operationId: changeFps
@@ -7849,6 +8408,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/video-color:
     post:
       operationId: videoColor
@@ -7898,6 +8459,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/video-speed:
     post:
       operationId: videoSpeed
@@ -7945,6 +8508,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/reverse-video:
     post:
       operationId: reverseVideo
@@ -7986,6 +8551,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/video-loudnorm:
     post:
       operationId: videoLoudnorm
@@ -8027,6 +8594,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/aspect-pad:
     post:
       operationId: aspectPad
@@ -8074,6 +8643,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/blur-pad:
     post:
       operationId: blurPad
@@ -8121,6 +8692,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/watermark-video:
     post:
       operationId: watermarkVideo
@@ -8171,6 +8744,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/stabilize-video:
     post:
       operationId: stabilizeVideo
@@ -8200,6 +8775,8 @@ paths:
                     - `smoothing` (integer 5-60, default 15) - Smoothing window size in frames
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -8226,6 +8803,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -8278,6 +8857,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/video-to-webp:
     post:
       operationId: videoToWebp
@@ -8327,6 +8908,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/video-to-frames:
     post:
       operationId: videoToFrames
@@ -8376,6 +8959,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/merge-videos:
     post:
       operationId: mergeVideos
@@ -8404,6 +8989,8 @@ paths:
                   description: Two or more video files to merge (up to 10)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -8430,6 +9017,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -8479,6 +9068,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/burn-subtitles:
     post:
       operationId: burnSubtitles
@@ -8510,6 +9101,8 @@ paths:
                     - `fontSize` (integer 8-72, default 24) - Subtitle font size in pixels
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -8536,6 +9129,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -8590,6 +9185,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/extract-subtitles:
     post:
       operationId: extractSubtitles
@@ -8631,6 +9228,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/images-to-video:
     post:
       operationId: imagesToVideo
@@ -8681,6 +9280,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/video-metadata:
     post:
       operationId: videoMetadata
@@ -8722,6 +9323,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/auto-subtitles:
     post:
       operationId: autoSubtitles
@@ -8755,6 +9358,8 @@ paths:
                     - `format` (string, default "srt") - One of: srt, vtt
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -8781,6 +9386,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -8839,6 +9446,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/convert-audio:
     post:
       operationId: convertAudio
@@ -8886,6 +9495,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/trim-audio:
     post:
       operationId: trimAudio
@@ -8933,6 +9544,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/volume-adjust:
     post:
       operationId: volumeAdjust
@@ -8979,6 +9592,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/normalize-audio:
     post:
       operationId: normalizeAudio
@@ -9020,6 +9635,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/fade-audio:
     post:
       operationId: fadeAudio
@@ -9067,6 +9684,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/reverse-audio:
     post:
       operationId: reverseAudio
@@ -9108,6 +9727,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/audio-speed:
     post:
       operationId: audioSpeed
@@ -9154,6 +9775,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/pitch-shift:
     post:
       operationId: pitchShift
@@ -9200,6 +9823,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/audio-channels:
     post:
       operationId: audioChannels
@@ -9246,6 +9871,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/silence-removal:
     post:
       operationId: removeSilence
@@ -9293,6 +9920,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/noise-reduction:
     post:
       operationId: reduceNoise
@@ -9339,6 +9968,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/merge-audio:
     post:
       operationId: mergeAudio
@@ -9387,6 +10018,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/split-audio:
     post:
       operationId: splitAudio
@@ -9439,6 +10072,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/ringtone-maker:
     post:
       operationId: ringtoneMaker
@@ -9486,6 +10121,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/waveform-image:
     post:
       operationId: waveformImage
@@ -9534,6 +10171,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/audio-metadata:
     post:
       operationId: audioMetadata
@@ -9586,6 +10225,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/audio/transcribe-audio:
     post:
       operationId: transcribeAudio
@@ -9619,6 +10260,8 @@ paths:
                     - `outputFormat` (string, default "txt") - One of: txt, srt, vtt
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -9645,6 +10288,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -9700,6 +10345,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/split-pdf:
     post:
       operationId: splitPdf
@@ -9751,6 +10398,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/compress-pdf:
     post:
       operationId: compressPdf
@@ -9783,7 +10432,7 @@ paths:
                     JSON string with options:
                     - `mode` (string, default "quality") - One of: quality, targetSize
                     - `quality` (integer 1-100, optional) - Compression quality (higher = less compression). Used in quality mode
-                    - `targetSizeKb` (number, optional) - Target file size in kilobytes. Used in targetSize mode
+                    - `targetSizeKb` (number, optional) - Target file size in KB, where 1 KB = 1000 bytes. Used in targetSize mode
       responses:
         '200':
           description: Compressed PDF
@@ -9803,6 +10452,323 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/pdf/compress-pdf-to-100kb:
+    post:
+      operationId: compressPdfTo100KbTool
+      tags:
+        - Tools
+      summary: ضغط PDF إلى 100 KB
+      description: |
+        ضغط PDF إلى حجم مستهدف 100 KB (100 KB، حيث 1 KB = 1000 بايت).
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress-pdf` في وضع targetSize.
+        أفضل جهد: قد لا يصل PDF المكون بشكل أساسي من نص إلى الحجم المستهدف. تتضمن نتيجة المهمة حينها
+        `targetMet: false` إلى جانب `targetKb`، والملف هو الأصغر الذي يمكن إنشاؤه.
+        تُعاد البايتات الأصلية إذا كان الضغط سيؤدي إلى تكبير الملف.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 100.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '202':
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/pdf/compress-pdf-to-200kb:
+    post:
+      operationId: compressPdfTo200KbTool
+      tags:
+        - Tools
+      summary: ضغط PDF إلى 200 KB
+      description: |
+        ضغط PDF إلى حجم مستهدف 200 KB (200 KB، حيث 1 KB = 1000 بايت).
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress-pdf` في وضع targetSize.
+        أفضل جهد: قد لا يصل PDF المكون بشكل أساسي من نص إلى الحجم المستهدف. تتضمن نتيجة المهمة حينها
+        `targetMet: false` إلى جانب `targetKb`، والملف هو الأصغر الذي يمكن إنشاؤه.
+        تُعاد البايتات الأصلية إذا كان الضغط سيؤدي إلى تكبير الملف.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 200.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '202':
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/pdf/compress-pdf-to-500kb:
+    post:
+      operationId: compressPdfTo500KbTool
+      tags:
+        - Tools
+      summary: ضغط PDF إلى 500 KB
+      description: |
+        ضغط PDF إلى حجم مستهدف 500 KB (500 KB، حيث 1 KB = 1000 بايت).
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress-pdf` في وضع targetSize.
+        أفضل جهد: قد لا يصل PDF المكون بشكل أساسي من نص إلى الحجم المستهدف. تتضمن نتيجة المهمة حينها
+        `targetMet: false` إلى جانب `targetKb`، والملف هو الأصغر الذي يمكن إنشاؤه.
+        تُعاد البايتات الأصلية إذا كان الضغط سيؤدي إلى تكبير الملف.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 500.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '202':
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/pdf/compress-pdf-to-1mb:
+    post:
+      operationId: compressPdfTo1MbTool
+      tags:
+        - Tools
+      summary: ضغط PDF إلى 1 MB
+      description: |
+        ضغط PDF إلى حجم مستهدف 1 MB (1000 KB، حيث 1 KB = 1000 بايت).
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress-pdf` في وضع targetSize.
+        أفضل جهد: قد لا يصل PDF المكون بشكل أساسي من نص إلى الحجم المستهدف. تتضمن نتيجة المهمة حينها
+        `targetMet: false` إلى جانب `targetKb`، والملف هو الأصغر الذي يمكن إنشاؤه.
+        تُعاد البايتات الأصلية إذا كان الضغط سيؤدي إلى تكبير الملف.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 1000.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '202':
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/pdf/compress-pdf-to-2mb:
+    post:
+      operationId: compressPdfTo2MbTool
+      tags:
+        - Tools
+      summary: ضغط PDF إلى 2 MB
+      description: |
+        ضغط PDF إلى حجم مستهدف 2 MB (2000 KB، حيث 1 KB = 1000 بايت).
+        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress-pdf` في وضع targetSize.
+        أفضل جهد: قد لا يصل PDF المكون بشكل أساسي من نص إلى الحجم المستهدف. تتضمن نتيجة المهمة حينها
+        `targetMet: false` إلى جانب `targetKb`، والملف هو الأصغر الذي يمكن إنشاؤه.
+        تُعاد البايتات الأصلية إذا كان الضغط سيؤدي إلى تكبير الملف.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 2000.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '202':
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/rotate-pdf:
     post:
       operationId: rotatePdf
@@ -9850,6 +10816,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/extract-pages:
     post:
       operationId: extractPages
@@ -9896,6 +10864,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/remove-pages:
     post:
       operationId: removePages
@@ -9942,6 +10912,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/organize-pdf:
     post:
       operationId: organizePdf
@@ -9988,6 +10960,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/pdf/multi-tool-pdf:
+    post:
+      operationId: multiToolPdf
+      tags:
+        - Tools
+      summary: أداة PDF متعددة
+      description: تجميع PDF من خطة صفحات صريحة - إعادة ترتيب الصفحات أو تكرارها أو تدويرها أو حذفها وسحب صفحات من PDFs إضافية، في إرسال واحد.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: One or more PDF files (max 20); the document being edited comes first, then the extra documents in the order added
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `items` (array, required) - Output page plan in output order (max 1200); each item is `{doc, page, rot?}` where `doc` is the 0-based upload index, `page` is a 1-based page number, and `rot` is an optional clockwise rotation (90, 180, or 270) recorded on that output position
+                    - `pageCounts` (array, required) - Real page count of each uploaded document, in upload order; plans referencing a page beyond its document's count are rejected with 400
+      responses:
+        '200':
+          description: Assembled PDF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/protect-pdf:
     post:
       operationId: protectPdf
@@ -10035,6 +11060,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/unlock-pdf:
     post:
       operationId: unlockPdf
@@ -10081,6 +11108,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/repair-pdf:
     post:
       operationId: repairPdf
@@ -10122,6 +11151,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/linearize-pdf:
     post:
       operationId: linearizePdf
@@ -10163,6 +11194,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/grayscale-pdf:
     post:
       operationId: grayscalePdf
@@ -10204,6 +11237,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdfa-convert:
     post:
       operationId: pdfaConvert
@@ -10245,6 +11280,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/crop-pdf:
     post:
       operationId: cropPdf
@@ -10291,6 +11328,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/nup-pdf:
     post:
       operationId: nupPdf
@@ -10337,6 +11376,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/booklet-pdf:
     post:
       operationId: bookletPdf
@@ -10383,6 +11424,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/watermark-pdf:
     post:
       operationId: watermarkPdf
@@ -10433,6 +11476,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdf-page-numbers:
     post:
       operationId: pdfPageNumbers
@@ -10480,6 +11525,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/convert-document:
     post:
       operationId: convertDocument
@@ -10509,6 +11556,8 @@ paths:
                     - `format` (string, required) - One of: docx, odt, rtf, txt
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10535,6 +11584,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/convert-presentation:
     post:
       operationId: convertPresentation
@@ -10564,6 +11615,8 @@ paths:
                     - `format` (string, required) - One of: pptx, odp
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10590,6 +11643,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/convert-spreadsheet:
     post:
       operationId: convertSpreadsheet
@@ -10619,6 +11674,8 @@ paths:
                     - `format` (string, required) - One of: xlsx, ods, csv
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10645,6 +11702,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/excel-to-pdf:
     post:
       operationId: excelToPdf
@@ -10669,6 +11728,8 @@ paths:
                   description: Spreadsheet file to convert (.xlsx, .xls, .ods, .csv)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10695,6 +11756,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/word-to-pdf:
     post:
       operationId: wordToPdf
@@ -10719,6 +11782,8 @@ paths:
                   description: Word document to convert (.docx, .doc, .odt, .rtf, .txt)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10745,6 +11810,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/powerpoint-to-pdf:
     post:
       operationId: powerpointToPdf
@@ -10769,6 +11836,8 @@ paths:
                   description: Presentation file to convert (.pptx, .ppt, .odp)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10795,6 +11864,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/html-to-pdf:
     post:
       operationId: htmlToPdf
@@ -10819,6 +11890,8 @@ paths:
                   description: HTML file to convert (.html, .htm)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10845,6 +11918,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/markdown-to-docx:
     post:
       operationId: markdownToDocx
@@ -10886,6 +11961,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/markdown-to-html:
     post:
       operationId: markdownToHtml
@@ -10927,6 +12004,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/markdown-to-pdf:
     post:
       operationId: markdownToPdf
@@ -10951,6 +12030,8 @@ paths:
                   description: Markdown file to convert (.md, .markdown)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -10977,6 +12058,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/epub-convert:
     post:
       operationId: epubConvert
@@ -11006,6 +12089,8 @@ paths:
                     - `format` (string, required) - One of: pdf, docx, html, md
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -11032,6 +12117,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/to-epub:
     post:
       operationId: toEpub
@@ -11056,6 +12143,8 @@ paths:
                   description: Document file to convert (.docx, .md, .html, .txt)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -11082,6 +12171,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/flatten-pdf:
     post:
       operationId: flattenPdf
@@ -11123,6 +12214,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/redact-pdf:
     post:
       operationId: redactPdf
@@ -11176,6 +12269,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdf-to-text:
     post:
       operationId: pdfToText
@@ -11223,6 +12318,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdf-to-word:
     post:
       operationId: pdfToWord
@@ -11247,6 +12344,8 @@ paths:
                   description: PDF file to convert (.pdf)
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -11273,6 +12372,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdf-metadata:
     post:
       operationId: pdfMetadata
@@ -11328,6 +12429,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/ocr-pdf:
     post:
       operationId: ocrPdf
@@ -11360,12 +12463,14 @@ paths:
                   description: |
                     JSON string with options:
                     - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko, ar. Korean and Arabic are unsupported by fast and the legacy tesseract alias
                     - `pages` (string, default "all") - Page selection, e.g. "all", "1-3", "1,3,5"
                     - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
                     - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -11400,7 +12505,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
-          description: Encoded PDF exceeds the hard 512 MiB safety limit
+          description: The PDF is over the upload limit (`MAX_UPLOAD_SIZE_MB`, never more than 512 MiB for OCR).
           content:
             application/json:
               schema:
@@ -11429,7 +12534,7 @@ paths:
       tags:
         - Tools
       summary: منشئ الرسوم البيانية
-      description: إنشاء رسوم بيانية شريطية أو خطية أو دائرية من بيانات CSV أو JSON. تُرجع صورة PNG.
+      description: إنشاء مخططات أعمدة أو خطوط أو دوائر من بيانات CSV أو JSON. يُرجع صورة PNG. عندما يتم حذف صفوف لأن خلية قيمتها احتوت على نص ليس رقماً، تضيف الاستجابة `chartRows` ({charted, skipped})؛ ولا تُحتسب الصفوف الفارغة.
       security:
         - bearerAuth: []
       requestBody:
@@ -11472,6 +12577,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/csv-excel:
     post:
       operationId: csvExcel
@@ -11518,6 +12625,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/csv-json:
     post:
       operationId: csvJson
@@ -11564,6 +12673,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/json-xml:
     post:
       operationId: jsonXml
@@ -11610,6 +12721,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/split-csv:
     post:
       operationId: splitCsv
@@ -11657,6 +12770,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/merge-csvs:
     post:
       operationId: mergeCsvs
@@ -11700,6 +12815,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson
@@ -11741,6 +12858,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/xml-to-csv:
     post:
       operationId: xmlToCsv
@@ -11782,6 +12901,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -11825,6 +12946,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/extract-zip:
     post:
       operationId: extractZip
@@ -11866,6 +12989,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/background-replace:
     post:
       operationId: backgroundReplace
@@ -11904,6 +13029,8 @@ paths:
                     - `format` (string, default "png") - One of: png, webp
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -11930,6 +13057,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -11976,6 +13105,8 @@ paths:
                     - `format` (string, default "png") - One of: png, webp
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -12002,6 +13133,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -12129,6 +13262,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/rounded-crop:
     post:
       operationId: roundedCrop
@@ -12183,6 +13318,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/duotone:
     post:
       operationId: duotone
@@ -12231,6 +13368,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/image-pad:
     post:
       operationId: imagePad
@@ -12282,6 +13421,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/pixelate:
     post:
       operationId: pixelate
@@ -12333,6 +13474,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/vignette:
     post:
       operationId: vignette
@@ -12385,6 +13528,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/gif-webp:
     post:
       operationId: gifWebp
@@ -12433,6 +13578,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/histogram:
     post:
       operationId: histogram
@@ -12565,6 +13712,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/lqip-placeholder:
     post:
       operationId: lqipPlaceholder
@@ -12642,6 +13791,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/sprite-sheet:
     post:
       operationId: spriteSheet
@@ -12735,6 +13886,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/passport-photo:
     post:
       operationId: passportPhotoTool
@@ -12801,6 +13954,8 @@ paths:
                   description: JSON array of placement objects with sig, page, x, y, w, and h. Coordinates are page fractions with top-left origin.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
                 fileId:
                   type: string
@@ -12836,6 +13991,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -12873,6 +14030,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -12893,6 +14052,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -12930,6 +14091,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -12950,6 +14113,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -12987,6 +14152,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13007,6 +14174,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13044,6 +14213,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13064,6 +14235,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13101,6 +14274,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13121,6 +14296,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13158,6 +14335,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13178,6 +14357,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13215,6 +14396,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13235,6 +14418,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13272,6 +14457,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13292,6 +14479,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13329,6 +14518,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13349,6 +14540,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13386,6 +14579,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13406,6 +14601,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13443,6 +14640,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13463,6 +14662,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13500,6 +14701,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13520,6 +14723,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13557,6 +14762,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13577,6 +14784,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13614,6 +14823,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13634,6 +14845,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13671,6 +14884,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13691,6 +14906,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13728,6 +14945,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13748,6 +14967,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13785,6 +15006,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13805,6 +15028,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13842,6 +15067,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13862,6 +15089,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13899,6 +15128,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13919,6 +15150,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -13956,6 +15189,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -13976,6 +15211,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14013,6 +15250,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14033,6 +15272,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14070,6 +15311,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14090,6 +15333,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14127,6 +15372,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14147,6 +15394,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14184,6 +15433,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14204,6 +15455,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14241,6 +15494,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14261,6 +15516,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14298,6 +15555,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14318,6 +15577,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14355,6 +15616,8 @@ paths:
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14375,6 +15638,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14412,6 +15677,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14432,6 +15699,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14469,6 +15738,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14489,6 +15760,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14526,6 +15799,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14546,6 +15821,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14583,6 +15860,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14603,6 +15882,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14640,6 +15921,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -14660,6 +15943,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14695,9 +15980,6 @@ paths:
                   description: |
                     Dedicated SVG to PNG converter using the svg-to-raster pipeline.
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -14717,6 +15999,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14752,9 +16036,6 @@ paths:
                   description: |
                     Dedicated SVG to JPG converter using the svg-to-raster pipeline.
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -14774,6 +16055,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14811,9 +16094,6 @@ paths:
                   description: |
                     Dedicated JPG to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -14833,6 +16113,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14870,9 +16152,6 @@ paths:
                   description: |
                     Dedicated PNG to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -14892,6 +16171,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14929,9 +16210,6 @@ paths:
                   description: |
                     Dedicated HEIC to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -14951,6 +16229,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -14988,9 +16268,6 @@ paths:
                   description: |
                     Dedicated TIFF to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15010,6 +16287,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15047,9 +16326,6 @@ paths:
                   description: |
                     Dedicated WebP to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15069,6 +16345,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15106,9 +16384,6 @@ paths:
                   description: |
                     Dedicated GIF to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15128,6 +16403,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15165,9 +16442,6 @@ paths:
                   description: |
                     Dedicated EPS to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15187,6 +16461,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15222,9 +16498,6 @@ paths:
                   description: |
                     Dedicated PDF to JPG converter using the pdf-to-image pipeline.
                     The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15244,6 +16517,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15279,9 +16554,6 @@ paths:
                   description: |
                     Dedicated PDF to PNG converter using the pdf-to-image pipeline.
                     The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15301,6 +16573,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15336,9 +16610,6 @@ paths:
                   description: |
                     Dedicated PDF to TIFF converter using the pdf-to-image pipeline.
                     The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15358,6 +16629,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15395,6 +16668,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15421,6 +16696,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15458,6 +16735,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15484,6 +16763,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15521,6 +16802,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15547,6 +16830,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15584,6 +16869,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15610,6 +16897,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15647,6 +16936,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15673,6 +16964,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15710,6 +17003,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15736,6 +17031,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15773,6 +17070,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15799,6 +17098,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15836,6 +17137,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15862,6 +17165,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15899,6 +17204,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15925,6 +17232,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -15962,6 +17271,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -15988,6 +17299,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16025,6 +17338,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -16051,6 +17366,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16088,6 +17405,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -16114,6 +17433,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16151,6 +17472,8 @@ paths:
                     Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -16177,6 +17500,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16214,6 +17539,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -16240,6 +17567,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16277,6 +17606,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -16303,6 +17634,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16340,6 +17673,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -16366,6 +17701,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16403,6 +17740,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -16429,6 +17768,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16466,6 +17807,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16486,6 +17829,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16523,6 +17868,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16543,6 +17890,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16580,6 +17929,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16600,6 +17951,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16637,6 +17990,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16657,6 +18012,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16694,6 +18051,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16714,6 +18073,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16751,6 +18112,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16771,6 +18134,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16808,6 +18173,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16828,6 +18195,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16865,6 +18234,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16885,6 +18256,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16922,6 +18295,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16942,6 +18317,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -16979,6 +18356,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -16999,6 +18378,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17036,6 +18417,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17056,6 +18439,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17093,6 +18478,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17113,6 +18500,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17150,6 +18539,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17170,6 +18561,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17207,6 +18600,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17227,6 +18622,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17264,6 +18661,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17284,6 +18683,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17321,6 +18722,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17341,6 +18744,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17378,6 +18783,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17398,6 +18805,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17435,6 +18844,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17455,6 +18866,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17492,6 +18905,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17512,6 +18927,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17549,6 +18966,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17569,6 +18988,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17606,6 +19027,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
@@ -17626,6 +19049,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17663,6 +19088,8 @@ paths:
                     The output format is locked by the endpoint.
                 clientJobId:
                   type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
                   description: Client-provided job ID for SSE progress tracking
       responses:
         '202':
@@ -17689,6 +19116,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Processing failed
           content:
@@ -17997,6 +19426,8 @@ paths:
           description: Preview binary
         '400':
           description: Unsupported file type or missing file
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           description: Could not generate preview
   /api/v1/admin/log-level:
@@ -18190,6 +19621,8 @@ paths:
           description: Insufficient permissions
         '409':
           description: Import lock is held
+        '413':
+          description: A file in the import is over 20 GiB. This route has its own size limits; `MAX_UPLOAD_SIZE_MB` doesn't apply to it.
         '507':
           description: Insufficient storage for the authenticated archive and expanded runtime
   /api/v1/enterprise/scim/token:
@@ -18941,6 +20374,46 @@ x-i18n:
       sourceHash: 01f63e9e928a
       provenance: machine
       outputHash: c6cafb954ea1
+    paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
+      sourceHash: 7b2b9d14367f
+      provenance: machine
+      outputHash: 0a6b2aa3d889
+    paths./api/v1/tools/image/compress-image-to-20kb.post.description:
+      sourceHash: dbaf064a68d0
+      provenance: machine
+      outputHash: 79ac7542c73c
+    paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
+      sourceHash: 404de90e70be
+      provenance: machine
+      outputHash: 70b2c9d830d8
+    paths./api/v1/tools/image/compress-image-to-50kb.post.description:
+      sourceHash: 17ad89889448
+      provenance: machine
+      outputHash: 7b4c29883227
+    paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
+      sourceHash: 871df45d5496
+      provenance: machine
+      outputHash: 8e6d8929ba4b
+    paths./api/v1/tools/image/compress-image-to-100kb.post.description:
+      sourceHash: 485abfab7e89
+      provenance: machine
+      outputHash: c74c98432b55
+    paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
+      sourceHash: 58077de56ada
+      provenance: machine
+      outputHash: 046e03da1f67
+    paths./api/v1/tools/image/compress-image-to-200kb.post.description:
+      sourceHash: 2326ab771a4e
+      provenance: machine
+      outputHash: ad8632043532
+    paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
+      sourceHash: 8ddcd7ea07a9
+      provenance: machine
+      outputHash: 82d3f2e5489d
+    paths./api/v1/tools/image/compress-image-to-500kb.post.description:
+      sourceHash: 7026713d7c84
+      provenance: machine
+      outputHash: 5d9288c50673
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine
@@ -19726,9 +21199,9 @@ x-i18n:
       provenance: machine
       outputHash: ae9548df2184
     paths./api/v1/teams/{id}.put.summary:
-      sourceHash: c5dd33827a5b
+      sourceHash: 645d474857ba
       provenance: machine
-      outputHash: dc8c883f1cf4
+      outputHash: 582d57c1ae61
     paths./api/v1/teams/{id}.put.description:
       sourceHash: 88ce5170c6ed
       provenance: machine
@@ -20237,6 +21710,46 @@ x-i18n:
       sourceHash: 89f23fb6b3c8
       provenance: machine
       outputHash: 66672d29156b
+    paths./api/v1/tools/pdf/compress-pdf-to-100kb.post.summary:
+      sourceHash: 5e4d2e88ec6b
+      provenance: machine
+      outputHash: 6b73410d8c17
+    paths./api/v1/tools/pdf/compress-pdf-to-100kb.post.description:
+      sourceHash: 5a13ae7c6e69
+      provenance: machine
+      outputHash: 3c89172687f5
+    paths./api/v1/tools/pdf/compress-pdf-to-200kb.post.summary:
+      sourceHash: 221c729e6ddd
+      provenance: machine
+      outputHash: 3f1a206bbebb
+    paths./api/v1/tools/pdf/compress-pdf-to-200kb.post.description:
+      sourceHash: 48e46409e13a
+      provenance: machine
+      outputHash: '642260781686'
+    paths./api/v1/tools/pdf/compress-pdf-to-500kb.post.summary:
+      sourceHash: 9196060d0d71
+      provenance: machine
+      outputHash: e4e24dd66f18
+    paths./api/v1/tools/pdf/compress-pdf-to-500kb.post.description:
+      sourceHash: 24c751490f0b
+      provenance: machine
+      outputHash: 3f151e0b6749
+    paths./api/v1/tools/pdf/compress-pdf-to-1mb.post.summary:
+      sourceHash: affd9a8d906f
+      provenance: machine
+      outputHash: d5733daef29d
+    paths./api/v1/tools/pdf/compress-pdf-to-1mb.post.description:
+      sourceHash: 16ef1ad29f01
+      provenance: machine
+      outputHash: 481e0408698e
+    paths./api/v1/tools/pdf/compress-pdf-to-2mb.post.summary:
+      sourceHash: c78524582a37
+      provenance: machine
+      outputHash: 7c0aca37a920
+    paths./api/v1/tools/pdf/compress-pdf-to-2mb.post.description:
+      sourceHash: 9408c6fdc894
+      provenance: machine
+      outputHash: 660409fa12a4
     paths./api/v1/tools/pdf/rotate-pdf.post.summary:
       sourceHash: 1eccabbce838
       provenance: machine
@@ -20269,6 +21782,14 @@ x-i18n:
       sourceHash: ac32f48665e7
       provenance: machine
       outputHash: 725f62674f4b
+    paths./api/v1/tools/pdf/multi-tool-pdf.post.summary:
+      sourceHash: 0db53f175915
+      provenance: machine
+      outputHash: 6d7b6e62e12a
+    paths./api/v1/tools/pdf/multi-tool-pdf.post.description:
+      sourceHash: b3cd42a4b0b1
+      provenance: machine
+      outputHash: bf8f85b4892d
     paths./api/v1/tools/pdf/protect-pdf.post.summary:
       sourceHash: dae6c607e963
       provenance: machine
@@ -20506,9 +22027,9 @@ x-i18n:
       provenance: machine
       outputHash: 433c9e51ba85
     paths./api/v1/tools/files/chart-maker.post.description:
-      sourceHash: e4adb80dab58
+      sourceHash: afd06c39e795
       provenance: machine
-      outputHash: 7815e776bfd8
+      outputHash: 529dc85af97b
     paths./api/v1/tools/files/csv-excel.post.summary:
       sourceHash: c53386a6d40d
       provenance: machine

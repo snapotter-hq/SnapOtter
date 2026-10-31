@@ -4,7 +4,7 @@ import { colorBlindness } from "./operations/color-blindness.js";
 import { colorChannels } from "./operations/color-channels.js";
 import { compress } from "./operations/compress.js";
 import { contrast } from "./operations/contrast.js";
-import { convert } from "./operations/convert.js";
+import { convert, hasFloatPipelineStage } from "./operations/convert.js";
 import { crop } from "./operations/crop.js";
 import { editMetadata } from "./operations/edit-metadata.js";
 import { flip } from "./operations/flip.js";
@@ -44,6 +44,10 @@ export interface Operation {
   options: Record<string, unknown>;
 }
 
+export function configureSharpConcurrency(threads: number): number {
+  return sharp.concurrency(threads);
+}
+
 const OPERATION_MAP: Record<
   string,
   (image: Sharp, options: Record<string, unknown>) => Promise<Sharp>
@@ -80,6 +84,158 @@ const FORMAT_MAP: Record<string, string> = {
   jxl: "jxl",
 };
 
+const RECOMB_OPS = new Set(["color-blindness", "color-channels", "sepia"]);
+
+const TRANSFORM_OPS = new Set([
+  "resize",
+  "crop",
+  "rotate",
+  "flip",
+  "grayscale",
+  "color-blindness",
+  "color-channels",
+  "sepia",
+  "brightness",
+  "saturation",
+  "sharpen",
+  "sharpen-advanced",
+  "contrast",
+  "invert",
+]);
+
+type PipelineOptions = {
+  topOffsetPre?: number;
+  topOffsetPost?: number;
+  width?: number;
+  height?: number;
+  angle?: number;
+  rotationAngle?: number;
+  flip?: boolean;
+  flop?: boolean;
+  greyscale?: boolean;
+  recombMatrix?: unknown;
+  convKernel?: unknown;
+  negate?: boolean;
+  linearA?: number[];
+  brightness?: number;
+  saturation?: number;
+  sharpenSigma?: number;
+  keepMetadata?: number;
+  lastStripKeepMetadata?: number;
+  formatOut?: string;
+  jpegQuality?: number;
+  pngPalette?: boolean;
+  pngQuality?: number;
+  webpQuality?: number;
+  heifQuality?: number;
+  heifEffort?: number;
+  tiffQuality?: number;
+  tiffCompression?: string;
+  gifReuse?: boolean;
+  jxlDistance?: number;
+};
+
+const ENCODER_OPTION_KEYS = [
+  "formatOut",
+  "jpegQuality",
+  "pngPalette",
+  "pngQuality",
+  "webpQuality",
+  "heifQuality",
+  "heifEffort",
+  "tiffQuality",
+  "tiffCompression",
+  "gifReuse",
+  "jxlDistance",
+] as const;
+
+function hasNonRecombTransformStage(image: Sharp): boolean {
+  const opts = (image as unknown as { options?: PipelineOptions }).options;
+  if (!opts) return false;
+  return (
+    Boolean(opts.negate) ||
+    (opts.linearA?.length ?? 0) > 0 ||
+    (opts.sharpenSigma ?? 0) !== 0 ||
+    (opts.brightness ?? 1) !== 1 ||
+    (opts.saturation ?? 1) !== 1 ||
+    opts.convKernel !== undefined ||
+    Boolean(opts.greyscale) ||
+    (opts.topOffsetPre ?? -1) !== -1 ||
+    (opts.topOffsetPost ?? -1) !== -1 ||
+    (opts.width ?? -1) !== -1 ||
+    (opts.height ?? -1) !== -1 ||
+    (opts.angle ?? 0) !== 0 ||
+    (opts.rotationAngle ?? 0) !== 0 ||
+    Boolean(opts.flip) ||
+    Boolean(opts.flop)
+  );
+}
+
+function shouldMaterializeBefore(
+  image: Sharp,
+  op: Operation,
+  metadataStrippedAll: boolean,
+): boolean {
+  const opts = (image as unknown as { options?: PipelineOptions }).options;
+  if (op.type === "edit-metadata") {
+    return metadataStrippedAll || (opts?.keepMetadata ?? 0) !== 0;
+  }
+  if (!TRANSFORM_OPS.has(op.type)) return false;
+  if (RECOMB_OPS.has(op.type)) {
+    return hasNonRecombTransformStage(image);
+  }
+  return hasFloatPipelineStage(image) || hasNonRecombTransformStage(image);
+}
+
+function isStripAllOptions(options: Record<string, unknown>): boolean {
+  return (
+    options.stripAll === true ||
+    ((options.stripExif === true || options.stripGps === true) &&
+      options.stripIcc === true &&
+      options.stripXmp === true) ||
+    (options.stripExif === undefined &&
+      options.stripGps === undefined &&
+      options.stripIcc === undefined &&
+      options.stripXmp === undefined &&
+      options.stripAll === undefined)
+  );
+}
+
+async function materializeStage(
+  image: Sharp,
+  metadataStrippedAll: boolean,
+  metadataRestrictedByStrip: boolean,
+): Promise<Sharp> {
+  const opts = (image as unknown as { options?: PipelineOptions }).options;
+  const prevKeepMetadata = opts?.keepMetadata ?? 0;
+  const prevLastStripKeepMetadata = opts?.lastStripKeepMetadata;
+  const prevFormatOut = opts?.formatOut;
+  const savedEncoderOpts: Partial<Record<(typeof ENCODER_OPTION_KEYS)[number], unknown>> = {};
+  if (opts && prevFormatOut && prevFormatOut !== "input") {
+    for (const key of ENCODER_OPTION_KEYS) {
+      savedEncoderOpts[key] = opts[key];
+    }
+  }
+  const shouldKeepAllForLaterOps = !metadataRestrictedByStrip && !metadataStrippedAll;
+  const buf = await (shouldKeepAllForLaterOps ? image.keepMetadata() : image)
+    .png({ palette: false })
+    .toBuffer();
+  const next = sharp(buf);
+  const nextOpts = (next as unknown as { options?: PipelineOptions }).options;
+  if (nextOpts) {
+    if (prevKeepMetadata !== 0) {
+      nextOpts.keepMetadata = prevKeepMetadata;
+    }
+    if (prevLastStripKeepMetadata !== undefined) {
+      nextOpts.lastStripKeepMetadata = prevLastStripKeepMetadata;
+    }
+    if (prevFormatOut && prevFormatOut !== "input") {
+      Object.assign(nextOpts, savedEncoderOpts);
+    }
+  }
+  return next;
+}
+
 /**
  * Process an image through a pipeline of operations.
  *
@@ -94,6 +250,9 @@ export async function processImage(
   outputFormat?: OutputFormat,
 ): Promise<OperationResult> {
   let image: Sharp = sharp(input);
+  let materialized = false;
+  let metadataStrippedAll = false;
+  let metadataRestrictedByStrip = false;
 
   // Apply each operation in sequence
   for (const op of operations) {
@@ -101,16 +260,80 @@ export async function processImage(
     if (!handler) {
       throw new Error(`Unknown operation: ${op.type}`);
     }
-    image = await handler(image, op.options);
+    if (shouldMaterializeBefore(image, op, metadataStrippedAll)) {
+      image = await materializeStage(image, metadataStrippedAll, metadataRestrictedByStrip);
+      materialized = true;
+    }
+    const opOptions =
+      materialized &&
+      op.type === "compress" &&
+      op.options.format === undefined &&
+      (image as unknown as { options?: PipelineOptions }).options?.formatOut === "input"
+        ? { ...op.options, format: (await sharp(input).metadata()).format }
+        : op.options;
+    image = await handler(image, opOptions);
+    if (op.type === "strip-metadata") {
+      const opts = (image as unknown as { options?: PipelineOptions }).options;
+      if (isStripAllOptions(op.options) || (opts?.keepMetadata ?? 0) === 0) {
+        metadataStrippedAll = true;
+        metadataRestrictedByStrip = true;
+        if (opts) opts.keepMetadata = 0;
+      } else {
+        metadataStrippedAll = false;
+        const strippingNothing =
+          !op.options.stripExif &&
+          !op.options.stripGps &&
+          !op.options.stripIcc &&
+          !op.options.stripXmp;
+        metadataRestrictedByStrip = !strippingNothing;
+      }
+    } else if (op.type === "edit-metadata") {
+      metadataStrippedAll = false;
+    }
   }
 
-  // Convert to output format if specified
+  // Resolve effective target format from outputFormat, the last convert/compress
+  // operation in operations[], or the input metadata when neither is present (#3114).
+  let sharpFormat: string | undefined;
   if (outputFormat) {
-    const sharpFormat = FORMAT_MAP[outputFormat];
+    sharpFormat = FORMAT_MAP[outputFormat];
     if (!sharpFormat) {
       throw new Error(`Unsupported output format: ${outputFormat}`);
     }
-    image = image.toFormat(sharpFormat as SharpFormat);
+  } else {
+    for (let i = operations.length - 1; i >= 0; i--) {
+      const op = operations[i];
+      if (
+        (op.type === "convert" || op.type === "compress") &&
+        typeof op.options.format === "string"
+      ) {
+        sharpFormat = op.options.format === "jpeg" ? "jpeg" : FORMAT_MAP[op.options.format];
+        break;
+      }
+    }
+    if (!sharpFormat) {
+      const inputMeta = await sharp(input).metadata();
+      sharpFormat = inputMeta.format;
+    }
+  }
+
+  const formatResetByMaterialize =
+    materialized &&
+    (image as unknown as { options?: PipelineOptions }).options?.formatOut === "input";
+
+  if (outputFormat || formatResetByMaterialize || sharpFormat === "gif" || sharpFormat === "tiff") {
+    const formatOptions: Record<string, unknown> = {};
+    if (sharpFormat === "gif") {
+      formatOptions.reuse = false;
+    } else if (sharpFormat === "tiff") {
+      formatOptions.compression = "lzw";
+      // vips_recomb and 3-channel vips_convolve leave the pipeline in 32-bit
+      // float (0..255), which LZW tiffsave writes as a float scRGB TIFF unless
+      // cast back to 8-bit uchar first (#2607, #3114). keepMetadata() forwards
+      // any ICC/XMP metadata that the first hop intentionally kept.
+      image = sharp(await image.png().toBuffer()).keepMetadata();
+    }
+    image = image.toFormat(sharpFormat as SharpFormat, formatOptions);
   }
 
   const buffer = await image.toBuffer();

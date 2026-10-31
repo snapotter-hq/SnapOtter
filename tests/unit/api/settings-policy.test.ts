@@ -1,8 +1,14 @@
+import {
+  isPasswordRuleEnabled,
+  isPasswordRuleSettingKey,
+  normalizePasswordRuleSetting,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   getSettingPolicy,
   isConfigExportableSetting,
   prepareSetting,
+  SETTING_POLICIES,
 } from "../../../apps/api/src/lib/settings-policy.js";
 
 describe("settings policy registry", () => {
@@ -12,6 +18,8 @@ describe("settings policy registry", () => {
     { key: "tempFileMaxAgeHours", input: "1.5", expected: "1.5" },
     { key: "startupCleanup", input: true, expected: "true" },
     { key: "jobsRetentionDays", input: 30, expected: "30" },
+    // Surrounding whitespace is still accepted; only an all-blank value is refused (#1695).
+    { key: "maxSessionsPerUser", input: " 30 ", expected: "30" },
     // 0 is a valid override here: it disables the login throttle.
     { key: "loginThrottleMaxFailures", input: 0, expected: "0" },
     { key: "loginThrottleWindowSeconds", input: "900", expected: "900" },
@@ -33,9 +41,16 @@ describe("settings policy registry", () => {
     { key: "loginAttemptLimit", input: "0" },
     { key: "loginThrottleMaxFailures", input: "-1" },
     { key: "loginThrottleWindowSeconds", input: "0" },
-    { key: "passwordMinLength", input: "7" },
+    { key: "passwordMinLength", input: "0" },
     { key: "disabledTools", input: "not-json" },
     { key: "ssoBreakGlassUsername", input: "invalid username" },
+    // Number("") is 0, and 0 means unlimited or off for these keys (#1695).
+    { key: "maxSessionsPerUser", input: "" },
+    { key: "maxSessionsPerUser", input: "   " },
+    { key: "jobsRetentionDays", input: "" },
+    { key: "sessionIdleTimeoutMinutes", input: "\t" },
+    { key: "fileUploadLimitMb", input: "" },
+    { key: "tempFileMaxAgeHours", input: "  " },
   ])("rejects invalid $key values", ({ key, input }) => {
     const result = prepareSetting(key, input);
 
@@ -86,5 +101,47 @@ describe("settings policy registry", () => {
     expect(getSettingPolicy("loginThrottleWindowSeconds")?.write).toBe("security:manage");
     expect(getSettingPolicy("auditRetentionDays")?.write).toBe("compliance:manage");
     expect(getSettingPolicy("oidc_client_secret")?.write).toBe("full-admin");
+  });
+
+  it("marks every encrypted setting policy as redacted (#2534)", () => {
+    const encryptedEntries = Object.entries(SETTING_POLICIES).filter(
+      ([, policy]) => policy.encrypted,
+    );
+    expect(encryptedEntries.length).toBeGreaterThan(0);
+    for (const [key, policy] of encryptedEntries) {
+      expect(policy.redacted, `${key} has encrypted: true without redacted: true`).toBe(true);
+    }
+  });
+
+  describe("shared password-rule helpers (#2036)", () => {
+    it.each([
+      "passwordRequireUppercase",
+      "passwordRequireLowercase",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+    ] as const)("treats default-on rule %s as enabled unless stored as false", (key) => {
+      expect(isPasswordRuleSettingKey(key)).toBe(true);
+      for (const onValue of [undefined, null, "true", "TRUE", "1", "0", "FALSE", "", "yes"]) {
+        expect(isPasswordRuleEnabled(key, onValue)).toBe(true);
+        expect(normalizePasswordRuleSetting(key, onValue)).toBe("true");
+      }
+      expect(isPasswordRuleEnabled(key, "false")).toBe(false);
+      expect(normalizePasswordRuleSetting(key, "false")).toBe("false");
+    });
+
+    it("treats passwordRequireSpecial as enabled only when stored as true", () => {
+      expect(isPasswordRuleSettingKey("passwordRequireSpecial")).toBe(true);
+      expect(isPasswordRuleEnabled("passwordRequireSpecial", "true")).toBe(true);
+      expect(normalizePasswordRuleSetting("passwordRequireSpecial", "true")).toBe("true");
+      for (const offValue of [undefined, null, "false", "TRUE", "1", "0", "", "yes"]) {
+        expect(isPasswordRuleEnabled("passwordRequireSpecial", offValue)).toBe(false);
+        expect(normalizePasswordRuleSetting("passwordRequireSpecial", offValue)).toBe("false");
+      }
+    });
+
+    it("identifies only password-rule boolean setting keys", () => {
+      expect(isPasswordRuleSettingKey("passwordMinLength")).toBe(false);
+      expect(isPasswordRuleSettingKey("defaultTheme")).toBe(false);
+    });
   });
 });

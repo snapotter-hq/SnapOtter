@@ -24,10 +24,20 @@ vi.mock("@/lib/api", async (importOriginal) => {
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth }));
 
+// A PostHog-backed instance by default; the no-sink case flips feedbackSink.
+const analyticsConfig = vi.hoisted(() => ({
+  enabled: true,
+  posthogApiKey: "phc_test",
+  feedbackSink: true,
+}));
+
 vi.mock("@/stores/analytics-store", () => ({
   useAnalyticsStore: (
-    selector: (state: { config: { enabled: boolean }; configLoaded: boolean }) => unknown,
-  ) => selector({ config: { enabled: true }, configLoaded: true }),
+    selector: (state: {
+      config: { enabled: boolean; posthogApiKey: string; feedbackSink: boolean };
+      configLoaded: boolean;
+    }) => unknown,
+  ) => selector({ config: analyticsConfig, configLoaded: true }),
 }));
 
 import { UsageSurveyOverlay } from "@/components/onboarding/usage-survey-overlay";
@@ -37,14 +47,38 @@ import { UsageSurveyOverlay } from "@/components/onboarding/usage-survey-overlay
 const PROCESSED = { "onboarding.firstProcessedAt": "2026-01-01T00:00:00Z" };
 
 afterEach(() => {
+  analyticsConfig.enabled = true;
+  analyticsConfig.posthogApiKey = "phc_test";
+  analyticsConfig.feedbackSink = true;
   cleanup();
-  submitFeedback.mockClear();
+  submitFeedback.mockReset();
+  submitFeedback.mockResolvedValue({ ok: true, accepted: true });
   trackFeedbackPromptShown.mockClear();
   trackFeedbackPromptDismissed.mockClear();
-  apiGet.mockClear();
+  // Reset, not clear: answerSettingsLater installs an implementation that a
+  // later test must not inherit.
+  apiGet.mockReset();
   apiPut.mockClear();
   useAuth.mockReset();
 });
+
+// Answers the settings read on a later macrotask, the way a loaded runner does.
+// A "stays hidden" check must survive that delay: asserting absence before the
+// read lands passes whether or not the overlay would have shown (#1802).
+function answerSettingsLater(settings: Record<string, string>) {
+  apiGet.mockImplementation(
+    () => new Promise((resolve) => setTimeout(() => resolve({ settings }), 20)),
+  );
+}
+
+// Absence only means something once the overlay has seen its settings: wait for
+// the read to resolve and for React to commit whatever it decided.
+async function settingsReadSettled() {
+  await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+  await act(async () => {
+    await apiGet.mock.results[0]?.value;
+  });
+}
 
 function renderOverlay(initialPath = "/") {
   return render(
@@ -66,25 +100,39 @@ describe("UsageSurveyOverlay", () => {
 
   it("stays hidden until the instance's first processing has completed", async () => {
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
-    apiGet.mockResolvedValue({ settings: {} });
+    answerSettingsLater({});
 
     renderOverlay();
 
-    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    await settingsReadSettled();
+    expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
+    expect(trackFeedbackPromptShown).not.toHaveBeenCalled();
+  });
+
+  it("isn't offered when the server has no feedback sink, even with a baked key (#2220, #2252)", async () => {
+    analyticsConfig.feedbackSink = false;
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    answerSettingsLater(PROCESSED);
+
+    renderOverlay();
+
+    await settingsReadSettled();
     expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
     expect(trackFeedbackPromptShown).not.toHaveBeenCalled();
   });
 
   it("renders nothing once already answered or dismissed", async () => {
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
-    apiGet.mockResolvedValue({
-      settings: { ...PROCESSED, "onboarding.usageSurvey.dismissedAt": "2026-01-01T00:00:00Z" },
+    answerSettingsLater({
+      ...PROCESSED,
+      "onboarding.usageSurvey.dismissedAt": "2026-01-01T00:00:00Z",
     });
 
     renderOverlay();
 
-    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    await settingsReadSettled();
     expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
+    expect(trackFeedbackPromptShown).not.toHaveBeenCalled();
   });
 
   it("shows the telemetry-blind questions after processing and emits a shown event", async () => {
@@ -194,6 +242,28 @@ describe("UsageSurveyOverlay", () => {
     expect(submitFeedback).toHaveBeenCalledTimes(1);
   });
 
+  it("does not mark the survey answered when the server declines the answer (#2252)", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: PROCESSED });
+    submitFeedback.mockResolvedValueOnce({ ok: true, accepted: false });
+
+    renderOverlay();
+    await screen.findByText("How are you using SnapOtter?");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled(),
+    );
+
+    // A declined answer was not recorded, so the survey must not claim it was.
+    expect(apiPut).not.toHaveBeenCalled();
+    expect(screen.getByText("How are you using SnapOtter?")).toBeDefined();
+    expect(screen.getByText("Feedback could not be sent. Please try again.")).toBeInTheDocument();
+  });
+
   it("stays visible and re-enables Continue if the feedback submission itself fails", async () => {
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({ settings: PROCESSED });
@@ -212,6 +282,7 @@ describe("UsageSurveyOverlay", () => {
 
     expect(screen.getByText("How are you using SnapOtter?")).toBeDefined();
     expect(apiPut).not.toHaveBeenCalled();
+    expect(screen.getByText("Feedback could not be sent. Please try again.")).toBeInTheDocument();
   });
 
   it("ignores a second dismiss click while the first write is in flight", async () => {

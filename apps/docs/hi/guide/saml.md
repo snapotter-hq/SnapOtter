@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter के लिए SAML 2.0 Single Sign-On सेटअप करें। Okta, Azure AD / Entra ID, Google Workspace, और अन्य SAML identity providers के लिए चरण-दर-चरण गाइड।"
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: f14eea5bfa2f
+i18n_output_hash: 2292de650ef6
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ auto-link केवल तभी सक्षम करें जब आप अ�
 2. **Admin Settings > Security** में, **SSO Enforcement** को on टॉगल करें।
 3. एक **break-glass username** सेट करें: यह वह एकमात्र स्थानीय account है जो अब भी password से login कर सकता है, IdP के पहुँच से बाहर होने पर आपातकालीन पहुँच के लिए।
 
-जब SSO enforcement सक्रिय हो, तो किसी भी स्थानीय login प्रयास (break-glass user को छोड़कर) पर "Local password login is disabled. Please use SSO." संदेश के साथ एक 403 त्रुटि लौटती है।
+जब SSO enforcement सक्रिय हो, तो केवल break-glass user ही स्थानीय पासवर्ड से login कर सकता है। किसी भी अन्य स्थानीय login प्रयास को वही 401 "Invalid credentials" देकर अस्वीकार कर दिया जाता है जो गलत पासवर्ड पर मिलता है, भले ही पासवर्ड सही हो, और वह login throttle में गिना जाता है।
 
 ::: tip 
 SSO enforcement सक्षम करने से पहले हमेशा एक break-glass username configure करें। इसके बिना, यदि आपका IdP डाउन हो जाता है तो आप SnapOtter से बाहर लॉक हो सकते हैं।

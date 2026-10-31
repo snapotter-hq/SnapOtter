@@ -4,8 +4,9 @@
  * The existing settings-policy.test.ts covers the basics. This file pins the
  * survived / no-coverage mutants:
  *   - validateSettingsRuntimeConstraints: the MFA license gate (admins_only /
- *     required only), the SSO-enforcement gate (value === "true" AND neither
- *     OIDC nor SAML configured), and the exact statusCode / code it returns.
+ *     required only), the SSO-enforcement gate (value === "true" needs a
+ *     configured OIDC or SAML provider, then the sso_enforcement licence, #2298),
+ *     and the exact statusCode / code it returns.
  *   - prepareSetting: the no-schema branch (storageKey remap + JSON.stringify of
  *     non-strings), the storageKey remap on the schema branch, and the
  *     UNKNOWN_SETTING / VALIDATION_ERROR discriminators.
@@ -22,6 +23,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   mfaLicensed: false,
+  ssoLicensed: false,
   enterpriseThrows: false,
   oidcEnabled: false,
   samlEnabled: false,
@@ -30,7 +32,9 @@ const state = vi.hoisted(() => ({
 vi.mock("@snapotter/enterprise", () => ({
   isFeatureEnabled: (feature: string) => {
     if (state.enterpriseThrows) throw new Error("enterprise unavailable");
-    return feature === "mfa" ? state.mfaLicensed : false;
+    if (feature === "mfa") return state.mfaLicensed;
+    if (feature === "sso_enforcement") return state.ssoLicensed;
+    return false;
   },
 }));
 
@@ -54,6 +58,7 @@ import {
 
 beforeEach(() => {
   state.mfaLicensed = false;
+  state.ssoLicensed = false;
   state.enterpriseThrows = false;
   state.oidcEnabled = false;
   state.samlEnabled = false;
@@ -113,16 +118,16 @@ describe("prepareSetting Zod refinements", () => {
     expect(prepareSetting("loginAttemptLimit", "0")).toMatchObject({ success: false });
   });
 
-  it("accepts passwordMinLength at its lower and upper bounds (8 and 128)", () => {
-    expect(prepareSetting("passwordMinLength", "8")).toMatchObject({ success: true, value: "8" });
+  it("accepts passwordMinLength at its lower and upper bounds (1 and 128)", () => {
+    expect(prepareSetting("passwordMinLength", "1")).toMatchObject({ success: true, value: "1" });
     expect(prepareSetting("passwordMinLength", "128")).toMatchObject({
       success: true,
       value: "128",
     });
   });
 
-  it("rejects passwordMinLength just outside each bound (7 and 129)", () => {
-    expect(prepareSetting("passwordMinLength", "7")).toMatchObject({ success: false });
+  it("rejects passwordMinLength just outside each bound (0 and 129)", () => {
+    expect(prepareSetting("passwordMinLength", "0")).toMatchObject({ success: false });
     expect(prepareSetting("passwordMinLength", "129")).toMatchObject({ success: false });
   });
 
@@ -248,6 +253,26 @@ describe("isConfigExportableSetting", () => {
 // ── validateSettingsRuntimeConstraints: MFA + SSO gates ───────────────────
 
 describe("validateSettingsRuntimeConstraints: MFA licensing", () => {
+  it("names the setting it refused, so a caller can point at the row (#2339)", async () => {
+    state.mfaLicensed = false;
+    const mfa = await validateSettingsRuntimeConstraints([{ key: "mfaPolicy", value: "required" }]);
+    expect(mfa).toMatchObject({ success: false, setting: "mfaPolicy" });
+
+    state.oidcEnabled = false;
+    state.samlEnabled = false;
+    const sso = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(sso).toMatchObject({ success: false, setting: "ssoEnforcement" });
+
+    state.oidcEnabled = true;
+    state.ssoLicensed = false;
+    const unlicensed = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(unlicensed).toMatchObject({ success: false, setting: "ssoEnforcement" });
+  });
+
   it("blocks mfaPolicy=required with 403 FEATURE_NOT_LICENSED when MFA is unlicensed", async () => {
     state.mfaLicensed = false;
     const result = await validateSettingsRuntimeConstraints([
@@ -310,7 +335,8 @@ describe("validateSettingsRuntimeConstraints: SSO enforcement", () => {
     }
   });
 
-  it("allows ssoEnforcement=true when OIDC is configured", async () => {
+  it("allows ssoEnforcement=true when OIDC is configured and the feature is licensed", async () => {
+    state.ssoLicensed = true;
     state.oidcEnabled = true;
     state.samlEnabled = false;
     const result = await validateSettingsRuntimeConstraints([
@@ -319,11 +345,50 @@ describe("validateSettingsRuntimeConstraints: SSO enforcement", () => {
     expect(result).toEqual({ success: true });
   });
 
-  it("allows ssoEnforcement=true when only SAML is configured", async () => {
+  it("allows ssoEnforcement=true when only SAML is configured and the feature is licensed", async () => {
+    state.ssoLicensed = true;
     state.oidcEnabled = false;
     state.samlEnabled = true;
     const result = await validateSettingsRuntimeConstraints([
       { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(result).toEqual({ success: true });
+  });
+
+  it("blocks ssoEnforcement=true with 403 FEATURE_NOT_LICENSED when a provider is configured but the feature isn't licensed (#2298)", async () => {
+    state.oidcEnabled = true;
+    state.ssoLicensed = false;
+    const result = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(result).toMatchObject({
+      success: false,
+      statusCode: 403,
+      code: "FEATURE_NOT_LICENSED",
+    });
+  });
+
+  it("still names the missing provider first when neither a provider nor the licence is there", async () => {
+    const result = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(result).toMatchObject({ success: false, code: "DEPENDENCY_VALIDATION_FAILED" });
+  });
+
+  it("treats an enterprise import failure as unlicensed for ssoEnforcement too", async () => {
+    state.oidcEnabled = true;
+    state.enterpriseThrows = true;
+    const result = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(result).toMatchObject({ success: false, code: "FEATURE_NOT_LICENSED" });
+  });
+
+  it("lets an unlicensed instance switch ssoEnforcement off", async () => {
+    state.oidcEnabled = true;
+    state.ssoLicensed = false;
+    const result = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "false" },
     ]);
     expect(result).toEqual({ success: true });
   });

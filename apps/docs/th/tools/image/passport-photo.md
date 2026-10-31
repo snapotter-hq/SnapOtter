@@ -1,8 +1,8 @@
 ---
 description: "ตัวสร้างรูปถ่ายพาสปอร์ตและบัตรประชาชนด้วย AI พร้อมการตรวจจับใบหน้า การลบพื้นหลัง และการเรียงต่อสำหรับพิมพ์"
-i18n_source_hash: d4b4f4ced988
+i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 95b054c1d02b
+i18n_output_hash: cf90cdf1c56e
 ---
 
 # Passport Photo {#passport-photo}
@@ -92,7 +92,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | documentType | string | No | `"passport"` | ประเภทเอกสาร (จากข้อกำหนดของประเทศ) |
 | bgColor | string | No | `"#FFFFFF"` | สีพื้นหลังแบบ hex |
 | printLayout | string | No | `"none"` | เลย์เอาต์กระดาษพิมพ์: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | ข้อจำกัดขนาดไฟล์สูงสุดเป็น KB (0 = ไม่จำกัด) |
+| maxFileSizeKb | number | No | `0` | ขนาดไฟล์สูงสุดเป็น KB โดย 1 KB = 1000 ไบต์ (0 = ไม่จำกัด) |
 | dpi | number | No | `300` | DPI เอาต์พุต (72-1200) |
 | customWidthMm | number | No | - | ความกว้างรูปถ่ายที่กำหนดเองเป็นมม. (แทนที่ข้อกำหนดของประเทศ) |
 | customHeightMm | number | No | - | ความสูงรูปถ่ายที่กำหนดเองเป็นมม. (แทนที่ข้อกำหนดของประเทศ) |
@@ -148,6 +148,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Error: Analysis Expired (410) {#error-analysis-expired-410}
+
+Generate ทำงานจากภาพที่ลบพื้นหลังแล้วซึ่ง analyze จัดเก็บไว้สำหรับ `jobId` เอาต์พุตที่จัดเก็บไว้จะถูกล้างออกไปตามเวลา หากเวลาผ่านไปนานเกินไประหว่างการเรียกสองครั้ง ภาพนั้นจะหายไป ให้เรียก analyze อีกครั้งด้วยรูปถ่ายเดิมและใช้ `jobId` ที่ได้กลับมา
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+`jobId` หรือ `filename` ที่ระบุไฟล์ที่จัดเก็บไว้ไม่ได้ (มีเครื่องหมายคั่นพาธ, `..`, สตริงว่าง) จะตอบกลับ 400
+
 ---
 
 ### Base Route {#base-route}
@@ -170,4 +183,4 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 - ฟิลด์ `preview` ในการตอบกลับของ analyze เป็น PNG ที่เข้ารหัสแบบ base64 (กว้างสูงสุด 800px) เพื่อการแสดงผลที่รวดเร็ว
 - ข้อกำหนดของประเทศรวมมิติเอกสาร อัตราส่วนความสูงของศีรษะ และตำแหน่งเส้นระดับสายตาตามข้อกำหนดรูปถ่ายพาสปอร์ตอย่างเป็นทางการ
 - ตัวเลือก `printLayout` จะสร้างแผ่นที่เรียงต่อกันบนกระดาษ 4x6\" หรือ A4 พร้อมช่องว่าง 2มม. ระหว่างรูปถ่าย
-- เมื่อตั้งค่า `maxFileSizeKb` เอาต์พุตจะถูกบีบอัดซ้ำ ๆ เพื่อให้อยู่ในขีดจำกัดขนาด
+- เมื่อตั้งค่า `maxFileSizeKb` คุณภาพ JPEG ของเอาต์พุตจะถูกลดลงทีละขั้นจนกว่าจะพอดี ขนาดพิกเซลถูกกำหนดตายตัวโดยข้อกำหนดของประเทศ ดังนั้นหากรูปถ่ายยังไม่พอดีแม้ที่คุณภาพต่ำสุด `/generate` จะคืนค่า 422 พร้อมข้อความแจ้ง แทนที่จะคืนไฟล์ที่เกินขีดจำกัด

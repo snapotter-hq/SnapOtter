@@ -1,6 +1,6 @@
 ---
 description: "Как участвовать в развитии SnapOtter. Отчёты об ошибках, запросы функций, pull request'ы и требования CLA."
-i18n_source_hash: 6c920a5f83e0
+i18n_source_hash: b053a84679da
 i18n_provenance: human
 i18n_output_hash: ad5af3c27b23
 i18n_hash_version: 2

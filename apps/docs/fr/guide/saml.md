@@ -1,8 +1,9 @@
 ---
 description: "Configurez l'authentification unique SAML 2.0 pour SnapOtter. Guides étape par étape pour Okta, Azure AD / Entra ID, Google Workspace et d'autres fournisseurs d'identité SAML."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: f6164bc8d2bb
+i18n_output_hash: 1e03319fc627
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Si vous voulez exiger que tous les utilisateurs se connectent via SAML (ou OIDC)
 2. Dans **Admin Settings > Security**, activez **SSO Enforcement**.
 3. Définissez un **nom d'utilisateur de secours (break-glass)** : c'est le seul compte local qui peut encore se connecter avec un mot de passe, pour un accès d'urgence si l'IdP est injoignable.
 
-Lorsque l'application du SSO est active, toute tentative de connexion locale (à l'exception de l'utilisateur de secours) renvoie une erreur 403 avec le message « Local password login is disabled. Please use SSO. »
+Lorsque l'application du SSO est active, seul l'utilisateur de secours peut se connecter avec un mot de passe local. Toute autre tentative de connexion locale est refusée avec le même 401 « Invalid credentials » qu'un mot de passe incorrect, même si le mot de passe est correct, et compte dans la limitation des connexions.
 
 ::: tip 
 Configurez toujours un nom d'utilisateur de secours avant d'activer l'application du SSO. Sans lui, vous pourriez être verrouillé hors de SnapOtter si votre IdP tombe en panne.

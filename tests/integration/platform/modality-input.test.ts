@@ -54,6 +54,31 @@ describe.skipIf(!ffmpegAvailable())("MediaInputHandler (requires ffmpeg)", () =>
   });
 });
 
+describe("MediaInputHandler AbortSignal (#3709)", () => {
+  it("rejects immediately when signal is already aborted on subtitle and video paths", async () => {
+    const srt = Buffer.from("1\n00:00:01,000 --> 00:00:04,000\nHello\n");
+    const subController = new AbortController();
+    const subReason = new DOMException("Pre-aborted subtitle", "AbortError");
+    subController.abort(subReason);
+    await expect(
+      new MediaInputHandler("subtitle").prepare(srt, "tiny.srt", {
+        scratchDir,
+        signal: subController.signal,
+      }),
+    ).rejects.toBe(subReason);
+
+    const vidController = new AbortController();
+    const vidReason = new DOMException("Pre-aborted video", "AbortError");
+    vidController.abort(vidReason);
+    await expect(
+      new MediaInputHandler("video").prepare(Buffer.from("not-probed"), "tiny.mp4", {
+        scratchDir,
+        signal: vidController.signal,
+      }),
+    ).rejects.toBe(vidReason);
+  });
+});
+
 describe("DocumentInputHandler", () => {
   it("rejects a non-pdf with pdf extension", async () => {
     await expect(
@@ -86,9 +111,18 @@ describe("DocumentInputHandler", () => {
   it.skipIf(!qpdfAvailable())("rejects a truncated PDF under strict mode", async () => {
     const full = readFixture(fixtures.document.pdf3);
     const truncated = full.subarray(0, Math.floor(full.length * 0.6));
-    await expect(
-      new DocumentInputHandler().prepare(truncated, "broken.pdf", { scratchDir }),
-    ).rejects.toThrow(/Damaged PDF/);
+    const err = await new DocumentInputHandler()
+      .prepare(truncated, "broken.pdf", { scratchDir })
+      .then(
+        (): Error => {
+          throw new Error("expected rejection");
+        },
+        (e: unknown): Error => e as Error,
+      );
+    expect(err.message).toMatch(/Damaged PDF/);
+    expect(err.message).toContain("[internal]");
+    expect(err.message).not.toContain(scratchDir);
+    expect(err.message).not.toContain(tmpdir());
   });
 
   it.skipIf(!qpdfAvailable())("accepts a truncated PDF under lenient mode", async () => {

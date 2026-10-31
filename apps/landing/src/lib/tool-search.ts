@@ -1,4 +1,4 @@
-import { normalizeSearchQuery } from "@snapotter/shared/search/format-aliases.js";
+import { isJoinableFormat, normalizeSearchQuery } from "@snapotter/shared/search/format-aliases.js";
 
 export type ModalityFilter =
   | "all"
@@ -322,17 +322,17 @@ function normalizeNoopFormatAliasToken(token: string): string {
 }
 
 function expandCompactConversionToken(token: string): string {
-  const match = token.match(/^([a-z0-9]+)(?:2|to)([a-z0-9]+)$/);
-  if (!match) return token;
-
-  const [, sourceToken, destinationToken] = match;
-  if (
-    sourceToken &&
-    destinationToken &&
-    isConcreteConversionFormatToken(sourceToken) &&
-    isConcreteConversionFormatToken(destinationToken)
-  ) {
-    return `${sourceToken} to ${destinationToken}`;
+  // Try every "2"/"to" in the token: formats contain both ("m2ts", "photo"),
+  // so the first or last one isn't always the connective ("mp32m2ts").
+  for (const match of token.matchAll(/2|to/g)) {
+    const sourceToken = token.slice(0, match.index);
+    const destinationToken = token.slice(match.index + match[0].length);
+    if (
+      isCompactConversionFormatToken(sourceToken) &&
+      isCompactConversionFormatToken(destinationToken)
+    ) {
+      return `${sourceToken} to ${destinationToken}`;
+    }
   }
 
   return token;
@@ -353,6 +353,12 @@ function isKnownConversionFormatToken(token: string): boolean {
 
 function isConcreteConversionFormatToken(token: string): boolean {
   return isKnownConversionFormatToken(token) && !BROAD_CONVERSION_FORMAT_TOKENS.has(token);
+}
+
+// #1420: the shared normalizer's list covers every extension a tool accepts,
+// so a joined query splits here exactly when it splits there.
+function isCompactConversionFormatToken(token: string): boolean {
+  return isConcreteConversionFormatToken(token) || isJoinableFormat(token);
 }
 
 function isBroadConversionFormatToken(token: string): boolean {
@@ -531,7 +537,9 @@ function buildQuery(rawQuery: string): {
   conversionTargetTokens: string[];
   conversionDirection: ConversionDirection;
 } {
-  const raw = plainNormalize(rawQuery);
+  // Split joined forms ("cr3tojpg") so the raw phrase doesn't demand a token
+  // no tool contains (#1420).
+  const raw = tokenize(plainNormalize(rawQuery)).map(expandCompactConversionToken).join(" ");
   const normalized = normalizeSearchQuery(rawQuery);
   const normalizedOrRaw = normalized || raw;
   const basePhrases = unique([raw, normalized]).filter(

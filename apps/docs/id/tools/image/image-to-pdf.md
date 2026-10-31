@@ -1,6 +1,6 @@
 ---
 description: "Gabungkan satu atau lebih gambar menjadi dokumen PDF dengan opsi ukuran halaman, orientasi, dan ukuran file target."
-i18n_source_hash: f659c7e7f56b
+i18n_source_hash: 666b54821528
 i18n_provenance: human
 i18n_output_hash: 968ad5429bc4
 ---

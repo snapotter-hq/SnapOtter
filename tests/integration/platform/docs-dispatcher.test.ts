@@ -81,4 +81,41 @@ describe.skipIf(!hasFitz)("docs dispatcher fitz (requires python + PyMuPDF)", ()
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("aborts an in-flight docs wrapper while a concurrent sibling docs call survives via per-request fallback (#2733)", async () => {
+    const pdf = fixtures.document.pdf3;
+    const dir = mkdtempSync(join(tmpdir(), "concurrent-cancel-"));
+    try {
+      // Warm up the shared docs dispatcher so both concurrent calls enter dispatcherRun.
+      const readyStatus = await getDocsDispatcher().init();
+      expect(readyStatus.ready).toBe(true);
+
+      const canceledAc = new AbortController();
+      const siblingAc = new AbortController();
+      const out1 = join(dir, "canceled.txt");
+      const out2 = join(dir, "survived.txt");
+
+      const canceledPromise = pdfTextPy(pdf, out1, { signal: canceledAc.signal });
+      const siblingPromise = pdfTextPy(pdf, out2, { signal: siblingAc.signal });
+
+      canceledAc.abort(new DOMException("The operation was aborted", "AbortError"));
+
+      const [canceledSettled, siblingResult] = await Promise.all([
+        canceledPromise.then(
+          () => ({ ok: true as const }),
+          (err: unknown) => ({ ok: false as const, err }),
+        ),
+        siblingPromise,
+      ]);
+
+      expect(canceledSettled.ok).toBe(false);
+      if (!canceledSettled.ok) {
+        expect((canceledSettled.err as Error).name).toBe("AbortError");
+      }
+      expect(siblingResult.chars).toBeGreaterThan(0);
+      expect(getDocsDispatcher().getStatus().consecutiveCrashes).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

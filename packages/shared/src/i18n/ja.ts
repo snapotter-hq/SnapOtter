@@ -31,6 +31,7 @@ export const ja: TranslationKeys = {
     clear: "クリア",
     copy: "コピー",
     copied: "コピーしました！",
+    copyFailed: "コピーに失敗しました",
     noResults: "結果が見つかりません",
     showLess: "折りたたむ",
     showMore: "あと{count}件を表示",
@@ -1065,6 +1066,10 @@ export const ja: TranslationKeys = {
       name: "PDF 整理",
       description: "ページ順を指定して並べ替え",
     },
+    "multi-tool-pdf": {
+      name: "PDF マルチツール",
+      description: "1 つのエディターでページの並べ替え・回転・削除と他の PDF からのページ取り込み",
+    },
     "protect-pdf": {
       name: "PDF 保護",
       description: "パスワード保護を追加 (AES-256 暗号化)",
@@ -1198,7 +1203,13 @@ export const ja: TranslationKeys = {
         "爆弾保護付きで ZIP アーカイブからファイルを安全に展開。単一ファイルのアーカイブはそのまま返します。",
     },
     pipeline: { name: "Pipelineビルダー", description: "複数のツールをワークフローに連結" },
-    processing: { canceled: "処理がキャンセルされました" },
+    processing: {
+      canceled: "処理がキャンセルされました",
+      cancelUnavailable: "この処理は現在キャンセルできません。処理は続行中です。",
+      cancelNotAllowed:
+        "キャンセルできません。サインアウトしているか、この処理を停止する権限がありません。処理は続行中です。",
+      cancelFailed: "処理をキャンセルできませんでした。処理は続行中です。もう一度お試しください。",
+    },
     mediaPlayer: {
       unsupported: "お使いのブラウザはこのメディア形式に対応していません。",
     },
@@ -1224,7 +1235,6 @@ export const ja: TranslationKeys = {
       paintOverObjectsToErase: "消去したいオブジェクトの上を塗ってください",
     },
     "crop-canvas": {
-      original: "元：",
       cropPreview: "クロッププレビュー",
       cropRegionSize: "クロップ領域：{width} x {height}",
       originalSize: "元：{width} x {height}",
@@ -1257,7 +1267,6 @@ export const ja: TranslationKeys = {
       infoBar: "{width} x {height}px ・ {cols}x{rows}グリッド ・ {count}タイル",
     },
     "remove-bg": {
-      original: "元：",
       transparent: "透明",
       color: "カラー",
       gradient: "グラデーション",
@@ -1284,7 +1293,6 @@ export const ja: TranslationKeys = {
       theExtractedTextWillAppear: "OCRを実行すると、抽出されたテキストがここに表示されます。",
     },
     "image-enhancement": {
-      original: "元：",
       removesNoiseAndArtifactsUsing: "AIでノイズとアーティファクトを除去",
       analyzingImage: "画像を解析中...",
       imageLooksGoodFineTune: "画像は良好です。強度スライダーで微調整してください。",
@@ -1296,8 +1304,6 @@ export const ja: TranslationKeys = {
       enhancedSizeKb: "エンハンス後：{size} KB",
     },
     "find-duplicates-results": {
-      all: "すべて",
-      group: "グループ",
       dimensions: "サイズ",
       format: "フォーマット",
       scanned: "スキャン済み：",
@@ -1332,7 +1338,6 @@ export const ja: TranslationKeys = {
       pageSize: "ページサイズ",
     },
     color: {
-      original: "元：",
       light: "ライト",
       brightness: "明るさ",
       contrast: "コントラスト",
@@ -1370,6 +1375,7 @@ export const ja: TranslationKeys = {
       submitBatch: "圧縮（{count}ファイル）",
       submitTarget: "{size} KBに圧縮",
       resizedToFit: "{size} KBに収めるため{width} × {height}に縮小しました",
+      batchResized: "{total}枚中{count}枚の画像を{size} KBに収めるため縮小しました。",
       progressLabel: "圧縮中",
       original: "元：{size} KB",
       processed: "処理後：{size} KB",
@@ -1400,6 +1406,8 @@ export const ja: TranslationKeys = {
       submit: "リサイズ",
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "リサイズ中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      maxPercentageExceeded: "1〜{max}% の倍率を指定してください。",
     },
     crop: {
       width: "幅",
@@ -1423,6 +1431,7 @@ export const ja: TranslationKeys = {
       submit: "クロップ",
       submitBatch: "クロップ（{count}ファイル）",
       progressLabel: "クロップ中",
+      free: "自由",
     },
     rotate: {
       rotate90CounterClockwise: "反時計回りに90°回転",
@@ -1442,7 +1451,6 @@ export const ja: TranslationKeys = {
       progressLabel: "適用中",
     },
     convert: {
-      original: "元：",
       originalSizeKb: "元：{size} KB",
       processedSizeKb: "処理後：{size} KB",
       targetFormat: "変換先フォーマット",
@@ -1472,7 +1480,6 @@ export const ja: TranslationKeys = {
       progressLabel: "最適化中",
     },
     "strip-metadata": {
-      original: "元：",
       iccProfile: "ICC",
       originalSize: "元：{size} KB",
       processedSize: "処理後：{size} KB",
@@ -1496,9 +1503,9 @@ export const ja: TranslationKeys = {
       metadataRemoved: "削除されたメタデータ：{size} KB",
       submit: "メタデータ削除",
       progressLabel: "メタデータを削除中",
+      inspectFailed: "メタデータの確認に失敗しました",
     },
     "edit-metadata": {
-      original: "元：",
       imageDescription: "画像の説明",
       photographerCreatorName: "撮影者・作成者名",
       imageTitle: "画像タイトル",
@@ -1558,6 +1565,7 @@ export const ja: TranslationKeys = {
       datesShifted: "日付をシフト",
       submit: "メタデータ適用",
       progressLabel: "メタデータを書き込み中",
+      inspectFailed: "ファイルの確認に失敗しました",
     },
     "bulk-rename": {
       pattern: "パターン",
@@ -1568,6 +1576,7 @@ export const ja: TranslationKeys = {
       renaming: "リネーム中...",
       submit: "{count}ファイルをリネーム",
       zipDownloaded: "ZIPのダウンロードが完了しました",
+      renameFailed: "リネームに失敗しました",
     },
     "image-to-pdf": {
       preview: "プレビュー",
@@ -1597,10 +1606,12 @@ export const ja: TranslationKeys = {
       progressLabel: "PDFを作成中",
       uploadingImages: "画像をアップロード中...",
       processingPages: "{count}ページを処理中...",
+      parseResponseFailed: "サーバーの応答の解析に失敗しました",
+      creationFailedWithStatus: "PDFを作成できませんでした。画像を確認してもう一度お試しください。",
+      networkErrorCreation: "PDF作成中にネットワークエラーが発生しました",
+      requestTimedOut: "リクエストがタイムアウトしました。サーバーが過負荷の可能性があります",
     },
     "pdf-to-image": {
-      converting2: "変換中",
-      page: "ページ",
       custom: "カスタム",
       uploadAPdfToGet: "PDFをアップロードして開始してください",
       generatingPagePreviews: "ページプレビューを生成中...",
@@ -1657,6 +1668,12 @@ export const ja: TranslationKeys = {
       submitPlural: "Favicon生成（{count}枚）",
       downloadZip: "Favicon ZIPをダウンロード",
       progressLabel: "Faviconを生成中",
+      generationFailed: "Faviconを生成できませんでした。別の画像をお試しください。",
+      networkError: "Favicon生成中にネットワークエラーが発生しました",
+      timeout: "リクエストがタイムアウトしました。サーバーが過負荷の可能性があります",
+      uploadingImages: "画像をアップロード中...",
+      processingImagesOne: "{count}枚の画像を処理中...",
+      processingImagesOther: "{count}枚の画像を処理中...",
     },
     "adjust-colors": {
       light: "ライト",
@@ -1688,7 +1705,6 @@ export const ja: TranslationKeys = {
       progressLabel: "色を調整中",
     },
     sharpening: {
-      original: "元：",
       originalSize: "元：{size} KB",
       processedSize: "処理後：{size} KB",
       method: "方式",
@@ -1715,9 +1731,17 @@ export const ja: TranslationKeys = {
       submit: "シャープ化",
       submitBatch: "シャープ化（{count}ファイル）",
       progressLabel: "シャープニング中",
+      presetNames: {
+        light: "弱",
+        medium: "中",
+        strong: "強",
+        portrait: "ポートレート",
+        landscape: "風景",
+        detail: "ディテール",
+        print: "印刷",
+      },
     },
     "replace-color": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       sourceColor: "元の色（置換対象）",
@@ -1731,7 +1755,6 @@ export const ja: TranslationKeys = {
       progressLabel: "色を置換中",
     },
     "color-blindness": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       simulationType: "シミュレーションタイプ",
@@ -1741,6 +1764,40 @@ export const ja: TranslationKeys = {
       submit: "シミュレート",
       submitBatch: "シミュレート（{count}ファイル）",
       progressLabel: "色覚をシミュレート中",
+      types: {
+        protanopia: {
+          label: "1型2色覚",
+          description: "赤錐体がありません。赤が暗く見えます。男性の約1%。",
+        },
+        protanomaly: {
+          label: "1型3色覚",
+          description: "赤の感度が低下しています。男性の約1%。",
+        },
+        deuteranopia: {
+          label: "2型2色覚",
+          description: "緑錐体がありません。赤と緑が似て見えます。男性の約1%。",
+        },
+        deuteranomaly: {
+          label: "2型3色覚",
+          description: "緑の感度が低下しています。最も一般的なタイプです。男性の約5%。",
+        },
+        tritanopia: {
+          label: "3型2色覚",
+          description: "青錐体がありません。青と緑が似て見えます。非常にまれです。",
+        },
+        tritanomaly: {
+          label: "3型3色覚",
+          description: "青の感度が低下しています。非常にまれです。",
+        },
+        achromatopsia: {
+          label: "全色盲",
+          description: "色をまったく識別できません。輝度のみを知覚します。非常にまれです。",
+        },
+        blueConeMonochromacy: {
+          label: "青錐体1色覚",
+          description: "青錐体のみが機能します。色の識別は非常に限られます。非常にまれです。",
+        },
+      },
     },
     "remove-background": {
       subject: "被写体",
@@ -1778,6 +1835,28 @@ export const ja: TranslationKeys = {
       submitBatch: "背景を除去（{count}ファイル）",
       progressLabel: "背景を除去中",
       cpuNote: "AIモデルを使用します。GPUがない場合、大きな画像には時間がかかることがあります。",
+      colorPresets: {
+        white: "白",
+        black: "黒",
+        red: "赤",
+        green: "緑",
+        blue: "青",
+      },
+      gradientPresets: {
+        purple: "紫",
+        pink: "ピンク",
+        blue: "青",
+        green: "緑",
+        sunset: "サンセット",
+        lavender: "ラベンダー",
+      },
+      effectsProcessingFailed: "エフェクトの処理に失敗しました",
+      effectsExpired:
+        "以前の背景除去の有効期限が切れたため、再実行しています。完了したらエフェクトを適用してください。",
+      refineChanged:
+        "被写体、品質、エッジの平滑化、色の汚染除去は、背景を削除するときに適用されます。新しい設定を使うには、もう一度実行してください。",
+      backgroundImageRequired: "続行するには背景画像を選択してください。",
+      invalidHexColor: "#FF5500 や #F50 のような 16 進数のカラーコードを入力してください。",
     },
     "remove-gif-background": {
       quality: "品質",
@@ -1817,7 +1896,6 @@ export const ja: TranslationKeys = {
       download: "ダウンロード",
     },
     upscale: {
-      original: "元：",
       off: "オフ",
       originalKb: "元：{size} KB",
       upscaledKb: "アップスケール後：{size} KB",
@@ -1834,9 +1912,11 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像をアップスケール中",
       cpuNote:
         "AIアップスケーリングは処理負荷が高い処理です。GPUがない場合、大きな画像には数分かかることがあります。",
+      qualityFast: "高速",
+      qualityBalanced: "バランス",
+      qualityBest: "最高",
     },
     "erase-object": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       qualityFast: "高速",
@@ -1851,11 +1931,16 @@ export const ja: TranslationKeys = {
       clear: "クリア",
       outputFormat: "出力フォーマット",
       quality: "品質",
-      paintHint: "除去したいオブジェクトの上を塗ってください。Ctrl+Zで元に戻せます。",
-      lassoHint: "除去したいオブジェクトを囲むように輪を描いてください。Ctrl+Zで元に戻せます。",
+      paintHint: "除去したいオブジェクトの上を塗ってください。{shortcut}で元に戻せます。",
+      lassoHint: "除去したいオブジェクトを囲むように輪を描いてください。{shortcut}で元に戻せます。",
       submit: "消去",
       submitBatch: "すべて消去（{count}）",
       progressLabel: "オブジェクトを消去中",
+      stall: "処理が進まないままタイムアウトしました。もう一度お試しください。",
+      stallBatch: "処理がタイムアウトしました。もう一度お試しください。",
+      timeoutOverloaded:
+        "リクエストがタイムアウトしました。サーバーが過負荷の可能性があります。もう一度お試しください。",
+      erasingProgress: "消去中 {current}/{total}",
     },
     ocr: {
       copied: "コピーしました",
@@ -1865,6 +1950,8 @@ export const ja: TranslationKeys = {
         "認識前に局所コントラストを改善します。高速では直接適用し、バランスと最高では調整済みスコアで結果が改善する場合のみ採用します。",
       fastKoreanUnsupported:
         "高速 OCR は韓国語に対応していません。高精度 OCR パックをインストールし、バランスまたは最高を選択してください。",
+      fastArabicUnsupported:
+        "高速 OCR はアラビア語に対応していません。高精度 OCR パックをインストールし、バランスまたは最高を選択してください。",
       language: "言語",
       autoDetect: "自動検出",
       extractedText: "抽出テキスト",
@@ -1873,6 +1960,9 @@ export const ja: TranslationKeys = {
       submit: "テキスト抽出",
       submitBatch: "テキスト抽出（{count}ファイル）",
       progressLabel: "テキストを抽出中",
+      filesFailed: "{total}件中{failed}件のファイルが失敗しました",
+      noTextDetectedInline: "（テキストが検出されませんでした）",
+      fileErrorInline: "（エラー：{message}）",
     },
     "ocr-pdf": {
       quality: "品質",
@@ -1886,7 +1976,6 @@ export const ja: TranslationKeys = {
       progressLabel: "PDFからテキストを抽出中",
     },
     "blur-faces": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       blurRadius: "ぼかし半径",
@@ -1899,7 +1988,6 @@ export const ja: TranslationKeys = {
       progressLabel: "顔をぼかし中",
     },
     "enhance-faces": {
-      original: "元：",
       subtle: "弱",
       maximum: "最高",
       fewerFaces: "少なく検出",
@@ -1960,6 +2048,9 @@ export const ja: TranslationKeys = {
       submitSubject: "スマートクロップ",
       submitFace: "顔クロップ",
       submitTrim: "ボーダートリム",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      cropAreaExceeded:
+        "この切り抜きは {max} ピクセルの上限を超えています。幅、高さ、パディングを小さくしてください。",
     },
     imageEnhancement: {
       enhancementMode: "エンハンスモード",
@@ -1995,6 +2086,14 @@ export const ja: TranslationKeys = {
         "ディープエンハンスにはアップスケール＆エンハンスバンドルが必要ですが、インストールされていないため、標準のエンハンスを適用しました。",
       deepEnhanceSkippedAnimated:
         "ディープエンハンスはアニメーション画像には使えないため、各フレームに標準のエンハンスを適用しました。",
+      batchDeepEnhanceSkipped:
+        "{total} 枚中 {count} 枚でディープエンハンスが実行されなかったため、標準のエンハンスを適用しました。",
+      batchDeepEnhanceSkippedFailed:
+        "{total} 枚中 {count} 枚でディープエンハンスに失敗したため、標準のエンハンスを適用しました。",
+      batchDeepEnhanceSkippedUnavailable:
+        "アップスケール＆エンハンスバンドルがインストールされていないため、{total} 枚中 {count} 枚でディープエンハンスが実行されませんでした。",
+      batchDeepEnhanceSkippedAnimated:
+        "{total} 枚中 {count} 枚はアニメーション画像のため、ディープエンハンスをスキップしました。",
     },
     "noise-removal": {
       off: "オフ",
@@ -2026,7 +2125,6 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像のノイズを除去中",
     },
     "red-eye-removal": {
-      original: "元：",
       originalKb: "元：{size} KB",
       fixedKb: "補正後：{size} KB",
       sensitivity: "感度",
@@ -2043,7 +2141,6 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像の赤目を補正中",
     },
     "restore-photo": {
-      original: "元：",
       subtle: "弱",
       strong: "強",
       originalKb: "元：{size} KB",
@@ -2079,6 +2176,9 @@ export const ja: TranslationKeys = {
       submit: "リサイズ",
       submitBatch: "リサイズ（{count}ファイル）",
       progressLabel: "コンテンツ認識リサイズ中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
+      areaExceeded:
+        "コンテンツ認識リサイズは合計 {max} ピクセルまでです。幅または高さを小さくしてください。",
     },
     "ai-canvas-expand": {
       quality: "品質",
@@ -2100,7 +2200,6 @@ export const ja: TranslationKeys = {
       progressLabel: "キャンバスを拡張中",
     },
     colorize: {
-      original: "元：",
       originalKb: "元：{size} KB",
       colorizedKb: "カラー化後：{size} KB",
       aiModel: "AIモデル",
@@ -2244,6 +2343,12 @@ export const ja: TranslationKeys = {
       dragToAdjust: "ドラッグで調整",
       scrollToZoom: "スクロールでズーム",
       photoGenerated: "写真が生成されました。左パネルからダウンロードしてください。",
+      analysisFailedWithStatus: "この写真を分析できませんでした。より鮮明な写真をお試しください。",
+      faceAnalysisFailed: "顔の分析に失敗しました",
+      generationFailedWithStatus: "証明写真を生成できませんでした。もう一度お試しください。",
+      photoGenerationFailed: "写真の生成に失敗しました",
+      analysisExpired:
+        "解析の有効期限が切れたため、写真を再解析しています。完了したら生成してください。",
     },
     "transcribe-audio": {
       language: "言語",
@@ -2301,7 +2406,6 @@ export const ja: TranslationKeys = {
       progressLabel: "背景をぼかし中",
     },
     "watermark-text": {
-      original: "元：",
       applyWatermark: "ウォーターマーク適用",
       tiledRepeating: "タイル（繰り返し）",
       originalKb: "元：{size} KB",
@@ -2324,7 +2428,6 @@ export const ja: TranslationKeys = {
       progressLabel: "ウォーターマークを追加中",
     },
     "watermark-image": {
-      original: "元：",
       center: "中央",
       topLeft: "左上",
       topRight: "右上",
@@ -2343,7 +2446,6 @@ export const ja: TranslationKeys = {
       submitBatch: "ウォーターマーク適用（{count}ファイル）",
     },
     "text-overlay": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       text: "テキスト",
@@ -2363,7 +2465,6 @@ export const ja: TranslationKeys = {
       defaultText: "ここにテキストを入力",
     },
     compose: {
-      original: "元：",
       screen: "スクリーン",
       processing: "処理中...",
       overlayImage: "オーバーレイ画像",
@@ -2419,9 +2520,6 @@ export const ja: TranslationKeys = {
       backToGallery: "ギャラリーに戻る",
     },
     info: {
-      min: "最小：",
-      max: "最大：",
-      mean: "平均：",
       minValue: "最小：{value}",
       maxValue: "最大：{value}",
       meanValue: "平均：{value}",
@@ -2458,6 +2556,7 @@ export const ja: TranslationKeys = {
       similarity: "類似度：{percent}%",
       submit: "比較",
       downloadDiff: "差分をダウンロード",
+      comparisonFailed: "比較に失敗しました",
     },
     "find-duplicates": {
       sensitivity: "感度",
@@ -2487,6 +2586,10 @@ export const ja: TranslationKeys = {
       threshold: "しきい値",
       submit: "重複スキャン",
       scanning: "スキャン中...",
+      parseResultsFailed: "スキャン結果の解析に失敗しました",
+      networkErrorUpload:
+        "アップロード中にネットワークエラーが発生しました。ファイル数を減らすか、接続を確認してください。",
+      requestTimedOut: "リクエストがタイムアウトしました。ファイル数を減らしてお試しください。",
     },
     "color-palette": {
       colors: "色数",
@@ -2557,6 +2660,26 @@ export const ja: TranslationKeys = {
       downloadFormat: "ダウンロードフォーマット",
       submit: "QRコード生成",
       download: "QRコードをダウンロード",
+      styleSquare: "四角",
+      styleRounded: "角丸",
+      styleDots: "ドット",
+      styleClassy: "クラシー",
+      styleClassyRounded: "クラシー角丸",
+      styleExtraRounded: "強い角丸",
+      styleDot: "ドット",
+      formatDescPng: "デジタル向け",
+      formatDescSvg: "印刷向け",
+      formatDescJpeg: "小さいファイル",
+      formatDescWebp: "最新フォーマット",
+      vcardFirstName: "名",
+      vcardFirstNamePlaceholder: "太郎",
+      vcardLastName: "姓",
+      vcardLastNamePlaceholder: "山田",
+      vcardOrganization: "組織",
+      vcardOrganizationPlaceholder: "会社名",
+      vcardJobTitle: "役職",
+      vcardJobTitlePlaceholder: "開発者",
+      vcardWebsite: "ウェブサイト",
     },
     "html-to-image": {
       webp: "WebP",
@@ -2606,6 +2729,9 @@ export const ja: TranslationKeys = {
       noBarcodesFound: "バーコードが見つかりません",
       barcodesFound: "{count}個のバーコードが見つかりました",
       barcodesFoundPlural: "{count}個のバーコードが見つかりました",
+      scanningFile: "{name} をスキャン中...",
+      scanningFailedWithStatus: "この画像をスキャンできませんでした。別の画像をお試しください。",
+      filesFailed: "{total}件中{count}件のファイルが失敗しました",
     },
     collage: {
       sideBySide: "横並び",
@@ -2626,9 +2752,6 @@ export const ja: TranslationKeys = {
       mosaic: "モザイク",
       uploadingImages: "画像をアップロード中...",
       processingCollage: "コラージュを処理中...",
-      loaded: "読み込み済み",
-      images: "画像",
-      collage: "コラージュ：",
       snapotter: "SnapOtter",
       background: "背景",
       format: "フォーマット",
@@ -2664,6 +2787,12 @@ export const ja: TranslationKeys = {
       quality: "品質",
       submit: "コラージュ作成",
       downloadCollage: "コラージュをダウンロード",
+      ratioFree: "自由",
+      bgWhite: "白",
+      bgBlack: "黒",
+      bgNone: "なし",
+      bgCustom: "カスタム",
+      collageFailed: "コラージュの作成に失敗しました",
     },
     stitch: {
       format: "フォーマット",
@@ -2693,6 +2822,7 @@ export const ja: TranslationKeys = {
       outputFormat: "出力フォーマット",
       quality: "品質",
       submit: "画像を結合",
+      stitchFailed: "結合に失敗しました",
     },
     split: {
       splitMode: "分割モード",
@@ -2721,6 +2851,21 @@ export const ja: TranslationKeys = {
       submit: "画像を分割",
       downloadAll: "一括ダウンロード（ZIP）",
       tileWarningSmall: "タイルが非常に小さくなります（{width}x{height}px）",
+      presetHints: {
+        horizontalHalf: "横に2分割",
+        verticalHalf: "縦に2分割",
+        quarters: "4分割",
+        horizontalStrip: "横長の帯",
+        verticalStrip: "縦長の帯",
+        grid9: "9タイルのグリッド",
+        portrait6: "6タイル（縦長）",
+        landscape6: "6タイル（横長）",
+        grid16: "16タイルのグリッド",
+      },
+      keepOriginal: "元のフォーマットを維持",
+      auto: "自動",
+      splitFailed: "分割に失敗しました",
+      failedToSplit: "{name} の分割に失敗しました：{detail}",
     },
     border: {
       blur: "ぼかし",
@@ -2746,6 +2891,16 @@ export const ja: TranslationKeys = {
       submit: "ボーダー追加",
       submitBatch: "ボーダー追加（{count}ファイル）",
       progressLabel: "ボーダーを追加中",
+      presetNames: {
+        cleanWhite: "クリーンホワイト",
+        galleryBlack: "ギャラリーブラック",
+        shadow: "シャドウ",
+        rounded: "角丸",
+        polaroid: "ポラロイド",
+        vintage: "ビンテージ",
+        minimal: "ミニマル",
+        cinematic: "シネマティック",
+      },
     },
     beautify: {
       background: "背景",
@@ -2762,7 +2917,6 @@ export const ja: TranslationKeys = {
       text: "テキスト",
       position: "位置",
       newTab: "新しいタブ",
-      frame: "フレーム",
       quickPresets: "クイックプリセット",
       linear: "線形",
       radial: "放射",
@@ -2790,6 +2944,33 @@ export const ja: TranslationKeys = {
       submit: "美化",
       submitBatch: "美化（{count}ファイル）",
       progressLabel: "スクリーンショットを美化中",
+      presetPurpleHaze: "パープルヘイズ",
+      presetFlamingo: "フラミンゴ",
+      presetOcean: "オーシャン",
+      presetMidnight: "ミッドナイト",
+      presetMint: "ミント",
+      presetSunset: "サンセット",
+      presetCleanWhite: "クリーンホワイト",
+      presetNoBackground: "背景なし",
+      bgGradient: "グラデーション",
+      bgSolid: "単色",
+      bgImage: "画像",
+      none: "なし",
+      frameBrowser: "ブラウザ",
+      shadowSubtle: "控えめ",
+      shadowMedium: "中",
+      shadowDramatic: "ドラマチック",
+      shadowCustom: "カスタム",
+      socialOriginal: "オリジナル",
+      socialIgSquare: "IG スクエア",
+      socialIgStory: "IG ストーリー",
+      positionTopLeft: "左上",
+      positionTopRight: "右上",
+      positionCenter: "中央",
+      positionBottomLeft: "左下",
+      positionBottomRight: "右下",
+      processingFailed: "処理に失敗しました",
+      processingFailedStatus: "この画像を処理できませんでした。もう一度お試しください。",
     },
     "circle-crop": {
       border: "ボーダー",
@@ -2828,6 +3009,16 @@ export const ja: TranslationKeys = {
       submit: "デュオトーンを適用",
       submitBatch: "デュオトーンを適用 ({count} ファイル)",
       progressLabel: "デュオトーンを適用中",
+      presetNames: {
+        classic: "クラシック",
+        noir: "ノワール",
+        sepia: "セピア",
+        midnight: "ミッドナイト",
+        sunset: "サンセット",
+        cyber: "サイバー",
+        ocean: "オーシャン",
+        forest: "フォレスト",
+      },
     },
     "image-pad": {
       background: "背景",
@@ -2840,6 +3031,7 @@ export const ja: TranslationKeys = {
       submit: "パディング",
       submitBatch: "パディング ({count} ファイル)",
       progressLabel: "画像をパディング中",
+      custom: "カスタム",
     },
     pixelate: {
       blockSize: "ブロックサイズ",
@@ -2940,7 +3132,6 @@ export const ja: TranslationKeys = {
       progressLabel: "SVGを変換中",
     },
     vectorize: {
-      original: "元：",
       detail: "ディテール",
       smoothing: "スムージング",
       blackWhite: "白黒",
@@ -2977,7 +3168,6 @@ export const ja: TranslationKeys = {
       progressLabel: "ベクター化中",
     },
     "gif-tools": {
-      original: "元：",
       widthPx: "幅（px）",
       auto: "自動",
       heightPx: "高さ（px）",
@@ -3034,6 +3224,7 @@ export const ja: TranslationKeys = {
       submit: "GIF処理",
       submitBatch: "処理（{count}ファイル）",
       progressLabel: "GIFを処理中",
+      maxDimensionExceeded: "1〜{max} px のサイズを指定してください。",
     },
     "image-to-base64": {
       converting: "変換中...",
@@ -3067,6 +3258,7 @@ export const ja: TranslationKeys = {
       includeText: "テキストを表示",
       submit: "バーコードを生成",
       download: "バーコードをダウンロード",
+      generateFailed: "バーコードの生成に失敗しました",
     },
     "chart-maker": {
       optionalChartTitle: "グラフタイトル（任意）",
@@ -3077,6 +3269,11 @@ export const ja: TranslationKeys = {
       submit: "グラフを作成",
       submitBatch: "グラフを作成 ({count} ファイル)",
       progressLabel: "グラフを作成中",
+      kindBar: "棒グラフ",
+      kindLine: "折れ線グラフ",
+      kindPie: "円グラフ",
+      rowsSkipped:
+        "グラフにした行: {charted}。値の列に数値がなかったためスキップした行: {skipped}。",
     },
     "enhance-faces-standalone": {
       model: "モデル",
@@ -3467,12 +3664,12 @@ export const ja: TranslationKeys = {
       submit: "圧縮",
       submitBatch: "圧縮 ({count}ファイル)",
       submitTarget: "{size}に圧縮",
+      batchMissed: "{total}件中{count}件のファイルが{target}を下回りませんでした。",
       progressLabel: "圧縮中",
       bestEffortHint:
         "可能な限りの上限です。画像ベースのPDFはこのサイズに近づきますが、テキストのみのPDFはこのサイズまで縮小できない場合があります。",
       targetReached: "目標の{target}に到達しました（結果: {size}）。",
-      targetMissed:
-        "{target}に到達できませんでした。このPDFは主にテキストまたはベクターで構成されており、画像圧縮では縮小できないため、達成できた最小サイズは{size}でした。",
+      targetMissed: "{target}に到達できませんでした。達成できた最小サイズは{size}でした。",
     },
     "rotate-pdf": {
       angle: "回転角度",
@@ -3540,6 +3737,31 @@ export const ja: TranslationKeys = {
       resetOrder: "順序をリセット",
       pageLabel: "ページ{n}",
       orderTooLong: "送信できる移動の数を超えています。リセットして、変更を減らしてください。",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "最大{docs}個のPDF、出力は最大{pages}ページです。",
+      addDocument: "PDF を追加",
+      addAll: "すべてのページを追加",
+      allPages: "すべてプランへ追加済み",
+      addPage: "{n} ページを追加",
+      dragHint:
+        "ドラッグで並べ替え・回転・削除ができます。PDF を追加するとそのページを取り込めます。",
+      reset: "プランをリセット",
+      emptyPlan: "プランにページがありません。上のドキュメントからページを追加してください。",
+      docFailed: "ドキュメントを 1 つ読み込めませんでした。",
+      skippedNotPdf: "{count} 個のファイルをスキップしました。追加できるのは PDF のみです。",
+      skippedOverLimit:
+        "{count} 個の PDF を追加できませんでした。追加できる PDF は最大 {docs} 個です。",
+      pageLabel: "位置 {n}",
+      planSummary: "{docs} 個のドキュメントから {pages} ページを組み立てます。",
+      submit: "PDF を作成 ({pages} ページ)",
+      progressLabel: "組み立て中",
+      rotateLeft: "左に回転",
+      rotateRight: "右に回転",
+      removePage: "ページを削除",
+      removeDoc: "PDF を削除",
+      zoomIn: "拡大",
+      zoomOut: "縮小",
     },
     "protect-pdf": {
       userPassword: "ユーザーパスワード",
@@ -3659,6 +3881,9 @@ export const ja: TranslationKeys = {
         save: "保存して配置",
         uploadHint: "PNG / JPG をドロップするか、クリックして選択します。透明な PNG が最適です。",
       },
+      exportFailed: "配置した署名を読み取れませんでした。もう一度お試しください。",
+      stall: "処理がタイムアウトしました。もう一度お試しください。",
+      timeout: "リクエストがタイムアウトしました。もう一度お試しください。",
     },
     "redact-pdf": {
       terms: "墨消しする語句",
@@ -3672,6 +3897,9 @@ export const ja: TranslationKeys = {
       submit: "テキストを抽出",
       submitBatch: "テキストを抽出 ({count}ファイル)",
       progressLabel: "抽出中",
+      scannedHint:
+        "このPDFはスキャンされた画像のため、抽出できるテキストがありません。OCRなら読み取れますが、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+      runOcr: "このPDFでOCRを実行",
     },
     "pdf-to-word": {
       hint: "テキストベースのPDFに最適です。スキャンページにはOCRが必要です",
@@ -3828,6 +4056,9 @@ export const ja: TranslationKeys = {
     importFromFiles: "ファイルからインポート",
     saveToFiles: "ファイルに保存",
     savedToFiles: "ファイルに保存しました",
+    resultExpired: "この結果は有効期限が切れています。ツールをもう一度実行してください。",
+    libraryFull:
+      "ファイルの保存容量がいっぱいです。いくつかのファイルを削除してから、もう一度お試しください。",
     librarySaveTitle: "このファイルはマイファイルから読み込まれています",
     librarySaveAsNew: "結果を新しいファイルとして保存",
     librarySaveAsNewHint: "元のファイルはマイファイルに残ります",
@@ -4048,7 +4279,7 @@ export const ja: TranslationKeys = {
       dropDescription: "ここに画像をドロップして開始",
       openImageButton: "画像を開く",
       newDocumentButton: "新規ドキュメント",
-      pasteHint: "またはクリップボードから貼り付け（Ctrl+V）",
+      pasteHint: "またはクリップボードから貼り付け（{shortcut}）",
     },
     mobile: {
       heading: "デスクトップ推奨",
@@ -4101,6 +4332,7 @@ export const ja: TranslationKeys = {
         ratioLabel: "比率：",
         applyTitle: "切り抜きを適用（Enter）",
         cancelTitle: "切り抜きをキャンセル（Escape）",
+        free: "自由",
       },
       dodgeBurn: {
         dodge: "覆い焼き",
@@ -4117,6 +4349,9 @@ export const ja: TranslationKeys = {
       eyedropper: {
         sampleLabel: "サンプル：",
         toggleDropdown: "ドロップダウンを開閉",
+        samplePoint: "ポイント（1x1）",
+        sampleAverage3: "3x3 平均",
+        sampleAverage5: "5x5 平均",
       },
       fill: {
         tolerance: "許容値",
@@ -4212,6 +4447,68 @@ export const ja: TranslationKeys = {
         grain: "粒子",
         resetAll: "すべてリセット",
         apply: "適用",
+        autoButtons: {
+          autoTone: "自動トーン",
+          autoContrast: "自動コントラスト",
+          autoColor: "自動カラー",
+          autoEnhance: "自動補正",
+        },
+        sliders: {
+          brightness: "明るさ",
+          contrast: "コントラスト",
+          hue: "色相",
+          saturation: "彩度",
+          luminance: "輝度",
+          exposure: "露出",
+          vibrance: "自然な彩度",
+          warmth: "暖かみ",
+        },
+        filters: {
+          grayscale: "グレースケール",
+          sepia: "セピア",
+          invert: "階調の反転",
+          solarize: "ソラリゼーション",
+          blur: "ぼかし",
+          sharpen: "シャープ",
+          noise: "ノイズ",
+          pixelate: "ピクセレート",
+          emboss: "エンボス",
+          posterize: "ポスタリゼーション",
+          threshold: "2階調化",
+          kaleidoscope: "万華鏡",
+          motionBlur: "モーションぼかし",
+          radialBlur: "放射ぼかし",
+          surfaceBlur: "表面ぼかし",
+        },
+        params: {
+          radius: "半径",
+          amount: "量",
+          size: "サイズ",
+          strength: "強度",
+          levels: "階調数",
+          level: "レベル",
+          power: "パワー",
+          angle: "角度",
+          distance: "距離",
+          centerX: "中心X",
+          centerY: "中心Y",
+          threshold: "しきい値",
+          midpoint: "中心点",
+          roundness: "丸み",
+          feather: "ぼかし幅",
+          roughness: "粗さ",
+        },
+        curvePresets: {
+          linear: "線形",
+          darken: "暗く",
+          lighten: "明るく",
+          increaseContrast: "コントラストを上げる",
+          decreaseContrast: "コントラストを下げる",
+          mediumContrast: "コントラスト（中）",
+          strongContrast: "コントラスト（強）",
+          crossProcess: "クロスプロセス",
+          negative: "ネガ",
+        },
       },
       color: {
         channelAriaLabel: "{channel} カラーチャンネル",
@@ -4227,12 +4524,64 @@ export const ja: TranslationKeys = {
         median: "中央値",
       },
       history: {
-        undoTitle: "元に戻す（Ctrl+Z）",
-        redoTitle: "やり直し（Ctrl+Shift+Z）",
+        undoTitle: "元に戻す（{shortcut}）",
+        redoTitle: "やり直し（{shortcut}）",
         empty: "履歴はまだありません",
+        unknown: "不明",
+        actions: {
+          initialState: "初期状態",
+          loadImage: "画像を読み込み",
+          loadProject: "プロジェクトを読み込み",
+          restoreAutosave: "自動保存から復元",
+          resizeCanvas: "キャンバスサイズを変更",
+          resizeImage: "画像サイズを変更",
+          rotateCanvas: "キャンバスを回転 {degrees}",
+          flipHorizontal: "水平反転",
+          flipVertical: "垂直反転",
+          trimCanvas: "キャンバスをトリム",
+          addObject: "{type}を追加",
+          layerEffect: "レイヤー効果",
+          delete: "削除",
+          bringToFront: "最前面へ",
+          bringForward: "前面へ",
+          sendBackward: "背面へ",
+          sendToBack: "最背面へ",
+          addLayer: "レイヤーを追加",
+          deleteLayer: "レイヤーを削除",
+          duplicateLayer: "レイヤーを複製",
+          reorderLayers: "レイヤーの順序を変更",
+          mergeDown: "下のレイヤーと結合",
+          flattenAll: "すべて統合",
+          adjust: "{name}を調整",
+          resetAdjustments: "調整をリセット",
+          levels: "レベル",
+          curves: "トーンカーブ",
+          resetLevels: "レベルをリセット",
+          resetCurves: "トーンカーブをリセット",
+          resetAll: "すべてリセット",
+          toggleFilter: "{name}フィルターの切り替え",
+          setFilterParam: "{filter}の{param}を設定",
+          crop: "切り抜き",
+          cut: "切り取り",
+          paste: "貼り付け",
+          pasteInPlace: "同じ位置に貼り付け",
+          nudge: "少し移動",
+          brushStroke: "ブラシストローク",
+          eraserStroke: "消しゴムストローク",
+        },
+        objectTypes: {
+          line: "直線",
+          rect: "四角形",
+          ellipse: "楕円",
+          text: "テキスト",
+          image: "画像",
+          arrow: "矢印",
+          polygon: "多角形",
+          star: "星形",
+        },
       },
       layers: {
-        newLayerTitle: "新規レイヤー（Ctrl+Shift+N）",
+        newLayerTitle: "新規レイヤー（{shortcut}）",
         blend: "描画モード",
         opacity: "不透明度",
         hideLayer: "レイヤーを非表示",
@@ -4260,9 +4609,34 @@ export const ja: TranslationKeys = {
           positionCenter: "中央",
           positionOutside: "外側",
         },
+        blendModes: {
+          normal: "通常",
+          multiply: "乗算",
+          screen: "スクリーン",
+          overlay: "オーバーレイ",
+          darken: "比較（暗）",
+          lighten: "比較（明）",
+          colorDodge: "覆い焼きカラー",
+          colorBurn: "焼き込みカラー",
+          hardLight: "ハードライト",
+          softLight: "ソフトライト",
+          difference: "差の絶対値",
+          exclusion: "除外",
+          hue: "色相",
+          saturation: "彩度",
+          color: "カラー",
+          luminosity: "輝度",
+        },
+        duplicate: "複製",
+        flattenAll: "すべて統合",
       },
       navigator: {
         noImageLoaded: "画像が読み込まれていません",
+      },
+      tabs: {
+        layers: "レイヤー",
+        adjustments: "調整",
+        history: "履歴",
       },
     },
     ui: {
@@ -4278,6 +4652,7 @@ export const ja: TranslationKeys = {
         anchorLabel: "基準位置：",
         anchorAriaLabel: "基準位置 {position}",
         backgroundLabel: "背景：",
+        transparent: "透明",
         anchors: {
           topLeft: "左上",
           topCenter: "上中央",
@@ -4295,6 +4670,14 @@ export const ja: TranslationKeys = {
         original: "元のサイズ：{width} x {height} px",
         note: "すべてのオブジェクトを新しいサイズに合わせて比例拡大・縮小します。",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "この画像は大きすぎて、ブラウザでこのツールを使って編集できません。キャンバスサイズを小さくしてみてください。",
+        crossOriginBlocked:
+          "エディターは、別のサイトから読み込んだ画像のピクセルを読み取れません。画像をダウンロードして、そのファイルを開いてください。",
+        sourceImageFailed:
+          "画像を読み込めませんでした。別のサイトでホストされている場合は、そのサイト側でクロスオリジンアクセスを許可する必要があります。",
+      },
       exportDialog: {
         heading: "画像を書き出し",
         previewAlt: "書き出しプレビュー",
@@ -4308,13 +4691,20 @@ export const ja: TranslationKeys = {
         exportButton: "書き出し",
         copied: "コピーしました",
         copyFailed: "コピーに失敗しました",
+        exportFailed:
+          "エクスポートに失敗しました。もう一度お試しいただくか、別の形式を選択してください。",
+        tooLarge:
+          "この書き出しは大きすぎて、ブラウザで処理できません。サイズを小さくしてみてください。",
         saveProject: "プロジェクトを保存",
         loadProject: "プロジェクトを読み込み",
+        invalidProject: "このファイルは有効なSnapOtterプロジェクトではありません。",
       },
       autosaveRecovery: {
         message: "{time} の未保存の作業を復元しました。",
         restore: "復元",
         discard: "破棄",
+        saveFailed:
+          "このブラウザに作業内容を保存できませんでした。コピーを残すには書き出すか「プロジェクトを保存」を使ってください。",
       },
       fillDialog: {
         heading: "塗りつぶし",
@@ -4340,6 +4730,7 @@ export const ja: TranslationKeys = {
           black: "黒",
           transparent: "透明",
         },
+        presetCustom: "カスタム",
       },
       colorSwatch: {
         ariaLabel: "カラー {color}",
@@ -4349,6 +4740,25 @@ export const ja: TranslationKeys = {
         noneSelected: "{label}：なし",
         setNone: "{label} なし",
       },
+      contextMenu: {
+        duplicate: "複製",
+        selectAll: "すべて選択",
+      },
+    },
+    toolbar: {
+      move: "移動",
+      marquee: "選択範囲",
+      crop: "切り抜き",
+      eyedropper: "スポイト",
+      brush: "ブラシ",
+      pencil: "鉛筆",
+      cloneStamp: "コピースタンプ",
+      eraser: "消しゴム",
+      paintBucket: "塗りつぶし",
+      gradient: "グラデーション",
+      text: "テキスト",
+      hand: "手のひら",
+      zoom: "ズーム",
     },
   },
   settings: {
@@ -4381,6 +4791,7 @@ export const ja: TranslationKeys = {
       saveButton: "設定を保存",
       saveSuccess: "設定を保存しました。",
       saveFailed: "設定の保存に失敗しました。",
+      loadFailed: "ユーザー設定を読み込めませんでした。",
       roleUnknown: "不明",
     },
     system: {
@@ -4405,6 +4816,7 @@ export const ja: TranslationKeys = {
       saveButton: "設定を保存",
       saveSuccess: "設定を保存しました。",
       saveFailed: "設定の保存に失敗しました。",
+      loadFailed: "システム設定を読み込めませんでした。",
       limitsAndResources: "制限とリソース",
       maxFileSize: "最大ファイルサイズ",
       maxBatchSize: "最大バッチサイズ",
@@ -4442,10 +4854,11 @@ export const ja: TranslationKeys = {
       newPasswordPlaceholder: "新しいパスワード",
       confirmPasswordPlaceholder: "新しいパスワードの確認",
       passwordsMismatch: "パスワードが一致しません",
-      passwordTooShort: "パスワードは4文字以上必要です",
       changeSuccess: "パスワードを変更しました",
       changeFailed: "パスワードの変更に失敗しました",
       currentPasswordIncorrect: "現在のパスワードが正しくありません",
+      passwordChangedElsewhere:
+        "パスワードが別の場所で変更されました。もう一度サインインしてください。",
       changePasswordButton: "パスワード変更",
       loginAttemptLimitNote: "ログイン試行制限はシステム設定で構成できます。",
       twoFactorHeading: "2 要素認証",
@@ -4491,6 +4904,8 @@ export const ja: TranslationKeys = {
       passwordMinLengthDesc: "パスワードに必要な最小文字数です。",
       passwordRequireUppercase: "大文字を必須にする",
       passwordRequireUppercaseDesc: "大文字を1文字以上含める必要があります。",
+      passwordRequireLowercase: "小文字を必須にする",
+      passwordRequireLowercaseDesc: "小文字を1文字以上含める必要があります。",
       passwordRequireNumber: "数字を必須にする",
       passwordRequireNumberDesc: "数字を1文字以上含める必要があります。",
       passwordRequireSpecial: "特殊文字を必須にする",
@@ -4498,6 +4913,13 @@ export const ja: TranslationKeys = {
       passwordPolicyHeading: "パスワードポリシー",
       securitySettingsSaved: "セキュリティ設定を保存しました",
       securitySettingsFailed: "セキュリティ設定の保存に失敗しました",
+      adminSettingsLoadFailed: "セキュリティ設定を読み込めませんでした。",
+      twoFactorStateChanged:
+        "2 要素認証が別のウィンドウで変更されました。再読み込みしてもう一度お試しください。",
+      twoFactorUnreadable:
+        "サーバーで 2 要素認証の設定を読み取れません。管理者に問い合わせてください。",
+      ssoNeedsProvider:
+        "SSO を強制するには、先に OIDC または SAML プロバイダーを設定してください。",
     },
     people: {
       heading: "メンバー",
@@ -4530,7 +4952,7 @@ export const ja: TranslationKeys = {
       updateFailed: "ユーザーの更新に失敗しました",
       cannotRemoveOwnAdmin: "自分の管理者ロールは削除できません",
       resetPasswordHeading: "{username}のパスワードをリセット",
-      newPasswordLabel: "新しいパスワード（8文字以上）",
+      newPasswordLabel: "新しいパスワード",
       resetPasswordButton: "パスワードリセット",
       resetPasswordWarning: "このユーザーのすべてのセッションとAPIキーが無効になります。",
       resetSuccess: "パスワードをリセットしました",
@@ -4540,6 +4962,7 @@ export const ja: TranslationKeys = {
       tableHeaderTeam: "チーム",
       noSearchResults: "検索に一致するメンバーがいません。",
       noUsersFound: "ユーザーが見つかりません。",
+      loadFailed: "ユーザーを読み込めませんでした。",
       authBadgeLocalOidc: "ローカル + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "ロール/チームを編集",
@@ -4552,6 +4975,13 @@ export const ja: TranslationKeys = {
         "今すぐこのパスワードをコピーしてください。ユーザー作成後は表示できません。",
       memberCount: "{count}人のメンバー",
       memberCountPlural: "{count}人のメンバー",
+      usernameTaken: "このユーザー名は既に使われています",
+      lastAdmin: "管理者は常に1人以上必要です",
+      cannotDeleteSelf: "自分のアカウントは削除できません",
+      usernameInvalid:
+        "ユーザー名は 3〜50 文字で、a-z、A-Z、0-9、ドット、ハイフン、アンダースコアのみ使用できます",
+      roleNotFound: "そのロールはもう存在しません",
+      teamNotFound: "そのチームはもう存在しません",
     },
     teams: {
       heading: "チーム",
@@ -4573,6 +5003,7 @@ export const ja: TranslationKeys = {
       tableHeaderTeamName: "チーム名",
       tableHeaderMembers: "メンバー",
       emptyState: "チームが見つかりません。",
+      loadFailed: "チームを読み込めませんでした。",
       renameSaveButton: "保存",
       renameCancelButton: "キャンセル",
       renameAction: "名前変更",
@@ -4586,6 +5017,7 @@ export const ja: TranslationKeys = {
       teamRetentionHours: "保持期間（時間）",
       teamRetentionHoursDesc: "チームの処理ファイル保持期間。空欄でグローバルデフォルトを使用。",
       quotaSaved: "チーム設定を保存しました",
+      quotaSaveFailed: "チーム設定の保存に失敗しました",
     },
     roles: {
       heading: "ロール",
@@ -4610,6 +5042,7 @@ export const ja: TranslationKeys = {
       deleteSuccess: "ロール「{name}」を削除しました",
       deleteFailed: "ロールの削除に失敗しました",
       emptyState: "ロールが見つかりません。",
+      loadFailed: "ロールを読み込めませんでした。",
       builtInBadge: "ビルトイン",
       userCountBadge: "{count}人",
       editRoleTitle: "ロールを編集",
@@ -4623,12 +5056,16 @@ export const ja: TranslationKeys = {
         users: "ユーザー",
         teams: "チーム",
         system: "システム",
+        enterpriseAdmin: "エンタープライズ管理",
       },
+      nameInvalid: "ロール名は 2〜30 文字で、a-z、0-9、ハイフン、アンダースコアのみ使用できます",
+      permissionsRequired: "権限を 1 つ以上選択してください",
     },
     auditLog: {
       heading: "監査ログ",
       allActionsFilter: "すべてのアクション",
       emptyState: "監査ログエントリーはありません。",
+      loadFailed: "監査ログを読み込めませんでした。",
       tableHeaderTime: "時刻",
       tableHeaderUser: "ユーザー",
       tableHeaderAction: "アクション",
@@ -4671,6 +5108,7 @@ export const ja: TranslationKeys = {
       teamColumn: "チーム",
       storageColumn: "ストレージ",
       usersColumn: "ユーザー",
+      loadFailed: "使用状況データを読み込めませんでした。",
     },
     apiKeys: {
       heading: "APIキー",
@@ -4680,6 +5118,7 @@ export const ja: TranslationKeys = {
       removeScopingLabel: "権限スコープを解除",
       restrictPermissionsLabel: "権限を制限（任意）",
       expiresLabel: "有効期限：",
+      expiresInPast: "有効期限は将来の日時を指定してください。",
       clearButton: "クリア",
       copyTitle: "コピー",
       keyWarning: "このキーは安全に保管してください。再表示されません。",
@@ -4690,6 +5129,7 @@ export const ja: TranslationKeys = {
       deleteKeyTitle: "キーを削除",
       deleteConfirm: "このAPIキーを削除しますか？このキーを使用するすべての連携が停止します。",
       emptyState: "まだAPIキーがありません。1つ生成して開始しましょう。",
+      loadFailed: "APIキーを読み込めませんでした。",
     },
     tools: {
       heading: "ツール",
@@ -4730,6 +5170,7 @@ export const ja: TranslationKeys = {
       description: "高度なファイル処理のためのAIモデルバンドルを管理します。",
       installAll: "すべてインストール",
       diskUsage: "ディスク使用量: {size}",
+      statusStale: "バンドルの状態を更新できませんでした。下の一覧は最新でない可能性があります。",
       sizeOnDisk: "ディスク上 {size}",
       installed: "インストール済み",
       notInstalled: "未インストール",
@@ -4760,6 +5201,10 @@ export const ja: TranslationKeys = {
       resetFailed: "リセットに失敗しました: {error}",
       resetVenvKept:
         "共有のPython環境はそのまま残しました。このインストールには、環境を作り直すための同梱のベースがありません。モデル、ダウンロードキャッシュ、インストール記録は削除済みです。環境内の古いパッケージが原因の場合は、その環境をご自身で作り直してください。",
+      importBusy:
+        "別のインストールまたはインポートが実行中です。完了してからもう一度お試しください。",
+      importNoSpace:
+        "サーバーのディスク容量が不足しているため、このバンドルをインポートできません。",
     },
     about: {
       heading: "SnapOtterについて",
@@ -4779,6 +5224,9 @@ export const ja: TranslationKeys = {
   auth: {
     login: "ログイン",
     logout: "ログアウト",
+    logoutFailed: "ログアウトできませんでした。もう一度お試しください。",
+    idpLogoutFailed:
+      "SnapOtterからはログアウトしましたが、SSOプロバイダーのセッションが開いたままの可能性があります。そちらからもログアウトしてください。",
     username: "ユーザー名",
     password: "パスワード",
     loginButton: "ログイン",
@@ -4808,10 +5256,23 @@ export const ja: TranslationKeys = {
     verify: "確認",
     verifying: "確認中...",
     mfaInvalidCode: "無効なコードです。もう一度お試しください。",
+    mfaAttemptsExhausted:
+      "無効なコードの入力回数が上限に達しました。もう一度ログインしてください。",
+    mfaEnrollmentAttemptsExhausted:
+      "無効なコードの入力回数が上限に達しました。もう一度ログインして新しいQRコードと新しいリカバリーコードを取得してください。以前に表示されたコードは使用できません。",
+    mfaExpired: "認証セッションの有効期限が切れました。もう一度ログインしてください。",
+    mfaEnrollmentExpired:
+      "セットアップセッションの有効期限が切れました。もう一度ログインして新しいQRコードと新しいリカバリーコードを取得してください。以前に表示されたコードは使用できません。",
+    mfaNotConfigured: "2 要素認証が設定されていません。もう一度ログインしてください。",
+    mfaAlreadyEnabled: "2 要素認証はすでに有効になっています。もう一度ログインしてください。",
+    mfaUnreadable: "サーバーで 2 要素認証データを読み取れません。管理者にお問い合わせください。",
     mfaEnrollmentHeading: "続行するには 2 要素認証を設定してください",
     mfaEnrollmentRequired: "組織で多要素認証が必須です。アカウント設定で MFA を設定してください。",
     mfaPolicyUnavailable:
       "MFA ポリシーを確認できませんでした。しばらくしてからもう一度お試しください。",
+    accountDisabled: "このアカウントは無効化されています。管理者にお問い合わせください。",
+    ipNotAllowed:
+      "お使いの IP アドレスからのアクセスは許可されていません。管理者にお問い合わせください。",
     loginThrottled: "ログインの試行が多すぎます。{minutes}分後にもう一度お試しください。",
     loginThrottledPlural: "ログインの試行が多すぎます。{minutes}分後にもう一度お試しください。",
     loginThrottledUnknownWait:
@@ -4855,14 +5316,13 @@ export const ja: TranslationKeys = {
   },
   changePassword: {
     title: "パスワードを変更してください",
-    description:
-      "続行するには新しいパスワードの設定が必要です。8文字以上で大文字、小文字、数字を含めてください。",
+    description: "続行するには新しいパスワードの設定が必要です。",
     usernameLabel: "ユーザー名",
     currentPasswordLabel: "現在のパスワード",
     currentPasswordPlaceholder: "現在のパスワードを入力",
     newPasswordLabel: "新しいパスワード",
     generateButton: "強力なパスワードを生成",
-    newPasswordPlaceholder: "8文字以上",
+    newPasswordPlaceholder: "新しいパスワードを入力",
     confirmPasswordLabel: "新しいパスワードの確認",
     confirmPasswordPlaceholder: "新しいパスワードを再入力",
     passwordsMismatch: "パスワードが一致しません",
@@ -4872,6 +5332,8 @@ export const ja: TranslationKeys = {
     changeButton: "パスワード変更",
     sidebarTitle: "あと少しです",
     sidebarDescription: "強力なパスワードを設定してアカウントを保護すれば、準備完了です。",
+    sessionEnded:
+      "セッションが終了しました。パスワードを変更するには、もう一度サインインしてください。",
   },
   automate: {
     title: "自動化",
@@ -4881,6 +5343,15 @@ export const ja: TranslationKeys = {
     noSteps: "Pipelineファイルにステップがありません",
     importFailed: "インポートに失敗しました",
     couldNotRead: "Pipelineファイルを読み取れませんでした",
+    importListRefreshFailed:
+      "Pipelineをインポートしましたが、保存済みリストが更新されませんでした。ページを再読み込みすると表示されます。",
+    saveFailed: "Pipelineの保存に失敗しました",
+    deleteFailed: "Pipelineの削除に失敗しました",
+    loadFailed: "保存されたPipelineを読み込めませんでした。",
+    saveListRefreshFailed:
+      "Pipelineを保存しましたが、保存済みリストが更新されませんでした。ページを再読み込みすると表示されます。",
+    deleteListRefreshFailed:
+      "Pipelineを削除しましたが、保存済みリストが更新されませんでした。ページを再読み込みすると変更が反映されます。",
     fileCount: "{count}ファイル",
     fileCountPlural: "{count}ファイル",
     importFromLibrary: "ライブラリからインポート",
@@ -4966,6 +5437,7 @@ export const ja: TranslationKeys = {
     fileCount: "{count} ファイル",
     fileCountSingular: "{count} ファイル",
     noFilesFound: "ファイルが見つかりません",
+    loadFailed: "ファイルを読み込めませんでした。",
     selectFilePrompt: "ファイルを選択して詳細を表示",
     openFile: "ファイルを開く",
     selectFile: "ファイルを選択",
@@ -4984,6 +5456,7 @@ export const ja: TranslationKeys = {
     download: "ダウンロード",
     details: {
       previewFailedRetry: "プレビューの生成に失敗しました。もう一度お試しください。",
+      loadFailed: "このファイルを読み込めませんでした。",
     },
   },
   dropzone: {
@@ -5003,6 +5476,7 @@ export const ja: TranslationKeys = {
     filesSelected: "{count}ファイルを選択済み",
     dropToAdd: "ファイルを追加するにはドロップ",
     dropToReplace: "ファイルを置き換えるにはドロップ",
+    ignoredWhileRunning: "実行中です。ファイルを追加するには、完了するまでお待ちください。",
     reorderHint: "実行する前に、サムネイルをドラッグして並べ替えるか、順序を逆にできます。",
   },
   reviewPanel: {
@@ -5034,6 +5508,8 @@ export const ja: TranslationKeys = {
     lessThanMinute: "残り1分未満",
     oneMinuteLeft: "約1分",
     minutesLeft: "約{mins}分",
+    minutesLeftFew: "約{mins}分",
+    minutesLeftTwo: "約{mins}分",
     progressMessages: [
       "もうすぐです...たぶん...",
       "良いものには時間がかかります...",
@@ -5111,6 +5587,57 @@ export const ja: TranslationKeys = {
     networkError: "ネットワークエラー。接続を確認してください。",
     invalidCredentials: "ユーザー名またはパスワードが無効です",
     connectionError: "接続エラー",
+    fileTooLarge:
+      "このファイルは大きすぎるためアップロードできません。より小さいファイルを試すか、サーバー管理者にアップロード上限の引き上げを依頼してください。",
+    featureNotInstalledForTool:
+      "{tool}には「{feature}」機能が必要です。設定 → AI機能で有効にしてください。",
+    featureNotInstalled:
+      "「{feature}」機能がインストールされていません。設定 → AI機能で有効にしてください。",
+    featureIncompatible: "「{feature}」機能はこのサーバーのハードウェアでは実行できません。",
+    passwordTooShort: "パスワードは{minLength}文字以上にしてください。",
+    passwordNeedsUppercase: "パスワードには大文字を含める必要があります。",
+    passwordNeedsLowercase: "パスワードには小文字を含める必要があります。",
+    passwordNeedsDigit: "パスワードには数字を含める必要があります。",
+    passwordNeedsSpecial: "パスワードには特殊文字を含める必要があります。",
+    passwordNoControlCharacters: "パスワードに制御文字を含めることはできません。",
+    passwordTooLong: "パスワードは{maxLength}文字以内にしてください。",
+    passwordTooLongAdminReset:
+      "パスワードが長すぎます（最大 {maxLength} 文字）。管理者がリセットする必要があります。",
+    passwordNoInvalidCharacters: "パスワードに無効な文字を含めることはできません。",
+    tooManyRequests: "試行回数が多すぎます。1分待ってからもう一度お試しください。",
+    escalationDenied: "この操作には、あなたのロールを超える権限が必要です。",
+    featureNotLicensed: "エンタープライズライセンスが必要です。",
+    sessionEnded: "セッションが終了しました。もう一度サインインしてください。",
+    forbidden: "この操作を行う権限がありません。",
+    invalidSetting: "{setting} の値が無効です。",
+    network: "ネットワークエラー",
+    invalidResponse: "無効な応答",
+    staleVersionReload: "アプリが更新されました。ページを再読み込みして、もう一度お試しください。",
+    failedWithStatus: "リクエストを完了できませんでした。もう一度お試しください。",
+    processingFailedWithStatus:
+      "このファイルを処理できませんでした。ファイルが破損していないか確認して、もう一度お試しください。",
+    processingFailedNoDetail: "処理に失敗しました",
+    canceled: "処理がキャンセルされました",
+    jobTrackingFailed: "このジョブの追跡中に問題が発生しました。もう一度お試しください。",
+    requestTimedOut: "リクエストがタイムアウトしました",
+    runInterrupted: "処理が中断されました。もう一度実行してください。",
+    requestFailedWithStatus: "リクエストを完了できませんでした。もう一度お試しください。",
+    invalidServerResponse: "サーバーからの応答が無効です",
+    batchFailed: "バッチ処理に失敗しました",
+    batchFailedWithStatus: "一括処理を完了できませんでした。もう一度実行してください。",
+    allFilesFailed: "すべてのファイルの処理に失敗しました",
+    filesFailedSuffix_one: " (1個のファイルが失敗)",
+    filesFailedSuffix_other: " ({count}個のファイルが失敗)",
+    uploadTimeout:
+      "アップロードがタイムアウトしました。接続を確認するか、小さなファイルをお試しください。",
+    processingInterrupted: "処理が中断されました。再接続時にもう一度お試しください。",
+    processingInterruptedUnconfirmed:
+      "処理が中断され、サーバーはジョブを確認しませんでした。再接続時にもう一度お試しください。",
+    resultNoLongerAvailable: "完了した結果はもう利用できません。ジョブを再度実行してください。",
+    batchDownloadFailed:
+      "完了したバッチをダウンロードできませんでした。更新してからもう一度お試しください。",
+    fileNotFoundInBatch: "バッチ結果にファイルが見つかりません",
+    noFilesSelected: "ファイルが選択されていません",
   },
   sidebar: {
     sponsor: "支援する",
@@ -5146,6 +5673,7 @@ export const ja: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "GitHub Sponsors で SnapOtter を支援する",
     skipToContent: "メインコンテンツへスキップ",
     openSidebar: "サイドバーを開く",
@@ -5168,6 +5696,8 @@ export const ja: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "ズームコントロール",
     dragToReorder: "ドラッグして並べ替え",
+    resultResizedToFit: "目標サイズに収めるため縮小しました",
+    resultMissedTarget: "目標サイズに届きませんでした",
     reverseOrder: "順序を逆にする",
     whiteBackground: "白背景",
     blackBackground: "黒背景",
@@ -5248,11 +5778,47 @@ export const ja: TranslationKeys = {
       description: "AIで古い写真や傷んだ写真を修復し、着色して拡大します。",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "背景除去",
+      description: "AIで画像の背景を除去します",
+    },
+    "face-detection": {
+      name: "顔検出",
+      description: "顔の検出とぼかし、赤目補正、スマートクロップ",
+    },
+    "object-eraser-colorize": {
+      name: "オブジェクト消去とカラー化",
+      description: "写真からオブジェクトを消去し、白黒画像をカラー化します",
+    },
+    "inpaint-hq": {
+      name: "高品質インペインティング",
+      description:
+        "大きなオブジェクト、細かいテクスチャ、構造的な背景に対応する拡散モデルによるオブジェクト除去",
+    },
+    "upscale-enhance": {
+      name: "アップスケールと補正",
+      description: "AIアップスケール、顔エンハンスメント、ノイズ除去",
+    },
+    "photo-restoration": {
+      name: "写真修復",
+      description: "古い写真や傷んだ写真を修復します",
+    },
+    ocr: {
+      name: "OCR",
+      description: "画像とPDFから文字を抽出します",
+    },
+    transcription: {
+      name: "文字起こし",
+      description: "音声と動画の音声をテキストに変換します（字幕）",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "インポート中...",
       importCount: "インポート（{count}）",
       import: "インポート",
+      importFailed: "{total}件中{failed}件のファイルをインポートできませんでした。",
     },
     metadataGrid: {
       noData: "データなし",
@@ -5265,6 +5831,19 @@ export const ja: TranslationKeys = {
     waveform: {
       play: "再生",
       pause: "一時停止",
+    },
+    languageNames: {
+      en: "英語",
+      de: "ドイツ語",
+      fr: "フランス語",
+      es: "スペイン語",
+      zh: "中国語",
+      ja: "日本語",
+      ko: "韓国語",
+      ar: "アラビア語",
+      id: "インドネシア語",
+      th: "タイ語",
+      vi: "ベトナム語",
     },
   },
   privacyPolicy: {

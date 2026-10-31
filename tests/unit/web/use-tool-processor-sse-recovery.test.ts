@@ -10,6 +10,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -23,13 +24,17 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { captureHandledError } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 
 interface MockXhr {
   status: number;
   responseText: string;
   timeout: number;
-  upload: { onprogress?: unknown; onload?: unknown };
+  upload: {
+    onprogress?: ((event: ProgressEvent) => void) | null;
+    onload?: (() => void) | null;
+  };
   onload?: () => void;
   onerror?: (() => void) | null;
   ontimeout?: (() => void) | null;
@@ -59,6 +64,7 @@ let xhrs: MockXhr[];
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.mocked(captureHandledError).mockClear();
   vi.stubGlobal("URL", {
     ...globalThis.URL,
     createObjectURL: vi.fn(() => "blob:fake-url"),
@@ -256,27 +262,35 @@ describe("useToolProcessor SSE recovery", () => {
 
     it("still ends the run when the failed-frame settle throws", () => {
       const { unmount } = startRun({ async: true });
-      // The failed branch clears the job id before its entry write, so the
-      // handler-error path must not read that as an already-settled run.
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       vi.spyOn(useFileStore.getState(), "updateEntry")
         .mockImplementationOnce(() => {
           throw new Error("boom");
         })
         .mockImplementation(realUpdateEntry);
 
-      expect(() =>
+      try {
+        // The entry settle runs after the teardown and logs its throw
+        // (#1698), so the run ends on the server's own error instead of
+        // falling into the generic frame-handling one.
         act(() => {
           MockEventSource.instances[0].onmessage?.({
             data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
           } as MessageEvent);
-        }),
-      ).toThrow("boom");
+        });
 
-      expect(useFileStore.getState().processing).toBe(false);
-      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
-      expect(useFileStore.getState().entries[0].status).toBe("failed");
-
-      unmount();
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(useFileStore.getState().activeJobId).toBeNull();
+        expect(useFileStore.getState().error).toBe("server said no");
+        expect(consoleError).toHaveBeenCalledWith(
+          "Failing the run's entry failed",
+          expect.objectContaining({ message: "boom" }),
+        );
+        expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+        unmount();
+      }
     });
 
     it("rethrows the root cause when the teardown itself throws", () => {
@@ -297,14 +311,151 @@ describe("useToolProcessor SSE recovery", () => {
           }),
         ).toThrow("root cause");
         expect(consoleError).toHaveBeenCalledWith(
-          "SSE teardown after a frame handling error failed",
+          "Ending the run failed",
           expect.objectContaining({ message: "teardown broke" }),
         );
+        // Each teardown write has its own guard, so the run still ends
+        // (#1890), and the teardown's first break is reported once.
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(useFileStore.getState().activeJobId).toBeNull();
+        expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+        expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+        const reports = vi
+          .mocked(captureHandledError)
+          .mock.calls.filter(
+            ([e]) => e.message === "Ending a tool run after a frame handling error failed",
+          );
+        expect(reports).toHaveLength(1);
+        expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
       } finally {
         unsubscribe();
         consoleError.mockRestore();
         unmount();
       }
+    });
+
+    // #1739: the completion branch set the payload and warning before its
+    // store writes, so a write that threw left tools that render straight
+    // from resultPayload (histogram, sprite sheet, LQIP) showing a finished
+    // result beside the tracking error. The sync path (#1354) already sets
+    // them last.
+    describe("result payload on a failed landing (#1739)", () => {
+      const WARNED_FRAME = {
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          result: {
+            jobId: "server-job",
+            downloadUrl: "/api/v1/download/server-job/upscaled.png",
+            originalSize: 64,
+            processedSize: 128,
+            savedFileId: "saved-file",
+            warning: "Output was clamped",
+          },
+        }),
+      } as MessageEvent;
+      const realMarkClaimed = useFileStore.getState().markClaimed;
+      afterEach(() => {
+        useFileStore.setState({ markClaimed: realMarkClaimed });
+      });
+
+      it("shows no payload or warning when the entry write throws", () => {
+        const { result, unmount } = startRun({ async: true });
+        vi.spyOn(useFileStore.getState(), "updateEntry")
+          .mockImplementationOnce(() => {
+            throw new Error("boom");
+          })
+          .mockImplementation(realUpdateEntry);
+
+        expect(() =>
+          act(() => {
+            MockEventSource.instances[0].onmessage?.(WARNED_FRAME);
+          }),
+        ).toThrow("boom");
+        // act skips its flush when the callback throws.
+        act(() => {});
+
+        expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+        expect(useFileStore.getState().entries[0].status).toBe("failed");
+        expect(result.current.resultPayload).toBeNull();
+        expect(result.current.warning).toBeNull();
+
+        unmount();
+      });
+
+      it("shows no payload or warning when marking the auto-saved result claimed throws", () => {
+        const { result, unmount } = startRun({ async: true });
+        vi.spyOn(useFileStore.getState(), "markClaimed").mockImplementation(() => {
+          throw new Error("claim broke");
+        });
+
+        expect(() =>
+          act(() => {
+            MockEventSource.instances[0].onmessage?.(WARNED_FRAME);
+          }),
+        ).toThrow("claim broke");
+        act(() => {});
+
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+        expect(result.current.resultPayload).toBeNull();
+        expect(result.current.warning).toBeNull();
+        // The result did land before the claim threw, so the entry keeps it
+        // (the sync path's failEntry does the same).
+        expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+        unmount();
+      });
+
+      it("drops the payload when ending the run throws after it was set", () => {
+        const { result, unmount } = startRun({ async: true });
+        // clearActiveJob nulls the job ref before its store write, so a
+        // listener that throws on that write leaves processing on and the
+        // handler-error teardown still has a live run to fail.
+        const unsubscribe = useFileStore.subscribe((state, prev) => {
+          if (prev.activeJobId && !state.activeJobId) throw new Error("teardown write broke");
+        });
+
+        try {
+          expect(() =>
+            act(() => {
+              MockEventSource.instances[0].onmessage?.(WARNED_FRAME);
+            }),
+          ).toThrow("teardown write broke");
+          act(() => {});
+
+          expect(useFileStore.getState().processing).toBe(false);
+          expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+          expect(result.current.resultPayload).toBeNull();
+          expect(result.current.warning).toBeNull();
+        } finally {
+          unsubscribe();
+          unmount();
+        }
+      });
+
+      it("shows the payload and warning once a completion lands", () => {
+        const { result, unmount } = startRun({ async: true });
+
+        act(() => {
+          MockEventSource.instances[0].onmessage?.(WARNED_FRAME);
+        });
+
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(useFileStore.getState().error).toBeNull();
+        expect(useFileStore.getState().entries[0]).toMatchObject({
+          status: "completed",
+          claimed: true,
+        });
+        expect(result.current.resultPayload).toMatchObject({
+          downloadUrl: "/api/v1/download/server-job/upscaled.png",
+          savedFileId: "saved-file",
+        });
+        expect(result.current.warning).toBe("Output was clamped");
+
+        unmount();
+      });
     });
 
     it("still ignores a malformed frame", () => {
@@ -323,6 +474,217 @@ describe("useToolProcessor SSE recovery", () => {
         MockEventSource.instances[0].onmessage?.(COMPLETE_FRAME);
       });
       expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+      unmount();
+    });
+  });
+
+  // #3923: when an upload takes longer than the 10-second pre-upload grace
+  // window on GET /api/v1/jobs/:jobId/progress (or the SSE socket drops during
+  // upload), es.onerror closes the EventSource and nulls eventSourceRef while
+  // asyncModeRef.current is false. Both upload completion and a single-file 202
+  // response must reopen a closed stream so live progress and terminal frames
+  // reach the client without waiting 5 minutes for SSE_STALL_TIMEOUT_MS.
+  describe("slow-upload SSE close recovery (#3923)", () => {
+    it("reopens SSE on a single-file 202 response and settles immediately from the terminal frame", () => {
+      const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+      useFileStore.getState().setFiles([file]);
+      const { result, unmount } = renderHook(() => useToolProcessor("upscale"));
+
+      act(() => {
+        result.current.processFiles([file], {});
+      });
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      // Pre-upload SSE closes on error while asyncModeRef is false.
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      // Upload finishes, reopening SSE, then SSE drops again before 202 arrives.
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+      expect(MockEventSource.instances).toHaveLength(2);
+      act(() => {
+        MockEventSource.instances[1].onerror?.();
+      });
+      expect(MockEventSource.instances[1].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].status = 202;
+        xhrs[0].responseText = JSON.stringify({ jobId: "server-job", async: true });
+        xhrs[0].onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(3);
+
+      act(() => {
+        MockEventSource.instances[2].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            percent: 100,
+            result: {
+              jobId: "server-job",
+              downloadUrl: "/api/v1/download/server-job/upscaled.png",
+              originalSize: 64,
+              processedSize: 128,
+            },
+          }),
+        } as MessageEvent);
+      });
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "completed",
+        processedUrl: "/api/v1/download/server-job/upscaled.png",
+      });
+
+      unmount();
+    });
+
+    it("reopens a closed SSE stream once when upload finishes on a single-file sync run and preserves live progress across delayed upload.onload", () => {
+      const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+      useFileStore.getState().setFiles([file]);
+      const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+      act(() => {
+        result.current.processFiles([file], { width: 100 });
+      });
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].upload.onprogress?.(
+          new ProgressEvent("progress", { lengthComputable: true, loaded: 64, total: 64 }),
+        );
+      });
+
+      // Reopened on the final upload progress.
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+      // In Firefox (#2136), live SSE frames can arrive during waitForJob before upload.onload fires.
+      act(() => {
+        MockEventSource.instances[1].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "processing",
+            percent: 50,
+            stage: "Resizing...",
+          }),
+        } as MessageEvent);
+        xhrs[0].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(result.current.progress).toMatchObject({
+        phase: "processing",
+        percent: 57.5,
+        stage: "Resizing...",
+      });
+
+      unmount();
+    });
+
+    it("reopens a closed SSE stream in upload.onload on single and batch runs when onprogress was not lengthComputable", () => {
+      const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+      useFileStore.getState().setFiles([file]);
+      const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+      act(() => {
+        result.current.processFiles([file], { width: 100 });
+      });
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+      const files = [
+        new File([new ArrayBuffer(32)], "a.png", { type: "image/png" }),
+        new File([new ArrayBuffer(32)], "b.png", { type: "image/png" }),
+      ];
+      useFileStore.getState().setFiles(files);
+
+      act(() => {
+        void result.current.processAllFiles(files, { width: 100 });
+      });
+      expect(MockEventSource.instances).toHaveLength(3);
+
+      act(() => {
+        MockEventSource.instances[2].onerror?.();
+      });
+      expect(MockEventSource.instances[2].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[1].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(4);
+      expect(MockEventSource.instances[3].close).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it("reopens a closed SSE stream once when upload finishes on a batch run", () => {
+      const files = [
+        new File([new ArrayBuffer(32)], "a.png", { type: "image/png" }),
+        new File([new ArrayBuffer(32)], "b.png", { type: "image/png" }),
+      ];
+      useFileStore.getState().setFiles(files);
+      const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+      act(() => {
+        void result.current.processAllFiles(files, { width: 100 });
+      });
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].upload.onprogress?.(
+          new ProgressEvent("progress", { lengthComputable: true, loaded: 64, total: 64 }),
+        );
+        xhrs[0].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+      act(() => {
+        MockEventSource.instances[1].onmessage?.({
+          data: JSON.stringify({
+            type: "batch",
+            status: "processing",
+            totalFiles: 2,
+            completedFiles: 1,
+            failedFiles: 0,
+            currentFile: "b.png",
+            errors: [],
+          }),
+        } as MessageEvent);
+      });
+
+      expect(result.current.progress).toMatchObject({
+        phase: "processing",
+        stage: "Processing b.png (1/2)",
+      });
 
       unmount();
     });

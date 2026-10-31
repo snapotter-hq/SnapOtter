@@ -11,6 +11,7 @@ already done. The advice has to follow the shape of the failure, not the fact
 that one occurred.
 """
 
+import errno
 import importlib.util
 import os
 
@@ -64,3 +65,54 @@ def test_a_runtime_failure_points_at_a_repair_rather_than_an_install():
 
     assert "Install the upscale-enhance feature" not in message
     assert "Reset AI Environment" in message
+
+
+def test_default_and_fallback_tile_sizes_distinguish_cpu_and_gpu():
+    upscale = load_upscale()
+
+    assert upscale.default_tile_size(False) == 256
+    assert upscale.default_tile_size(True) == 512
+    assert upscale.fallback_tile_size(512) == 256
+    assert upscale.fallback_tile_size(256) == 128
+
+
+def test_oom_errors_report_memory_remedy_rather_than_reinstall():
+    upscale = load_upscale()
+
+    cpu_oom = RuntimeError(
+        "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."
+    )
+    assert upscale.is_oom_error(cpu_oom) is True
+    assert upscale.is_oom_error(MemoryError("unable to allocate array")) is True
+    numpy_oom = RuntimeError(
+        "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
+    )
+    assert upscale.is_oom_error(numpy_oom) is True
+    assert "out of memory" in upscale.realesrgan_failure_message(numpy_oom).lower()
+    for alloc_oom in (
+        RuntimeError("CUDA error: CUBLAS_STATUS_ALLOC_FAILED"),
+        RuntimeError("cudaErrorMemoryAllocation"),
+        RuntimeError("std::bad_alloc"),
+        RuntimeError("MemoryError: allocation failed"),
+        OSError(errno.ENOMEM, "Cannot allocate memory"),
+        OSError(errno.ENOMEM, "Nicht genügend Hauptspeicher verfügbar"),
+    ):
+        assert upscale.is_oom_error(alloc_oom) is True, alloc_oom
+        msg = upscale.realesrgan_failure_message(alloc_oom)
+        assert "out of memory" in msg.lower(), msg
+        assert "Reinstall" not in msg, msg
+        assert "Reset AI Environment" not in msg, msg
+    assert upscale.is_oom_error(RuntimeError("CUDA error: no kernel image")) is False
+    assert upscale.is_oom_error(OSError(errno.EACCES, "Permission denied")) is False
+
+    message = upscale.realesrgan_failure_message(cpu_oom)
+    assert "out of memory" in message.lower()
+    assert "Reinstall" not in message
+    assert "Reset AI Environment" not in message
+    assert "model=lanczos" in message
+
+    bare_oom = upscale.realesrgan_failure_message(MemoryError())
+    assert "MemoryError" in bare_oom
+    assert "out of memory" in bare_oom.lower()
+
+

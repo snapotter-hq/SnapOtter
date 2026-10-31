@@ -367,15 +367,13 @@ describe("the API names the format of every intermediate it writes (#1190)", () 
     // Counted per file rather than pinned to a line, so moving one of these
     // around does not fail the suite while adding one still does.
     //
-    // Every remaining GIF write reads something with no palette to reuse: an
-    // SVG, a PDF page, a WebP, or a PNG handed back by the Python sidecar. The
-    // six in gif-tools are the modes that reorder existing frames, and they
-    // must keep the default: assembleAnimatedGif splices frames together
-    // keeping the first one's colour table, so a fresh palette per frame would
-    // leave every later frame indexed against the wrong one.
+    // Every remaining GIF write either reads something with no palette to reuse
+    // (an SVG, a PDF page, a WebP, or PNG frames decoded before a join) or is a
+    // gif-tools mode that transforms frame timing, order, orientation, or
+    // palette size without introducing new colours.
     //
-    // These are listed because "no palette upstream" is a fact about the
-    // caller, which the text of the line cannot show.
+    // These are listed because "no new colours or no palette upstream" is a
+    // fact about the caller, which the text of the line cannot show.
     expect(byFile).toEqual({
       "lib/animated-image.ts": 1,
       "routes/tools/ai-canvas-expand.ts": 1,

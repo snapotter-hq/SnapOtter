@@ -30,11 +30,11 @@ beforeAll(async () => {
     error: { message: "test failure" },
     durationMs: 123,
   });
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("GET /api/v1/admin/support-bundle", () => {
   it("rejects unauthenticated requests", async () => {

@@ -1,9 +1,12 @@
+import { SafeError } from "@snapotter/shared";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useEditorStore } from "@/stores/editor-store";
+import { isHexColor, useEditorStore } from "@/stores/editor-store";
 import type { AnchorPosition } from "@/types/editor";
 
 // ---------------------------------------------------------------------------
@@ -22,27 +25,73 @@ const ANCHOR_POSITIONS: AnchorPosition[] = [
   "bottom-right",
 ];
 
+// Browsers refuse to draw canvases past this edge length, so the rebake would fail.
+const MAX_DIMENSION = 16384;
+
+function clampDimension(value: number): number {
+  return Math.min(MAX_DIMENSION, Math.max(1, Math.round(value) || 1));
+}
+
 export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const resizeCanvas = useEditorStore((s) => s.resizeCanvas);
+  const rebaking = useEditorStore((s) => s.rebaking);
 
   const [width, setWidth] = useState(canvasSize.width);
   const [height, setHeight] = useState(canvasSize.height);
   const [anchor, setAnchor] = useState<AnchorPosition>("center");
+  // `fill` is always a #rrggbb color, the one form the picker can hold and the store
+  // will paint. `draft` is the text box while it is being edited: a valid entry
+  // commits as it is typed, and blur, a pick or a reopen drops the draft so the box
+  // shows the committed color again, as in the color panel's hex field (#2068).
   const [fill, setFill] = useState("#ffffff");
+  const [draft, setDraft] = useState<string | null>(null);
+  const [transparent, setTransparent] = useState(false);
+  // Resizes queue behind each other now, so a second click would commit a second,
+  // identical resize (and another full-size bitmap in undo history).
+  const [applying, setApplying] = useState(false);
+
+  const handleFillPick = (value: string) => {
+    setFill(value);
+    setDraft(null);
+  };
+
+  const handleFillTextChange = (raw: string) => {
+    setDraft(raw);
+    const candidate = raw.startsWith("#") ? raw : `#${raw}`;
+    if (isHexColor(candidate)) setFill(candidate.toLowerCase());
+  };
 
   useEffect(() => {
     if (open) {
       setWidth(canvasSize.width);
       setHeight(canvasSize.height);
+      setDraft(null);
     }
   }, [open, canvasSize]);
 
-  const handleApply = useCallback(() => {
-    resizeCanvas(width, height, anchor, fill);
-    onClose();
-  }, [width, height, anchor, fill, resizeCanvas, onClose]);
+  const handleApply = useCallback(async () => {
+    if (applying || rebaking) return;
+    setApplying(true);
+    try {
+      const applied = transparent
+        ? await resizeCanvas(width, height, anchor)
+        : await resizeCanvas(width, height, anchor, fill);
+      if (applied !== false) onClose();
+    } catch (err) {
+      // A refused color or a rebake that failed. A toast alone leaves nothing to debug
+      // from, so log and report it the way runEditorAction does for rotate and flip.
+      console.error("Canvas resize failed", err);
+      void captureHandledError(
+        new SafeError("Editor could not resize the canvas", { kind: "operational", cause: err }),
+        { error_class: "operational" },
+      );
+      toast.error(t.common.somethingWentWrong);
+    } finally {
+      setApplying(false);
+    }
+  }, [applying, rebaking, width, height, anchor, fill, transparent, resizeCanvas, onClose, t]);
 
   if (!open) return null;
 
@@ -101,9 +150,9 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
                 id="canvas-w"
                 type="number"
                 min={1}
-                max={16384}
+                max={MAX_DIMENSION}
                 value={width}
-                onChange={(e) => setWidth(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => setWidth(clampDimension(Number(e.target.value)))}
                 className={inputCn}
               />
             </div>
@@ -115,9 +164,9 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
                 id="canvas-h"
                 type="number"
                 min={1}
-                max={16384}
+                max={MAX_DIMENSION}
                 value={height}
-                onChange={(e) => setHeight(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => setHeight(clampDimension(Number(e.target.value)))}
                 className={inputCn}
               />
             </div>
@@ -157,18 +206,41 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
               id="canvas-fill"
               type="color"
               value={fill}
-              onChange={(e) => setFill(e.target.value)}
-              className="h-7 w-7 cursor-pointer rounded border border-border"
+              onChange={(e) => handleFillPick(e.target.value)}
+              disabled={transparent}
+              className="h-7 w-7 cursor-pointer rounded border border-border disabled:cursor-not-allowed disabled:opacity-50"
             />
             <input
               type="text"
-              value={fill}
-              onChange={(e) => setFill(e.target.value)}
+              value={draft ?? fill}
+              onChange={(e) => handleFillTextChange(e.target.value)}
+              onBlur={() => setDraft(null)}
+              maxLength={7}
+              spellCheck={false}
+              disabled={transparent}
+              aria-label={t.a11y.hexColorValue}
+              data-testid="canvas-fill-hex"
               className={cn(
                 "h-7 w-20 rounded border border-border bg-card px-1.5 text-xs text-foreground",
                 "focus:border-ring focus:outline-none",
+                "disabled:cursor-not-allowed disabled:opacity-50",
               )}
             />
+            <div className="ms-auto flex items-center gap-1.5">
+              <input
+                id="canvas-transparent"
+                type="checkbox"
+                checked={transparent}
+                onChange={(e) => setTransparent(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              <label
+                htmlFor="canvas-transparent"
+                className="cursor-pointer text-xs text-muted-foreground select-none"
+              >
+                {t.editor.ui.canvasResize.transparent}
+              </label>
+            </div>
           </div>
         </div>
 
@@ -186,10 +258,11 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
           </button>
           <button
             type="button"
-            onClick={handleApply}
+            onClick={() => void handleApply()}
+            disabled={applying || rebaking}
             className={cn(
               "h-8 rounded bg-primary px-3 text-sm text-primary-foreground",
-              "hover:bg-primary/90 transition-colors",
+              "hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
             )}
           >
             {t.editor.ui.apply}

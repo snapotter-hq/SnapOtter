@@ -1,9 +1,78 @@
 """Runtime GPU/CUDA detection utility."""
+import errno
 import functools
 import json
 import os
 import subprocess
 import sys
+
+
+_OOM_MARKERS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
+    "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
+)
+_HOST_OOM_MARKERS = (
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "[errno 12]",
+    "unable to allocate",
+    "bad_alloc",
+    "memoryerror",
+)
+_MODEL_LOAD_ERROR_MARKERS = (
+    "invalidprotobuf",
+    "invalid_protobuf",
+    "protobuf parsing failed",
+    "invalidgraph",
+    "invalid_graph",
+    "no_suchfile",
+    "nosuchfile",
+    "file doesn't exist",
+    "modelproto does not have a graph",
+    "checksum",
+    "hash of downloaded file",
+    "does not match the known hash",
+    "snapotter_allow_model_download",
+)
+
+
+def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    return any(s in m for s in _OOM_MARKERS)
+
+
+def _is_host_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    if any(s in m for s in _HOST_OOM_MARKERS):
+        return True
+    return "defaultcpuallocator" in m and _is_oom(err)
+
+
+def _is_model_load_error(err):
+    if isinstance(err, EOFError):
+        return True
+    if isinstance(err, OSError):
+        return err.errno != errno.ENOMEM
+    m = f"{type(err).__name__} {err}".lower()
+    return any(s in m for s in _MODEL_LOAD_ERROR_MARKERS)
 
 
 def emit_info(msg):
@@ -20,9 +89,34 @@ def _nvidia_smi_gpu_name():
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired):
         pass
     return None
+
+
+def _cuda_driver_usable():
+    """True if the NVIDIA CUDA driver actually initializes on this host.
+
+    This is what torch and onnxruntime do internally to bind CUDA: map libcuda
+    (the driver library a container receives when launched with GPU access) and
+    call cuInit(0), which succeeds only when a real, usable driver is present.
+    Unlike nvidia-smi, it does not depend on the CLI binary being on PATH, so a
+    GPU exposed with only the `compute` capability (no `utility`, hence no
+    nvidia-smi) is still detected. On a CPU-only host libcuda is absent or
+    cuInit fails, so this returns False.
+    """
+    import ctypes
+
+    for soname in ("libcuda.so.1", "libcuda.so"):
+        try:
+            lib = ctypes.CDLL(soname)
+        except OSError:
+            continue
+        try:
+            return lib.cuInit(0) == 0  # 0 == CUDA_SUCCESS
+        except (AttributeError, OSError):
+            return False
+    return False
 
 
 def _override_disables_gpu():
@@ -49,8 +143,8 @@ def gpu_available():
     if torch_available:
         return True
 
-    # torch either isn't installed or can't use CUDA. Fall through to
-    # ONNX Runtime + nvidia-smi so ONNX-based tools can still use GPU.
+    # torch either isn't installed or can't use CUDA. Fall through to ONNX
+    # Runtime + the CUDA driver probe so ONNX-based tools can still use GPU.
     onnx_available = _try_onnx_cuda()
     if onnx_available:
         return True
@@ -67,16 +161,119 @@ def gpu_available():
     return False
 
 
+def _parse_cuda_arch(entry):
+    """Parse a torch arch string into (major, minor, is_ptx, arch_specific).
+
+    torch reports SASS targets as ``sm_90`` and PTX targets as ``compute_90``;
+    a ``+PTX`` suffix is tolerated too. Arch-specific targets carry a letter
+    suffix (``sm_90a``, ``sm_100f``) and only run on that exact capability.
+    """
+    text = str(entry).strip().lower()
+    is_ptx = text.endswith("+ptx")
+    if is_ptx:
+        text = text[: -len("+ptx")]
+    prefix, separator, digits = text.partition("_")
+    if prefix not in ("sm", "compute") or not separator:
+        return None
+    arch_specific = digits[-1:].isalpha()
+    digits = digits.rstrip("abcdefghijklmnopqrstuvwxyz")
+    if len(digits) < 2 or not digits.isdigit():
+        return None
+    return int(digits[:-1]), int(digits[-1]), is_ptx or prefix == "compute", arch_specific
+
+
+def _torch_device_supported(torch, capability):
+    """Return (supported, arch_list) for a device compute capability.
+
+    A wheel only runs on a device when it carries SASS for the same major arch
+    at or below the device's minor version, or PTX at or below the device (PTX
+    is forward compatible across majors, never backward). SASS is never
+    compatible across majors: sm_90 code does not run on sm_100 or sm_120.
+    Arch-specific targets cover only their exact capability. When the build
+    cannot report or the list cannot be understood, the device keeps its GPU
+    support rather than being disabled on a guess.
+    """
+    get_arch_list = getattr(torch.cuda, "get_arch_list", None)
+    if not callable(get_arch_list):
+        return True, []
+    try:
+        arch_list = list(get_arch_list() or [])
+    except Exception as e:
+        print(
+            f"[gpu] cannot read torch's compiled arch list ({e}); "
+            "assuming the GPU is usable",
+            file=sys.stderr,
+            flush=True,
+        )
+        return True, []
+    if not arch_list:
+        return True, arch_list
+
+    major, minor = capability
+    understood = False
+    for entry in arch_list:
+        parsed = _parse_cuda_arch(entry)
+        if parsed is None:
+            continue
+        understood = True
+        entry_major, entry_minor, is_ptx, arch_specific = parsed
+        if arch_specific:
+            if (entry_major, entry_minor) == (major, minor):
+                return True, arch_list
+        elif is_ptx:
+            if (entry_major, entry_minor) <= (major, minor):
+                return True, arch_list
+        elif entry_major == major and entry_minor <= minor:
+            return True, arch_list
+
+    if not understood:
+        return True, arch_list
+    return False, arch_list
+
+
 def _try_torch_cuda():
     """Check GPU via torch.cuda. Returns True if CUDA is usable."""
     try:
         import torch
-    except ImportError as e:
+    except Exception as e:
         print(f"[gpu] torch not importable: {e}", file=sys.stderr, flush=True)
         return False
 
-    if torch.cuda.is_available():
-        name = torch.cuda.get_device_name(0)
+    try:
+        cuda_available = torch.cuda.is_available()
+    except Exception as e:
+        print(json.dumps({"warning": f"[gpu] torch CUDA probe failed: {e}"}), file=sys.stderr, flush=True)
+        return False
+
+    if cuda_available:
+        try:
+            name = torch.cuda.get_device_name(0)
+        except Exception:
+            name = "CUDA device 0"
+        try:
+            capability = torch.cuda.get_device_capability(0)
+            supported, arch_list = _torch_device_supported(torch, capability)
+        except Exception as e:
+            print(
+                f"[gpu] cannot verify torch kernels for {name} ({e}); "
+                "assuming the GPU is usable",
+                file=sys.stderr,
+                flush=True,
+            )
+            return True
+        if not supported:
+            sm = f"sm_{capability[0]}{capability[1]}"
+            hint = (
+                " RTX 50-series and other Blackwell cards need a cu128 torch build."
+                if capability >= (10, 0)
+                else ""
+            )
+            emit_info(
+                f"GPU {name} is {sm}, but this torch build has no kernels for it "
+                f"(built for {', '.join(str(arch) for arch in arch_list)}). "
+                f"Torch-based tools will run on CPU.{hint}"
+            )
+            return False
         print(f"[gpu] CUDA available via torch: {name}", file=sys.stderr, flush=True)
         return True
 
@@ -111,29 +308,36 @@ def _try_torch_cuda():
 
 
 def _try_onnx_cuda():
-    """Check GPU via ONNX Runtime CUDAExecutionProvider + nvidia-smi."""
+    """Check GPU via ONNX Runtime's CUDA provider confirmed by a driver probe.
+
+    CUDAExecutionProvider being listed only means onnxruntime was built with
+    CUDA support, not that CUDA can bind here, so it is confirmed against the
+    driver (cuInit). nvidia-smi is now only a secondary signal for naming the
+    GPU in the log; it is no longer required, because a container exposed with
+    the `compute` capability alone has a usable driver but no nvidia-smi on PATH
+    (RVA-20260727-001).
+    """
     try:
         import onnxruntime as _ort
-        providers = _ort.get_available_providers()
-        if "CUDAExecutionProvider" not in providers:
+        if "CUDAExecutionProvider" not in _ort.get_available_providers():
             return False
-        gpu_name = _nvidia_smi_gpu_name()
-        if gpu_name:
-            print(f"[gpu] CUDA available via ONNX Runtime + nvidia-smi: {gpu_name}",
-                  file=sys.stderr, flush=True)
-            return True
+        if not _cuda_driver_usable():
+            return False
+    except Exception:
         return False
-    except (ImportError, FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    label = _nvidia_smi_gpu_name() or "CUDA driver present (nvidia-smi not on PATH)"
+    print(f"[gpu] CUDA available via ONNX Runtime: {label}",
+          file=sys.stderr, flush=True)
+    return True
 
 
 def torch_gpu_available():
     """True iff torch itself can use CUDA (honors the SNAPOTTER_GPU override).
 
-    Torch-based tools (upscale, denoise, face enhancement, restore) must gate on
-    this rather than gpu_available(), which can report True based on ONNX Runtime
-    while torch is a CPU-only build. Routing those tools to CUDA on a
-    device torch cannot use would crash them.
+    Torch-based tools (upscale, denoise, face enhancement, HQ inpainting) must
+    gate on this rather than gpu_available(), which can report True based on
+    ONNX Runtime while torch is a CPU-only build. Routing those tools to CUDA
+    on a device torch cannot use would crash them.
     """
     if _override_disables_gpu():
         return False
@@ -154,6 +358,28 @@ def ctranslate2_gpu_available():
         return ctranslate2.get_cuda_device_count() > 0
     except Exception:
         return False
+
+
+def onnx_gpu_available():
+    """True iff ONNX Runtime itself can use CUDA (honors the SNAPOTTER_GPU override).
+
+    ONNX-based tools (background removal, LaMa inpainting/outpainting, DDColor,
+    photo restoration) require CUDAExecutionProvider in onnxruntime plus a
+    usable GPU, not merely a CUDA-enabled torch build (#490).
+    """
+    if _override_disables_gpu():
+        return False
+    return _try_onnx_cuda()
+
+
+def gpu_frameworks_available():
+    """Return per-framework CUDA availability for the sidecar readiness payload."""
+    return {
+        "torch": bool(torch_gpu_available()),
+        "onnx": bool(onnx_gpu_available()),
+        "ctranslate2": bool(ctranslate2_gpu_available()),
+    }
+
 
 
 def onnx_providers():
@@ -181,20 +407,29 @@ def onnx_providers():
 def safe_onnx_session(model_path, providers=None):
     """Create an ONNX Runtime InferenceSession with graceful CUDA EP fallback.
 
-    Returns (session, device) where device is "cuda" or "cpu".
+    Returns (session, device) where device is "cuda" or "cpu", read from the
+    providers the session actually runs on, so explicit providers report CUDA
+    too and a CUDA provider ONNX Runtime dropped reports CPU.
     """
     import onnxruntime as ort
 
-    device = "cpu"
     if providers is None:
-        providers, device = onnx_providers()
+        providers, _ = onnx_providers()
 
     try:
         session = ort.InferenceSession(model_path, providers=providers)
-        return session, device
     except Exception as e:
-        if "CUDAExecutionProvider" in providers:
+        if (
+            "CUDAExecutionProvider" in providers
+            and not _is_host_oom(e)
+            and not _is_model_load_error(e)
+        ):
             emit_info(f"CUDA init failed ({e}), falling back to CPU")
             session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
             return session, "cpu"
         raise
+
+    get_providers = getattr(session, "get_providers", None)
+    active_providers = get_providers() if callable(get_providers) else providers
+    device = "cuda" if "CUDAExecutionProvider" in active_providers else "cpu"
+    return session, device

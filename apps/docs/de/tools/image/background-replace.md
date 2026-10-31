@@ -1,6 +1,6 @@
 ---
 description: "Den Bildhintergrund mit einer Volltonfarbe oder einem Farbverlauf per KI ersetzen."
-i18n_source_hash: 930fe8890e55
+i18n_source_hash: 03d2298daaa3
 i18n_provenance: human
 i18n_output_hash: 3a562fed291b
 ---

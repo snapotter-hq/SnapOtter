@@ -20,11 +20,11 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("images-to-video (requires ffmpeg)", () => {
   it("creates a slideshow from two images with default settings", async () => {

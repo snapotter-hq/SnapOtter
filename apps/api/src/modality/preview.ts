@@ -5,25 +5,85 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveGs } from "@snapotter/doc-engine";
 import { ffmpegAvailable, runFfmpeg } from "@snapotter/media-engine";
+import { hasServerErrorStatus } from "@snapotter/shared";
+import { isOperationalErrno } from "../lib/error-report.js";
+import { DecoderOutOfMemoryError } from "../lib/format-decoders.js";
+import { logger } from "../lib/logger.js";
 
 const PREVIEW_WIDTH = 480;
+
+const PREVIEW_OPERATIONAL_CODES = new Set([
+  "ENOSPC",
+  "EDQUOT",
+  "EACCES",
+  "EPERM",
+  "EROFS",
+  "EMFILE",
+  "ENFILE",
+  "ENOMEM",
+  "EIO",
+]);
+
+function isPreviewOutOfMemory(err: unknown): boolean {
+  return (
+    (err as { signal?: unknown } | null)?.signal === "SIGKILL" ||
+    (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed"))
+  );
+}
+
+/**
+ * True when a preview or thumbnail failure is an operational/server fault
+ * (scratch disk/permission/descriptor/memory errno, syscall-bearing spawn or
+ * filesystem failure, 5xx status-bearing error, or runtime programming defect)
+ * rather than an input file the preview engine could not render (#2870).
+ */
+export function isPreviewServerFault(err: unknown): boolean {
+  if (isOperationalErrno(err) || hasServerErrorStatus(err) || isPreviewOutOfMemory(err)) {
+    return true;
+  }
+  const { code, syscall } = (err ?? {}) as NodeJS.ErrnoException;
+  if (typeof code === "string" && PREVIEW_OPERATIONAL_CODES.has(code)) {
+    return true;
+  }
+  if (typeof syscall === "string" && !(code === "ENOENT" && syscall === "open")) {
+    return true;
+  }
+  return err instanceof TypeError || err instanceof ReferenceError || err instanceof SyntaxError;
+}
+
+function isMissingPreviewOutput(err: unknown, outputPath: string): boolean {
+  const e = err as NodeJS.ErrnoException | null;
+  return e?.code === "ENOENT" && e?.syscall === "open" && e?.path === outputPath;
+}
 
 /** Video poster frame as WebP, or null when ffmpeg is unavailable/fails. */
 export async function videoPosterPreview(buffer: Buffer): Promise<Buffer | null> {
   if (!ffmpegAvailable()) return null;
   const dir = join(tmpdir(), "snapotter-scratch", `preview-${randomUUID()}`);
-  await mkdir(dir, { recursive: true });
+  const output = join(dir, "poster.webp");
+  let scratchStaged = false;
   try {
+    await mkdir(dir, { recursive: true });
     const input = join(dir, "in");
-    const output = join(dir, "poster.webp");
     await writeFile(input, buffer);
+    scratchStaged = true;
     await runFfmpeg(
       ["-ss", "0", "-i", input, "-frames:v", "1", "-vf", `scale=${PREVIEW_WIDTH}:-2`, output],
       { timeoutMs: 30_000 },
     );
     return await readFile(output);
-  } catch {
-    return null; // previews must never fail the job
+  } catch (err) {
+    if (isPreviewOutOfMemory(err)) {
+      throw new DecoderOutOfMemoryError(
+        "The video preview engine ran out of memory decoding this video, or was killed. The video may need more memory than this server has.",
+        err,
+      );
+    }
+    if (!scratchStaged || (!isMissingPreviewOutput(err, output) && isPreviewServerFault(err))) {
+      throw err;
+    }
+    logger.warn({ err }, "video poster preview failed");
+    return null;
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -34,11 +94,13 @@ export async function pdfFirstPagePreview(buffer: Buffer): Promise<Buffer | null
   const gs = resolveGs();
   if (!gs) return null;
   const dir = join(tmpdir(), "snapotter-scratch", `preview-${randomUUID()}`);
-  await mkdir(dir, { recursive: true });
+  const output = join(dir, "page1.png");
+  let scratchStaged = false;
   try {
+    await mkdir(dir, { recursive: true });
     const input = join(dir, "in.pdf");
-    const output = join(dir, "page1.png");
     await writeFile(input, buffer);
+    scratchStaged = true;
     await new Promise<void>((resolvePromise, reject) => {
       const child = spawn(
         gs,
@@ -77,11 +139,25 @@ export async function pdfFirstPagePreview(buffer: Buffer): Promise<Buffer | null
         settled = true;
         clearTimeout(timer);
         if (code === 0) resolvePromise();
-        else reject(new Error(`gs exited ${code ?? signal}: ${err}`));
+        else {
+          const exitErr = new Error(`gs exited ${code ?? signal}: ${err}`);
+          if (signal !== null) Object.assign(exitErr, { signal });
+          reject(exitErr);
+        }
       });
     });
     return await readFile(output);
-  } catch {
+  } catch (err) {
+    if (isPreviewOutOfMemory(err)) {
+      throw new DecoderOutOfMemoryError(
+        "The PDF preview engine ran out of memory rendering this PDF, or was killed. The PDF may need more memory than this server has.",
+        err,
+      );
+    }
+    if (!scratchStaged || (!isMissingPreviewOutput(err, output) && isPreviewServerFault(err))) {
+      throw err;
+    }
+    logger.warn({ err }, "pdf first-page preview failed");
     return null;
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});

@@ -69,7 +69,7 @@ test("does not desynchronise its stream scan on the endstream keyword", () => {
 test("reads media duration from WAV headers and ISO movie headers", () => {
   assert.equal(wavDurationS(fixture("audio/valid/media-30s.wav")), 30);
   assert.ok(Math.abs(wavDurationS(fixture("audio/valid/speech-10s.wav")) - 6.6646) < 0.01);
-  assert.equal(isoDurationS(fixture("video/valid/media-30s.mp4")), 8);
+  assert.ok(Math.abs(isoDurationS(fixture("video/valid/media-30s.mp4")) - 30.112) < 0.01);
   assert.ok(Math.abs(isoDurationS(fixture("audio/valid/speech.m4a")) - 6.665) < 0.01);
   assert.equal(wavDurationS(fixture("image/valid/test-200x150.png")), null);
 });

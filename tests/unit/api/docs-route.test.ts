@@ -4,6 +4,7 @@
  * Tests the isPublic, generateLlmsTxt, and generateLlmsFullTxt helpers
  * that produce llms.txt and llms-full.txt content from the OpenAPI spec.
  */
+import { TOOLS } from "@snapotter/shared";
 import { describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
@@ -15,140 +16,12 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   schema: {},
 }));
 
-// ── Reproduce helper functions and types from docs.ts ───────────────────
-
-interface PathOperation {
-  tags?: string[];
-  summary?: string;
-  description?: string;
-  security?: Array<Record<string, string[]>>;
-  parameters?: Array<{ name: string; in: string; required?: boolean; schema?: { type: string } }>;
-  requestBody?: { content: Record<string, { schema?: SchemaObject }> };
-  responses?: Record<string, { description?: string }>;
-}
-
-interface SchemaObject {
-  type?: string;
-  properties?: Record<string, SchemaObject>;
-  required?: string[];
-  description?: string;
-}
-
-interface OpenAPISpec {
-  info: { title: string; version: string; description?: string };
-  tags?: Array<{ name: string; description?: string }>;
-  paths: Record<string, Record<string, PathOperation>>;
-}
-
-function isPublic(op: PathOperation): boolean {
-  return Array.isArray(op.security) && op.security.length === 0;
-}
-
-function generateLlmsTxt(spec: OpenAPISpec): string {
-  const lines: string[] = [];
-  lines.push(`# ${spec.info.title}`);
-  lines.push("");
-  lines.push(
-    "> Self-hosted file processing API with 200+ tools across image, video, audio, document, and data. Convert, compress, edit, transcribe, OCR, and more.",
-  );
-  lines.push("");
-  lines.push("## Docs");
-  lines.push("- [Interactive API Reference](/api/docs): Full interactive API documentation");
-  lines.push("- [OpenAPI Spec](/api/v1/openapi.yaml): OpenAPI 3.1 specification (YAML)");
-  lines.push(
-    "- [Full API Docs (LLM-friendly)](/llms-full.txt): Complete API documentation in plain text",
-  );
-  lines.push("");
-  lines.push("## API Sections");
-
-  for (const tag of spec.tags || []) {
-    const count = Object.values(spec.paths).reduce((n, methods) => {
-      return n + Object.values(methods).filter((op) => op.tags?.[0] === tag.name).length;
-    }, 0);
-    lines.push(`- ${tag.name} (${count} endpoints): ${tag.description || ""}`);
-  }
-
-  lines.push("");
-  lines.push("## Authentication");
-  lines.push("- Session token via `POST /api/auth/login` -> `Authorization: Bearer <token>`");
-  lines.push("- API key (prefixed `si_`) -> `Authorization: Bearer si_...`");
-
-  return lines.join("\n");
-}
-
-function generateLlmsFullTxt(spec: OpenAPISpec): string {
-  const lines: string[] = [];
-  lines.push(`# ${spec.info.title} v${spec.info.version}`);
-  lines.push("");
-  if (spec.info.description) {
-    lines.push(spec.info.description.trim());
-    lines.push("");
-  }
-
-  const tagGroups = new Map<string, Array<{ method: string; path: string; op: PathOperation }>>();
-  for (const [path, methods] of Object.entries(spec.paths)) {
-    for (const [method, op] of Object.entries(methods)) {
-      const tag = op.tags?.[0] || "Other";
-      if (!tagGroups.has(tag)) tagGroups.set(tag, []);
-      tagGroups.get(tag)?.push({ method: method.toUpperCase(), path, op });
-    }
-  }
-
-  const tagOrder = (spec.tags || []).map((t) => t.name);
-  const allTags = [...new Set([...tagOrder, ...tagGroups.keys()])];
-
-  for (const tag of allTags) {
-    const endpoints = tagGroups.get(tag);
-    if (!endpoints) continue;
-
-    const tagInfo = spec.tags?.find((t) => t.name === tag);
-    lines.push(`## ${tag}`);
-    if (tagInfo?.description) lines.push(`${tagInfo.description}`);
-    lines.push("");
-
-    for (const { method, path, op } of endpoints) {
-      const auth = isPublic(op) ? "(public)" : "(auth required)";
-      lines.push(`### ${method} ${path} ${auth}`);
-      if (op.summary) lines.push(`**${op.summary}**`);
-      if (op.description) lines.push(op.description.trim());
-      lines.push("");
-
-      if (op.parameters?.length) {
-        lines.push("**Parameters:**");
-        for (const p of op.parameters) {
-          lines.push(
-            `- \`${p.name}\` (${p.in}${p.required ? ", required" : ""}) — ${p.schema?.type || "string"}`,
-          );
-        }
-        lines.push("");
-      }
-
-      if (op.requestBody) {
-        const contentType = Object.keys(op.requestBody.content)[0];
-        const schema = op.requestBody.content[contentType]?.schema;
-        lines.push(`**Request:** \`${contentType}\``);
-        if (schema?.properties) {
-          for (const [name, prop] of Object.entries(schema.properties)) {
-            const required = schema.required?.includes(name) ? " (required)" : "";
-            const desc = prop.description ? ` — ${prop.description.split("\n")[0]}` : "";
-            lines.push(`- \`${name}\`${required}: ${prop.type || "string"}${desc}`);
-          }
-        }
-        lines.push("");
-      }
-
-      if (op.responses) {
-        lines.push("**Responses:**");
-        for (const [code, res] of Object.entries(op.responses)) {
-          lines.push(`- \`${code}\` — ${res.description || ""}`);
-        }
-        lines.push("");
-      }
-    }
-  }
-
-  return lines.join("\n");
-}
+import {
+  generateLlmsFullTxt,
+  generateLlmsTxt,
+  isPublic,
+  type OpenAPISpec,
+} from "../../../apps/api/src/routes/docs.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
@@ -188,9 +61,11 @@ describe("docs route logic", () => {
       },
     };
 
-    it("starts with the API title", () => {
+    it("starts with the API title and dynamic catalog tool count", () => {
       const result = generateLlmsTxt(minimalSpec);
       expect(result).toContain("# SnapOtter API");
+      expect(result).toContain(`${TOOLS.length} catalog tool routes`);
+      expect(result).toContain("Base URL: `/api/v1`");
     });
 
     it("includes the Docs section", () => {
@@ -200,15 +75,20 @@ describe("docs route logic", () => {
       expect(result).toContain("[OpenAPI Spec]");
     });
 
-    it("lists API sections with endpoint counts", () => {
+    it("lists API sections with endpoint counts and per-section tool tables", () => {
       const result = generateLlmsTxt(minimalSpec);
       expect(result).toContain("Tools (1 endpoints): Image processing tools");
       expect(result).toContain("Auth (1 endpoints): Authentication");
+      expect(result).toContain("## Tools");
+      expect(result).toContain("content-aware-resize, sync");
+      expect(result).toContain("passport-photo, two-phase");
     });
 
-    it("includes authentication section", () => {
+    it("includes authentication, processing contract, and surrounding APIs sections", () => {
       const result = generateLlmsTxt(minimalSpec);
       expect(result).toContain("## Authentication");
+      expect(result).toContain("## Processing Contract");
+      expect(result).toContain("## Surrounding APIs");
     });
 
     it("handles spec with no tags", () => {
@@ -240,6 +120,13 @@ describe("docs route logic", () => {
         description: "Image processing API",
       },
       tags: [{ name: "Tools", description: "Processing tools" }],
+      components: {
+        responses: {
+          PayloadTooLarge: {
+            description: "Upload exceeds configured size limit",
+          },
+        },
+      },
       paths: {
         "/api/v1/tools/image/resize": {
           post: {
@@ -264,6 +151,7 @@ describe("docs route logic", () => {
             responses: {
               "200": { description: "Successful resize" },
               "400": { description: "Invalid input" },
+              "413": { $ref: "#/components/responses/PayloadTooLarge" },
             },
           },
         },
@@ -312,11 +200,12 @@ describe("docs route logic", () => {
       expect(result).toContain("**Request:** `multipart/form-data`");
     });
 
-    it("includes responses section", () => {
+    it("includes responses section and resolves $ref under components.responses", () => {
       const result = generateLlmsFullTxt(fullSpec);
       expect(result).toContain("**Responses:**");
-      expect(result).toContain("`200`");
-      expect(result).toContain("`400`");
+      expect(result).toContain("`200` — Successful resize");
+      expect(result).toContain("`400` — Invalid input");
+      expect(result).toContain("`413` — Upload exceeds configured size limit");
     });
 
     it("handles spec with no description", () => {

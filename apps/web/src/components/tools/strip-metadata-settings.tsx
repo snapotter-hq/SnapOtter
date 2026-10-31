@@ -6,20 +6,54 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
-import { EXIF_LABELS, SKIP_KEYS } from "@/lib/metadata-utils";
+import { countDisplayableMetadata, EXIF_LABELS } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface MetadataResult {
   filename: string;
   fileSize: number;
   exif?: Record<string, unknown> | null;
-  exifError?: string;
+  exifError?: string | null;
   gps?: Record<string, unknown> | null;
   icc?: Record<string, string> | null;
   xmp?: Record<string, string> | null;
+}
+
+function isOptionalRecord(value: unknown): value is Record<string, unknown> | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "object" && !Array.isArray(value))
+  );
+}
+
+function isOptionalFiniteNumber(value: unknown): value is number | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+function isMetadataResult(value: unknown): value is MetadataResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.filename === "string" &&
+    data.filename.length > 0 &&
+    typeof data.fileSize === "number" &&
+    Number.isFinite(data.fileSize) &&
+    data.fileSize >= 0 &&
+    isOptionalRecord(data.exif) &&
+    (data.exifError === undefined ||
+      data.exifError === null ||
+      typeof data.exifError === "string") &&
+    isOptionalRecord(data.gps) &&
+    (!data.gps ||
+      (isOptionalFiniteNumber(data.gps._latitude) &&
+        isOptionalFiniteNumber(data.gps._longitude))) &&
+    isOptionalRecord(data.icc) &&
+    isOptionalRecord(data.xmp)
+  );
 }
 
 interface StripMetadataControlsProps {
@@ -109,7 +143,7 @@ export function StripMetadataControls({
           {hasExif && !stripAll && (
             <span className="ms-auto text-[10px] text-muted-foreground">
               {format(t.toolSettings["strip-metadata"].fieldsCount, {
-                count: Object.keys(metadata?.exif ?? {}).filter((k) => !SKIP_KEYS.has(k)).length,
+                count: countDisplayableMetadata(metadata?.exif),
               })}
             </span>
           )}
@@ -185,8 +219,8 @@ export function StripMetadataSettings() {
     stripXmp: false,
   });
 
-  // Per-file metadata cache (from feature branch)
-  const [metadataCache, setMetadataCache] = useState<Map<string, MetadataResult>>(new Map());
+  // Per-file metadata cache
+  const metadataCacheRef = useRef<Map<string, MetadataResult>>(new Map());
   const [metadata, setMetadata] = useState<MetadataResult | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const [inspectError, setInspectError] = useState<string | null>(null);
@@ -197,16 +231,20 @@ export function StripMetadataSettings() {
     : null;
 
   // Auto-fetch metadata for the selected file (with per-file caching)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: t only supplies error fallbacks; a locale switch must not refetch
   useEffect(() => {
     if (!currentFile || !fileKey) {
+      setInspecting(false);
       setMetadata(null);
       setInspectError(null);
       return;
     }
 
     // Check cache first
-    const cached = metadataCache.get(fileKey);
+    const cached = metadataCacheRef.current.get(fileKey);
     if (cached) {
+      setInspecting(false);
+      setInspectError(null);
       setMetadata(cached);
       return;
     }
@@ -225,23 +263,45 @@ export function StripMetadataSettings() {
           body: formData,
           signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Failed: ${res.status}`);
+          if (controller.signal.aborted) return;
+          throw new Error(
+            failedAnswerMessage(
+              t,
+              body,
+              res.status,
+              format(t.errors.failedWithStatus, { status: res.status }),
+            ),
+          );
         }
-        const data: MetadataResult = await res.json();
+        const data = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
+        if (controller.signal.aborted) return;
+        if (!isMetadataResult(data)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
+        metadataCacheRef.current.set(fileKey, data);
         setMetadata(data);
-        if (fileKey) setMetadataCache((prev) => new Map(prev).set(fileKey, data));
       } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        setInspectError(err instanceof Error ? err.message : "Failed to inspect metadata");
+        if (controller.signal.aborted || (err as Error)?.name === "AbortError") return;
+        setInspectError(
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : t.toolSettings["strip-metadata"].inspectFailed,
+        );
       } finally {
-        setInspecting(false);
+        if (!controller.signal.aborted) {
+          setInspecting(false);
+        }
       }
     })();
 
     return () => controller.abort();
-  }, [currentFile, fileKey, metadataCache]);
+  }, [currentFile, fileKey]);
 
   const handleProcess = () => {
     if (files.length > 1) {
@@ -258,16 +318,23 @@ export function StripMetadataSettings() {
     if (hasFile && !processing) handleProcess();
   };
 
-  const hasExif = metadata?.exif && Object.keys(metadata.exif).length > 0;
-  const hasGps = metadata?.gps && Object.keys(metadata.gps).length > 0;
-  const hasIcc = metadata?.icc && Object.keys(metadata.icc).length > 0;
-  const hasXmp = metadata?.xmp && Object.keys(metadata.xmp).length > 0;
-  const hasAnyMetadata = hasExif || hasGps || hasIcc || hasXmp;
-  const sectionCount = [hasExif, hasGps, hasIcc, hasXmp].filter(Boolean).length;
+  const exifCount = countDisplayableMetadata(metadata?.exif);
+  const gpsCount = countDisplayableMetadata(metadata?.gps);
+  const iccCount = countDisplayableMetadata(metadata?.icc);
+  const xmpCount = countDisplayableMetadata(metadata?.xmp);
 
   // GPS coordinates for display
   const gpsLat = metadata?.gps?._latitude as number | null | undefined;
   const gpsLon = metadata?.gps?._longitude as number | null | undefined;
+  const hasGpsCoords = gpsLat != null && gpsLon != null;
+
+  const hasExif = exifCount > 0;
+  const hasGps = gpsCount > 0 || hasGpsCoords;
+  const hasIcc = iccCount > 0;
+  const hasXmp = xmpCount > 0;
+  const exifError = metadata?.exifError?.trim() || null;
+  const hasAnyMetadata = hasExif || hasGps || hasIcc || hasXmp;
+  const sectionCount = [hasExif, hasGps, hasIcc, hasXmp].filter(Boolean).length;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -287,13 +354,13 @@ export function StripMetadataSettings() {
 
           {inspectError && <p className="text-[10px] text-destructive-ink">{inspectError}</p>}
 
-          {metadata && !hasAnyMetadata && !inspecting && (
+          {metadata && !hasAnyMetadata && !exifError && !inspecting && (
             <p className="text-xs text-muted-foreground italic py-1">
               {t.toolSettings["strip-metadata"].noMetadataFound}
             </p>
           )}
 
-          {metadata && hasAnyMetadata && (
+          {metadata && (hasAnyMetadata || exifError) && (
             <div className="space-y-1.5">
               {/* GPS warning banner. Coordinates render as plain text: no map
                   tiles are fetched, so the photo's location never leaves the
@@ -325,25 +392,15 @@ export function StripMetadataSettings() {
               )}
 
               {hasExif && metadata.exif && (
-                <CollapsibleSection
-                  title="EXIF"
-                  badge={`${Object.keys(metadata.exif).filter((k) => !SKIP_KEYS.has(k) && !k.startsWith("_")).length} fields`}
-                  defaultOpen
-                >
+                <CollapsibleSection title="EXIF" badge={`${exifCount} fields`} defaultOpen>
                   <MetadataGrid data={metadata.exif} labelMap={EXIF_LABELS} />
                 </CollapsibleSection>
               )}
 
-              {metadata?.exifError && (
-                <p className="text-[11px] text-muted-foreground">EXIF: {metadata.exifError}</p>
-              )}
+              {exifError && <p className="text-[11px] text-muted-foreground">EXIF: {exifError}</p>}
 
-              {hasGps && metadata.gps && (
-                <CollapsibleSection
-                  title="GPS"
-                  warning
-                  badge={`${Object.keys(metadata.gps).filter((k) => !k.startsWith("_")).length} fields`}
-                >
+              {gpsCount > 0 && metadata.gps && (
+                <CollapsibleSection title="GPS" warning badge={`${gpsCount} fields`}>
                   <MetadataGrid data={metadata.gps} />
                 </CollapsibleSection>
               )}
@@ -351,44 +408,43 @@ export function StripMetadataSettings() {
               {hasIcc && metadata.icc && (
                 <CollapsibleSection
                   title={t.toolSettings["strip-metadata"].iccProfile}
-                  badge={`${Object.keys(metadata.icc).length} fields`}
+                  badge={`${iccCount} fields`}
                 >
                   <MetadataGrid data={metadata.icc} />
                 </CollapsibleSection>
               )}
 
               {hasXmp && metadata.xmp && (
-                <CollapsibleSection
-                  title="XMP"
-                  badge={`${Object.keys(metadata.xmp).length} fields`}
-                >
+                <CollapsibleSection title="XMP" badge={`${xmpCount} fields`}>
                   <MetadataGrid data={metadata.xmp} />
                 </CollapsibleSection>
               )}
 
-              <p className="text-[10px] text-muted-foreground">
-                {plural(
-                  sectionCount,
-                  format(t.toolSettings["strip-metadata"].metadataSections, {
-                    count: sectionCount,
-                  }),
-                  format(t.toolSettings["strip-metadata"].metadataSectionsPlural, {
-                    count: sectionCount,
-                  }),
-                )}
-              </p>
+              {hasAnyMetadata && (
+                <p className="text-[10px] text-muted-foreground">
+                  {plural(
+                    sectionCount,
+                    format(t.toolSettings["strip-metadata"].metadataSections, {
+                      count: sectionCount,
+                    }),
+                    format(t.toolSettings["strip-metadata"].metadataSectionsPlural, {
+                      count: sectionCount,
+                    }),
+                  )}
+                </p>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {hasFile && hasAnyMetadata && <div className="border-t border-border" />}
+      {hasFile && (hasAnyMetadata || exifError) && <div className="border-t border-border" />}
 
       <StripMetadataControls
         onChange={setStripSettings}
         metadata={metadata}
-        hasExif={!!hasExif}
-        hasGps={!!hasGps}
+        hasExif={hasExif}
+        hasGps={hasGps}
       />
 
       {/* Error */}

@@ -16,11 +16,11 @@ describe("pipeline templates drift guard", () => {
 
   beforeAll(async () => {
     testApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   it("every step's toolId is registry-runnable with valid settings", () => {
     for (const tpl of PIPELINE_TEMPLATES) {

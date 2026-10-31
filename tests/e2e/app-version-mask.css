@@ -1,0 +1,12 @@
+/*
+ * Applied only while maskAppVersion() screenshots are taken (#1862). A mask
+ * covers its element's box, and the version span is as wide as its text, so
+ * "2.10.0" would draw a wider mask than "2.2.0". A fixed width keeps the mask
+ * the same size across releases.
+ */
+[data-testid="app-version"] {
+  display: inline-block;
+  width: 16ch;
+  overflow: hidden;
+  vertical-align: bottom;
+}

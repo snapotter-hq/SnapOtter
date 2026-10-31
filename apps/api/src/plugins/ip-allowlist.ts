@@ -26,39 +26,16 @@ function isExemptPath(url: string): boolean {
   return EXEMPT_PATHS.some((p) => url.startsWith(p));
 }
 
-/**
- * Parse an array of CIDR strings (or bare addresses) into a BlockList.
- * Returns null when the list is empty (meaning "allow all").
- */
-export function buildBlockList(cidrs: string[]): BlockList | null {
-  if (cidrs.length === 0) return null;
-  const bl = new BlockList();
-  for (const cidr of cidrs) {
-    try {
-      if (cidr.includes("/")) {
-        const [addr, prefix] = cidr.split("/");
-        bl.addSubnet(addr, Number(prefix), addr.includes(":") ? "ipv6" : "ipv4");
-      } else {
-        bl.addAddress(cidr, cidr.includes(":") ? "ipv6" : "ipv4");
-      }
-    } catch {
-      // Invalid CIDR -- skip silently
-    }
-  }
-  return bl;
-}
+const CIDR_PREFIX_RE = /^(?:0|[1-9]\d*)$/;
 
-/**
- * Validate a single CIDR string (or bare IP).
- * Returns true when the string can be parsed without error.
- */
-export function isValidCidr(cidr: string): boolean {
+function addCidrToBlockList(bl: BlockList, cidr: string): boolean {
   try {
-    const bl = new BlockList();
     if (cidr.includes("/")) {
-      const [addr, prefix] = cidr.split("/");
+      const parts = cidr.split("/");
+      if (parts.length !== 2) return false;
+      const [addr, prefix] = parts;
+      if (!CIDR_PREFIX_RE.test(prefix)) return false;
       const prefixNum = Number(prefix);
-      if (Number.isNaN(prefixNum) || prefixNum < 0) return false;
       const family = addr.includes(":") ? "ipv6" : "ipv4";
       if (family === "ipv4" && prefixNum > 32) return false;
       if (family === "ipv6" && prefixNum > 128) return false;
@@ -70,6 +47,27 @@ export function isValidCidr(cidr: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Parse an array of CIDR strings (or bare addresses) into a BlockList.
+ * Returns null when the list is empty (meaning "allow all").
+ */
+export function buildBlockList(cidrs: string[]): BlockList | null {
+  if (cidrs.length === 0) return null;
+  const bl = new BlockList();
+  for (const cidr of cidrs) {
+    addCidrToBlockList(bl, cidr);
+  }
+  return bl;
+}
+
+/**
+ * Validate a single CIDR string (or bare IP).
+ * Returns true when the string can be parsed without error.
+ */
+export function isValidCidr(cidr: string): boolean {
+  return addCidrToBlockList(new BlockList(), cidr);
 }
 
 /**
@@ -96,6 +94,17 @@ export { EXEMPT_PATHS, isExemptPath };
 const ALLOWLIST_KEY = "ip:allowlist";
 const ALLOWLIST_CHANNEL = "ip:allowlist:refresh";
 
+function parseAllowlistJson(raw: string): string[] {
+  const parsed: unknown = JSON.parse(raw);
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every((entry): entry is string => typeof entry === "string" && isValidCidr(entry))
+  ) {
+    throw new SyntaxError("ipAllowlist must be a JSON array of valid CIDR strings");
+  }
+  return parsed;
+}
+
 export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
   // Only run if enterprise feature is enabled
   const isEnabled = await isEnterpriseFeatureEnabled("ip_allowlist", "boot");
@@ -103,14 +112,10 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   // Load allowlist from settings table
   async function loadAllowlist(): Promise<string[]> {
-    const { getSettingString } = await import("../lib/settings-helpers.js");
-    const raw = await getSettingString("ipAllowlist", "");
-    if (!raw) return [];
-    try {
-      return JSON.parse(raw) as string[];
-    } catch {
-      return [];
-    }
+    const { getSettingStrict } = await import("../lib/settings-helpers.js");
+    const raw = await getSettingStrict("ipAllowlist");
+    if (raw === undefined || raw === "") return [];
+    return parseAllowlistJson(raw);
   }
 
   // Cache in-process
@@ -119,13 +124,58 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   let cachedBlockList: BlockList | null = null;
   let cachedCidrs: string[] = [];
+  let hasLoadedAllowlist = false;
 
   async function refreshAllowlist(): Promise<void> {
-    const cidrs = await loadAllowlist();
+    let cidrs: string[];
+    try {
+      cidrs = await loadAllowlist();
+    } catch (err) {
+      if (hasLoadedAllowlist) {
+        app.log.error(
+          { err, key: "ipAllowlist" },
+          "Failed to refresh IP allowlist from settings; keeping cached allowlist",
+        );
+        return;
+      }
+
+      try {
+        const cachedRaw = await redis.get?.(ALLOWLIST_KEY);
+        if (cachedRaw) {
+          const cached = parseAllowlistJson(cachedRaw);
+          if (cached.length > 0) {
+            cachedCidrs = cached;
+            cachedBlockList = buildBlockList(cached);
+            hasLoadedAllowlist = true;
+            app.log.warn(
+              { err, key: "ipAllowlist" },
+              "Failed to load IP allowlist from settings; using Redis cached allowlist",
+            );
+            return;
+          }
+        }
+      } catch (redisErr) {
+        app.log.warn({ err: redisErr }, "Failed to read IP allowlist fallback from Redis");
+      }
+
+      cachedCidrs = [];
+      cachedBlockList = new BlockList();
+      app.log.error(
+        { err, key: "ipAllowlist" },
+        "Failed to load IP allowlist from settings and no usable Redis cache is available; failing closed",
+      );
+      return;
+    }
+
     cachedCidrs = cidrs;
     cachedBlockList = buildBlockList(cidrs);
+    hasLoadedAllowlist = true;
     // Mirror into Redis so other instances can bootstrap faster
-    await redis.set(ALLOWLIST_KEY, JSON.stringify(cidrs));
+    try {
+      await redis.set(ALLOWLIST_KEY, JSON.stringify(cidrs));
+    } catch (err) {
+      app.log.warn({ err }, "Failed to cache IP allowlist in Redis");
+    }
   }
 
   // Initial load
@@ -133,9 +183,18 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   // Subscribe to refresh events from other instances
   const sub = redis.duplicate();
-  await sub.subscribe(ALLOWLIST_CHANNEL);
+  sub.on("error", (err) => {
+    app.log.warn({ err }, "IP allowlist Redis subscriber error");
+  });
+  try {
+    await sub.subscribe(ALLOWLIST_CHANNEL);
+  } catch (err) {
+    app.log.warn({ err }, "Failed to subscribe to IP allowlist refresh channel");
+  }
   sub.on("message", async () => {
-    refreshAllowlist().catch(() => {});
+    refreshAllowlist().catch((err) => {
+      app.log.error({ err }, "Unexpected error refreshing IP allowlist");
+    });
   });
 
   // Clean up subscriber on shutdown
@@ -150,16 +209,18 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   // Hook -- runs before auth, before routes
   app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!cachedBlockList || cachedCidrs.length === 0) return; // No allowlist = allow all
+    if (!cachedBlockList) return; // No allowlist = allow all
     if (isExemptPath(request.url)) return;
 
     const ip = request.ip;
     if (!isIpAllowed(ip, cachedBlockList)) {
-      return reply.status(403).send({ error: "IP address not allowed" });
+      return reply.status(403).send({ error: "IP address not allowed", code: "IP_NOT_ALLOWED" });
     }
   });
 
-  app.log.info(`IP allowlist active (${cachedCidrs.length} entries)`);
+  if (hasLoadedAllowlist) {
+    app.log.info(`IP allowlist active (${cachedCidrs.length} entries)`);
+  }
 }
 
 /**

@@ -6,9 +6,12 @@
  * detection so the route exercises real processing without Python sidecars.
  */
 
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { waitForJob } from "../../../../apps/api/src/jobs/enqueue.js";
+import { logger } from "../../../../apps/api/src/lib/logger.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -49,11 +52,11 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 beforeEach(() => {
   mocks.detectFaces.mockReset();
@@ -120,6 +123,46 @@ describe("smart-crop sidecar-free processing", () => {
     expect(outputUrl).toContain("_smartcrop.");
   });
 
+  it("keeps a truecolor PNG lossless instead of palette-quantising when quality: 95 is passed (#2205)", async () => {
+    const width = 64;
+    const height = 64;
+    const raw = Buffer.alloc(width * height * 3);
+    for (let i = 0; i < width * height; i++) {
+      raw[i * 3] = i & 0xff;
+      raw[i * 3 + 1] = (i >> 4) & 0xff;
+      raw[i * 3 + 2] = (i >> 8) & 0xff;
+    }
+    const truecolorPng = await sharp(raw, { raw: { width, height, channels: 3 } })
+      .png()
+      .toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "noisy.png", contentType: "image/png", content: truecolorPng },
+      {
+        name: "settings",
+        content: JSON.stringify({ mode: "subject", width: 64, height: 64, quality: 95 }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/smart-crop",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    const download = await downloadOutput(await outputUrlFor(res));
+    const meta = await sharp(download.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+    // PNG IHDR byte 25 is the colour type: 2 = truecolor RGB, 3 = palette.
+    expect(download.rawPayload[25]).toBe(2);
+
+    const decoded = await sharp(download.rawPayload).raw().toBuffer();
+    expect(decoded.equals(raw)).toBe(true);
+  });
+
   it("maps legacy attention/content modes to subject and trim behavior", async () => {
     const attention = await postSmartCrop({ mode: "attention", width: 80, height: 80 });
     await expect(outputUrlFor(attention)).resolves.toContain("_smartcrop.");
@@ -147,7 +190,14 @@ describe("smart-crop sidecar-free processing", () => {
     });
 
     const outputUrl = await outputUrlFor(res);
-    expect(mocks.detectFaces).toHaveBeenCalledWith(expect.any(Buffer), { sensitivity: 0.75 });
+    expect(mocks.detectFaces).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.objectContaining({
+        sensitivity: 0.75,
+        toolId: "smart-crop",
+        signal: expect.any(AbortSignal),
+      }),
+    );
 
     const download = await downloadOutput(outputUrl);
     const meta = await sharp(download.rawPayload).metadata();
@@ -173,6 +223,101 @@ describe("smart-crop sidecar-free processing", () => {
     const meta = await sharp(download.rawPayload).metadata();
     expect(meta.width).toBe(120);
     expect(meta.height).toBe(80);
+  });
+
+  it("fails a trim of a 2 x 2 image as rejected input, not a server fault", async () => {
+    // Sharp cannot trim a side under 3 pixels and used to throw a bare Error that
+    // the worker reported as a bug (#2202).
+    const errorSpy = vi.spyOn(logger, "error");
+    try {
+      const tiny = await sharp({
+        create: { width: 2, height: 2, channels: 3, background: "#ff0000" },
+      })
+        .png()
+        .toBuffer();
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "tiny.png", contentType: "image/png", content: tiny },
+        { name: "settings", content: JSON.stringify({ mode: "trim" }) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/smart-crop",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      // smart-crop is a long tool: the route answers 202 without waiting, so the
+      // verdict lives on the job.
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      await expect(waitForJob("ai", jobId, 20_000)).rejects.toThrow(
+        /too small to trim \(2 x 2 pixels\)/,
+      );
+
+      // The error class doesn't survive the queue, so the row's httpStatus is what
+      // marks a rejected input. A server fault would also be logged at error level.
+      const [row] = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toMatchObject({
+        httpStatus: 400,
+        message: expect.stringContaining("too small to trim (2 x 2 pixels)"),
+      });
+      const errorLogsForJob = errorSpy.mock.calls.filter(
+        ([bindings]) => (bindings as { jobId?: unknown } | undefined)?.jobId === jobId,
+      );
+      expect(errorLogsForJob).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("fails a subject crop whose cover stretch exceeds the 64 MP pixel limit as rejected input, not a server fault", async () => {
+    // 1000 x 100 cropped to 10 x 4000 passes the schema (40,000 output pixels),
+    // but Sharp stretches the input to 40000 x 4000 (160 MP) before cropping (#2203).
+    const errorSpy = vi.spyOn(logger, "error");
+    try {
+      const strip = await sharp({
+        create: { width: 1000, height: 100, channels: 3, background: "#336699" },
+      })
+        .png()
+        .toBuffer();
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "strip.png", contentType: "image/png", content: strip },
+        {
+          name: "settings",
+          content: JSON.stringify({ mode: "subject", width: 10, height: 4000 }),
+        },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/smart-crop",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      await expect(waitForJob("ai", jobId, 20_000)).rejects.toThrow(/40000 x 4000/);
+
+      const [row] = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toMatchObject({
+        httpStatus: 400,
+        message: expect.stringContaining("40000 x 4000"),
+      });
+      const errorLogsForJob = errorSpy.mock.calls.filter(
+        ([bindings]) => (bindings as { jobId?: unknown } | undefined)?.jobId === jobId,
+      );
+      expect(errorLogsForJob).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("rejects malformed JSON and invalid setting ranges before enqueueing", async () => {

@@ -1,0 +1,157 @@
+import { describe, expect, it, vi } from "vitest";
+import { parseCsvWithHeader } from "../../../apps/api/src/lib/csv-parse.js";
+
+/**
+ * Papa builds each header-mode row as `{}` and assigns `row[field] = value`, so a
+ * column headed `__proto__` hit the prototype setter and its cells were dropped
+ * while `meta.fields` still listed it (#2096). Rows are null-prototype objects
+ * now, so every header, including `__proto__`, is an own property.
+ */
+describe("parseCsvWithHeader", () => {
+  it("keeps a column headed __proto__", () => {
+    const { data, meta } = parseCsvWithHeader("__proto__,x\r\n5,1\r\n6,2");
+
+    expect(meta.fields).toEqual(["__proto__", "x"]);
+    expect(data.map((row) => Object.keys(row))).toEqual([
+      ["__proto__", "x"],
+      ["__proto__", "x"],
+    ]);
+    expect(Object.getOwnPropertyDescriptor(data[0], "__proto__")?.value).toBe("5");
+    expect(JSON.stringify(data)).toBe('[{"__proto__":"5","x":"1"},{"__proto__":"6","x":"2"}]');
+  });
+
+  it("keeps a column headed __parsed_extra as a scalar, instead of Papa wrapping it in an array (#2269)", () => {
+    const { data, meta } = parseCsvWithHeader("__parsed_extra,x\r\n1,2");
+
+    expect(meta.fields).toEqual(["__parsed_extra", "x"]);
+    expect(JSON.stringify(data)).toBe('[{"__parsed_extra":"1","x":"2"}]');
+  });
+
+  it("handles duplicate __parsed_extra headers the way Papa renames any other duplicate", () => {
+    const { data, meta } = parseCsvWithHeader("__parsed_extra,__parsed_extra,x\r\n1,2,3");
+
+    expect(meta.fields).toEqual(["__parsed_extra", "__parsed_extra_1", "x"]);
+    expect(JSON.stringify(data[0])).toBe('{"__parsed_extra":"1","__parsed_extra_1":"2","x":"3"}');
+  });
+
+  it("restores the sentinel properly without affecting columns that just happen to start with the NUL byte (#2322)", () => {
+    const { data, meta } = parseCsvWithHeader("\u0000foo,x\r\n1,2");
+
+    expect(meta.fields).toEqual(["\u0000foo", "x"]);
+    expect(JSON.stringify(data[0])).toBe('{"\\u0000foo":"1","x":"2"}');
+  });
+
+  it("prevents PapaParse's extra fields array from overwriting a real __parsed_extra column", () => {
+    const { data } = parseCsvWithHeader("__parsed_extra,x\r\n1,2,extra_val");
+
+    expect(JSON.stringify(data[0])).toBe(
+      '{"__parsed_extra":"1","x":"2","__parsed_extra_1":["extra_val"]}',
+    );
+  });
+
+  it("builds rows without a prototype when a __proto__ column forces the rebuild", () => {
+    const { data } = parseCsvWithHeader("__proto__,b\r\n1,2");
+
+    expect(Object.getPrototypeOf(data[0])).toBeNull();
+    expect(data[0].constructor).toBeUndefined();
+  });
+
+  it("stays linear on a header of many __proto__ copies", () => {
+    const count = 5000;
+    const header = Array(count).fill("__proto__").join(",");
+    const started = Date.now();
+    const { meta } = parseCsvWithHeader(`${header}\r\n${Array(count).fill("1").join(",")}`);
+
+    expect(meta.fields).toHaveLength(count);
+    expect(new Set(meta.fields).size).toBe(count);
+    expect(Date.now() - started).toBeLessThan(3000);
+  });
+
+  it("renames a duplicated __proto__ header the way Papa renames any other duplicate", () => {
+    const { data, meta } = parseCsvWithHeader("__proto__,__proto__,x\r\n1,2,3");
+
+    expect(meta.fields).toEqual(["__proto__", "__proto___1", "x"]);
+    expect(JSON.stringify(data[0])).toBe('{"__proto__":"1","__proto___1":"2","x":"3"}');
+  });
+
+  it("strips the BOM and leading blank lines to preserve Papa's deduplication logic (#2268)", () => {
+    const { data, meta } = parseCsvWithHeader("\uFEFF\n\n\ra,a,x\r\n1,2,3");
+
+    expect(meta.fields).toEqual(["a", "a_1", "x"]);
+    expect(JSON.stringify(data[0])).toBe('{"a":"1","a_1":"2","x":"3"}');
+  });
+
+  // Papa checks its rename candidates against the raw header names, so the second
+  // copy could restore onto a name a real column already has and silently replace it.
+  it.each([
+    ["__proto__,__proto__,__proto___1", ["__proto__", "__proto___2", "__proto___1"]],
+    ["__proto___1,__proto__,__proto__", ["__proto___1", "__proto__", "__proto___2"]],
+    [
+      "__proto__,__proto__,__proto__,__proto___2",
+      ["__proto__", "__proto___1", "__proto___3", "__proto___2"],
+    ],
+  ])("never lets a renamed duplicate land on a real column: %s", (header, expected) => {
+    const { data, meta } = parseCsvWithHeader(
+      `${header}\r\n1,2,3${header.split(",").length > 3 ? ",4" : ""}`,
+    );
+
+    expect(meta.fields).toEqual(expected);
+    expect(Object.keys(data[0])).toEqual(expected);
+    expect(new Set(Object.keys(data[0])).size).toBe(expected.length);
+  });
+
+  it("restores the sentinel in the rename record too", () => {
+    const { meta } = parseCsvWithHeader("__proto__,__proto__,x\r\n1,2,3");
+
+    expect(meta.renamedHeaders).toEqual({ __proto___1: "__proto__" });
+    expect(JSON.stringify(meta)).not.toContain("\\u0000");
+  });
+
+  it("keeps Papa's field-count errors and extra cells", () => {
+    const short = parseCsvWithHeader("__proto__,x\r\n5");
+    expect(short.errors.map((e) => e.code)).toContain("TooFewFields");
+    expect(Object.getOwnPropertyDescriptor(short.data[0], "__proto__")?.value).toBe("5");
+
+    const long = parseCsvWithHeader("__proto__,x\r\n5,1,9");
+    expect(long.errors.map((e) => e.code)).toContain("TooManyFields");
+    expect(Object.getOwnPropertyDescriptor(long.data[0], "__proto__")?.value).toBe("5");
+    expect(long.data[0].__parsed_extra).toEqual(["9"]);
+  });
+
+  it("leaves an ordinary file exactly as Papa parses it", () => {
+    const { data, meta, errors } = parseCsvWithHeader("name,age\r\nAda,36\r\nGrace,45");
+
+    expect(meta.fields).toEqual(["name", "age"]);
+    expect(errors).toEqual([]);
+    expect(data.map((row) => ({ ...row }))).toEqual([
+      { name: "Ada", age: "36" },
+      { name: "Grace", age: "45" },
+    ]);
+  });
+
+  it("keeps Papa's parse errors", () => {
+    const { errors } = parseCsvWithHeader('a,b\r\n"unterminated,1');
+
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it("suppresses Papa's console.warn when renaming duplicate headers and restores console.warn (#2229)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { meta } = parseCsvWithHeader("a,a\r\n1,2");
+      expect(meta.renamedHeaders).toEqual({ a_1: "a" });
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(console.warn).toBe(warnSpy);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("strips interleaved leading BOMs and blank lines before deduplicating headers (#2229)", () => {
+    const { data, meta } = parseCsvWithHeader("\r\n\uFEFF\r\n__proto__,__proto__,x\r\n1,2,3");
+
+    expect(meta.fields).toEqual(["__proto__", "__proto___1", "x"]);
+    expect(meta.renamedHeaders).toEqual({ __proto___1: "__proto__" });
+    expect(JSON.stringify(data[0])).toBe('{"__proto__":"1","__proto___1":"2","x":"3"}');
+  });
+});
