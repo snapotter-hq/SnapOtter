@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" role="img" aria-label="Star history for snapotter-hq/SnapOtter: 2,920 stars">
+  <defs>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E07832" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#E07832" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="799" height="479" rx="14" fill="#1A1210" stroke="#33271f"/>
+  <text x="70" y="41" fill="#F0EBE4" font-size="19" font-weight="700">Star history</text>
+  <g>
+    <circle cx="674" cy="36" r="4.5" fill="#E07832"/>
+    <text x="686" y="41" fill="#9a8b7d" font-size="13">GitHub stars</text>
+  </g>
+  <g>
+    <line x1="70" y1="426.0" x2="770" y2="426.0" stroke="#33271f" stroke-width="1"/><text x="60" y="426.0" fill="#9a8b7d" font-size="12" text-anchor="end" dominant-baseline="middle">0</text>
+    <line x1="70" y1="308.7" x2="770" y2="308.7" stroke="#33271f" stroke-width="1"/><text x="60" y="308.7" fill="#9a8b7d" font-size="12" text-anchor="end" dominant-baseline="middle">1,000</text>
+    <line x1="70" y1="191.3" x2="770" y2="191.3" stroke="#33271f" stroke-width="1"/><text x="60" y="191.3" fill="#9a8b7d" font-size="12" text-anchor="end" dominant-baseline="middle">2,000</text>
+    <line x1="70" y1="74.0" x2="770" y2="74.0" stroke="#33271f" stroke-width="1"/><text x="60" y="74.0" fill="#9a8b7d" font-size="12" text-anchor="end" dominant-baseline="middle">3,000</text>
+  </g>
+  <path d="M 70.0,426.0 L 70.0,425.9 L 77.8,420.1 L 77.9,414.4 L 78.1,408.6 L 78.3,402.9 L 78.5,397.1 L 79.1,391.4 L 79.7,385.6 L 80.4,379.9 L 81.5,374.1 L 84.5,368.4 L 90.9,362.6 L 100.5,356.9 L 107.2,351.1 L 115.4,345.4 L 126.8,339.6 L 129.5,333.9 L 146.1,328.1 L 155.0,322.4 L 157.1,316.6 L 158.3,310.9 L 160.1,305.1 L 168.5,299.4 L 174.2,293.6 L 177.6,287.9 L 193.0,282.1 L 215.4,276.4 L 222.9,270.7 L 237.2,264.9 L 247.5,259.2 L 273.6,253.4 L 306.3,247.7 L 323.3,241.9 L 335.0,236.2 L 337.0,230.4 L 342.2,224.7 L 354.6,218.9 L 364.6,213.2 L 380.6,207.4 L 397.4,201.7 L 410.0,195.9 L 427.0,190.2 L 443.7,184.4 L 460.9,178.7 L 496.7,172.9 L 529.3,167.2 L 544.8,161.4 L 546.5,155.7 L 556.2,149.9 L 584.2,144.2 L 592.1,138.4 L 593.6,132.7 L 596.1,126.9 L 602.8,121.2 L 619.3,115.4 L 635.9,109.7 L 664.1,103.9 L 705.4,98.2 L 753.4,92.4 L 762.6,86.7 L 769.0,83.4 L 770.0,83.4 L 770.0,426.0 Z" fill="url(#area)"/>
+  <polyline points="70.0,425.9 77.8,420.1 77.9,414.4 78.1,408.6 78.3,402.9 78.5,397.1 79.1,391.4 79.7,385.6 80.4,379.9 81.5,374.1 84.5,368.4 90.9,362.6 100.5,356.9 107.2,351.1 115.4,345.4 126.8,339.6 129.5,333.9 146.1,328.1 155.0,322.4 157.1,316.6 158.3,310.9 160.1,305.1 168.5,299.4 174.2,293.6 177.6,287.9 193.0,282.1 215.4,276.4 222.9,270.7 237.2,264.9 247.5,259.2 273.6,253.4 306.3,247.7 323.3,241.9 335.0,236.2 337.0,230.4 342.2,224.7 354.6,218.9 364.6,213.2 380.6,207.4 397.4,201.7 410.0,195.9 427.0,190.2 443.7,184.4 460.9,178.7 496.7,172.9 529.3,167.2 544.8,161.4 546.5,155.7 556.2,149.9 584.2,144.2 592.1,138.4 593.6,132.7 596.1,126.9 602.8,121.2 619.3,115.4 635.9,109.7 664.1,103.9 705.4,98.2 753.4,92.4 762.6,86.7 769.0,83.4 770.0,83.4" fill="none" stroke="#E07832" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="770.0" cy="83.4" r="4.5" fill="#E07832" stroke="#1A1210" stroke-width="1.5"/>
+  <text x="762.0" y="71.4" fill="#F09550" font-size="14" font-weight="700" text-anchor="end">2,920</text>
+  <g>
+    <text x="70.0" y="448" fill="#9a8b7d" font-size="12" text-anchor="middle">Apr 2026</text>
+    <text x="167.3" y="448" fill="#9a8b7d" font-size="12" text-anchor="middle">May 2026</text>
+    <text x="268.9" y="448" fill="#9a8b7d" font-size="12" text-anchor="middle">Jun 2026</text>
+    <text x="367.2" y="448" fill="#9a8b7d" font-size="12" text-anchor="middle">Jul 2026</text>
+    <text x="468.9" y="448" fill="#9a8b7d" font-size="12" text-anchor="middle">Aug 2026</text>
+    <text x="570.5" y="448" fill="#9a8b7d" font-size="12" text-anchor="middle">Sep 2026</text>
+    <text x="668.8" y="448" fill="#9a8b7d" font-size="12" text-anchor="middle">Oct 2026</text>
+  </g>
+</svg>
