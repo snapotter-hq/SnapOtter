@@ -16,5 +16,9 @@
       ]
     }
   },
-  "include": ["tests/unit/web/**/*", "apps/web/src/vite-env.d.ts"]
+  "include": [
+    "tests/unit/web/**/*",
+    "tests/integration/generated/catalog-integrity.test.ts",
+    "apps/web/src/vite-env.d.ts"
+  ]
 }

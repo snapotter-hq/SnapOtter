@@ -16,6 +16,7 @@
       "@snapotter/media-engine": ["packages/media-engine/src/index.ts"],
       "@snapotter/doc-engine": ["packages/doc-engine/src/index.ts"],
       "@snapotter/ai": ["packages/ai/src/index.ts"],
+      "@aws-sdk/client-s3": ["packages/enterprise/node_modules/@aws-sdk/client-s3"],
       "*": ["apps/api/node_modules/@types/*", "apps/api/node_modules/*"]
     }
   },
@@ -44,13 +45,16 @@
     "tests/unit/infra/**/*",
     "tests/unit/landing/**/*",
     "tests/unit/scripts/**/*",
-    "tests/unit/security/**/*"
+    "tests/unit/security/**/*",
+    "tests/*.ts",
+    "tests/*.mts",
+    "tests/benchmark/**/*",
+    "tests/unit/doc-engine/**/*",
+    "tests/unit/docker/**/*",
+    "tests/unit/helpers/**/*",
+    "tests/unit/media-engine/**/*",
+    "tests/unit/qa/**/*",
+    "tests/unit/shared/**/*"
   ],
-  "exclude": [
-    "tests/integration/generated/catalog-integrity.test.ts",
-    "tests/integration/platform/s3-download-fault.test.ts",
-    "tests/integration/platform/s3-result-download-fault.test.ts",
-    "tests/integration/platform/s3-storage.test.ts",
-    "tests/integration/platform/tracing-lifecycle.test.ts"
-  ]
+  "exclude": ["tests/integration/generated/catalog-integrity.test.ts"]
 }

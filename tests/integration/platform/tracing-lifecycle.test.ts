@@ -8,7 +8,7 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
-import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import { core } from "@opentelemetry/sdk-node";
 import { afterEach, describe, expect, it } from "vitest";
 
 /**
@@ -61,7 +61,7 @@ describe("tracing lifecycle", () => {
     );
 
     context.setGlobalContextManager(new TestContextManager());
-    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
 
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({
@@ -118,7 +118,7 @@ describe("tracing lifecycle", () => {
     );
 
     context.setGlobalContextManager(new TestContextManager());
-    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
 
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({
@@ -158,7 +158,7 @@ describe("tracing lifecycle", () => {
     );
 
     context.setGlobalContextManager(new TestContextManager());
-    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
 
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({
@@ -186,7 +186,7 @@ describe("tracing lifecycle", () => {
     );
 
     context.setGlobalContextManager(new TestContextManager());
-    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
 
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({
