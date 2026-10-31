@@ -10,7 +10,7 @@ import { join } from "node:path";
 import multipart from "@fastify/multipart";
 import { apiToolPath, SafeError } from "@snapotter/shared";
 import Fastify from "fastify";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const putObject = vi.fn();
@@ -264,14 +264,12 @@ describe("pdf-to-image single-file route", () => {
       "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60_000);
     const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
-    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
-      this: sharp.Sharp,
-    ) {
+    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (this: Sharp) {
       return {
         toBuffer: async () => {
           throw new RangeError("Array buffer allocation failed");
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     const jxlSpy = vi
       .spyOn(formatEncoders, "encodeJxl")
@@ -358,28 +356,28 @@ describe("pdf-to-image single-file route", () => {
     const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
     const jpegSpy = vi
       .spyOn(sharp.prototype, "jpeg")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
               code: "ENOSPC",
             });
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     const metaSpy = vi
       .spyOn(sharp.prototype, "metadata")
@@ -632,28 +630,28 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
       .toBuffer();
     const pngSpy = vi
       .spyOn(sharp.prototype, "png")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     const jpegSpy = vi.spyOn(sharp.prototype, "jpeg").mockImplementationOnce(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       return {
         toBuffer: async () => {
           throw new RangeError("Array buffer allocation failed");
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     const app = await buildApp(registerImageToPdf);
     try {
@@ -1279,14 +1277,12 @@ describe("pdf-to-image batch route (#1552)", () => {
       "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 50 * 60_000);
     const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
-    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
-      this: sharp.Sharp,
-    ) {
+    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (this: Sharp) {
       return {
         toBuffer: async () => {
           throw new RangeError("Array buffer allocation failed");
         },
-      } as unknown as sharp.Sharp;
+      } as unknown as Sharp;
     });
     const jxlSpy = vi
       .spyOn(formatEncoders, "encodeJxl")
@@ -1597,19 +1593,19 @@ describe("svg-to-raster batch route all-failed settlement (#2765)", () => {
     const app = await buildApp(registerSvg);
     const pngSpy = vi
       .spyOn(sharp.prototype, "png")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     const enospc = () =>
       Object.assign(new Error("ENOSPC: no space left on device"), {

@@ -9,7 +9,7 @@
 
 import { isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
+import sharp, { type Region } from "sharp";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
@@ -44,7 +44,7 @@ async function solid(width: number, height: number) {
 
 // A white strip with a red block across it. The block is 3 or more pixels on
 // each side so libvips' 3 x 3 median keeps it; a 1 pixel line would vanish.
-async function strip(width: number, height: number, block: sharp.Region) {
+async function strip(width: number, height: number, block: Region) {
   const red = await solid(block.width, block.height);
   return sharp({ create: { width, height, channels: 3, background: "#ffffff" } })
     .composite([{ input: red, left: block.left, top: block.top }])

@@ -16,7 +16,7 @@
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { isToolInputError } from "@snapotter/shared";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -861,7 +861,7 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
       const corruptMetaErr = new Error("Input buffer has corrupt header: gifload");
       let metaCalls = 0;
       const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
-        this: sharp.Sharp,
+        this: Sharp,
         ...args: Parameters<typeof origMetadata>
       ) {
         metaCalls++;
@@ -1271,13 +1271,13 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
         .spyOn(formatDecoders, "decodeToSharpCompat")
         .mockRejectedValueOnce(decodeFailure);
       const rawProbeOomSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-        this: sharp.Sharp,
+        this: Sharp,
       ) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
       try {
         await expect(prepareRouteImage(validPng, "photo.dng", "raw")).rejects.toBeInstanceOf(
@@ -1305,19 +1305,19 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
 
     const pngOomSpy = vi
       .spyOn(sharp.prototype, "png")
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       })
-      .mockImplementationOnce(function (this: sharp.Sharp) {
+      .mockImplementationOnce(function (this: Sharp) {
         return {
           toBuffer: async () => {
             throw new RangeError("Array buffer allocation failed");
           },
-        } as unknown as sharp.Sharp;
+        } as unknown as Sharp;
       });
     try {
       await expect(

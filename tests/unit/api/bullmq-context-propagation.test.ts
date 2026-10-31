@@ -7,7 +7,7 @@ import {
   ROOT_CONTEXT,
   trace,
 } from "@opentelemetry/api";
-import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import { core } from "@opentelemetry/sdk-node";
 import { afterEach, describe, expect, it } from "vitest";
 
 /**
@@ -57,7 +57,7 @@ describe("BullMQ trace context injection", () => {
     );
 
     context.setGlobalContextManager(new TestContextManager());
-    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
 
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({
@@ -106,7 +106,7 @@ describe("BullMQ trace context extraction", () => {
     );
 
     context.setGlobalContextManager(new TestContextManager());
-    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
 
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({

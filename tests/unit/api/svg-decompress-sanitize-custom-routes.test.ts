@@ -89,7 +89,7 @@ vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
 });
 
 import { SafeError } from "@snapotter/shared";
-import sharp from "sharp";
+import sharp, { type Metadata, type Sharp } from "sharp";
 import { env } from "../../../apps/api/src/config.js";
 import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
@@ -1061,19 +1061,19 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       let allocSpy: { mockRestore(): void } | undefined;
       const metaSpy = vi
         .spyOn(sharp.prototype, "metadata")
-        .mockResolvedValueOnce({ exif: exifOomBuf } as sharp.Metadata)
+        .mockResolvedValueOnce({ exif: exifOomBuf } as Metadata)
         .mockImplementationOnce(async () => {
           allocSpy = vi.spyOn(Buffer, "alloc").mockImplementationOnce(() => {
             throw v8Oom;
           });
-          return { icc: mlucIcc } as sharp.Metadata;
+          return { icc: mlucIcc } as Metadata;
         })
-        .mockResolvedValueOnce({ xmp: xmpOomBuf } as sharp.Metadata)
+        .mockResolvedValueOnce({ xmp: xmpOomBuf } as Metadata)
         .mockResolvedValueOnce({
           exif: exifCorruptBuf,
           icc: iccCorruptBuf,
           xmp: xmpCorruptBuf,
-        } as sharp.Metadata);
+        } as Metadata);
 
       try {
         await expect(
@@ -1277,7 +1277,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       let metaCalls = 0;
       const postSanitizeMetaSpy = vi
         .spyOn(sharp.prototype, "metadata")
-        .mockImplementation(function (this: sharp.Sharp) {
+        .mockImplementation(function (this: Sharp) {
           metaCalls++;
           if (metaCalls === 2) {
             return Promise.reject(v8Oom);
@@ -1535,7 +1535,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       const origMetadata = sharp.prototype.metadata;
       let metaCalls = 0;
       const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
-        this: sharp.Sharp,
+        this: Sharp,
       ) {
         metaCalls++;
         // Call 1 is validateImageBuffer; call 2 is info.ts's direct sharp(fileBuffer).metadata() probe.
@@ -2329,14 +2329,14 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           const origResize = sharp.prototype.resize;
           const origStats = sharp.prototype.stats;
           const resizeSpy = vi.spyOn(sharp.prototype, "resize").mockImplementation(function (
-            this: sharp.Sharp,
+            this: Sharp,
             ...args: Parameters<typeof origResize>
           ) {
             if (!disguisedSanitized) pixelDecodedBeforeSanitize = true;
             return origResize.apply(this, args);
           });
           const statsSpy = vi.spyOn(sharp.prototype, "stats").mockImplementation(function (
-            this: sharp.Sharp,
+            this: Sharp,
             ...args: Parameters<typeof origStats>
           ) {
             if (!disguisedSanitized) pixelDecodedBeforeSanitize = true;

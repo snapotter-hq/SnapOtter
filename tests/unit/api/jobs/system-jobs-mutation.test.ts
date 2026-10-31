@@ -626,12 +626,16 @@ describe("decideExpiry S3-row age boundary", () => {
       ["exact", { createdAt: new Date(cutoffMs - 1000), completedAt: new Date(cutoffMs) }],
     ]);
 
-    expect(decideExpiry({ key: "uploads/exact", mtimeMs: 0 }, cutoffMs, rowsById)).toBe("keep");
+    expect(decideExpiry({ key: "uploads/exact", size: 0, mtimeMs: 0 }, cutoffMs, rowsById)).toBe(
+      "keep",
+    );
     // One millisecond older -> expired (guards the operator direction).
     const rowsOlder = new Map([
       ["older", { createdAt: new Date(cutoffMs - 1000), completedAt: new Date(cutoffMs - 1) }],
     ]);
-    expect(decideExpiry({ key: "uploads/older", mtimeMs: 0 }, cutoffMs, rowsOlder)).toBe("expired");
+    expect(decideExpiry({ key: "uploads/older", size: 0, mtimeMs: 0 }, cutoffMs, rowsOlder)).toBe(
+      "expired",
+    );
   });
 
   it("uses createdAt as the age basis when completedAt is null", async () => {
@@ -639,7 +643,9 @@ describe("decideExpiry S3-row age boundary", () => {
     const cutoffMs = new Date("2026-07-01T00:00:00.000Z").getTime();
     // completedAt null -> falls back to createdAt (before cutoff) -> expired.
     const rowsById = new Map([["c", { createdAt: new Date(cutoffMs - 1), completedAt: null }]]);
-    expect(decideExpiry({ key: "outputs/c", mtimeMs: 0 }, cutoffMs, rowsById)).toBe("expired");
+    expect(decideExpiry({ key: "outputs/c", size: 0, mtimeMs: 0 }, cutoffMs, rowsById)).toBe(
+      "expired",
+    );
   });
 });
 

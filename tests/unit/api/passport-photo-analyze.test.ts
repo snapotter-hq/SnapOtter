@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import multipart from "@fastify/multipart";
 import { SafeError } from "@snapotter/shared";
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveBenchmarkResponse } from "../../benchmark/lib/job-aware.mjs";
@@ -126,7 +126,7 @@ function buildAnalyzeMultipart(png: Buffer, clientJobId?: string) {
 }
 
 describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress settlement (#2577)", () => {
-  let app: ReturnType<typeof Fastify>;
+  let app: FastifyInstance;
 
   beforeEach(async () => {
     detectFaceLandmarks.mockReset();

@@ -10,6 +10,8 @@ import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
 // hint.originalException on a frameless event (errorName/errorCode/errorDigest).
 
 type AnyEvent = Record<string, any>;
+// The scrubber is typed over `unknown` payloads; tests drill into the result, so widen it.
+type Sender = (event: AnyEvent, hint: AnyEvent) => AnyEvent | null;
 
 // FNV-1a 32-bit hex, mirrored from the module, so the tests can assert the exact
 // digest a given input must produce (and, by mismatch, that a different input
@@ -31,17 +33,13 @@ const framelessEvt = (over: AnyEvent = {}): AnyEvent => ({
 });
 
 // One breadcrumb through the scrubber; returns the scrubbed message string.
-const scrubMessage = (
-  send: ReturnType<typeof buildBeforeSend>,
-  message: string,
-  extra: AnyEvent = {},
-): string => {
+const scrubMessage = (send: Sender, message: string, extra: AnyEvent = {}): string => {
   const out = send({ breadcrumbs: [{ message, ...extra }] } as AnyEvent, {})!;
   return out.breadcrumbs[0].message;
 };
 
 describe("sentry-scrub redaction placeholders (scrubText)", () => {
-  let send: ReturnType<typeof buildBeforeSend>;
+  let send: Sender;
   beforeEach(() => {
     send = buildBeforeSend(() => true);
   });
@@ -120,7 +118,7 @@ describe("sentry-scrub redaction placeholders (scrubText)", () => {
 });
 
 describe("sentry-scrub breadcrumb field handling (scrubBreadcrumb)", () => {
-  let send: ReturnType<typeof buildBeforeSend>;
+  let send: Sender;
   beforeEach(() => {
     send = buildBeforeSend(() => true);
   });
@@ -218,7 +216,7 @@ describe("sentry-scrub breadcrumb field handling (scrubBreadcrumb)", () => {
 });
 
 describe("sentry-scrub stackless fingerprint digest/name/code", () => {
-  let send: ReturnType<typeof buildBeforeSend>;
+  let send: Sender;
   beforeEach(() => {
     send = buildBeforeSend(() => true);
   });
@@ -329,7 +327,7 @@ describe("sentry-scrub stackless fingerprint digest/name/code", () => {
 });
 
 describe("sentry-scrub tags fallback on the frameless path (L223)", () => {
-  let send: ReturnType<typeof buildBeforeSend>;
+  let send: Sender;
   beforeEach(() => {
     send = buildBeforeSend(() => true);
   });
@@ -382,7 +380,7 @@ describe("sentry-scrub per-hour window reset (L146)", () => {
 });
 
 describe("sentry-scrub asObj array/primitive rejection (L48)", () => {
-  let send: ReturnType<typeof buildBeforeSend>;
+  let send: Sender;
   beforeEach(() => {
     send = buildBeforeSend(() => true);
   });

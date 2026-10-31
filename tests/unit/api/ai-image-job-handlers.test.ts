@@ -83,7 +83,10 @@ function resetAiMocks() {
   });
   vi.mocked(noiseRemoval).mockResolvedValue({
     buffer: PNG,
+    width: 200,
+    height: 150,
     format: "jpeg",
+    tier: "mock",
   });
   vi.mocked(restorePhoto).mockResolvedValue({
     buffer: PNG,
@@ -98,13 +101,16 @@ function resetAiMocks() {
   vi.mocked(enhanceFaces).mockResolvedValue({
     buffer: PNG,
     facesDetected: 2,
-    faces: [{ x: 1, y: 2, width: 20, height: 30 }],
+    faces: [{ x: 1, y: 2, w: 20, h: 30 }],
     model: "codeformer",
   });
   vi.mocked(removeRedEye).mockResolvedValue({
     buffer: PNG,
     facesDetected: 1,
     eyesCorrected: 2,
+    width: 200,
+    height: 150,
+    format: "png",
   });
   vi.mocked(removeBackground).mockResolvedValue(PNG);
   vi.mocked(upscale).mockResolvedValue({

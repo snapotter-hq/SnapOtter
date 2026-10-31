@@ -8,7 +8,7 @@
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -2555,13 +2555,13 @@ describe("user files route logic", () => {
             new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
           );
           const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-            this: sharp.Sharp,
+            this: Sharp,
           ) {
             return {
               toBuffer: async () => {
                 throw new RangeError("Array buffer allocation failed");
               },
-            } as unknown as sharp.Sharp;
+            } as unknown as Sharp;
           });
           try {
             const warnProbeRawOom = vi.fn();
@@ -2635,13 +2635,13 @@ describe("user files route logic", () => {
             new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
           );
           const nonOomRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
-            this: sharp.Sharp,
+            this: Sharp,
           ) {
             return {
               toBuffer: async () => {
                 throw new RangeError("Invalid raw parameter");
               },
-            } as unknown as sharp.Sharp;
+            } as unknown as Sharp;
           });
           try {
             const warnProbeNonOom = vi.fn();
@@ -2858,7 +2858,7 @@ describe("user files route logic", () => {
             let resized1x1 = false;
             const origResize = sharp.prototype.resize;
             const resizeSpy = vi.spyOn(sharp.prototype, "resize").mockImplementation(function (
-              this: sharp.Sharp,
+              this: Sharp,
               ...args: Parameters<typeof origResize>
             ) {
               if (args[0] === 1) resized1x1 = true;

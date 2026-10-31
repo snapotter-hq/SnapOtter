@@ -484,7 +484,7 @@ describe("detectFaces", () => {
 
     expect(result.facesDetected).toBe(1);
     expect(result.faces).toEqual(faces);
-    expect((result as Record<string, unknown>).buffer).toBeUndefined();
+    expect("buffer" in result).toBe(false);
   });
 
   it("cleans up temp input file", async () => {
@@ -1030,7 +1030,6 @@ describe("restorePhoto", () => {
     mockParseStdoutJson.mockReturnValue({ success: true, width: 800, height: 600 });
 
     await restorePhoto(INPUT_BUFFER, OUTPUT_DIR, {
-      mode: "heavy",
       scratchRemoval: true,
       faceEnhancement: true,
       fidelity: 0.5,
@@ -1041,7 +1040,6 @@ describe("restorePhoto", () => {
 
     const [, args] = mockRunPythonWithProgress.mock.calls[0];
     const optsArg = JSON.parse(args[2]);
-    expect(optsArg.mode).toBe("heavy");
     expect(optsArg.scratchRemoval).toBe(true);
     expect(optsArg.colorize).toBe(true);
   });

@@ -138,17 +138,21 @@ describe("system jobs behavior", () => {
       ],
     ]);
 
-    expect(decideExpiry({ key: "uploads/job-a", mtimeMs: cutoffMs - 1 }, cutoffMs, rowsById)).toBe(
+    expect(
+      decideExpiry({ key: "uploads/job-a", size: 0, mtimeMs: cutoffMs - 1 }, cutoffMs, rowsById),
+    ).toBe("expired");
+    expect(
+      decideExpiry({ key: "outputs/job-b", size: 0, mtimeMs: cutoffMs }, cutoffMs, rowsById),
+    ).toBe("keep");
+    expect(decideExpiry({ key: "uploads/job-old", size: 0, mtimeMs: 0 }, cutoffMs, rowsById)).toBe(
       "expired",
     );
-    expect(decideExpiry({ key: "outputs/job-b", mtimeMs: cutoffMs }, cutoffMs, rowsById)).toBe(
+    expect(decideExpiry({ key: "outputs/job-new", size: 0, mtimeMs: 0 }, cutoffMs, rowsById)).toBe(
       "keep",
     );
-    expect(decideExpiry({ key: "uploads/job-old", mtimeMs: 0 }, cutoffMs, rowsById)).toBe(
-      "expired",
+    expect(decideExpiry({ key: "uploads/orphan", size: 0, mtimeMs: 0 }, cutoffMs, rowsById)).toBe(
+      "skip",
     );
-    expect(decideExpiry({ key: "outputs/job-new", mtimeMs: 0 }, cutoffMs, rowsById)).toBe("keep");
-    expect(decideExpiry({ key: "uploads/orphan", mtimeMs: 0 }, cutoffMs, rowsById)).toBe("skip");
   });
 
   it("schedules repeatable jobs and removes storage TTL scheduler when cleanup is disabled", async () => {

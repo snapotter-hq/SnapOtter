@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
@@ -219,11 +219,11 @@ describe("duotone blend buffer guard (#1189)", () => {
       .toBuffer();
 
     const sharpProto = Object.getPrototypeOf(sharp()) as {
-      removeAlpha: (this: sharp.Sharp) => sharp.Sharp;
+      removeAlpha: (this: Sharp) => Sharp;
     };
     const origRemoveAlpha = sharpProto.removeAlpha;
     let removeAlphaCalls = 0;
-    vi.spyOn(sharpProto, "removeAlpha").mockImplementation(function (this: sharp.Sharp) {
+    vi.spyOn(sharpProto, "removeAlpha").mockImplementation(function (this: Sharp) {
       removeAlphaCalls++;
       // Call 1 builds grayBuf; call 2 builds origRaw in the k < 1 blend branch;
       // call 3 builds duo. Skipping call 2 leaves origRaw at 4 channels (14400 B)
@@ -254,11 +254,11 @@ describe("duotone blend buffer guard (#1189)", () => {
     const rgbPng = await swatch([200, 120, 80], "png");
 
     const sharpProto = Object.getPrototypeOf(sharp()) as {
-      removeAlpha: (this: sharp.Sharp) => sharp.Sharp;
+      removeAlpha: (this: Sharp) => Sharp;
     };
     const origRemoveAlpha = sharpProto.removeAlpha;
     let removeAlphaCalls = 0;
-    vi.spyOn(sharpProto, "removeAlpha").mockImplementation(function (this: sharp.Sharp) {
+    vi.spyOn(sharpProto, "removeAlpha").mockImplementation(function (this: Sharp) {
       removeAlphaCalls++;
       // Replacing call 3 (duo in the k < 1 blend branch) with ensureAlpha()
       // makes duo 4 channels (40000 B) against a 3-channel origRaw (30000 B).

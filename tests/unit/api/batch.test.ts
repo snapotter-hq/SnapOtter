@@ -233,25 +233,25 @@ describe("batch size enforcement", () => {
 
 describe("skip-preprocess logic for metadata tools", () => {
   it("skips preprocess for edit-metadata", () => {
-    const toolId = "edit-metadata";
+    const toolId: string = "edit-metadata";
     const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
     expect(skipPreprocess).toBe(true);
   });
 
   it("skips preprocess for strip-metadata", () => {
-    const toolId = "strip-metadata";
+    const toolId: string = "strip-metadata";
     const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
     expect(skipPreprocess).toBe(true);
   });
 
   it("does not skip preprocess for resize", () => {
-    const toolId = "resize";
+    const toolId: string = "resize";
     const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
     expect(skipPreprocess).toBe(false);
   });
 
   it("does not skip preprocess for compress", () => {
-    const toolId = "compress";
+    const toolId: string = "compress";
     const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
     expect(skipPreprocess).toBe(false);
   });
@@ -406,22 +406,22 @@ describe("file results map (X-File-Results header)", () => {
 
 describe("batch progress status determination", () => {
   it("status is 'failed' when all files fail", () => {
-    const totalFiles = 3;
-    const failedFiles = 3;
+    const totalFiles: number = 3;
+    const failedFiles: number = 3;
     const status = failedFiles === totalFiles ? "failed" : "completed";
     expect(status).toBe("failed");
   });
 
   it("status is 'completed' when some files succeed", () => {
-    const totalFiles = 3;
-    const failedFiles = 1;
+    const totalFiles: number = 3;
+    const failedFiles: number = 1;
     const status = failedFiles === totalFiles ? "failed" : "completed";
     expect(status).toBe("completed");
   });
 
   it("status is 'completed' when no files fail", () => {
-    const totalFiles = 5;
-    const failedFiles = 0;
+    const totalFiles: number = 5;
+    const failedFiles: number = 0;
     const status = failedFiles === totalFiles ? "failed" : "completed";
     expect(status).toBe("completed");
   });

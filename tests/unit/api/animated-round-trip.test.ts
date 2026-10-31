@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   isAnimated,
@@ -1031,7 +1031,7 @@ describe("readAnimation rethrows DecoderOutOfMemoryError on metadata() OOM (#383
     const v8Oom = new RangeError("Array buffer allocation failed");
     let callCount = 0;
     const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       callCount++;
       // Call 1 is strip-metadata reading the input format; call 2 is readAnimationFor.

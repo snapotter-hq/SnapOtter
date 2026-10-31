@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { isToolInputError } from "@snapotter/shared";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import {
@@ -1150,7 +1150,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     // 1. processBeautify main .apng upload: 1st metadata() is validateImageBuffer, 2nd is .apng SVG check
     let callCount = 0;
     const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(async function (
-      this: sharp.Sharp,
+      this: Sharp,
     ) {
       callCount++;
       if (callCount === 2) throw v8Oom;
@@ -1175,7 +1175,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
       // 2. POST /api/v1/tools/image/beautify backgroundImage .apng upload
       // (call 1: main validateImageBuffer, call 2: main autoOrient metadata, call 3: bg validateImageBuffer, call 4: bg .apng SVG check)
       callCount = 0;
-      metaSpy.mockImplementation(async function (this: sharp.Sharp) {
+      metaSpy.mockImplementation(async function (this: Sharp) {
         callCount++;
         if (callCount === 4) throw v8Oom;
         return origMetadata.call(this);
@@ -1197,7 +1197,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
 
       // 3. POST /api/v1/tools/image/meme-generator and registry process .apng upload
       callCount = 0;
-      metaSpy.mockImplementation(async function (this: sharp.Sharp) {
+      metaSpy.mockImplementation(async function (this: Sharp) {
         callCount++;
         if (callCount === 2) throw v8Oom;
         return origMetadata.call(this);
