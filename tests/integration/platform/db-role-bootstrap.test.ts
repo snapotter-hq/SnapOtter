@@ -465,7 +465,7 @@ describe("split-mode boot that succeeds", () => {
     await withSplitEnv(urlAs(bootRole, password), privilegedUrl, () => runMigrations());
     // Created only after the boot sequence returned, and nothing grants on it.
     // Standing default privileges are the only thing that can make it reachable,
-    // which is the hand-run `drizzle-kit migrate` case from CLAUDE.md.
+    // which is the hand-run `drizzle-kit migrate` case.
     await owner.query("CREATE TABLE probe_after_boot_table (id serial PRIMARY KEY, note text)");
     await settleTo(backendCount, backendsBefore);
     backendsAfter = await backendCount();
