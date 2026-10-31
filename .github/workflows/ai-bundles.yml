@@ -2300,8 +2300,8 @@ jobs:
           set -euo pipefail
           manifest=docker/feature-manifest.json
           bundle_repo="$(jq -r '.bundleRepo // "deepsafe/feature-bundles"' "$manifest")"
-          # Explicit list: the verifier has an oracle per bundle. inpaint-hq has none yet.
-          bundles=(background-removal face-detection object-eraser-colorize upscale-enhance photo-restoration transcription)
+          # Explicit list: the verifier has an oracle per bundle. ocr is excluded.
+          bundles=(background-removal face-detection object-eraser-colorize upscale-enhance photo-restoration transcription inpaint-hq)
           for bundle in "${bundles[@]}"; do
             jq -e --arg b "$bundle" '.bundles[$b]' "$manifest" >/dev/null || { echo "::error::${bundle} missing from manifest"; exit 1; }
           done
