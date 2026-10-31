@@ -88,7 +88,7 @@ test.describe("Third-party egress", () => {
     loggedInPage: page,
   }) => {
     const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
-    const auth = token ? { authorization: `Bearer ${token}` } : {};
+    const auth: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     const optOut = await page.request.put("/api/v1/settings", {
       headers: auth,
       data: { analyticsEnabled: "false" },
