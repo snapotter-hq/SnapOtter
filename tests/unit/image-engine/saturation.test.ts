@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
+import type { Sharp } from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const require = createRequire(
@@ -16,7 +17,7 @@ beforeAll(() => {
   png200x150 = readFixture(fixtures.image.base.png200);
 });
 
-async function getMeta(img: sharp.Sharp) {
+async function getMeta(img: Sharp) {
   const buf = await img.toBuffer();
   return sharp(buf).metadata();
 }

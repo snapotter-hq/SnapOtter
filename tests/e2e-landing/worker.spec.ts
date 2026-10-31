@@ -1,6 +1,5 @@
 // tests/e2e-landing/worker.spec.ts
 import { expect, test } from "@playwright/test";
-// @ts-expect-error plain ESM asset, no types
 import worker from "../../apps/landing/public/_worker.js";
 
 /**

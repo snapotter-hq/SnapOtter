@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import { buildJsonLd, SECTION_CRUMB } from "../../../apps/docs/.vitepress/jsonld.mts";
+import { buildJsonLd, SECTION_CRUMB } from "../../../apps/docs/.vitepress/jsonld.mjs";
 
 const HOSTNAME = "https://docs.snapotter.com";
 const base = { hostname: HOSTNAME, isLocale: false };

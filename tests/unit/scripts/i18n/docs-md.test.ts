@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createDocsAdapter } from "../../../../scripts/i18n/adapters/docs-md.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 
+type Unit = { id: string; sourceText: string };
+
 let root: string;
 
 async function seed(rel: string, body: string) {
@@ -27,7 +29,7 @@ describe("docs-md adapter", () => {
     await seed("index.md", "---\nlayout: page\n---\n# Home\n");
     const adapter = createDocsAdapter({ root });
     const units = await adapter.extract();
-    const ids = units.map((u) => u.id).sort();
+    const ids = units.map((u: Unit) => u.id).sort();
     expect(ids).toEqual(["guide/getting-started.md", "index.md"]);
     expect(units[0].kind).toBe("markdown");
   });

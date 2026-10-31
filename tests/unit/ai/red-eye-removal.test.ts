@@ -267,7 +267,7 @@ describe("removeRedEye", () => {
     it("omits onProgress when not provided", async () => {
       await removeRedEye(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.onProgress).toBeUndefined();
     });
 

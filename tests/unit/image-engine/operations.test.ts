@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
+import type { Sharp } from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 
 // sharp is only installed in the image-engine package, so resolve it from there
@@ -9,7 +10,7 @@ const require = createRequire(
 const sharp = require("sharp") as typeof import("sharp").default;
 const exifReader = require(
   path.resolve(__dirname, "../../../packages/image-engine/node_modules/exif-reader"),
-) as typeof import("exif-reader").default;
+) as typeof import("exif-reader");
 
 import {
   brightness,
@@ -39,13 +40,13 @@ import {
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 // Helper to get metadata from a sharp pipeline result
-async function getMeta(img: sharp.Sharp) {
+async function getMeta(img: Sharp) {
   const buf = await img.toBuffer();
   return sharp(buf).metadata();
 }
 
 // Helper to get raw pixel data
-async function _getPixels(img: sharp.Sharp) {
+async function _getPixels(img: Sharp) {
   return img.raw().toBuffer({ resolveWithObject: true });
 }
 

@@ -271,21 +271,21 @@ describe("removeBackground", () => {
       it("uses 300000ms base timeout for non-birefnet models", async () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
 
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(300000);
       });
 
       it("uses 600000ms base timeout for birefnet models", async () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
 
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBeGreaterThanOrEqual(600000);
       });
 
       it("uses 600000ms base timeout for birefnet-massive model", async () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-massive" });
 
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBeGreaterThanOrEqual(600000);
       });
 
@@ -295,14 +295,14 @@ describe("removeBackground", () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
         // 24 MP * 30 * 1000 = 720000 > 300000
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(720000);
       });
 
       it("uses default 300000ms base when model is not specified", async () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(300000);
       });
     });
@@ -311,14 +311,14 @@ describe("removeBackground", () => {
       it("raises the base timeout to 600000ms: model load alone can exceed 5 minutes", async () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
 
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(600000);
       });
 
       it("keeps the 600000ms base for birefnet models", async () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
 
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(600000);
       });
 
@@ -328,14 +328,14 @@ describe("removeBackground", () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
         // 24 MP * 180 * 1000 = 4320000 > 600000
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(4320000);
       });
 
       it("uses the 600000ms base when model is not specified", async () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(600000);
       });
 
@@ -346,7 +346,7 @@ describe("removeBackground", () => {
         await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
 
         expect(isGpuAvailable).toHaveBeenCalledWith("onnx");
-        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
         expect(options.timeout).toBe(24 * 180_000);
       });
     });
@@ -398,7 +398,7 @@ describe("removeBackground", () => {
     it("passes undefined onProgress when not provided", async () => {
       await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
       expect(options.onProgress).toBeUndefined();
     });
   });
@@ -584,8 +584,8 @@ describe("removeBackground", () => {
 
       await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
 
-      const primaryOptions = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      const fallbackOptions = vi.mocked(runPythonWithProgress).mock.calls[1][2];
+      const primaryOptions = vi.mocked(runPythonWithProgress).mock.calls[0][2]!;
+      const fallbackOptions = vi.mocked(runPythonWithProgress).mock.calls[1][2]!;
       expect(fallbackOptions.timeout).toBe(primaryOptions.timeout);
       expect(fallbackOptions.timeout).toBe(4320000);
     });
