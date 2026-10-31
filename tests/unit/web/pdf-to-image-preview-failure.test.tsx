@@ -94,7 +94,13 @@ beforeEach(() => {
   previewSignals = [];
   storageMap.clear();
   vi.stubGlobal("localStorage", localStorageMock);
-  vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL: () => {} });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   vi.stubGlobal(
     "fetch",
     previewServer(() => failed("Bad PDF")),
