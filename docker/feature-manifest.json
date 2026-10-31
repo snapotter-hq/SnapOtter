@@ -35,10 +35,10 @@
           "extractedSize": 7197559452
         },
         "arm64-cpu": {
-          "file": "v2.0.0/background-removal-arm64-cpu-r2.tar.gz",
-          "sha256": "eb453211098ca6a90b23bae987c3be6873cf7f0f7d67e1855d34f335a2add076",
-          "compressedSize": 4535687017,
-          "extractedSize": 6375426284
+          "file": "v2.0.0/background-removal-arm64-cpu-r3.tar.gz",
+          "sha256": "a31f5f8677dde1da34dfde992f177e9315548b6c5afa95a0a53620f61ea52a10",
+          "compressedSize": 4541593265,
+          "extractedSize": 6393738831
         }
       },
       "packages": {
