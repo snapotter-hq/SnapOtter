@@ -1,3 +1,4 @@
+import type { LightMyRequestResponse } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../fixtures/index.js";
 import { hasFitz } from "../helpers/python-gate.js";
@@ -40,7 +41,7 @@ describe("sign-pdf", () => {
 
   function postFields(
     fields: Parameters<typeof createMultipartPayload>[0],
-  ): ReturnType<typeof testApp.app.inject> {
+  ): Promise<LightMyRequestResponse> {
     const { body, contentType } = createMultipartPayload(fields);
     return testApp.app.inject({
       method: "POST",

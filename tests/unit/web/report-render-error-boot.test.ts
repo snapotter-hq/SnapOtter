@@ -35,6 +35,7 @@ const ON: AnalyticsConfig = {
   posthogApiKey: "",
   posthogHost: "",
   posthogProxyPath: "",
+  feedbackSink: false,
   sentryDsn: "",
   sentryDsnWeb: "https://sentry.test/web/1",
   posthogSampleRate: 1,

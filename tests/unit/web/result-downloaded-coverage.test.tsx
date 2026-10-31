@@ -272,8 +272,9 @@ describe("result_downloaded funnel coverage (#3966)", () => {
     const sampleKeys: Record<(typeof OWN_STORE_TOOL_IDS)[number], ResultKey> = {
       collage: collageResultKey("/api/v1/download/j/collage.png"),
       "find-duplicates": duplicateResultKey({
-        totalFiles: 2,
-        uniqueCount: 1,
+        totalImages: 2,
+        uniqueImages: 1,
+        spaceSaveable: 0,
         duplicateGroups: [],
       }),
       "html-to-image": htmlToImageResultKey("/api/v1/download/j/shot.png"),
@@ -294,18 +295,15 @@ describe("result_downloaded funnel coverage (#3966)", () => {
       "meme-generator": memeResultKey("/api/v1/download/j/meme.png"),
       "passport-photo": passportPhotoResultKey({
         downloadUrl: "/api/v1/download/j/passport.jpg",
-        printDownloadUrl: null,
-        widthPx: 600,
-        heightPx: 600,
-        dpi: 300,
-        fileSize: 12000,
+        dimensions: { width: 600, height: 600 },
+        spec: { country: "US", document: "passport" },
       }),
       "pdf-to-image": pdfToImageResultKey(
-        [{ page: 1, downloadUrl: "/api/v1/download/j/p1.png", width: 100, height: 100, size: 500 }],
+        [{ page: 1, downloadUrl: "/api/v1/download/j/p1.png", size: 500 }],
         "/api/v1/download/j/pages.zip",
       ),
       split: splitResultKey(
-        [{ row: 1, col: 1, label: "1,1", blobUrl: "blob:tile-1" }],
+        [{ row: 1, col: 1, label: "1,1", width: 10, height: 10, blobUrl: "blob:tile-1" }],
         "blob:split-zip",
       ),
     };
@@ -324,7 +322,7 @@ describe("result_downloaded funnel coverage (#3966)", () => {
       expect.anything(),
     );
 
-    const tile = { row: 1, col: 1, label: "1,1", blobUrl: "blob:t1" };
+    const tile = { row: 1, col: 1, label: "1,1", width: 10, height: 10, blobUrl: "blob:t1" };
     claimToolResultItem("split", splitTileKey(tile));
     expect(downloadedCallsFor("split")).toHaveLength(1);
 
@@ -393,7 +391,7 @@ describe("result_downloaded funnel coverage (#3966)", () => {
 
   it("emits RESULT_DOWNLOADED when clicking own-store download controls in panels and results views", () => {
     // collage
-    useCollageStore.setState({ resultUrl: "/api/v1/download/j/collage.png", phase: "done" });
+    useCollageStore.setState({ resultUrl: "/api/v1/download/j/collage.png", phase: "result" });
     const collageView = render(<CollageSettings />);
     fireEvent.click(collageView.getByTestId("collage-download"));
     expect(downloadedCallsFor("collage")).toHaveLength(1);
@@ -449,15 +447,21 @@ describe("result_downloaded funnel coverage (#3966)", () => {
         preview: "",
         imageWidth: 800,
         imageHeight: 1000,
-        landmarks: null,
+        landmarks: {
+          leftEye: { x: 0, y: 0 },
+          rightEye: { x: 0, y: 0 },
+          eyeCenter: { x: 0, y: 0 },
+          chin: { x: 0, y: 0 },
+          forehead: { x: 0, y: 0 },
+          crown: { x: 0, y: 0 },
+          nose: { x: 0, y: 0 },
+          faceCenterX: 0,
+        },
       },
       generateResult: {
         downloadUrl: "/api/v1/download/j-1/passport.jpg",
-        printDownloadUrl: null,
-        widthPx: 600,
-        heightPx: 600,
-        dpi: 300,
-        fileSize: 10000,
+        dimensions: { width: 600, height: 600 },
+        spec: { country: "US", document: "passport" },
       },
     });
     const passportView = render(<PassportPhotoSettings />);
@@ -470,9 +474,7 @@ describe("result_downloaded funnel coverage (#3966)", () => {
     useFileStore.getState().setFiles([pdfFile]);
     usePdfToImageStore.setState({
       file: pdfFile,
-      results: [
-        { page: 1, downloadUrl: "/api/v1/download/j/p1.png", width: 100, height: 100, size: 500 },
-      ],
+      results: [{ page: 1, downloadUrl: "/api/v1/download/j/p1.png", size: 500 }],
       zipUrl: "/api/v1/download/j/pages.zip",
     });
     const pdfSettingsView = render(<PdfToImageSettings />);
@@ -492,7 +494,7 @@ describe("result_downloaded funnel coverage (#3966)", () => {
     const splitView = render(<SplitSettings />);
     act(() => {
       useSplitStore.setState({
-        tiles: [{ row: 1, col: 1, label: "1,1", blobUrl: "blob:tile-1" }],
+        tiles: [{ row: 1, col: 1, label: "1,1", width: 10, height: 10, blobUrl: "blob:tile-1" }],
         zipBlobUrl: "blob:split-zip",
         runFileCount: 1,
       });
@@ -660,11 +662,13 @@ describe("result_downloaded funnel coverage (#3966)", () => {
     });
     const signCanvasRef = {
       current: {
-        getPlacements: () => [{ page: 0, x: 0.1, y: 0.1, width: 0.2, height: 0.1 }],
-        getSignatureBlob: async () => new Blob(["sig"], { type: "image/png" }),
         addSignature: vi.fn(),
         deleteSelected: vi.fn(),
-        clearAll: vi.fn(),
+        hasPlacements: () => true,
+        exportPlacements: async () => ({
+          pngs: [new Blob(["sig"], { type: "image/png" })],
+          placements: [{ sig: 0, page: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.1 }],
+        }),
       } satisfies SignCanvasRef,
     };
     const signView = render(
@@ -733,15 +737,34 @@ describe("result_downloaded funnel coverage (#3966)", () => {
     act(() => {
       useDuplicateStore.setState({
         results: {
-          totalFiles: 2,
-          uniqueCount: 1,
+          totalImages: 2,
+          uniqueImages: 1,
+          spaceSaveable: 100,
           duplicateGroups: [
             {
+              groupId: 1,
               files: [
-                { filename: "dup1.png", width: 10, height: 10, size: 100, similarity: 100 },
-                { filename: "dup2.png", width: 10, height: 10, size: 100, similarity: 100 },
+                {
+                  filename: "dup1.png",
+                  similarity: 100,
+                  width: 10,
+                  height: 10,
+                  fileSize: 100,
+                  format: "png",
+                  isBest: true,
+                  thumbnail: null,
+                },
+                {
+                  filename: "dup2.png",
+                  similarity: 100,
+                  width: 10,
+                  height: 10,
+                  fileSize: 100,
+                  format: "png",
+                  isBest: false,
+                  thumbnail: null,
+                },
               ],
-              bestFile: "dup1.png",
             },
           ],
         },

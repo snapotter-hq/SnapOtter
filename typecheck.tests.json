@@ -29,6 +29,7 @@
     "tests/e2e-editor/**/*",
     "tests/e2e-landing/**/*",
     "tests/e2e-noauth/**/*",
+    "tests/integration/**/*",
     "tests/types/**/*",
     "tests/unit/*.ts",
     "tests/unit/*.mts",
@@ -41,5 +42,12 @@
     "tests/unit/landing/**/*",
     "tests/unit/scripts/**/*",
     "tests/unit/security/**/*"
+  ],
+  "exclude": [
+    "tests/integration/generated/catalog-integrity.test.ts",
+    "tests/integration/platform/s3-download-fault.test.ts",
+    "tests/integration/platform/s3-result-download-fault.test.ts",
+    "tests/integration/platform/s3-storage.test.ts",
+    "tests/integration/platform/tracing-lifecycle.test.ts"
   ]
 }

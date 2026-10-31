@@ -68,6 +68,8 @@
     "/remotion",
     "/apps/videos",
     "/demo",
+    "/branding",
+    "/scripts/branding",
     "/apps/api/data",
     "/tests/e2e/screenshots"
   ],

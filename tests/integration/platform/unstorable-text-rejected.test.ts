@@ -6,6 +6,7 @@
  * copy is bookkeeping and is sanitized instead.
  */
 
+import type { InjectOptions } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
@@ -34,7 +35,7 @@ function expectRejected(res: { statusCode: number; body: string }) {
 }
 
 describe("preferences refuse text Postgres cannot store", () => {
-  const put = (payload: unknown) =>
+  const put = (payload: InjectOptions["payload"]) =>
     app.inject({ method: "PUT", url: "/api/v1/preferences", headers: auth(), payload });
 
   it.each([
@@ -76,7 +77,7 @@ describe("preferences refuse text Postgres cannot store", () => {
 });
 
 describe("saved pipelines refuse text Postgres cannot store", () => {
-  const save = (payload: unknown) =>
+  const save = (payload: InjectOptions["payload"]) =>
     app.inject({ method: "POST", url: "/api/v1/pipeline/save", headers: auth(), payload });
   const step = (settings: Record<string, unknown>) => ({ toolId: "rotate", settings });
 
@@ -106,7 +107,7 @@ describe("saved pipelines refuse text Postgres cannot store", () => {
 });
 
 describe("API-key names refuse text Postgres cannot store", () => {
-  const create = (payload: unknown) =>
+  const create = (payload: InjectOptions["payload"]) =>
     app.inject({ method: "POST", url: "/api/v1/api-keys", headers: auth(), payload });
 
   it.each([

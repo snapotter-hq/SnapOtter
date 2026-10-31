@@ -2,6 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ComponentType } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/analytics", async () => {
@@ -1701,7 +1702,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
   it("sets errorCategory to upload_error on 413 and network failures across compose, compare, watermark-image, beautify, and stitch (#3250)", async () => {
     // 1. Fetch-based single-entry panels: ComposeSettings, CompareSettings, WatermarkImageSettings (single-file), BeautifySettings (image background).
     const fetchPanels: Array<{
-      Panel: typeof ComposeSettings;
+      Panel: ComponentType;
       submitId: string;
       prepare?: () => void;
     }> = [

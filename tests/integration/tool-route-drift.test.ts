@@ -1,7 +1,7 @@
 import { apiToolPath, COMPRESS_PRESETS, CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getRegisteredToolIds, getToolConfig } from "../../apps/api/src/routes/tool-factory.js";
+import { MULTI_FILE_TOOLS } from "../../apps/web/src/lib/tool-display-modes.js";
 import { REGISTRY_EXEMPT } from "../helpers/registry-exempt.js";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 

@@ -38,6 +38,7 @@ vi.mock("@/hooks/use-auth", () => ({
 
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { MetadataGrid } from "@/components/common/metadata-grid";
+import { defaultCurvesState, defaultLevelsState } from "@/components/editor/adjustment-lut";
 import { AutosaveRecoveryBanner } from "@/components/editor/common/export-dialog";
 import { BrushOptions } from "@/components/editor/options/brush-options";
 import { FileListItem } from "@/components/files/file-list-item";
@@ -357,8 +358,9 @@ describe("date formatting in app locale (#924)", () => {
             originalName: "report.pdf",
             mimeType: "application/pdf",
             size: 2048,
+            width: null,
+            height: null,
             version: 1,
-            parentId: null,
             toolChain: [],
             createdAt: CREATED_ISO,
           }}
@@ -409,6 +411,8 @@ describe("date formatting in app locale (#924)", () => {
               warmth: 0,
             },
             filters: [],
+            levels: defaultLevelsState(),
+            curves: defaultCurvesState(),
             guides: [],
             sourceImageUrl: null,
             sourceImageSize: null,
@@ -456,8 +460,9 @@ describe("date formatting in app locale (#924)", () => {
               originalName: "corrupt.pdf",
               mimeType: "application/pdf",
               size: 1024,
+              width: null,
+              height: null,
               version: 1,
-              parentId: null,
               toolChain: [],
               createdAt: "not-a-date",
             }}
@@ -485,6 +490,8 @@ describe("date formatting in app locale (#924)", () => {
                 warmth: 0,
               },
               filters: [],
+              levels: defaultLevelsState(),
+              curves: defaultCurvesState(),
               guides: [],
               sourceImageUrl: null,
               sourceImageSize: null,

@@ -244,7 +244,7 @@ async function finalizeReturnValue(parentId: string): Promise<Record<string, unk
     const j = await getQueue("system").getJob(parentId);
     return j?.returnvalue ? j : undefined;
   });
-  return job.returnvalue as Record<string, unknown>;
+  return job.returnvalue as unknown as Record<string, unknown>;
 }
 
 /** A batch child's BullMQ return value on the image pool (#1347). */

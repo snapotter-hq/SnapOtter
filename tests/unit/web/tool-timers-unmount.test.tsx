@@ -965,9 +965,11 @@ describe("The library modal drops a pending search when it goes (#1817)", () => 
 
   it("closing it cancels the debounced search", async () => {
     const fetchMock = stubFilesApi();
-    const { rerender } = render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    const { rerender } = render(
+      <FileLibraryModal open onClose={() => {}} onImport={() => undefined} />,
+    );
     await typeSearch(fetchMock);
-    rerender(<FileLibraryModal open={false} onClose={() => {}} onImport={() => {}} />);
+    rerender(<FileLibraryModal open={false} onClose={() => {}} onImport={() => undefined} />);
     await act(async () => {
       vi.advanceTimersByTime(300);
     });
@@ -977,7 +979,7 @@ describe("The library modal drops a pending search when it goes (#1817)", () => 
 
   it("unmounting it cancels the debounced search", async () => {
     const fetchMock = stubFilesApi();
-    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
     await typeSearch(fetchMock);
     cleanup();
     expect(vi.getTimerCount()).toBe(0);
@@ -989,7 +991,7 @@ describe("The library modal drops a pending search when it goes (#1817)", () => 
 
   it("still searches while it stays open", async () => {
     const fetchMock = stubFilesApi();
-    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => undefined} />);
     await typeSearch(fetchMock);
     await act(async () => {
       vi.advanceTimersByTime(300);

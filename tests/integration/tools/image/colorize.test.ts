@@ -148,26 +148,21 @@ describe("colorize", () => {
     expect([202, 501]).toContain(res.statusCode);
   }, 60_000);
 
-  it(
-    "handles HEIC input (202 or 501)",
-    { timeout: 120_000 },
-    async () => {
-      const { body, contentType } = createMultipartPayload([
-        { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
-        { name: "settings", content: JSON.stringify({}) },
-      ]);
+  it("handles HEIC input (202 or 501)", { timeout: 120_000 }, async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
 
-      const res = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/colorize",
-        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-        body,
-      });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/colorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
 
-      expect([202, 501]).toContain(res.statusCode);
-    },
-    60_000,
-  );
+    expect([202, 501]).toContain(res.statusCode);
+  });
 
   it("handles 1x1 pixel input (200, 422, or 501)", async () => {
     const { body, contentType } = createMultipartPayload([

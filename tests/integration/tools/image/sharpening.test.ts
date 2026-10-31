@@ -458,23 +458,18 @@ describe("HEIC with different methods", () => {
 
 // ── HEIF input ──────────────────────────────────────────────────
 describe("HEIF input", () => {
-  it(
-    "processes HEIF image (motorcycle.heif)",
-    { timeout: 120_000 },
-    async () => {
-      const HEIF = readFixture(fixtures.image.motorcycle);
-      const res = await postTool(
-        { method: "adaptive", sigma: 2.0 },
-        HEIF,
-        "photo.heif",
-        "image/heif",
-      );
-      expect(res.statusCode).toBe(200);
-      const result = JSON.parse(res.body);
-      expect(result.downloadUrl).toBeDefined();
-    },
-    120_000,
-  );
+  it("processes HEIF image (motorcycle.heif)", { timeout: 120_000 }, async () => {
+    const HEIF = readFixture(fixtures.image.motorcycle);
+    const res = await postTool(
+      { method: "adaptive", sigma: 2.0 },
+      HEIF,
+      "photo.heif",
+      "image/heif",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
 });
 
 // ── Animated GIF input ──────────────────────────────────────────

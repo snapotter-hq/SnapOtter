@@ -24,6 +24,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mocks (spawn + AI dispatcher + OCR runtime helpers) ───
@@ -265,11 +266,7 @@ interface FeatureRow {
 }
 
 describe("feature bundle route contracts", () => {
-  let app: Awaited<ReturnType<typeof import("fastify")>>["default"] extends (
-    ...args: infer _A
-  ) => infer R
-    ? R
-    : never;
+  let app: FastifyInstance;
   let token: string;
 
   beforeAll(async () => {

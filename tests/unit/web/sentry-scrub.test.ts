@@ -2,6 +2,24 @@ import { httpStatusTag, SafeError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS, isIgnoredError } from "@/lib/sentry-scrub";
 
+interface ScrubbedEvent {
+  request?: unknown;
+  user?: unknown;
+  contexts: { react: { componentStack: string }; device?: unknown };
+  exception: {
+    values: { value: string; stacktrace?: { frames: { filename: string }[] } }[];
+  };
+  tags: Record<string, string | undefined>;
+  breadcrumbs?: unknown;
+}
+
+// buildWebBeforeSend is typed over loose Record events; the assertions below
+// read concrete Sentry fields, so narrow the result once here.
+function asScrubbed(event: Record<string, unknown> | null): ScrubbedEvent {
+  if (!event) throw new Error("beforeSend dropped the event");
+  return event as unknown as ScrubbedEvent;
+}
+
 describe("static filter lists", () => {
   it("deny extension frames and ignore noisy network errors", () => {
     expect(DENY_URLS.some((re) => re.test("chrome-extension://abcdef/content.js"))).toBe(true);
@@ -102,13 +120,15 @@ describe("buildWebBeforeSend", () => {
 
   it("gates, strips, keeps react componentStack, redacts values", () => {
     const send = buildWebBeforeSend(() => true);
-    const out = send(baseEvent(), { originalException: new TypeError("boom /Users/a/b") })!;
+    const out = asScrubbed(
+      send(baseEvent(), { originalException: new TypeError("boom /Users/a/b") }),
+    );
     expect(out.request).toBeUndefined();
     expect(out.user).toBeUndefined();
     expect(out.contexts.react.componentStack).toBe("at ToolPage");
     expect(out.contexts.device).toBeUndefined();
     expect(out.exception.values[0].value).toBe("boom <path>");
-    expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("/assets/app.js");
+    expect(out.exception.values[0].stacktrace?.frames[0].filename).toBe("/assets/app.js");
     expect(out.tags.tool_id).toBe("resize");
     expect(out.tags.drop_me).toBeUndefined();
     expect(buildWebBeforeSend(() => false)(baseEvent(), {})).toBeNull();
@@ -116,19 +136,21 @@ describe("buildWebBeforeSend", () => {
 
   it("keeps the breadcrumb trail, redacting urls but keeping safe fetch status/method", () => {
     const send = buildWebBeforeSend(() => true);
-    const out = send(
-      baseEvent({
-        breadcrumbs: [
-          {
-            message: "fetch https://host/user.png",
-            category: "fetch",
-            data: { url: "https://host/user.png", status_code: 500, method: "POST" },
-          },
-          { message: "open /Users/a/secret.pdf", category: "console", level: "warning" },
-        ],
-      }),
-      {},
-    )!;
+    const out = asScrubbed(
+      send(
+        baseEvent({
+          breadcrumbs: [
+            {
+              message: "fetch https://host/user.png",
+              category: "fetch",
+              data: { url: "https://host/user.png", status_code: 500, method: "POST" },
+            },
+            { message: "open /Users/a/secret.pdf", category: "console", level: "warning" },
+          ],
+        }),
+        {},
+      ),
+    );
     expect(out.breadcrumbs).toEqual([
       { message: "fetch <url>", category: "fetch", data: { status_code: 500, method: "POST" } },
       { message: "open <path>", category: "console", level: "warning" },
@@ -138,15 +160,17 @@ describe("buildWebBeforeSend", () => {
   it("keeps a redacted message for a non-native error", () => {
     const send = buildWebBeforeSend(() => true);
     const custom = Object.assign(new Error("user secret"), { name: "WeirdLibError" });
-    const out = send(baseEvent(), { originalException: custom })!;
+    const out = asScrubbed(send(baseEvent(), { originalException: custom }));
     expect(out.exception.values[0].value).toBe("user secret");
   });
 
   it("keeps a redacted message for a non-native app error", () => {
     const send = buildWebBeforeSend(() => true);
-    const out = send(baseEvent(), {
-      originalException: new Error("upload failed for report.pdf"),
-    })!;
+    const out = asScrubbed(
+      send(baseEvent(), {
+        originalException: new Error("upload failed for report.pdf"),
+      }),
+    );
     expect(out.exception.values[0].value).toBe("upload failed for <file>");
   });
 
@@ -211,13 +235,15 @@ describe("status_code tag (#1351)", () => {
 
   it("keeps a valid status_code tag next to the other allowlisted tags", () => {
     const send = buildWebBeforeSend(() => true);
-    const out = send(eventWithTags({ status_code: "404", tool_id: "resize", drop_me: "x" }), {})!;
+    const out = asScrubbed(
+      send(eventWithTags({ status_code: "404", tool_id: "resize", drop_me: "x" }), {}),
+    );
     expect(out.tags).toEqual({ status_code: "404", tool_id: "resize" });
   });
 
   it("normalizes a numeric status_code tag to its string form", () => {
     const send = buildWebBeforeSend(() => true);
-    const out = send(eventWithTags({ status_code: 502 }), {})!;
+    const out = asScrubbed(send(eventWithTags({ status_code: 502 }), {}));
     expect(out.tags).toEqual({ status_code: "502" });
   });
 
@@ -231,7 +257,7 @@ describe("status_code tag (#1351)", () => {
     null,
   ])("drops a status_code tag of %j", (value) => {
     const send = buildWebBeforeSend(() => true);
-    const out = send(eventWithTags({ status_code: value, tool_id: "resize" }), {})!;
+    const out = asScrubbed(send(eventWithTags({ status_code: value, tool_id: "resize" }), {}));
     expect(out.tags).toEqual({ tool_id: "resize" });
   });
 
@@ -241,9 +267,11 @@ describe("status_code tag (#1351)", () => {
       code: "save-upload-500",
       statusCode: 500,
     });
-    const out = send(eventWithTags({ status_code: "500", error_class: "operational" }), {
-      originalException: err,
-    })!;
+    const out = asScrubbed(
+      send(eventWithTags({ status_code: "500", error_class: "operational" }), {
+        originalException: err,
+      }),
+    );
     expect(out.exception.values[0].value).toBe("Save to Files upload failed");
     expect(out.tags).toEqual({ status_code: "500", error_class: "operational" });
   });

@@ -2308,6 +2308,7 @@ jobs:
           mkdir -p /tmp/mb
           for bundle in "${bundles[@]}"; do
             echo "::group::verify ${bundle} (${ARCH})"
+            started=${SECONDS}
             file="$(jq -r --arg b "$bundle" --arg a "$ARCH" '.bundles[$b].archives[$a].file' "$manifest")"
             sha="$(jq -r --arg b "$bundle" --arg a "$ARCH" '.bundles[$b].archives[$a].sha256' "$manifest")"
             [[ "$file" != "null" && "$sha" =~ ^[a-f0-9]{64}$ ]] || { echo "::error::missing ${ARCH} archive for ${bundle}"; exit 1; }
@@ -2323,6 +2324,8 @@ jobs:
               "${SNAPOTTER_BUNDLE_IMAGE}" \
               /verify-model-bundle-runtime.sh "${bundle}" "${ARCH}"
             rm -f "$tar" "${tar}.sha256"
+            echo "${bundle} (${ARCH}): $((SECONDS - started))s, disk after:"
+            df -h /
             echo "::endgroup::"
           done
           echo "All ${#bundles[@]} model bundles ran correctly against the release image for ${ARCH}"

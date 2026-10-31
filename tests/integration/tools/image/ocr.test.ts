@@ -166,26 +166,21 @@ describe("ocr", () => {
     await awaitOcrResult(res);
   }, 60_000);
 
-  it(
-    "handles HEIC input asynchronously",
-    { timeout: 120_000 },
-    async () => {
-      const { body, contentType } = createMultipartPayload([
-        { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
-        { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
-      ]);
+  it("handles HEIC input asynchronously", { timeout: 120_000 }, async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
+    ]);
 
-      const res = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/ocr",
-        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-        body,
-      });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/ocr",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
 
-      await awaitOcrResult(res);
-    },
-    60_000,
-  );
+    await awaitOcrResult(res);
+  });
 
   it("handles a 1x1 pixel input without leaking its async job", async () => {
     const { body, contentType } = createMultipartPayload([

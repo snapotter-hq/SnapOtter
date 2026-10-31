@@ -99,7 +99,7 @@ describe("favicon", () => {
     const zip = new AdmZip(Buffer.from(res.rawPayload));
     const manifestEntry = zip.getEntry("manifest.json");
     expect(manifestEntry).toBeDefined();
-    const manifest = JSON.parse(manifestEntry?.getData().toString("utf-8"));
+    const manifest = JSON.parse(manifestEntry?.getData().toString("utf-8") as string);
     expect(manifest.icons).toBeDefined();
     expect(manifest.icons.length).toBeGreaterThan(0);
   });
@@ -330,7 +330,9 @@ describe("favicon", () => {
 
     expect(res.statusCode).toBe(200);
     const zip = new AdmZip(Buffer.from(res.rawPayload));
-    const manifest = JSON.parse(zip.getEntry("manifest.json")?.getData().toString("utf-8"));
+    const manifest = JSON.parse(
+      zip.getEntry("manifest.json")?.getData().toString("utf-8") as string,
+    );
     expect(manifest.name).toBe("my-app-logo");
     expect(manifest.short_name).toBe("my-app-logo");
     expect(manifest.theme_color).toBe("#ffffff");
@@ -640,7 +642,9 @@ describe("favicon", () => {
 
     expect(res.statusCode).toBe(200);
     const zip = new AdmZip(Buffer.from(res.rawPayload));
-    const manifest = JSON.parse(zip.getEntry("manifest.json")?.getData().toString("utf-8"));
+    const manifest = JSON.parse(
+      zip.getEntry("manifest.json")?.getData().toString("utf-8") as string,
+    );
     expect(manifest.name).toBe("my.app.logo");
   });
 
@@ -850,7 +854,7 @@ describe("favicon", () => {
     for (const name of pngEntries) {
       const entry = zip.getEntry(name);
       expect(entry).toBeDefined();
-      const data = entry?.getData();
+      const data = entry?.getData() as Buffer;
       expect(data.length).toBeGreaterThan(0);
       const meta = await sharp(data).metadata();
       expect(meta.format).toBe("png");
@@ -993,7 +997,9 @@ describe("favicon", () => {
 
     expect(res.statusCode).toBe(200);
     const zip = new AdmZip(Buffer.from(res.rawPayload));
-    const manifest = JSON.parse(zip.getEntry("manifest.json")?.getData().toString("utf-8"));
+    const manifest = JSON.parse(
+      zip.getEntry("manifest.json")?.getData().toString("utf-8") as string,
+    );
     expect(manifest.icons).toHaveLength(2);
     for (const icon of manifest.icons) {
       expect(icon.src).toBeDefined();
@@ -1125,7 +1131,9 @@ describe("favicon", () => {
     expect(entries).toContain("favicon-snippet.html");
 
     // themeColor reflected in manifest
-    const manifest = JSON.parse(zip.getEntry("manifest.json")?.getData().toString("utf-8"));
+    const manifest = JSON.parse(
+      zip.getEntry("manifest.json")?.getData().toString("utf-8") as string,
+    );
     expect(manifest.theme_color).toBe("#336699");
     expect(manifest.background_color).toBe("#336699");
   });

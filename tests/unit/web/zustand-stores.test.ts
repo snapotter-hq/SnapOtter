@@ -74,6 +74,7 @@ describe("useBase64Store", () => {
     useBase64Store.getState().setExpandedIndex(3);
     const results: Base64Result[] = [
       {
+        entryId: "a.png",
         filename: "a.png",
         mimeType: "image/png",
         width: 100,
@@ -85,7 +86,7 @@ describe("useBase64Store", () => {
         dataUri: "data:image/png;base64,abc",
       },
     ];
-    const errors: Base64Error[] = [{ filename: "b.png", error: "too big" }];
+    const errors: Base64Error[] = [{ entryId: "b.png", filename: "b.png", error: "too big" }];
     useBase64Store.getState().setResults(results, errors);
 
     const s = useBase64Store.getState();
@@ -112,6 +113,7 @@ describe("useBase64Store", () => {
 
   it("addResult appends to results array", () => {
     const r1: Base64Result = {
+      entryId: "a.png",
       filename: "a.png",
       mimeType: "image/png",
       width: 10,
@@ -122,7 +124,7 @@ describe("useBase64Store", () => {
       base64: "x",
       dataUri: "data:image/png;base64,x",
     };
-    const r2: Base64Result = { ...r1, filename: "b.png" };
+    const r2: Base64Result = { ...r1, entryId: "b.png", filename: "b.png" };
 
     useBase64Store.getState().addResult(r1);
     expect(useBase64Store.getState().results).toHaveLength(1);
@@ -133,8 +135,8 @@ describe("useBase64Store", () => {
   });
 
   it("addError appends to errors array", () => {
-    useBase64Store.getState().addError({ filename: "x.png", error: "fail" });
-    useBase64Store.getState().addError({ filename: "y.png", error: "crash" });
+    useBase64Store.getState().addError({ entryId: "x.png", filename: "x.png", error: "fail" });
+    useBase64Store.getState().addError({ entryId: "y.png", filename: "y.png", error: "crash" });
     expect(useBase64Store.getState().errors).toHaveLength(2);
   });
 
@@ -147,6 +149,7 @@ describe("useBase64Store", () => {
     useBase64Store.getState().setProcessing(true);
     useBase64Store.getState().setProgress({ completed: 1, total: 2, currentFile: "f" });
     useBase64Store.getState().addResult({
+      entryId: "a.png",
       filename: "a.png",
       mimeType: "image/png",
       width: 1,
@@ -157,7 +160,7 @@ describe("useBase64Store", () => {
       base64: "",
       dataUri: "",
     });
-    useBase64Store.getState().addError({ filename: "b.png", error: "err" });
+    useBase64Store.getState().addError({ entryId: "b.png", filename: "b.png", error: "err" });
     useBase64Store.getState().setExpandedIndex(2);
 
     useBase64Store.getState().reset();
@@ -1378,9 +1381,9 @@ describe("usePdfToImageStore", () => {
       pageCount: 3,
     });
 
-    let capturedFormData: FormData | null = null;
+    const captured: { body: FormData | null } = { body: null };
     fetchMock.mockImplementationOnce((_url: string, opts: { body: FormData }) => {
-      capturedFormData = opts.body;
+      captured.body = opts.body;
       return Promise.resolve({
         ok: true,
         json: () =>
@@ -1394,9 +1397,9 @@ describe("usePdfToImageStore", () => {
 
     await usePdfToImageStore.getState().convert();
 
-    expect(capturedFormData).not.toBeNull();
+    expect(captured.body).not.toBeNull();
     // FormData.get works in jsdom when appended synchronously
-    const settings = capturedFormData?.get("settings");
+    const settings = captured.body?.get("settings");
     expect(settings).not.toBeNull();
     const parsed = JSON.parse(settings as string);
     expect(parsed.pages).toBe("all");
@@ -1411,9 +1414,9 @@ describe("usePdfToImageStore", () => {
       pageCount: 5,
     });
 
-    let capturedFormData: FormData | null = null;
+    const captured: { body: FormData | null } = { body: null };
     fetchMock.mockImplementationOnce((_url: string, opts: { body: FormData }) => {
-      capturedFormData = opts.body;
+      captured.body = opts.body;
       return Promise.resolve({
         ok: true,
         json: () =>
@@ -1427,8 +1430,8 @@ describe("usePdfToImageStore", () => {
 
     await usePdfToImageStore.getState().convert();
 
-    expect(capturedFormData).not.toBeNull();
-    const settings = capturedFormData?.get("settings");
+    expect(captured.body).not.toBeNull();
+    const settings = captured.body?.get("settings");
     expect(settings).not.toBeNull();
     const parsed = JSON.parse(settings as string);
     expect(parsed.pages).toBe("1-2");
@@ -3184,7 +3187,7 @@ describe("useFeaturesStore", () => {
   // -- EventSource progress handling ----------------------------------------
 
   it("listenToProgress handles complete phase from EventSource", async () => {
-    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const captured: { onMessage: ((event: MessageEvent) => void) | null } = { onMessage: null };
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
@@ -3196,7 +3199,7 @@ describe("useFeaturesStore", () => {
         };
         // Capture for later triggering
         setTimeout(() => {
-          esOnMessage = es.onmessage;
+          captured.onMessage = es.onmessage;
         }, 0);
         return es;
       }),
@@ -3211,8 +3214,8 @@ describe("useFeaturesStore", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Simulate complete event
-    if (esOnMessage) {
-      esOnMessage({
+    if (captured.onMessage) {
+      captured.onMessage({
         data: JSON.stringify({ phase: "complete", percent: 100, stage: "Done" }),
       } as MessageEvent);
     }
@@ -3222,7 +3225,7 @@ describe("useFeaturesStore", () => {
   });
 
   it("listenToProgress handles failed phase from EventSource", async () => {
-    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const captured: { onMessage: ((event: MessageEvent) => void) | null } = { onMessage: null };
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
@@ -3233,7 +3236,7 @@ describe("useFeaturesStore", () => {
           close: mockClose,
         };
         setTimeout(() => {
-          esOnMessage = es.onmessage;
+          captured.onMessage = es.onmessage;
         }, 0);
         return es;
       }),
@@ -3245,8 +3248,8 @@ describe("useFeaturesStore", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Simulate failed event
-    if (esOnMessage) {
-      esOnMessage({
+    if (captured.onMessage) {
+      captured.onMessage({
         data: JSON.stringify({ phase: "failed", percent: 0, stage: "", error: "Disk full" }),
       } as MessageEvent);
     }
@@ -3256,7 +3259,7 @@ describe("useFeaturesStore", () => {
   });
 
   it("listenToProgress handles progress updates from EventSource", async () => {
-    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const captured: { onMessage: ((event: MessageEvent) => void) | null } = { onMessage: null };
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
@@ -3267,7 +3270,7 @@ describe("useFeaturesStore", () => {
           close: mockClose,
         };
         setTimeout(() => {
-          esOnMessage = es.onmessage;
+          captured.onMessage = es.onmessage;
         }, 0);
         return es;
       }),
@@ -3279,8 +3282,8 @@ describe("useFeaturesStore", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Simulate progress update
-    if (esOnMessage) {
-      esOnMessage({
+    if (captured.onMessage) {
+      captured.onMessage({
         data: JSON.stringify({ phase: "processing", percent: 50, stage: "Downloading..." }),
       } as MessageEvent);
     }
@@ -3289,7 +3292,7 @@ describe("useFeaturesStore", () => {
   });
 
   it("listenToProgress uses max of current and new percent", async () => {
-    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const captured: { onMessage: ((event: MessageEvent) => void) | null } = { onMessage: null };
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
@@ -3300,7 +3303,7 @@ describe("useFeaturesStore", () => {
           close: mockClose,
         };
         setTimeout(() => {
-          esOnMessage = es.onmessage;
+          captured.onMessage = es.onmessage;
         }, 0);
         return es;
       }),
@@ -3312,14 +3315,14 @@ describe("useFeaturesStore", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Send a high percent first
-    if (esOnMessage) {
-      esOnMessage({
+    if (captured.onMessage) {
+      captured.onMessage({
         data: JSON.stringify({ phase: "processing", percent: 70, stage: "Step 1" }),
       } as MessageEvent);
     }
     // Then a lower percent (should keep the higher one)
-    if (esOnMessage) {
-      esOnMessage({
+    if (captured.onMessage) {
+      captured.onMessage({
         data: JSON.stringify({ phase: "processing", percent: 40, stage: "Step 2" }),
       } as MessageEvent);
     }
@@ -3328,7 +3331,7 @@ describe("useFeaturesStore", () => {
   });
 
   it("EventSource onerror closes and falls back to polling", async () => {
-    let esOnError: (() => void) | null = null;
+    const captured: { onError: (() => void) | null } = { onError: null };
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
@@ -3339,7 +3342,7 @@ describe("useFeaturesStore", () => {
           close: mockClose,
         };
         setTimeout(() => {
-          esOnError = es.onerror;
+          captured.onError = es.onerror;
         }, 0);
         return es;
       }),
@@ -3351,8 +3354,8 @@ describe("useFeaturesStore", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Trigger onerror
-    if (esOnError) {
-      esOnError();
+    if (captured.onError) {
+      captured.onError();
     }
     expect(mockClose).toHaveBeenCalled();
     // Bundle should still be in installing state (polling takes over)
@@ -3389,7 +3392,7 @@ describe("useFeaturesStore", () => {
     useFeaturesStore.setState({ bundles, loaded: true });
 
     // For the install call, we need to immediately resolve so installAll loop progresses
-    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const captured: { onMessage: ((event: MessageEvent) => void) | null } = { onMessage: null };
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
@@ -3400,10 +3403,10 @@ describe("useFeaturesStore", () => {
           close: mockClose,
         };
         setTimeout(() => {
-          esOnMessage = es.onmessage;
+          captured.onMessage = es.onmessage;
           // Immediately complete the install
-          if (esOnMessage) {
-            esOnMessage({
+          if (captured.onMessage) {
+            captured.onMessage({
               data: JSON.stringify({ phase: "complete", percent: 100, stage: "Done" }),
             } as MessageEvent);
           }
