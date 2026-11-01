@@ -5748,6 +5748,11 @@ export const nl: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} geïnstalleerd",
       bundlesQueued: "{count} in wachtrij",
     },
+    updateNotice: {
+      available: "SnapOtter {version} is beschikbaar. Je gebruikt {current}.",
+      whatsNew: "Wat is er nieuw",
+      dismiss: "Updatemelding sluiten",
+    },
   },
   a11y: {
     comparisonScroller: "Vergelijkingsgebied",

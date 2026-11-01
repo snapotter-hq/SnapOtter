@@ -1,6 +1,6 @@
 ---
 description: "Data penggunaan anonim apa yang dikumpulkan SnapOtter, kapan dikirim, dan cara mematikan analitik produk untuk seluruh instance."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: b753bc59abac
 ---
@@ -25,6 +25,10 @@ Analitik Produk Anonim aktif secara default dan diatur untuk seluruh instance ol
 - Metadata gambar (EXIF)
 - Teks dokumen yang diekstrak
 - Alamat IP atau identitas akun Anda
+
+## Pemberitahuan pembaruan {#update-notices}
+
+Selama analitik aktif, server bertanya ke PostHog setiap beberapa jam rilis SnapOtter mana yang terbaru, dengan memakai ID anonim instance dan versinya. Jika ada rilis yang lebih baru, admin melihat pemberitahuan berisi tautan ke catatan rilis. Jika ditutup, pemberitahuan itu tetap tersembunyi sampai rilis berikutnya. Tidak ada yang dipasang atau diunduh untuk Anda, dan saat analitik nonaktif server tidak pernah bertanya.
 
 ## Cara mematikannya {#turning-it-off}
 

@@ -1,6 +1,6 @@
 ---
 description: "Vilken anonym användningsdata SnapOtter samlar in, när den skickas och hur man stänger av instansomfattande produktanalys."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: 59a586e4d3ef
 ---
@@ -25,6 +25,10 @@ Anonym produktanalys är på som standard och ställs in för hela instansen av 
 - Bildmetadata (EXIF)
 - Extraherad dokumenttext
 - Din IP-adress eller kontoidentitet
+
+## Uppdateringsmeddelanden {#update-notices}
+
+Så länge analys är på frågar servern PostHog med några timmars mellanrum vilken SnapOtter-version som är nyast, med instansens anonyma ID och dess version. Finns en nyare version ser administratörer ett meddelande med en länk till versionsinformationen. Stänger du meddelandet visas det inte igen förrän nästa version. Inget installeras eller laddas ned åt dig, och med analys avstängd frågar servern aldrig.
 
 ## Stänga av det {#turning-it-off}
 

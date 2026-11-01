@@ -10,6 +10,7 @@ import { SettingsDialog } from "../settings/settings-dialog";
 import { AiInstallIndicator } from "./ai-install-indicator";
 import { MobileBottomNav } from "./mobile-bottom-nav";
 import { TopNav } from "./top-nav.js";
+import { UpdateNotice } from "./update-notice";
 
 interface AppLayoutProps {
   children?: React.ReactNode;
@@ -62,6 +63,8 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
         }}
         onSettingsClick={() => setSettingsOpen(true)}
       />
+
+      <UpdateNotice />
 
       {/* Main content area */}
       <main

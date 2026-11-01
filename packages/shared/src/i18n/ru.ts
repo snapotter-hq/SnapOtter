@@ -5733,6 +5733,11 @@ export const ru: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} установлено",
       bundlesQueued: "{count} в очереди",
     },
+    updateNotice: {
+      available: "Доступна версия SnapOtter {version}. Сейчас установлена {current}.",
+      whatsNew: "Что нового",
+      dismiss: "Закрыть уведомление об обновлении",
+    },
   },
   a11y: {
     comparisonScroller: "Область сравнения",

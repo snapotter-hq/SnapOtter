@@ -5744,6 +5744,11 @@ export const pl: TranslationKeys = {
       bundlesInstalled: "Zainstalowano {completed}/{total}",
       bundlesQueued: "{count} w kolejce",
     },
+    updateNotice: {
+      available: "SnapOtter {version} jest już dostępny. Używana wersja: {current}.",
+      whatsNew: "Co nowego",
+      dismiss: "Zamknij powiadomienie o aktualizacji",
+    },
   },
   a11y: {
     comparisonScroller: "Obszar porównania",

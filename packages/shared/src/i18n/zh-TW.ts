@@ -5398,6 +5398,11 @@ export const zhTW: TranslationKeys = {
       bundlesInstalled: "已安裝 {completed}/{total}",
       bundlesQueued: "{count} 個等待中",
     },
+    updateNotice: {
+      available: "SnapOtter {version} 已發布。你目前使用的是 {current}。",
+      whatsNew: "查看新功能",
+      dismiss: "關閉更新提示",
+    },
   },
   a11y: {
     comparisonScroller: "對比捲動區域",

@@ -1,6 +1,6 @@
 ---
 description: "Quali dati di utilizzo anonimi raccoglie SnapOtter, quando vengono inviati e come disattivare le analisi di prodotto a livello di istanza."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: c04dcf2bd071
 ---
@@ -25,6 +25,10 @@ Le analisi di prodotto anonime sono attive per impostazione predefinita e vengon
 - Metadati delle immagini (EXIF)
 - Testo estratto dai documenti
 - Il tuo indirizzo IP o la tua identità di account
+
+## Avvisi di aggiornamento {#update-notices}
+
+Finché l'analisi è attiva, il server chiede a PostHog ogni qualche ora qual è la versione più recente di SnapOtter, usando l'ID anonimo dell'istanza e la sua versione. Quando esiste una versione più recente, gli amministratori vedono un avviso con un link alle note di rilascio. Se lo chiudi, resta nascosto fino alla versione successiva. Non viene installato né scaricato nulla al posto tuo e, con l'analisi disattivata, il server non lo chiede mai.
 
 ## Come disattivarle {#turning-it-off}
 

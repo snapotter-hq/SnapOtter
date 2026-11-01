@@ -5644,6 +5644,11 @@ export const en = {
       bundlesInstalled: "{completed}/{total} installed",
       bundlesQueued: "{count} queued",
     },
+    updateNotice: {
+      available: "SnapOtter {version} is available. You're on {current}.",
+      whatsNew: "What's new",
+      dismiss: "Dismiss update notice",
+    },
   },
   a11y: {
     comparisonScroller: "Comparison scroller",

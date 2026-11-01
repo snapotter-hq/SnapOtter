@@ -5629,6 +5629,11 @@ export const ko: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} 설치됨",
       bundlesQueued: "{count}개 대기 중",
     },
+    updateNotice: {
+      available: "SnapOtter {version}이 출시되었습니다. 현재 버전은 {current}입니다.",
+      whatsNew: "새로운 기능",
+      dismiss: "업데이트 알림 닫기",
+    },
   },
   a11y: {
     comparisonScroller: "비교 스크롤 영역",

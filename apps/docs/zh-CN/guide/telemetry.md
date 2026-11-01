@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter 收集哪些匿名使用数据、何时发送，以及如何关闭实例范围的产品分析。"
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: 694a13753955
 ---
@@ -25,6 +25,10 @@ i18n_output_hash: 694a13753955
 - 图像元数据 (EXIF)
 - 提取的文档文本
 - 你的 IP 地址或账户身份
+
+## 更新提示 {#update-notices}
+
+分析功能开启期间，服务器每隔几小时会用实例的匿名 ID 和当前版本向 PostHog 查询 SnapOtter 的最新版本。有更新的版本时，管理员会看到一条附带发布说明链接的提示。关闭提示后，在下一个版本发布前不会再次出现。系统不会替你安装或下载任何内容；分析功能关闭时，服务器不会发出查询。
 
 ## 关闭它 {#turning-it-off}
 

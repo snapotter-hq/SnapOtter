@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter'ın hangi anonim kullanım verilerini topladığı, ne zaman gönderildiği ve örnek genelindeki ürün analitiğinin nasıl kapatılacağı."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: 0111270b4a5d
 ---
@@ -25,6 +25,10 @@ Anonim Ürün Analitiği varsayılan olarak açıktır ve bir yönetici tarafın
 - Görüntü meta verileri (EXIF)
 - Çıkarılan belge metni
 - IP adresiniz veya hesap kimliğiniz
+
+## Güncelleme bildirimleri {#update-notices}
+
+Analitik açıkken sunucu, örneğin anonim kimliğini ve sürümünü kullanarak birkaç saatte bir PostHog'a en yeni SnapOtter sürümünü sorar. Daha yeni bir sürüm varsa yöneticiler, sürüm notlarına bağlantı içeren bir bildirim görür. Bildirimi kapatırsanız bir sonraki sürüme kadar gizli kalır. Sizin yerinize hiçbir şey yüklenmez veya indirilmez ve analitik kapalıyken sunucu hiç sormaz.
 
 ## Kapatma {#turning-it-off}
 

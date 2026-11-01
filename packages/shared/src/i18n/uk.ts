@@ -5732,6 +5732,11 @@ export const uk: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} встановлено",
       bundlesQueued: "{count} у черзі",
     },
+    updateNotice: {
+      available: "Доступна версія SnapOtter {version}. Зараз встановлено {current}.",
+      whatsNew: "Що нового",
+      dismiss: "Закрити сповіщення про оновлення",
+    },
   },
   a11y: {
     comparisonScroller: "Область порівняння",

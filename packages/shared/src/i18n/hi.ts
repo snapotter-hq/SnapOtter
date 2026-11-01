@@ -5494,6 +5494,11 @@ export const hi: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} इंस्टॉल",
       bundlesQueued: "{count} कतार में",
     },
+    updateNotice: {
+      available: "SnapOtter {version} उपलब्ध है। आप {current} इस्तेमाल कर रहे हैं।",
+      whatsNew: "नया क्या है",
+      dismiss: "अपडेट सूचना बंद करें",
+    },
   },
   a11y: {
     comparisonScroller: "तुलना क्षेत्र",

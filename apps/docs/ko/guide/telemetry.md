@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter가 수집하는 익명 사용 데이터, 전송 시점, 인스턴스 전체 제품 분석을 끄는 방법."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: 98f38443c2fd
 ---
@@ -25,6 +25,10 @@ i18n_output_hash: 98f38443c2fd
 - 이미지 메타데이터(EXIF)
 - 추출된 문서 텍스트
 - 여러분의 IP 주소 또는 계정 신원
+
+## 업데이트 알림 {#update-notices}
+
+분석이 켜져 있는 동안 서버는 몇 시간마다 인스턴스의 익명 ID와 버전을 사용해 PostHog에 SnapOtter 최신 릴리스를 확인합니다. 더 새로운 릴리스가 있으면 관리자에게 릴리스 노트 링크가 포함된 알림이 표시됩니다. 알림을 닫으면 다음 릴리스까지 다시 나타나지 않습니다. 자동으로 설치하거나 다운로드하는 것은 없으며, 분석이 꺼져 있으면 서버는 확인하지 않습니다.
 
 ## 끄는 방법 {#turning-it-off}
 

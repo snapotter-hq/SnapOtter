@@ -5703,6 +5703,11 @@ export const vi: TranslationKeys = {
       bundlesInstalled: "Đã cài {completed}/{total}",
       bundlesQueued: "{count} đang chờ",
     },
+    updateNotice: {
+      available: "Đã có SnapOtter {version}. Bạn đang dùng {current}.",
+      whatsNew: "Có gì mới",
+      dismiss: "Đóng thông báo cập nhật",
+    },
   },
   a11y: {
     comparisonScroller: "Vùng so sánh",

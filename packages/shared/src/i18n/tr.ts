@@ -5728,6 +5728,11 @@ export const tr: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} kuruldu",
       bundlesQueued: "{count} sırada",
     },
+    updateNotice: {
+      available: "SnapOtter {version} yayımlandı. Şu an {current} sürümünü kullanıyorsunuz.",
+      whatsNew: "Yenilikler",
+      dismiss: "Güncelleme bildirimini kapat",
+    },
   },
   a11y: {
     comparisonScroller: "Karşılaştırma alanı",

@@ -5722,6 +5722,11 @@ export const id: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} terinstal",
       bundlesQueued: "{count} dalam antrean",
     },
+    updateNotice: {
+      available: "SnapOtter {version} sudah tersedia. Anda memakai {current}.",
+      whatsNew: "Yang baru",
+      dismiss: "Tutup pemberitahuan pembaruan",
+    },
   },
   a11y: {
     comparisonScroller: "Area perbandingan",

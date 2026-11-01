@@ -5716,6 +5716,11 @@ export const sv: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} installerade",
       bundlesQueued: "{count} i kö",
     },
+    updateNotice: {
+      available: "SnapOtter {version} finns nu. Du kör {current}.",
+      whatsNew: "Nyheter",
+      dismiss: "Stäng uppdateringsmeddelandet",
+    },
   },
   a11y: {
     comparisonScroller: "Jämförelseområde",
