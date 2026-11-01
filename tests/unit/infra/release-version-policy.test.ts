@@ -209,4 +209,44 @@ describe("release version domains", () => {
     expect(manifest.imageVersion).toBe(policy.legacyBundleImageVersion);
     expect(manifest.bundles.ocr.runtimeFormatVersion).toBe(3);
   });
+
+  it("only points the release runbook at workflows that exist", () => {
+    // RELEASE.md once told maintainers to dispatch attest.yml after the pipeline
+    // absorbed it, so the post-release checklist sent them to a missing workflow.
+    const runbook = readFileSync(path.resolve(root, "RELEASE.md"), "utf8");
+    const named = new Set([...runbook.matchAll(/\b([a-z][a-z0-9-]*\.ya?ml)\b/g)].map((m) => m[1]));
+    const workflows = new Set(readdirSync(path.resolve(root, ".github/workflows")));
+    for (const file of named) {
+      if (file.startsWith("docker-compose")) continue;
+      expect(workflows.has(file), `RELEASE.md names ${file}, which is not a workflow`).toBe(true);
+    }
+  });
+
+  it("keeps the Docker Hub release banner coherent and never ahead of the release", () => {
+    const overview = readFileSync(path.resolve(root, "DOCKERHUB.md"), "utf8");
+    const banner =
+      /\*\*SnapOtter (\d+\.\d+) is out\.\*\* The `latest` tag points at `(\d+\.\d+\.\d+)`/.exec(
+        overview,
+      );
+    expect(banner, "DOCKERHUB.md release banner is missing or reworded").not.toBeNull();
+    const [, minorLine, exact] = banner as RegExpExecArray;
+
+    expect(
+      exact.startsWith(`${minorLine}.`),
+      "banner minor line must match its exact version",
+    ).toBe(true);
+    expect(overview).toContain(`| \`${exact}\` | Exact version |`);
+    expect(overview).toContain(`| \`${minorLine}\` | Latest patch in the ${minorLine}.x line |`);
+    expect(overview).toContain(`releases/tag/v${exact})`);
+
+    const [bannerMajor, bannerMinor, bannerPatch] = exact.split(".").map(Number);
+    const [rootMajor, rootMinor, rootPatch] = rootPackage.version.split(".").map(Number);
+    const ahead =
+      bannerMajor > rootMajor ||
+      (bannerMajor === rootMajor &&
+        (bannerMinor > rootMinor || (bannerMinor === rootMinor && bannerPatch > rootPatch)));
+    expect(ahead, `DOCKERHUB.md claims ${exact} but the repo is at ${rootPackage.version}`).toBe(
+      false,
+    );
+  });
 });
