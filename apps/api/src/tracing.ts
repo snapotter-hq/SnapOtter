@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import type { SpanExporter } from "@opentelemetry/sdk-trace-base";
+import type { SpanExporter } from "@opentelemetry/sdk-trace";
 
 let _active = false;
 let _sdk: { shutdown(): Promise<void> } | null = null;
@@ -12,14 +12,13 @@ export async function initTracing(options: { exporter?: SpanExporter } = {}): Pr
   if (_active) return;
 
   const { NodeSDK } = await import("@opentelemetry/sdk-node");
-  const { BatchSpanProcessor } = await import("@opentelemetry/sdk-trace-base");
+  const { BatchSpanProcessor } = await import("@opentelemetry/sdk-trace");
   const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http");
   const { defaultResource, resourceFromAttributes } = await import("@opentelemetry/resources");
   const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = await import(
     "@opentelemetry/semantic-conventions"
   );
   const { HttpInstrumentation } = await import("@opentelemetry/instrumentation-http");
-  const { FastifyInstrumentation } = await import("@opentelemetry/instrumentation-fastify");
   const { PgInstrumentation } = await import("@opentelemetry/instrumentation-pg");
   const { IORedisInstrumentation } = await import("@opentelemetry/instrumentation-ioredis");
   const { AwsInstrumentation } = await import("@opentelemetry/instrumentation-aws-sdk");
@@ -38,7 +37,7 @@ export async function initTracing(options: { exporter?: SpanExporter } = {}): Pr
 
   const sdk = new NodeSDK({
     resource,
-    spanProcessors: [new BatchSpanProcessor(exporter)],
+    spanProcessors: [new BatchSpanProcessor({ exporter })],
     instrumentations: [
       new HttpInstrumentation({
         ignoreOutgoingRequestHook: (req) => {
@@ -46,7 +45,6 @@ export async function initTracing(options: { exporter?: SpanExporter } = {}): Pr
           return host.includes("posthog") || host.includes("sentry");
         },
       }),
-      new FastifyInstrumentation(),
       new PgInstrumentation(),
       new IORedisInstrumentation({
         requireParentSpan: true,

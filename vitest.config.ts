@@ -1,4 +1,3 @@
-import { readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
@@ -13,20 +12,6 @@ const webNodeModules = path.resolve(__dirname, "apps/web/node_modules");
 
 // Resolve landing-workspace packages.
 const landingNodeModules = path.resolve(__dirname, "apps/landing/node_modules");
-
-// @opentelemetry/core is a transitive dep (via sdk-node) not hoisted by pnpm.
-// Find it in the pnpm store so tests can import W3CTraceContextPropagator.
-function findPnpmPackage(scope: string, name: string): string {
-  const pnpmDir = path.resolve(__dirname, "node_modules/.pnpm");
-  const prefix = `${scope}+${name}@`;
-  const entries = readdirSync(pnpmDir)
-    .filter((e) => e.startsWith(prefix))
-    .sort();
-  if (entries.length === 0) {
-    throw new Error(`${scope}/${name} not found in pnpm store`);
-  }
-  return path.join(pnpmDir, entries[entries.length - 1], "node_modules", scope, name);
-}
 
 /**
  * Shards by measured cost instead of by SHA1 of the file path.
@@ -237,9 +222,9 @@ export default defineConfig({
       "posthog-js": path.join(webNodeModules, "posthog-js"),
       "@sentry/react": path.join(webNodeModules, "@sentry/react"),
       "@opentelemetry/api": path.join(apiNodeModules, "@opentelemetry/api"),
-      "@opentelemetry/core": findPnpmPackage("@opentelemetry", "core"),
+      "@opentelemetry/core": path.join(apiNodeModules, "@opentelemetry/core"),
       "@opentelemetry/sdk-node": path.join(apiNodeModules, "@opentelemetry/sdk-node"),
-      "@opentelemetry/sdk-trace-base": path.join(apiNodeModules, "@opentelemetry/sdk-trace-base"),
+      "@opentelemetry/sdk-trace": path.join(apiNodeModules, "@opentelemetry/sdk-trace"),
       "@opentelemetry/exporter-trace-otlp-http": path.join(
         apiNodeModules,
         "@opentelemetry/exporter-trace-otlp-http",
@@ -252,10 +237,6 @@ export default defineConfig({
       "@opentelemetry/instrumentation-http": path.join(
         apiNodeModules,
         "@opentelemetry/instrumentation-http",
-      ),
-      "@opentelemetry/instrumentation-fastify": path.join(
-        apiNodeModules,
-        "@opentelemetry/instrumentation-fastify",
       ),
       "@opentelemetry/instrumentation-pg": path.join(
         apiNodeModules,
