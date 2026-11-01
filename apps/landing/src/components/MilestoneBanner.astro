@@ -1,7 +1,6 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import { t } from "@/i18n";
-import { getStarCount } from "@/lib/stats";
 
 interface Props {
   locale?: string;
@@ -11,15 +10,7 @@ const { locale = "en" } = Astro.props;
 const RELEASE_VERSION = "v2.3.0";
 const RELEASE_URL = `https://github.com/snapotter-hq/SnapOtter/releases/tag/${RELEASE_VERSION}`;
 
-// The stars clause is a claim, so it only renders once a build reads a live
-// count at or above the milestone. STAR_FALLBACK sits below it, so a build
-// whose GitHub fetch fails drops the clause instead of overstating.
-const STARS_MILESTONE = 3_000;
-const starsReached = (await getStarCount()) >= STARS_MILESTONE;
-const thanks = t(
-  locale,
-  starsReached ? "home.milestone.thanksPullsStars" : "home.milestone.thanksPulls",
-);
+const thanks = t(locale, "home.milestone.thanksPullsStars");
 ---
 
 <a

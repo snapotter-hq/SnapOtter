@@ -1973,12 +1973,6 @@
     "outputHash": "ba4c8c3f60e1",
     "stale": false
   },
-  "home.milestone.thanksPulls": {
-    "sourceHash": "fac06741c968",
-    "provenance": "machine",
-    "outputHash": "19429a7ee324",
-    "stale": false
-  },
   "home.milestone.thanksPullsStars": {
     "sourceHash": "06635e39eec9",
     "provenance": "machine",

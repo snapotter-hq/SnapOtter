@@ -43,7 +43,7 @@ test.describe("Landing Homepage", () => {
   test("hero renders the milestone banner linking to the v2.3.0 release", async ({ page }) => {
     const banner = page.locator("[data-milestone-banner]");
     await expect(banner).toBeVisible();
-    await expect(banner).toContainText(/1 million pulls(?: and 3,000 GitHub stars)?\. Thank you\./);
+    await expect(banner).toContainText(/1 million pulls and 3,000 GitHub stars\. Thank you\./);
     await expect(banner).toContainText("SnapOtter v2.3.0 is our thank-you release.");
     await expect(banner).toHaveAttribute(
       "href",
