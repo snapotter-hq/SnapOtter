@@ -37,7 +37,7 @@ describe("tracing bootstrap", () => {
       }),
     }));
 
-    const { InMemorySpanExporter } = await import("@opentelemetry/sdk-trace-base");
+    const { InMemorySpanExporter } = await import("@opentelemetry/sdk-trace");
     const exporter = new InMemorySpanExporter();
     const { initTracing, isTracingActive } = await import("../../../apps/api/src/tracing.js");
     await initTracing({ exporter });

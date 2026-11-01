@@ -7,12 +7,12 @@ import {
   ROOT_CONTEXT,
   trace,
 } from "@opentelemetry/api";
-import { core } from "@opentelemetry/sdk-node";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { afterEach, describe, expect, it } from "vitest";
 
 /**
  * Minimal AsyncLocalStorage-based context manager for tests.
- * OTel v2 BasicTracerProvider no longer registers one automatically.
+ * The OTel TracerProvider does not register one automatically.
  */
 class TestContextManager implements ContextManager {
   private _als = new AsyncLocalStorage<Context>();
@@ -52,16 +52,16 @@ describe("sidecar trace context injection", () => {
   });
 
   it("produces _otel field when span is active", async () => {
-    const { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } = await import(
-      "@opentelemetry/sdk-trace-base"
+    const { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } = await import(
+      "@opentelemetry/sdk-trace"
     );
 
     context.setGlobalContextManager(new TestContextManager());
-    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
+    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
     const exporter = new InMemorySpanExporter();
-    const provider = new BasicTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    const provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
     trace.setGlobalTracerProvider(provider);
 

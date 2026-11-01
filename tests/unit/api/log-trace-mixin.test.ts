@@ -11,7 +11,7 @@ import { traceMixin } from "../../../apps/api/src/lib/log-trace-mixin.js";
 
 /**
  * Minimal AsyncLocalStorage-based context manager for tests.
- * OTel v2 BasicTracerProvider no longer registers one automatically.
+ * The OTel TracerProvider does not register one automatically.
  */
 class TestContextManager implements ContextManager {
   private _als = new AsyncLocalStorage<Context>();
@@ -55,16 +55,16 @@ describe("traceMixin", () => {
   });
 
   it("returns traceId, spanId, traceFlags when span is active", async () => {
-    const { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } = await import(
-      "@opentelemetry/sdk-trace-base"
+    const { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } = await import(
+      "@opentelemetry/sdk-trace"
     );
 
     // Register a real context manager so context.with() propagates
     context.setGlobalContextManager(new TestContextManager());
 
     const exporter = new InMemorySpanExporter();
-    const provider = new BasicTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    const provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
     trace.setGlobalTracerProvider(provider);
 
