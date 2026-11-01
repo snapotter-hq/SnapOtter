@@ -28,7 +28,7 @@
     [
       "@semantic-release/exec",
       {
-        "verifyReleaseCmd": "./scripts/check-expected-version.sh ${nextRelease.version}",
+        "verifyReleaseCmd": "bash ./scripts/check-expected-version.sh ${nextRelease.version}",
         "prepareCmd": "./scripts/sync-version.sh ${nextRelease.version}",
         "publishCmd": "echo '${nextRelease.version}' > .release-version"
       }

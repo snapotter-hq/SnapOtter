@@ -96,7 +96,7 @@ jobs:
             echo "::error::semantic-release produced an invalid version"
             exit 1
           }
-          ./scripts/check-expected-version.sh "${version}"
+          bash ./scripts/check-expected-version.sh "${version}"
           git fetch --force --no-tags origin \
             "refs/tags/v${version}:refs/tags/v${version}"
           release_commit="$(git rev-parse "refs/tags/v${version}^{commit}")"

@@ -58,7 +58,7 @@ describe("release commit analysis", () => {
 describe("expected release version gate", () => {
   function check(version: string, expected?: string) {
     try {
-      const stdout = execFileSync(checkScript, [version], {
+      const stdout = execFileSync("bash", [checkScript, version], {
         encoding: "utf8",
         env: { ...process.env, EXPECTED_VERSION: expected ?? "" },
         stdio: "pipe",
@@ -88,11 +88,11 @@ describe("expected release version gate", () => {
 
   it("runs before semantic-release tags and again on a tag-only retry", () => {
     expect(pluginOptions("@semantic-release/exec").verifyReleaseCmd).toBe(
-      "./scripts/check-expected-version.sh ${nextRelease.version}",
+      "bash ./scripts/check-expected-version.sh ${nextRelease.version}",
     );
 
     const workflow = readFileSync(path.resolve(root, ".github/workflows/release.yml"), "utf8");
     expect(workflow).toContain("EXPECTED_VERSION: ${{ inputs.expected_version }}");
-    expect(workflow).toContain('./scripts/check-expected-version.sh "${version}"');
+    expect(workflow).toContain('bash ./scripts/check-expected-version.sh "${version}"');
   });
 });

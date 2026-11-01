@@ -3,7 +3,7 @@
 # and differs from the computed version. An unset or empty EXPECTED_VERSION
 # skips the check.
 #
-# Usage: EXPECTED_VERSION=1.2.3 ./scripts/check-expected-version.sh <next-version>
+# Usage: EXPECTED_VERSION=1.2.3 bash ./scripts/check-expected-version.sh <next-version>
 
 set -euo pipefail
 
