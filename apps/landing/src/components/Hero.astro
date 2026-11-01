@@ -6,6 +6,7 @@ import CategoryCards from "./CategoryCards.astro";
 import HeroQuickstart from "./HeroQuickstart.astro";
 import HeroSearch from "./HeroSearch.astro";
 import HeroTestimonialStrip from "./HeroTestimonialStrip.astro";
+import MilestoneBanner from "./MilestoneBanner.astro";
 import TrustSignals from "./TrustSignals.astro";
 
 interface Props {
@@ -37,6 +38,8 @@ const trustBadges = [
   </div>
 
   <div class="relative mx-auto max-w-4xl text-center">
+    <MilestoneBanner locale={locale} />
+
     <!-- Enterprise trust badges -->
     <div class="animate-fade-up flex flex-wrap items-center justify-center gap-2">
       {trustBadges.map((badge) => (

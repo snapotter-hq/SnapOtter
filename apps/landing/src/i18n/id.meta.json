@@ -1961,6 +1961,30 @@
     "outputHash": "017c1a098483",
     "stale": false
   },
+  "home.milestone.cta": {
+    "sourceHash": "4145a3ef0619",
+    "provenance": "machine",
+    "outputHash": "8c40839bcb8f",
+    "stale": false
+  },
+  "home.milestone.release": {
+    "sourceHash": "5654e3f7f44c",
+    "provenance": "machine",
+    "outputHash": "e0ad916ce467",
+    "stale": false
+  },
+  "home.milestone.thanksPulls": {
+    "sourceHash": "fac06741c968",
+    "provenance": "machine",
+    "outputHash": "8bd1e42dbe45",
+    "stale": false
+  },
+  "home.milestone.thanksPullsStars": {
+    "sourceHash": "06635e39eec9",
+    "provenance": "machine",
+    "outputHash": "bdd5ae902743",
+    "stale": false
+  },
   "home.openSource.discord": {
     "sourceHash": "62d97f750910",
     "provenance": "machine",

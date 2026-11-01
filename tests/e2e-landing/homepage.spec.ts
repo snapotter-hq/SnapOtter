@@ -40,6 +40,27 @@ test.describe("Landing Homepage", () => {
     ).toBeVisible();
   });
 
+  test("hero renders the milestone banner linking to the v2.3.0 release", async ({ page }) => {
+    const banner = page.locator("[data-milestone-banner]");
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText(/1 million pulls(?: and 3,000 GitHub stars)?\. Thank you\./);
+    await expect(banner).toContainText("SnapOtter v2.3.0 is our thank-you release.");
+    await expect(banner).toHaveAttribute(
+      "href",
+      "https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0",
+    );
+  });
+
+  test("milestone banner fits a phone viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const banner = page.locator("[data-milestone-banner]");
+    await expect(banner).toBeVisible();
+    const box = await banner.boundingBox();
+    if (!box) throw new Error("milestone banner has no bounding box");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
+  });
+
   test("hero renders trust badges", async ({ page }) => {
     for (const badge of ["Self-hosted", "Open source", "Air-gap capable", "Compliance-friendly"]) {
       await expect(page.getByText(badge, { exact: true }).first()).toBeVisible();
