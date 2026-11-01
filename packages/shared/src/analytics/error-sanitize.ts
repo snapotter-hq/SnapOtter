@@ -341,13 +341,13 @@ export function connectivityClass(err: unknown): ConnectivityClass | null {
   }
 }
 
-// pg SQLSTATE classes that mean the deployment's database is misconfigured or
-// resource-starved (the operator's environment), not that our code is wrong:
-// class 28 (invalid authorization), 53 (insufficient resources), 57 (operator
-// intervention). 42501 is insufficient_privilege, the one access code in class
-// 42 (otherwise our query bugs). Connection loss (class 08 / 57P0x) is already
+// pg SQLSTATE classes that point at the deployment's database rather than our
+// code: 28 (invalid authorization), 53 (insufficient resources), 57 (operator
+// intervention) and 58 (system error, e.g. a data file Postgres can't open;
+// #4202). 42501 is insufficient_privilege, the one access code in class 42
+// (otherwise our query bugs). Connection loss (class 08 / 57P0x) is already
 // covered by connectivityClass; overlap here is harmless.
-const ENVIRONMENTAL_PG_CLASS = /^(28|53|57)/;
+const ENVIRONMENTAL_PG_CLASS = /^(28|53|57|58)/;
 
 /**
  * True when the error chain carries a pg SQLSTATE indicating an environmental
