@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter कौन सा अनाम usage data एकत्र करता है, इसे कब भेजा जाता है, और instance-wide product analytics को कैसे बंद करें।"
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: cf0c51fe9a2f
 ---
@@ -25,6 +25,10 @@ Anonymous Product Analytics default रूप से चालू है और 
 - Image metadata (EXIF)
 - Extracted document text
 - आपका IP address या account identity
+
+## अपडेट सूचनाएँ {#update-notices}
+
+जब तक एनालिटिक्स चालू है, सर्वर हर कुछ घंटों में इंस्टेंस की अनाम आईडी और उसके संस्करण के साथ PostHog से पूछता है कि SnapOtter का सबसे नया रिलीज़ कौन-सा है। नया रिलीज़ उपलब्ध होने पर एडमिन को रिलीज़ नोट्स के लिंक के साथ एक सूचना दिखती है। इसे बंद करने पर यह अगले रिलीज़ तक छिपी रहती है। आपकी ओर से कुछ भी इंस्टॉल या डाउनलोड नहीं किया जाता, और एनालिटिक्स बंद होने पर सर्वर कभी नहीं पूछता।
 
 ## Turning it off {#turning-it-off}
 

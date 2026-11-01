@@ -5671,6 +5671,11 @@ export const ja: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} インストール済み",
       bundlesQueued: "{count} 件待機中",
     },
+    updateNotice: {
+      available: "SnapOtter {version} が公開されました。現在のバージョンは {current} です。",
+      whatsNew: "新機能を見る",
+      dismiss: "更新のお知らせを閉じる",
+    },
   },
   a11y: {
     comparisonScroller: "比較スクロール領域",

@@ -1,6 +1,6 @@
 ---
 description: "Welke anonieme gebruiksgegevens SnapOtter verzamelt, wanneer die worden verstuurd, en hoe je instance-brede productanalytics uitschakelt."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: b5dad7c63a7d
 ---
@@ -25,6 +25,10 @@ Anonieme productanalytics staat standaard aan en wordt door een beheerder voor d
 - Afbeeldingsmetadata (EXIF)
 - Geëxtraheerde documenttekst
 - Je IP-adres of accountidentiteit
+
+## Updatemeldingen {#update-notices}
+
+Zolang analyse aan staat, vraagt de server elke paar uur aan PostHog welke SnapOtter-release de nieuwste is, met de anonieme ID van de instantie en de versie ervan. Is er een nieuwere release, dan zien beheerders een melding met een link naar de release notes. Sluit je de melding, dan blijft die verborgen tot de volgende release. Er wordt niets voor je geïnstalleerd of gedownload, en met analyse uit vraagt de server het nooit.
 
 ## Uitschakelen {#turning-it-off}
 

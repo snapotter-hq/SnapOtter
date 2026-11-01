@@ -5741,6 +5741,11 @@ export const ptBR: TranslationKeys = {
       bundlesInstalled: "{completed}/{total} instalados",
       bundlesQueued: "{count} na fila",
     },
+    updateNotice: {
+      available: "O SnapOtter {version} está disponível. Você está na {current}.",
+      whatsNew: "Novidades",
+      dismiss: "Fechar aviso de atualização",
+    },
   },
   a11y: {
     comparisonScroller: "Área de comparação",

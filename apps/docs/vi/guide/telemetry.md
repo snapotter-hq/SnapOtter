@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter thu thập dữ liệu sử dụng ẩn danh nào, khi nào nó được gửi, và cách tắt phân tích sản phẩm trên toàn phiên bản."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: fe718032834f
 ---
@@ -25,6 +25,10 @@ Phân tích Sản phẩm Ẩn danh được bật theo mặc định và đượ
 - Siêu dữ liệu hình ảnh (EXIF)
 - Văn bản tài liệu được trích xuất
 - Địa chỉ IP hoặc danh tính tài khoản của bạn
+
+## Thông báo cập nhật {#update-notices}
+
+Khi phân tích đang bật, máy chủ hỏi PostHog vài giờ một lần xem bản phát hành SnapOtter mới nhất là bản nào, dùng ID ẩn danh của phiên bản cài đặt và phiên bản hiện tại. Khi có bản mới hơn, quản trị viên sẽ thấy thông báo kèm liên kết tới ghi chú phát hành. Nếu bạn đóng thông báo, nó sẽ ẩn cho tới bản phát hành tiếp theo. Không có gì được tự động cài đặt hay tải xuống, và khi phân tích bị tắt, máy chủ không bao giờ hỏi.
 
 ## Cách tắt nó {#turning-it-off}
 

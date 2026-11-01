@@ -1,6 +1,6 @@
 ---
 description: "Jakie anonimowe dane o użyciu zbiera SnapOtter, kiedy są wysyłane i jak wyłączyć analitykę produktową dla całej instancji."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: 5cbde8eb2737
 ---
@@ -25,6 +25,10 @@ Anonimowa analityka produktowa jest domyślnie włączona i ustawiana dla całej
 - Metadanych obrazów (EXIF)
 - Wyodrębnionego tekstu dokumentów
 - Twojego adresu IP ani tożsamości konta
+
+## Powiadomienia o aktualizacjach {#update-notices}
+
+Gdy analityka jest włączona, serwer co kilka godzin pyta PostHog, które wydanie SnapOtter jest najnowsze, przekazując anonimowy identyfikator instancji i jej wersję. Jeśli jest nowsze wydanie, administratorzy widzą powiadomienie z linkiem do informacji o wydaniu. Zamknięte powiadomienie pozostaje ukryte do następnego wydania. Nic nie jest instalowane ani pobierane automatycznie, a przy wyłączonej analityce serwer nigdy nie pyta.
 
 ## Wyłączanie {#turning-it-off}
 

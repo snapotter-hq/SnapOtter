@@ -1,6 +1,6 @@
 ---
 description: "Welche anonymen Nutzungsdaten SnapOtter erfasst, wann sie gesendet werden und wie Sie instanzweite Produktanalysen deaktivieren."
-i18n_source_hash: 4f5f7e96309e
+i18n_source_hash: 875ed3efcabd
 i18n_provenance: human
 i18n_output_hash: 80f93f5f790f
 ---
@@ -25,6 +25,10 @@ Anonyme Produktanalysen sind standardmäßig aktiviert und werden von einem Admi
 - Bildmetadaten (EXIF)
 - Extrahierten Dokumenttext
 - Ihre IP-Adresse oder Kontoidentität
+
+## Update-Hinweise {#update-notices}
+
+Solange die Analyse aktiviert ist, fragt der Server alle paar Stunden bei PostHog nach, welche SnapOtter-Version die neueste ist, und nutzt dafür die anonyme ID der Instanz und ihre Version. Gibt es eine neuere Version, sehen Administratoren einen Hinweis mit einem Link zu den Versionshinweisen. Wenn Sie ihn schließen, bleibt er bis zur nächsten Version ausgeblendet. Es wird nichts für Sie installiert oder heruntergeladen, und bei deaktivierter Analyse fragt der Server nie nach.
 
 ## Deaktivieren {#turning-it-off}
 

@@ -23,6 +23,10 @@ Anonymous Product Analytics is on by default and set for the whole instance by a
 - Extracted document text
 - Your IP address or account identity
 
+## Update notices {#update-notices}
+
+While analytics is on, the server asks PostHog every few hours which SnapOtter release is newest, using the instance's anonymous id and its version. When a newer release exists, admins see a notice with a link to the release notes. Dismiss it and it stays hidden until the next release. Nothing is installed or downloaded for you, and with analytics off the server never asks.
+
 ## Turning it off {#turning-it-off}
 
 Admins: Settings > System > Privacy, flip "Anonymous Product Analytics" off. It stops immediately, instance-wide. To build an image that can never emit, set the `SNAPOTTER_ANALYTICS=off` build arg.

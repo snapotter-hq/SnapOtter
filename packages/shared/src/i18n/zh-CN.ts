@@ -5396,6 +5396,11 @@ export const zhCN: TranslationKeys = {
       bundlesInstalled: "已安装 {completed}/{total}",
       bundlesQueued: "{count} 个排队中",
     },
+    updateNotice: {
+      available: "SnapOtter {version} 已发布。你当前使用的是 {current}。",
+      whatsNew: "查看新功能",
+      dismiss: "关闭更新提示",
+    },
   },
   a11y: {
     comparisonScroller: "对比滚动区域",

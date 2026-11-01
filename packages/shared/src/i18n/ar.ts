@@ -5666,6 +5666,11 @@ export const ar: TranslationKeys = {
       bundlesInstalled: "تم تثبيت {completed}/{total}",
       bundlesQueued: "{count} في الانتظار",
     },
+    updateNotice: {
+      available: "يتوفر SnapOtter {version}. أنت تستخدم الإصدار {current}.",
+      whatsNew: "ما الجديد",
+      dismiss: "إغلاق إشعار التحديث",
+    },
   },
   a11y: {
     comparisonScroller: "عارض المقارنة",

@@ -121,6 +121,26 @@ export async function trackEvent(
   }
 }
 
+/**
+ * Read a PostHog feature flag's payload for this instance. Null when analytics
+ * is off (no request is made) or the lookup fails. `$feature_flag_called`
+ * events are not sent: the read is not product usage.
+ */
+export async function getFlagPayload(key: string): Promise<unknown> {
+  try {
+    if (!analyticsEnabled() || !posthogClient) return null;
+    const payload = await posthogClient.getFeatureFlagPayload(
+      key,
+      await getInstanceId(),
+      undefined,
+      { personProperties: { app_version: APP_VERSION }, sendFeatureFlagEvents: false },
+    );
+    return payload ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function cleanFeedbackProperties(properties: FeedbackEventProperties): Record<string, unknown> {
   const out: Record<string, unknown> = {
     feedback_version: 1,

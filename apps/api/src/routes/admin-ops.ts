@@ -9,12 +9,14 @@
  * GET  /api/v1/admin/usage            -- local usage dashboard data
  * POST /api/v1/admin/backup-status    -- record backup completion
  * GET  /api/v1/admin/backup-status    -- read last backup info + staleness
+ * GET  /api/v1/admin/latest-release   -- newer SnapOtter release, if any
  */
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { formatZodErrors } from "../lib/errors.js";
+import { getNewerRelease } from "../lib/latest-release.js";
 import { logger } from "../lib/logger.js";
 import { metricsText } from "../lib/metrics.js";
 import { upsertSetting } from "../lib/settings-helpers.js";
@@ -47,6 +49,14 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
     }
     app.log.level = parsed.data.level;
     return { level: app.log.level };
+  });
+
+  // GET /api/v1/admin/latest-release -- drives the admin update notice.
+  // Answers { latest: null } when analytics is off or nothing newer exists.
+  app.get("/api/v1/admin/latest-release", async (request: FastifyRequest, reply: FastifyReply) => {
+    const admin = await requirePermission("settings:write")(request, reply);
+    if (!admin) return;
+    return { latest: await getNewerRelease() };
   });
 
   // GET /api/v1/metrics -- Prometheus scrape endpoint

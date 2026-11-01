@@ -5622,6 +5622,11 @@ export const th: TranslationKeys = {
       bundlesInstalled: "ติดตั้งแล้ว {completed}/{total}",
       bundlesQueued: "อยู่ในคิว {count}",
     },
+    updateNotice: {
+      available: "SnapOtter {version} พร้อมให้ใช้งานแล้ว คุณกำลังใช้ {current}",
+      whatsNew: "มีอะไรใหม่",
+      dismiss: "ปิดการแจ้งเตือนอัปเดต",
+    },
   },
   a11y: {
     comparisonScroller: "พื้นที่เปรียบเทียบ",
