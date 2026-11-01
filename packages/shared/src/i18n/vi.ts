@@ -190,7 +190,7 @@ export const vi: TranslationKeys = {
     utilities: "Tiện ích",
     optimization: "Tối ưu hóa",
     format: "Định dạng & Chuyển đổi",
-    "video-edit": "Video",
+    "video-edit": "Chỉnh sửa",
     "video-convert": "Chuyển đổi",
     "video-effects": "Hiệu ứng & Ghép",
     "video-subtitles": "Phụ đề",
@@ -829,7 +829,7 @@ export const vi: TranslationKeys = {
     },
     "sprite-sheet": {
       name: "Bảng Sprite",
-      description: "Ghép nhiều hình ảnh thành một lưới sprite sheet",
+      description: "Ghép nhiều hình ảnh thành một lưới sprite",
     },
     "svg-to-raster": {
       name: "SVG sang ảnh raster",
@@ -3142,9 +3142,9 @@ export const vi: TranslationKeys = {
       columns: "Số cột",
       padding: "Khoảng đệm",
       background: "Màu nền",
-      submit: "Tạo Sprite Sheet",
-      submitBatch: "Tạo Sprite Sheet",
-      progressLabel: "Đang tạo sprite sheet",
+      submit: "Tạo Bảng Sprite",
+      submitBatch: "Tạo Bảng Sprite",
+      progressLabel: "Đang tạo bảng sprite",
     },
     "svg-to-raster": {
       scaleFactor: "Hệ số phóng đại",
@@ -5705,7 +5705,7 @@ export const vi: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Vùng so sánh",
     sponsorLink: "Ủng hộ SnapOtter trên GitHub Sponsors",
     skipToContent: "Chuyển đến nội dung chính",
     openSidebar: "Mở thanh bên",

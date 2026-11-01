@@ -185,7 +185,7 @@ export const zhTW: TranslationKeys = {
     utilities: "實用工具",
     optimization: "最佳化",
     format: "格式與轉換",
-    "video-edit": "Video",
+    "video-edit": "編輯",
     "video-convert": "轉換",
     "video-effects": "特效與合成",
     "video-subtitles": "字幕",
@@ -5400,7 +5400,7 @@ export const zhTW: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "對比捲動區域",
     sponsorLink: "在 GitHub Sponsors 上支持 SnapOtter",
     skipToContent: "跳至主要內容",
     openSidebar: "開啟側邊欄",

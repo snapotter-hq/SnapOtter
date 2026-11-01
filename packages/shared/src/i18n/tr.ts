@@ -188,7 +188,7 @@ export const tr: TranslationKeys = {
     utilities: "Yardımcı Araçlar",
     optimization: "Optimizasyon",
     format: "Biçim ve Dönüştürme",
-    "video-edit": "Video",
+    "video-edit": "Düzenleme",
     "video-convert": "Dönüştürme",
     "video-effects": "Efektler ve Birleştirme",
     "video-subtitles": "Altyazı",
@@ -5730,7 +5730,7 @@ export const tr: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Karşılaştırma alanı",
     sponsorLink: "SnapOtter'ı GitHub Sponsors'ta destekleyin",
     skipToContent: "Ana içeriğe geç",
     openSidebar: "Kenar çubuğunu aç",

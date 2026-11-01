@@ -189,7 +189,7 @@ export const sv: TranslationKeys = {
     utilities: "Verktyg",
     optimization: "Optimering",
     format: "Format & Konvertering",
-    "video-edit": "Video",
+    "video-edit": "Redigera",
     "video-convert": "Konvertera",
     "video-effects": "Effekter & Komposition",
     "video-subtitles": "Undertexter",
@@ -1101,7 +1101,7 @@ export const sv: TranslationKeys = {
       description: "Ordna om sidor med en angiven sidordning",
     },
     "multi-tool-pdf": {
-      name: "PDF Multi-Tool",
+      name: "PDF-multiverktyg",
       description:
         "Ordna om, rotera och ta bort sidor och hämta sidor från andra PDF:er i en och samma editor",
     },
@@ -5718,7 +5718,7 @@ export const sv: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Jämförelseområde",
     sponsorLink: "Stöd SnapOtter på GitHub Sponsors",
     skipToContent: "Hoppa till huvudinnehåll",
     openSidebar: "Öppna sidopanel",

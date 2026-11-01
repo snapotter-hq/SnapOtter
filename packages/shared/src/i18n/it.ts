@@ -189,7 +189,7 @@ export const it: TranslationKeys = {
     utilities: "Utilità",
     optimization: "Ottimizzazione",
     format: "Formato e conversione",
-    "video-edit": "Video",
+    "video-edit": "Modifica",
     "video-convert": "Converti",
     "video-effects": "Effetti e Composizione",
     "video-subtitles": "Sottotitoli",
@@ -830,7 +830,7 @@ export const it: TranslationKeys = {
     },
     "sprite-sheet": {
       name: "Foglio Sprite",
-      description: "Combina più immagini in un'unica griglia di sprite sheet",
+      description: "Combina più immagini in un'unica griglia di sprite",
     },
     "svg-to-raster": {
       name: "SVG a raster",
@@ -1107,7 +1107,7 @@ export const it: TranslationKeys = {
       description: "Riordina le pagine con un ordine esplicito",
     },
     "multi-tool-pdf": {
-      name: "PDF Multi-Tool",
+      name: "Strumento multifunzione PDF",
       description:
         "Riordina, ruota, elimina pagine e prendi pagine da altri PDF in un unico editor",
     },
@@ -5745,7 +5745,7 @@ export const it: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Area di confronto",
     sponsorLink: "Sostieni SnapOtter su GitHub Sponsors",
     skipToContent: "Vai al contenuto principale",
     openSidebar: "Apri barra laterale",

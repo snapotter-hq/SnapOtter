@@ -187,7 +187,7 @@ export const pl: TranslationKeys = {
     utilities: "Narzędzia",
     optimization: "Optymalizacja",
     format: "Format i konwersja",
-    "video-edit": "Video",
+    "video-edit": "Edycja",
     "video-convert": "Konwersja",
     "video-effects": "Efekty i montaż",
     "video-subtitles": "Napisy",
@@ -826,8 +826,8 @@ export const pl: TranslationKeys = {
       description: "Wygeneruj miniaturowy obraz zastępczy niskiej jakości z URI danych base64",
     },
     "sprite-sheet": {
-      name: "Sprite Sheet",
-      description: "Połącz wiele obrazów w jedną siatkę sprite sheet",
+      name: "Arkusz sprite'ów",
+      description: "Połącz wiele obrazów w jedną siatkę sprite'ów",
     },
     "svg-to-raster": {
       name: "SVG do rastra",
@@ -1104,7 +1104,7 @@ export const pl: TranslationKeys = {
       description: "Uporządkuj strony w podanej kolejności",
     },
     "multi-tool-pdf": {
-      name: "PDF Multi-Tool",
+      name: "Narzędzie wielofunkcyjne PDF",
       description:
         "Zmieniaj kolejność, obracaj i usuwaj strony oraz przenoś strony z innych PDF-ów w jednym edytorze",
     },
@@ -3154,9 +3154,9 @@ export const pl: TranslationKeys = {
       columns: "Kolumny",
       padding: "Odstęp",
       background: "Kolor tła",
-      submit: "Utwórz sprite sheet",
-      submitBatch: "Utwórz sprite sheet",
-      progressLabel: "Tworzenie sprite sheet",
+      submit: "Utwórz arkusz sprite'ów",
+      submitBatch: "Utwórz arkusz sprite'ów",
+      progressLabel: "Tworzenie arkusza sprite'ów",
     },
     "svg-to-raster": {
       scaleFactor: "Współczynnik skali",
@@ -5746,7 +5746,7 @@ export const pl: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Obszar porównania",
     sponsorLink: "Wesprzyj SnapOtter na GitHub Sponsors",
     skipToContent: "Przejdź do treści",
     openSidebar: "Otwórz panel boczny",

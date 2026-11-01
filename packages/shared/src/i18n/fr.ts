@@ -190,7 +190,7 @@ export const fr: TranslationKeys = {
     utilities: "Utilitaires",
     optimization: "Optimisation",
     format: "Format et conversion",
-    "video-edit": "Vidéo",
+    "video-edit": "Éditer",
     "video-convert": "Convertir",
     "video-effects": "Effets & composition",
     "video-subtitles": "Sous-titres",
@@ -1110,7 +1110,7 @@ export const fr: TranslationKeys = {
       description: "Réordonnez les pages selon un ordre explicite",
     },
     "multi-tool-pdf": {
-      name: "PDF Multi-Tool",
+      name: "Outil multifonction PDF",
       description:
         "Réordonnez, pivotez, supprimez des pages et reprenez des pages d'autres PDF dans un seul éditeur",
     },
@@ -5763,7 +5763,7 @@ export const fr: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Zone de comparaison",
     sponsorLink: "Soutenir SnapOtter sur GitHub Sponsors",
     skipToContent: "Aller au contenu principal",
     openSidebar: "Ouvrir le panneau latéral",
