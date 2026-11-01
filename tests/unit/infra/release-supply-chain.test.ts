@@ -201,6 +201,24 @@ describe("release supply-chain closure", () => {
     expect(aliases).toContain("needs: [release, manifest, image-provenance, release-subjects]");
   });
 
+  it("attaches the Compose files from the release commit before binding subjects", () => {
+    const workflow = readRequired(releaseWorkflowPath);
+    const releaseSubjects = job(workflow, "release-subjects", "aliases");
+
+    expect(releaseSubjects).toContain(
+      "for compose_file in docker/docker-compose.yml docker/docker-compose-gpu.yml; do",
+    );
+    expect(releaseSubjects).toContain(
+      'expected_assets.update({"docker-compose.yml", "docker-compose-gpu.yml"})',
+    );
+    const upload = releaseSubjects.indexOf("Publish release Compose files");
+    const build = releaseSubjects.indexOf("Build canonical release-subject manifest");
+    expect(upload).toBeGreaterThan(
+      releaseSubjects.indexOf("Check out the immutable release commit"),
+    );
+    expect(build).toBeGreaterThan(upload);
+  });
+
   it("never overwrites an existing immutable release asset", () => {
     const workflow = readRequired(releaseWorkflowPath);
     const archiveSecurity = job(workflow, "archive-security", "docker");
