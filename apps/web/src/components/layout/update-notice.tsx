@@ -48,7 +48,7 @@ export function UpdateNotice() {
           href={release.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-medium text-primary underline-offset-2 hover:underline"
+          className="font-medium text-primary-ink underline-offset-2 hover:underline"
         >
           {t.appLayout.updateNotice.whatsNew}
         </a>
