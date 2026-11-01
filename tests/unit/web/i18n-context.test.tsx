@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { en, SafeError } from "@snapotter/shared";
+import { ar } from "@snapotter/shared/i18n/ar.js";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider, loadLocale, localeLoaders, useTranslation } from "@/contexts/i18n-context";
@@ -16,6 +17,25 @@ vi.mock("@/lib/analytics", () => ({
 // Locale chunks load asynchronously, and a loaded CI runner can take longer than
 // waitFor's 1 s default to resolve one (#4117).
 const CHUNK_TIMEOUT = { timeout: 5_000 };
+
+const originalArLoader = localeLoaders.ar;
+
+// The rtl tests wait on the Arabic chunk. A real dynamic import can be slow or
+// fail on CI, and a failed import falls back to English and stays ltr (#4246),
+// so these tests hand out the catalog themselves.
+function deferArabicChunk(): () => Promise<void> {
+  let resolveChunk!: () => void;
+  const chunk = new Promise<void>((resolve) => {
+    resolveChunk = resolve;
+  });
+  localeLoaders.ar = () => chunk.then(() => ({ ar }));
+  return async () => {
+    await act(async () => {
+      resolveChunk();
+      await chunk;
+    });
+  };
+}
 
 const storageMap = new Map<string, string>();
 const localStorageMock = {
@@ -63,12 +83,14 @@ beforeEach(() => {
     }),
   );
   setSentryTag.mockClear();
+  captureHandledError.mockClear();
   localStorageMock.getItem.mockClear();
   localStorageMock.setItem.mockClear();
 });
 
 afterEach(() => {
   cleanup();
+  localeLoaders.ar = originalArLoader;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -156,6 +178,7 @@ describe("I18nProvider locale validation (#3952)", () => {
     unmount();
 
     storageMap.set("snapotter-locale", "ar-SA");
+    const loadArabicChunk = deferArabicChunk();
     await act(async () => {
       render(
         <I18nProvider>
@@ -167,7 +190,9 @@ describe("I18nProvider locale validation (#3952)", () => {
     expect(screen.getByTestId("locale").textContent).toBe("ar");
     // Direction follows the loaded catalog (#4031), so rtl arrives with the
     // Arabic chunk rather than with the requested locale.
-    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"), CHUNK_TIMEOUT);
+    await loadArabicChunk();
+    expect(captureHandledError).not.toHaveBeenCalled();
+    expect(screen.getByTestId("dir").textContent).toBe("rtl");
   });
 
   it("fetches instance default when localStorage holds an unsupported code and validates defaultLocale", async () => {
@@ -376,21 +401,25 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
   });
 
   it("keeps rtl and lang=ar when the Arabic chunk loads", async () => {
-    const originalLoader = localeLoaders.ar;
-    localeLoaders.ar = () =>
-      new Promise((resolve) => setTimeout(() => resolve(originalLoader()), 1500));
+    const loadArabicChunk = deferArabicChunk();
     storageMap.set("snapotter-locale", "ar");
 
-    render(
-      <I18nProvider>
-        <LocaleProbe />
-      </I18nProvider>,
-    );
+    await act(async () => {
+      render(
+        <I18nProvider>
+          <LocaleProbe />
+        </I18nProvider>,
+      );
+    });
 
-    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"), CHUNK_TIMEOUT);
+    // Until the chunk lands, English renders, so the document stays ltr.
+    expect(screen.getByTestId("dir").textContent).toBe("ltr");
+
+    await loadArabicChunk();
+    expect(captureHandledError).not.toHaveBeenCalled();
+    expect(screen.getByTestId("dir").textContent).toBe("rtl");
     expect(document.documentElement.dir).toBe("rtl");
     expect(document.documentElement.lang).toBe("ar");
-    localeLoaders.ar = originalLoader;
   });
 });
 
