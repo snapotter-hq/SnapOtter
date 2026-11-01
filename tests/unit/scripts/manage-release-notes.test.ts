@@ -67,6 +67,25 @@ test("recovers generated release notes from the committed changelog", async () =
   }
 });
 
+test("recovers conventionalcommits notes that use second-level version headings", async () => {
+  const { materializeReleaseNotes } = await import(pathToFileURL(scriptPath).href);
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "snapotter-release-notes-"));
+  const expected =
+    "## [3.0.0](https://example.test/v3.0.0)\n\n### ⚠ BREAKING CHANGES\n\n* dropped the legacy API\n";
+
+  try {
+    writeFileSync(
+      path.join(fixtureRoot, "CHANGELOG.md"),
+      `${expected}\n# [2.9.0](https://example.test/v2.9.0)\n\nOlder notes.\n`,
+    );
+    const output = path.join(fixtureRoot, "materialized.md");
+    expect(materializeReleaseNotes(fixtureRoot, "3.0.0", output)).toBe(false);
+    expect(readFileSync(output, "utf8")).toBe(expected);
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true });
+  }
+});
+
 test("inserts an exact custom-note entry after the published changelog heading once", async () => {
   expect(existsSync(scriptPath), "release-note manager is missing").toBe(true);
   const releaseNotes = await import(pathToFileURL(scriptPath).href);

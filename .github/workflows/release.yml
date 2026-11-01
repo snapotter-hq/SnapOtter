@@ -2,6 +2,12 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_version:
+        description: "Optional. Fail before tagging if semantic-release computes another version (for example 3.0.0)."
+        required: false
+        default: ""
+        type: string
 
 permissions: {}
 
@@ -64,10 +70,13 @@ jobs:
           # back to the default token if the secret is unset, so behaviour is
           # unchanged until the secret exists.
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: npx semantic-release
 
       - name: Check for new release
         id: check
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: |
           if [ -f .release-version ]; then
             version="$(cat .release-version)"
@@ -88,6 +97,7 @@ jobs:
             echo "::error::semantic-release produced an invalid version"
             exit 1
           }
+          ./scripts/check-expected-version.sh "${version}"
           git fetch --force --no-tags origin \
             "refs/tags/v${version}:refs/tags/v${version}"
           release_commit="$(git rev-parse "refs/tags/v${version}^{commit}")"

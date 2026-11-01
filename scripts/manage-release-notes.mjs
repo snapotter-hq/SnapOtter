@@ -48,11 +48,11 @@ export function materializeReleaseNotes(root, version, output) {
 
   const changelog = readFileSync(path.join(root, "CHANGELOG.md"), "utf8");
   const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const heading = new RegExp(`^# \\[${escapedVersion}\\](?:\\(|\\s|$)`, "m");
+  const heading = new RegExp(`^##? \\[${escapedVersion}\\](?:\\(|\\s|$)`, "m");
   const match = heading.exec(changelog);
   if (!match) throw new Error(`CHANGELOG.md has no generated notes for v${version}`);
   const tail = changelog.slice(match.index);
-  const nextHeading = /\n# \[[0-9]/.exec(tail);
+  const nextHeading = /\n##? \[[0-9]/.exec(tail);
   const notes = tail.slice(0, nextHeading?.index ?? tail.length).trimEnd();
   writeFileSync(output, `${notes}\n`);
   return false;
