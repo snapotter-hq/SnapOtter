@@ -76,10 +76,13 @@ export function failedRead(results: readonly { isValid: boolean; error: string }
  * - a WebAssembly RuntimeError: it couldn't instantiate (the glue wraps every
  *   instantiate error this way) or it trapped mid-read, after which the
  *   instance can't be trusted (#1402);
- * - no room in its heap for the image, which zxing throws as a plain Error;
+ * - no room in its heap for the image or its grayscale copy, which zxing
+ *   throws as a plain Error;
  * - no room mid-read (DecoderOutOfMemory, from failedRead) (#1425);
- * - no room in Node for zxing's grayscale copy of the image, made in JS
- *   before the wasm call: V8's "Array buffer allocation failed" (#1469).
+ * - no room in Node for a buffer outside the wasm call: V8's "Array buffer
+ *   allocation failed" (#1469). zxing-wasm 3.1.6 moved its grayscale copy
+ *   into the wasm heap, so this branch now only guards the route's own
+ *   Node buffers.
  *
  * sharp running out of memory earlier in the route isn't here because it
  * can't be: libvips crashes the process (a segfault under `ulimit -v`, an
@@ -390,9 +393,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
         // so hand it the binary again: new overrides drop the cached instance
         // and the next request starts a fresh one with a fresh heap (#1402).
         if (isDecoderFault(err)) {
-          // Node failing to allocate zxing's grayscale copy happens before the
-          // wasm call, so the decoder is fine; reloading it would only add
-          // work while memory is short (#1469).
+          // Node failing to allocate a buffer happens outside the wasm call,
+          // so the decoder is fine; reloading it would only add work while
+          // memory is short (#1469).
           const reload = !(err instanceof RangeError);
           // The size tells memory pressure (retry works) from an image too
           // big for this server (it never will). It's set once the image is

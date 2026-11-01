@@ -1228,23 +1228,20 @@ describe("Barcode Read server-side failures", () => {
     expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
   });
 
-  it("answers 503 when Node can't allocate the decoder's copy of the image", async () => {
-    // Before handing the image to wasm, zxing copies it into a one-byte
-    // grayscale Uint8Array in JS. Under memory pressure V8 throws
-    // "Array buffer allocation failed" there; before #1469 that was a 422.
+  it("answers 503 when the decoder can't allocate its copy of the image", async () => {
+    // zxing copies the image into a one-byte grayscale buffer that it mallocs
+    // in the wasm heap, and throws "Failed to allocate" when malloc returns 0.
     // Fail exactly that allocation (400x400 = 160000 bytes) and nothing else.
-    const RealUint8Array = globalThis.Uint8Array;
-    globalThis.Uint8Array = new Proxy(RealUint8Array, {
-      construct(target, args, newTarget) {
-        if (args[0] === 400 * 400) throw new RangeError("Array buffer allocation failed");
-        return Reflect.construct(target, args, newTarget);
-      },
-    });
+    const { getZXingModule } = await zxing();
+    await readQr(); // make sure the decoder is instantiated
+    const heap = await getZXingModule();
+    const malloc = heap._malloc;
+    heap._malloc = (size: number) => (size === 400 * 400 ? 0 : malloc(size));
     let res: Awaited<ReturnType<typeof readQr>>;
     try {
       res = await readQr();
     } finally {
-      globalThis.Uint8Array = RealUint8Array;
+      heap._malloc = malloc;
     }
     expect(res.statusCode).toBe(503);
     expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
