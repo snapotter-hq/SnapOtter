@@ -4,14 +4,16 @@ SnapOtter ships a multi-arch container image to Docker Hub (`snapotter/snapotter
 
 ## How the pipeline is wired
 
-`.github/workflows/release.yml` runs on `workflow_dispatch` only. Nothing publishes when a PR merges to `main`. One dispatch runs these jobs in order:
+`.github/workflows/release.yml` runs on `workflow_dispatch` only. Nothing publishes when a PR merges to `main`. One dispatch runs these jobs:
 
-1. `release`: semantic-release computes the next version from the Conventional Commits since the last tag, tags it, and creates the GitHub release with notes.
-2. `prebuilt`: builds the source archives (amd64, arm64) and attaches them to the GitHub release.
+1. `release`: semantic-release computes the next version from the Conventional Commits since the last tag, runs `scripts/sync-version.sh` (workspace versions, `APP_VERSION`, version-pinned docs references, docs changelog), tags it, and creates a **draft** GitHub release with the committed notes.
+2. `prebuilt` and `archive-security`: build the source archives (amd64, arm64), then verify, scan, and attest them before they are attached to the release.
 3. `docker`: builds both arches and pushes them to Docker Hub + GHCR **by digest only**. These pushes are unnamed and are not pullable by any tag.
-4. `scan`: Trivy scans the built image and fails the run on unignored CRITICAL/HIGH vulnerabilities.
-5. `sbom`: generates CycloneDX + SPDX SBOMs and attaches them to the GitHub release.
-6. `manifest`: **gated.** Creates the public `latest`, `vX.Y.Z`, `X.Y`, and `X` tags on both registries. This is the moment the image becomes pullable by tag.
+4. `scan` and `sbom`: Trivy scans the built image and fails the run on unignored CRITICAL/HIGH vulnerabilities; CycloneDX + SPDX SBOMs are attached to the release.
+5. `ai-bundles`: builds, verifies, signs, and uploads the AI feature bundles to HuggingFace. No approval gate.
+6. `manifest`: **gated.** Creates the public `latest`, `X.Y.Z`, `X.Y`, and `X` image tags (no `v` prefix; the git tag and GitHub release are `vX.Y.Z`) on both registries. This is the moment the image becomes pullable by tag.
+7. `image-provenance`, `release-subjects`, `aliases`: attest the immutable image manifest, bind the release commit to the published subjects, and advance the non-regressing aliases.
+8. `publish-release`: flips the GitHub release from draft to public. This is also what triggers the Discord `#announcements` post (a GitHub webhook on `release` events).
 
 The `manifest` job targets the `publish-images` GitHub Environment, which requires a maintainer to approve the run before it proceeds. If Trivy fails at step 4, `manifest` never runs and no tags are published.
 
@@ -82,10 +84,14 @@ To abort, **Reject** the deployment instead. The version tag and the GitHub rele
 - [ ] Confirm the tags resolve:
       ```bash
       docker pull snapotter/snapotter:latest
-      docker pull ghcr.io/snapotter-hq/snapotter:vX.Y.Z
+      docker pull ghcr.io/snapotter-hq/snapotter:X.Y.Z
       ```
-- [ ] Optional: attest provenance by dispatching **Attest Provenance** (`attest.yml`) with the image digest.
-- [ ] The Docker Hub description syncs from `DOCKERHUB.md` through its own workflow. No action needed unless you changed it.
+- [ ] Provenance is attested by the `image-provenance` job; there is no separate attestation workflow. Spot-check it:
+      ```bash
+      gh attestation verify oci://ghcr.io/snapotter-hq/snapotter:X.Y.Z --repo snapotter-hq/SnapOtter
+      ```
+- [ ] A `[GitHub]` release post appears in Discord `#announcements` within about a minute of the release going public.
+- [ ] Update the release banner and tag table in `DOCKERHUB.md` and open a PR. The Docker Hub description syncs from it through its own workflow once merged. Do this after the tags are live, not before, because the banner says what `latest` points at.
 
 ## Notes
 
