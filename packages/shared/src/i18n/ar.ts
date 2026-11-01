@@ -186,7 +186,7 @@ export const ar: TranslationKeys = {
     utilities: "الأدوات المساعدة",
     optimization: "التحسين",
     format: "التنسيق والتحويل",
-    "video-edit": "Video",
+    "video-edit": "تحرير",
     "video-convert": "تحويل",
     "video-effects": "تأثيرات ودمج",
     "video-subtitles": "ترجمات",
@@ -5668,7 +5668,7 @@ export const ar: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "عارض المقارنة",
     sponsorLink: "ادعم SnapOtter على GitHub Sponsors",
     skipToContent: "تخطي إلى المحتوى الرئيسي",
     openSidebar: "فتح الشريط الجانبي",

@@ -188,7 +188,7 @@ export const ru: TranslationKeys = {
     utilities: "Утилиты",
     optimization: "Оптимизация",
     format: "Формат и конвертация",
-    "video-edit": "Video",
+    "video-edit": "Редактирование",
     "video-convert": "Конвертация",
     "video-effects": "Эффекты и компоновка",
     "video-subtitles": "Субтитры",
@@ -5735,7 +5735,7 @@ export const ru: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Область сравнения",
     sponsorLink: "Поддержать SnapOtter на GitHub Sponsors",
     skipToContent: "Перейти к основному содержимому",
     openSidebar: "Открыть боковую панель",

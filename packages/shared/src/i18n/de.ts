@@ -190,7 +190,7 @@ export const de: TranslationKeys = {
     utilities: "Hilfswerkzeuge",
     optimization: "Optimierung",
     format: "Format & Konvertierung",
-    "video-edit": "Video",
+    "video-edit": "Bearbeiten",
     "video-convert": "Konvertieren",
     "video-effects": "Effekte & Zusammensetzen",
     "video-subtitles": "Untertitel",
@@ -5782,7 +5782,7 @@ export const de: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "Vergleichsansicht",
     sponsorLink: "SnapOtter auf GitHub Sponsors unterstützen",
     skipToContent: "Zum Hauptinhalt springen",
     openSidebar: "Seitenleiste öffnen",

@@ -184,7 +184,7 @@ export const zhCN: TranslationKeys = {
     utilities: "实用工具",
     optimization: "优化",
     format: "格式与转换",
-    "video-edit": "Video",
+    "video-edit": "编辑",
     "video-convert": "转换",
     "video-effects": "特效与合成",
     "video-subtitles": "字幕",
@@ -5398,7 +5398,7 @@ export const zhCN: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "对比滚动区域",
     sponsorLink: "在 GitHub Sponsors 上支持 SnapOtter",
     skipToContent: "跳到主要内容",
     openSidebar: "打开侧边栏",

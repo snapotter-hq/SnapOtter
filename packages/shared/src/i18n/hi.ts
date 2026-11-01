@@ -186,7 +186,7 @@ export const hi: TranslationKeys = {
     utilities: "सहायक टूल्स",
     optimization: "ऑप्टिमाइज़ेशन",
     format: "फॉर्मेट और कन्वर्शन",
-    "video-edit": "Video",
+    "video-edit": "एडिट",
     "video-convert": "कन्वर्ट",
     "video-effects": "इफ़ेक्ट्स और कम्पोज़",
     "video-subtitles": "सबटाइटल",
@@ -5496,7 +5496,7 @@ export const hi: TranslationKeys = {
     },
   },
   a11y: {
-    comparisonScroller: "Comparison scroller",
+    comparisonScroller: "तुलना क्षेत्र",
     sponsorLink: "GitHub Sponsors पर SnapOtter का समर्थन करें",
     skipToContent: "मुख्य सामग्री पर जाएं",
     openSidebar: "साइडबार खोलें",
