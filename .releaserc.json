@@ -1,8 +1,18 @@
 {
   "branches": ["main"],
   "plugins": [
-    "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits"
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits"
+      }
+    ],
     [
       "@semantic-release/changelog",
       {
@@ -18,6 +28,7 @@
     [
       "@semantic-release/exec",
       {
+        "verifyReleaseCmd": "bash ./scripts/check-expected-version.sh ${nextRelease.version}",
         "prepareCmd": "./scripts/sync-version.sh ${nextRelease.version}",
         "publishCmd": "echo '${nextRelease.version}' > .release-version"
       }

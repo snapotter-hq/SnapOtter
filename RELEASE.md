@@ -6,7 +6,7 @@ SnapOtter ships a multi-arch container image to Docker Hub (`snapotter/snapotter
 
 `.github/workflows/release.yml` runs on `workflow_dispatch` only. Nothing publishes when a PR merges to `main`. One dispatch runs these jobs:
 
-1. `release`: semantic-release computes the next version from the Conventional Commits since the last tag, runs `scripts/sync-version.sh` (workspace versions, `APP_VERSION`, version-pinned docs references, docs changelog), tags it, and creates a **draft** GitHub release with the committed notes.
+1. `release`: semantic-release computes the next version from the Conventional Commits since the last tag (`conventionalcommits` preset: `feat!:`, `fix!:`, or a `BREAKING CHANGE:` footer gives a major bump), runs `scripts/sync-version.sh` (workspace versions, `APP_VERSION`, version-pinned docs references, docs changelog), tags it, and creates a **draft** GitHub release with the committed notes.
 2. `prebuilt` and `archive-security`: build the source archives (amd64, arm64), then verify, scan, and attest them before they are attached to the release.
 3. `docker`: builds both arches and pushes them to Docker Hub + GHCR **by digest only**. These pushes are unnamed and are not pullable by any tag.
 4. `scan` and `sbom`: Trivy scans the built image and fails the run on unignored CRITICAL/HIGH vulnerabilities; CycloneDX + SPDX SBOMs are attached to the release.
@@ -54,11 +54,11 @@ If `RELEASE_TOKEN` is missing, the workflow falls back to the default token, the
 
 1. Make sure `main` is green and everything you want in the release is merged.
 2. Optional: to override the auto-generated release notes, add a `.release-notes.md` on `main`. If present, it replaces the GitHub release body and seeds the docs changelog.
-3. Dispatch the workflow:
+3. Dispatch the workflow. Set `expected_version` to the version you intend to ship. If semantic-release computes another version, the `release` job fails before it creates a tag or a draft release:
    ```bash
-   gh workflow run release.yml --repo snapotter-hq/SnapOtter
+   gh workflow run release.yml --repo snapotter-hq/SnapOtter -f expected_version=X.Y.Z
    ```
-   Or from the Actions tab: **Release → Run workflow**.
+   Or from the Actions tab: **Release → Run workflow**. Leave `expected_version` empty to skip the check.
 4. Watch the run. Jobs `release` through `sbom` run without intervention.
 
 ## Approve the publish
