@@ -2,6 +2,7 @@ import {
   connectivityClass,
   extractErrorCode,
   isClientAbort,
+  isEnvironmentalDbError,
   rebuildErrorValue,
   SafeError,
 } from "@snapotter/shared";
@@ -535,6 +536,25 @@ describe("connectivityClass", () => {
     expect(
       connectivityClass(Object.assign(new Error("ERR unknown command"), { name: "ReplyError" })),
     ).toBeNull();
+  });
+});
+
+describe("isEnvironmentalDbError", () => {
+  const drizzleWrap = (code: string) =>
+    Object.assign(new Error("Failed query"), {
+      name: "DrizzleQueryError",
+      cause: Object.assign(new Error("pg error"), { code }),
+    });
+
+  it.each(["58000", "58P01", "58030"])(
+    "flags SQLSTATE %s (system error) as environmental",
+    (code) => {
+      expect(isEnvironmentalDbError(drizzleWrap(code))).toBe(true);
+    },
+  );
+
+  it.each(["42601", "23505"])("leaves SQLSTATE %s as a code bug", (code) => {
+    expect(isEnvironmentalDbError(drizzleWrap(code))).toBe(false);
   });
 });
 

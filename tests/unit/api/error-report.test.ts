@@ -64,6 +64,14 @@ describe("classifyError", () => {
       ),
     ).toBe("operational");
   });
+  it("operational: Postgres cannot open a data file (SQLSTATE 58P01, #4202)", () => {
+    const pgError = Object.assign(new Error("could not open file"), { code: "58P01" });
+    const err = Object.assign(new Error("Failed query"), {
+      name: "DrizzleQueryError",
+      cause: pgError,
+    });
+    expect(classifyError(err, "cron")).toBe("operational");
+  });
   it("operational: a worker fetch with no route to the network (ENETUNREACH, #1992)", () => {
     const err = new TypeError("fetch failed", {
       cause: Object.assign(new Error("connect ENETUNREACH 10.0.0.1:443"), {
