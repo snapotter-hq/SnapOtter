@@ -22,6 +22,8 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+    env:
+      EXPECTED_VERSION: ${{ inputs.expected_version }}
     outputs:
       new_version: ${{ steps.check.outputs.version }}
       release_commit: ${{ steps.check.outputs.release_commit }}
@@ -70,13 +72,10 @@ jobs:
           # back to the default token if the secret is unset, so behaviour is
           # unchanged until the secret exists.
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: npx semantic-release
 
       - name: Check for new release
         id: check
-        env:
-          EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: |
           if [ -f .release-version ]; then
             version="$(cat .release-version)"

@@ -12,10 +12,10 @@ const checkScript = path.resolve(root, "scripts/check-expected-version.sh");
 
 function pluginOptions(name: string): Record<string, unknown> {
   const plugin = releaseConfig.plugins.find(
-    (entry: unknown) => entry === name || (Array.isArray(entry) && entry[0] === name),
+    (entry: unknown) => Array.isArray(entry) && entry[0] === name,
   );
-  expect(plugin, `${name} is missing from .releaserc.json`).toBeDefined();
-  return Array.isArray(plugin) ? plugin[1] : {};
+  expect(plugin, `${name} options are missing from .releaserc.json`).toBeDefined();
+  return plugin[1];
 }
 
 function context(messages: string[]) {
@@ -92,10 +92,7 @@ describe("expected release version gate", () => {
     );
 
     const workflow = readFileSync(path.resolve(root, ".github/workflows/release.yml"), "utf8");
-    expect(workflow).toContain("      expected_version:\n");
-    expect(workflow.match(/EXPECTED_VERSION: \$\{\{ inputs\.expected_version \}\}/g)).toHaveLength(
-      2,
-    );
+    expect(workflow).toContain("EXPECTED_VERSION: ${{ inputs.expected_version }}");
     expect(workflow).toContain('./scripts/check-expected-version.sh "${version}"');
   });
 });
