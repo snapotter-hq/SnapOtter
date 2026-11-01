@@ -1687,6 +1687,31 @@ jobs:
           merge-multiple: true
           path: /tmp/prebuilt-subjects
 
+      # Users fetch the Compose files from the release page as well as from the
+      # tag, so they ship as release assets read from the release commit. They
+      # upload before the manifest is built so the attestation covers them too.
+      - name: Publish release Compose files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          REPOSITORY="snapotter-hq/SnapOtter"
+          for compose_file in docker/docker-compose.yml docker/docker-compose-gpu.yml; do
+            asset_name="$(basename "${compose_file}")"
+            existing="/tmp/existing-compose-${asset_name}"
+            rm -f "${existing}"
+            if gh release download "v${VERSION}" --pattern "${asset_name}" \
+              --output "${existing}" --repo "${REPOSITORY}" 2>/dev/null; then
+              cmp --silent "${compose_file}" "${existing}" || {
+                echo "::error::Existing immutable release asset differs: ${asset_name}"
+                exit 1
+              }
+              echo "Verified existing immutable release asset: ${asset_name}"
+            else
+              gh release upload "v${VERSION}" "${compose_file}" --repo "${REPOSITORY}"
+            fi
+          done
+
       # GITHUB_SHA remains the commit that triggered this workflow even after
       # checkout. Record it separately instead of misrepresenting it as the
       # semantic-release-created commit. The attested file explicitly binds
@@ -1774,6 +1799,7 @@ jobs:
                       f"snapotter-v{version}-image-linux-{arch}-trivy.json",
                   }
               )
+          expected_assets.update({"docker-compose.yml", "docker-compose-gpu.yml"})
           missing = sorted(expected_assets - set(names))
           if missing:
               raise SystemExit(f"release subject closure is incomplete: {missing}")
