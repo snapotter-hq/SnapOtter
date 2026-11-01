@@ -31,7 +31,7 @@ Package authors retain all rights granted by their respective licenses.
 
 ## (MPL-2.0 OR Apache-2.0)
 
-- [dompurify@3.4.14](https://github.com/cure53/DOMPurify)
+- [dompurify@3.4.17](https://github.com/cure53/DOMPurify)
 
 ## 0BSD
 
