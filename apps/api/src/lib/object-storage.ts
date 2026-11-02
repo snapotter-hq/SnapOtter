@@ -519,7 +519,7 @@ export async function putObjectStream(
  */
 export function isStorageServiceFault(error: unknown): boolean {
   if (!isS3Enabled()) return false;
-  return !s3Mod || !s3Mod.isMissingObjectError(error);
+  return !s3Mod?.isMissingObjectError(error);
 }
 
 /**

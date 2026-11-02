@@ -19,7 +19,7 @@ import { eq } from "drizzle-orm";
 import type { PostHog } from "posthog-node";
 import { db, schema } from "../db/index.js";
 import { sanitizeEventProperties } from "./analytics-allowlist.js";
-import { analyticsEnabled, bakedEnabled } from "./analytics-gate.js";
+import { analyticsEnabled, bakedEnabled, onAnalyticsDisabled } from "./analytics-gate.js";
 import { logger } from "./logger.js";
 
 let posthogClient: PostHog | null = null;
@@ -61,6 +61,7 @@ export async function initAnalytics(): Promise<void> {
         flushAt: 20,
         flushInterval: 30000,
       });
+      onAnalyticsDisabled(discardQueuedTelemetry);
     } catch (err) {
       // Telemetry must never stop the server, so this doesn't rethrow. It does
       // say so: without a client every feedback submit is declined (#2198),
@@ -82,6 +83,30 @@ export async function shutdownAnalytics(): Promise<void> {
     await posthogClient.shutdown();
     posthogClient = null;
   }
+}
+
+// Persisted queue keys used by posthog-node (PostHogPersistedProperty.Queue,
+// AiQueue, AiCaptureQueue). The enum is not exported from the package root.
+const QUEUED_EVENT_KEYS = ["queue", "ai_queue", "ai_capture_queue"] as const;
+// The values are the enum's string values; the cast only bridges the typed setter.
+type PersistedKey = Parameters<PostHog["setPersistedProperty"]>[0];
+
+/**
+ * Drop events that were captured while analytics was on but have not been sent.
+ * The PostHog client flushes its queue without re-checking the opt-out, so an
+ * event queued at boot would still leave after the admin turns analytics off (#4269).
+ * New events are already stopped by trackEvent's gate.
+ */
+export function discardQueuedTelemetry(): void {
+  if (!posthogClient) return;
+  for (const key of QUEUED_EVENT_KEYS) {
+    posthogClient.setPersistedProperty(key as PersistedKey, null);
+  }
+}
+
+/** Test seam: the client that initAnalytics created, or null. */
+export function __getClientForTests(): PostHog | null {
+  return posthogClient;
 }
 
 async function getInstanceId(): Promise<string> {

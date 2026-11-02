@@ -64,15 +64,37 @@ export function analyticsEnabled(): boolean {
   return cachedEnabled;
 }
 
+const disabledListeners = new Set<() => void>();
+
+/**
+ * Runs once each time the toggle moves from on to off. Events already queued in
+ * the telemetry client must be dropped here, because the client flushes queued
+ * events without re-checking the opt-out (#4269).
+ */
+export function onAnalyticsDisabled(listener: () => void): () => void {
+  disabledListeners.add(listener);
+  return () => disabledListeners.delete(listener);
+}
+
 /** Read the toggle and update the cache. Fails closed on read error. */
 export async function refreshAnalyticsGate(): Promise<void> {
   try {
     const v = await reader();
     const on = v === undefined ? true : v;
+    const becameDisabled = !on && !knownDisabled;
     cachedEnabled = on;
     knownDisabled = !on;
     primed = true;
     fetchedAt = Date.now();
+    if (becameDisabled) {
+      for (const listener of disabledListeners) {
+        try {
+          listener();
+        } catch {
+          // A failing listener must not break the gate; the cache is already updated.
+        }
+      }
+    }
   } catch {
     // DB read failed. If we ever positively saw "disabled", keep serving disabled
     // rather than reverting to the ON default. Otherwise keep the last value.
