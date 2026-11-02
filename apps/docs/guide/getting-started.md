@@ -91,13 +91,13 @@ pnpm dev
 
 ### File Processing (200+ Tools) {#file-processing-200-tools}
 
-| Modality | Count | Example Tools |
-|----------|-------|---------------|
-| **Image** | 112 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
-| **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
-| **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
-| **PDF / Document** | 35 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
-| **Files** | 23 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
+| Area | Example tools |
+|------|---------------|
+| **Image** | Resize, crop, compress, convert, remove background, upscale, OCR, watermark, collage, colorize, GIF tools |
+| **Video** | Trim, crop, compress, convert, merge, extract audio, auto subtitles, video to GIF, stabilize |
+| **Audio** | Trim, merge, convert, normalize, noise reduction, transcribe, pitch shift, fade, ringtone maker |
+| **PDF and documents** | Merge, split, compress, OCR, watermark, redact, Word to PDF, Excel to PDF, rotate, protect, repair |
+| **Files** | CSV to JSON, JSON to XML, merge and split CSVs, create and extract ZIP, chart maker |
 
 ### Pipelines {#pipelines}
 

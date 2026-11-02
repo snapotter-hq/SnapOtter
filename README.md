@@ -40,7 +40,7 @@ For Docker Compose, production setups, and GPU acceleration, see the [deployment
 
 ## Privacy
 
-Your files stay on your machine. Basic analytics are on by default to help us find bugs. You can turn them off in the admin settings. [Details](https://docs.snapotter.com/guide/telemetry).
+Your files stay on the machine you run SnapOtter on. Basic analytics are on by default to help us find bugs. You can turn them off in the admin settings. [Details](https://docs.snapotter.com/guide/telemetry).
 
 ## Contributing
 
