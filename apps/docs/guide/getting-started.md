@@ -146,7 +146,7 @@ The interface is available in 21 languages, including right-to-left support for 
 
 ### Platforms {#platforms}
 
-The app image runs natively on `linux/amd64` and `linux/arm64`: Intel and AMD servers, Apple Silicon Macs, and 64-bit ARM boards such as the Raspberry Pi 4 and 5. 32-bit ARM (`armv7`) is not supported. See [Hardware requirements](/guide/deployment#hardware-requirements) before you pick a machine.
+The app image runs natively on `linux/amd64` and `linux/arm64`: Intel and AMD servers, Apple Silicon Macs, and 64-bit ARM hosts. 32-bit ARM (`armv7`) is not supported. See [Hardware requirements](/guide/deployment#hardware-requirements) before you pick a machine.
 
 ## Use It From Your Phone {#use-it-from-your-phone}
 
