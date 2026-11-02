@@ -91,13 +91,13 @@ pnpm dev
 
 ### File Processing (200+ Tools) {#file-processing-200-tools}
 
-| Modality | Count | Example Tools |
-|----------|-------|---------------|
-| **Image** | 112 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
-| **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
-| **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
-| **PDF / Document** | 35 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
-| **Files** | 23 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
+| Area | Example tools |
+|------|---------------|
+| **Image** | Resize, crop, compress, convert, remove background, upscale, OCR, watermark, collage, colorize, GIF tools |
+| **Video** | Trim, crop, compress, convert, merge, extract audio, auto subtitles, video to GIF, stabilize |
+| **Audio** | Trim, merge, convert, normalize, noise reduction, transcribe, pitch shift, fade, ringtone maker |
+| **PDF and documents** | Merge, split, compress, OCR, watermark, redact, Word to PDF, Excel to PDF, rotate, protect, repair |
+| **Files** | CSV to JSON, JSON to XML, merge and split CSVs, create and extract ZIP, chart maker |
 
 ### Pipelines {#pipelines}
 
@@ -139,6 +139,14 @@ Enable multiple users with role-based access control:
 Create teams under **Settings → Teams** to group users.
 
 Set `AUTH_ENABLED=true` (or `false` for single-user/self-use without login).
+
+### Languages {#languages}
+
+The interface is available in 21 languages, including right-to-left support for Arabic. Each user can pick a language in **Settings → General**, from the globe selector in the footer, or from the login page. Admins set the instance-wide default under **Settings → System**, or with `DEFAULT_LOCALE`. See [Supported languages](/guide/translations#supported-languages) for the full list.
+
+### Platforms {#platforms}
+
+The app image runs natively on `linux/amd64` and `linux/arm64`: Intel and AMD servers, Apple Silicon Macs, and 64-bit ARM hosts. 32-bit ARM (`armv7`) is not supported. See [Hardware requirements](/guide/deployment#hardware-requirements) before you pick a machine.
 
 ## Use It From Your Phone {#use-it-from-your-phone}
 
