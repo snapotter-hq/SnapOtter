@@ -17,6 +17,8 @@ A free, self-hosted toolbox for images, videos, audio, and PDFs. Run it on your 
 
 [Try the live demo](https://demo.snapotter.com) · [Documentation](https://docs.snapotter.com/guide/getting-started)
 
+![SnapOtter dashboard](branding/dashboard.gif)
+
 ## Install
 
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and open it.
