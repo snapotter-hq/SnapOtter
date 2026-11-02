@@ -63,17 +63,18 @@ describe("Dockerfile build args", () => {
     // Transitive modules pinned above what the application itself requires, so
     // a vulnerable version can be patched without unpinning the application.
     // x/image and x/text are linked into both binaries (x/text 0.38.0 carried
-    // CVE-2026-56852, fixed in 0.39.0). x/sys is only in caire's graph; pdfcpu
+    // CVE-2026-56852, fixed in 0.39.0, and 0.39.0 carried CVE-2026-56851, fixed
+    // in 0.41.0; x/image 0.43.0 carried CVE-2026-46603, fixed in 0.45.0). x/sys is only in caire's graph; pdfcpu
     // has no dependency on it. caire resolved x/sys 0.22.0, which carries
     // CVE-2026-39824 (fixed in 0.44.0): Windows-only code, but Trivy flags the
     // module version compiled into the shipped binary.
-    const sharedPins = ["golang.org/x/image v0.43.0", "golang.org/x/text v0.39.0"];
+    const sharedPins = ["golang.org/x/image v0.45.0", "golang.org/x/text v0.41.0"];
     for (const contract of [
       {
         stage: "caire-builder",
         directory: "caire",
         application: "github.com/esimov/caire v1.5.0",
-        pins: [...sharedPins, "golang.org/x/sys v0.44.0"],
+        pins: [...sharedPins, "golang.org/x/sys v0.47.0"],
       },
       {
         stage: "pdfcpu-builder",
