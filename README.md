@@ -34,11 +34,15 @@ For Docker Compose, production setups, and GPU acceleration, see the [deployment
 
 ## What it does
 
-- **Images:** resize, compress, convert, remove backgrounds, watermark
-- **Video:** convert, compress, trim, extract audio
-- **Audio:** convert, trim, normalize, transcribe
-- **PDFs:** merge, split, compress, protect, OCR
-- **Files:** CSV, JSON, and Excel conversion
+200+ tools for images, video, audio, PDFs, and data files. A few examples:
+
+- Shrink a 20 MB photo for email
+- Turn a screen recording into a GIF
+- Merge a folder of PDFs into one file
+- Transcribe a voice memo
+- Convert a spreadsheet to CSV
+
+Chain tools into pipelines, process files in batches, or call everything through the REST API.
 
 ## Privacy
 
