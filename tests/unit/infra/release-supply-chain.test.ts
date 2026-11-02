@@ -32,6 +32,10 @@ describe("release supply-chain closure", () => {
     expect(githubPlugin?.[1]?.draftRelease).toBe(true);
     expect(githubPlugin?.[1]?.successCommentCondition).toBe(false);
     expect(githubPlugin?.[1]?.releasedLabels).toBe(false);
+    // The generated notes cover every commit since the last tag (about 470 KB
+    // for v2.3.0). A release body is capped at 125,000 characters, so the draft
+    // starts with a stub and "Ensure exact GitHub draft" writes the real notes.
+    expect(githubPlugin?.[1]?.releaseBodyTemplate).not.toContain("nextRelease.notes");
 
     const workflow = readRequired(releaseWorkflowPath);
     const publish = job(workflow, "publish-release");
@@ -47,6 +51,9 @@ describe("release supply-chain closure", () => {
     );
     expect(gitPlugin?.[1]?.assets).toContain(".release-notes/*.md");
     expect(gitPlugin?.[1]?.assets).toContain("apps/docs/changelog.md");
+    // Generated notes in the commit message overflow the kernel's per-argument
+    // limit (E2BIG) on a large release; CHANGELOG.md already carries them.
+    expect(gitPlugin?.[1]?.message).not.toContain("nextRelease.notes");
 
     const sync = readRequired(versionSyncPath);
     expect(sync).toContain('manage-release-notes.mjs" archive "$VERSION"');
