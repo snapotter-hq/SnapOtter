@@ -1,12 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { PostHog } from "posthog-node";
+import type { PostHog } from "posthog-node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  __resetGateForTests,
-  __setReaderForTests,
-  refreshAnalyticsGate,
-} from "../../../apps/api/src/lib/analytics-gate.js";
 import {
   __getClientForTests,
   discardQueuedTelemetry,
@@ -14,6 +9,11 @@ import {
   shutdownAnalytics,
   trackEvent,
 } from "../../../apps/api/src/lib/analytics.js";
+import {
+  __resetGateForTests,
+  __setReaderForTests,
+  refreshAnalyticsGate,
+} from "../../../apps/api/src/lib/analytics-gate.js";
 
 // The real posthog-node client, created by initAnalytics, sends to a local HTTP
 // server. Nothing can leave the machine, and the test covers the production
