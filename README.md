@@ -35,8 +35,6 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 Open [http://localhost:1349](http://localhost:1349) and log in with `admin` / `admin`. That's the whole install.
 
-For the production Compose stack, NVIDIA GPU acceleration, and configuration, see [Deployment](#deployment) below.
-
 ## Key Features
 
 - **200+ tools across 5 modalities:**
@@ -57,63 +55,7 @@ For the production Compose stack, NVIDIA GPU acceleration, and configuration, se
 
 ## Deployment
 
-The [Quick Start](#quick-start) one-liner above is all most people need. For production, run the 3-container Compose stack (app + Postgres 17 + Redis 8). Save this as `compose.yaml`:
-
-```yaml
-services:
-  snapotter:
-    image: snapotter/snapotter:latest
-    ports: ["1349:1349"]
-    environment:
-      DATABASE_URL: postgres://snapotter:snapotter@postgres:5432/snapotter
-      REDIS_URL: redis://redis:6379
-    volumes:
-      - SnapOtter-data:/data
-    depends_on: [postgres, redis]
-    restart: unless-stopped
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      # Change this for any non-local deployment.
-      POSTGRES_PASSWORD: snapotter
-      POSTGRES_DB: snapotter
-    volumes: ["SnapOtter-pgdata:/var/lib/postgresql/data"]
-    restart: unless-stopped
-  redis:
-    image: redis:8-alpine
-    volumes: ["SnapOtter-redisdata:/data"]
-    restart: unless-stopped
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
-```
-
-Then start the stack:
-
-```bash
-docker compose up -d
-```
-
-<details>
-<summary><sub>Have an NVIDIA GPU? Click here for CUDA acceleration.</sub></summary>
-<br>
-
-Use the GPU Compose file for NVIDIA CUDA-accelerated background removal, upscaling, and transcription. OCR deliberately uses the same portable CPU runtime on CPU-only and NVIDIA hosts. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today; those systems run AI tools on CPU. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for the GPU Compose example and benchmarks.
-
-</details>
-
-**Default credentials:**
-
-| Field    | Value   |
-|----------|---------|
-| Username | `admin` |
-| Password | `admin` |
-
-You will be asked to change your password on first login.
-
-For Docker Compose, persistent storage, and other setup options, see the [Getting Started Guide](https://docs.snapotter.com/guide/getting-started). For NVIDIA CUDA acceleration and tag details, see [Docker Tags](https://docs.snapotter.com/guide/docker-tags).
+For Docker Compose, the production stack with Postgres 17 and Redis 8, NVIDIA GPU acceleration, persistent storage, and other setup options, see the [Deployment guide](https://docs.snapotter.com/guide/deployment).
 
 ## Documentation
 
