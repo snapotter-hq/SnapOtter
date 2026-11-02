@@ -161,7 +161,7 @@ Package authors retain all rights granted by their respective licenses.
 - [protobufjs@8.6.6](https://github.com/protobufjs/protobuf.js#readme)
 - [secure-json-parse@4.1.0](https://github.com/fastify/secure-json-parse#readme)
 - [smol-toml@1.9.1](https://github.com/squirrelchat/smol-toml#readme)
-- [source-map-js@1.2.1,1.2.2](https://github.com/7rulnik/source-map-js)
+- [source-map-js@1.2.2](https://github.com/7rulnik/source-map-js)
 - [wavesurfer.js@7.12.12](https://wavesurfer.xyz)
 
 ## BlueOak-1.0.0
@@ -395,7 +395,7 @@ Package authors retain all rights granted by their respective licenses.
 - [bluebird@3.7.2](https://github.com/petkaantonov/bluebird)
 - [bmp-js@0.1.0](https://github.com/shaozilee/bmp-js#readme)
 - [bowser@2.14.1](https://github.com/bowser-js/bowser)
-- [brace-expansion@5.0.12,5.0.8](https://github.com/juliangruber/brace-expansion#readme)
+- [brace-expansion@5.0.12](https://github.com/juliangruber/brace-expansion#readme)
 - [brotli@1.3.3](https://github.com/devongovett/brotli.js)
 - [buffer@5.6.0,5.7.1,6.0.3](https://github.com/feross/buffer)
 - [buffer-crc32@0.2.13,1.0.0](https://github.com/brianloveswords/buffer-crc32)
@@ -480,7 +480,7 @@ Package authors retain all rights granted by their respective licenses.
 - [find-up@4.1.0](https://github.com/sindresorhus/find-up#readme)
 - [flattie@1.1.1](https://github.com/lukeed/flattie#readme)
 - [fnv1a-64@0.1.2](https://github.com/danielroe/fnv1a-64#readme)
-- [follow-redirects@1.16.0](https://github.com/follow-redirects/follow-redirects)
+- [follow-redirects@1.16.2](https://github.com/follow-redirects/follow-redirects)
 - [fontace@0.4.1](https://github.com/delucis/fontace#readme)
 - [fontkit@2.0.4](https://github.com/foliojs/fontkit#readme)
 - [fontkitten@1.0.3](https://github.com/delucis/fontkitten#readme)

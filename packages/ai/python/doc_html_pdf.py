@@ -10,27 +10,31 @@ import json
 import sys
 
 
-def _make_url_fetcher(default_fetcher):
+def _make_url_fetcher(fetcher_cls):
     """Build the url_fetcher: serve data: URIs, refuse every other scheme.
 
     This is the single network chokepoint for the three tools that reach
     WeasyPrint. The 5-character scheme prefix is matched case-insensitively
     per RFC 3986 without lowercasing the rest of the URI (#1205); every other
-    scheme fails closed.
+    scheme fails closed. WeasyPrint's own allowed_protocols list enforces the
+    same rule a second time, and redirects are off so a served URL can't turn
+    into a fetched one.
 
-    main() passes the delegate in rather than this importing weasyprint itself,
-    because WeasyPrint turns any exception a fetcher raises into an omitted
-    resource. An ImportError in here would drop every data: image from the PDF
-    and still report success; raised from main() it stops the job. That is not
-    hypothetical: default_url_fetcher is deprecated in the pinned 69.0.
+    WeasyPrint 70 takes a URLFetcher instance rather than a plain function: it
+    reads attributes off the fetcher and asserts the response type. main()
+    passes the class in rather than this importing weasyprint itself, because
+    WeasyPrint turns any exception a fetcher raises into an omitted resource.
+    An ImportError in here would drop every data: image from the PDF and still
+    report success; raised from main() it stops the job.
     """
 
-    def fetch(url, *args, **kwargs):
-        if url[:5].lower() == "data:":
-            return default_fetcher(url, *args, **kwargs)
-        raise ValueError(f"remote resources are disabled: {url[:120]}")
+    class DataOnlyFetcher(fetcher_cls):
+        def fetch(self, url, headers=None):
+            if url[:5].lower() == "data:":
+                return super().fetch(url, headers)
+            raise ValueError(f"remote resources are disabled: {url[:120]}")
 
-    return fetch
+    return DataOnlyFetcher(allowed_protocols=("data",), allow_redirects=False)
 
 
 def main():
@@ -41,7 +45,7 @@ def main():
         sys.exit(1)
     try:
         from weasyprint import HTML
-        from weasyprint.urls import default_url_fetcher
+        from weasyprint.urls import URLFetcher
     except ImportError as exc:
         print(json.dumps({"error": f"weasyprint not usable: {exc}"}))
         sys.exit(1)
@@ -62,7 +66,7 @@ def main():
                 "code,pre{background:#f4f4f4;}table,td,th{border:1px solid #999;border-collapse:collapse;padding:4px;}</style>"
                 f"</head><body>{body}</body></html>"
             )
-        fetcher = _make_url_fetcher(default_url_fetcher)
+        fetcher = _make_url_fetcher(URLFetcher)
         HTML(string=source, url_fetcher=fetcher, base_url=None).write_pdf(out)
         print(json.dumps({"ok": True}))
     except SystemExit:

@@ -14,7 +14,7 @@ FROM mwader/static-ffmpeg:8.1.2@sha256:33f770f812cbfc3de96c547157fc9faf8bd95a364
 # Stage 0b: Static pdfcpu binary (pure Go, no CGO)
 # ============================================
 # CGO_ENABLED=0 produces a fully static binary; no cross-compiler needed.
-FROM --platform=$BUILDPLATFORM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS pdfcpu-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS pdfcpu-builder
 ARG TARGETOS=linux
 ARG TARGETARCH
 WORKDIR /build
@@ -150,7 +150,7 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
 # on Apple Silicon when cross-compiling for linux/amd64.
 # caire imports gioui.org/app which requires CGO on Linux, so we use a
 # proper C cross-compiler instead of CGO_ENABLED=0.
-FROM --platform=$BUILDPLATFORM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS caire-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS caire-builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -552,7 +552,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         "huggingface-hub[hf_xet,hf_transfer]==0.36.2" \
         pikepdf==10.8.0 \
         PyMuPDF==1.27.2.3 \
-        weasyprint==69.0 \
+        weasyprint==70.0 \
         pdf2docx==0.5.13 \
         markdown==3.10.2 && \
     # Trivy scans setuptools' vendored dist-info metadata, so replace the

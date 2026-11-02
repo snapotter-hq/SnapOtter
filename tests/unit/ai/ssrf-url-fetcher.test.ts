@@ -48,7 +48,23 @@ class FakeHTML:
 weasyprint = types.ModuleType("weasyprint")
 weasyprint.HTML = FakeHTML
 weasyprint_urls = types.ModuleType("weasyprint.urls")
-weasyprint_urls.default_url_fetcher = lambda url, *a, **k: {"string": b"DELEGATED", "url": url}
+
+
+class FakeURLFetcher:
+    """Stands in for weasyprint.urls.URLFetcher: fetch() is what a subclass
+    delegates to, and __call__ routes through fetch() the way WeasyPrint's does."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def fetch(self, url, headers=None):
+        return {"string": b"DELEGATED", "url": url}
+
+    def __call__(self, url):
+        return self.fetch(url)
+
+
+weasyprint_urls.URLFetcher = FakeURLFetcher
 weasyprint.urls = weasyprint_urls
 sys.modules["weasyprint"] = weasyprint
 sys.modules["weasyprint.urls"] = weasyprint_urls
@@ -66,7 +82,7 @@ spec = importlib.util.spec_from_file_location("doc_html_pdf", MODULE)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
-probe_fetcher = mod._make_url_fetcher(weasyprint_urls.default_url_fetcher)
+probe_fetcher = mod._make_url_fetcher(weasyprint_urls.URLFetcher)
 
 
 def refuses(fetcher, url):
@@ -94,7 +110,14 @@ def serves_data(fetcher):
         return False
 
 
-result = {"fetcher": {}, "dataUris": {}}
+result = {
+    "fetcher": {},
+    "dataUris": {},
+    "options": {
+        "allowedProtocols": list(probe_fetcher.kwargs.get("allowed_protocols") or []),
+        "allowRedirects": probe_fetcher.kwargs.get("allow_redirects", True),
+    },
+}
 for url in [
     "https://example.com/x.png",
     "HTTPS://example.com/x.png",
@@ -210,6 +233,7 @@ interface MainRun {
 
 interface DriverResult {
   fetcher: Record<string, string>;
+  options: { allowedProtocols: string[]; allowRedirects: boolean };
   dataUris: Record<string, string>;
   html: MainRun;
   markdown: MainRun;
@@ -260,6 +284,12 @@ describe.skipIf(!hasPython)("doc_html_pdf.py url_fetcher (the SSRF chokepoint)",
     "DaTa:image/png;base64,AA==",
   ])("serves %s through WeasyPrint's own fetcher without mutating the URI", (url) => {
     expect(result.dataUris[url]).toBe("DELEGATED");
+  });
+
+  // A second, independent refusal inside WeasyPrint itself, and no redirect
+  // that could turn a served URL into a fetched one.
+  it("restricts WeasyPrint's own fetcher to data: with redirects off", () => {
+    expect(result.options).toEqual({ allowedProtocols: ["data"], allowRedirects: false });
   });
 
   it("imports on an interpreter where weasyprint is unusable", () => {
@@ -324,7 +354,7 @@ describe.skipIf(!hasPython)("doc_html_pdf.py url_fetcher (the SSRF chokepoint)",
   });
 
   it("names the refused URL if a refusal ever escapes the render", () => {
-    // WeasyPrint 69 swallows the ValueError and omits the resource, so this
+    // WeasyPrint 70 swallows the ValueError and omits the resource, so this
     // branch is unreachable today. It is the fallback the acceptance criteria
     // ask for: a message naming the URL, never a bare exit-1.
     expect(result.escapes.exitCode).toBe(1);

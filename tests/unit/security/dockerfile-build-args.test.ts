@@ -57,7 +57,7 @@ describe("Dockerfile build args", () => {
 
   it("pins fixed Go toolchains and checksummed dependency overrides for shipped binaries", () => {
     const goBuilder =
-      "golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61";
+      "golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9";
     expect(dockerfile.split(goBuilder)).toHaveLength(3);
 
     // Transitive modules pinned above what the application itself requires, so
@@ -80,7 +80,9 @@ describe("Dockerfile build args", () => {
         stage: "pdfcpu-builder",
         directory: "pdfcpu",
         application: "github.com/pdfcpu/pdfcpu v0.13.0",
-        pins: sharedPins,
+        // pdfcpu resolved x/crypto 0.52.0, which carries CVE-2026-56854 (fixed
+        // in 0.55.0).
+        pins: [...sharedPins, "golang.org/x/crypto v0.55.0"],
       },
     ]) {
       const modulePath = resolve(root, `docker/go-tools/${contract.directory}/go.mod`);
