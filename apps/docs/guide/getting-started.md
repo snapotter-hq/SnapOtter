@@ -140,6 +140,14 @@ Create teams under **Settings → Teams** to group users.
 
 Set `AUTH_ENABLED=true` (or `false` for single-user/self-use without login).
 
+### Languages {#languages}
+
+The interface is available in 21 languages, including right-to-left support for Arabic. Each user can pick a language in **Settings → General**, from the globe selector in the footer, or from the login page. Admins set the instance-wide default under **Settings → System**, or with `DEFAULT_LOCALE`. See [Supported languages](/guide/translations#supported-languages) for the full list.
+
+### Platforms {#platforms}
+
+The app image runs natively on `linux/amd64` and `linux/arm64`: Intel and AMD servers, Apple Silicon Macs, and 64-bit ARM boards such as the Raspberry Pi 4 and 5. 32-bit ARM (`armv7`) is not supported. See [Hardware requirements](/guide/deployment#hardware-requirements) before you pick a machine.
+
 ## Use It From Your Phone {#use-it-from-your-phone}
 
 SnapOtter works in mobile browsers, and you can install it as an app. Open your instance on the phone, then:
