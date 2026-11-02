@@ -14,7 +14,7 @@ SnapOtter 完全在你自己的基础设施上处理文件。它默认发送匿�
 
 ## 容器硬化 {#container-hardening}
 
-规范的 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) 和 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose 文件是事实来源。不要将缩写示例复制到生产中；从您验证的发布标签部署文件。
+规范的 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) 和 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) Compose 文件是事实来源。不要将缩写示例复制到生产中；从您验证的发布标签部署文件。
 
 两个堆栈都应用以下控制：
 
@@ -242,7 +242,7 @@ sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 下载发布主题清单并验证它是否已由发布工作流程证明：
 
 ```bash
-gh attestation verify snapotter-v2.2.0-release-subjects.json \
+gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -253,13 +253,13 @@ gh attestation verify snapotter-v2.2.0-release-subjects.json \
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.3.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.2.0
+trivy image snapotter/snapotter:2.3.0
 ```
 
 ::: info

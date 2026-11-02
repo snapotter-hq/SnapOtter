@@ -14,7 +14,7 @@ SnapOtter는 파일을 전적으로 사용자의 인프라에서 처리한다. �
 
 ## 컨테이너 경화 {#container-hardening}
 
-표준 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) 및 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose 파일이 정보의 소스입니다. 축약된 예제를 프로덕션에 복사하지 마십시오. 확인한 릴리스 태그에서 파일을 배포합니다.
+표준 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) 및 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) Compose 파일이 정보의 소스입니다. 축약된 예제를 프로덕션에 복사하지 마십시오. 확인한 릴리스 태그에서 파일을 배포합니다.
 
 두 스택 모두 다음 컨트롤을 적용합니다.
 
@@ -242,7 +242,7 @@ sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 릴리스 주제 매니페스트를 다운로드하고 릴리스 워크플로에서 증명되었는지 확인합니다.
 
 ```bash
-gh attestation verify snapotter-v2.2.0-release-subjects.json \
+gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -253,13 +253,13 @@ gh attestation verify snapotter-v2.2.0-release-subjects.json \
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.3.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.2.0
+trivy image snapotter/snapotter:2.3.0
 ```
 
 ::: info
