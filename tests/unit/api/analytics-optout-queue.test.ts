@@ -83,6 +83,9 @@ beforeEach(async () => {
   await shutdownAnalytics();
 });
 
+// The string value matches PostHogPersistedProperty.Queue; the cast bridges the typed getter.
+type PersistedKey = Parameters<PostHog["getPersistedProperty"]>[0];
+
 /** The client initAnalytics created; a missing client is a test failure, not a crash. */
 function activeClient(): PostHog {
   const client = __getClientForTests();
@@ -97,7 +100,7 @@ async function bootAndQueueOneEvent(): Promise<void> {
   await initAnalytics();
   await trackEvent("instance_started", {}, "qa-distinct");
   await vi.waitFor(() => {
-    const queued = activeClient().getPersistedProperty("queue");
+    const queued = activeClient().getPersistedProperty("queue" as PersistedKey);
     expect(Array.isArray(queued) ? queued.length : 0).toBe(1);
   });
 }
