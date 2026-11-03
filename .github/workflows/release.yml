@@ -1,5 +1,11 @@
 name: Release
 
+# Two approvals on the publish-images environment. publish-approval comes
+# before anything reaches Docker Hub, GHCR, or Hugging Face. manifest comes
+# after the scans and before the named image tags. Before the first approval
+# the run only pushes the version commit and tag, drafts the GitHub release,
+# and attaches and attests the verified source archives on that draft.
+
 on:
   workflow_dispatch:
 
@@ -549,15 +555,35 @@ jobs:
         with:
           subject-path: "/tmp/prebuilt/${{ env.archive_name }}"
 
+  publish-approval:
+    name: Approve publishing
+    needs: release
+    if: needs.release.outputs.new_version
+    # First publish gate (#4329). Every job that writes to Docker Hub, GHCR, or
+    # Hugging Face runs after this one: docker pushes digests and registry
+    # cache, ai-bundles uploads to Hugging Face. Rejecting here publishes
+    # nothing to those registries. manifest asks again before the named tags.
+    environment: publish-images
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Record the approved release
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: echo "Publishing approved for v${VERSION} at ${RELEASE_COMMIT}."
+
   docker:
     name: Build (${{ matrix.platform }})
-    needs: release
+    needs: [release, publish-approval]
     concurrency:
       group: snapotter-image-${{ needs.release.outputs.new_version }}-${{ matrix.platform }}
       cancel-in-progress: false
     # Builds and pushes the multi-arch app image (by digest) to Docker Hub +
-    # GHCR; the manifest job then creates the named tags. Only runs when
-    # semantic-release produced a version (or fell back to the latest tag).
+    # GHCR once publish-approval passes; the manifest job then creates the
+    # named tags. Only runs when semantic-release produced a version (or fell
+    # back to the latest tag).
     if: needs.release.outputs.new_version
     permissions:
       contents: write
@@ -1285,8 +1311,10 @@ jobs:
     name: Create Multi-Arch Manifests
     needs: [release, prebuilt, archive-security, docker, scan, sbom, ai-bundles]
     runs-on: ubuntu-latest
-    # Manual publish gate: this job creates only the immutable version tags. A
-    # downstream, globally serialized job advances moving aliases after checking
+    # Second publish gate: publish-approval already guarded the digest pushes
+    # and the Hugging Face upload, and this approval comes after the scans so
+    # the reviewer can check them before any tag exists. This job creates only
+    # the immutable version tags. A downstream, globally serialized job advances moving aliases after checking
     # all remote release tags again. Keeping the approval outside that global
     # lock avoids blocking newer releases for up to the environment wait limit.
     environment: publish-images
