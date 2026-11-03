@@ -7,7 +7,7 @@ Package authors retain all rights granted by their respective licenses.
 
 ## (Apache-2.0 AND MIT)
 
-- [posthog-js@1.404.1](https://posthog.com/docs/libraries/js)
+- [posthog-js@1.438.12](https://posthog.com/docs/libraries/js)
 
 ## (BSD-2-Clause OR MIT OR Apache-2.0)
 
