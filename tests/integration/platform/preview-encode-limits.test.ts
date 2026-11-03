@@ -40,7 +40,8 @@ writeFileSync(
     realFfmpeg ? `    exec '${realFfmpeg}' "$@"` : "    exit 1",
     "  fi",
     "done",
-    `echo $$ > '${pidFile}'`,
+    `echo $$ > '${pidFile}.tmp'`,
+    `mv '${pidFile}.tmp' '${pidFile}'`,
     `if [ "$(cat '${modeFile}' 2>/dev/null)" = "slow-ok" ]; then`,
     // The output path is the argument before runFfmpeg's trailing `-progress pipe:1`.
     '  out=""; prev=""',
@@ -80,11 +81,20 @@ afterEach(() => {
   const pid = encodePid();
   if (pid && isAlive(pid)) process.kill(pid, "SIGKILL");
   rmSync(pidFile, { force: true });
+  rmSync(`${pidFile}.tmp`, { force: true });
   rmSync(modeFile, { force: true });
 });
 
 function encodePid(): number | null {
-  return existsSync(pidFile) ? Number(readFileSync(pidFile, "utf8").trim()) : null;
+  if (!existsSync(pidFile)) return null;
+  try {
+    const raw = readFileSync(pidFile, "utf8");
+    if (!/^\d+\n$/.test(raw)) return null;
+    const parsed = Number(raw.trim());
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function isAlive(pid: number): boolean {
