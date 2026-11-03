@@ -14,7 +14,7 @@ i18n_hash_version: 2
 
 ## تصلب الحاويات {#container-hardening}
 
-تعد ملفات الإنشاء الأساسية [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) و[GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) مصدر الحقيقة. لا تنسخ مثالًا مختصرًا إلى الإنتاج؛ انشر الملف من علامة الإصدار التي قمت بالتحقق منها.
+تعد ملفات الإنشاء الأساسية [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) و[GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) مصدر الحقيقة. لا تنسخ مثالًا مختصرًا إلى الإنتاج؛ انشر الملف من علامة الإصدار التي قمت بالتحقق منها.
 
 تطبق كلا المجموعتين عناصر التحكم التالية:
 
@@ -242,7 +242,7 @@ sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 قم بتنزيل بيان موضوع الإصدار وتحقق من أنه تم التصديق عليه من خلال سير عمل الإصدار:
 
 ```bash
-gh attestation verify snapotter-v2.3.0-release-subjects.json \
+gh attestation verify snapotter-v2.2.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -253,13 +253,13 @@ gh attestation verify snapotter-v2.3.0-release-subjects.json \
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.3.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.3.0
+trivy image snapotter/snapotter:2.2.0
 ```
 
 ::: info

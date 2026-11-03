@@ -14,7 +14,7 @@ Der Container läuft als dedizierter Non-Root-Benutzer (`snapotter`) mit allen e
 
 ## Containerhärtung {#container-hardening}
 
-Die kanonischen Compose-Dateien [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) und [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) sind die Quelle der Wahrheit. Kopieren Sie kein gekürztes Beispiel in die Produktion. Stellen Sie die Datei mit dem von Ihnen überprüften Release-Tag bereit.
+Die kanonischen Compose-Dateien [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) und [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) sind die Quelle der Wahrheit. Kopieren Sie kein gekürztes Beispiel in die Produktion. Stellen Sie die Datei mit dem von Ihnen überprüften Release-Tag bereit.
 
 Beide Stapel wenden die folgenden Steuerelemente an:
 
@@ -245,7 +245,7 @@ Jede SnapOtter-Version enthält die folgenden Sicherheitsartefakte:
 Laden Sie das Release-Subjekt-Manifest herunter und überprüfen Sie, ob es vom Release-Workflow bestätigt wurde:
 
 ```bash
-gh attestation verify snapotter-v2.3.0-release-subjects.json \
+gh attestation verify snapotter-v2.2.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -256,13 +256,13 @@ Sie können auch ein heruntergeladenes SBOM oder das Bild direkt scannen:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.3.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.3.0
+trivy image snapotter/snapotter:2.2.0
 ```
 
 ::: info
