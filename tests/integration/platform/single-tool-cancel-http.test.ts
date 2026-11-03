@@ -437,7 +437,12 @@ describe("route-stamped alias metadata (#808)", () => {
         artifactJobId?: string;
         async: boolean;
       };
-      expect(payload).toEqual({ jobId: expect.any(String), async: true });
+      expect(payload).toEqual({
+        jobId: expect.any(String),
+        async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
+      });
       expect(payload.jobId).not.toBe(clientJobId);
 
       await waitForTerminalFrame(payload.jobId);
@@ -495,7 +500,12 @@ describe("route-stamped alias metadata (#808)", () => {
         async: boolean;
       };
       enqueuedJobId = payload.artifactJobId ?? payload.jobId;
-      expect(payload).toEqual({ jobId: expect.any(String), async: true });
+      expect(payload).toEqual({
+        jobId: expect.any(String),
+        async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
+      });
       expect(payload.jobId).not.toBe(clientJobId);
 
       const parent = await jobRow(clientJobId);
