@@ -65,7 +65,10 @@ services:
     image: snapotter/snapotter:latest
     ports: ["1349:1349"]
     environment:
-      DATABASE_URL: postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Requests are served by a role that can only read and write rows. The
+      # owner connects only during boot, to migrate and to grant.
+      DATABASE_URL: postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      DATABASE_MIGRATION_URL: postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       REDIS_URL: redis://redis:6379
     volumes:
       - SnapOtter-data:/data
@@ -74,10 +77,10 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: snapotter
-      # Change this for any non-local deployment.
-      POSTGRES_PASSWORD: snapotter
-      POSTGRES_DB: snapotter
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      # Change this and POSTGRES_APP_PASSWORD for any non-local deployment.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes: ["SnapOtter-pgdata:/var/lib/postgresql/data"]
     restart: unless-stopped
   redis:
