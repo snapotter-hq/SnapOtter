@@ -38,7 +38,7 @@
   "altSlug.snapotterVs": "SnapOtter проти {competitor}",
   "altSlug.sourcesReviewed": "Перевірені джерела",
   "banner.dismiss": "Закрити",
-  "banner.localeRecall": "Ви бачите цю сторінку українською, бо раніше обрали цю мову тут.",
+  "banner.localeRecall": "Ви бачите цю сторінку мовою {language}, бо раніше обрали її тут.",
   "banner.machineTranslated": "Цю сторінку перекладено машинним способом. Помітили помилку? Допоможіть покращити переклад.",
   "banner.viewInEnglish": "View in English",
   "category.adjustments": "Коригування",
