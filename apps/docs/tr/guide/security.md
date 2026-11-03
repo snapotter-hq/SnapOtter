@@ -14,7 +14,7 @@ Konteyner, gerekli minimum küme dışında tüm Linux yetenekleri düşürülm�
 
 ## Konteyner Sertleştirme {#container-hardening}
 
-Kurallı [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) ve [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose dosyaları gerçeğin kaynağıdır. Kısaltılmış bir örneği üretime kopyalamayın; dosyayı doğruladığınız sürüm etiketinden dağıtın.
+Kurallı [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) ve [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) Compose dosyaları gerçeğin kaynağıdır. Kısaltılmış bir örneği üretime kopyalamayın; dosyayı doğruladığınız sürüm etiketinden dağıtın.
 
 Her iki yığın da aşağıdaki kontrolleri uygular:
 
@@ -242,7 +242,7 @@ Her SnapOtter sürümü aşağıdaki güvenlik yapılarını içerir:
 Yayın konusu bildirimini indirin ve yayın iş akışı tarafından onaylandığını doğrulayın:
 
 ```bash
-gh attestation verify snapotter-v2.2.0-release-subjects.json \
+gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -253,13 +253,13 @@ Bildirim, `releaseTag`, `releaseCommit` ve `workflowTriggerCommit`'yi ayrı ayr�
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.3.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.2.0
+trivy image snapotter/snapotter:2.3.0
 ```
 
 ::: info
