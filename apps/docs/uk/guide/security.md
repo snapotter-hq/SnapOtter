@@ -14,7 +14,7 @@ SnapOtter обробляє файли повністю на вашій інфр�
 
 ## Зміцнення контейнера {#container-hardening}
 
-Канонічні файли Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) і [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) є джерелом правди. Не копіюйте скорочений приклад у виробництво; розгорнути файл із тегу випуску, який ви перевірили.
+Канонічні файли Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) і [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) є джерелом правди. Не копіюйте скорочений приклад у виробництво; розгорнути файл із тегу випуску, який ви перевірили.
 
 Обидва стеки застосовують такі елементи керування:
 
@@ -245,7 +245,7 @@ sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 Завантажте маніфест теми випуску та переконайтеся, що він підтверджений робочим процесом випуску:
 
 ```bash
-gh attestation verify snapotter-v2.2.0-release-subjects.json \
+gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -256,13 +256,13 @@ gh attestation verify snapotter-v2.2.0-release-subjects.json \
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.3.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.2.0
+trivy image snapotter/snapotter:2.3.0
 ```
 
 ::: info

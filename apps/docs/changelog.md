@@ -4,6 +4,159 @@ description: Release notes and version history for SnapOtter. See what's new, im
 
 # Changelog {#changelog}
 
+## v2.3.0
+
+SnapOtter just passed one million image pulls across Docker Hub and GHCR, and 3,000 stars on GitHub. That's a lot of self-hosted servers, so this release is our thank-you to everyone running them.
+
+Upgrade soon. 2.3.0 closes six security advisories, one of them high severity. Details are in the Security section below.
+
+Beyond the fixes, there are new tools: a PDF Multi-Tool page editor, one-click compress-to-size presets for images and PDFs, and drag-and-drop page ordering in Organize PDF. OCR now reads Arabic, and pdf-to-text offers OCR when it hits a scanned PDF. SnapOtter can run under a subpath like `/snapotter` behind a reverse proxy. The app no longer needs a Postgres superuser to run. Admins who get locked out can recover from the command line. The rest is about 1,400 fixes, most of them for problems you reported.
+
+> [!IMPORTANT]
+> All six advisories below affect 2.2.0, and some reach back to 2.0.0. If you share an instance with other users or expose it beyond your own network, upgrade.
+
+### Security
+
+- **SVG uploads could skip sanitization (GHSA-9c7h-xjrp-8gh3, high).** An SVG that the image decoder rejected was stored and served as-is instead of being sanitized. Affected: 2.2.0 and earlier. Reported by @xaferima. (#1211)
+- **The job progress stream didn't check who was asking (GHSA-ff22-w6x2-fm98, medium).** It now requires sign-in and job ownership. Affected: 2.0.0 through 2.2.0. (#1750)
+- **Result download links also served the original upload (GHSA-jgv3-2jc6-f628, medium).** Affected: 2.2.0 and earlier. Reported by @emirhancatkin. (#3623)
+- **Passport photo and background effects trusted a client-supplied job id (GHSA-3c8g-8v4x-qq9j, medium).** Affected: 2.2.0 and earlier. Reported by @shaoyuuuuu. (#3623)
+- **URL import, upload, and preview skipped role and API-key permission checks (GHSA-8xxr-g2w8-7f9r, medium).** Affected: 2.2.0 and earlier. Reported by @nguyenvantiennani. (#3780, #707)
+- **SSO enforcement revealed the break-glass username (GHSA-q6fg-vvw9-cr8r, low).** A refused local login now gets the same 401 as any other failed login. Affected: 2.0.0 through 2.2.0. (#2148)
+- **Postgres no longer runs as superuser.** The app now connects with a role that can only read and write data. Migrations use a separate, optional connection. See Upgrade Notes. (#918)
+- **Patched dependencies**: dompurify and handlebars override floors raised to the fixed versions. (#4247)
+
+### New Features
+
+- **PDF Multi-Tool**: a page editor that reorders, duplicates, rotates, and deletes pages, and pulls pages in from other PDFs. The server assembles the final file. (#1338)
+- **Compress to a target size in one click**: five image presets (20, 50, 100, 200, 500 KB) and five PDF presets (100, 200, 500 KB, 1 MB, 2 MB). (#1250, #1377)
+- **Run SnapOtter under a subpath**: set `BASE_PATH=/snapotter` and the same image serves from there. Result links, cookies, SSO redirects, and the API docs all follow it. (#1252, #1324)
+- **Arabic OCR**: choose Arabic explicitly, or let auto mode detect it. Works for image and PDF OCR. (#4130, #4183)
+- **pdf-to-text offers OCR** when a PDF, or a whole batch, has no text layer, instead of returning an empty file. (#4142, #4198)
+- **Drag-and-drop page ordering in Organize PDF**, mouse and touch. (#1249, #2601)
+- **Reorder files before a multi-file run**: merge, stitch, collage, and the other multi-file tools keep the order you set. (#756, #757)
+- **Cancel batch and pipeline runs**, and the work actually stops on the server. (#807)
+- **`snapotter-admin` recovery commands**: `reset-password`, `create-admin`, `unlock-user`, and MFA reset, for admins locked out of the web UI. (#4016)
+- **MFA enrollment at login**: when MFA is required, users without it set it up on the spot instead of being blocked.
+- **Camera capture and an installable app**: take a photo straight into a tool on mobile, and install SnapOtter as a PWA. (#773)
+- **Transparent padding in the editor's Canvas Size dialog.** (#4111)
+- **Update notices for admins**: when a newer SnapOtter is out, admins see a dismissible notice with a link to the release notes. The check runs through the existing analytics connection, so it's off when analytics is off.
+
+### Improvements
+
+- **Background removal is faster on repeat runs**: the model stays loaded between requests instead of reloading every time. (#4144)
+- **Batch uploads use much less memory**: each file goes to scratch disk and is processed one at a time instead of sitting in RAM. (#2687)
+- **AI bundle installs fail cleanly and roll back** instead of leaving a half-installed venv. Proxmox LXC background-removal installs work again, and low-memory hosts get sensible CPU limits before a job starts. (#2628, #2597, #2526, #2546)
+- **GPU detection is more reliable**: CUDA is detected through the driver, RTX 50-series cards fall back to CPU instead of failing, and hardware video encoders are test-run before use. (#4225, #4075, #3980, #3983)
+- **`MAX_WORKER_THREADS` now works**. It was parsed but never applied. (#3249)
+- **Long tools get the long timeout**: pdf-to-word, compress-pdf, convert-document, and content-aware resize no longer time out early on big files. (#3276)
+- **Compress PDF keeps scans readable**, and says so when a target size can't be reached instead of producing an unreadable file. (#4112)
+- **Failed logins are throttled per username**: more than ten in fifteen minutes gets a 429 with `Retry-After`. (#827)
+- **Errors say what went wrong**: missing binaries, storage faults, out-of-memory kills, and upload limits now get specific messages instead of a bare 500 or 422.
+- **The audit log covers tool, batch, and pipeline runs**, and user, role, team, and GDPR events record who did what to whom. (#3991, #3984)
+- **The all-in-one container stops on a bad first boot** instead of restarting forever, and the embedded Postgres and Redis have startup deadlines. (#3008, #1130)
+- **Dates and plurals follow your language**, and the last hardcoded English strings are translated.
+- **Mobile and editor polish**: slider, Sign PDF, and crop layouts on phones, touch drag, faster pixel brushes, and Levels and Curves in undo and autosave.
+
+### Bug Fixes
+
+- **Adjust Colors combined settings wrongly**: temperature, saturation, hue, contrast, and sepia overrode each other instead of stacking. (#3153, #3120, #3469)
+- **Pixelate didn't pixelate**, and PNG output was quietly palette-reduced across image tools. (#709, #716)
+- **Animated GIF and WebP lost frames** in several tools, and GIF palettes and transparency came out wrong. (#1184, #1225, #3407, #2573)
+- **Rotated uploads lost quality**: auto-orient dropped lossless encoding, transparency, and 16-bit depth. Animated WebP now rotates every frame. (#2384, #2529)
+- **TIFFs with transparency, AV1 HEIF files, and several RAW formats** failed or lost alpha. (#2609, #2572, #1120)
+- **Resizing the editor canvas scaled the image** instead of adding room around it. (#2081)
+- **Output filenames got mangled**: `.jpeg` and `.tif` became something else, and dotfiles or names that repeat their extension broke. (#3495, #3382)
+- **Library auto-save ignored the storage quota**, and storage counters could go negative. (#2389, #2585)
+- **Jobs stuck after a restart** are now settled at startup instead of showing "processing" forever. (#3219, #3193)
+- **OIDC sign-in named every new user "admin"**, and iOS Safari sign-ins ended on an error page after succeeding. (#862, #4021)
+- **Disabled password rules were still enforced** when creating users. (#1028)
+- **Damaged PDFs hung for 30 seconds** before failing. (#920)
+- **The AI bundle disk check asked for about 18 GB** to install a single bundle. (#1248)
+- **Compress Video failed on variable-frame-rate screen recordings.** (#2427)
+- **Batch background removal lost finished results** when the browser retried the request. (#2015)
+- **Settings number fields couldn't be cleared** while typing. (#1449)
+- **Turning analytics off left queued events to send** about 30 seconds later. They're now dropped when you opt out. (#4270)
+
+### Upgrade Notes
+
+Migrations run on their own at startup. You don't need to run any SQL.
+
+- **Database roles.** The canonical Compose file now gives the app a role that can only read and write data (`DATABASE_URL`) and a separate privileged connection (`DATABASE_MIGRATION_URL`) that's used only at boot for migrations and grants. An existing Compose file keeps working as before: leave `DATABASE_MIGRATION_URL` unset and SnapOtter runs with one role. For a non-local deployment, set `POSTGRES_APP_PASSWORD` alongside `POSTGRES_PASSWORD`.
+- **Stricter startup checks.** These used to fail later, or quietly. Now they stop the container with a message naming the variable: an unsupported `DEFAULT_LOCALE` (use a supported code like `de`, not `de_DE`), malformed `SAML_IDP_SSO_URL`, `SAML_CALLBACK_URL`, or `OIDC_ISSUER_URL` when SSO is on, an invalid `TRUST_PROXY` list, a bad `BASE_PATH`, and an unwritable `LOG_DIR`.
+- **`TRUST_PROXY` no longer takes a hop count.** A number like `TRUST_PROXY=2` now stops the container at startup instead of silently trusting no proxy. Set it to the proxy addresses or named ranges (the default is `loopback,linklocal,uniquelocal`), `false` when nothing proxies SnapOtter, or `true` only when a proxy you control sits in front on a public address. (#998)
+- **`MAX_WORKER_THREADS` now takes effect.** If you set it and saw no change before, you'll see it now.
+- **API status codes.** Engine and storage faults return 503 `ENGINE_UNAVAILABLE` (batch endpoints used to return 422). Over-limit uploads return 413 (was 400). Malformed `clientJobId` returns 400 and a reused one 409 (was 500). Replaying your own pipeline batch returns 202. `mode=targetSize` without `targetSizeKb` returns 400. A refused local login under SSO enforcement returns 401 instead of 403 `SSO_ENFORCED`. Throttled logins return 429 `LOGIN_THROTTLED`. The remove-background result no longer includes `originalUrl`.
+- **New optional variables**: `BASE_PATH`, `DATABASE_MIGRATION_URL`, `GDPR_EXPORT_TIMEOUT_MS` (15 minutes by default, `0` disables), `EMBEDDED_REDIS_TIMEOUT_S` (180), and `EMBEDDED_POSTGRES_TIMEOUT_S` (600).
+- **Compose files ship with the release.** `docker-compose.yml` and `docker-compose-gpu.yml` are attached to this release, so you can download them straight from the release page.
+
+### Acknowledgements
+
+A million pulls means a lot of people reporting bugs, sending fixes, and telling us what was missing. This release is mostly their work.
+
+Code and contributions:
+
+- **@zakka258** ❤️: Built the PDF Multi-Tool page editor and subpath deployment, two of the biggest features in this release, including the tests for auth and SSO under a subpath. (#1338, #1252, #1324, #1295)
+- **@akshat-lakhera** ❤️: Built the one-click compress-to-size image presets, fixed preview concurrency and cleanup, and stopped blocked browser storage from hanging the login spinner. (#1250, #1368, #2359)
+- **@ChrisCreatesNet** ❤️: Added drag-and-drop page reordering to Organize PDF, which they'd first asked for in Discussions. (#1249, #965)
+- **@drakeo338** ❤️: Ten fixes across the stack, including auto-orient keeping format and quality, SCIM groups created in one transaction, AI installs under cgroup v2, and 5xx errors no longer masked as 422. (#1229, #2014, #1638, #1667)
+- **@SuranaSanyam** ❤️: Added transparent canvas padding to the editor, fixed stale Compress PDF target-size verdicts, and allowed partial team updates. (#4111, #4112, #1906, #2366, #2367)
+- **@thejdubb02** ❤️: Stopped self-hosted instances sending heatmap data, validated `TRUST_PROXY` at startup instead of crashing, and fixed SCIM group-name and qpdf timeout handling. (#1051, #1052, #1053, #993, #994)
+- **@88subarno88** ❤️: Turned several 500s into proper 400 and 409 answers for malformed job ids and multipart imports, and fixed clearing number fields in Settings. (#1486, #1556, #1603, #1449)
+- **@harshoutoftokens** ❤️: Made barcode reading work offline by bundling its decoder, fixed media previews showing the input, and improved format search. (#1401, #1512, #1388)
+- **@darklabs9** ❤️: Reported and fixed Compress Video failing on variable-frame-rate screen recordings. (#2426, #2427)
+- **@dvd233** ❤️: Exposed every camera RAW format the decoder supports, and made favicon tools show up for ICO searches. (#1120, #1121)
+- **@bercedev** ❤️: Fixed filenames whose stem repeats the extension, and made AI report the device it actually runs on. (#3382, #3613)
+- **@pamod-madubashana** ❤️: Translated the last English-only MFA heading and wired up unused progress strings. (#1228, #1227)
+- **@mvanhorn** ❤️: Fixed duplicate username allocation on SAML sign-in. (#2640)
+- **@peremunoz** ❤️: Stopped barcode generation hiding storage and memory faults as "Invalid text". (#4057)
+- **@mayuriphad** ❤️: Fixed a crash on a malformed stored alert auth header. (#3080)
+- **@DevShoaib78** ❤️: Fixed closing the polygonal lasso in the editor. (#1207)
+- **@dltsum** ❤️: Moved progress displays onto the shared message catalog. (#1262)
+- **@albanobattistella** ❤️: Translation fixes. (#1024)
+- **@shoaibyazdani** ❤️: Regenerated the macOS visual baselines. (#2475)
+
+Security disclosures:
+
+- **@xaferima** ❤️: Found that SVGs the decoder rejected skipped sanitization, and worked through the impact with us. (GHSA-9c7h-xjrp-8gh3, #1211)
+- **@emirhancatkin** ❤️: Found that result links also served the original upload. (GHSA-jgv3-2jc6-f628, #3623)
+- **@shaoyuuuuu** ❤️: Found that passport photo and background effects trusted a client-supplied job id. (GHSA-3c8g-8v4x-qq9j, #3623)
+- **@nguyenvantiennani** ❤️: Found that URL import skipped permission checks. (GHSA-8xxr-g2w8-7f9r, #3780)
+- **tonghuaroot** ❤️: Reported IPv6 bypasses of the SSRF address checks, with working proofs of concept. The fixes shipped in 2.0.0, and this thank-you is overdue. (#287)
+
+Bug reports:
+
+- **@kabo** ❤️: The example `docker-compose.yml` didn't work. (#1027)
+- **@xromen** ❤️: Damaged PDFs hanging until a 30-second qpdf timeout. (#920)
+- **@snmabaur** ❤️: OIDC sign-in setting every profile name to "admin". (#862)
+- **@CodecNomad** ❤️: The Blur tool duplicating the image. (#829)
+- **@ohora0923** ❤️ and **@Alexis-VS-CSharp** ❤️: Pixelate not working. (#678, #775)
+- **@mptpro** ❤️: The background-removal AI download failing. (#714)
+- **@dominic427** ❤️: Resizing the editor canvas scaled the image instead of extending it. (#2016)
+- **@CodeByToast** ❤️: Number fields in Settings that couldn't be cleared. (#1186)
+- **@gioxx** ❤️: The AI bundle disk check demanding about 18 GB for one bundle. (#1248)
+- **@rekcodocker** ❤️ and **@madmike970** ❤️: AI bundle installs failing on Proxmox LXC, with the container details that helped pin it down. (#1030, #352)
+- **@wxf26054** ❤️: Disabled password rules still enforced when creating users. (#1028)
+- **@ersil** ❤️: iOS Safari requesting the OIDC callback twice and landing on an error page after a successful sign-in. (#4021)
+- **@casi-3** ❤️: Batch background removal losing finished results when the browser replayed the request, with a precise diagnosis. (#2015)
+- **@killervette42** ❤️: The Blackwell GPU failure on unRaid, which fed into the RTX 50-series CPU fallback. (#120, #4075)
+
+Feature requests and feedback:
+
+- **@photoevents** ❤️: Measured that background removal spent about 11 seconds loading the model and 1 second inferring, proposed caching sessions, and shared what they'd learned running their own cache. That became the session cache in this release. (#768, #776, #4144)
+- **@benbou8231** ❤️: Pointed out that imported files land in reverse order across multi-file tools, which led to reordering before a run. (#729, #756)
+- **@cf3901646** ❤️: Traced a noisy production error to Postgres error class 58 and proposed the fix. We couldn't merge their PR without a signed CLA, so we wrote the same fix ourselves. (#4210, #4253)
+- **@chiliec** ❤️: Spotted that a failed auto-orient was swallowed silently and that install progress ignored the translation catalog. Both proposals shipped through maintainer PRs. (#1266, #1416, #1258, #1262)
+- **@wahajahmed010** ❤️: Proposed single-flighting the enterprise module import, the fix for concurrent SCIM requests disagreeing about the licence. (#1267, #1283)
+- **@chenzeyan54-commits** ❤️: Pointed out that the configuration guide never mentioned the engine binary overrides or `SNAPOTTER_HW_ACCEL`, which are documented now. (#1312, #1696)
+- **@aron-intframe** ❤️: Reproduced an exiftool error-handling gap on a fresh clone and found the temp-path race was worse than the issue described. (#3458)
+
+Thank you as well to the community members who reported these over Discord and email, whose names we did not record.
+
+[Full diff on GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.2.0...v2.3.0)
+
+---
+
 ## v2.2.0 {#v2-2-0}
 
 Most of 2.2 is hardening. A non-admin holding a delegated `users:manage` role could take over an instance, and every tool endpoint turned out to be missing its permission check. Upgrade if you run more than one user.
