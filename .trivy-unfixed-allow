@@ -315,3 +315,84 @@ CVE-2026-56208
 CVE-2026-56209
 CVE-2026-56210
 CVE-2026-56211
+
+# ---------------------------------------------------------------------------
+# Added for 2.3.0 (2026-11-03). Forty IDs Debian published against the arm64
+# bookworm base after 2.2.0. Same packages as above or close neighbours, all
+# with no fix in bookworm, bookworm-security or bookworm-backports per Trivy's
+# fix status at release time. The 2.2.0 arm64 image carries the same or older
+# versions of every package below, so shipping 2.3.0 adds no exposure.
+#
+# Unlike the entries above, these were classified from the code paths and the
+# reasoning already recorded in this file, not re-verified with LD_DEBUG and
+# rdepends against the image. That pass and the arm64 base move
+# (IMG-20260726-005) are tracked in the follow-up issue filed with this change.
+# Re-check: next release.
+# ---------------------------------------------------------------------------
+
+# Reachable from an upload, same paths as the entries above.
+# ghostscript 10.0.0: PDF previews and compression run gs on user PDFs
+# (apps/api/src/modality/preview.ts and the doc-engine), always under -dSAFER.
+CVE-2026-101258
+CVE-2026-103226
+# ImageMagick 6.9.11: format-decoders.ts falls back to it for uploads.
+CVE-2026-119123
+# tesseract 5: the OCR tools feed it user images.
+CVE-2026-73066
+CVE-2026-88047
+CVE-2026-88048
+CVE-2026-88051
+CVE-2026-88052
+CVE-2026-88053
+# OpenEXR 3.1.5, expat 2.5.0, libtiff 4.5.0, libxml2 2.9.14: see their entries
+# above for the upload paths.
+CVE-2026-59184
+CVE-2026-59186
+CVE-2026-59187
+CVE-2026-59189
+CVE-2026-59981
+CVE-2026-59982
+CVE-2026-68515
+CVE-2026-117610
+CVE-2026-118370
+CVE-2026-52490
+CVE-2026-74860
+CVE-2026-86138
+CVE-2026-86140
+CVE-2026-86142
+CVE-2026-86143
+CVE-2026-86144
+# LibreOffice 7.4 (reported against fonts-opensymbol, the same source package):
+# every office-format upload goes through convertDocument.
+CVE-2026-63277
+# raptor2: LibreOffice's RDF metadata parser, so an ODF upload can plausibly
+# reach it. Not ruled out, so filed as reachable.
+CVE-2025-71436
+# GStreamer base plugins: a LibreOffice avmedia dependency. Headless
+# --convert-to doesn't play embedded media, but that isn't verified.
+CVE-2026-86476
+
+# Shadowed or not on a user path, same reasoning as the entries above.
+# libheif1 1.15.1 is shadowed by the 1.23.4 build in /usr/local/lib.
+CVE-2026-84450
+CVE-2026-84451
+# sqlite 3.40 needs attacker-controlled SQL; the app runs on Postgres.
+CVE-2026-11822
+CVE-2026-11824
+CVE-2026-119373
+# libcups2: client library only, nothing opens an IPP connection.
+CVE-2026-55453
+# curl: the only runtime call is the localhost healthcheck.
+CVE-2026-8458
+# util-linux (reported against bsdutils): never invoked with user input.
+CVE-2026-53613
+CVE-2026-78410
+# libsystemd0 and libudev1: linked by base packages, no systemd or udev runs in
+# the container.
+CVE-2026-16742
+# libx11 and libxrender: X client libraries pulled in by Chromium and
+# LibreOffice. The container has no X server, so there is no peer to send them
+# crafted protocol data.
+CVE-2026-88806
+CVE-2026-88807
+
