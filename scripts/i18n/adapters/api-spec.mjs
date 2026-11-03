@@ -23,10 +23,54 @@ function loadEnglishSpec(dir) {
   return yaml.load(raw);
 }
 
+// Keys whose string values are prose a reader sees. Example payloads and vendor
+// extensions are skipped: their strings are data, not documentation.
+const PROSE_KEYS = new Set(["summary", "description"]);
+const SKIPPED_KEYS = new Set(["example", "examples"]);
+
+const isSkippedKey = (key) => SKIPPED_KEYS.has(key) || key.startsWith("x-");
+
+/**
+ * Slots that have a dedicated id form above. The pointer walk must not emit them
+ * a second time under a `ptr:` id.
+ */
+function hasDedicatedId(segments) {
+  const [head, ...rest] = segments;
+  if (head === "info") return rest.length === 1 && rest[0] === "description";
+  if (head === "tags") return rest.length === 2 && rest[1] === "description";
+  if (head === "paths") {
+    return rest.length === 3 && HTTP_METHODS.includes(rest[1]) && PROSE_KEYS.has(rest[2]);
+  }
+  return false;
+}
+
+// RFC 6901 JSON Pointer, prefixed so it never collides with the dotted ids above.
+const pointerId = (segments) =>
+  `ptr:/${segments.map((s) => String(s).replace(/~/g, "~0").replace(/\//g, "~1")).join("/")}`;
+
+function collectPointerProse(node, segments, out) {
+  if (Array.isArray(node)) {
+    for (let i = 0; i < node.length; i++) collectPointerProse(node[i], [...segments, i], out);
+    return;
+  }
+  if (!node || typeof node !== "object") return;
+  for (const [key, value] of Object.entries(node)) {
+    if (isSkippedKey(key)) continue;
+    const next = [...segments, key];
+    if (PROSE_KEYS.has(key) && typeof value === "string") {
+      if (!hasDedicatedId(next)) out.push([pointerId(next), value]);
+    } else {
+      collectPointerProse(value, next, out);
+    }
+  }
+}
+
 /**
  * Walk a parsed spec and yield [id, text] for every translatable prose field,
  * in a deterministic order. This is the single source of the id contract used by
- * extract, load, and write.
+ * extract, load, and write. Every `summary` and `description` string in the
+ * document is prose, so responses, parameters, and schema properties are covered
+ * alongside the operation-level fields that have dotted ids.
  * @param {any} spec
  * @returns {Array<[string, string]>}
  */
@@ -52,6 +96,7 @@ export function proseFields(spec) {
       }
     }
   }
+  collectPointerProse(spec, [], out);
   return out;
 }
 
@@ -78,6 +123,17 @@ export function setProseField(spec, id, value) {
     const [, path, method, field] = pathMatch;
     const op = spec.paths?.[path]?.[method];
     if (op) op[field] = value;
+    return;
+  }
+  if (id.startsWith("ptr:/")) {
+    const segments = id
+      .slice("ptr:/".length)
+      .split("/")
+      .map((s) => s.replace(/~1/g, "/").replace(/~0/g, "~"));
+    const key = segments.pop();
+    let parent = spec;
+    for (const segment of segments) parent = parent?.[segment];
+    if (parent && typeof parent === "object") parent[key] = value;
   }
 }
 

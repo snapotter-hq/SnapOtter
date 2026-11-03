@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -124,7 +124,7 @@ export function BarcodeGenerateSettings() {
         return;
       }
       unsubscribe();
-      setError(err instanceof Error ? err.message : ts.generateFailed);
+      setError(userErrorMessage(t, err, ts.generateFailed));
     } finally {
       unsubscribe();
       if (abortRef.current === controller) {

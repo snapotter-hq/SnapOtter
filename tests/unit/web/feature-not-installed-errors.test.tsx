@@ -185,7 +185,8 @@ describe("feature-not-installed errors are translated (#1410)", () => {
     }
     for (const locale of SUPPORTED_LOCALES) {
       const tr = await loadTranslations(locale.code);
-      const errors = tr.errors as Record<string, string>;
+      // `codes` is a nested object; the keys checked here are all strings.
+      const errors = tr.errors as unknown as Record<string, string>;
       for (const key of [
         "featureNotInstalledForTool",
         "featureNotInstalled",

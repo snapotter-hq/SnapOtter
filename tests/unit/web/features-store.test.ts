@@ -10,6 +10,8 @@ const apiPostMock = vi.fn();
 vi.mock("@/lib/api", () => ({
   apiGet: (...args: unknown[]) => apiGetMock(...args),
   apiPost: (...args: unknown[]) => apiPostMock(...args),
+  userErrorMessage: (_t: unknown, err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback,
 }));
 
 class FakeEventSource {
