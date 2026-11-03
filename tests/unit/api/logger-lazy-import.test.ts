@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify from "fastify";
@@ -94,6 +94,80 @@ describe("logger module load (#1418)", () => {
       { timeout: 10_000, interval: 100 },
     );
   });
+
+  it("keeps running when the log file cannot be opened (#4203)", async () => {
+    // A log file fault used to reach an EventEmitter with no "error" listener
+    // and take the whole API down as an uncaught exception (Sentry NODE-4B).
+    // A LOG_DIR that is a file fails the open, portably.
+    const env = fullEnv();
+    const blocked = join(env.LOG_DIR, "not-a-dir");
+    writeFileSync(blocked, "");
+    stubConfig({ ...env, LOG_DIR: blocked });
+
+    const uncaught: unknown[] = [];
+    const onUncaught = (err: unknown) => uncaught.push(err);
+    process.on("uncaughtException", onUncaught);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { logger } = await import(LOGGER_PATH);
+      logger.info("first line");
+
+      // Wait for whichever way the failure surfaces, a crash or the warning.
+      await vi.waitFor(
+        () => {
+          expect(uncaught.length + errSpy.mock.calls.length).toBeGreaterThan(0);
+        },
+        { timeout: 10_000, interval: 50 },
+      );
+      expect(uncaught).toEqual([]);
+      expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[logger\] log file .*EEXIST/));
+
+      // Writes after the failure still reach stdout, never throw, and never
+      // reach the uncaught path or repeat the warning.
+      expect(() => logger.error("after the failure")).not.toThrow();
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(uncaught).toEqual([]);
+      expect(errSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      process.off("uncaughtException", onUncaught);
+      errSpy.mockRestore();
+    }
+  });
+
+  // /dev/full fails every write with ENOSPC, the full-disk case from the field.
+  it.skipIf(!existsSync("/dev/full"))(
+    "keeps running when log file writes fail with ENOSPC (#4203)",
+    async () => {
+      const env = fullEnv();
+      symlinkSync("/dev/full", join(env.LOG_DIR, "snapotter.1.log"));
+      stubConfig(env);
+
+      const uncaught: unknown[] = [];
+      const onUncaught = (err: unknown) => uncaught.push(err);
+      process.on("uncaughtException", onUncaught);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const { logger } = await import(LOGGER_PATH);
+        logger.info("first line");
+
+        await vi.waitFor(
+          () => {
+            expect(uncaught.length + errSpy.mock.calls.length).toBeGreaterThan(0);
+          },
+          { timeout: 10_000, interval: 50 },
+        );
+        // Let any flush timer still queued behind the failure run.
+        for (let i = 0; i < 5; i++) logger.info(`after the failure ${i}`);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(uncaught).toEqual([]);
+        expect(errSpy).toHaveBeenCalledTimes(1);
+        expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[logger\] log file .*ENOSPC/));
+      } finally {
+        process.off("uncaughtException", onUncaught);
+        errSpy.mockRestore();
+      }
+    },
+  );
 
   it("lets vi.spyOn intercept calls made through the shared export", async () => {
     // The export has to stay a plain object with own, configurable methods:
