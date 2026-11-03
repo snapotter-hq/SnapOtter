@@ -18,6 +18,7 @@ import {
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { validateStagedMedia } from "../../lib/staged-media-validation.js";
 import { type TranscriptSegment, toSrt, toVtt } from "../../lib/subtitle-format.js";
 import {
   discardUnenqueuedUploads,
@@ -177,6 +178,16 @@ export function registerAutoSubtitles(app: FastifyInstance) {
         if (!inputKey) {
           return reply.status(400).send({ error: "No video file provided" });
         }
+
+        const rejection = await validateStagedMedia({
+          key: inputKey,
+          filename,
+          kind: "video",
+          toolId,
+          jobId,
+          log: request.log,
+        });
+        if (rejection) return reply.status(rejection.status).send(rejection.body);
 
         let settings: z.infer<typeof settingsSchema>;
         try {
