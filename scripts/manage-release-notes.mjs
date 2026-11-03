@@ -71,6 +71,21 @@ function docsChangelogBody(notes) {
   return body.replace(/^---[ \t]*$/gm, "").trim();
 }
 
+// Every release has a "New Features" or "Bug Fixes" subsection, and VitePress
+// refuses to build when two headings share an id, so each one gets an id
+// scoped to its version. Headings that already carry an id are left alone.
+function scopeSubheadingIds(body, version) {
+  const prefix = `v${version.replaceAll(".", "-")}`;
+  return body.replace(/^(#{3,6}[ \t]+)(.+?)[ \t]*$/gm, (line, hashes, title) => {
+    if (/\{#[^}]+\}$/.test(title)) return line;
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return slug ? `${hashes}${title} {#${prefix}-${slug}}` : line;
+  });
+}
+
 export function syncDocsChangelog(
   root,
   version,
@@ -82,7 +97,7 @@ export function syncDocsChangelog(
   const archived = path.join(root, ".release-notes", `v${version}.md`);
   if (!existsSync(archived)) return false;
 
-  const body = docsChangelogBody(readFileSync(archived, "utf8"));
+  const body = scopeSubheadingIds(docsChangelogBody(readFileSync(archived, "utf8")), version);
   const entry = [
     `## v${version}`,
     "",
