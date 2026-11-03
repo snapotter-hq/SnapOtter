@@ -103,7 +103,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "ocr",
     name: "OCR",
     description: "Extract text from images and PDFs",
-    estimatedSize: "208-234 MiB",
+    estimatedSize: "215-241 MiB",
     enablesTools: ["ocr", "ocr-pdf"],
     smokeImports: ["rapidocr", "onnxruntime"],
   },

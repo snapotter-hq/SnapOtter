@@ -14,7 +14,7 @@ Container chạy dưới danh nghĩa một người dùng không phải root chu
 
 ## Làm cứng thùng chứa {#container-hardening}
 
-Các tệp soạn thảo [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) và [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) chuẩn là nguồn gốc của sự thật. Không sao chép một ví dụ viết tắt vào sản xuất; triển khai tệp từ thẻ phát hành mà bạn đã xác minh.
+Các tệp soạn thảo [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) và [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) chuẩn là nguồn gốc của sự thật. Không sao chép một ví dụ viết tắt vào sản xuất; triển khai tệp từ thẻ phát hành mà bạn đã xác minh.
 
 Cả hai ngăn xếp đều áp dụng các điều khiển sau:
 
@@ -242,7 +242,7 @@ Mỗi bản phát hành SnapOtter bao gồm các tạo phẩm bảo mật sau:
 Tải xuống bản kê khai chủ đề phát hành và xác minh rằng nó đã được chứng thực bởi quy trình phát hành:
 
 ```bash
-gh attestation verify snapotter-v2.3.0-release-subjects.json \
+gh attestation verify snapotter-v2.2.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -253,13 +253,13 @@ Bạn cũng có thể quét trực tiếp SBOM đã tải xuống hoặc hình �
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.3.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.3.0
+trivy image snapotter/snapotter:2.2.0
 ```
 
 ::: info
