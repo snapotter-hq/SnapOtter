@@ -7772,7 +7772,7 @@ paths:
       tags:
         - Features
       summary: Cài mọi gói tính năng mà một công cụ cần
-      description: Xếp hàng từng gói mà công cụ cần và báo cho từng gói là đã xếp hàng hay bị bỏ qua. Yêu cầu features:manage.
+      description: Xếp hàng từng gói mà công cụ cần và cho biết mỗi gói đã được xếp hàng hay bị bỏ qua. Yêu cầu features:manage.
       parameters:
         - name: toolId
           in: path
@@ -22474,7 +22474,7 @@ x-i18n:
     paths./api/v1/admin/tools/{toolId}/features/install.post.description:
       sourceHash: 5769016e70ea
       provenance: machine
-      outputHash: 882f3d715773
+      outputHash: f138bd75c9fe
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine

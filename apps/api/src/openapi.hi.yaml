@@ -7274,7 +7274,7 @@ paths:
       description: |
         बिना कनेक्शन खुला रखे job की संग्रहीत स्थिति लौटाता है। 202 प्रतिक्रिया के बाद इसे poll करें, या progress stream बंद होने पर fallback के रूप में इसका उपयोग करें।
 
-        `status` `queued`, `processing`, `completed`, `failed` या `canceled` में से एक है। `completed`, `failed` और `canceled` terminal हैं। Canceled job में फिर भी `result` हो सकता है (जैसे पूरी हुई फ़ाइलों का ZIP), इसलिए `result` मौजूद होने पर उसे ज़रूर पढ़ें।
+        `status` `queued`, `processing`, `completed`, `failed` या `canceled` में से एक है। `completed`, `failed` और `canceled` terminal हैं। Canceled job में फिर भी आंशिक `result` हो सकता है (जैसे पूरी हुई फ़ाइलों का ZIP), इसलिए `result` मौजूद होने पर उसे ज़रूर पढ़ें।
 
         पहुँच progress stream के अनुसार होती है: job का owner, `files:all` वाला उपयोगकर्ता, या feature-install job के लिए `features:manage` वाला उपयोगकर्ता। कोई अन्य caller 404 पाता है।
       parameters:
@@ -7734,7 +7734,7 @@ paths:
         - Features
       summary: सभी AI feature bundles रीसेट करें
       description: |
-        AI virtual environment, models और pip cache को मिटाता है, फिर हर bundle को इंस्टॉल नहीं के रूप में चिह्नित करता है। इसका उपयोग तब करें जब install अपने आप ठीक न हो सके। किसी bundle को uninstall करने पर केवल उसके model weights हटते हैं, इसलिए यह पूरा reset है।
+        AI virtual environment, models और pip cache को मिटाता है, फिर हर bundle को इंस्टॉल नहीं किया हुआ चिह्नित करता है। इसका उपयोग तब करें जब install अपने आप ठीक न हो सके। किसी bundle को uninstall करने पर केवल उसके model weights हटते हैं, इसलिए यह पूरा reset है।
 
         प्रतिक्रिया बताती है कि venv आधार (baked base) से दोबारा seed हुआ या नहीं (venvReseeded)। bundle install चल रहा हो तो 409 लौटाता है। features:manage आवश्यक है।
       responses:
@@ -22407,7 +22407,7 @@ x-i18n:
     paths./api/v1/jobs/{jobId}.get.description:
       sourceHash: 3b539e2cd6b0
       provenance: machine
-      outputHash: a2fa8b64d807
+      outputHash: 714db74cd2a5
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -22463,7 +22463,7 @@ x-i18n:
     paths./api/v1/admin/features/reset.post.description:
       sourceHash: be188cb61d14
       provenance: machine
-      outputHash: 7bbd31a9f46d
+      outputHash: 629e9ea4aac0
     paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
       sourceHash: b51abe2a96a1
       provenance: machine

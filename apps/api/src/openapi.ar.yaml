@@ -7637,7 +7637,7 @@ paths:
       tags:
         - System
       summary: إرسال ملاحظات حول المنتج
-      description: يسجّل حدثًا واحدًا من الملاحظات من المستخدم المسجَّل الدخول. الحد 10 طلبات في الدقيقة. `accepted` تكون false عندما لا يسجّل الخادم الحدث.
+      description: يسجّل حدث ملاحظات واحدًا من المستخدم المسجَّل الدخول. الحد 10 طلبات في الدقيقة. `accepted` تكون false عندما لا يسجّل الخادم الحدث.
       requestBody:
         required: true
         content:
@@ -7735,7 +7735,7 @@ paths:
         - Features
       summary: إعادة ضبط كل حزم ميزات الذكاء الاصطناعي
       description: |
-        يمسح البيئة الافتراضية لـ AI والنماذج وذاكرة pip المؤقتة، ثم يضع علامة غير مثبّتة على كل حزمة. استخدمه عندما يتعذر على التثبيت التعافي وحده. إلغاء تثبيت حزمة يزيل أوزان نماذجها فقط، لذا فهذه هي الإعادة الكاملة.
+        يمسح البيئة الافتراضية لـ AI والنماذج وذاكرة pip المؤقتة، ثم يُعلّم كل حزمة بأنها غير مثبّتة. استخدمه عندما يتعذّر على التثبيت أن يتعافى وحده. إلغاء تثبيت حزمة يزيل أوزان نماذجها فقط، لذا فهذه هي الإعادة الكاملة.
 
         توضح الاستجابة إن أُعيد بناء البيئة من الأساس المدمج (venvReseeded). تُرجع 409 أثناء تشغيل تثبيت حزمة. يتطلب features:manage.
       responses:
@@ -22451,7 +22451,7 @@ x-i18n:
     paths./api/v1/feedback.post.description:
       sourceHash: 294a6d11b67b
       provenance: machine
-      outputHash: 1f7800f52046
+      outputHash: 8aada816d530
     paths./api/v1/admin/latest-release.get.summary:
       sourceHash: 5c462d541cf1
       provenance: machine
@@ -22467,7 +22467,7 @@ x-i18n:
     paths./api/v1/admin/features/reset.post.description:
       sourceHash: be188cb61d14
       provenance: machine
-      outputHash: 0675b63d8399
+      outputHash: e3fabfa32db7
     paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
       sourceHash: b51abe2a96a1
       provenance: machine

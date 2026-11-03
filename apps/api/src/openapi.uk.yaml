@@ -7638,7 +7638,7 @@ paths:
       tags:
         - System
       summary: Надіслати відгук про продукт
-      description: Записує одну подію зворотного зв'язку від увійденого користувача. Обмежено 10 запитами на хвилину. `accepted` має значення false, якщо сервер не записав подію.
+      description: Записує одну подію зворотного зв'язку від користувача, який увійшов в систему. Обмежено 10 запитами на хвилину. `accepted` має значення false, якщо сервер не записав подію.
       requestBody:
         required: true
         content:
@@ -22452,7 +22452,7 @@ x-i18n:
     paths./api/v1/feedback.post.description:
       sourceHash: 294a6d11b67b
       provenance: machine
-      outputHash: 6c9a1d2dc773
+      outputHash: 637cf207c335
     paths./api/v1/admin/latest-release.get.summary:
       sourceHash: 5c462d541cf1
       provenance: machine

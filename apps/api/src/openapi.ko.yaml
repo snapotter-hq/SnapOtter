@@ -22,7 +22,7 @@ servers:
     description: Current instance
 tags:
   - name: Tools
-    description: 길게 묶이지 않은 도구 엔드포인트입니다.
+    description: 특정 섹션에 묶이지 않은 도구 엔드포인트입니다.
   - name: Image
     description: 이미지 도구입니다. 각 도구는 multipart 파일 업로드를 받아 다운로드 URL을 반환합니다.
   - name: Video
@@ -20770,7 +20770,7 @@ paths:
       tags:
         - Enterprise
       summary: SCIM 사용자 부분 업데이트
-      description: RFC 7644 PatchOp입니다. 서버가 허용하는 경로에 대해 add, remove, replace를 지원합니다. 사용자 경로는 작업마다 검증됩니다.
+      description: RFC 7644 PatchOp입니다. 서버가 허용하는 경로에 대해 add, remove, replace를 지원합니다. 사용자 경로는 각 연산마다 검증됩니다.
       parameters:
         - name: id
           in: path
@@ -20898,7 +20898,7 @@ paths:
       tags:
         - Enterprise
       summary: SCIM 그룹 부분 업데이트
-      description: RFC 7644 PatchOp입니다. 서버가 허용하는 경로에 대해 add, remove, replace를 지원합니다. 그룹 멤버는 작업마다 검증됩니다.
+      description: RFC 7644 PatchOp입니다. 서버가 허용하는 경로에 대해 add, remove, replace를 지원합니다. 그룹 멤버는 각 연산마다 검증됩니다.
       parameters:
         - name: id
           in: path
@@ -21422,7 +21422,7 @@ x-i18n:
     tags.Tools.description:
       sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: 363b2b62698b
+      outputHash: 1ac8050510ac
     tags.Image.description:
       sourceHash: 74856faf62a4
       provenance: machine
@@ -24386,7 +24386,7 @@ x-i18n:
     paths./api/v1/scim/v2/Users/{id}.patch.description:
       sourceHash: 4d560dd051f1
       provenance: machine
-      outputHash: e8174d338c5b
+      outputHash: e513039ef4c6
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -24434,7 +24434,7 @@ x-i18n:
     paths./api/v1/scim/v2/Groups/{id}.patch.description:
       sourceHash: 758265bf4193
       provenance: machine
-      outputHash: 18e12588cc00
+      outputHash: 9651201a574d
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine

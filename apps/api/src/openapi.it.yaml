@@ -7278,7 +7278,7 @@ paths:
 
         `status` è uno tra `queued`, `processing`, `completed`, `failed` o `canceled`. `completed`, `failed` e `canceled` sono stati terminali. Un job annullato può comunque contenere un `result` parziale (per esempio uno ZIP dei file completati), quindi leggi `result` ogni volta che è presente.
 
-        L'accesso segue il flusso di avanzamento: il proprietario del job, un utente con `files:all`, oppure un utente con `features:manage` per un job di installazione di una funzionalità. Qualsiasi altro chiamante riceve 404.
+        L'accesso segue il flusso di avanzamento: il proprietario del job, un utente con `files:all`, oppure un utente con `features:manage` per un job di installazione di un bundle di funzionalità. Qualsiasi altro chiamante riceve 404.
       parameters:
         - name: jobId
           in: path
@@ -22412,7 +22412,7 @@ x-i18n:
     paths./api/v1/jobs/{jobId}.get.description:
       sourceHash: 3b539e2cd6b0
       provenance: machine
-      outputHash: b3f91b06b3ed
+      outputHash: eb47e5043933
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine

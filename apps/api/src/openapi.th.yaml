@@ -7697,7 +7697,7 @@ paths:
       description: |
         ล้างสภาพแวดล้อมเสมือน AI โมเดล และแคช pip จากนั้นทำเครื่องหมายว่าทุกชุดฟีเจอร์ยังไม่ได้ติดตั้ง ใช้เมื่อการติดตั้งไม่สามารถกู้คืนได้เอง การถอนการติดตั้งชุดฟีเจอร์จะลบเฉพาะน้ำหนักโมเดล ดังนั้นการรีเซ็ตนี้คือการรีเซ็ตทั้งหมด
 
-        การตอบกลับจะระบุว่า venv ถูกเติมใหม่จากฐานที่บันทึกไว้หรือไม่ (venvReseeded) คืน 409 ขณะที่การติดตั้งชุดฟีเจอร์กำลังทำงาน ต้องใช้สิทธิ์ features:manage
+        การตอบกลับจะระบุว่า venv ถูกเติมใหม่จากฐานที่ฝังมาในอิมเมจหรือไม่ (venvReseeded) คืน 409 ขณะที่การติดตั้งชุดฟีเจอร์กำลังทำงาน ต้องใช้สิทธิ์ features:manage
       responses:
         '200':
           description: Reset complete
@@ -22395,7 +22395,7 @@ x-i18n:
     paths./api/v1/admin/features/reset.post.description:
       sourceHash: be188cb61d14
       provenance: machine
-      outputHash: 0dbd61d37f96
+      outputHash: 626e1d779722
     paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
       sourceHash: b51abe2a96a1
       provenance: machine
