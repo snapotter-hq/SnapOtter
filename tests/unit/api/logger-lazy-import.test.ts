@@ -11,6 +11,11 @@ const PARTIAL_ENV = { env: { WORKSPACE_PATH: "/tmp/snapotter-logger-test" } };
 
 let logDir: string | undefined;
 
+/** Waits `n` event-loop turns, without a fixed sleep. */
+async function turns(n: number) {
+  for (let i = 0; i < n; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
 function stubConfig(env: Record<string, unknown>) {
   vi.doMock(CONFIG_PATH, () => ({ env }));
   vi.resetModules();
@@ -80,8 +85,8 @@ describe("logger module load (#1418)", () => {
     app.log.info("logger-lazy-import test line");
     await app.close();
 
-    // The transport is a worker thread that has to load pino-roll before the
-    // first write, so give it room on a loaded host. pino-roll 4 names the
+    // pino-roll opens the file asynchronously, so give it room on a loaded
+    // host. pino-roll 4 names the
     // first file <LOG_DIR>/snapotter.1.log (its own ".log" fallback; it ignores
     // the configured extension, which happens to be the same).
     const dir = logDir as string;
@@ -92,6 +97,25 @@ describe("logger module load (#1418)", () => {
         );
       },
       { timeout: 10_000, interval: 100 },
+    );
+  });
+
+  it("writes lines logged while the file is still opening, in order (#4203)", async () => {
+    stubConfig(fullEnv());
+    const { logger } = await import(LOGGER_PATH);
+    // Logged before pino-roll has opened the file, so both go through the
+    // pending buffer.
+    logger.info("pending line one");
+    logger.info("pending line two");
+
+    const file = join(logDir as string, "snapotter.1.log");
+    await vi.waitFor(
+      () => {
+        const text = readFileSync(file, "utf8");
+        expect(text).toContain("pending line two");
+        expect(text.indexOf("pending line one")).toBeLessThan(text.indexOf("pending line two"));
+      },
+      { timeout: 10_000, interval: 50 },
     );
   });
 
@@ -122,10 +146,10 @@ describe("logger module load (#1418)", () => {
       expect(uncaught).toEqual([]);
       expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[logger\] log file .*EEXIST/));
 
-      // Writes after the failure still reach stdout, never throw, and never
-      // reach the uncaught path or repeat the warning.
+      // Writes after the failure never throw, never reach the uncaught path,
+      // and don't repeat the warning.
       expect(() => logger.error("after the failure")).not.toThrow();
-      await new Promise((resolve) => setImmediate(resolve));
+      await turns(5);
       expect(uncaught).toEqual([]);
       expect(errSpy).toHaveBeenCalledTimes(1);
     } finally {
@@ -156,9 +180,10 @@ describe("logger module load (#1418)", () => {
           },
           { timeout: 10_000, interval: 50 },
         );
-        // Let any flush timer still queued behind the failure run.
+        // The old transport crashed again from a flush timer queued behind
+        // the failure; give any such timer its turns.
         for (let i = 0; i < 5; i++) logger.info(`after the failure ${i}`);
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await turns(5);
         expect(uncaught).toEqual([]);
         expect(errSpy).toHaveBeenCalledTimes(1);
         expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[logger\] log file .*ENOSPC/));
