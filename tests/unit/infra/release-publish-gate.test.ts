@@ -44,6 +44,10 @@ function isGate(job: Job): boolean {
   return environment === GATE_ENVIRONMENT;
 }
 
+// A job-level always(), !cancelled(), or failure() runs a job even when the
+// approval was rejected, which would skip the gate.
+const FORCE_RUN = /always\(\)|cancelled\(\)|failure\(\)/;
+
 // A job can write to Docker Hub, GHCR, or Hugging Face if it holds a write
 // credential for one of them or pushes an image.
 function canPublish(job: Job): boolean {
@@ -53,7 +57,8 @@ function canPublish(job: Job): boolean {
     packagesWrite ||
     text.includes("secrets.DOCKERHUB_TOKEN") ||
     text.includes("secrets.HF_TOKEN") ||
-    text.includes("push=true")
+    text.includes("push=true") ||
+    text.includes('"secrets":"inherit"')
   );
 }
 
@@ -74,6 +79,14 @@ describe("release publish approval gate (#4329)", () => {
     expect(ungated).toEqual([]);
   });
 
+  it("never force-runs a publishing job or anything it needs past a rejected approval", () => {
+    const forced = Object.keys(release.jobs)
+      .filter((name) => canPublish(release.jobs[name]))
+      .flatMap((name) => [name, ...ancestors(release, name)])
+      .filter((name) => FORCE_RUN.test(release.jobs[name].if ?? ""));
+    expect(forced).toEqual([]);
+  });
+
   it("asks for approval before the first image push, not after the scan", () => {
     const gates = [...ancestors(release, "docker")].filter((name) => isGate(release.jobs[name]));
     expect(gates).not.toEqual([]);
@@ -90,8 +103,8 @@ describe("release publish approval gate (#4329)", () => {
       const chain = ancestors(bundles, name);
       expect(chain.has("validate-inputs"), `${name} must need validate-inputs`).toBe(true);
       for (const ancestor of [name, ...chain]) {
-        expect(bundles.jobs[ancestor].if ?? "", `${ancestor} must not force-run`).not.toContain(
-          "always()",
+        expect(bundles.jobs[ancestor].if ?? "", `${ancestor} must not force-run`).not.toMatch(
+          FORCE_RUN,
         );
       }
     }
