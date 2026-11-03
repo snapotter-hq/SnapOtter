@@ -10,6 +10,7 @@ vi.mock("@/lib/analytics", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
+  translatedCodeMessage: () => undefined,
   formatHeaders: () => new Map<string, string>(),
   parseApiError: (body: unknown) => (body as { error?: string } | null)?.error ?? "error",
 }));

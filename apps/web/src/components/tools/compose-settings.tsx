@@ -200,7 +200,7 @@ export function ComposeSettings() {
         processedFilename: null,
         processedSize: null,
         status: "failed",
-        error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+        error: userErrorMessage(t, err, t.errors.processingFailedNoDetail),
         errorCategory: feedbackCategoryOf(err),
       });
     } finally {

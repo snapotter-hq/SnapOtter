@@ -521,7 +521,7 @@ describe("remove-background result after the files change (#2107)", () => {
     vi.mocked(track).mockClear();
     fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
 
-    await waitFor(() => expect(screen.getByText("Boom")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Effects failed: 500")).toBeInTheDocument());
     expect(clickSpy).not.toHaveBeenCalled();
     expect(track).not.toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, expect.anything());
     unmount();

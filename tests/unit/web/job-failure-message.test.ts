@@ -41,8 +41,8 @@ describe("jobFailureMessage", () => {
 });
 
 describe("frameFailure", () => {
-  it("keeps real server text as the message", () => {
-    expect(frameFailure("Mask is empty")).toEqual({ message: "Mask is empty" });
+  it("maps server text without a known code to noDetail", () => {
+    expect(frameFailure("Mask is empty")).toEqual({ reason: "noDetail" });
   });
 
   it("maps a missing, blank or non-string error to noDetail", () => {

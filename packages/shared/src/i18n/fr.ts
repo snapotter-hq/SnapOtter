@@ -5678,6 +5678,58 @@ export const fr: TranslationKeys = {
     uninstallFailed: "Échec de la désinstallation",
     resetFailed: "Échec de la réinitialisation",
     codes: {
+      MFA_ENROLLMENT_REQUIRED:
+        "Votre administrateur exige la double authentification. Configurez-la pour continuer.",
+      ANALYSIS_EXPIRED: "Cette analyse a expiré. Recommencez.",
+      BACKGROUND_REMOVAL_EXPIRED: "Cette suppression d'arrière-plan a expiré. Recommencez.",
+      BROWSER_CRASHED: "Le navigateur a planté pendant le rendu. Réessayez.",
+      BROWSER_NOT_AVAILABLE:
+        "Le navigateur dont cet outil a besoin n'est pas disponible pour le moment.",
+      DEPENDENCY_VALIDATION_FAILED:
+        "Ce paramètre dépend d'un autre paramètre qui n'est pas valide.",
+      FEATURE_INCOMPATIBLE:
+        "Cette fonctionnalité ne peut pas s'exécuter avec les paramètres actuels.",
+      FST_REQ_FILE_TOO_LARGE: "Ce fichier est trop volumineux pour être téléversé.",
+      IDLE_TIMEOUT: "Vous avez été déconnecté après une période d'inactivité. Reconnectez-vous.",
+      INPUT_MISSING: "Un fichier ou un paramètre nécessaire à cette étape est manquant.",
+      INVALID_CIDR: "Cette plage d'adresses IP n'est pas valide.",
+      INVALID_CODE: "Ce code n'est pas valide. Réessayez.",
+      INVALID_PASSWORD: "Ce mot de passe est incorrect.",
+      INVALID_STORED_NAME: "Ce nom de fichier stocké n'est pas valide.",
+      LOGIN_THROTTLED: "Trop de tentatives de connexion. Patientez quelques minutes et réessayez.",
+      MFA_ALREADY_ENABLED: "La connexion en deux étapes est déjà activée pour ce compte.",
+      MFA_ATTEMPTS_EXHAUSTED: "Trop de codes erronés. Recommencez la connexion.",
+      MFA_NOT_CONFIGURED: "La connexion en deux étapes n'est pas configurée pour ce compte.",
+      MFA_NOT_ENABLED: "La connexion en deux étapes n'est pas activée pour ce compte.",
+      MFA_POLICY_UNAVAILABLE:
+        "La politique d'authentification en deux étapes n'a pas pu être vérifiée. Réessayez.",
+      MUST_CHANGE_PASSWORD: "Vous devez changer votre mot de passe avant de continuer.",
+      NOT_ANIMATED: "Ce fichier n'est pas un GIF animé.",
+      NO_PENDING_ENROLLMENT:
+        "Aucune configuration de l'authentification en deux étapes n'est en cours. Recommencez.",
+      OIDC_DISCOVERY_FAILED: "Le fournisseur d'authentification unique est injoignable.",
+      OIDC_DISCOVERY_TIMEOUT: "Le fournisseur d'authentification unique n'a pas répondu à temps.",
+      OIDC_END_SESSION_INVALID:
+        "L'adresse de déconnexion de l'authentification unique n'est pas valide.",
+      OIDC_END_SESSION_SCHEME:
+        "L'adresse de déconnexion de l'authentification unique doit utiliser HTTPS.",
+      OIDC_ISSUER_SCHEME_MISMATCH:
+        "L'adresse de l'émetteur de l'authentification unique ne correspond pas à son schéma.",
+      OIDC_NO_PASSWORD:
+        "Ce compte se connecte par authentification unique, il n'a donc pas de mot de passe.",
+      PASSWORD_CHANGED: "Votre mot de passe a été modifié. Reconnectez-vous.",
+      READONLY_SETTING: "Ce paramètre est en lecture seule.",
+      SELF_DELETE: "Vous ne pouvez pas supprimer votre propre compte.",
+      SELF_DEMOTE: "Vous ne pouvez pas retirer votre propre rôle d'administrateur.",
+      SELF_LOCKOUT: "Cette modification vous verrouillerait l'accès.",
+      SETTING_DECRYPTION_FAILED: "Ce paramètre n'a pas pu être lu. Saisissez-le à nouveau.",
+      STAGED_DISCARD_FAILED: "Le fichier en attente n'a pas pu être supprimé.",
+      UNKNOWN_ROLE: "Ce rôle n'existe pas.",
+      UNKNOWN_SETTING: "Ce paramètre n'existe pas.",
+      UNKNOWN_TEAM: "Cette équipe n'existe pas.",
+      USERNAME_RACE_EXHAUSTED: "Ce nom d'utilisateur est déjà pris. Choisissez-en un autre.",
+      USER_LIMIT_REACHED: "Cette instance a atteint sa limite d'utilisateurs.",
+      WEBHOOK_DECRYPTION_FAILED: "Le secret du webhook n'a pas pu être lu. Saisissez-le à nouveau.",
       FEATURE_NOT_INSTALLED: "Cette fonctionnalité n'est pas encore installée.",
       FEATURE_NOT_LICENSED: "Cette fonctionnalité nécessite une licence.",
       ESCALATION_DENIED: "Vous ne pouvez pas accorder plus d'accès que vous n'en avez.",

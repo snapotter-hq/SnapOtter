@@ -186,7 +186,7 @@ export function CompareSettings() {
         processedFilename: null,
         processedSize: null,
         status: "failed",
-        error: err instanceof Error ? err.message : t.toolSettings.compare.comparisonFailed,
+        error: userErrorMessage(t, err, t.toolSettings.compare.comparisonFailed),
         errorCategory: feedbackCategoryOf(err),
       });
     } finally {

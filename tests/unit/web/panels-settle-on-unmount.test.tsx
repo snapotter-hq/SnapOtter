@@ -1336,25 +1336,26 @@ describe("own-store tool handlers abort and ignore late completions on store res
     useFileStore.getState().setFiles([image("one.png")]);
     render(<SplitSettings />);
 
+    // The server's reason stays in the response body for logs; the banner
+    // shows the translated fallback built from the status.
+    const SPLIT_FAILED = "Failed to split one.png: 422";
     const triggerFailedSplit = async () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId("split-submit"));
       });
-      await vi.waitFor(() =>
-        expect(screen.getByText(/Tile dimensions exceed image bounds/)).toBeInTheDocument(),
-      );
-      expect(useSplitStore.getState().error).toContain("Tile dimensions exceed image bounds");
+      await vi.waitFor(() => expect(screen.getByText(SPLIT_FAILED)).toBeInTheDocument());
+      expect(useSplitStore.getState().error).toBe(SPLIT_FAILED);
     };
 
     await triggerFailedSplit();
     fireEvent.change(screen.getByLabelText(/columns/i), { target: { value: "4" } });
     expect(useSplitStore.getState().error).toBeNull();
-    expect(screen.queryByText(/Tile dimensions exceed image bounds/)).toBeNull();
+    expect(screen.queryByText(SPLIT_FAILED)).toBeNull();
 
     await triggerFailedSplit();
     fireEvent.change(screen.getByLabelText(/rows/i), { target: { value: "5" } });
     expect(useSplitStore.getState().error).toBeNull();
-    expect(screen.queryByText(/Tile dimensions exceed image bounds/)).toBeNull();
+    expect(screen.queryByText(SPLIT_FAILED)).toBeNull();
 
     // Switch to tile-size mode to exercise tileWidth and tileHeight inputs
     fireEvent.click(screen.getByRole("button", { name: /tile size/i }));
@@ -1362,12 +1363,12 @@ describe("own-store tool handlers abort and ignore late completions on store res
     await triggerFailedSplit();
     fireEvent.change(screen.getByLabelText(/tile width/i), { target: { value: "250" } });
     expect(useSplitStore.getState().error).toBeNull();
-    expect(screen.queryByText(/Tile dimensions exceed image bounds/)).toBeNull();
+    expect(screen.queryByText(SPLIT_FAILED)).toBeNull();
 
     await triggerFailedSplit();
     fireEvent.change(screen.getByLabelText(/tile height/i), { target: { value: "300" } });
     expect(useSplitStore.getState().error).toBeNull();
-    expect(screen.queryByText(/Tile dimensions exceed image bounds/)).toBeNull();
+    expect(screen.queryByText(SPLIT_FAILED)).toBeNull();
 
     // Open Output Format section and exercise outputFormat and quality controls
     fireEvent.click(screen.getByRole("button", { name: /output format/i }));
@@ -1375,12 +1376,12 @@ describe("own-store tool handlers abort and ignore late completions on store res
     await triggerFailedSplit();
     fireEvent.click(screen.getByRole("button", { name: "WebP" }));
     expect(useSplitStore.getState().error).toBeNull();
-    expect(screen.queryByText(/Tile dimensions exceed image bounds/)).toBeNull();
+    expect(screen.queryByText(SPLIT_FAILED)).toBeNull();
 
     await triggerFailedSplit();
     fireEvent.change(screen.getByLabelText(/quality/i), { target: { value: "70" } });
     expect(useSplitStore.getState().error).toBeNull();
-    expect(screen.queryByText(/Tile dimensions exceed image bounds/)).toBeNull();
+    expect(screen.queryByText(SPLIT_FAILED)).toBeNull();
   });
 
   it("image-to-base64: aborts in-flight fetch on useBase64Store.reset() or useFileStore.reset() and stops looping", async () => {

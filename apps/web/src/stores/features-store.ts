@@ -1,7 +1,7 @@
 import type { FeatureBundleState } from "@snapotter/shared";
 import { TOOL_BUNDLE_MAP, TOOL_EXTRA_BUNDLES } from "@snapotter/shared";
 import { create } from "zustand";
-import { apiGet, apiPost, userErrorMessage } from "@/lib/api";
+import { apiGet, apiPost, translatedCodeMessage, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { currentTranslations } from "@/lib/current-translations";
 
@@ -215,6 +215,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         percent: number;
         stage: string;
         error?: string;
+        code?: string;
       };
       try {
         data = JSON.parse(event.data);
@@ -240,7 +241,9 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           es.close();
           if (esRefs[bundleId] === es) delete esRefs[bundleId];
           stopTracking(bundleId);
-          onInstallSettled(bundleId, data.error ?? "Installation failed");
+          const t = currentTranslations();
+          const code = typeof data.code === "string" ? data.code : undefined;
+          onInstallSettled(bundleId, translatedCodeMessage(t, code, 0) ?? t.errors.installFailed);
           return;
         }
         // First progress frame means the server has started this install for

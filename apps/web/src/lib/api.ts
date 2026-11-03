@@ -2,6 +2,7 @@ import { en, type TranslationKeys } from "@snapotter/shared";
 import { getDistinctId } from "@/lib/analytics";
 import { appUrl } from "@/lib/app-url";
 import { featureIncompatibleMessage, featureNotInstalledMessage } from "@/lib/bundle-i18n";
+import { currentTranslations } from "@/lib/current-translations";
 import { createXhrWatchdog } from "@/lib/xhr-watchdog";
 import { useConnectionStore } from "@/stores/connection-store";
 
@@ -122,7 +123,10 @@ export function failedAnswerMessage(
   const record = body as Record<string, unknown>;
   if (record.canceled === true) return t.errors.canceled;
   const parsed = parseApiError(record, status, fallback);
-  if (typeof parsed === "string") return parsed;
+  if (typeof parsed === "string") {
+    const code = typeof record.code === "string" ? record.code : undefined;
+    return translatedCodeMessage(t, code, status) ?? fallback;
+  }
   return parsed.type === "feature_incompatible"
     ? featureIncompatibleMessage(t, parsed)
     : featureNotInstalledMessage(t, parsed, toolName);
@@ -163,10 +167,10 @@ export function formatHeaders(init?: HeadersInit): Headers {
 }
 
 /**
- * A request the API answered with a non-2xx status. `message` is still the
- * server's `error` text, for logs and for callers that haven't moved over,
- * but that text is always English: UI copy should be chosen from `status`
- * and `code` instead (#1445). `body` is the parsed JSON, or `{}`.
+ * A request the API answered with a non-2xx status. `message` is translated
+ * from `code` or `status` (or the generic text), so reading it is safe for
+ * UI. The server's English `error` text stays in `body` for logs (#4285).
+ * `body` is the parsed JSON, or `{}`.
  */
 export class ApiError extends Error {
   constructor(
@@ -178,6 +182,28 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+/**
+ * Translated text for a server answer, from its code or its status. Returns
+ * undefined when nothing maps, so the caller shows its own translated fallback.
+ * Server English never comes back from here (#4285).
+ */
+export function translatedCodeMessage(
+  t: TranslationKeys,
+  code: string | undefined,
+  status: number,
+): string | undefined {
+  const table: Partial<Record<string, string>> = {
+    ...t.errors.codes,
+    AUTH_REQUIRED: t.errors.sessionEnded,
+    FORBIDDEN: t.errors.forbidden,
+    IP_NOT_ALLOWED: t.auth.ipNotAllowed,
+  };
+  if (code !== undefined && table[code]) return table[code];
+  // A rate limiter's 429 carries no code.
+  if (status === 429) return t.errors.tooManyRequests;
+  return undefined;
 }
 
 /**
@@ -193,17 +219,10 @@ export function apiErrorMessage(
   fallback: string,
 ): string {
   if (err instanceof ApiError) {
-    const byAnyCode: Partial<Record<string, string>> = {
-      ...t.errors.codes,
-      AUTH_REQUIRED: t.errors.sessionEnded,
-      FORBIDDEN: t.errors.forbidden,
-      IP_NOT_ALLOWED: t.auth.ipNotAllowed,
-      ...byCode,
-    };
-    const mapped = err.code !== undefined ? byAnyCode[err.code] : undefined;
-    if (mapped) return mapped;
-    // A rate limiter's 429 carries no code.
-    if (err.status === 429) return t.errors.tooManyRequests;
+    const own = err.code !== undefined ? byCode[err.code] : undefined;
+    if (own) return own;
+    const translated = translatedCodeMessage(t, err.code, err.status);
+    if (translated) return translated;
   }
   // The screen shows only the translated fallback, so keep the server's
   // reason where someone debugging can find it.
@@ -222,19 +241,25 @@ export function userErrorMessage(t: TranslationKeys, err: unknown, fallback: str
 }
 
 export async function throwWithMessage(res: Response): Promise<never> {
-  let msg = `API error: ${res.status}`;
   let body: Record<string, unknown> = {};
   try {
     const parsed = await res.json();
     if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>;
-    if (typeof body.error === "string" && body.error) msg = body.error;
-    else if (typeof body.message === "string" && body.message) msg = body.message;
   } catch (error) {
     // response wasn't JSON — use the default message, but keep the parse
     // failure visible for proxies and gateways that answer with HTML (#4062)
     console.warn(`Failed to parse non-2xx API response (status: ${res.status}):`, error);
   }
-  throw new ApiError(msg, res.status, typeof body.code === "string" ? body.code : undefined, body);
+  const code = typeof body.code === "string" ? body.code : undefined;
+  // The message shown to anyone who reads err.message is translated. The
+  // server's English text stays in body.error for logs.
+  const t = currentTranslations();
+  throw new ApiError(
+    translatedCodeMessage(t, code, res.status) ?? t.errors.generic,
+    res.status,
+    code,
+    body,
+  );
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
@@ -452,11 +477,8 @@ export function apiUploadUserFiles(
           );
         }
         if (xhr.status === 413) {
-          const quotaMsg =
-            body?.code === "STORAGE_QUOTA_EXCEEDED" && typeof body.error === "string"
-              ? body.error
-              : "";
-          reject(new Error(quotaMsg || t.errors.fileTooLarge));
+          const code = typeof body?.code === "string" ? body.code : undefined;
+          reject(new Error(translatedCodeMessage(t, code, 413) ?? t.errors.fileTooLarge));
           return;
         }
         const message = body

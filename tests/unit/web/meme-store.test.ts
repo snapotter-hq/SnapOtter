@@ -330,15 +330,15 @@ describe("useMemeStore", () => {
       expect(s.loading).toBe(false);
     });
 
-    it("on non-ok response: routes body through failedAnswerMessage (#3158)", async () => {
+    it("on non-ok response: shows the fallback and keeps the server reason out of the UI (#3158)", async () => {
       fetchMock.mockReturnValueOnce(failResponse(503, { error: "Template catalog unavailable" }));
       await useMemeStore.getState().fetchTemplates();
-      expect(useMemeStore.getState().error).toBe("Template catalog unavailable");
+      expect(useMemeStore.getState().error).toBe("Failed to load templates: 503");
       expect(useMemeStore.getState().loading).toBe(false);
 
       fetchMock.mockReturnValueOnce(failResponse(500, { details: "Storage offline" }));
       await useMemeStore.getState().fetchTemplates();
-      expect(useMemeStore.getState().error).toBe("Storage offline");
+      expect(useMemeStore.getState().error).toBe("Failed to load templates: 500");
 
       fetchMock.mockReturnValueOnce(failResponse(502, { error: { nested: true } }));
       await useMemeStore.getState().fetchTemplates();
@@ -607,11 +607,11 @@ describe("useMemeStore", () => {
       expect(s.generating).toBe(false);
     });
 
-    it("on non-ok response: extracts error from body", async () => {
+    it("on non-ok response: shows the fallback, not the server error text", async () => {
       useMemeStore.setState({ selectedTemplate: TEMPLATE });
       fetchMock.mockReturnValue(failResponse(422, { error: "Invalid text" }));
       await useMemeStore.getState().generateMeme();
-      expect(useMemeStore.getState().error).toBe("Invalid text");
+      expect(useMemeStore.getState().error).toBe("Generation failed: 422");
     });
 
     it("on non-ok response with no body error: uses status code", async () => {

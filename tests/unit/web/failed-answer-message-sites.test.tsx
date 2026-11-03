@@ -60,21 +60,24 @@ const FEATURE_NOT_INSTALLED = {
   estimatedSize: "1 GB",
 };
 
-/** Answers a real server sends, with what the site should end on. */
+/**
+ * Answers a real server sends. None carries a code the table maps, so every
+ * site ends on its own translated fallback and the server text stays out of the UI.
+ */
 function answers(fallback: string): Array<[string, unknown, string]> {
   return [
     ["an object error", { error: { reason: "x" } }, fallback],
-    ["details alone", { details: "Not enough memory" }, "Not enough memory"],
-    ["a string error", { error: "Bad file" }, "Bad file"],
+    ["details alone", { details: "Not enough memory" }, fallback],
+    ["a string error", { error: "Bad file" }, fallback],
     [
       "the error handler's echo of one message",
       { error: "Bad file", details: "Bad file" },
-      "Bad file",
+      fallback,
     ],
     [
       "an error with different details",
       { error: "Invalid settings", details: "x: too big" },
-      "Invalid settings: x: too big",
+      fallback,
     ],
     ["a body that is not JSON", NOT_JSON, fallback],
   ];
@@ -224,7 +227,7 @@ const STORES: StoreRow[] = [
 ];
 
 describe.each(STORES)("$site: a failed answer", (row) => {
-  it.each(answers(row.fallback))("ends on %s as readable text", async (_label, body, expected) => {
+  it.each(answers(row.fallback))("ends on the fallback for %s", async (_label, body, expected) => {
     answer = { status: STATUS, body };
     expect(await row.run(en)).toBe(expected);
   });
@@ -435,7 +438,7 @@ async function importPipeline(t: TranslationKeys): Promise<void> {
 
 describe("automate pipeline import: a failed answer", () => {
   it.each(answers(en.automate.importFailed))(
-    "shows %s as readable text",
+    "shows the fallback for %s",
     async (_label, body, expected) => {
       answer = { status: STATUS, body };
       await importPipeline(en);

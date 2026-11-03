@@ -5653,6 +5653,57 @@ export const es: TranslationKeys = {
     uninstallFailed: "Error al desinstalar",
     resetFailed: "Error al restablecer",
     codes: {
+      MFA_ENROLLMENT_REQUIRED:
+        "Su administrador exige la verificación en dos pasos. Configúrela para continuar.",
+      ANALYSIS_EXPIRED: "Este análisis ha caducado. Empieza de nuevo.",
+      BACKGROUND_REMOVAL_EXPIRED: "Esta eliminación de fondo ha caducado. Empieza de nuevo.",
+      BROWSER_CRASHED: "El navegador se bloqueó durante el renderizado. Inténtalo de nuevo.",
+      BROWSER_NOT_AVAILABLE:
+        "El navegador que necesita esta herramienta no está disponible en este momento.",
+      DEPENDENCY_VALIDATION_FAILED: "Este ajuste depende de otro ajuste que no es válido.",
+      FEATURE_INCOMPATIBLE: "Esta función no se puede ejecutar con los ajustes actuales.",
+      FST_REQ_FILE_TOO_LARGE: "Este archivo es demasiado grande para subirlo.",
+      IDLE_TIMEOUT: "Se cerró tu sesión por inactividad. Vuelve a iniciar sesión.",
+      INPUT_MISSING: "Falta un archivo o un ajuste que necesita este paso.",
+      INVALID_CIDR: "Ese rango de direcciones IP no es válido.",
+      INVALID_CODE: "Ese código no es válido. Inténtalo de nuevo.",
+      INVALID_PASSWORD: "Esa contraseña no es correcta.",
+      INVALID_STORED_NAME: "Ese nombre de archivo almacenado no es válido.",
+      LOGIN_THROTTLED:
+        "Demasiados intentos de inicio de sesión. Espera unos minutos e inténtalo de nuevo.",
+      MFA_ALREADY_ENABLED: "El inicio de sesión en dos pasos ya está activado en esta cuenta.",
+      MFA_ATTEMPTS_EXHAUSTED:
+        "Demasiados códigos incorrectos. Inicia sesión de nuevo desde el principio.",
+      MFA_NOT_CONFIGURED: "El inicio de sesión en dos pasos no está configurado en esta cuenta.",
+      MFA_NOT_ENABLED: "El inicio de sesión en dos pasos no está activado en esta cuenta.",
+      MFA_POLICY_UNAVAILABLE: "No se pudo comprobar la política de dos pasos. Inténtalo de nuevo.",
+      MUST_CHANGE_PASSWORD: "Debes cambiar tu contraseña antes de continuar.",
+      NOT_ANIMATED: "Este archivo no es un GIF animado.",
+      NO_PENDING_ENROLLMENT:
+        "No hay ninguna configuración de dos pasos en curso. Empieza de nuevo.",
+      OIDC_DISCOVERY_FAILED: "No se pudo contactar con el proveedor de inicio de sesión único.",
+      OIDC_DISCOVERY_TIMEOUT: "El proveedor de inicio de sesión único no respondió a tiempo.",
+      OIDC_END_SESSION_INVALID:
+        "La dirección de cierre de sesión del inicio de sesión único no es válida.",
+      OIDC_END_SESSION_SCHEME:
+        "La dirección de cierre de sesión del inicio de sesión único debe usar HTTPS.",
+      OIDC_ISSUER_SCHEME_MISMATCH:
+        "La dirección del emisor del inicio de sesión único no coincide con su esquema.",
+      OIDC_NO_PASSWORD:
+        "Esta cuenta inicia sesión con inicio de sesión único, por lo que no tiene contraseña.",
+      PASSWORD_CHANGED: "Se cambió tu contraseña. Vuelve a iniciar sesión.",
+      READONLY_SETTING: "Este ajuste es de solo lectura.",
+      SELF_DELETE: "No puedes eliminar tu propia cuenta.",
+      SELF_DEMOTE: "No puedes quitarte a ti mismo el rol de administrador.",
+      SELF_LOCKOUT: "Este cambio te bloquearía el acceso.",
+      SETTING_DECRYPTION_FAILED: "No se pudo leer este ajuste. Introdúcelo de nuevo.",
+      STAGED_DISCARD_FAILED: "No se pudo descartar el archivo preparado.",
+      UNKNOWN_ROLE: "Ese rol no existe.",
+      UNKNOWN_SETTING: "Ese ajuste no existe.",
+      UNKNOWN_TEAM: "Ese equipo no existe.",
+      USERNAME_RACE_EXHAUSTED: "Ese nombre de usuario ya está en uso. Elige otro.",
+      USER_LIMIT_REACHED: "Esta instancia ha alcanzado su límite de usuarios.",
+      WEBHOOK_DECRYPTION_FAILED: "No se pudo leer el secreto del webhook. Introdúcelo de nuevo.",
       FEATURE_NOT_INSTALLED: "Esta función aún no está instalada.",
       FEATURE_NOT_LICENSED: "Esta función requiere una licencia.",
       ESCALATION_DENIED: "No puedes conceder más acceso del que tienes.",

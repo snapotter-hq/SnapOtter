@@ -16,6 +16,7 @@ vi.mock("@/lib/analytics", () => ({
 
 vi.mock("@/lib/api", () => ({
   formatHeaders: () => new Map<string, string>(),
+  translatedCodeMessage: () => undefined,
   parseApiError: (body: { code?: string }) =>
     body?.code === "feature_not_installed"
       ? {
@@ -640,7 +641,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     unmount();
   });
 
-  it("settles the entry to failed when the SSE reports the job failed", () => {
+  it("settles the entry to failed with the fallback when the SSE reports the job failed", () => {
     const { unmount } = startRun();
 
     act(() => {
@@ -649,10 +650,10 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
 
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
-      error: "boom",
+      error: "Processing failed",
       errorCategory: null,
     });
-    expect(useFileStore.getState().error).toBe("boom");
+    expect(useFileStore.getState().error).toBe("Processing failed");
     expect(useFileStore.getState().processing).toBe(false);
 
     unmount();
@@ -781,14 +782,14 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     });
     expect(useFileStore.getState().entries[1]).toMatchObject({
       status: "failed",
-      error: "boom",
+      error: "Processing failed",
     });
     expect(useFileStore.getState().entries[2].status).toBe("pending");
 
     hook.unmount();
   });
 
-  it("shows the operator hint a failed frame carries (#1432)", () => {
+  it("shows the fallback, not the server text or operator hint, for a failed frame whose code has no translation (#1432)", () => {
     const { unmount } = startRun();
 
     act(() => {
@@ -801,9 +802,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
       });
     });
 
-    const expected =
-      "PDF processing is unavailable on this server because qpdf could not be started.: " +
-      "Check QPDF_PATH: it must point at an executable qpdf binary.";
+    const expected = "Processing failed";
     expect(useFileStore.getState().entries[0]).toMatchObject({ status: "failed", error: expected });
     expect(useFileStore.getState().error).toBe(expected);
 
@@ -1416,7 +1415,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
     unmount();
   });
 
-  it("ends the run with the frame's own error when failing the entry throws", () => {
+  it("ends the run with the fallback when failing the entry throws", () => {
     const { unmount } = startRun();
     degrade();
     breakEntryWrites();
@@ -1425,8 +1424,8 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       sendSingleFrame({ phase: "failed", percent: 0, error: "server said no" });
     });
 
-    // The server's error, not the generic frame-handling one.
-    expectRunEnded("server said no", TOOL_SETTLE_REPORT);
+    // The fallback for the failed frame, not the generic frame-handling error.
+    expectRunEnded("Processing failed", TOOL_SETTLE_REPORT);
     unmount();
   });
 
@@ -2681,7 +2680,7 @@ describe("useToolProcessor entry-identity settle and stale onload guard (#944)",
     expect(useFileStore.getState().entries[0].status).toBe("pending");
     expect(useFileStore.getState().entries[1]).toMatchObject({
       status: "failed",
-      error: "boom",
+      error: "Processing failed",
     });
     unmount();
   });
@@ -2827,7 +2826,7 @@ describe("useToolProcessor entry-identity settle and stale onload guard (#944)",
     });
     expect(useFileStore.getState().entries[1]).toMatchObject({
       status: "failed",
-      error: "boom",
+      error: "Processing failed",
     });
     unmount();
   });

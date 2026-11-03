@@ -771,7 +771,7 @@ describe("Optimize for Web live preview failures are visible (#2185)", () => {
     });
   }
 
-  it("shows the API's reason, drops the stale savings, and reports the failure", async () => {
+  it("shows the translated preview-failed copy instead of the API's reason, drops the stale savings, and reports the failure", async () => {
     vi.useFakeTimers();
     try {
       const reason = "Invalid settings: maxWidth: Expected integer, received float";
@@ -787,7 +787,8 @@ describe("Optimize for Web live preview failures are visible (#2185)", () => {
       previewFetch.failNext();
       await changeQuality();
 
-      expect(screen.getByRole("alert")).toHaveTextContent(reason);
+      expect(screen.getByRole("alert")).toHaveTextContent(en.toolPage.previewFailed);
+      expect(screen.getByRole("alert")).not.toHaveTextContent(reason);
       expect(screen.queryByText("60.0% smaller")).not.toBeInTheDocument();
       expect(screen.queryByText(copy.sizeComparison)).not.toBeInTheDocument();
       expect(captureHandledError).toHaveBeenCalledTimes(1);
@@ -954,7 +955,8 @@ describe("Optimize for Web live preview failures are visible (#2185)", () => {
       previewFetch.failNext();
       await changeQuality();
 
-      expect(screen.getByRole("alert")).toHaveTextContent("Could not decode image");
+      expect(screen.getByRole("alert")).toHaveTextContent(en.toolPage.previewFailed);
+      expect(screen.getByRole("alert")).not.toHaveTextContent("Could not decode image");
       expect(captureHandledError).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
