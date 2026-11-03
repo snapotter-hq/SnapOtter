@@ -826,6 +826,8 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
           bundleId: "ocr",
           jobId: expect.any(String),
           queued: false,
+          statusUrl: expect.any(String),
+          progressUrl: expect.any(String),
         },
       ],
     });
