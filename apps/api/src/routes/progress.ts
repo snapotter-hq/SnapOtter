@@ -940,6 +940,14 @@ async function streamAccess(
   return "denied";
 }
 
+/** Shared by the SSE stream and GET /api/v1/jobs/:jobId so both answer the same question. */
+export async function canReadJob(
+  row: { userId: string | null; settings: unknown },
+  user: AuthUser,
+): Promise<boolean> {
+  return (await streamAccess(row, user)) === "allowed";
+}
+
 async function jobStreamAccess(
   jobId: string,
   user: AuthUser,

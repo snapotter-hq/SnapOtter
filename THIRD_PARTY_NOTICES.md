@@ -7,7 +7,7 @@ Package authors retain all rights granted by their respective licenses.
 
 ## (Apache-2.0 AND MIT)
 
-- [posthog-js@1.404.1](https://posthog.com/docs/libraries/js)
+- [posthog-js@1.438.12](https://posthog.com/docs/libraries/js)
 
 ## (BSD-2-Clause OR MIT OR Apache-2.0)
 
@@ -136,7 +136,7 @@ Package authors retain all rights granted by their respective licenses.
 - [sharp@0.35.5](https://sharp.pixelplumbing.com)
 - [text-decoder@1.2.7](https://github.com/holepunchto/text-decoder#readme)
 - [tunnel-agent@0.6.0](https://github.com/mikeal/tunnel-agent#readme)
-- [web-vitals@5.3.0](https://github.com/GoogleChrome/web-vitals#readme)
+- [web-vitals@6.2.1](https://github.com/GoogleChrome/web-vitals#readme)
 
 ## BSD-2-Clause
 
@@ -312,8 +312,9 @@ Package authors retain all rights granted by their respective licenses.
 - [@oslojs/encoding@1.1.0](https://github.com/oslo-project/encoding#readme)
 - [@oxc-project/types@0.156.0](https://oxc.rs)
 - [@pinojs/redact@0.4.0](https://github.com/pinojs/redact#readme)
-- [@posthog/core@1.43.1,1.62.0](https://github.com/PostHog/posthog-js#readme)
-- [@posthog/types@1.397.0,1.418.0](https://github.com/PostHog/posthog-js#readme)
+- [@posthog/browser-common@0.9.12](https://github.com/PostHog/posthog-js#readme)
+- [@posthog/core@1.62.0](https://github.com/PostHog/posthog-js#readme)
+- [@posthog/types@1.418.0](https://github.com/PostHog/posthog-js#readme)
 - [@remix-run/route-pattern@0.22.1](https://github.com/remix-run/remix/tree/main/packages/route-pattern#readme)
 - [@rolldown/binding@1.2.16](https://rolldown.rs/)
 - [@rolldown/pluginutils@1.0.1](https://github.com/rolldown/plugins/tree/main/packages/pluginutils#readme)

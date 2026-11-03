@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import {
@@ -166,7 +166,7 @@ export function ImageToBase64Settings() {
           addError({
             entryId,
             filename: file.name,
-            error: err instanceof Error ? err.message : "Failed to convert",
+            error: userErrorMessage(t, err, "Failed to convert"),
           });
           continue;
         }

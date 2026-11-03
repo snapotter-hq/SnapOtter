@@ -7,7 +7,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
 import { cancelAbandonedJob, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
@@ -894,12 +894,7 @@ export function EraseObjectSettings({
       }
       endWatch();
       const category = err instanceof Error ? undefined : "upload_error";
-      endRunWithError(
-        err instanceof Error ? err.message : t.errors.network,
-        stopProgress,
-        false,
-        category,
-      );
+      endRunWithError(userErrorMessage(t, err, t.errors.network), stopProgress, false, category);
     }
   };
 

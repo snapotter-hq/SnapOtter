@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { quietImport } from "@/lib/chunk-reload";
 import { formatFileSize } from "@/lib/download";
@@ -278,9 +278,7 @@ export function FindDuplicatesSettings() {
       cleanup();
       if (!stillLoaded()) return;
       try {
-        setError(
-          err instanceof Error ? err.message : t.toolSettings["find-duplicates"].networkErrorUpload,
-        );
+        setError(userErrorMessage(t, err, t.toolSettings["find-duplicates"].networkErrorUpload));
       } finally {
         setScanning(false);
       }
@@ -328,7 +326,7 @@ export function FindDuplicatesSettings() {
     a.click();
     URL.revokeObjectURL(url);
     claimToolResult("find-duplicates", duplicateResultKey(results));
-  }, [files, results, bestOverrides]);
+  }, [files, results, bestOverrides, t]);
 
   const handleDownloadGrouped = useCallback(async () => {
     if (!results || results.duplicateGroups.length === 0) return;
@@ -391,7 +389,7 @@ export function FindDuplicatesSettings() {
     a.click();
     URL.revokeObjectURL(url);
     claimToolResult("find-duplicates", duplicateResultKey(results));
-  }, [files, results]);
+  }, [files, results, t]);
 
   const hasFiles = files.length >= 2;
   const presetDescriptions: Record<Preset, string> = {

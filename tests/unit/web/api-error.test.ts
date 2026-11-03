@@ -84,7 +84,7 @@ describe("apiErrorMessage (#1445)", () => {
   });
 
   it.each([
-    ["an unmapped code", err(409, "CONFLICT")],
+    ["an unmapped code", err(409, "NOT_MAPPED_ANYWHERE")],
     ["no code", err(500)],
     ["a plain Error", new Error("plain")],
   ])("falls back for %s and logs the reason", (_case, error) => {

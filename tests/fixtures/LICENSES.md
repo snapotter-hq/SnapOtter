@@ -56,7 +56,7 @@ reliably."
 | Path | Format | Notes |
 |------|--------|-------|
 | `content/speech-10s.wav` | 16kHz mono PCM WAV | Primary speech fixture (~6.7s) |
-| `content/speech-10s.mp4` | AAC in MP4 container | Speech for video transcription tests |
+| `content/speech-10s.mp4` | AAC plus a 64x64 black H.264 track in MP4 | Speech for video transcription tests |
 | `content/speech.flac` | FLAC lossless | Audio format variant |
 | `content/speech.ogg` | Ogg Vorbis | Audio format variant |
 | `content/speech.m4a` | AAC in M4A container | Audio format variant |

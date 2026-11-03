@@ -41,6 +41,8 @@ vi.mock("@/lib/api", () => ({
   apiListFiles: vi.fn(),
   apiUploadUserFiles: vi.fn(),
   apiDeleteUserFiles: vi.fn(),
+  userErrorMessage: (_t: unknown, err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback,
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPut: vi.fn(),

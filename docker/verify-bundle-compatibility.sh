@@ -183,11 +183,7 @@ if violations:
 
 print()
 print('All constrained packages present in exactly one, correct version.')
-"
-
-if [[ $? -ne 0 ]]; then
-  fail "Constrained-package consistency check failed -- see violations above" 2
-fi
+" || fail "Constrained-package consistency check failed -- see violations above" 2
 
 log "Scanning every package for multi-version disagreement (not just constrained)"
 

@@ -216,6 +216,8 @@ describe("OCR route enqueue safety", () => {
     expect(reply.payload).toEqual({
       jobId: artifactJobId,
       async: true,
+      statusUrl: `/api/v1/jobs/${artifactJobId}`,
+      progressUrl: `/api/v1/jobs/${artifactJobId}/progress`,
     });
   });
 

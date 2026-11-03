@@ -1,6 +1,6 @@
 # Releasing SnapOtter
 
-SnapOtter ships a multi-arch container image to Docker Hub (`snapotter/snapotter`) and GHCR (`ghcr.io/snapotter-hq/snapotter`). Releases are cut by hand, and the image publish is gated. The build and scan run automatically, but the public `latest` and version tags only go live after a maintainer approves the run.
+SnapOtter ships a multi-arch container image to Docker Hub (`snapotter/snapotter`) and GHCR (`ghcr.io/snapotter-hq/snapotter`). Releases are cut by hand, and every publish is gated. Nothing reaches Docker Hub, GHCR, or HuggingFace until a maintainer approves the run, and the public `latest` and version tags need a second approval after the scans.
 
 ## How the pipeline is wired
 
@@ -8,14 +8,15 @@ SnapOtter ships a multi-arch container image to Docker Hub (`snapotter/snapotter
 
 1. `release`: semantic-release computes the next version from the Conventional Commits since the last tag, runs `scripts/sync-version.sh` (workspace versions, `APP_VERSION`, version-pinned docs references, docs changelog), tags it, and creates a **draft** GitHub release with the committed notes.
 2. `prebuilt` and `archive-security`: build the source archives (amd64, arm64), then verify, scan, and attest them before they are attached to the release.
-3. `docker`: builds both arches and pushes them to Docker Hub + GHCR **by digest only**. These pushes are unnamed and are not pullable by any tag.
-4. `scan` and `sbom`: Trivy scans the built image and fails the run on unignored CRITICAL/HIGH vulnerabilities; CycloneDX + SPDX SBOMs are attached to the release.
-5. `ai-bundles`: builds, verifies, signs, and uploads the AI feature bundles to HuggingFace. No approval gate.
-6. `manifest`: **gated.** Creates the public `latest`, `X.Y.Z`, `X.Y`, and `X` image tags (no `v` prefix; the git tag and GitHub release are `vX.Y.Z`) on both registries. This is the moment the image becomes pullable by tag.
-7. `image-provenance`, `release-subjects`, `aliases`: attest the immutable image manifest, bind the release commit to the published subjects, and advance the non-regressing aliases.
-8. `publish-release`: flips the GitHub release from draft to public. This is also what triggers the Discord `#announcements` post (a GitHub webhook on `release` events).
+3. `publish-approval`: **gated.** The first approval. Nothing from step 4 on runs until a maintainer approves it, so a rejection here publishes nothing to Docker Hub, GHCR, or HuggingFace.
+4. `docker`: builds both arches and pushes them to Docker Hub + GHCR **by digest only**. These pushes are unnamed and are not pullable by any tag.
+5. `scan` and `sbom`: Trivy scans the built image and fails the run on unignored CRITICAL/HIGH vulnerabilities; CycloneDX + SPDX SBOMs are attached to the release.
+6. `ai-bundles`: builds, verifies, signs, and uploads the AI feature bundles to HuggingFace. It runs after `docker`, so after the first approval.
+7. `manifest`: **gated.** The second approval. Creates the public `latest`, `X.Y.Z`, `X.Y`, and `X` image tags (no `v` prefix; the git tag and GitHub release are `vX.Y.Z`) on both registries. This is the moment the image becomes pullable by tag.
+8. `image-provenance`, `release-subjects`, `aliases`: attest the immutable image manifest, bind the release commit to the published subjects, and advance the non-regressing aliases.
+9. `publish-release`: flips the GitHub release from draft to public. This is also what triggers the Discord `#announcements` post (a GitHub webhook on `release` events).
 
-The `manifest` job targets the `publish-images` GitHub Environment, which requires a maintainer to approve the run before it proceeds. If Trivy fails at step 4, `manifest` never runs and no tags are published.
+`publish-approval` and `manifest` both target the `publish-images` GitHub Environment, which requires a maintainer to approve each of them before it proceeds. If Trivy fails at step 5, `manifest` never runs and no tags are published.
 
 ## One-time setup: `RELEASE_TOKEN`
 
@@ -59,9 +60,17 @@ If `RELEASE_TOKEN` is missing, the workflow falls back to the default token, the
    gh workflow run release.yml --repo snapotter-hq/SnapOtter
    ```
    Or from the Actions tab: **Release → Run workflow**.
-4. Watch the run. Jobs `release` through `sbom` run without intervention.
+4. Watch the run. Once `release` finishes, the run pauses at `publish-approval` while `prebuilt` and `archive-security` carry on without intervention.
 
 ## Approve the publish
+
+There are two approvals, both under **Review deployments** → `publish-images`.
+
+### First approval: `publish-approval`
+
+This releases the image build, the digest pushes, and the HuggingFace bundle upload. Before approving, check that `release` produced the version you expected and that the draft GitHub release looks right. To stop here, **Reject**: nothing reaches Docker Hub, GHCR, or HuggingFace.
+
+### Second approval: `manifest`
 
 When the run reaches `manifest` it pauses with a "Review deployments" prompt, and you get a GitHub notification.
 
@@ -77,7 +86,7 @@ Before approving, check:
 
 Then approve: open the run, click **Review deployments**, select `publish-images`, and **Approve and deploy**. The `manifest` job runs and the tags go live.
 
-To abort, **Reject** the deployment instead. The version tag and the GitHub release still exist, so delete them by hand if you want to fully unwind. No image tags get published.
+To abort, **Reject** the deployment instead. The version tag and the GitHub release still exist, so delete them by hand if you want to fully unwind. No image tags get published, though the untagged digests and that version's HuggingFace bundles already went out after the first approval.
 
 ## After the tags are live
 
@@ -95,7 +104,7 @@ To abort, **Reject** the deployment instead. The version tag and the GitHub rele
 
 ## Notes
 
-- The `docker` job uploads layers by digest before the gate. They are untagged, invisible on the registry tag lists, and exist so Trivy can scan the real image before you approve. Registry garbage collection reclaims unreferenced digests over time. If you want nothing at all pushed before approval, move the `environment: publish-images` gate from `manifest` up to the `docker` job, at the cost of approving before the scan runs.
+- The `docker` job uploads layers by digest after the first approval and before the second. They are untagged, invisible on the registry tag lists, and exist so Trivy can scan the real image before you approve the tags. Registry garbage collection reclaims unreferenced digests over time. The HuggingFace bundles are also uploaded between the two approvals, so rejecting `manifest` leaves that version's bundles published.
 - To change who can approve, edit **Settings → Environments → publish-images → Required reviewers**.
 - AI feature bundles are built and published by the release's `ai-bundles` job, which calls the reusable `ai-bundles.yml` to build, verify, sign, and upload them to HuggingFace. The gated `manifest` job lists `ai-bundles` in its `needs`, so a version's public image tags go live only once that version's bundles are published. Publishing is idempotent: if the bundle release already exists it is verified, not re-uploaded.
 - `ai-bundles.yml` also has an opt-in `verify-model-bundles` job (input `verify_model_bundles`, default false) that installs each published model bundle into the unpublished release image and runs its tool against a fixture, using `docker/verify-model-bundle-runtime.sh`. It is not wired into `release.yml` or the `publish` job yet. To make it a release gate, pass `verify_model_bundles: true` from `release.yml` and add `verify-model-bundles` to `publish`'s `needs`.

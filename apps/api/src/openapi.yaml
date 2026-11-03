@@ -24,9 +24,19 @@ servers:
 
 tags:
   - name: Tools
-    description: File processing tools spanning image, video, audio, PDF, and files. Each accepts a multipart file upload and returns a download URL.
+    description: Tool endpoints that are not grouped under a section.
+  - name: Image
+    description: Image tools. Each accepts a multipart file upload and returns a download URL.
+  - name: Video
+    description: Video tools. Each accepts a multipart file upload and returns a download URL.
+  - name: Audio
+    description: Audio tools. Each accepts a multipart file upload and returns a download URL.
+  - name: PDF
+    description: PDF and document tools. Each accepts a multipart file upload and returns a download URL.
   - name: Batch
     description: Process multiple files through a tool in one request.
+  - name: Jobs
+    description: Status and progress of long-running jobs.
   - name: Pipelines
     description: Chain multiple tools into reusable workflows.
   - name: Files
@@ -99,7 +109,7 @@ components:
   schemas:
     Error:
       type: object
-      required: [error]
+      required: [error, code, requestId]
       properties:
         error:
           type: string
@@ -107,6 +117,54 @@ components:
         details:
           type: string
           description: Additional error details (e.g. Zod validation errors)
+        code:
+          type: string
+          description: Stable machine-readable code. Listed in the error catalog.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: Request ID for support and log correlation.
+          example: req-42
+
+    JobStatus:
+      type: object
+      required: [jobId, status, progress, progressUrl]
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed, canceled]
+          description: Stored job status. completed, failed, and canceled are terminal.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required: [percent]
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Present when the job has a result. The shape depends on the tool, for example downloadUrl. A canceled job can carry a partial result.
+        error:
+          type: object
+          required: [message]
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: SSE stream for this job.
+          example: /api/v1/jobs/3f9c2a1e/progress
 
     ToolResponse:
       type: object
@@ -270,7 +328,7 @@ paths:
   /api/v1/tools/image/resize:
     post:
       operationId: resizeImage
-      tags: [Tools]
+      tags: [Image]
       summary: Resize Image
       description: Resize an image to specific dimensions or by percentage.
       security:
@@ -321,7 +379,7 @@ paths:
   /api/v1/tools/image/content-aware-resize:
     post:
       operationId: contentAwareResize
-      tags: [Tools]
+      tags: [Image]
       summary: Content-aware resize
       description: Resize an image using seam carving to intelligently remove or insert content while preserving important features.
       security:
@@ -382,7 +440,7 @@ paths:
   /api/v1/tools/image/crop:
     post:
       operationId: cropImage
-      tags: [Tools]
+      tags: [Image]
       summary: Crop Image
       description: Crop an image to a specific region.
       security:
@@ -433,7 +491,7 @@ paths:
   /api/v1/tools/image/rotate:
     post:
       operationId: rotateImage
-      tags: [Tools]
+      tags: [Image]
       summary: Rotate & Flip Image
       description: Rotate an image by angle or flip horizontally/vertically.
       security:
@@ -482,7 +540,7 @@ paths:
   /api/v1/tools/image/convert:
     post:
       operationId: convertFormat
-      tags: [Tools]
+      tags: [Image]
       summary: Convert Image
       description: Convert an image to a different format.
       security:
@@ -530,7 +588,7 @@ paths:
   /api/v1/tools/image/compress:
     post:
       operationId: compressImage
-      tags: [Tools]
+      tags: [Image]
       summary: Compress Image
       description: Reduce image file size by quality level or target size.
       security:
@@ -579,7 +637,7 @@ paths:
   /api/v1/tools/image/compress-image-to-20kb:
     post:
       operationId: compressImageTo20KbTool
-      tags: [Tools]
+      tags: [Image]
       summary: "Compress Image to 20 KB"
       description: |
         Compress an image to a 20 KB target size
@@ -638,7 +696,7 @@ paths:
   /api/v1/tools/image/compress-image-to-50kb:
     post:
       operationId: compressImageTo50KbTool
-      tags: [Tools]
+      tags: [Image]
       summary: "Compress Image to 50 KB"
       description: |
         Compress an image to a 50 KB target size
@@ -697,7 +755,7 @@ paths:
   /api/v1/tools/image/compress-image-to-100kb:
     post:
       operationId: compressImageTo100KbTool
-      tags: [Tools]
+      tags: [Image]
       summary: "Compress Image to 100 KB"
       description: |
         Compress an image to a 100 KB target size
@@ -756,7 +814,7 @@ paths:
   /api/v1/tools/image/compress-image-to-200kb:
     post:
       operationId: compressImageTo200KbTool
-      tags: [Tools]
+      tags: [Image]
       summary: "Compress Image to 200 KB"
       description: |
         Compress an image to a 200 KB target size
@@ -815,7 +873,7 @@ paths:
   /api/v1/tools/image/compress-image-to-500kb:
     post:
       operationId: compressImageTo500KbTool
-      tags: [Tools]
+      tags: [Image]
       summary: "Compress Image to 500 KB"
       description: |
         Compress an image to a 500 KB target size
@@ -874,7 +932,7 @@ paths:
   /api/v1/tools/image/strip-metadata:
     post:
       operationId: stripMetadata
-      tags: [Tools]
+      tags: [Image]
       summary: Remove Image Metadata
       description: Remove EXIF, GPS, ICC, or XMP metadata from an image.
       security:
@@ -925,7 +983,7 @@ paths:
   /api/v1/tools/image/border:
     post:
       operationId: addBorder
-      tags: [Tools]
+      tags: [Image]
       summary: Border and frame
       description: Add a border, rounded corners, padding, or shadow to an image.
       security:
@@ -982,7 +1040,7 @@ paths:
   /api/v1/tools/image/beautify:
     post:
       operationId: beautifyScreenshot
-      tags: [Tools]
+      tags: [Image]
       summary: Beautify screenshot
       description: |
         Add gradient backgrounds, device frames, shadows, watermarks, and social
@@ -1056,7 +1114,7 @@ paths:
   /api/v1/tools/image/adjust-colors:
     post:
       operationId: adjustColors
-      tags: [Tools]
+      tags: [Image]
       summary: Color adjustments
       description: >
         Consolidated color adjustment tool. Adjusts brightness, contrast, exposure,
@@ -1117,7 +1175,7 @@ paths:
   /api/v1/tools/image/sharpening:
     post:
       operationId: sharpenImage
-      tags: [Tools]
+      tags: [Image]
       summary: Sharpen Image
       description: Sharpen an image using adaptive, unsharp mask, or high-pass methods with optional noise reduction.
       security:
@@ -1176,7 +1234,7 @@ paths:
   /api/v1/tools/image/optimize-for-web:
     post:
       operationId: optimizeForWeb
-      tags: [Tools]
+      tags: [Image]
       summary: Optimize for web
       description: Optimize an image for web delivery by converting to modern formats, adjusting quality, and optionally resizing.
       security:
@@ -1228,7 +1286,7 @@ paths:
   /api/v1/tools/image/optimize-for-web/preview:
     post:
       operationId: optimizeForWebPreview
-      tags: [Tools]
+      tags: [Image]
       summary: Optimize for web (preview)
       description: |
         Lightweight preview endpoint for live parameter tuning. Returns the
@@ -1290,7 +1348,7 @@ paths:
   /api/v1/tools/image/image-enhancement:
     post:
       operationId: enhanceImage
-      tags: [Tools]
+      tags: [Image]
       summary: Image enhancement
       description: |
         AI-powered automatic image enhancement. Analyzes the image and applies
@@ -1349,7 +1407,7 @@ paths:
   /api/v1/tools/image/image-enhancement/analyze:
     post:
       operationId: analyzeImageEnhancement
-      tags: [Tools]
+      tags: [Image]
       summary: Analyze image for enhancement
       description: |
         Analyze an image and return suggested corrections without applying them.
@@ -1400,7 +1458,7 @@ paths:
   /api/v1/tools/image/noise-removal:
     post:
       operationId: removeNoise
-      tags: [Tools]
+      tags: [Image]
       summary: Noise removal
       description: |
         AI-powered noise removal using the Python sidecar. Supports multiple
@@ -1438,11 +1496,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1478,7 +1547,7 @@ paths:
   /api/v1/tools/image/red-eye-removal:
     post:
       operationId: removeRedEye
-      tags: [Tools]
+      tags: [Image]
       summary: Red-eye removal
       description: |
         AI-powered red-eye detection and removal. Detects faces and corrects
@@ -1514,11 +1583,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1554,7 +1634,7 @@ paths:
   /api/v1/tools/image/restore-photo:
     post:
       operationId: restorePhoto
-      tags: [Tools]
+      tags: [Image]
       summary: Photo restoration
       description: |
         AI-powered photo restoration pipeline. Repairs scratches, enhances faces,
@@ -1593,11 +1673,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1633,7 +1724,7 @@ paths:
   /api/v1/tools/image/passport-photo/analyze:
     post:
       operationId: analyzePassportPhoto
-      tags: [Tools]
+      tags: [Image]
       summary: Passport photo - analyze
       description: |
         Phase 1 of passport photo generation. Detects face landmarks and removes
@@ -1768,7 +1859,7 @@ paths:
   /api/v1/tools/image/passport-photo/generate:
     post:
       operationId: generatePassportPhoto
-      tags: [Tools]
+      tags: [Image]
       summary: Passport photo - generate
       description: |
         Phase 2 of passport photo generation. Uses the jobId and landmarks from
@@ -1905,7 +1996,7 @@ paths:
   /api/v1/tools/image/colorize:
     post:
       operationId: colorizeImage
-      tags: [Tools]
+      tags: [Image]
       summary: Colorize
       description: |
         AI-powered photo colorization. Converts black-and-white or grayscale
@@ -1939,11 +2030,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1979,7 +2081,7 @@ paths:
   /api/v1/tools/image/enhance-faces:
     post:
       operationId: enhanceFaces
-      tags: [Tools]
+      tags: [Image]
       summary: Face enhancement
       description: |
         AI-powered face enhancement using GFPGAN or CodeFormer. Detects faces
@@ -2015,11 +2117,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2055,7 +2168,7 @@ paths:
   /api/v1/tools/image/image-to-base64:
     post:
       operationId: imageToBase64
-      tags: [Tools]
+      tags: [Image]
       summary: Image to Base64
       description: |
         Convert one or more images to Base64-encoded strings with data URIs.
@@ -2148,7 +2261,7 @@ paths:
   /api/v1/tools/image/watermark-text:
     post:
       operationId: addTextWatermark
-      tags: [Tools]
+      tags: [Image]
       summary: Text watermark
       description: Add a text watermark to an image.
       security:
@@ -2200,7 +2313,7 @@ paths:
   /api/v1/tools/image/text-overlay:
     post:
       operationId: addTextOverlay
-      tags: [Tools]
+      tags: [Image]
       summary: Text overlay
       description: Add styled text overlay with optional background box.
       security:
@@ -2253,7 +2366,7 @@ paths:
   /api/v1/tools/image/replace-color:
     post:
       operationId: replaceColor
-      tags: [Tools]
+      tags: [Image]
       summary: Replace color
       description: Replace a specific color in an image with another color or transparency.
       security:
@@ -2303,7 +2416,7 @@ paths:
   /api/v1/tools/image/color-blindness:
     post:
       operationId: simulateColorBlindness
-      tags: [Tools]
+      tags: [Image]
       summary: Color blindness simulation
       description: Simulate how an image appears to people with various types of color vision deficiency.
       security:
@@ -2350,7 +2463,7 @@ paths:
   /api/v1/tools/image/gif-tools:
     post:
       operationId: processGif
-      tags: [Tools]
+      tags: [Image]
       summary: GIF tools
       description: Resize, optimize, speed-adjust, reverse, extract frames from, or rotate animated GIFs.
       security:
@@ -2413,7 +2526,7 @@ paths:
   /api/v1/tools/image/gif-tools/info:
     post:
       operationId: getGifInfo
-      tags: [Tools]
+      tags: [Image]
       summary: GIF info
       description: Get metadata about an animated GIF including dimensions, frame count, delays, and duration.
       security: []
@@ -2469,7 +2582,7 @@ paths:
   /api/v1/tools/image/smart-crop:
     post:
       operationId: smartCrop
-      tags: [Tools]
+      tags: [Image]
       summary: Smart crop
       description: Smart crop with three modes - subject focus, face focus, or auto trim.
       security:
@@ -2527,7 +2640,7 @@ paths:
   /api/v1/tools/image/vectorize:
     post:
       operationId: vectorizeImage
-      tags: [Tools]
+      tags: [Image]
       summary: Image to SVG
       description: Convert a raster image to SVG vector format using potrace (B&W) or VTracer (color).
       security:
@@ -2581,7 +2694,7 @@ paths:
   /api/v1/tools/image/svg-to-raster:
     post:
       operationId: svgToRaster
-      tags: [Tools]
+      tags: [Image]
       summary: SVG to raster
       description: Convert an SVG file to a raster image format at custom scale and DPI.
       security:
@@ -2633,7 +2746,7 @@ paths:
   /api/v1/tools/image/svg-to-raster/batch:
     post:
       operationId: svgToRasterBatch
-      tags: [Tools]
+      tags: [Image]
       summary: SVG to raster (batch)
       description: Convert multiple SVG files to raster images. Returns a ZIP archive.
       security:
@@ -2692,7 +2805,7 @@ paths:
   /api/v1/tools/image/image-to-pdf:
     post:
       operationId: imageToPdf
-      tags: [Tools]
+      tags: [Image]
       summary: Image to PDF
       description: Convert one or more images into a PDF document.
       security:
@@ -2773,7 +2886,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-image:
     post:
       operationId: pdfToImage
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF to image
       description: Convert PDF pages to images. Returns individual page downloads and a ZIP of all pages.
       security:
@@ -2861,7 +2974,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-image/info:
     post:
       operationId: getPdfInfo
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF page count
       description: Get the number of pages in a PDF file.
       security: []
@@ -2899,7 +3012,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-image/preview:
     post:
       operationId: previewPdfPages
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF page thumbnails
       description: Generate thumbnail previews for each page in a PDF (max 200 pages, JPEG 300px wide).
       security: []
@@ -2951,7 +3064,7 @@ paths:
   /api/v1/tools/image/split:
     post:
       operationId: splitImage
-      tags: [Tools]
+      tags: [Image]
       summary: Split Image
       description: Split an image into a grid of tiles. Returns a ZIP file.
       security:
@@ -3004,7 +3117,7 @@ paths:
   /api/v1/tools/image/bulk-rename:
     post:
       operationId: bulkRename
-      tags: [Tools]
+      tags: [Image]
       summary: Bulk rename
       description: Rename multiple images using a pattern template. Supports {{index}}, {{padded}}, and {{original}} tokens. Returns a ZIP file.
       security:
@@ -3055,7 +3168,7 @@ paths:
   /api/v1/tools/image/favicon:
     post:
       operationId: generateFavicon
-      tags: [Tools]
+      tags: [Image]
       summary: Favicon generator
       description: Generate a complete favicon set (16px to 512px PNGs, ICO, and manifest.json) from an image. Returns a ZIP file.
       security:
@@ -3098,7 +3211,7 @@ paths:
   /api/v1/tools/image/watermark-image:
     post:
       operationId: addImageWatermark
-      tags: [Tools]
+      tags: [Image]
       summary: Image watermark
       description: Add an image watermark overlay.
       security:
@@ -3151,7 +3264,7 @@ paths:
   /api/v1/tools/image/compose:
     post:
       operationId: composeImages
-      tags: [Tools]
+      tags: [Image]
       summary: Image composition
       description: Composite an overlay image onto a base image with blend modes.
       security:
@@ -3205,7 +3318,7 @@ paths:
   /api/v1/tools/image/meme-generator:
     post:
       operationId: generateMeme
-      tags: [Tools]
+      tags: [Image]
       summary: Meme generator
       description: >
         Create memes using templates or custom images. Supports two modes:
@@ -3446,7 +3559,7 @@ paths:
   /api/v1/tools/image/compare:
     post:
       operationId: compareImages
-      tags: [Tools]
+      tags: [Image]
       summary: Image compare
       description: Compare two images and generate a visual difference report.
       security:
@@ -3511,7 +3624,7 @@ paths:
   /api/v1/tools/image/erase-object:
     post:
       operationId: eraseObject
-      tags: [Tools]
+      tags: [Image]
       summary: Object eraser
       description: Erase objects from an image using a mask. White areas in the mask indicate regions to erase. Uses LaMa inpainting.
       security:
@@ -3551,11 +3664,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3591,7 +3715,7 @@ paths:
   /api/v1/tools/image/ai-canvas-expand:
     post:
       operationId: aiCanvasExpand
-      tags: [Tools]
+      tags: [Image]
       summary: AI canvas expand (experimental)
       description: |
         Expand an image canvas using AI outpainting. Extends the image in any
@@ -3633,11 +3757,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3673,7 +3808,7 @@ paths:
   /api/v1/tools/image/collage:
     post:
       operationId: createCollage
-      tags: [Tools]
+      tags: [Image]
       summary: Collage & Grid
       description: Combine multiple images into a grid collage.
       security:
@@ -3729,7 +3864,7 @@ paths:
   /api/v1/tools/image/stitch:
     post:
       operationId: stitchImages
-      tags: [Tools]
+      tags: [Image]
       summary: Stitch Images
       description: Join multiple images horizontally, vertically, or in a grid layout.
       security:
@@ -3787,7 +3922,7 @@ paths:
   /api/v1/tools/image/remove-gif-background:
     post:
       operationId: removeGifBackground
-      tags: [Tools]
+      tags: [Image]
       summary: Remove background from an animated image
       description: Remove the background from an animated GIF, WebP, or APNG frame by frame using AI (rembg). Runs locally.
       security:
@@ -3832,11 +3967,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3866,7 +4012,7 @@ paths:
   /api/v1/tools/image/remove-background:
     post:
       operationId: removeBackground
-      tags: [Tools]
+      tags: [Image]
       summary: Remove background
       description: Remove the background from an image using AI (rembg). Runs locally.
       security:
@@ -3899,11 +4045,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3939,7 +4096,7 @@ paths:
   /api/v1/tools/image/remove-background/effects:
     post:
       operationId: applyBackgroundEffects
-      tags: [Tools]
+      tags: [Image]
       summary: Apply background effects
       description: >
         Apply background replacement or effects to a previously processed remove-background result.
@@ -4006,7 +4163,7 @@ paths:
   /api/v1/tools/image/transparency-fixer:
     post:
       operationId: fixTransparency
-      tags: [Tools]
+      tags: [Image]
       summary: Fix fake transparency
       description: |
         Fix "fake transparent" PNGs that have fringing, halos, or semi-transparent
@@ -4043,11 +4200,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4083,7 +4251,7 @@ paths:
   /api/v1/tools/image/upscale:
     post:
       operationId: upscaleImage
-      tags: [Tools]
+      tags: [Image]
       summary: Image upscaling
       description: Upscale an image using AI (Real-ESRGAN). Runs locally.
       security:
@@ -4118,11 +4286,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4158,7 +4337,7 @@ paths:
   /api/v1/tools/image/blur-faces:
     post:
       operationId: blurFaces
-      tags: [Tools]
+      tags: [Image]
       summary: Blur Faces & PII
       description: Detect and blur faces in an image for privacy. Uses OpenCV. Runs locally.
       security:
@@ -4189,11 +4368,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4229,7 +4419,7 @@ paths:
   /api/v1/tools/image/ocr:
     post:
       operationId: extractText
-      tags: [Tools]
+      tags: [Image]
       summary: OCR / text extraction
       description: |
         Extract text from an image locally. The built-in Fast tier uses
@@ -4266,12 +4456,23 @@ paths:
       responses:
         "202":
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 required: [jobId, async]
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4317,7 +4518,7 @@ paths:
   /api/v1/tools/image/info:
     post:
       operationId: getImageInfo
-      tags: [Tools]
+      tags: [Image]
       summary: Image info
       description: Get detailed metadata about an image including dimensions, format, color space, and EXIF data.
       security:
@@ -4415,7 +4616,7 @@ paths:
   /api/v1/tools/image/color-palette:
     post:
       operationId: extractColorPalette
-      tags: [Tools]
+      tags: [Image]
       summary: Color palette
       description: Extract the dominant colors from an image.
       security:
@@ -4467,7 +4668,7 @@ paths:
   /api/v1/tools/image/barcode-read:
     post:
       operationId: readBarcode
-      tags: [Tools]
+      tags: [Image]
       summary: Barcode reader
       description: Read QR codes and barcodes from an image.
       security:
@@ -4559,7 +4760,7 @@ paths:
   /api/v1/tools/image/find-duplicates:
     post:
       operationId: findDuplicates
-      tags: [Tools]
+      tags: [Image]
       summary: Find duplicates
       description: Find duplicate images in a set using perceptual hashing.
       security:
@@ -4659,7 +4860,7 @@ paths:
   /api/v1/tools/image/qr-generate:
     post:
       operationId: generateQrCode
-      tags: [Tools]
+      tags: [Image]
       summary: QR code generator
       description: Generate a QR code image from text. This tool accepts a JSON body, not multipart.
       security:
@@ -4717,7 +4918,7 @@ paths:
   /api/v1/tools/image/html-to-image:
     post:
       operationId: captureWebpage
-      tags: [Tools]
+      tags: [Image]
       summary: Capture webpage as image
       description: Capture a webpage as a high-quality screenshot image. Accepts a JSON body with a URL and capture options.
       security:
@@ -4795,7 +4996,7 @@ paths:
   /api/v1/tools/image/strip-metadata/inspect:
     post:
       operationId: inspectMetadata
-      tags: [Tools]
+      tags: [Image]
       summary: Inspect metadata
       description: View all metadata (EXIF, GPS, ICC, XMP) in an image without removing it.
       security:
@@ -4863,7 +5064,7 @@ paths:
   /api/v1/tools/image/edit-metadata:
     post:
       operationId: editMetadata
-      tags: [Tools]
+      tags: [Image]
       summary: Edit Image Metadata
       description: Edit EXIF, IPTC, GPS, and other metadata fields in an image using ExifTool.
       security:
@@ -4931,7 +5132,7 @@ paths:
   /api/v1/tools/image/edit-metadata/inspect:
     post:
       operationId: inspectMetadataExifTool
-      tags: [Tools]
+      tags: [Image]
       summary: Inspect metadata (ExifTool)
       description: Read all metadata from an image using ExifTool. Returns all embedded EXIF, IPTC, XMP, and GPS fields.
       security:
@@ -6937,6 +7138,53 @@ paths:
                   authEnabled:
                     type: boolean
 
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags: [Jobs]
+      summary: Get job status
+      description: |
+        Returns the stored status of a job without holding a connection open. Poll it after a 202 response, or use it as a fallback when the progress stream drops.
+
+        `status` is one of `queued`, `processing`, `completed`, `failed`, or `canceled`. `completed`, `failed`, and `canceled` are terminal. A canceled job can still carry a partial `result` (for example a ZIP of the files that finished), so read `result` whenever it is present.
+
+        Access follows the progress stream: the job's owner, a user with `files:all`, or a user with `features:manage` for a feature-install job. Any other caller gets 404.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: The jobId from a 202 response.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: "2026-11-03T10:00:00.000Z"
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Job not found, or not visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7217,6 +7465,193 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags: [System]
+      summary: Submit product feedback
+      description: Records one feedback event from the signed-in user. Limited to 10 requests per minute. `accepted` is false when the server did not record the event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source]
+              properties:
+                source:
+                  type: string
+                  description: Where the feedback was given. Accepted values are defined in the shared feedback constants.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: "^[a-z0-9_-]+$"
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        "200":
+          description: Feedback handled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, accepted]
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags: [Admin]
+      summary: Get the newer release available
+      description: Returns the newest published release when it is newer than the running version, or null. Requires settings:write.
+      responses:
+        "200":
+          description: Latest release, or null when this instance is current
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [latest]
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Missing settings:write permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags: [Features]
+      summary: Reset all AI feature bundles
+      description: |
+        Wipes the AI virtual environment, the models, and the pip cache, then marks every bundle as not installed. Use it when an install cannot recover on its own. Uninstalling a bundle only removes its model weights, so this is the full reset.
+
+        The response says whether the venv was reseeded from the baked base (venvReseeded). Returns 409 while a bundle install is running. Requires features:manage.
+      responses:
+        "200":
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: A bundle install is already running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags: [Features]
+      summary: Install every feature bundle a tool needs
+      description: Queues each bundle the tool requires and reports, per bundle, whether it was queued or skipped. Requires features:manage.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Per-bundle status. Each queued bundle carries its own statusUrl and progressUrl. Skipped bundles have neither.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+                        jobId:
+                          type: string
+                        statusUrl:
+                          type: string
+                        progressUrl:
+                          type: string
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Unknown tool, or the tool needs no bundles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7255,11 +7690,22 @@ paths:
       responses:
         "202":
           description: Installation started or queued
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
@@ -7759,7 +8205,7 @@ paths:
   /api/v1/tools/video/convert-video:
     post:
       operationId: convertVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Convert Video
       description: Convert videos between MP4, MOV, WebM, AVI, and MKV.
       security:
@@ -7790,11 +8236,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7824,7 +8281,7 @@ paths:
   /api/v1/tools/video/compress-video:
     post:
       operationId: compressVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Compress Video
       description: Shrink video file size with quality control.
       security:
@@ -7855,11 +8312,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7889,7 +8357,7 @@ paths:
   /api/v1/tools/video/trim-video:
     post:
       operationId: trimVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Trim Video
       description: Cut a clip out of a video.
       security:
@@ -7938,7 +8406,7 @@ paths:
   /api/v1/tools/video/mute-video:
     post:
       operationId: muteVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Mute Video
       description: Remove the audio track from a video.
       security:
@@ -7980,7 +8448,7 @@ paths:
   /api/v1/tools/video/video-to-gif:
     post:
       operationId: videoToGif
-      tags: [Tools]
+      tags: [Video]
       summary: Video to GIF
       description: Turn a video clip into an animated GIF.
       security:
@@ -8013,11 +8481,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8047,7 +8526,7 @@ paths:
   /api/v1/tools/video/resize-video:
     post:
       operationId: resizeVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Resize Video
       description: Scale a video to a new resolution or preset size.
       security:
@@ -8096,7 +8575,7 @@ paths:
   /api/v1/tools/video/crop-video:
     post:
       operationId: cropVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Crop Video
       description: Crop a region out of a video.
       security:
@@ -8146,7 +8625,7 @@ paths:
   /api/v1/tools/video/rotate-video:
     post:
       operationId: rotateVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Rotate Video
       description: Rotate or flip a video.
       security:
@@ -8193,7 +8672,7 @@ paths:
   /api/v1/tools/video/change-fps:
     post:
       operationId: changeFps
-      tags: [Tools]
+      tags: [Video]
       summary: Change FPS
       description: Change the frame rate of a video.
       security:
@@ -8240,7 +8719,7 @@ paths:
   /api/v1/tools/video/video-color:
     post:
       operationId: videoColor
-      tags: [Tools]
+      tags: [Video]
       summary: Video Color
       description: Adjust brightness, contrast, saturation, and gamma.
       security:
@@ -8290,7 +8769,7 @@ paths:
   /api/v1/tools/video/video-speed:
     post:
       operationId: videoSpeed
-      tags: [Tools]
+      tags: [Video]
       summary: Video Speed
       description: Speed up or slow down a video.
       security:
@@ -8338,7 +8817,7 @@ paths:
   /api/v1/tools/video/reverse-video:
     post:
       operationId: reverseVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Reverse Video
       description: Play a video clip backwards. Limited to clips up to 5 minutes.
       security:
@@ -8380,7 +8859,7 @@ paths:
   /api/v1/tools/video/video-loudnorm:
     post:
       operationId: videoLoudnorm
-      tags: [Tools]
+      tags: [Video]
       summary: Normalize Video Audio
       description: Normalize video audio volume to broadcast standard (EBU R128).
       security:
@@ -8422,7 +8901,7 @@ paths:
   /api/v1/tools/video/aspect-pad:
     post:
       operationId: aspectPad
-      tags: [Tools]
+      tags: [Video]
       summary: Aspect Pad
       description: Add solid-color bars to fit a target aspect ratio.
       security:
@@ -8470,7 +8949,7 @@ paths:
   /api/v1/tools/video/blur-pad:
     post:
       operationId: blurPad
-      tags: [Tools]
+      tags: [Video]
       summary: Blur Pad
       description: Fill bars with a blurred copy of the video.
       security:
@@ -8518,7 +8997,7 @@ paths:
   /api/v1/tools/video/watermark-video:
     post:
       operationId: watermarkVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Watermark Video
       description: Burn a text watermark onto video frames.
       security:
@@ -8569,7 +9048,7 @@ paths:
   /api/v1/tools/video/stabilize-video:
     post:
       operationId: stabilizeVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Stabilize Video
       description: Reduce camera shake with two-pass stabilization.
       security:
@@ -8599,11 +9078,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8633,7 +9123,7 @@ paths:
   /api/v1/tools/video/gif-to-video:
     post:
       operationId: gifToVideo
-      tags: [Tools]
+      tags: [Video]
       summary: GIF to Video
       description: Convert an animated GIF into an MP4, WebM, or MOV video.
       security:
@@ -8680,7 +9170,7 @@ paths:
   /api/v1/tools/video/video-to-webp:
     post:
       operationId: videoToWebp
-      tags: [Tools]
+      tags: [Video]
       summary: Video to WebP
       description: Convert a video clip into an animated WebP image.
       security:
@@ -8730,7 +9220,7 @@ paths:
   /api/v1/tools/video/video-to-frames:
     post:
       operationId: videoToFrames
-      tags: [Tools]
+      tags: [Video]
       summary: Video to Frames
       description: Extract frames from a video as a ZIP of images.
       security:
@@ -8780,7 +9270,7 @@ paths:
   /api/v1/tools/video/merge-videos:
     post:
       operationId: mergeVideos
-      tags: [Tools]
+      tags: [Video]
       summary: Merge Videos
       description: |
         Join multiple video clips into one MP4 file. All inputs are
@@ -8809,11 +9299,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8843,7 +9344,7 @@ paths:
   /api/v1/tools/video/replace-audio:
     post:
       operationId: replaceAudio
-      tags: [Tools]
+      tags: [Video]
       summary: Replace Audio
       description: Swap the audio track of a video with another file.
       security:
@@ -8887,7 +9388,7 @@ paths:
   /api/v1/tools/video/burn-subtitles:
     post:
       operationId: burnSubtitles
-      tags: [Tools]
+      tags: [Video]
       summary: Burn Subtitles
       description: Permanently render subtitles onto video frames.
       security:
@@ -8919,11 +9420,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8953,7 +9465,7 @@ paths:
   /api/v1/tools/video/embed-subtitles:
     post:
       operationId: embedSubtitles
-      tags: [Tools]
+      tags: [Video]
       summary: Embed Subtitles
       description: Mux a subtitle track into the video container.
       security:
@@ -9002,7 +9514,7 @@ paths:
   /api/v1/tools/video/extract-subtitles:
     post:
       operationId: extractSubtitles
-      tags: [Tools]
+      tags: [Video]
       summary: Extract Subtitles
       description: Pull the subtitle track out of a video as an SRT file.
       security:
@@ -9044,7 +9556,7 @@ paths:
   /api/v1/tools/video/images-to-video:
     post:
       operationId: imagesToVideo
-      tags: [Tools]
+      tags: [Video]
       summary: Images to Video
       description: Turn a set of images into a slideshow video.
       security:
@@ -9095,7 +9607,7 @@ paths:
   /api/v1/tools/video/video-metadata:
     post:
       operationId: videoMetadata
-      tags: [Tools]
+      tags: [Video]
       summary: Clean Video Metadata
       description: Strip metadata from a video and report what was found.
       security:
@@ -9137,7 +9649,7 @@ paths:
   /api/v1/tools/video/auto-subtitles:
     post:
       operationId: autoSubtitles
-      tags: [Tools]
+      tags: [Video]
       summary: Auto Subtitles
       description: |
         AI-powered subtitle generation from video audio tracks using
@@ -9171,11 +9683,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9211,7 +9734,7 @@ paths:
   /api/v1/tools/video/extract-audio:
     post:
       operationId: extractAudio
-      tags: [Tools]
+      tags: [Video]
       summary: Extract Audio
       description: Pull the audio track out of a video.
       security:
@@ -9257,7 +9780,7 @@ paths:
   /api/v1/tools/audio/convert-audio:
     post:
       operationId: convertAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Convert Audio
       description: Convert audio between MP3, WAV, OGG, and more.
       security:
@@ -9305,7 +9828,7 @@ paths:
   /api/v1/tools/audio/trim-audio:
     post:
       operationId: trimAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Trim Audio
       description: Cut a section out of an audio file.
       security:
@@ -9353,7 +9876,7 @@ paths:
   /api/v1/tools/audio/volume-adjust:
     post:
       operationId: volumeAdjust
-      tags: [Tools]
+      tags: [Audio]
       summary: Adjust Volume
       description: Increase or decrease audio volume by a fixed gain.
       security:
@@ -9400,7 +9923,7 @@ paths:
   /api/v1/tools/audio/normalize-audio:
     post:
       operationId: normalizeAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Normalize Audio
       description: Even out loudness to broadcast standard levels (EBU R128, -16 LUFS).
       security:
@@ -9442,7 +9965,7 @@ paths:
   /api/v1/tools/audio/fade-audio:
     post:
       operationId: fadeAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Fade Audio
       description: Add fade-in and fade-out effects to audio.
       security:
@@ -9490,7 +10013,7 @@ paths:
   /api/v1/tools/audio/reverse-audio:
     post:
       operationId: reverseAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Reverse Audio
       description: Play audio backwards.
       security:
@@ -9532,7 +10055,7 @@ paths:
   /api/v1/tools/audio/audio-speed:
     post:
       operationId: audioSpeed
-      tags: [Tools]
+      tags: [Audio]
       summary: Audio Speed
       description: Speed up or slow down audio playback.
       security:
@@ -9579,7 +10102,7 @@ paths:
   /api/v1/tools/audio/pitch-shift:
     post:
       operationId: pitchShift
-      tags: [Tools]
+      tags: [Audio]
       summary: Pitch Shift
       description: Raise or lower pitch by semitones without changing speed.
       security:
@@ -9626,7 +10149,7 @@ paths:
   /api/v1/tools/audio/audio-channels:
     post:
       operationId: audioChannels
-      tags: [Tools]
+      tags: [Audio]
       summary: Audio Channels
       description: Convert between mono, stereo, or swap left and right channels.
       security:
@@ -9673,7 +10196,7 @@ paths:
   /api/v1/tools/audio/silence-removal:
     post:
       operationId: removeSilence
-      tags: [Tools]
+      tags: [Audio]
       summary: Silence Removal
       description: Strip silent sections from audio.
       security:
@@ -9721,7 +10244,7 @@ paths:
   /api/v1/tools/audio/noise-reduction:
     post:
       operationId: reduceNoise
-      tags: [Tools]
+      tags: [Audio]
       summary: Noise Reduction
       description: Reduce background noise with FFT-based denoising.
       security:
@@ -9768,7 +10291,7 @@ paths:
   /api/v1/tools/audio/merge-audio:
     post:
       operationId: mergeAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Merge Audio
       description: Combine multiple audio files into one sequential track.
       security:
@@ -9817,7 +10340,7 @@ paths:
   /api/v1/tools/audio/split-audio:
     post:
       operationId: splitAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Split Audio
       description: |
         Split audio by time, equal parts, or silence detection. Returns a
@@ -9870,7 +10393,7 @@ paths:
   /api/v1/tools/audio/ringtone-maker:
     post:
       operationId: ringtoneMaker
-      tags: [Tools]
+      tags: [Audio]
       summary: Ringtone Maker
       description: Create a ringtone clip (.m4r) from any audio file.
       security:
@@ -9918,7 +10441,7 @@ paths:
   /api/v1/tools/audio/waveform-image:
     post:
       operationId: waveformImage
-      tags: [Tools]
+      tags: [Audio]
       summary: Waveform Image
       description: Generate a waveform visualization as a PNG image from an audio file.
       security:
@@ -9967,7 +10490,7 @@ paths:
   /api/v1/tools/audio/audio-metadata:
     post:
       operationId: audioMetadata
-      tags: [Tools]
+      tags: [Audio]
       summary: Audio Metadata
       description: |
         View, edit, or strip audio tags (ID3). The response includes a
@@ -10020,7 +10543,7 @@ paths:
   /api/v1/tools/audio/transcribe-audio:
     post:
       operationId: transcribeAudio
-      tags: [Tools]
+      tags: [Audio]
       summary: Transcribe Audio
       description: |
         AI-powered speech-to-text transcription using faster-whisper. Outputs
@@ -10054,11 +10577,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10093,7 +10627,7 @@ paths:
   /api/v1/tools/pdf/merge-pdf:
     post:
       operationId: mergePdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Merge PDFs
       description: Combine multiple PDFs into one. Requires at least two files.
       security:
@@ -10137,7 +10671,7 @@ paths:
   /api/v1/tools/pdf/split-pdf:
     post:
       operationId: splitPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Split PDF
       description: |
         Extract pages or split into parts. In "range" mode returns a single PDF
@@ -10189,7 +10723,7 @@ paths:
   /api/v1/tools/pdf/compress-pdf:
     post:
       operationId: compressPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Compress PDF
       description: |
         Shrink PDF file size by downsampling embedded images. In "quality" mode
@@ -10242,7 +10776,7 @@ paths:
   /api/v1/tools/pdf/compress-pdf-to-100kb:
     post:
       operationId: compressPdfTo100KbTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "Compress PDF to 100 KB"
       description: |
         Compress a PDF to a 100 KB target size (100 KB, where 1 KB = 1000 bytes).
@@ -10276,11 +10810,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10304,7 +10849,7 @@ paths:
   /api/v1/tools/pdf/compress-pdf-to-200kb:
     post:
       operationId: compressPdfTo200KbTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "Compress PDF to 200 KB"
       description: |
         Compress a PDF to a 200 KB target size (200 KB, where 1 KB = 1000 bytes).
@@ -10338,11 +10883,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10366,7 +10922,7 @@ paths:
   /api/v1/tools/pdf/compress-pdf-to-500kb:
     post:
       operationId: compressPdfTo500KbTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "Compress PDF to 500 KB"
       description: |
         Compress a PDF to a 500 KB target size (500 KB, where 1 KB = 1000 bytes).
@@ -10400,11 +10956,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10428,7 +10995,7 @@ paths:
   /api/v1/tools/pdf/compress-pdf-to-1mb:
     post:
       operationId: compressPdfTo1MbTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "Compress PDF to 1 MB"
       description: |
         Compress a PDF to a 1 MB target size (1000 KB, where 1 KB = 1000 bytes).
@@ -10462,11 +11029,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10490,7 +11068,7 @@ paths:
   /api/v1/tools/pdf/compress-pdf-to-2mb:
     post:
       operationId: compressPdfTo2MbTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "Compress PDF to 2 MB"
       description: |
         Compress a PDF to a 2 MB target size (2000 KB, where 1 KB = 1000 bytes).
@@ -10524,11 +11102,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10552,7 +11141,7 @@ paths:
   /api/v1/tools/pdf/rotate-pdf:
     post:
       operationId: rotatePdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Rotate PDF
       description: Rotate pages in a PDF by 90, 180, or 270 degrees.
       security:
@@ -10600,7 +11189,7 @@ paths:
   /api/v1/tools/pdf/extract-pages:
     post:
       operationId: extractPages
-      tags: [Tools]
+      tags: [PDF]
       summary: Extract pages
       description: Pull selected pages into a new PDF.
       security:
@@ -10647,7 +11236,7 @@ paths:
   /api/v1/tools/pdf/remove-pages:
     post:
       operationId: removePages
-      tags: [Tools]
+      tags: [PDF]
       summary: Remove pages
       description: Delete specific pages from a PDF. Cannot remove every page.
       security:
@@ -10694,7 +11283,7 @@ paths:
   /api/v1/tools/pdf/organize-pdf:
     post:
       operationId: organizePdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Organize PDF
       description: Reorder pages with an explicit page order.
       security:
@@ -10741,7 +11330,7 @@ paths:
   /api/v1/tools/pdf/multi-tool-pdf:
     post:
       operationId: multiToolPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF Multi-Tool
       description: Assemble a PDF from an explicit page plan - reorder, duplicate, rotate, or delete pages and pull pages in from additional PDFs, in one submission.
       security:
@@ -10791,7 +11380,7 @@ paths:
   /api/v1/tools/pdf/protect-pdf:
     post:
       operationId: protectPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Protect PDF
       description: Add password protection with AES-256 encryption. Passwords are redacted from audit logs.
       security:
@@ -10839,7 +11428,7 @@ paths:
   /api/v1/tools/pdf/unlock-pdf:
     post:
       operationId: unlockPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Unlock PDF
       description: Remove password protection from a PDF. The correct password must be provided. Passwords are redacted from audit logs.
       security:
@@ -10886,7 +11475,7 @@ paths:
   /api/v1/tools/pdf/repair-pdf:
     post:
       operationId: repairPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Repair PDF
       description: Attempt to repair a damaged or corrupted PDF. Structural validation is skipped on input to allow malformed files.
       security:
@@ -10928,7 +11517,7 @@ paths:
   /api/v1/tools/pdf/linearize-pdf:
     post:
       operationId: linearizePdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Web-optimize PDF
       description: Linearize a PDF for fast web viewing (progressive download).
       security:
@@ -10970,7 +11559,7 @@ paths:
   /api/v1/tools/pdf/grayscale-pdf:
     post:
       operationId: grayscalePdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Grayscale PDF
       description: Convert all colors in a PDF to grayscale.
       security:
@@ -11012,7 +11601,7 @@ paths:
   /api/v1/tools/pdf/pdfa-convert:
     post:
       operationId: pdfaConvert
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF/A Converter
       description: Convert a PDF to archival PDF/A-2 format for long-term preservation.
       security:
@@ -11054,7 +11643,7 @@ paths:
   /api/v1/tools/pdf/crop-pdf:
     post:
       operationId: cropPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Crop PDF
       description: Crop all pages with a uniform margin.
       security:
@@ -11101,7 +11690,7 @@ paths:
   /api/v1/tools/pdf/nup-pdf:
     post:
       operationId: nupPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Pages Per Sheet (N-up)
       description: Arrange multiple pages per sheet (e.g. 2-up, 4-up).
       security:
@@ -11148,7 +11737,7 @@ paths:
   /api/v1/tools/pdf/booklet-pdf:
     post:
       operationId: bookletPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Booklet PDF
       description: Arrange pages for folding into a booklet (impose for duplex printing).
       security:
@@ -11195,7 +11784,7 @@ paths:
   /api/v1/tools/pdf/watermark-pdf:
     post:
       operationId: watermarkPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Watermark PDF
       description: Add a text watermark to every page of a PDF.
       security:
@@ -11246,7 +11835,7 @@ paths:
   /api/v1/tools/pdf/pdf-page-numbers:
     post:
       operationId: pdfPageNumbers
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF page numbers
       description: Add page numbers ("Page N of M") to every page of a PDF.
       security:
@@ -11293,7 +11882,7 @@ paths:
   /api/v1/tools/files/convert-document:
     post:
       operationId: convertDocument
-      tags: [Tools]
+      tags: [Files]
       summary: Convert document
       description: Convert between Word, OpenDocument, RTF, and plain text formats.
       security:
@@ -11323,11 +11912,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11351,7 +11951,7 @@ paths:
   /api/v1/tools/files/convert-presentation:
     post:
       operationId: convertPresentation
-      tags: [Tools]
+      tags: [Files]
       summary: Convert presentation
       description: Convert between PowerPoint and OpenDocument presentation formats.
       security:
@@ -11381,11 +11981,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11409,7 +12020,7 @@ paths:
   /api/v1/tools/files/convert-spreadsheet:
     post:
       operationId: convertSpreadsheet
-      tags: [Tools]
+      tags: [Files]
       summary: Convert spreadsheet
       description: Convert between Excel, OpenDocument, and CSV formats. Multi-sheet workbooks export the first sheet to CSV.
       security:
@@ -11439,11 +12050,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11467,7 +12089,7 @@ paths:
   /api/v1/tools/files/excel-to-pdf:
     post:
       operationId: excelToPdf
-      tags: [Tools]
+      tags: [Files]
       summary: Excel to PDF
       description: Convert spreadsheets to PDF. Wide sheets may paginate across multiple pages.
       security:
@@ -11492,11 +12114,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11520,7 +12153,7 @@ paths:
   /api/v1/tools/files/word-to-pdf:
     post:
       operationId: wordToPdf
-      tags: [Tools]
+      tags: [Files]
       summary: Word to PDF
       description: Convert Word documents to PDF.
       security:
@@ -11545,11 +12178,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11573,7 +12217,7 @@ paths:
   /api/v1/tools/files/powerpoint-to-pdf:
     post:
       operationId: powerpointToPdf
-      tags: [Tools]
+      tags: [Files]
       summary: PowerPoint to PDF
       description: Convert presentations to PDF.
       security:
@@ -11598,11 +12242,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11626,7 +12281,7 @@ paths:
   /api/v1/tools/files/html-to-pdf:
     post:
       operationId: htmlToPdf
-      tags: [Tools]
+      tags: [Files]
       summary: HTML to PDF
       description: Convert an HTML file to PDF. Remote resources are disabled for privacy.
       security:
@@ -11651,11 +12306,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11679,7 +12345,7 @@ paths:
   /api/v1/tools/files/markdown-to-docx:
     post:
       operationId: markdownToDocx
-      tags: [Tools]
+      tags: [Files]
       summary: Markdown to Word
       description: Convert a Markdown file to a Word document (DOCX).
       security:
@@ -11721,7 +12387,7 @@ paths:
   /api/v1/tools/files/markdown-to-html:
     post:
       operationId: markdownToHtml
-      tags: [Tools]
+      tags: [Files]
       summary: Markdown to HTML
       description: Convert a Markdown file to a standalone HTML page. Remote images in the source are left as-is in the output.
       security:
@@ -11763,7 +12429,7 @@ paths:
   /api/v1/tools/files/markdown-to-pdf:
     post:
       operationId: markdownToPdf
-      tags: [Tools]
+      tags: [Files]
       summary: Markdown to PDF
       description: Convert a Markdown file to a styled PDF. Remote resources are disabled for privacy.
       security:
@@ -11788,11 +12454,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11816,7 +12493,7 @@ paths:
   /api/v1/tools/files/epub-convert:
     post:
       operationId: epubConvert
-      tags: [Tools]
+      tags: [Files]
       summary: Convert from EPUB
       description: Convert an EPUB to PDF, DOCX, HTML, or Markdown. Remote resources inside the book are not fetched.
       security:
@@ -11846,11 +12523,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11874,7 +12562,7 @@ paths:
   /api/v1/tools/files/to-epub:
     post:
       operationId: toEpub
-      tags: [Tools]
+      tags: [Files]
       summary: Convert to EPUB
       description: Convert Word, Markdown, HTML, or plain text files to EPUB.
       security:
@@ -11899,11 +12587,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11927,7 +12626,7 @@ paths:
   /api/v1/tools/pdf/flatten-pdf:
     post:
       operationId: flattenPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Flatten PDF
       description: Bake forms and annotations into page content.
       security:
@@ -11969,7 +12668,7 @@ paths:
   /api/v1/tools/pdf/redact-pdf:
     post:
       operationId: redactPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: Redact PDF
       description: Permanently remove text occurrences (verified true redaction).
       security:
@@ -12023,7 +12722,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-text:
     post:
       operationId: pdfToText
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF to text
       description: Extract plain text from a PDF.
       security:
@@ -12071,7 +12770,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-word:
     post:
       operationId: pdfToWord
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF to Word
       description: Best for text-based PDFs; scanned pages need OCR.
       security:
@@ -12096,11 +12795,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12124,7 +12834,7 @@ paths:
   /api/v1/tools/pdf/pdf-metadata:
     post:
       operationId: pdfMetadata
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF metadata
       description: Read and write PDF document metadata.
       security:
@@ -12180,7 +12890,7 @@ paths:
   /api/v1/tools/pdf/ocr-pdf:
     post:
       operationId: ocrPdf
-      tags: [Tools]
+      tags: [PDF]
       summary: PDF OCR
       description: |
         Extract text from scanned PDF documents page by page. Fast uses the
@@ -12219,12 +12929,23 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 required: [jobId, async]
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12275,7 +12996,7 @@ paths:
   /api/v1/tools/files/chart-maker:
     post:
       operationId: chartMaker
-      tags: [Tools]
+      tags: [Files]
       summary: Chart Maker
       description: Create bar, line, or pie charts from CSV or JSON data. Returns a PNG image. When rows were left out because their value cell held text that isn't a number, the response adds `chartRows` ({charted, skipped}); blank rows aren't counted.
       security:
@@ -12325,7 +13046,7 @@ paths:
   /api/v1/tools/files/csv-excel:
     post:
       operationId: csvExcel
-      tags: [Tools]
+      tags: [Files]
       summary: CSV to Excel
       description: Convert between CSV and Excel (XLSX), both directions. Upload a CSV or TSV file to get XLSX, or upload an XLSX file to get CSV.
       security:
@@ -12372,7 +13093,7 @@ paths:
   /api/v1/tools/files/csv-json:
     post:
       operationId: csvJson
-      tags: [Tools]
+      tags: [Files]
       summary: CSV to JSON
       description: Convert between CSV and JSON, both directions. Upload a CSV or TSV file to get JSON, or upload a JSON array of objects to get CSV.
       security:
@@ -12419,7 +13140,7 @@ paths:
   /api/v1/tools/files/json-xml:
     post:
       operationId: jsonXml
-      tags: [Tools]
+      tags: [Files]
       summary: JSON to XML
       description: Convert between JSON and XML, both directions. Upload a JSON file to get XML, or upload an XML file to get JSON.
       security:
@@ -12466,7 +13187,7 @@ paths:
   /api/v1/tools/files/split-csv:
     post:
       operationId: splitCsv
-      tags: [Tools]
+      tags: [Files]
       summary: Split CSV
       description: Split a CSV file into smaller files by row count. Returns a ZIP archive containing the parts.
       security:
@@ -12514,7 +13235,7 @@ paths:
   /api/v1/tools/files/merge-csvs:
     post:
       operationId: mergeCsvs
-      tags: [Tools]
+      tags: [Files]
       summary: Merge CSVs
       description: Combine multiple CSV or TSV files with matching columns into one merged file. All files must have the same column headers.
       security:
@@ -12558,7 +13279,7 @@ paths:
   /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson
-      tags: [Tools]
+      tags: [Files]
       summary: Convert YAML / JSON
       description: Convert between YAML and JSON, both directions. Upload a YAML file to get JSON, or upload a JSON file to get YAML.
       security:
@@ -12600,7 +13321,7 @@ paths:
   /api/v1/tools/files/xml-to-csv:
     post:
       operationId: xmlToCsv
-      tags: [Tools]
+      tags: [Files]
       summary: XML to CSV
       description: Extract repeating elements from an XML file into a CSV table. Automatically finds the first array of objects in the XML tree.
       security:
@@ -12642,7 +13363,7 @@ paths:
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
-      tags: [Tools]
+      tags: [Files]
       summary: Create ZIP
       description: Bundle multiple files into a single ZIP archive. Duplicate filenames are automatically deduplicated.
       security:
@@ -12686,7 +13407,7 @@ paths:
   /api/v1/tools/files/extract-zip:
     post:
       operationId: extractZip
-      tags: [Tools]
+      tags: [Files]
       summary: Extract ZIP
       description: Safely extract files from a ZIP archive with bomb protection. Single-file archives return the file directly; multi-file archives return a flat ZIP.
       security:
@@ -12727,7 +13448,7 @@ paths:
   /api/v1/tools/image/background-replace:
     post:
       operationId: backgroundReplace
-      tags: [Tools]
+      tags: [Image]
       summary: Background replace
       description: |
         AI-powered background replacement. Removes the subject's background
@@ -12766,11 +13487,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12806,7 +13538,7 @@ paths:
   /api/v1/tools/image/blur-background:
     post:
       operationId: blurBackground
-      tags: [Tools]
+      tags: [Image]
       summary: Blur background
       description: |
         AI-powered background blur. Removes the background, blurs the
@@ -12841,11 +13573,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12881,7 +13624,7 @@ paths:
   /api/v1/tools/image/barcode-generate:
     post:
       operationId: generateBarcode
-      tags: [Tools]
+      tags: [Image]
       summary: Barcode generator
       description: Generate a barcode image from text. This tool accepts a JSON body, not multipart.
       security:
@@ -12937,7 +13680,7 @@ paths:
   /api/v1/tools/image/circle-crop:
     post:
       operationId: circleCrop
-      tags: [Tools]
+      tags: [Image]
       summary: Circle crop
       description: Crop an image to a centered circle with transparent corners, optional border, and adjustable zoom/offset.
       security:
@@ -12990,7 +13733,7 @@ paths:
   /api/v1/tools/image/rounded-crop:
     post:
       operationId: roundedCrop
-      tags: [Tools]
+      tags: [Image]
       summary: Rounded crop
       description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
       security:
@@ -13045,7 +13788,7 @@ paths:
   /api/v1/tools/image/duotone:
     post:
       operationId: duotone
-      tags: [Tools]
+      tags: [Image]
       summary: Duotone
       description: Apply a two-color duotone effect with custom shadow and highlight colors.
       security:
@@ -13094,7 +13837,7 @@ paths:
   /api/v1/tools/image/image-pad:
     post:
       operationId: imagePad
-      tags: [Tools]
+      tags: [Image]
       summary: Image pad
       description: Pad an image to a target aspect ratio with a solid color, transparent, or blurred background.
       security:
@@ -13146,7 +13889,7 @@ paths:
   /api/v1/tools/image/pixelate:
     post:
       operationId: pixelate
-      tags: [Tools]
+      tags: [Image]
       summary: Pixelate
       description: Apply a pixelation effect to the full image or a specific rectangular region.
       security:
@@ -13198,7 +13941,7 @@ paths:
   /api/v1/tools/image/vignette:
     post:
       operationId: vignette
-      tags: [Tools]
+      tags: [Image]
       summary: Vignette
       description: Add a vignette effect with adjustable strength, color, radius, softness, roundness, and center position.
       security:
@@ -13251,7 +13994,7 @@ paths:
   /api/v1/tools/image/gif-webp:
     post:
       operationId: gifWebp
-      tags: [Tools]
+      tags: [Image]
       summary: GIF/WebP converter
       description: Convert animated GIF to WebP and vice versa, preserving all frames. Only accepts .gif and .webp inputs.
       security:
@@ -13300,7 +14043,7 @@ paths:
   /api/v1/tools/image/histogram:
     post:
       operationId: histogram
-      tags: [Tools]
+      tags: [Image]
       summary: Histogram
       description: |
         Generate an RGB histogram chart from an image. Returns a PNG histogram
@@ -13433,7 +14176,7 @@ paths:
   /api/v1/tools/image/lqip-placeholder:
     post:
       operationId: lqipPlaceholder
-      tags: [Tools]
+      tags: [Image]
       summary: LQIP placeholder
       description: |
         Generate a tiny low-quality image placeholder. Returns a small image
@@ -13511,7 +14254,7 @@ paths:
   /api/v1/tools/image/sprite-sheet:
     post:
       operationId: spriteSheet
-      tags: [Tools]
+      tags: [Image]
       summary: Sprite sheet
       description: |
         Combine multiple images into a single sprite sheet grid. Accepts
@@ -13606,7 +14349,7 @@ paths:
   /api/v1/tools/image/passport-photo:
     post:
       operationId: passportPhotoTool
-      tags: [Tools]
+      tags: [Image]
       summary: "Passport Photo"
       description: |
         Guidance endpoint for the two-phase passport photo flow. Use
@@ -13639,7 +14382,7 @@ paths:
   /api/v1/tools/pdf/sign-pdf:
     post:
       operationId: signPdfTool
-      tags: [Tools]
+      tags: [PDF]
       summary: Sign PDF
       description: Stamp one or more signature PNG images onto a PDF using normalized page placements.
       security:
@@ -13680,11 +14423,22 @@ paths:
                 $ref: "#/components/schemas/ToolResponse"
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13714,7 +14468,7 @@ paths:
   /api/v1/tools/image/jpg-to-png:
     post:
       operationId: jpgToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to PNG"
       description: |
         Convert JPG to PNG
@@ -13774,7 +14528,7 @@ paths:
   /api/v1/tools/image/png-to-jpg:
     post:
       operationId: pngToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to JPG"
       description: |
         Convert PNG to JPG
@@ -13834,7 +14588,7 @@ paths:
   /api/v1/tools/image/jpg-to-webp:
     post:
       operationId: jpgToWebpTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to WebP"
       description: |
         Convert JPG to WebP
@@ -13894,7 +14648,7 @@ paths:
   /api/v1/tools/image/png-to-webp:
     post:
       operationId: pngToWebpTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to WebP"
       description: |
         Convert PNG to WebP
@@ -13954,7 +14708,7 @@ paths:
   /api/v1/tools/image/webp-to-jpg:
     post:
       operationId: webpToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "WebP to JPG"
       description: |
         Convert WebP to JPG
@@ -14014,7 +14768,7 @@ paths:
   /api/v1/tools/image/webp-to-png:
     post:
       operationId: webpToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "WebP to PNG"
       description: |
         Convert WebP to PNG
@@ -14074,7 +14828,7 @@ paths:
   /api/v1/tools/image/jpg-to-avif:
     post:
       operationId: jpgToAvifTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to AVIF"
       description: |
         Convert JPG to AVIF
@@ -14134,7 +14888,7 @@ paths:
   /api/v1/tools/image/png-to-avif:
     post:
       operationId: pngToAvifTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to AVIF"
       description: |
         Convert PNG to AVIF
@@ -14194,7 +14948,7 @@ paths:
   /api/v1/tools/image/webp-to-avif:
     post:
       operationId: webpToAvifTool
-      tags: [Tools]
+      tags: [Image]
       summary: "WebP to AVIF"
       description: |
         Convert WebP to AVIF
@@ -14254,7 +15008,7 @@ paths:
   /api/v1/tools/image/heic-to-jpg:
     post:
       operationId: heicToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "HEIC to JPG"
       description: |
         Convert HEIC to JPG
@@ -14314,7 +15068,7 @@ paths:
   /api/v1/tools/image/heic-to-png:
     post:
       operationId: heicToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "HEIC to PNG"
       description: |
         Convert HEIC to PNG
@@ -14374,7 +15128,7 @@ paths:
   /api/v1/tools/image/heic-to-avif:
     post:
       operationId: heicToAvifTool
-      tags: [Tools]
+      tags: [Image]
       summary: "HEIC to AVIF"
       description: |
         Convert HEIC to AVIF
@@ -14434,7 +15188,7 @@ paths:
   /api/v1/tools/image/jpg-to-gif:
     post:
       operationId: jpgToGifTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to GIF"
       description: |
         Convert JPG to GIF
@@ -14494,7 +15248,7 @@ paths:
   /api/v1/tools/image/png-to-gif:
     post:
       operationId: pngToGifTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to GIF"
       description: |
         Convert PNG to GIF
@@ -14554,7 +15308,7 @@ paths:
   /api/v1/tools/image/gif-to-jpg:
     post:
       operationId: gifToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "GIF to JPG"
       description: |
         Convert GIF to JPG
@@ -14614,7 +15368,7 @@ paths:
   /api/v1/tools/image/gif-to-png:
     post:
       operationId: gifToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "GIF to PNG"
       description: |
         Convert GIF to PNG
@@ -14674,7 +15428,7 @@ paths:
   /api/v1/tools/image/webp-to-gif:
     post:
       operationId: webpToGifTool
-      tags: [Tools]
+      tags: [Image]
       summary: "WebP to GIF"
       description: |
         Convert WebP to GIF
@@ -14734,7 +15488,7 @@ paths:
   /api/v1/tools/image/jpg-to-tiff:
     post:
       operationId: jpgToTiffTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to TIFF"
       description: |
         Convert JPG to TIFF
@@ -14794,7 +15548,7 @@ paths:
   /api/v1/tools/image/png-to-tiff:
     post:
       operationId: pngToTiffTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to TIFF"
       description: |
         Convert PNG to TIFF
@@ -14854,7 +15608,7 @@ paths:
   /api/v1/tools/image/tiff-to-jpg:
     post:
       operationId: tiffToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "TIFF to JPG"
       description: |
         Convert TIFF to JPG
@@ -14914,7 +15668,7 @@ paths:
   /api/v1/tools/image/tiff-to-png:
     post:
       operationId: tiffToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "TIFF to PNG"
       description: |
         Convert TIFF to PNG
@@ -14974,7 +15728,7 @@ paths:
   /api/v1/tools/image/psd-to-jpg:
     post:
       operationId: psdToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PSD to JPG"
       description: |
         Convert PSD to JPG
@@ -15034,7 +15788,7 @@ paths:
   /api/v1/tools/image/psd-to-png:
     post:
       operationId: psdToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PSD to PNG"
       description: |
         Convert PSD to PNG
@@ -15094,7 +15848,7 @@ paths:
   /api/v1/tools/image/png-to-eps:
     post:
       operationId: pngToEpsTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to EPS"
       description: |
         Convert PNG to EPS
@@ -15154,7 +15908,7 @@ paths:
   /api/v1/tools/image/jpg-to-eps:
     post:
       operationId: jpgToEpsTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to EPS"
       description: |
         Convert JPG to EPS
@@ -15214,7 +15968,7 @@ paths:
   /api/v1/tools/image/eps-to-png:
     post:
       operationId: epsToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "EPS to PNG"
       description: |
         Convert EPS to PNG
@@ -15274,7 +16028,7 @@ paths:
   /api/v1/tools/image/eps-to-jpg:
     post:
       operationId: epsToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "EPS to JPG"
       description: |
         Convert EPS to JPG
@@ -15334,7 +16088,7 @@ paths:
   /api/v1/tools/image/png-to-svg:
     post:
       operationId: pngToSvgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to SVG"
       description: |
         Convert PNG to SVG
@@ -15394,7 +16148,7 @@ paths:
   /api/v1/tools/image/jpg-to-svg:
     post:
       operationId: jpgToSvgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to SVG"
       description: |
         Convert JPG to SVG
@@ -15454,7 +16208,7 @@ paths:
   /api/v1/tools/image/tiff-to-svg:
     post:
       operationId: tiffToSvgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "TIFF to SVG"
       description: |
         Convert TIFF to SVG
@@ -15514,7 +16268,7 @@ paths:
   /api/v1/tools/image/psd-to-svg:
     post:
       operationId: psdToSvgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PSD to SVG"
       description: |
         Convert PSD to SVG
@@ -15574,7 +16328,7 @@ paths:
   /api/v1/tools/image/eps-to-svg:
     post:
       operationId: epsToSvgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "EPS to SVG"
       description: |
         Convert EPS to SVG
@@ -15634,7 +16388,7 @@ paths:
   /api/v1/tools/image/svg-to-png:
     post:
       operationId: svgToPngTool
-      tags: [Tools]
+      tags: [Image]
       summary: "SVG to PNG"
       description: |
         Convert SVG to PNG
@@ -15689,7 +16443,7 @@ paths:
   /api/v1/tools/image/svg-to-jpg:
     post:
       operationId: svgToJpgTool
-      tags: [Tools]
+      tags: [Image]
       summary: "SVG to JPG"
       description: |
         Convert SVG to JPG
@@ -15744,7 +16498,7 @@ paths:
   /api/v1/tools/image/jpg-to-pdf:
     post:
       operationId: jpgToPdfTool
-      tags: [Tools]
+      tags: [Image]
       summary: "JPG to PDF"
       description: |
         Convert JPG to PDF
@@ -15801,7 +16555,7 @@ paths:
   /api/v1/tools/image/png-to-pdf:
     post:
       operationId: pngToPdfTool
-      tags: [Tools]
+      tags: [Image]
       summary: "PNG to PDF"
       description: |
         Convert PNG to PDF
@@ -15858,7 +16612,7 @@ paths:
   /api/v1/tools/image/heic-to-pdf:
     post:
       operationId: heicToPdfTool
-      tags: [Tools]
+      tags: [Image]
       summary: "HEIC to PDF"
       description: |
         Convert HEIC to PDF
@@ -15915,7 +16669,7 @@ paths:
   /api/v1/tools/image/tiff-to-pdf:
     post:
       operationId: tiffToPdfTool
-      tags: [Tools]
+      tags: [Image]
       summary: "TIFF to PDF"
       description: |
         Convert TIFF to PDF
@@ -15972,7 +16726,7 @@ paths:
   /api/v1/tools/image/webp-to-pdf:
     post:
       operationId: webpToPdfTool
-      tags: [Tools]
+      tags: [Image]
       summary: "WebP to PDF"
       description: |
         Convert WebP to PDF
@@ -16029,7 +16783,7 @@ paths:
   /api/v1/tools/image/gif-to-pdf:
     post:
       operationId: gifToPdfTool
-      tags: [Tools]
+      tags: [Image]
       summary: "GIF to PDF"
       description: |
         Convert GIF to PDF
@@ -16086,7 +16840,7 @@ paths:
   /api/v1/tools/image/eps-to-pdf:
     post:
       operationId: epsToPdfTool
-      tags: [Tools]
+      tags: [Image]
       summary: "EPS to PDF"
       description: |
         Convert EPS to PDF
@@ -16143,7 +16897,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-jpg:
     post:
       operationId: pdfToJpgTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "PDF to JPG"
       description: |
         Convert PDF to JPG
@@ -16198,7 +16952,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-png:
     post:
       operationId: pdfToPngTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "PDF to PNG"
       description: |
         Convert PDF to PNG
@@ -16253,7 +17007,7 @@ paths:
   /api/v1/tools/pdf/pdf-to-tiff:
     post:
       operationId: pdfToTiffTool
-      tags: [Tools]
+      tags: [PDF]
       summary: "PDF to TIFF"
       description: |
         Convert PDF to TIFF
@@ -16308,7 +17062,7 @@ paths:
   /api/v1/tools/video/mov-to-mp4:
     post:
       operationId: movToMp4Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "MOV to MP4"
       description: |
         Convert MOV to MP4
@@ -16340,11 +17094,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16374,7 +17139,7 @@ paths:
   /api/v1/tools/video/webm-to-mp4:
     post:
       operationId: webmToMp4Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "WEBM to MP4"
       description: |
         Convert WEBM to MP4
@@ -16406,11 +17171,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16440,7 +17216,7 @@ paths:
   /api/v1/tools/video/mkv-to-mp4:
     post:
       operationId: mkvToMp4Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "MKV to MP4"
       description: |
         Convert MKV to MP4
@@ -16472,11 +17248,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16506,7 +17293,7 @@ paths:
   /api/v1/tools/video/avi-to-mp4:
     post:
       operationId: aviToMp4Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "AVI to MP4"
       description: |
         Convert AVI to MP4
@@ -16538,11 +17325,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16572,7 +17370,7 @@ paths:
   /api/v1/tools/video/mp4-to-mov:
     post:
       operationId: mp4ToMovTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MP4 to MOV"
       description: |
         Convert MP4 to MOV
@@ -16604,11 +17402,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16638,7 +17447,7 @@ paths:
   /api/v1/tools/video/mp4-to-webm:
     post:
       operationId: mp4ToWebmTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MP4 to WEBM"
       description: |
         Convert MP4 to WEBM
@@ -16670,11 +17479,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16704,7 +17524,7 @@ paths:
   /api/v1/tools/video/webm-to-mov:
     post:
       operationId: webmToMovTool
-      tags: [Tools]
+      tags: [Video]
       summary: "WEBM to MOV"
       description: |
         Convert WEBM to MOV
@@ -16736,11 +17556,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16770,7 +17601,7 @@ paths:
   /api/v1/tools/video/mkv-to-mov:
     post:
       operationId: mkvToMovTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MKV to MOV"
       description: |
         Convert MKV to MOV
@@ -16802,11 +17633,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16836,7 +17678,7 @@ paths:
   /api/v1/tools/video/avi-to-mov:
     post:
       operationId: aviToMovTool
-      tags: [Tools]
+      tags: [Video]
       summary: "AVI to MOV"
       description: |
         Convert AVI to MOV
@@ -16868,11 +17710,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16902,7 +17755,7 @@ paths:
   /api/v1/tools/video/mp4-to-avi:
     post:
       operationId: mp4ToAviTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MP4 to AVI"
       description: |
         Convert MP4 to AVI
@@ -16934,11 +17787,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16968,7 +17832,7 @@ paths:
   /api/v1/tools/video/mov-to-avi:
     post:
       operationId: movToAviTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MOV to AVI"
       description: |
         Convert MOV to AVI
@@ -17000,11 +17864,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17034,7 +17909,7 @@ paths:
   /api/v1/tools/video/mkv-to-avi:
     post:
       operationId: mkvToAviTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MKV to AVI"
       description: |
         Convert MKV to AVI
@@ -17066,11 +17941,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17100,7 +17986,7 @@ paths:
   /api/v1/tools/video/avi-to-mkv:
     post:
       operationId: aviToMkvTool
-      tags: [Tools]
+      tags: [Video]
       summary: "AVI to MKV"
       description: |
         Convert AVI to MKV
@@ -17132,11 +18018,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17166,7 +18063,7 @@ paths:
   /api/v1/tools/video/mp4-to-gif:
     post:
       operationId: mp4ToGifTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MP4 to GIF"
       description: |
         Convert MP4 to GIF
@@ -17198,11 +18095,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17232,7 +18140,7 @@ paths:
   /api/v1/tools/video/mov-to-gif:
     post:
       operationId: movToGifTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MOV to GIF"
       description: |
         Convert MOV to GIF
@@ -17264,11 +18172,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17298,7 +18217,7 @@ paths:
   /api/v1/tools/video/mkv-to-gif:
     post:
       operationId: mkvToGifTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MKV to GIF"
       description: |
         Convert MKV to GIF
@@ -17330,11 +18249,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17364,7 +18294,7 @@ paths:
   /api/v1/tools/video/avi-to-gif:
     post:
       operationId: aviToGifTool
-      tags: [Tools]
+      tags: [Video]
       summary: "AVI to GIF"
       description: |
         Convert AVI to GIF
@@ -17396,11 +18326,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17430,7 +18371,7 @@ paths:
   /api/v1/tools/video/gif-to-mp4:
     post:
       operationId: gifToMp4Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "GIF to MP4"
       description: |
         Convert GIF to MP4
@@ -17490,7 +18431,7 @@ paths:
   /api/v1/tools/video/gif-to-webm:
     post:
       operationId: gifToWebmTool
-      tags: [Tools]
+      tags: [Video]
       summary: "GIF to WEBM"
       description: |
         Convert GIF to WEBM
@@ -17550,7 +18491,7 @@ paths:
   /api/v1/tools/video/gif-to-mov:
     post:
       operationId: gifToMovTool
-      tags: [Tools]
+      tags: [Video]
       summary: "GIF to MOV"
       description: |
         Convert GIF to MOV
@@ -17610,7 +18551,7 @@ paths:
   /api/v1/tools/video/mp4-to-mp3:
     post:
       operationId: mp4ToMp3Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "MP4 to MP3"
       description: |
         Convert MP4 to MP3
@@ -17670,7 +18611,7 @@ paths:
   /api/v1/tools/video/mov-to-mp3:
     post:
       operationId: movToMp3Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "MOV to MP3"
       description: |
         Convert MOV to MP3
@@ -17730,7 +18671,7 @@ paths:
   /api/v1/tools/video/mkv-to-mp3:
     post:
       operationId: mkvToMp3Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "MKV to MP3"
       description: |
         Convert MKV to MP3
@@ -17790,7 +18731,7 @@ paths:
   /api/v1/tools/video/webm-to-mp3:
     post:
       operationId: webmToMp3Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "WEBM to MP3"
       description: |
         Convert WEBM to MP3
@@ -17850,7 +18791,7 @@ paths:
   /api/v1/tools/video/avi-to-mp3:
     post:
       operationId: aviToMp3Tool
-      tags: [Tools]
+      tags: [Video]
       summary: "AVI to MP3"
       description: |
         Convert AVI to MP3
@@ -17910,7 +18851,7 @@ paths:
   /api/v1/tools/video/mp4-to-wav:
     post:
       operationId: mp4ToWavTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MP4 to WAV"
       description: |
         Convert MP4 to WAV
@@ -17970,7 +18911,7 @@ paths:
   /api/v1/tools/video/mov-to-wav:
     post:
       operationId: movToWavTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MOV to WAV"
       description: |
         Convert MOV to WAV
@@ -18030,7 +18971,7 @@ paths:
   /api/v1/tools/video/mp4-to-ogg:
     post:
       operationId: mp4ToOggTool
-      tags: [Tools]
+      tags: [Video]
       summary: "MP4 to OGG"
       description: |
         Convert MP4 to OGG
@@ -18090,7 +19031,7 @@ paths:
   /api/v1/tools/audio/m4a-to-mp3:
     post:
       operationId: m4aToMp3Tool
-      tags: [Tools]
+      tags: [Audio]
       summary: "M4A to MP3"
       description: |
         Convert M4A to MP3
@@ -18150,7 +19091,7 @@ paths:
   /api/v1/tools/audio/m4a-to-wav:
     post:
       operationId: m4aToWavTool
-      tags: [Tools]
+      tags: [Audio]
       summary: "M4A to WAV"
       description: |
         Convert M4A to WAV
@@ -18210,7 +19151,7 @@ paths:
   /api/v1/tools/audio/aac-to-mp3:
     post:
       operationId: aacToMp3Tool
-      tags: [Tools]
+      tags: [Audio]
       summary: "AAC to MP3"
       description: |
         Convert AAC to MP3
@@ -18270,7 +19211,7 @@ paths:
   /api/v1/tools/audio/aac-to-wav:
     post:
       operationId: aacToWavTool
-      tags: [Tools]
+      tags: [Audio]
       summary: "AAC to WAV"
       description: |
         Convert AAC to WAV
@@ -18330,7 +19271,7 @@ paths:
   /api/v1/tools/audio/aac-to-flac:
     post:
       operationId: aacToFlacTool
-      tags: [Tools]
+      tags: [Audio]
       summary: "AAC to FLAC"
       description: |
         Convert AAC to FLAC
@@ -18390,7 +19331,7 @@ paths:
   /api/v1/tools/audio/ogg-to-mp3:
     post:
       operationId: oggToMp3Tool
-      tags: [Tools]
+      tags: [Audio]
       summary: "OGG to MP3"
       description: |
         Convert OGG to MP3
@@ -18450,7 +19391,7 @@ paths:
   /api/v1/tools/audio/ogg-to-wav:
     post:
       operationId: oggToWavTool
-      tags: [Tools]
+      tags: [Audio]
       summary: "OGG to WAV"
       description: |
         Convert OGG to WAV
@@ -18510,7 +19451,7 @@ paths:
   /api/v1/tools/audio/wav-to-mp3:
     post:
       operationId: wavToMp3Tool
-      tags: [Tools]
+      tags: [Audio]
       summary: "WAV to MP3"
       description: |
         Convert WAV to MP3
@@ -18570,7 +19511,7 @@ paths:
   /api/v1/tools/audio/mp3-to-wav:
     post:
       operationId: mp3ToWavTool
-      tags: [Tools]
+      tags: [Audio]
       summary: "MP3 to WAV"
       description: |
         Convert MP3 to WAV
@@ -18630,7 +19571,7 @@ paths:
   /api/v1/tools/audio/flac-to-mp3:
     post:
       operationId: flacToMp3Tool
-      tags: [Tools]
+      tags: [Audio]
       summary: "FLAC to MP3"
       description: |
         Convert FLAC to MP3
@@ -18690,7 +19631,7 @@ paths:
   /api/v1/tools/files/excel-to-csv:
     post:
       operationId: excelToCsvTool
-      tags: [Tools]
+      tags: [Files]
       summary: "Excel to CSV"
       description: |
         Convert Excel to CSV
@@ -18722,11 +19663,22 @@ paths:
       responses:
         "202":
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -18863,6 +19815,56 @@ paths:
           description: No pending enrollment or invalid body
         "401":
           description: Invalid TOTP code
+
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags: [Auth]
+      security: []
+      summary: Finish a forced MFA enrollment
+      description: "Confirms a forced enrollment that began at login and returns a session. The call is not session-gated; the short-lived enrollment token stands in for a session. Only a TOTP code is accepted here, never a recovery code."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrollmentToken, code]
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        "200":
+          description: Enrollment confirmed and session created. The session token is returned as it is at login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        "400":
+          description: Missing enrollment token or code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or expired enrollment token, or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/auth/mfa/complete:
     post:
@@ -19029,7 +20031,7 @@ paths:
 
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags: [Files]
       summary: Generate upload preview
       description: Generate an on-demand MP4 or MP3 preview for an uploaded media file.
@@ -19366,6 +20368,64 @@ paths:
         "200":
           description: SCIM user deactivated
 
+    patch:
+      operationId: patchScimUser
+      tags: [Enterprise]
+      summary: Partially update a SCIM user
+      description: RFC 7644 PatchOp. Supports add, remove, and replace on the paths the server allows. Users paths are validated per operation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Operations]
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required: [op]
+                    properties:
+                      op:
+                        type: string
+                        enum: [add, remove, replace]
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        "200":
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19427,6 +20487,64 @@ paths:
       responses:
         "204":
           description: SCIM group deleted
+
+    patch:
+      operationId: patchScimGroup
+      tags: [Enterprise]
+      summary: Partially update a SCIM group
+      description: RFC 7644 PatchOp. Supports add, remove, and replace on the paths the server allows. Group members are validated per operation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Operations]
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required: [op]
+                    properties:
+                      op:
+                        type: string
+                        enum: [add, remove, replace]
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        "200":
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/enterprise/audit/export:
     get:
@@ -19672,7 +20790,26 @@ paths:
             type: string
       responses:
         "202":
-          description: Export job started
+          description: Export started. Poll statusUrl for the result. The same URL is in the Location header.
+          headers:
+            Location:
+              description: Status URL for the export (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobId, message, statusUrl]
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         "403":
           description: Feature not licensed or insufficient permissions
         "404":

@@ -426,11 +426,11 @@
     },
     {
       "path": "video/valid/speech-10s.mp4",
-      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to AAC MP4",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to AAC MP4, muxed with a 64x64 black H.264 track so it is a real video (#4290)",
       "license": "CC0",
       "toolsServed": [],
-      "sha256": "2f8d3a93f01645af5b14859366d8d0aa59c10e79fca23bf56ab94cc8634bfe50",
-      "bytes": 92269
+      "sha256": "001b18701b3a472759d93f061697274b6c549011e0507c4899d11ffb89766693",
+      "bytes": 95007
     },
     {
       "path": "video/valid/video-with-meta.mp4",

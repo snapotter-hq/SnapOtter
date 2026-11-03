@@ -87,6 +87,7 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => (
 
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { settleUnenqueuedAlias } from "../../../apps/api/src/lib/upload-cleanup.js";
+import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
 import { registerAiCanvasExpand } from "../../../apps/api/src/routes/tools/ai-canvas-expand.js";
 import { registerAutoSubtitles } from "../../../apps/api/src/routes/tools/auto-subtitles.js";
 import { registerBackgroundReplace } from "../../../apps/api/src/routes/tools/background-replace.js";
@@ -120,6 +121,12 @@ const fakeApp = {
 } as unknown as Parameters<typeof registerEraseObject>[0];
 
 beforeAll(() => {
+  // The fixtures here are PNGs and CI has no ffprobe; the media ingress checks
+  // auto-subtitles and transcribe-audio run (#4290) are covered in
+  // ai-media-route-ingress.test.ts, so let the staged upload through.
+  vi.spyOn(MediaInputHandler.prototype, "prepare").mockImplementation(
+    async (buffer: Buffer, filename: string) => ({ buffer, filename }),
+  );
   registerEraseObject(fakeApp);
   registerSignPdf(fakeApp);
   registerUpscale(fakeApp);
@@ -724,12 +731,8 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
   });
 });
 
-const PRE_ENQUEUE_READ_ROUTES = ROUTES.filter(
-  ([toolId]) => toolId !== "transcribe-audio" && toolId !== "auto-subtitles",
-);
-
 describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitForJob settlement (#3481)", () => {
-  it.each(PRE_ENQUEUE_READ_ROUTES)(
+  it.each(ROUTES)(
     "%s normalizes pre-enqueue S3 getObjectBuffer faults into a 503 storage-unavailable SafeError and discards uploads",
     async (toolId, path) => {
       mocks.isStorageServiceFault.mockReturnValue(true);

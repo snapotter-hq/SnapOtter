@@ -127,7 +127,7 @@ describe("POST /api/v1/api-keys database failure handling", () => {
       });
 
       expect(res.statusCode).toBe(500);
-      expect(res.json()).toEqual({ error: "Internal server error" });
+      expect(res.json()).toMatchObject({ error: "Internal server error" });
       expect(logErrors).toEqual([
         [{ err: dbErr, url: "/api/v1/api-keys", method: "POST" }, "Unhandled request error"],
       ]);

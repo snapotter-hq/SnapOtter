@@ -95,7 +95,12 @@ describe("pipeline sync-wait expiry (#766)", () => {
       });
 
       expect(res.statusCode).toBe(202);
-      expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+      expect(JSON.parse(res.body)).toEqual({
+        jobId: clientJobId,
+        async: true,
+        statusUrl: `/api/v1/jobs/${clientJobId}`,
+        progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+      });
 
       // The flow does not care about the response: the finalize publishes
       // the terminal single frame whose result the client settles from.
@@ -136,7 +141,12 @@ describe("pipeline sync-wait expiry (#766)", () => {
       });
 
       expect(res.statusCode).toBe(202);
-      expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+      expect(JSON.parse(res.body)).toEqual({
+        jobId: clientJobId,
+        async: true,
+        statusUrl: `/api/v1/jobs/${clientJobId}`,
+        progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+      });
 
       const frame = await waitForTerminalFrame(clientJobId);
       expect(frame.type).toBe("batch");

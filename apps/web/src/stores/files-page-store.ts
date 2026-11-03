@@ -1,6 +1,13 @@
 import type { TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
-import { apiDeleteUserFiles, apiListFiles, apiUploadUserFiles, type UserFile } from "@/lib/api";
+import {
+  apiDeleteUserFiles,
+  apiListFiles,
+  apiUploadUserFiles,
+  type UserFile,
+  userErrorMessage,
+} from "@/lib/api";
+import { currentTranslations } from "@/lib/current-translations";
 
 interface FilesPageState {
   files: UserFile[];
@@ -75,7 +82,11 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
         total: 0,
         selectedFileId: null,
         checkedIds: new Set(),
-        error: err instanceof Error ? err.message : "Failed to load files",
+        error: userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.loadFilesFailed,
+        ),
         loading: false,
       });
     }
@@ -183,7 +194,14 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
     } catch (err) {
       if (deleteId !== deleteRequestId) return;
       ++fetchRequestId;
-      set({ error: err instanceof Error ? err.message : "Delete failed", loading: false });
+      set({
+        error: userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.deleteFailed,
+        ),
+        loading: false,
+      });
     }
   },
 

@@ -121,6 +121,8 @@ function expectAsyncAccepted(body: string, clientJobId: string) {
     progressJobId: clientJobId,
     artifactJobId,
     async: true,
+    statusUrl: `/api/v1/jobs/${clientJobId}`,
+    progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
   });
 }
 
