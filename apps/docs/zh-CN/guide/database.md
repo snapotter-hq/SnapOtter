@@ -1,22 +1,22 @@
 ---
 description: "SnapOtter 的 PostgreSQL 数据库架构、表、迁移和备份流程。"
-i18n_source_hash: 331b11cd21d1
+i18n_source_hash: 2150213f21da
 i18n_provenance: machine
-i18n_output_hash: 127adc94ef4c
+i18n_output_hash: 72b25076da96
 i18n_hash_version: 2
 ---
 
 # 数据库 {#database}
 
-SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)（pg-core / node-postgres）进行数据持久化。架构定义在 `apps/api/src/db/schema.ts`。
+SnapOtter 使用 PostgreSQL 17 和 [Drizzle ORM](https://orm.drizzle.team/)（pg-core / node-postgres）进行数据持久化。架构定义在 `apps/api/src/db/schema.ts` 中。
 
-连接通过 `DATABASE_URL` 环境变量配置（默认为 `postgres://snapotter:snapotter@postgres:5432/snapotter`）。在 Docker Compose 中，Postgres 容器将其数据存储在名为 `SnapOtter-pgdata` 的卷中。请求由一个只能读写数据行的角色提供服务，具体见下文的[最小权限角色](#least-privilege-roles)。
+连接通过 `DATABASE_URL` 环境变量配置（默认值为 `postgres://snapotter:snapotter@postgres:5432/snapotter`）。在 Docker Compose 中，Postgres 容器把数据存放在名为 `SnapOtter-pgdata` 的命名卷中。请求由一个只能读写行的角色处理，详见下文的[最小权限角色](#least-privilege-roles)。
 
 ## 表 {#tables}
 
 ### users {#users}
 
-存储用户账户。首次运行时会根据 `DEFAULT_USERNAME` 和 `DEFAULT_PASSWORD` 自动创建。
+存储用户账户。首次运行时根据 `DEFAULT_USERNAME` 和 `DEFAULT_PASSWORD` 自动创建。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
@@ -26,11 +26,11 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 | `role` | varchar | `admin`、`editor` 或 `user` |
 | `mustChangePassword` | boolean | 强制重置密码标志 |
 | `createdAt` | timestamp | 创建时间 |
-| `updatedAt` | timestamp | 上次更新时间 |
+| `updatedAt` | timestamp | 最后更新时间 |
 
 ### sessions {#sessions}
 
-活动登录会话。每一行将一个会话令牌与一个用户关联。
+活动的登录会话。每一行把一个会话令牌与一个用户关联起来。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
@@ -41,9 +41,9 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 
 ### teams {#teams}
 
-用于组织用户的分组。管理员可以将用户分配到团队。
+用于组织用户的分组。管理员可以把用户分配到团队。
 
-| 列 | 类型 | 描述 |
+| 列 | 类型 | 说明 |
 |--------|------|-------------|
 | `id` | uuid | 主键 |
 | `name` | varchar（唯一，最多 50 个字符） | 团队名称 |
@@ -51,7 +51,7 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 
 ### api_keys {#api-keys}
 
-用于程序化访问的 API 密钥。原始密钥仅在创建时显示一次；仅存储其哈希。
+用于程序化访问的 API 密钥。原始密钥只在创建时显示一次；只存储哈希。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
@@ -60,39 +60,39 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 | `keyHash` | varchar | 密钥的 scrypt 哈希 |
 | `name` | varchar | 用户提供的标签 |
 | `createdAt` | timestamp | 创建时间 |
-| `lastUsedAt` | timestamp | 每次经过身份验证的请求时更新 |
+| `lastUsedAt` | timestamp | 每次经过认证的请求时更新 |
 
 密钥以 `si_` 为前缀，后跟 96 个十六进制字符（48 个随机字节）。
 
 ### pipelines {#pipelines}
 
-用户在 UI 中创建的已保存工具链。
+用户在界面中创建的已保存工具链。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
 | `id` | uuid | 主键 |
-| `name` | varchar | 流水线名称 |
+| `name` | varchar | 管道名称 |
 | `description` | varchar | 可选描述 |
 | `steps` | jsonb | `{ toolId, settings }` 对象数组 |
 | `createdAt` | timestamp | 创建时间 |
 
 ### user_files {#user-files}
 
-持久化文件库。默认情况下，保存的编辑会作为一个独立的根行插入（“保存为新文件”：`version` 为 1、`parentId` 为 null，因此原文件仍会保留在列表中）；而当你覆盖原文件时，则作为一个与父行链接的版本（设置 `parentId`、递增 `version`，并取代原文件）。`toolChain` 列记录所应用的工具。
+持久文件库。默认情况下，已保存的编辑会作为独立的根行插入（“另存为新文件”：`version` 为 1，`parentId` 为 null，因此原始文件仍然列出），或者在你覆盖原始文件时作为带父级链接的版本插入（设置 `parentId`，`version` 递增，取代原始文件）。`toolChain` 列记录所应用的工具。
 
-| 列 | 类型 | 描述 |
+| 列 | 类型 | 说明 |
 |--------|------|-------------|
 | `id` | uuid | 主键 |
 | `userId` | uuid | 指向 users 的外键（CASCADE DELETE） |
 | `originalName` | varchar | 原始上传文件名 |
 | `storedName` | varchar | 磁盘上的文件名 |
 | `mimeType` | varchar | MIME 类型 |
-| `size` | integer | 文件大小（字节） |
-| `width` | integer | 图像宽度（像素） |
-| `height` | integer | 图像高度（像素） |
-| `version` | integer | 版本号（1 = 原始版本） |
+| `size` | integer | 文件大小，单位为字节 |
+| `width` | integer | 图像宽度，单位为 px |
+| `height` | integer | 图像高度，单位为 px |
+| `version` | integer | 版本号（1 = 原始） |
 | `parentId` | uuid 或 null | 指向 user_files 的外键（父版本） |
-| `toolChain` | jsonb | 按顺序应用以生成此版本的工具 ID |
+| `toolChain` | jsonb | 为生成此版本而按顺序应用的工具 ID |
 | `createdAt` | timestamp | 创建时间 |
 
 ### jobs {#jobs}
@@ -102,9 +102,9 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 | 列 | 类型 | 备注 |
 |---|---|---|
 | `id` | uuid | 主键 |
-| `type` | varchar | 工具或流水线标识符 |
+| `type` | varchar | 工具或管道标识符 |
 | `status` | varchar | `queued`、`processing`、`completed` 或 `failed` |
-| `progress` | real | 0.0-1.0 的分数 |
+| `progress` | real | 0.0-1.0 的小数 |
 | `inputFiles` | jsonb | 输入文件路径数组 |
 | `outputPath` | varchar | 结果文件的路径 |
 | `settings` | jsonb | 所用的工具设置 |
@@ -114,17 +114,17 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 
 ### settings {#settings}
 
-用于存储全服务器范围设置的键值存储，管理员可从 UI 更改这些设置。
+服务器范围设置的键值存储，管理员可以在界面中修改。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
 | `key` | varchar | 主键 |
 | `value` | varchar | 设置值 |
-| `updatedAt` | timestamp | 上次更新时间 |
+| `updatedAt` | timestamp | 最后更新时间 |
 
 ### roles {#roles}
 
-具有细粒度权限的自定义角色。
+带有细粒度权限的自定义角色。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
@@ -136,7 +136,7 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 
 ### audit_log {#audit-log}
 
-安全相关的操作日志。
+与安全相关的操作日志。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
@@ -148,18 +148,18 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 
 ### user_preferences {#user-preferences}
 
-按偏好名称存储的每用户界面状态。首页的已固定工具通过 `PUT /api/v1/preferences` 写入这里。
+每个用户的界面状态，以偏好名称为键。通过 `PUT /api/v1/preferences` 支撑仪表板上固定的工具。
 
 | 列 | 类型 | 备注 |
 |---|---|---|
-| `userId` | text | 指向 users 的外键，级联删除。与 `key` 共同构成主键 |
+| `userId` | text | 指向 users 的外键，删除时级联。与 `key` 共同构成主键 |
 | `key` | text | 偏好名称。与 `userId` 共同构成主键 |
-| `value` | jsonb | 偏好内容 |
+| `value` | jsonb | 偏好负载 |
 | `updatedAt` | timestamp | 最后写入时间 |
 
 ## 迁移 {#migrations}
 
-Drizzle 负责处理架构迁移。迁移文件位于 `apps/api/drizzle/`。开发期间：
+Drizzle 负责架构迁移。迁移文件位于 `apps/api/drizzle/`。开发期间：
 
 ```bash
 cd apps/api
@@ -171,47 +171,49 @@ npx drizzle-kit migrate    # apply pending migrations
 
 ## 最小权限角色 {#least-privilege-roles}
 
-两个角色，各司其职。`DATABASE_URL` 负责处理请求，对应用的表拥有 `SELECT`、`INSERT`、`UPDATE`、`DELETE` 权限，以及对相应序列的 `USAGE` 和 `SELECT` 权限。清单到此为止。它无法创建或删除表、安装扩展、执行 `TRUNCATE`、读取 `pg_authid`、创建数据库、修改角色，也无法触碰存放迁移历史的 `drizzle` 架构。
+两个角色，两项工作。`DATABASE_URL` 负责处理请求，对应用的数据表拥有 `SELECT`、`INSERT`、`UPDATE`、`DELETE` 权限，并对它们的序列拥有 `USAGE` 和 `SELECT` 权限。这就是全部清单。它不能创建或删除表、安装扩展、`TRUNCATE`、读取 `pg_authid`、创建数据库、修改角色，也不能接触存放迁移历史的 `drizzle` 架构。
 
-`DATABASE_MIGRATION_URL` 才是高权限的那个。它在启动期间执行迁移并为运行时角色授权，然后在任何一个请求被处理之前就关闭。
+`DATABASE_MIGRATION_URL` 是拥有特权的那个角色。它在启动期间运行迁移并向运行时角色授权，然后在处理任何请求之前关闭。
 
-Compose 和一体化镜像已经按这种方式接好了线，现有安装也包含在内。启动时，SnapOtter 会在运行时角色缺失时创建它，为其授权，执行迁移，然后把授权补到此前就已存在的表上。升级无需手动执行 SQL。
+这种拆分随 SnapOtter 2.3.0 发布。从该版本起，仓库内的 Compose 文件和一体化镜像都按此方式配置，包括现有安装：启动时，SnapOtter 会在运行时角色缺失时创建它，授权，执行迁移，然后把授权扫描应用到之前就存在的表上。升级不需要手动执行 SQL。
 
-把 `DATABASE_MIGRATION_URL` 留空则以单角色模式运行，由 `DATABASE_URL` 同时承担两项工作，和拆分之前完全一样。这是一种受支持的配置，并未被废弃。在托管 Postgres 上它往往是正确答案，因为创建角色通常轮不到你来做。
+2.2.0 镜像只读取运行时连接字符串，也从不创建第二个角色，所以把拆分后的配置交给它，它永远无法启动：应用日志会显示该角色的密码认证失败，而 Postgres 日志会显示该角色不存在。在将 Compose 文件切换为拆分配置之前，请先把镜像升级到 2.3.0 或更高版本。
 
-### 外部与托管 Postgres {#external-and-managed-postgres}
+将 `DATABASE_MIGRATION_URL` 留空会以单一角色运行，由 `DATABASE_URL` 像拆分之前一样承担两项工作。这是受支持的配置，而不是已弃用的配置。在托管的 Postgres 上这是正确的选择，因为在那里创建角色往往不是你能做的事。
 
-在 RDS、Supabase、Cloud SQL，或任何你自行运维的集群上，这种拆分需要主动启用。运行时角色只需创建一次：
+### 外部和托管的 Postgres {#external-and-managed-postgres}
+
+在 RDS、Supabase、Cloud SQL 或你自己运行的任何集群上，这种拆分都是可选的。先创建一次运行时角色：
 
 ```sql
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
 
-然后把两个连接字符串都交给 SnapOtter，让它们指向同一个主机、端口和数据库：
+然后把两个连接字符串都交给 SnapOtter，指向相同的主机、端口和数据库：
 
 ```bash
 DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
 DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
 ```
 
-到此为止就够了。SnapOtter 会自己应用这些授权，并在每次迁移之后重新应用，因此未来版本新增的表也会被覆盖到，无需任何人为它执行 SQL。
+到此为止。SnapOtter 会自己应用授权，并在每次迁移之后重新应用，因此未来版本新增的表无需任何人为它执行 SQL 就会被覆盖。
 
-`DATABASE_MIGRATION_URL` 中的角色必须拥有 SnapOtter 的这些表，因为只有表的所有者才能在其上授权。对于已有安装，这指的是你一直用来运行 SnapOtter 的那个角色，而不是为此新建的角色。如果指向一个什么都不拥有的新角色，启动就会失败，并给出正是这个意思的错误信息。它还需要 `CREATEROLE` 来创建和维护运行时角色，以及创建 `drizzle` 架构的权限。
+`DATABASE_MIGRATION_URL` 中的角色必须拥有 SnapOtter 的表，因为只有表的所有者才能对其授权。在现有安装上，这意味着你一直用来运行 SnapOtter 的那个角色，而不是为此新建的角色。如果指向一个不拥有任何东西的新角色，启动会失败，并给出恰好说明这一点的错误。它还需要 `CREATEROLE` 来创建和维护运行时角色，以及创建 `drizzle` 架构的权限。
 
-如果两个 URL 里填的是同一个角色，拆分就等于关闭，SnapOtter 会在日志里如实说明，而不会假装拆分仍然生效。如果你的服务商没有提供既能拥有这些表、又持有 `CREATEROLE` 的角色，那就用单角色模式。
+在两个 URL 中指定同一个角色就等于关闭了拆分，SnapOtter 会在日志中说明这一点，而不是假装没有发生。如果你的服务商没有提供既能拥有这些表又能持有 `CREATEROLE` 的角色，请使用单一角色运行。
 
-### 为什么不动超级用户属性 {#why-the-superuser-bit-is-left-alone}
+### 为什么不去动超级用户位 {#why-the-superuser-bit-is-left-alone}
 
-SnapOtter 绝不会自行剥夺某个角色的 `SUPERUSER` 属性。在拆分之前创建的安装中，`snapotter` 是集群里唯一的超级用户，把它降级会让集群一个超级用户都不剩，只能停掉服务器、进入单用户模式才能恢复。真正带来保护的，是把长期连接换成受限角色。超级用户只在启动的那几秒钟出现在连接上，之后便不复存在。
+SnapOtter 从不自行去除某个角色的 `SUPERUSER`。在拆分之前创建的安装上，`snapotter` 是集群中唯一的超级用户，将其降级会让集群没有任何超级用户，只能在服务器停止的情况下通过单用户模式恢复。把长期存在的连接移到受限角色上，才是获得保护的办法。超级用户只在启动的那几秒钟出现在连接上，随后就消失了。
 
-全新的一体化安装从来不存在这个问题。它们会得到三个角色：`postgres`（引导用超级用户，不出现在 SnapOtter 使用的任何连接字符串中）、`snapotter`（`NOSUPERUSER`，拥有数据，只在启动时连接）和 `snapotter_app`（只操作数据行，负责处理请求）。
+全新的一体化安装从不会遇到这个问题。它们有三个角色：`postgres`（引导用的超级用户，不出现在 SnapOtter 使用的任何连接字符串中）、`snapotter`（`NOSUPERUSER`，拥有数据，只在启动时连接）和 `snapotter_app`（只能操作行，处理请求）。
 
-如果仍然想给旧的 `snapotter` 降级，请先创建第二个超级用户，并以它登录确认可用。然后执行 `ALTER ROLE snapotter NOSUPERUSER`。
+如果仍要降级较旧的 `snapotter`，请先创建第二个超级用户，并以它登录以确认其可用。然后 `ALTER ROLE snapotter NOSUPERUSER`。
 
-## 备份和恢复{#backup-and-restore}
+## 备份与恢复 {#backup-and-restore}
 
-关系数据库位于 Postgres 容器的 `SnapOtter-pgdata` 卷中，而不是应用程序的 `/data` 卷中。
+关系型数据库位于 Postgres 容器的 `SnapOtter-pgdata` 卷中，而不是应用的 `/data` 卷。
 
 **带验证的逻辑备份（推荐）**
 
@@ -228,9 +230,9 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-这两条命令都以所有者 `snapotter` 的身份连接，也应当继续如此。运行时角色看不到 `drizzle` 架构，因此以该角色导出的转储会不完整。`--no-owner` 会把恢复出的对象归属给执行恢复的那个人，所以以所有者身份运行，正好让归属落在授权所期望的位置。在全新集群上有一个坑：`pg_dump` 会带上授权，却不会带上授权中提到的角色，所以要在恢复之前先创建 `snapotter_app`，否则 `--exit-on-error` 会在第一条 `GRANT` 处停下。无论如何，SnapOtter 都会在下次启动时重新应用这些授权。
+两条命令都以所有者 `snapotter` 的身份连接，并且应该继续这样做。运行时角色看不到 `drizzle` 架构，所以以该角色生成的转储是不完整的。`--no-owner` 会让恢复出的对象归运行恢复操作的人所有，因此以所有者身份运行可以让所有权落在授权所期望的位置。在全新集群上有一点要注意：`pg_dump` 带有授权，但不带它们所指名的角色，所以请在恢复之前创建 `snapotter_app`，否则 `--exit-on-error` 会在第一个 `GRANT` 处停止。无论如何，SnapOtter 都会在下次启动时重新应用授权。
 
-此数据库转储不包含以 `/data/files` 保存的库对象或 Redis 中的持久 BullMQ 状态。使用[安全与强化](/zh-CN/guide/security#backup-and-recovery) 中的协调程序备份和恢复这些内容。
+此数据库转储不包含 `/data/files` 中保存的库对象，也不包含 Redis 中持久的 BullMQ 状态。请按照[安全与加固](/zh-CN/guide/security#backup-and-recovery)中的协调流程备份并恢复它们。
 
 **冷卷快照**
 
@@ -240,8 +242,8 @@ docker exec -i SnapOtter-postgres \
 docker compose -f docker/docker-compose.yml stop
 ```
 
-不要使用 `tar` 复制实时 PostgreSQL 数据目录。按项目编写卷名称前缀，因此从 `docker inspect` 或您的存储平台解析已安装的卷 ID，而不是假设文字标签 `SnapOtter-pgdata`。
+不要用 `tar` 复制正在运行的 PostgreSQL 数据目录。Compose 会按项目为卷名加前缀，所以请从 `docker inspect` 或你的存储平台中解析已挂载卷的 ID，而不要假定字面标签 `SnapOtter-pgdata`。
 
 ### 从 1.x（SQLite）迁移 {#migrating-from-1-x-sqlite}
 
-从 SnapOtter 1.x 升级有专门的指南：参见 [从 1.x 升级到 2.0](./upgrading)。简而言之，复用你现有的 `/data` 卷，2.0 会在首次启动时自动检测并导入 `/data/snapotter.db`（或设置 `SQLITE_MIGRATE_PATH` 明确指向它）。请先备份整个 `/data` 卷，而不仅仅是 `snapotter.db`：1.x 使用 SQLite WAL 模式，因此一个已停止的容器往往会把大部分数据留在 `snapotter.db-wal` 中，旁边则是一个几乎为空的 `snapotter.db`。
+从 SnapOtter 1.x 升级有专门的指南：参见[从 1.x 升级到 2.0](./upgrading)。简而言之，复用你现有的 `/data` 卷，2.0 会在首次启动时自动检测并导入 `/data/snapotter.db`（或者设置 `SQLITE_MIGRATE_PATH` 来显式指向它）。请先备份整个 `/data` 卷，而不只是 `snapotter.db`：1.x 使用 SQLite 的 WAL 模式，所以已停止的容器通常会把大部分数据留在 `snapotter.db-wal` 中，而旁边的 `snapotter.db` 几乎是空的。

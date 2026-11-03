@@ -1,14 +1,14 @@
 ---
-description: "Alla SnapOtter-miljövariabler med standardvärden. Konfigurera autentisering, lagring, AI-modeller, analys med mera."
-i18n_source_hash: a694a81ef7e0
-i18n_provenance: human
-i18n_output_hash: 9966c9bb9ee4
+description: "Alla miljövariabler i SnapOtter med standardvärden. Konfigurera autentisering, lagring, AI-modeller, analys med mera."
+i18n_source_hash: caa895c0ba16
+i18n_provenance: machine
+i18n_output_hash: b06ef3970c9d
 i18n_hash_version: 2
 ---
 
 # Konfiguration {#configuration}
 
-All konfiguration görs via miljövariabler. Varje variabel har ett vettigt standardvärde, så SnapOtter fungerar direkt utan att någon av dem sätts.
+All konfiguration görs med miljövariabler. Varje variabel har ett rimligt standardvärde, så SnapOtter fungerar direkt utan att någon av dem sätts.
 
 ## Miljövariabler {#environment-variables}
 
@@ -16,49 +16,49 @@ All konfiguration görs via miljövariabler. Varje variabel har ett vettigt stan
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `PORT` | `1349` | Port som servern lyssnar på. |
-| `BASE_PATH` | (tom) | Offentlig distributionssökväg, t.ex. `/snapotter`. Tom eller `/` serverar på domänens rot. Tillämpas vid körning; ingen ombyggnad av avbildningen krävs. |
-| `RATE_LIMIT_PER_MIN` | `1000` | Maximalt antal förfrågningar per minut per IP. Sätt till 0 för att inaktivera hastighetsbegränsning. |
+| `PORT` | `1349` | Porten som servern lyssnar på. |
+| `BASE_PATH` | (tom) | Publik distributionssökväg, t.ex. `/snapotter`. Tom eller `/` serverar på domänens rot. Tillämpas vid körning; ingen ombyggnad av avbilden krävs. |
+| `RATE_LIMIT_PER_MIN` | `1000` | Högsta antal förfrågningar per minut och IP. Ange 0 för att inaktivera hastighetsbegränsning. |
 | `CORS_ORIGIN` | (tom) | Kommaseparerade tillåtna ursprung för CORS, eller tom för endast samma ursprung. |
-| `LOG_LEVEL` | `info` | Loggutförlighet. En av: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Vilka motparter som får sätta klientens IP via `X-Forwarded-For`. Standardvärdet tror bara på en motpart i ett privat nät, så en omvänd proxy på ett Docker-nätverk eller i ett LAN är betrodd medan en publik klients förfalskade huvud inte är det. Sätt `true` bara när en proxy du själv styr står framför på en publik adress. |
+| `LOG_LEVEL` | `info` | Loggningsnivå. En av: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Vilka peers som får ange klientens IP via `X-Forwarded-For`. Standardvärdet litar bara på en peer i ett privat nätverk, så en omvänd proxy i ett Docker-nätverk eller ett LAN är betrodd medan en falsk rubrik från en publik klient inte är det. Ange `true` endast när en proxy som du kontrollerar står framför på en publik adress. |
 
 ### Autentisering {#authentication}
 
-De två booleska värdena nedan accepterar bara `true` och `false`. Allt annat, `1` eller `yes` eller `on`, klarar inte valideringen och servern avslutas innan den börjar lyssna.
+De två booleska värdena nedan accepterar bara `true` och `false`. Allt annat, `1` eller `yes` eller `on`, misslyckas vid valideringen och servern avslutas innan den börjar lyssna.
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Kräver inloggning. Sätt till `false` för att köra helt utan konton, vilket ger varje förfrågan adminrättigheter, så håll det till ett betrott nätverk. |
-| `DEFAULT_USERNAME` | `admin` | Användarnamn för det initiala admin-kontot. Används endast vid första körningen. |
-| `DEFAULT_PASSWORD` | `admin` | Lösenord för det initiala admin-kontot. Ändra detta efter första inloggningen. |
-| `MAX_USERS` | `0` (obegränsat) | Maximalt antal registrerade användarkonton. Sätt till 0 för obegränsat. |
-| `SESSION_DURATION_HOURS` | `168` | Livslängd för inloggningssession i timmar (standard är 7 dagar). |
-| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Sätt till `true` för att hoppa över den tvingade uppmaningen om lösenordsbyte vid första inloggningen. |
+| `AUTH_ENABLED` | `true` | Kräv inloggning. Ange `false` för att köra helt utan konton, vilket ger varje förfrågan administratörsbehörighet, så begränsa det till ett betrott nätverk. |
+| `DEFAULT_USERNAME` | `admin` | Användarnamn för det första administratörskontot. Används bara vid första körningen. |
+| `DEFAULT_PASSWORD` | `admin` | Lösenord för det första administratörskontot. Ändra det efter första inloggningen. |
+| `MAX_USERS` | `0` (obegränsat) | Högsta antal registrerade användarkonton. Ange 0 för obegränsat. |
+| `SESSION_DURATION_HOURS` | `168` | Inloggningssessionens livslängd i timmar (standard är 7 dagar). |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Ange `true` för att hoppa över den tvingade uppmaningen om lösenordsbyte vid första inloggningen. |
 
 ### Lagring {#storage}
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` eller `s3`. S3 och MinIO kräver en licens med funktionen s3_storage plus `S3_*`-variablerna nedan. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-anslutningssträng, och den anslutning som varje förfrågan betjänas på. Från och med 2.3.0 anger du även `DATABASE_MIGRATION_URL`, och då blir denna den minst privilegierade körtidsrollen, med DML på appens tabeller och inget annat. Compose-stacken pekar den mot sin `postgres`-tjänst; lämna den osatt (tillsammans med `REDIS_URL`) för att få inbäddat läge. |
-| `DATABASE_MIGRATION_URL` | (tom) | Tillgänglig från 2.3.0; 2.2.0-avbildningen ignorerar den och kräver att `DATABASE_URL` namnger databasens ägare. Privilegierad anslutning som endast används vid start för att köra migreringar och bevilja körtidsrollen, och som stängs innan den första förfrågan. Lämna den tom så kör SnapOtter med en enda roll, där `DATABASE_URL` utför båda uppgifterna. Se [Roller med minsta möjliga behörighet](/sv/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Redis-anslutningssträng (används för BullMQ-jobbköer). Compose pekar den mot sin `redis`-tjänst. |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Katalog för tillfälliga filer under bearbetning. Rensas automatiskt. Avbildningen sätter `/tmp/workspace`. |
-| `FILES_STORAGE_PATH` | `./data/files` | Katalog för beständiga användarfiler (uppladdade bilder, sparade resultat). Avbildningen sätter `/data/files`. |
+| `STORAGE_MODE` | `local` | `local` eller `s3`. S3 och MinIO kräver en licens med funktionen s3_storage samt variablerna `S3_*` nedan. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Anslutningssträng till PostgreSQL, och anslutningen som alla förfrågningar betjänas på. Från och med 2.3.0, ange även `DATABASE_MIGRATION_URL` så blir detta rollen med lägst behörighet vid körning, med DML på appens tabeller och inget annat. Compose-stacken pekar den mot sin tjänst `postgres`; lämna den osatt (tillsammans med `REDIS_URL`) för att få inbäddat läge. |
+| `DATABASE_MIGRATION_URL` | (tom) | Privilegierad anslutning, används bara under uppstart för att köra migreringar och ge behörigheter till körningsrollen, och stängs sedan före den första förfrågan. Lämnas den tom kör SnapOtter med en enda roll, där `DATABASE_URL` gör båda jobben. Se [Roller med lägst behörighet](/sv/guide/database#least-privilege-roles). |
+| `REDIS_URL` | `redis://localhost:6379` | Anslutningssträng till Redis (används för BullMQ-jobbköer). Compose pekar den mot sin tjänst `redis`. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Katalog för temporära filer under bearbetning. Rensas automatiskt. Avbilden sätter `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Katalog för permanenta användarfiler (uppladdade bilder, sparade resultat). Avbilden sätter `/data/files`. |
 
 ### S3-objektlagring {#s3-object-storage}
 
-Läses bara när `STORAGE_MODE=s3`. Missar du någon av de tre obligatoriska misslyckas starten med namnet på variabeln du utelämnade.
+Läses bara när `STORAGE_MODE=s3`. Saknas någon av de tre obligatoriska misslyckas starten med namnet på variabeln du utelämnade.
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `S3_BUCKET` | (tom) | Bucket som håller uppladdningar och utdata. Obligatorisk. |
-| `S3_ACCESS_KEY_ID` | (tom) | Åtkomstnyckel. Obligatorisk. I containern kan du montera den i stället, via `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_BUCKET` | (tom) | Bucket som innehåller uppladdningar och utdata. Obligatorisk. |
+| `S3_ACCESS_KEY_ID` | (tom) | Åtkomstnyckel. Obligatorisk. I containern kan du i stället montera den via `S3_ACCESS_KEY_ID_FILE`. |
 | `S3_SECRET_ACCESS_KEY` | (tom) | Hemlig nyckel. Obligatorisk. Samma filkonvention: `S3_SECRET_ACCESS_KEY_FILE`. |
 | `S3_REGION` | `us-east-1` | Bucketens region. |
-| `S3_ENDPOINT` | (tom) | Egen endpoint för MinIO, R2, Backblaze och andra S3-kompatibla lagringar. Tom betyder AWS. |
-| `S3_FORCE_PATH_STYLE` | `false` | Sätt till `true` för MinIO och allt annat som vill ha `endpoint/bucket/key` i stället för adressering via virtuell värd. |
+| `S3_ENDPOINT` | (tom) | Anpassad slutpunkt för MinIO, R2, Backblaze och andra S3-kompatibla lager. Tom betyder AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Ange `true` för MinIO och allt annat som vill ha `endpoint/bucket/key` i stället för virtual-host-adressering. |
 | `S3_PREFIX` | (tom) | Nyckelprefix, så att en bucket kan rymma flera instanser. |
 
 ### Kryptering i vila {#encryption-at-rest}
@@ -66,60 +66,60 @@ Läses bara när `STORAGE_MODE=s3`. Missar du någon av de tre obligatoriska mis
 | Variabel | Standard | Beskrivning |
 |---|---|---|
 | `DATA_ENCRYPTION_KEY` | (tom) | 64 hexadecimala tecken (32 byte). Krypterar känsliga inställningar som lagras i databasen. Allt som inte är 64 hexadecimala tecken avvisas vid start. |
-| `DATA_ENCRYPTION_KEY_PREVIOUS` | (tom) | Nyckeln du roterar bort från, samma format. Sätt båda under en rotation så att befintliga rader fortfarande går att dekryptera, och ta sedan bort den här. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (tom) | Nyckeln du byter bort från, i samma format. Ange båda under en rotation så att befintliga rader fortfarande kan dekrypteras, och ta sedan bort denna. |
 
 ### Inbäddat läge {#embedded-mode}
 
-Kör avbildningen utan `DATABASE_URL` och utan `REDIS_URL` så startar den sin egen PostgreSQL 17 och Redis inuti containern, bundna till loopback, med all data på `/data`-volymen. Detta återställer `docker run`-upplevelsen med ett enda kommando för snabbstart, homelab och uppgraderingar från 1.x. Det är en bekvämlighetsväg, inte en produktionsdistribution: för produktion, kör Compose-stacken med 3 containrar med separat PostgreSQL och Redis. Inbäddat läge kräver att containern körs som root och är inkompatibelt med körtider med godtyckligt UID (OpenShift, Kubernetes `runAsNonRoot`); använd Compose där.
+Kör avbilden utan `DATABASE_URL` och utan `REDIS_URL` så startar den sin egen PostgreSQL 17 och Redis inuti containern, bundna till loopback, med all data på volymen `/data`. Detta återställer upplevelsen av ett enda kommando, `docker run`, för snabbstart, hemmalabb och uppgraderingar från 1.x. Det är en bekvämlighetsväg, inte en produktionsdistribution: kör i produktion den tre containrar stora Compose-stacken med separata PostgreSQL och Redis. Inbäddat läge kräver att containern körs som root och är inkompatibelt med körmiljöer med godtyckligt UID (OpenShift, Kubernetes `runAsNonRoot`); använd Compose där.
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `EMBEDDED` | `auto` | Aktiveras automatiskt när både `DATABASE_URL` och `REDIS_URL` är osatta. Sätt till `0` för att inaktivera det (appen misslyckas då snabbt om ingen extern `DATABASE_URL`/`REDIS_URL` är satt, i stället för att tyst starta en databas i containern). |
+| `EMBEDDED` | `auto` | Aktiveras automatiskt när både `DATABASE_URL` och `REDIS_URL` är osatta. Ange `0` för att inaktivera det (appen avslutas då direkt om ingen extern `DATABASE_URL`/`REDIS_URL` är satt, i stället för att tyst starta en databas i containern). |
 | `REDIS_MAXMEMORY` | `512mb` | Minnestak för den inbäddade Redis (endast inbäddat läge). Sänk det på minnesbegränsade värdar som en Raspberry Pi. |
-| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Antal sekunder som starten väntar på att den inbäddade Redis ska svara på `PING` innan den ger upp. Vid timeout stoppas containern och orsaken loggas, i stället för att hänga. Hela sekunder från 1 till 999999; det finns inget obegränsat värde, eftersom den här gränsen finns just för att förhindra att väntan aldrig tar slut. Höj den bara om en långsam värd utlöser den. |
-| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Samma sak för den inbäddade PostgreSQL. Klockan startar efter att första startens `initdb` har slutförts, så den täcker serverstart och kraschåterställning snarare än den initiala databasskapelsen. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Sekunder som uppstarten väntar på att den inbäddade Redis svarar på `PING` innan den ger upp. Vid tidsgräns stoppas containern och loggar orsaken i stället för att hänga sig. Hela sekunder från 1 till 999999; det finns inget obegränsat värde, eftersom att vänta för evigt är just det fel som gränsen finns för att förhindra. Höj den bara om en långsam värd överskrider den. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Samma sak, för den inbäddade PostgreSQL. Klockan startar efter att `initdb` vid första uppstarten är klar, så den täcker serverstart och kraschåterställning snarare än den första skapandet av databasen. |
 
-Uppgradering från 1.x: lägg din gamla `snapotter.db` på `/data/snapotter.db` i volymen så importerar inbäddat läge den till den inbäddade PostgreSQL vid första start. Importen körs en gång; senare starter hoppar över den.
+Uppgradering från 1.x: lägg din gamla `snapotter.db` på `/data/snapotter.db` i volymen så importerar inbäddat läge den till den inbäddade PostgreSQL vid första uppstarten. Importen körs en gång; senare uppstarter hoppar över den.
 
-Telemetrinotering: inbäddat läge ärver avbildningens analysstandard som all annan konfiguration. Den publicerade avbildningen levereras med analys på; bygg med `--build-arg SNAPOTTER_ANALYTICS=off`, eller använd admin-opt-out i appen, för att inaktivera det.
+Notering om telemetri: inbäddat läge ärver avbildens standardinställning för analys som all annan konfiguration. Den publicerade avbilden levereras med analys påslagen; bygg med `--build-arg SNAPOTTER_ANALYTICS=off`, eller använd administratörens avanmälan i appen, för att inaktivera den.
 
 ### Bearbetningsgränser {#processing-limits}
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `0` (obegränsat) | Maximal filstorlek per uppladdning i megabyte. Sätt till 0 för obegränsat. Den publicerade avbildningen levereras med `0`; ett bygge från källkoden börjar på 100. |
-| `MAX_BATCH_SIZE` | `0` (obegränsat) | Maximalt antal filer i en enda batchförfrågan. Sätt till 0 för obegränsat. Den publicerade avbildningen levereras med `0`; ett bygge från källkoden börjar på 100. |
-| `CONCURRENT_JOBS` | `0` (auto) | Antal batchjobb som körs parallellt. Sätt till 0 för att detektera automatiskt baserat på tillgängliga CPU-kärnor. |
-| `MAX_MEGAPIXELS` | `0` (obegränsat) | Maximal bildupplösning tillåten i megapixlar. Sätt till 0 för obegränsat. |
-| `MAX_WORKER_THREADS` | `0` (auto) | Maximalt antal worker-trådar för bildbehandling. Sätt till 0 för att detektera automatiskt baserat på tillgängliga CPU-kärnor. |
-| `PROCESSING_TIMEOUT_S` | `0` (ingen gräns) | Maximal bearbetningstid per förfrågan i sekunder. Sätt till 0 för ingen timeout. |
-| `MAX_PIPELINE_STEPS` | `20` | Maximalt antal steg i en pipeline. Sätt till 0 för ingen gräns. |
-| `MAX_CANVAS_PIXELS` | `0` (ingen gräns) | Maximal arbetsytestorlek i pixlar för utdatabilder. Sätt till 0 för ingen gräns. |
-| `MAX_SVG_SIZE_MB` | `50` | Största SVG som accepteras före sanering, i megabyte. `0` beter sig annorlunda här än i raderna omkring. Det tar bort storleksgränsen före parsning helt i stället för att höja den, så låt den här vara satt. |
-| `MAX_PDF_PAGES` | `0` (obegränsat) | Maximalt antal PDF-sidor för PDF-till-bild-konvertering. Sätt till 0 för obegränsat. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (obegränsat) | Största filstorlek per uppladdning i megabyte. Ange 0 för obegränsat. Den publicerade avbilden levereras med `0`; en källbygge startar på 100. |
+| `MAX_BATCH_SIZE` | `0` (obegränsat) | Högsta antal filer i en enskild batchförfrågan. Ange 0 för obegränsat. Den publicerade avbilden levereras med `0`; ett källbygge startar på 100. |
+| `CONCURRENT_JOBS` | `0` (auto) | Antal batchjobb som körs parallellt. Ange 0 för att automatiskt detektera utifrån tillgängliga CPU-kärnor. |
+| `MAX_MEGAPIXELS` | `0` (obegränsat) | Högsta tillåtna bildupplösning i megapixlar. Ange 0 för obegränsat. |
+| `MAX_WORKER_THREADS` | `0` (auto) | Högsta antal arbetstrådar för bildbearbetning. Ange 0 för att automatiskt detektera utifrån tillgängliga CPU-kärnor. |
+| `PROCESSING_TIMEOUT_S` | `0` (ingen gräns) | Längsta bearbetningstid per förfrågan i sekunder. Ange 0 för ingen tidsgräns. |
+| `MAX_PIPELINE_STEPS` | `20` | Högsta antal steg i en pipeline. Ange 0 för ingen gräns. |
+| `MAX_CANVAS_PIXELS` | `0` (ingen gräns) | Största dukstorlek i pixlar för utdatabilder. Ange 0 för ingen gräns. |
+| `MAX_SVG_SIZE_MB` | `50` | Största SVG som accepteras före sanering, i megabyte. `0` beter sig annorlunda här än i raderna omkring. Det tar bort storleksgränsen före tolkning helt i stället för att höja den, så låt denna vara satt. |
+| `MAX_PDF_PAGES` | `0` (obegränsat) | Högsta antal PDF-sidor för konvertering från PDF till bild. Ange 0 för obegränsat. |
 
 ### Motorer {#engines}
 
-SnapOtter slår upp varje bearbetningsbinär i `$PATH` inuti containern, så dessa förblir tomma om du inte monterar ett eget bygge.
+SnapOtter slår upp varje bearbetningsprogram på `$PATH` inuti containern, så dessa förblir tomma om du inte monterar ett eget bygge.
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
 | `FFMPEG_PATH` | (tom) | Sökväg till binären `ffmpeg` bakom video- och ljudverktygen. |
-| `FFPROBE_PATH` | (tom) | Sökväg till `ffprobe`, som läser mediefiler innan de bearbetas. Peka den på samma bygge som `FFMPEG_PATH`. |
+| `FFPROBE_PATH` | (tom) | Sökväg till `ffprobe`, som läser mediefiler innan de bearbetas. Peka den mot samma bygge som `FFMPEG_PATH`. |
 | `QPDF_PATH` | (tom) | Sökväg till `qpdf`, som används av PDF-verktygen och för att kontrollera uppladdade PDF-filer. |
-| `SOFFICE_PATH` | (tom) | Sökväg till LibreOffices `soffice`, som används för konvertering av kontorsdokument. |
+| `SOFFICE_PATH` | (tom) | Sökväg till LibreOffice `soffice`, som används för konvertering av kontorsdokument. |
 | `PDFCPU_PATH` | (tom) | Sökväg till `pdfcpu`, som används av vissa PDF-verktyg. |
-| `SNAPOTTER_HW_ACCEL` | (tom) | Familj av hårdvaruvideoencoder, `nvenc` eller `vaapi`. Tom kodar i programvara. |
+| `SNAPOTTER_HW_ACCEL` | (tom) | Familj för hårdvarukodare för video, `nvenc` eller `vaapi`. Tom kodar i mjukvara. |
 
-`SNAPOTTER_HW_ACCEL` kräver ett ffmpeg som är byggt med den encoderfamiljen, och ffmpeg i avbildningen har ingen av dem. Med avbildningens egen binär faller inställningen tillbaka på programvarukodning och säger det i startloggen. För att använda den, montera ditt eget ffmpeg-bygge, peka `FFMPEG_PATH` och `FFPROBE_PATH` på det och ge containern GPU-enheten. För `nvenc`, ange även `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: avbildningen begär bara `compute,utility`, och utan `video` monterar NVIDIA-körtiden inte encodingsbiblioteket, så encodern listas men varje encoding misslyckas. En sökvägsöverskuggning som inte finns eller inte är körbar namnges också i startloggen, och varje jobb som behöver den binären misslyckas tills du rättar sökvägen eller tar bort den.
+`SNAPOTTER_HW_ACCEL` kräver en ffmpeg byggd med den kodarfamiljen, och ffmpeg i avbilden har ingen av dem. Med avbildens egen binär faller inställningen tillbaka på mjukvarukodning och säger det i startloggen. För att använda den, montera ditt eget ffmpeg-bygge, peka `FFMPEG_PATH` och `FFPROBE_PATH` mot det och ge containern GPU-enheten. För `nvenc`, ange även `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: avbilden ber bara om `compute,utility`, och utan `video` monterar NVIDIA-körmiljön inte kodningsbiblioteket, så kodaren listas men varje kodning misslyckas. En sökvägsöverskrivning som inte finns eller inte är körbar nämns också i startloggen, och varje jobb som behöver den binären misslyckas tills du rättar sökvägen eller tar bort inställningen.
 
-De publicerade Compose-filerna skickar igenom alla sex från `.env`, så det räcker att ange dem där.
+De publicerade Compose-filerna skickar vidare alla sex från `.env`, så det räcker att sätta dem där.
 
 ### Rensning {#cleanup}
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `72` | Hur länge osparade bearbetningsresultat (råa uppladdningar och verktygsutdata) behålls innan automatisk radering. Filer du uttryckligen sparar till Files-biblioteket påverkas inte och består tills du raderar dem. |
+| `FILE_MAX_AGE_HOURS` | `72` | Hur länge osparade bearbetningsresultat (råa uppladdningar och verktygsutdata) behålls innan de raderas automatiskt. Filer som du uttryckligen sparar i filbiblioteket påverkas inte och finns kvar tills du raderar dem. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Hur ofta rensningsjobbet körs. |
 
 ### Utseende {#appearance}
@@ -127,15 +127,15 @@ De publicerade Compose-filerna skickar igenom alla sex från `.env`, så det rä
 | Variabel | Standard | Beskrivning |
 |---|---|---|
 | `DEFAULT_THEME` | `light` | Standardtema för nya sessioner. `light`, `dark` eller `system`. |
-| `DEFAULT_LOCALE` | `en` | Standardgränssnittsspråk. |
-| `DEFAULT_TOOL_VIEW` | `sidebar` | Standardverktygslayout. `sidebar` eller `fullscreen`. |
+| `DEFAULT_LOCALE` | `en` | Standardspråk för gränssnittet. |
+| `DEFAULT_TOOL_VIEW` | `sidebar` | Standardlayout för verktyg. `sidebar` eller `fullscreen`. |
 
 ### Docker-behörigheter {#docker-permissions}
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `PUID` | `999` | Kör containerprocessen som detta UID. Sätt till att matcha din värdanvändare för bind-monteringar (`id -u`). |
-| `PGID` | `999` | Kör containerprocessen som detta GID. Sätt till att matcha din värdgrupp för bind-monteringar (`id -g`). |
+| `PUID` | `999` | Kör containerprocessen som detta UID. Ange så att det matchar din värdanvändare för bind-monteringar (`id -u`). |
+| `PGID` | `999` | Kör containerprocessen som detta GID. Ange så att det matchar din värdgrupp för bind-monteringar (`id -g`). |
 
 ## Docker-exempel {#docker-example}
 
@@ -168,7 +168,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Ändra detta för icke-lokala distributioner
+      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
@@ -202,7 +202,7 @@ volumes:
 
 Docker Compose-stacken använder fyra volymer:
 
-- `/data` (app) - AI-modeller, Python-venv och användarfiler. Montera denna för att behålla uppladdade filer och installerade AI-paket över omstarter.
-- `/tmp/workspace` (app) - Tillfällig lagring för filer som bearbetas. Denna kan vara flyktig, men att montera den undviker att fylla upp containerns skrivbara lager.
-- `SnapOtter-pgdata` (postgres) - PostgreSQL-datakatalog. Denna innehåller alla relationsdata (användare, inställningar, pipelines, jobb, revisionslogg). Säkerhetskopiera via `pg_dump` eller volymögonblicksbild.
-- `SnapOtter-redisdata` (redis) - Redis append-only-fil för beständiga jobbköer.
+- `/data` (app) - AI-modeller, Python-venv och användarfiler. Montera denna för att behålla uppladdade filer och installerade AI-paket mellan omstarter.
+- `/tmp/workspace` (app) - Temporär lagring för filer som bearbetas. Denna kan vara efemär, men en montering hindrar containerns skrivbara lager från att fyllas.
+- `SnapOtter-pgdata` (postgres) - Datakatalog för PostgreSQL. Den innehåller all relationsdata (användare, inställningar, pipelines, jobb, granskningslogg). Säkerhetskopiera via `pg_dump` eller volymögonblicksbild.
+- `SnapOtter-redisdata` (redis) - Redis append-only-fil för hållbara jobbköer.

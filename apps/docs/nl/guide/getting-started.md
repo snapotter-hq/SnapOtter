@@ -1,15 +1,15 @@
 ---
-description: "Installeer SnapOtter met Docker in één commando. Inclusief Docker Compose-installatie, bouwen vanaf broncode en een volledig functieoverzicht."
-i18n_source_hash: 5bc863dc7351
+description: "Installeer SnapOtter met Docker in één opdracht. Inclusief Docker Compose-configuratie, bouwen vanaf de broncode en een volledig functieoverzicht."
+i18n_source_hash: aa8428189808
 i18n_provenance: machine
-i18n_output_hash: 034d42379189
+i18n_output_hash: 2cd174b8d528
 i18n_hash_version: 2
 ---
 
 # Aan de slag {#getting-started}
 
-::: tip Probeer voor je installeert
-Verken de volledige UI op [demo.snapotter.com](https://demo.snapotter.com) - geen aanmelding of installatie vereist.
+::: tip Eerst proberen, dan installeren
+Verken de volledige gebruikersinterface op [demo.snapotter.com](https://demo.snapotter.com) - zonder aanmelding of installatie.
 :::
 
 ## Snelstart {#quick-start}
@@ -18,30 +18,30 @@ Verken de volledige UI op [demo.snapotter.com](https://demo.snapotter.com) - gee
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Deze enkele container voert alles uit wat hij nodig heeft: zonder `DATABASE_URL` ingesteld, start hij zijn eigen PostgreSQL en Redis op de loopback-interface (embedded mode) en bewaart hij alle gegevens in het `SnapOtter-data`-volume. Het is de snelste manier om SnapOtter uit te proberen of zelf te hosten op een thuislab. Gebruik voor productie de [canonieke Docker Compose-stack](#docker-compose), die PostgreSQL en Redis in hun eigen containers bewaart. De ingebouwde modus wordt uitgevoerd als root (standaard) en wordt automatisch uitgeschakeld zodra u `DATABASE_URL` instelt.
+Deze ene container draait alles wat nodig is: zonder ingestelde `DATABASE_URL` start hij zijn eigen PostgreSQL en Redis op de loopback-interface (embedded modus) en bewaart hij alle data in het volume `SnapOtter-data`. Dit is de snelste manier om SnapOtter uit te proberen of zelf te hosten op een homelab. Gebruik voor productie de [canonieke Docker Compose-stack](#docker-compose), waarin PostgreSQL en Redis in eigen containers draaien. Embedded modus draait als root (de standaard) en schakelt automatisch uit zodra u `DATABASE_URL` instelt.
 
-Installeer je op een Raspberry Pi, een oude laptop of een kleine VPS? Zie [Setups met beperkte resources](/nl/guide/low-resource) voor een afgestemd stappenplan en wat je van beperkte hardware kunt verwachten.
+Installeert u op een Raspberry Pi, een oude laptop of een kleine VPS? Zie [Setups met weinig resources](/nl/guide/low-resource) voor een afgestemde handleiding en wat u van beperkte hardware mag verwachten.
 
-Je wordt bij de eerste login gevraagd je wachtwoord te wijzigen.
+U wordt gevraagd uw wachtwoord te wijzigen bij de eerste aanmelding.
 
-::: tip Anonieme Productanalytics
-SnapOtter bevat standaard anonieme productanalytics. Om het uit te schakelen, open je **Instellingen → Systeem → Privacy** en zet je **Anonieme Productanalytics** uit. Het stopt onmiddellijk voor de hele instance.
+::: tip Anonieme productanalyse
+SnapOtter bevat standaard anonieme productanalyse. Om dit uit te schakelen opent u **Settings → System → Privacy** en zet u **Anonymous Product Analytics** uit. Het stopt direct voor de hele instantie.
 
-Je kunt ook de omgevingsvariabele `SNAPOTTER_TELEMETRY=0` instellen (`false` en `off` werken ook) om alle telemetrie voor de instance uit te schakelen zonder herbouw.
+U kunt ook de omgevingsvariabele `SNAPOTTER_TELEMETRY=0` instellen (`false` en `off` werken ook) om alle telemetrie voor de instantie uit te schakelen zonder opnieuw te bouwen.
 
-Foutmonitoring wordt aangedreven door [Sentry](https://sentry.io), dat SnapOtter sponsort via zijn open-source-programma.
+Foutmonitoring wordt verzorgd door [Sentry](https://sentry.io), dat SnapOtter sponsort via zijn open-sourceprogramma.
 
 Zie [Wat SnapOtter verzamelt](/nl/guide/telemetry) voor details over wat er wordt verzameld.
 :::
 
 ::: tip NVIDIA CUDA-versnelling
-Voeg `--gpus all` toe voor NVIDIA CUDA-versnelde achtergrondverwijdering, opschaling, gezichtsverbetering en restauratie. OCR blijft CPU-gebaseerd en werkt in dezelfde afbeelding met of zonder GPU-toegang:
+Voeg `--gpus all` toe voor NVIDIA CUDA-versnelde achtergrondverwijdering, opschaling, gezichtsverbetering en restauratie. OCR blijft CPU-gebaseerd en werkt in dezelfde image met of zonder GPU-toegang:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Vereist de [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Valt automatisch terug naar de CPU wanneer CUDA niet beschikbaar is. Intel/AMD iGPU-versnelling via VA-API, Quick Sync of OpenCL wordt momenteel niet ondersteund voor AI-inferentie. Zie [Docker-tags](/nl/guide/docker-tags) voor benchmarks. Als AI-tools ondanks `--gpus all` op de CPU draaien, zie dan [GPU-versnelling verifiëren](/nl/guide/deployment#verify-gpu-acceleration).
+Vereist de [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Valt automatisch terug op de CPU wanneer CUDA niet beschikbaar is. Versnelling via een Intel/AMD-iGPU met VA-API, Quick Sync of OpenCL wordt momenteel niet ondersteund voor AI-inferentie. Zie [Docker-tags](/nl/guide/docker-tags) voor benchmarks. Draaien AI-tools op de CPU ondanks `--gpus all`, zie dan [GPU-versnelling controleren](/nl/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Ook op GHCR
@@ -52,9 +52,9 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Beide registries publiceren bij elke release dezelfde image.
 :::
 
-## Docker Componeer {#docker-compose}
+## Docker Compose {#docker-compose}
 
-Gebruik het productiebestand dat bij elke release wordt onderhouden en getest in plaats van een verkort Compose-voorbeeld van deze pagina te kopiëren:
+Gebruik het productiebestand dat bij elke release wordt onderhouden en getest, in plaats van een verkort Compose-voorbeeld van deze pagina over te nemen:
 
 ```bash
 install -d -m 700 snapotter && cd snapotter
@@ -72,11 +72,11 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-De canonieke [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) omvat alle vier de runtimevolumes, gezondheidscontroles, resourcelimieten, duurzame Redis-configuratie, vastgezette database-/cache-images en de huidige containerverharding. Wijzig het standaard beheerderswachtwoord onmiddellijk na de eerste keer inloggen. Voor een reproduceerbare implementatie maakt u de SnapOtter-toepassingsimage vast aan de releasetag of -digest die u hebt geverifieerd, in plaats van `latest` te volgen.
+Het canonieke [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) bevat alle vier de runtime-volumes, healthchecks, resourcelimieten, duurzame Redis-configuratie, vastgezette database-/cache-images en de huidige containerhardening. Wijzig het standaard beheerderswachtwoord direct na de eerste aanmelding. Zet voor een reproduceerbare implementatie de SnapOtter-applicatie-image vast op de releasetag of digest die u hebt gecontroleerd, in plaats van `latest` te volgen.
 
-Zie [Configuratie](/nl/guide/configuration) voor alle omgevingsvariabelen en [Beveiliging en beveiliging](/nl/guide/security) voor geheimen, netwerkbeleid en back-uprichtlijnen.
+Zie [Configuratie](/nl/guide/configuration) voor alle omgevingsvariabelen en [Beveiliging en hardening](/nl/guide/security) voor geheimen, netwerkbeleid en back-upadvies.
 
-## Bouwen vanaf broncode {#build-from-source}
+## Bouwen vanaf de broncode {#build-from-source}
 
 **Vereisten:** Node.js 22.22+, pnpm 9+, Docker (voor Postgres + Redis), Python 3.11+ (voor AI-functies), Git.
 
@@ -91,38 +91,38 @@ pnpm dev
 - Frontend: [http://localhost:1351](http://localhost:1351)
 - Backend: [http://localhost:13490](http://localhost:13490)
 
-## Wat je kunt doen {#what-you-can-do}
+## Wat u kunt doen {#what-you-can-do}
 
 ### Bestandsverwerking (200+ tools) {#file-processing-200-tools}
 
 | Modaliteit | Aantal | Voorbeeldtools |
 |----------|-------|---------------|
-| **Afbeelding** | 112 | Formaat wijzigen, Bijsnijden, Comprimeren, Converteren, Achtergrond verwijderen, Upscale, OCR, Watermerk, Collage, Inkleuren, GIF-tools, formaatpresets |
-| **Video** | 57 | Trimmen, Bijsnijden, Comprimeren, Converteren, Samenvoegen, Audio extraheren, Automatische ondertitels, Video naar GIF, Formaat wijzigen, Stabiliseren, formaatpresets |
-| **Audio** | 27 | Trimmen, Samenvoegen, Converteren, Normaliseren, Ruisonderdrukking, Transcriberen, Pitch verschuiven, Fade, Beltoonmaker, formaatpresets |
+| **Afbeelding** | 112 | Formaat wijzigen, Bijsnijden, Comprimeren, Converteren, Achtergrond verwijderen, Opschalen, OCR, Watermerk, Collage, Inkleuren, GIF-tools, formaatpresets |
+| **Video** | 57 | Knippen, Bijsnijden, Comprimeren, Converteren, Samenvoegen, Audio extraheren, Automatische ondertitels, Video naar GIF, Formaat wijzigen, Stabiliseren, formaatpresets |
+| **Audio** | 27 | Knippen, Samenvoegen, Converteren, Normaliseren, Ruisonderdrukking, Transcriberen, Toonhoogte wijzigen, Fade, Ringtone-maker, formaatpresets |
 | **PDF / Document** | 35 | Samenvoegen, Splitsen, Comprimeren, OCR, Watermerk, Redigeren, Word naar PDF, Excel naar PDF, Roteren, Beveiligen, Repareren |
 | **Bestanden** | 23 | CSV naar JSON, JSON naar XML, CSV's samenvoegen, CSV splitsen, ZIP maken, ZIP uitpakken, Grafiekmaker, YAML/JSON |
 
-### Pijplijnen {#pipelines}
+### Pipelines {#pipelines}
 
 Koppel tools aan elkaar tot workflows met meerdere stappen en pas ze toe op één afbeelding of een hele batch:
 
-1. Open **Pijplijnen** in de zijbalk.
-2. Voeg stappen toe (elke tool, alle instellingen).
-3. Draai op één bestand - of een hele batch tegelijk.
-4. Sla de pijplijn op voor later hergebruik.
+1. Open **Pipelines** in de zijbalk.
+2. Voeg stappen toe (elke tool, elke instelling).
+3. Voer uit op één bestand - of op een hele batch tegelijk.
+4. Sla de pipeline op voor later hergebruik.
 
-Pijplijnen staan standaard 20 stappen toe. Stel `MAX_PIPELINE_STEPS=0` in om de limiet onbeperkt te maken.
+Pipelines staan standaard 20 stappen toe. Stel `MAX_PIPELINE_STEPS=0` in om de limiet onbeperkt te maken.
 
 ### Bestandsbibliotheek {#file-library}
 
-Elk bestand dat je verwerkt, kan worden opgeslagen in je **Bestanden**-bibliotheek. SnapOtter houdt de volledige versiegeschiedenis bij zodat je elke verwerkingsstap kunt traceren van de oorspronkelijke upload tot de uiteindelijke uitvoer.
+Elk bestand dat u verwerkt, kan worden opgeslagen in uw **Files**-bibliotheek. SnapOtter houdt de volledige versiegeschiedenis bij, zodat u elke verwerkingsstap kunt terugvolgen van de oorspronkelijke upload tot het eindresultaat.
 
-Opslaan is expliciet: resultaten die je in de bibliotheek opslaat, blijven bewaard tot je ze verwijdert, terwijl resultaten die je verwerkt en niet opslaat automatisch na 72 uur worden gewist (configureerbaar via `FILE_MAX_AGE_HOURS`).
+Opslaan is expliciet: resultaten die u in de bibliotheek opslaat blijven bewaard tot u ze verwijdert, terwijl resultaten die u verwerkt maar niet opslaat na 72 uur automatisch worden gewist (instelbaar via `FILE_MAX_AGE_HOURS`).
 
-### REST API & API-sleutels {#rest-api-api-keys}
+### REST API en API-sleutels {#rest-api-api-keys}
 
-Elke tool is toegankelijk via HTTP:
+Elke tool is bereikbaar via HTTP:
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/resize \
@@ -131,28 +131,28 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
   -F 'settings={"width":800,"height":600,"fit":"cover"}'
 ```
 
-Genereer API-sleutels onder **Instellingen → API-sleutels**. Zie de [REST API-referentie](/nl/api/rest) voor alle endpoints, of bezoek [http://localhost:1349/api/docs](http://localhost:1349/api/docs) voor de interactieve referentie.
+Genereer API-sleutels onder **Settings → API Keys**. Zie de [REST API-referentie](/nl/api/rest) voor alle endpoints, of ga naar [http://localhost:1349/api/docs](http://localhost:1349/api/docs) voor de interactieve referentie.
 
-### Meerdere gebruikers & teams {#multi-user-teams}
+### Meerdere gebruikers en teams {#multi-user-teams}
 
-Schakel meerdere gebruikers in met op rollen gebaseerde toegangscontrole:
+Schakel meerdere gebruikers in met rolgebaseerde toegangscontrole:
 
-- **Beheerder**: volledige toegang - beheer gebruikers, teams, instellingen, alle bestanden/pijplijnen/API-sleutels
-- **Gebruiker**: gebruik tools, beheer eigen bestanden/pijplijnen/API-sleutels
+- **Admin**: volledige toegang - beheer gebruikers, teams, instellingen, alle bestanden/pipelines/API-sleutels
+- **User**: gebruik tools, beheer eigen bestanden/pipelines/API-sleutels
 
-Maak teams aan onder **Instellingen → Teams** om gebruikers te groeperen.
+Maak teams aan onder **Settings → Teams** om gebruikers te groeperen.
 
-Stel `AUTH_ENABLED=true` in (of `false` voor gebruik met één gebruiker/eigen gebruik zonder login).
+Stel `AUTH_ENABLED=true` in (of `false` voor gebruik door één persoon zonder aanmelding).
 
-## Gebruik het vanaf je telefoon {#use-it-from-your-phone}
+## Gebruik het vanaf uw telefoon {#use-it-from-your-phone}
 
-SnapOtter werkt in mobiele browsers, en je kunt het als app installeren. Open je instance op je telefoon en doe dan het volgende:
+SnapOtter werkt in mobiele browsers en u kunt het als app installeren. Open uw instantie op de telefoon en dan:
 
-- **iPhone / iPad (Safari)**: tik op Deel en dan op **Zet op beginscherm**.
-- **Android (Chrome)**: open het browsermenu en tik op **App installeren**.
+- **iPhone / iPad (Safari):** tik op Deel en kies daarna **Zet op beginscherm**.
+- **Android (Chrome):** open het browsermenu en tik op **App installeren**.
 
-De geïnstalleerde app opent in een eigen venster, direct in je instance.
+De geïnstalleerde app opent in een eigen venster, rechtstreeks naar uw instantie.
 
-Eén ding om te weten: browsers bieden de installatie alleen aan via HTTPS. Een gewoon HTTP-adres op je LAN werkt prima in een browsertabblad; voor de echte installatie zet je de instance achter een reverse proxy met een certificaat (zie de [implementatiegids](/nl/guide/deployment)).
+Eén kanttekening: browsers bieden de installatieprompt alleen aan via HTTPS. Een gewoon HTTP-adres op uw LAN werkt prima in een browsertabblad; zet voor de echte installatie de instantie achter een reverse proxy met een certificaat (zie de [implementatiehandleiding](/nl/guide/deployment)).
 
-Op telefoons en tablets tonen de afbeeldingstools een knop **Foto maken** naast de uploadknop. Fotografeer een bonnetje of een whiteboard en het staat meteen in de tool.
+Op telefoons en tablets tonen afbeeldingstools een knop **Foto maken** naast de uploadknop. Fotografeer een bon of een whiteboard en het komt direct in de tool terecht.

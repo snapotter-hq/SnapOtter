@@ -1,57 +1,57 @@
 ---
-description: "Hướng dẫn tăng cường bảo mật cho SnapOtter. Bảo mật container, cô lập mạng, Docker secret, triển khai Kubernetes, và các tài liệu tuân thủ."
-i18n_source_hash: f37bcb6cc1c5
+description: "Hướng dẫn tăng cường bảo mật cho SnapOtter. Bảo mật container, cô lập mạng, Docker secrets, triển khai Kubernetes và các tài liệu tuân thủ."
+i18n_source_hash: 5cf773ddb4c0
 i18n_provenance: machine
-i18n_output_hash: 832b0a8d9522
+i18n_output_hash: d2710e8434af
 i18n_hash_version: 2
 ---
 
-# Bảo mật & Tăng cường {#security-hardening}
+# Bảo mật và tăng cường {#security-hardening}
 
-SnapOtter xử lý tập tin hoàn toàn trên hạ tầng của bạn. Nó gửi phân tích sản phẩm và báo cáo sự cố ẩn danh, không chứa nội dung, theo mặc định để giúp cải thiện dự án. Nó không bao giờ gửi tập tin, tên tập tin, nội dung tập tin, kết quả OCR, metadata hình ảnh, hoặc văn bản tài liệu của bạn. Phản hồi tùy chọn chỉ được gửi sau khi người dùng gửi nó, chỉ khi phân tích được bật, và các trường liên hệ chỉ được bao gồm khi có sự đồng ý liên hệ tường minh. Một quản trị viên có thể tắt việc thu thập phân tích và phản hồi chỉ với một cú nhấp trong mục Settings > System > Privacy, không cần xây dựng lại. Việc xử lý tập tin luôn ở bên trong container của bạn.
+SnapOtter xử lý tệp hoàn toàn trên hạ tầng của bạn. Theo mặc định, nó gửi phân tích sử dụng sản phẩm và báo cáo sự cố ẩn danh, không chứa nội dung, để giúp cải thiện dự án. Nó không bao giờ gửi tệp, tên tệp, nội dung tệp, kết quả OCR, metadata ảnh hay văn bản tài liệu của bạn. Phản hồi tùy chọn chỉ được gửi sau khi người dùng gửi đi, chỉ khi phân tích được bật, và các trường liên hệ chỉ được đưa vào khi có sự đồng ý liên hệ rõ ràng. Quản trị viên có thể tắt phân tích và thu thập phản hồi chỉ bằng một cú nhấp trong Settings > System > Privacy, không cần build lại. Việc xử lý tệp luôn nằm bên trong container của bạn.
 
-Container chạy dưới danh nghĩa một người dùng không phải root chuyên dụng (`snapotter`) với tất cả các capability của Linux được loại bỏ ngoại trừ tập tối thiểu cần thiết. Để xem đầy đủ chính sách công bố lỗ hổng và kiến trúc bảo mật, xem [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trên GitHub.
+Container chạy dưới một người dùng không phải root chuyên dụng (`snapotter`) với mọi capability Linux bị loại bỏ, trừ tập tối thiểu cần thiết. Để xem chính sách công bố lỗ hổng đầy đủ và kiến trúc bảo mật, hãy xem [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trên GitHub.
 
-## Làm cứng thùng chứa {#container-hardening}
+## Tăng cường bảo mật container {#container-hardening}
 
-Các tệp soạn thảo [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) và [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) chuẩn là nguồn gốc của sự thật. Không sao chép một ví dụ viết tắt vào sản xuất; triển khai tệp từ thẻ phát hành mà bạn đã xác minh.
+Các tệp Compose chuẩn [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) và [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) là nguồn tham chiếu chính thức. Đừng sao chép một ví dụ rút gọn vào production; hãy triển khai tệp từ tag bản phát hành mà bạn đã xác minh.
 
-Cả hai ngăn xếp đều áp dụng các điều khiển sau:
+Cả hai stack đều áp dụng các biện pháp kiểm soát sau:
 
-- Các giới hạn về bộ nhớ, trao đổi, CPU và PID chứa quá trình xử lý gốc chạy trốn.
-- Mọi dịch vụ đều loại bỏ tất cả các khả năng của Linux. Ứng dụng chỉ bổ sung lại `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` để sở hữu khối lượng, giảm danh tính `gosu` một chiều và chuyển tiếp tín hiệu duyên dáng. PostgreSQL và Redis chỉ nhận được tập hợp con mà điểm truy nhập chính thức của họ cần.
-- `security_opt: [no-new-privileges:true]` ngăn các quy trình trong vùng chứa ứng dụng, PostgreSQL và Redis có được các đặc quyền bổ sung. Điều này vẫn tương thích với `gosu`: điểm vào bắt đầu với quyền root, chuẩn bị các ổ đĩa và chỉ giảm xuống người dùng `snapotter` chuyên dụng.
-- Đầu vào hình ảnh PostgreSQL và Redis được ghim bằng thông báo. Ứng dụng cũng phải được ghim vào thẻ phát hành hoặc thông báo đã được xác minh thay vì `latest`.
-- Kiểm tra tình trạng, xoay vòng nhật ký JSON có giới hạn, Redis AOF bền vững và chính sách khởi động lại được xác định tập trung trong các tệp chuẩn.
+- Giới hạn bộ nhớ, swap, CPU và PID ngăn việc xử lý native mất kiểm soát lan rộng.
+- Mọi dịch vụ đều loại bỏ toàn bộ capability Linux. Ứng dụng chỉ thêm lại `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` cho quyền sở hữu volume, việc hạ danh tính một chiều `gosu` và chuyển tiếp tín hiệu êm thấm. PostgreSQL và Redis chỉ nhận tập con mà entrypoint chính thức của chúng cần.
+- `security_opt: [no-new-privileges:true]` ngăn các tiến trình trong container ứng dụng, PostgreSQL và Redis giành thêm đặc quyền. Điều này vẫn tương thích với `gosu`: entrypoint bắt đầu với quyền root, chuẩn bị các volume, và chỉ hạ xuống người dùng `snapotter` chuyên dụng.
+- Đầu vào image của PostgreSQL và Redis được cố định theo digest. Tương tự, ứng dụng nên được cố định theo tag hoặc digest bản phát hành đã xác minh thay vì `latest`.
+- Health check, xoay vòng log JSON có giới hạn, Redis AOF bền vững và chính sách khởi động lại được định nghĩa tập trung trong các tệp chuẩn.
 
-Để triển khai qua Internet, hãy liên kết cổng 1349 với loopback và chấm dứt TLS tại proxy ngược được duy trì. Tạo thông tin đăng nhập PostgreSQL và Redis duy nhất, lưu trữ bí mật trong các tệp được bảo vệ hoặc trình quản lý bí mật và thay đổi mật khẩu quản trị viên ban đầu ngay lập tức.
+Với triển khai hướng ra internet, hãy gắn cổng 1349 vào loopback và kết thúc TLS tại một reverse proxy được bảo trì. Tạo thông tin xác thực PostgreSQL và Redis riêng biệt, lưu secret trong tệp được bảo vệ hoặc trình quản lý secret, và đổi mật khẩu quản trị ban đầu ngay lập tức.
 
-### Tại sao `read_only` không được đặt {#why-read-only-is-not-set}
+### Vì sao `read_only` không được đặt {#why-read-only-is-not-set}
 
-`read_only: true` không được đặt vì ánh xạ lại PUID/PGID ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu sử dụng cờ `--user` của Docker hoặc Kubernetes `runAsUser` thay vì PUID/PGID, bạn có thể kích hoạt hệ thống tệp gốc chỉ đọc một cách an toàn.
+`read_only: true` không được đặt vì việc ánh xạ lại PUID/PGID ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu bạn dùng cờ `--user` của Docker hoặc `runAsUser` của Kubernetes thay cho PUID/PGID, bạn có thể bật hệ thống tệp gốc chỉ đọc một cách an toàn.
 
-## Cách ly mạng {#network-isolation}
+## Cô lập mạng {#network-isolation}
 
-Quá trình xử lý tệp diễn ra cục bộ nhưng cài đặt mặc định **không phải là hệ thống không có đầu ra**. Phân tích sản phẩm ẩn danh sử dụng PostHog và báo cáo sự cố sử dụng Sentry khi bật tính năng đo từ xa. Đặt `SNAPOTTER_TELEMETRY=0` (hoặc tắt phân tích trong Cài đặt > Hệ thống > Quyền riêng tư) để tắt cả hai. SnapOtter không bao giờ bao gồm các tệp đã tải lên, tên tệp, đầu ra OCR, văn bản tài liệu hoặc nội dung tệp khác trong các sự kiện đó.
+Việc xử lý tệp diễn ra cục bộ, nhưng bản cài đặt mặc định **không phải là hệ thống không có lưu lượng đi ra**. Phân tích sử dụng sản phẩm ẩn danh dùng PostHog và báo cáo sự cố dùng Sentry khi telemetry được bật. Đặt `SNAPOTTER_TELEMETRY=0` (hoặc tắt phân tích trong Settings > System > Privacy) để tắt cả hai. SnapOtter không bao giờ đưa tệp tải lên, tên tệp, kết quả OCR, văn bản tài liệu hay nội dung tệp khác vào các sự kiện đó.
 
-Lưu lượng truy cập đi khác được điều khiển theo tính năng: Tải xuống bản cài đặt mô hình/gói AI đã ký các đầu vào phát hành; Nhập URL tìm nạp URL công khai do người dùng yêu cầu; và OIDC, SAML, OpenTelemetry, webhooks, bộ lưu trữ tương thích với S3 hoặc các tích hợp tương tự được định cấu hình rõ ràng sẽ liên hệ với các đích đến do quản trị viên chọn. Tải xuống mô hình trong thời gian chạy bị tắt theo mặc định. Chỉ đặt `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` để bật rõ ràng tính năng tải xuống dự phòng tự động. [Nhập gói ngoại tuyến](/vi/guide/deployment) có thể cung cấp các tính năng AI mà không cần xuất ra mô hình thời gian chạy.
+Lưu lượng đi ra khác phụ thuộc vào tính năng: cài đặt bundle/model AI tải về các đầu vào bản phát hành đã ký; nhập qua URL tải một URL công khai do người dùng yêu cầu; và các tích hợp được cấu hình rõ ràng như OIDC, SAML, OpenTelemetry, webhook, lưu trữ tương thích S3 hoặc tương tự sẽ liên hệ các đích do quản trị viên chọn. Việc tải model khi runtime bị tắt theo mặc định. Chỉ đặt `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` khi bạn muốn chủ động chọn tham gia tải dự phòng tự động. [Nhập bundle ngoại tuyến](/vi/guide/deployment) có thể cung cấp các tính năng AI mà không cần lưu lượng đi ra để tải model khi runtime.
 
 **Khuyến nghị về tường lửa:**
 
-|Kịch bản|Quy tắc đi|
+| Tình huống | Quy tắc đi ra |
 |---|---|
-|Khe hở không khí|Đặt `SNAPOTTER_TELEMETRY=0` và `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, sử dụng tính năng nhập gói AI ngoại tuyến, tắt tính năng nhập URL và tích hợp bên ngoài, sau đó chặn lối ra|
-|đo từ xa mặc định|Cho phép các điểm cuối PostHog và Sentry được liệt kê theo nhật ký trình duyệt/mạng của bạn; vô hiệu hóa đo từ xa nếu chính sách không cho phép chúng|
-|Cần có gói AI|Trong quá trình cài đặt, hãy cho phép HTTPS thành `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; sau đó chặn những máy chủ đó|
-|Tích hợp bên ngoài|Chỉ cho phép các đích đến OIDC/SAML/OTLP/webhook/object-storage được định cấu hình chính xác bởi quản trị viên|
+| Air-gapped | Đặt `SNAPOTTER_TELEMETRY=0` và `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, dùng nhập bundle AI ngoại tuyến, tắt nhập qua URL và các tích hợp bên ngoài, rồi chặn lưu lượng đi ra |
+| Telemetry mặc định | Cho phép các endpoint PostHog và Sentry được liệt kê trong log trình duyệt/mạng của bạn; tắt telemetry nếu chính sách không cho phép |
+| Cần bundle AI | Trong lúc cài đặt, cho phép HTTPS tới `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; sau đó chặn các host đó |
+| Tích hợp bên ngoài | Chỉ cho phép đúng các đích OIDC/SAML/OTLP/webhook/lưu trữ đối tượng do quản trị viên cấu hình |
 
-Các kho lưu trữ gói được cung cấp từ bộ lưu trữ Xet của Hugging Face, lưu trữ này truyền song song qua các điểm cuối `*.xethub.hf.co` và giúp tải xuống gói nhiều GB nhanh chóng. Nếu tường lửa của bạn cho phép `huggingface.co` nhưng chặn `*.xethub.hf.co`, quá trình cài đặt vẫn thành công nhưng quay lại tải xuống một luồng chậm hơn, vì vậy, hãy đưa các máy chủ Xet vào danh sách để tiếp tục hoạt động nhanh chóng. Các bản cài đặt hoàn toàn ngoại tuyến có thể bỏ qua tất cả những điều này và thay vào đó hãy sử dụng [Nhập gói ngoại tuyến](/vi/guide/deployment).
+Các tệp lưu trữ bundle được phục vụ từ kho lưu trữ Xet của Hugging Face, truyền song song qua các endpoint `*.xethub.hf.co` và là lý do việc tải bundle nhiều GB diễn ra nhanh. Nếu tường lửa của bạn cho phép `huggingface.co` nhưng chặn `*.xethub.hf.co`, việc cài đặt vẫn thành công nhưng chuyển sang tải một luồng chậm hơn, vì vậy hãy đưa các host Xet vào danh sách cho phép để giữ đường nhanh. Cài đặt hoàn toàn ngoại tuyến có thể bỏ qua tất cả điều này và dùng [Nhập bundle ngoại tuyến](/vi/guide/deployment) thay thế.
 
-Để biết cấu hình proxy ngược (Nginx, Traefik, Caddy, Cloudflare Tunnels), hãy xem [Hướng dẫn triển khai](/vi/guide/deployment#reverse-proxy).
+Về cấu hình reverse proxy (Nginx, Traefik, Caddy, Cloudflare Tunnels), xem [hướng dẫn Triển khai](/vi/guide/deployment#reverse-proxy).
 
-## Docker Secret {#docker-secrets}
+## Docker Secrets {#docker-secrets}
 
-Đối với các triển khai production, tránh truyền secret dưới dạng biến môi trường văn bản thuần. Entrypoint hỗ trợ quy ước `_FILE` của Docker: mount một secret dưới dạng một tập tin và đặt biến `_FILE` tương ứng thành đường dẫn của nó.
+Với triển khai production, hãy tránh truyền secret dưới dạng biến môi trường văn bản thuần. Entrypoint hỗ trợ quy ước `_FILE` của Docker: mount secret dưới dạng tệp và đặt biến `_FILE` tương ứng thành đường dẫn của nó.
 
 **Các secret được hỗ trợ:**
 
@@ -64,7 +64,7 @@ Các kho lưu trữ gói được cung cấp từ bộ lưu trữ Xet của Hugg
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
 | `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
 
-**Ví dụ với Docker Compose secret:**
+**Ví dụ với Docker Compose secrets:**
 
 ```yaml
 services:
@@ -87,14 +87,14 @@ secrets:
 ```
 
 ::: tip 
-Docker Compose secret (không dùng Swarm) yêu cầu Compose v2.23 trở lên.
+Docker Compose secrets (không dùng Swarm) yêu cầu Compose v2.23 trở lên.
 :::
 
 ## Triển khai Kubernetes {#kubernetes-deployment}
 
-Entrypoint phát hiện khi container đã chạy sẵn dưới danh nghĩa không phải root (ví dụ, thông qua `runAsUser` của Kubernetes) và tự động bỏ qua việc hạ đặc quyền gosu. Trong trường hợp đó nó không thể tự chown các volume đã mount, nên nó xác minh rằng chúng có thể ghi được và thoát sớm với hướng dẫn khả thi nếu chúng không thể ghi, xem [Quyền lưu trữ](/vi/guide/deployment#storage-permissions) cho các thiết lập `fsGroup` và UID lạ (TrueNAS, OpenShift).
+Entrypoint phát hiện khi container đã chạy với quyền không phải root (ví dụ qua `runAsUser` của Kubernetes) và tự động bỏ qua bước hạ đặc quyền bằng gosu. Trong trường hợp đó, nó không thể tự chown các volume đã mount, nên nó xác minh các volume có ghi được hay không và thoát sớm kèm hướng dẫn cụ thể nếu không. Xem [Quyền lưu trữ](/vi/guide/deployment#storage-permissions) cho `fsGroup` và các thiết lập UID ngoại lai (TrueNAS, OpenShift).
 
-**SecurityContext khuyến nghị cho Pod:**
+**SecurityContext của Pod được khuyến nghị:**
 
 ```yaml
 apiVersion: apps/v1
@@ -161,26 +161,26 @@ spec:
             sizeLimit: 2Gi
 ```
 
-Vì `runAsUser: 999` được đặt ở cấp pod, entrypoint bỏ qua hoàn toàn gosu. Điều này cho phép các capability `allowPrivilegeEscalation: false` và `drop: [ALL]` mà không xung đột.
+Vì `runAsUser: 999` được đặt ở cấp pod, entrypoint bỏ qua hoàn toàn gosu. Điều này cho phép dùng các capability `allowPrivilegeEscalation: false` và `drop: [ALL]` mà không xung đột.
 
-Để xác định kích cỡ tài nguyên, xem [Yêu cầu phần cứng](/vi/guide/deployment#hardware-requirements).
+Về việc xác định kích thước tài nguyên, xem [Yêu cầu phần cứng](/vi/guide/deployment#hardware-requirements).
 
-## Sao lưu và phục hồi {#backup-and-recovery}
+## Sao lưu và khôi phục {#backup-and-recovery}
 
-Ngăn xếp Compose sản xuất xác định bốn tập. Dừng xâm nhập và để các công việc đang hoạt động kết thúc trước khi thực hiện một bản sao lưu phối hợp để PostgreSQL, Redis và trạng thái tệp mô tả cùng một thời điểm.
+Stack Compose production định nghĩa bốn volume. Hãy dừng lưu lượng vào và để các job đang chạy hoàn tất trước khi sao lưu đồng bộ, để PostgreSQL, Redis và trạng thái tệp mô tả cùng một thời điểm.
 
-|Âm lượng|Nội dung|Điều trị phục hồi|
+| Volume | Nội dung | Cách xử lý khi khôi phục |
 |---|---|---|
-|`SnapOtter-pgdata`|Người dùng PostgreSQL, cài đặt, quy trình, công việc, siêu dữ liệu tệp và nhật ký kiểm tra|Phê bình; sử dụng kết xuất logic không nhanh để khôi phục di động|
-|`SnapOtter-data`|Các đối tượng thư viện, nhật ký và trạng thái AI đã lưu (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|Sao lưu toàn bộ âm lượng; để tiết kiệm dung lượng, cố tình bỏ qua tất cả trạng thái AI và cài đặt lại các gói của nó|
-|`SnapOtter-redisdata`|Redis AOF cho trạng thái hàng đợi BullMQ bền bỉ|Sao lưu sau khi tạm dừng ứng dụng và buộc `SAVE`; bắt buộc phải tiếp tục công việc được xếp hàng đợi một cách chính xác|
-|`SnapOtter-workspace`|Khóa lưu trữ đối tượng tạm thời (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|Không sao lưu sau khi tất cả công việc đã hoàn thành hoặc bị hủy bỏ; không bao giờ loại bỏ nó trong khi công việc đang hoạt động|
+| `SnapOtter-pgdata` | Người dùng, cài đặt, pipeline, job, metadata tệp và nhật ký kiểm toán của PostgreSQL | Quan trọng; dùng bản dump logic dừng ngay khi lỗi để khôi phục có thể di chuyển |
+| `SnapOtter-data` | Các đối tượng thư viện đã lưu, log và trạng thái AI (`/data/files, /data/logs, /data/ai, /data/ai/venv`) | Sao lưu toàn bộ volume; để tiết kiệm dung lượng, có thể cố ý bỏ toàn bộ trạng thái AI và cài lại các bundle |
+| `SnapOtter-redisdata` | Redis AOF cho trạng thái hàng đợi BullMQ bền vững | Sao lưu sau khi tạm dừng ứng dụng và buộc `SAVE`; cần thiết để tiếp tục chính xác công việc trong hàng đợi |
+| `SnapOtter-workspace` | Khóa lưu trữ đối tượng tạm thời (`/tmp/workspace/uploads, /tmp/workspace/outputs`) | Không sao lưu sau khi mọi job đã được xả hoặc hủy; không bao giờ bỏ nó khi còn job đang hoạt động |
 
-Soạn các tên tập tiền tố thông thường với tên dự án. Giải quyết ổ nguồn thực từ vùng chứa được gắn thay vì giả sử rằng tên hiển thị như `SnapOtter-data` là tên ổ Docker.
+Compose thường thêm tên dự án làm tiền tố cho tên volume. Hãy xác định volume nguồn thực từ container đã mount thay vì giả định rằng tên hiển thị như `SnapOtter-data` là tên volume Docker.
 
 ### Sao lưu cơ sở dữ liệu {#database-backup}
 
-Sử dụng định dạng lưu trữ tùy chỉnh của PostgreSQL và xác minh kho lưu trữ trước khi xử lý bản sao lưu hoàn chỉnh:
+Dùng định dạng archive tùy chỉnh của PostgreSQL và xác minh archive trước khi coi bản sao lưu là hoàn tất:
 
 ```bash
 docker exec SnapOtter-postgres \
@@ -194,13 +194,13 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Kiểm tra mọi bản sao lưu bằng cách khôi phục nó vào một ngăn xếp riêng biệt, kiểm tra các bản ghi cơ sở dữ liệu và tổng kiểm tra tệp, rồi khởi động ứng dụng. `tests/qa/backup-restore-drill.sh` của kho lưu trữ tự động hóa cổng phát hành đó dựa trên `QA_IMAGE` rõ ràng.
+Hãy kiểm thử mọi bản sao lưu bằng cách khôi phục vào một stack cô lập, kiểm tra các bản ghi cơ sở dữ liệu và checksum của tệp, rồi khởi động ứng dụng. `tests/qa/backup-restore-drill.sh` của kho mã tự động hóa cổng kiểm tra bản phát hành đó trên một `QA_IMAGE` cụ thể.
 
-Thay vào đó, nếu nền tảng của bạn thực hiện các ảnh chụp nhanh ổ đĩa nhất quán với sự cố, trước tiên hãy dừng toàn bộ ngăn xếp và chụp nhanh tất cả các ổ đĩa quan trọng dưới dạng một bộ. Bản sao thư mục dữ liệu PostgreSQL thô từ vùng chứa đang chạy không phải là bản sao lưu logic được hỗ trợ.
+Nếu nền tảng của bạn chụp snapshot volume nhất quán khi sập thay vào đó, hãy dừng toàn bộ stack trước và chụp snapshot tất cả volume quan trọng như một bộ. Sao chép thô thư mục dữ liệu PostgreSQL từ một container đang chạy không phải là bản sao lưu logic được hỗ trợ.
 
 ### Sao lưu tệp và hàng đợi {#file-and-queue-backup}
 
-Tạm dừng ứng dụng trước khi chụp khối lượng tệp và hàng đợi. Sử dụng `docker inspect` để phân giải tên tập thực tế, buộc Redis duy trì trạng thái hiện tại và lưu trữ với quyền sở hữu và quyền được bảo toàn:
+Hãy tạm dừng ứng dụng trước khi chụp các volume tệp và hàng đợi. Dùng `docker inspect` để xác định tên volume thực, buộc Redis lưu trạng thái hiện tại, và lưu trữ với quyền sở hữu và quyền truy cập được giữ nguyên:
 
 ```bash
 docker stop SnapOtter
@@ -218,28 +218,28 @@ docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
 sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-Khởi động lại Redis trước ứng dụng. Nếu bạn cố tình loại trừ `/data/ai`, hãy xóa toàn bộ cây con AI thay vì lưu giữ bản ghi `installed.json` mà không có mô hình hoặc môi trường ảo của nó. Giữ các tệp sao lưu được mã hóa, kiểm soát quyền truy cập và tách biệt khỏi máy chủ chạy SnapOtter.
+Khởi động lại Redis trước ứng dụng. Nếu bạn cố ý loại `/data/ai`, hãy xóa toàn bộ cây AI thay vì giữ lại bản ghi `installed.json` mà không có model hoặc môi trường ảo của nó. Giữ các tệp sao lưu được mã hóa, có kiểm soát truy cập và tách biệt khỏi máy chủ đang chạy SnapOtter.
 
-## Cấu phần tuân thủ {#compliance-artifacts}
+## Tài liệu tuân thủ {#compliance-artifacts}
 
-Mỗi bản phát hành SnapOtter bao gồm các tạo phẩm bảo mật sau:
+Mỗi bản phát hành SnapOtter bao gồm các tài liệu bảo mật sau:
 
-| Cổ vật | Định dạng | Tìm nó ở đâu |
+| Tài liệu | Định dạng | Nơi tìm |
 |---|---|---|
-| Giải phóng ràng buộc chủ đề | Chứng thực Canonical JSON + GitHub | Nội dung [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-release-subjects.json` |
-| Lưu trữ SBOM | CycloneDX và SPDX JSON | Nội dung phát hành: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Hình ảnh SBOM | CycloneDX và SPDX JSON | Nội dung phát hành: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Quét lỗ hổng | Trivy JSON | Phát hành nội dung có tiền tố `archive-linux-{arch}` hoặc `image-linux-{arch}` phù hợp |
+| Ràng buộc chủ thể bản phát hành | JSON chuẩn tắc + GitHub attestation | Asset của [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-release-subjects.json` |
+| SBOM của archive | CycloneDX và SPDX JSON | Asset của bản phát hành: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| SBOM của image | CycloneDX và SPDX JSON | Asset của bản phát hành: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Quét lỗ hổng | Trivy JSON | Asset của bản phát hành với tiền tố `archive-linux-{arch}` hoặc `image-linux-{arch}` tương ứng |
 | Quét lỗ hổng | SARIF | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) |
-| Phân tích tĩnh | CodeQL (JS/TS + Python) | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), chạy hàng tuần + mỗi PR |
-| Xem xét phụ thuộc | GitHub bản địa | Kiểm tra mỗi PR, không thành công khi bổ sung mức độ nghiêm trọng cao |
-| Kiểm tra phụ thuộc Python | pip-audit | CI chạy nhật ký trên mỗi lần đẩy |
-| Chính sách bảo mật | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trong kho lưu trữ |
-| Cập nhật phụ thuộc | Dependabot | PR hàng tuần tự động cho npm, pip, Docker, Hành động |
+| Phân tích tĩnh | CodeQL (JS/TS + Python) | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), chạy hằng tuần + mỗi PR |
+| Rà soát phụ thuộc | GitHub native | Kiểm tra theo từng PR, thất bại khi thêm phụ thuộc có mức độ nghiêm trọng cao |
+| Kiểm toán phụ thuộc Python | pip-audit | Log CI ở mỗi lần push |
+| Chính sách bảo mật | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trong kho mã |
+| Cập nhật phụ thuộc | Dependabot | PR tự động hằng tuần cho npm, pip, Docker, Actions |
 
-**Chạy quá trình quét của riêng bạn:**
+**Tự chạy quét:**
 
-Tải xuống bản kê khai chủ đề phát hành và xác minh rằng nó đã được chứng thực bởi quy trình phát hành:
+Tải manifest chủ thể bản phát hành và xác minh rằng nó đã được workflow phát hành attest:
 
 ```bash
 gh attestation verify snapotter-v2.3.0-release-subjects.json \
@@ -247,9 +247,9 @@ gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
 
-Tệp kê khai ghi lại `releaseTag`, `releaseCommit` và `workflowTriggerCommit` riêng biệt. Xác minh rằng `releaseCommit` là cam kết được tách khỏi thẻ bất biến, sau đó xác minh thông báo SHA-256 của kho lưu trữ, hình ảnh, SBOM hoặc bản quét mà bạn sử dụng đối với mục nhập của nó trong `subjects`. Sự khác biệt này là có chủ ý: việc kiểm tra cam kết phát hành mới được tạo không làm thay đổi danh tính cam kết trong thông tin xác thực OIDC của quy trình làm việc.
+Manifest ghi riêng `releaseTag`, `releaseCommit` và `workflowTriggerCommit`. Hãy xác minh rằng `releaseCommit` là commit được peel từ tag bất biến, sau đó xác minh digest SHA-256 của archive, image, SBOM hoặc bản quét mà bạn dùng so với mục tương ứng trong `subjects`. Sự phân biệt này là có chủ đích: việc checkout một commit bản phát hành mới tạo không làm thay đổi danh tính commit trong thông tin xác thực OIDC của workflow.
 
-Bạn cũng có thể quét trực tiếp SBOM đã tải xuống hoặc hình ảnh:
+Bạn cũng có thể quét trực tiếp một SBOM đã tải hoặc image:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
@@ -262,6 +262,6 @@ trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 trivy image snapotter/snapotter:2.3.0
 ```
 
-::: info
-Hình ảnh SBOMs và các bản quét phản ánh chính xác hình ảnh theo kiến ​​trúc cụ thể được xuất bản cho bản phát hành đó. Lưu trữ SBOMs và các bản quét mô tả riêng biệt kho lưu trữ dựng sẵn. Các gói mô hình AI được cài đặt sau khi triển khai không được bao gồm trong các SBOMs này vì chúng được tải xuống khi chạy.
+::: info 
+SBOM và bản quét của image phản ánh đúng image theo kiến trúc cụ thể được phát hành cho bản phát hành đó. SBOM và bản quét của archive mô tả riêng archive dựng sẵn. Các bundle model AI được cài sau khi triển khai không nằm trong các SBOM này vì chúng được tải khi runtime.
 :::

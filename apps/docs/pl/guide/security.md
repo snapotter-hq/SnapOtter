@@ -1,58 +1,57 @@
 ---
-description: "Przewodnik po wzmacnianiu bezpieczeństwa SnapOtter. Bezpieczeństwo kontenerów, izolacja sieci, sekrety Docker, wdrożenie Kubernetes i artefakty zgodności."
-i18n_source_hash: f37bcb6cc1c5
+description: "Przewodnik utwardzania bezpieczeństwa SnapOtter. Bezpieczeństwo kontenera, izolacja sieci, sekrety Docker, wdrożenie w Kubernetes i artefakty zgodności."
+i18n_source_hash: 5cf773ddb4c0
 i18n_provenance: machine
-i18n_output_hash: 20c36e0b6bb9
+i18n_output_hash: 29ec324a8903
 i18n_hash_version: 2
 ---
 
-# Bezpieczeństwo i wzmacnianie {#security-hardening}
+# Bezpieczeństwo i utwardzanie {#security-hardening}
 
-SnapOtter przetwarza pliki w całości na twojej infrastrukturze. Domyślnie wysyła anonimową, pozbawioną treści analitykę produktu i raporty o awariach, aby pomóc ulepszać projekt. Nigdy nie wysyła twoich plików, nazw plików, zawartości plików, wyniku OCR, metadanych obrazów ani tekstu dokumentów. Opcjonalna informacja zwrotna jest wysyłana dopiero po jej przesłaniu przez użytkownika, tylko gdy analityka jest włączona, a pola kontaktowe są dołączane wyłącznie za wyraźną zgodą na kontakt. Administrator może wyłączyć analitykę i zbieranie informacji zwrotnej jednym kliknięciem w Ustawienia > System > Prywatność, bez konieczności przebudowy. Przetwarzanie plików zawsze pozostaje wewnątrz twojego kontenera.
+SnapOtter przetwarza pliki w całości w Twojej infrastrukturze. Domyślnie wysyła anonimowe, pozbawione treści dane analityczne produktu i raporty o awariach, aby pomagać w rozwoju projektu. Nigdy nie wysyła plików, ich nazw, zawartości, wyników OCR, metadanych obrazów ani tekstu dokumentów. Opcjonalna opinia jest wysyłana dopiero po jej przesłaniu przez użytkownika, tylko gdy analityka jest włączona, a pola kontaktowe są dołączane wyłącznie za wyraźną zgodą na kontakt. Administrator może jednym kliknięciem wyłączyć analitykę i zbieranie opinii w Settings > System > Privacy, bez przebudowy. Przetwarzanie plików zawsze odbywa się wewnątrz kontenera.
 
-Kontener działa jako dedykowany użytkownik nie-root (`snapotter`) z odrzuconymi wszystkimi uprawnieniami Linuksa poza minimalnym wymaganym zestawem. Po pełną politykę ujawniania podatności i architekturę bezpieczeństwa zobacz [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) na GitHub.
+Kontener działa jako dedykowany użytkownik bez uprawnień roota (`snapotter`), a wszystkie uprawnienia (capabilities) systemu Linux są odebrane poza minimalnym wymaganym zestawem. Pełna polityka ujawniania podatności i architektura bezpieczeństwa są opisane w [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) na GitHub.
 
-## Hartowanie kontenera {#container-hardening}
+## Utwardzanie kontenera {#container-hardening}
 
-Źródłem prawdy są kanoniczne pliki [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) i [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml). Nie kopiuj skróconego przykładu do produkcji; wdróż plik ze zweryfikowanego tagu wydania.
+Kanoniczne pliki Compose dla [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) i [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) są źródłem prawdy. Nie należy kopiować skróconego przykładu do środowiska produkcyjnego, tylko wdrażać plik z zweryfikowanego tagu wydania.
 
-Obydwa stosy stosują następujące elementy sterujące:
+Oba stosy stosują następujące zabezpieczenia:
 
-- Limity pamięci, wymiany, procesora i PID powodują niekontrolowane przetwarzanie natywne.
-- Każda usługa powoduje utratę wszystkich możliwości Linuksa. Aplikacja dodaje tylko `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` dla własności wolumenu, jednokierunkową utratę tożsamości `gosu` i płynne przekazywanie sygnału. PostgreSQL i Redis otrzymują tylko podzbiór potrzebny ich oficjalnym punktom wejścia.
-- `security_opt: [no-new-privileges:true]` uniemożliwia procesom w aplikacji, kontenerach PostgreSQL i Redis uzyskanie dodatkowych uprawnień. Pozostaje to zgodne z `gosu`: punkt wejścia zaczyna się jako root, przygotowuje woluminy i przechodzi tylko do dedykowanego użytkownika `snapotter`.
-- Wejścia obrazów PostgreSQL i Redis są przypinane za pomocą skrótu. Aplikację należy również przypiąć do zweryfikowanego tagu wydania lub podsumowania, a nie `latest`.
+- Limity pamięci, swap, CPU i PID ograniczają skutki niekontrolowanego przetwarzania natywnego.
+- Każda usługa odrzuca wszystkie uprawnienia Linux. Aplikacja dodaje z powrotem tylko `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` na potrzeby własności woluminów, jednokierunkowego zrzucenia tożsamości `gosu` i prawidłowego przekazywania sygnałów. PostgreSQL i Redis dostają tylko podzbiór potrzebny ich oficjalnym punktom wejścia.
+- `security_opt: [no-new-privileges:true]` uniemożliwia procesom w kontenerach aplikacji, PostgreSQL i Redis zdobywanie dodatkowych uprawnień. Pozostaje to zgodne z `gosu`: punkt wejścia startuje jako root, przygotowuje woluminy i dopiero potem przechodzi na dedykowanego użytkownika `snapotter`.
+- Dane wejściowe obrazów PostgreSQL i Redis są przypięte przez digest. Aplikację również należy przypiąć do zweryfikowanego tagu wydania lub digestu zamiast do `latest`.
+- Kontrole stanu, ograniczona rotacja logów JSON, trwały Redis AOF i polityka restartów są zdefiniowane centralnie w plikach kanonicznych.
 
-— Kontrole stanu, ograniczona rotacja dzienników JSON, trwała funkcja Redis AOF i zasady ponownego uruchamiania są definiowane centralnie w plikach kanonicznych.
-
-W przypadku wdrożenia z dostępem do Internetu powiąż port 1349 z pętlą zwrotną i zakończ protokół TLS na utrzymywanym zwrotnym serwerze proxy. Wygeneruj unikalne dane uwierzytelniające PostgreSQL i Redis, przechowuj sekrety w chronionych plikach lub menedżerze sekretów i natychmiast zmień początkowe hasło administratora.
+W przypadku wdrożenia dostępnego z internetu należy powiązać port 1349 z loopback i kończyć TLS na utrzymywanym zwrotnym serwerze proxy. Należy wygenerować unikalne dane uwierzytelniające PostgreSQL i Redis, przechowywać sekrety w chronionych plikach lub menedżerze sekretów oraz zmienić początkowe hasło administratora natychmiast.
 
 ### Dlaczego `read_only` nie jest ustawione {#why-read-only-is-not-set}
 
-`read_only: true` nie jest ustawiony, ponieważ ponowne mapowanie PUID/PGID zapisuje podczas uruchamiania `/etc/passwd` i `/etc/group`. Jeśli zamiast PUID/PGID użyjesz flagi `--user` Dockera lub Kubernetes `runAsUser`, możesz bezpiecznie włączyć główny system plików tylko do odczytu.
+`read_only: true` nie jest ustawione, ponieważ remapowanie PUID/PGID zapisuje do `/etc/passwd` i `/etc/group` przy starcie. Jeśli zamiast PUID/PGID używana jest flaga Docker `--user` lub `runAsUser` w Kubernetes, można bezpiecznie włączyć główny system plików tylko do odczytu.
 
 ## Izolacja sieci {#network-isolation}
 
-Przetwarzanie plików odbywa się lokalnie, ale instalacja domyślna **nie jest systemem bez ruchu wychodzącego**. Anonimowe analizy produktów korzystają z PostHog, a raportowanie o awariach korzysta z Sentry, gdy włączona jest telemetria. Ustaw `SNAPOTTER_TELEMETRY=0` (lub wyłącz analizę w obszarze Ustawienia > System > Prywatność), aby wyłączyć oba. SnapOtter nigdy nie uwzględnia w tych zdarzeniach przesłanych plików, nazw plików, danych wyjściowych OCR, tekstu dokumentu ani innej zawartości plików.
+Przetwarzanie plików jest lokalne, ale domyślna instalacja **nie jest systemem bez ruchu wychodzącego**. Anonimowa analityka produktu korzysta z PostHog, a raportowanie awarii z Sentry, gdy telemetria jest włączona. Ustawienie `SNAPOTTER_TELEMETRY=0` (lub wyłączenie analityki w Settings > System > Privacy) wyłącza oba. SnapOtter nigdy nie umieszcza przesłanych plików, ich nazw, wyników OCR, tekstu dokumentów ani innej zawartości plików w tych zdarzeniach.
 
-Pozostały ruch wychodzący jest oparty na funkcjach: instalacja pakietu/modelu AI powoduje pobranie podpisanych danych wejściowych wersji; Import adresu URL powoduje pobranie publicznego adresu URL żądanego przez użytkownika; i jawnie skonfigurowane OIDC, SAML, OpenTelemetry, webhooki, pamięć zgodna z S3 lub podobne integracje łączą się z miejscami docelowymi wybranymi przez administratora. Pobieranie modeli w czasie wykonywania jest domyślnie wyłączone. Ustaw `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` tylko po to, aby jawnie włączyć automatyczne pobieranie zastępcze. [Import pakietu offline](/pl/guide/deployment) może zapewnić funkcje AI bez konieczności wychodzenia z modelu środowiska wykonawczego.
+Pozostały ruch wychodzący zależy od funkcji: instalacja pakietów i modeli AI pobiera podpisane dane wydania, import z URL pobiera publiczny URL wskazany przez użytkownika, a jawnie skonfigurowane integracje OIDC, SAML, OpenTelemetry, webhooki, magazyn zgodny z S3 lub podobne łączą się z miejscami wybranymi przez administratora. Pobieranie modeli w czasie działania jest domyślnie wyłączone. Ustawienie `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` należy stosować tylko po to, by jawnie włączyć automatyczne pobieranie zapasowe. [Import pakietu offline](/pl/guide/deployment) może udostępnić funkcje AI bez ruchu wychodzącego dla modeli w czasie działania.
 
-**Zalecenia dotyczące zapory sieciowej:**
+**Zalecenia dla zapory sieciowej:**
 
-|Scenariusz|Reguła wychodząca|
+| Scenariusz | Reguła ruchu wychodzącego |
 |---|---|
-|Szczelina powietrzna|Ustaw `SNAPOTTER_TELEMETRY=0` i `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, użyj importu pakietów AI offline, wyłącz import adresów URL i integracje zewnętrzne, a następnie zablokuj wyjście|
-|Domyślna telemetria|Zezwól na punkty końcowe PostHog i Sentry wymienione w dziennikach przeglądarki/sieci; wyłącz telemetrię, jeśli zasady na to nie pozwalają|
-|Potrzebne pakiety AI|Podczas instalacji zezwól HTTPS na `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; następnie zablokuj te hosty|
-|Integracje zewnętrzne|Zezwalaj tylko na dokładnie skonfigurowane przez administratora miejsca docelowe OIDC/SAML/OTLP/webhook/object-storage|
+| Środowisko odizolowane (air-gapped) | Ustawić `SNAPOTTER_TELEMETRY=0` i `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, użyć importu pakietu AI offline, wyłączyć import z URL i integracje zewnętrzne, a następnie zablokować ruch wychodzący |
+| Domyślna telemetria | Zezwolić na punkty końcowe PostHog i Sentry widoczne w logach przeglądarki/sieci. Wyłączyć telemetrię, jeśli polityka na to nie pozwala |
+| Wymagane pakiety AI | Podczas instalacji zezwolić na HTTPS do `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`, a następnie zablokować te hosty |
+| Integracje zewnętrzne | Zezwolić tylko na dokładne miejsca docelowe OIDC/SAML/OTLP/webhook/magazynu obiektów skonfigurowane przez administratora |
 
-Archiwa pakietów są obsługiwane z pamięci Xet firmy Hugging Face, która jest przesyłana równolegle przez punkty końcowe `*.xethub.hf.co` i dzięki temu pobieranie pakietów o wielkości wielu GB jest szybkie. Jeśli twoja zapora sieciowa pozwala na `huggingface.co`, ale blokuje `*.xethub.hf.co`, instalacje nadal się powiodą, ale powrócą do wolniejszego pobierania w jednym strumieniu, więc umieść hosty Xet na liście dozwolonych, aby pozostały na szybkiej ścieżce. Instalacje w pełni offline mogą to wszystko pominąć i zamiast tego użyć [Import pakietu offline](/pl/guide/deployment).
+Archiwa pakietów są serwowane z magazynu Xet w Hugging Face, który przesyła dane równolegle przez punkty końcowe `*.xethub.hf.co` i dzięki temu pobieranie wielogigabajtowych pakietów jest szybkie. Jeśli zapora zezwala na `huggingface.co`, ale blokuje `*.xethub.hf.co`, instalacje nadal się udają, ale wracają do wolniejszego pobierania jednym strumieniem, więc hosty Xet należy dodać do listy dozwolonych, aby zachować szybką ścieżkę. Instalacje w pełni offline mogą to pominąć i skorzystać z [Importu pakietu offline](/pl/guide/deployment).
 
-Informacje na temat konfiguracji odwrotnego proxy (Nginx, Traefik, Caddy, Cloudflare Tunnels) można znaleźć w [Przewodniku wdrażania](/pl/guide/deployment#reverse-proxy).
+Konfigurację zwrotnego serwera proxy (Nginx, Traefik, Caddy, Cloudflare Tunnels) opisano w [Przewodnik wdrażania](/pl/guide/deployment#reverse-proxy).
 
 ## Sekrety Docker {#docker-secrets}
 
-Dla wdrożeń produkcyjnych unikaj przekazywania sekretów jako zmiennych środowiskowych w postaci zwykłego tekstu. Punkt wejścia obsługuje konwencję `_FILE` Dockera: zamontuj sekret jako plik i ustaw odpowiednią zmienną `_FILE` na jego ścieżkę.
+W środowiskach produkcyjnych należy unikać przekazywania sekretów jako zmiennych środowiskowych w postaci jawnego tekstu. Punkt wejścia obsługuje konwencję Docker `_FILE`: sekret montuje się jako plik, a odpowiednią zmienną `_FILE` ustawia na jego ścieżkę.
 
 **Obsługiwane sekrety:**
 
@@ -88,14 +87,14 @@ secrets:
 ```
 
 ::: tip 
-Sekrety Docker Compose (bez Swarm) wymagają Compose v2.23 lub nowszego.
+Sekrety Docker Compose (bez Swarm) wymagają Compose w wersji 2.23 lub nowszej.
 :::
 
-## Wdrożenie Kubernetes {#kubernetes-deployment}
+## Wdrożenie w Kubernetes {#kubernetes-deployment}
 
-Punkt wejścia wykrywa, kiedy kontener już działa jako nie-root (np. przez `runAsUser` Kubernetes) i automatycznie pomija obniżenie uprawnień gosu. W takim przypadku nie może sam zmienić własności zamontowanych wolumenów przez chown, więc weryfikuje, czy są zapisywalne, i wcześnie kończy z praktycznymi wskazówkami, jeśli nie są, zobacz [Uprawnienia pamięci masowej](/pl/guide/deployment#storage-permissions) po `fsGroup` i konfiguracje z obcym UID (TrueNAS, OpenShift).
+Punkt wejścia wykrywa, że kontener już działa bez uprawnień roota (np. przez `runAsUser` w Kubernetes), i automatycznie pomija zrzucenie uprawnień przez gosu. W takim przypadku sam nie może wykonać chown na zamontowanych woluminach, więc sprawdza, czy są zapisywalne, i kończy działanie wcześnie ze wskazówkami, jeśli nie są. Zobacz [Uprawnienia magazynu](/pl/guide/deployment#storage-permissions) dla `fsGroup` i konfiguracji z obcym UID (TrueNAS, OpenShift).
 
-**Zalecany SecurityContext poda:**
+**Zalecany Pod SecurityContext:**
 
 ```yaml
 apiVersion: apps/v1
@@ -164,24 +163,24 @@ spec:
 
 Ponieważ `runAsUser: 999` jest ustawione na poziomie poda, punkt wejścia całkowicie pomija gosu. Pozwala to na uprawnienia `allowPrivilegeEscalation: false` i `drop: [ALL]` bez konfliktu.
 
-Po dobór rozmiaru zasobów zobacz [Wymagania sprzętowe](/pl/guide/deployment#hardware-requirements).
+Wymiarowanie zasobów opisano w [Wymagania sprzętowe](/pl/guide/deployment#hardware-requirements).
 
-## Kopia zapasowa i odzyskiwanie {#backup-and-recovery}
+## Kopie zapasowe i odzyskiwanie {#backup-and-recovery}
 
-Produkcyjny stos Compose definiuje cztery woluminy. Zatrzymaj ruch wejściowy i poczekaj na zakończenie aktywnych zadań przed wykonaniem skoordynowanej kopii zapasowej, tak aby PostgreSQL, Redis i stan pliku opisywały ten sam punkt w czasie.
+Produkcyjny stos Compose definiuje cztery woluminy. Przed wykonaniem skoordynowanej kopii zapasowej należy zatrzymać ruch przychodzący i poczekać na zakończenie aktywnych zadań, aby PostgreSQL, Redis i stan plików opisywały ten sam moment w czasie.
 
-|Tom|Zawartość|Leczenie regeneracyjne|
+| Wolumin | Zawartość | Sposób odzyskiwania |
 |---|---|---|
-|`SnapOtter-pgdata`|Użytkownicy PostgreSQL, ustawienia, potoki, zadania, metadane plików i dziennik audytu|Krytyczny; użyj niezawodnego zrzutu logicznego do odzyskiwania przenośnego|
-|`SnapOtter-data`|Zapisane obiekty biblioteki, dzienniki i stan AI (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|Utwórz kopię zapasową całego woluminu; aby zaoszczędzić miejsce, celowo pomiń cały stan AI i zainstaluj ponownie jego pakiety|
-|`SnapOtter-redisdata`|Redis AOF dla trwałego stanu kolejki BullMQ|Utwórz kopię zapasową po wstrzymaniu aplikacji i wymuszeniu `SAVE`; wymagane do dokładnego wznowienia pracy w kolejce|
-|`SnapOtter-workspace`|Tymczasowe klucze do przechowywania obiektów (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|Nie twórz kopii zapasowych po wyczerpaniu lub anulowaniu wszystkich zadań; nigdy go nie wyrzucaj, gdy zadania są aktywne|
+| `SnapOtter-pgdata` | Użytkownicy PostgreSQL, ustawienia, potoki, zadania, metadane plików i dziennik audytu | Krytyczny. Do przenośnego odzyskiwania należy użyć zrzutu logicznego kończącego się natychmiast przy błędzie |
+| `SnapOtter-data` | Zapisane obiekty biblioteki, logi i stan AI (`/data/files, /data/logs, /data/ai, /data/ai/venv`) | Kopię należy wykonać dla całego woluminu. Aby oszczędzić miejsce, można celowo pominąć cały stan AI i zainstalować pakiety ponownie |
+| `SnapOtter-redisdata` | Redis AOF dla trwałego stanu kolejki BullMQ | Kopię należy wykonać po wstrzymaniu aplikacji i wymuszeniu `SAVE`. Wymagany, aby dokładnie wznowić zadania w kolejce |
+| `SnapOtter-workspace` | Tymczasowe klucze magazynu obiektów (`/tmp/workspace/uploads, /tmp/workspace/outputs`) | Nie wykonywać kopii po opróżnieniu lub anulowaniu wszystkich zadań. Nigdy nie odrzucać, gdy zadania są aktywne |
 
-Funkcja Compose zwykle poprzedza nazwy woluminów nazwą projektu. Rozwiąż rzeczywisty wolumin źródłowy z zamontowanego kontenera, zamiast zakładać, że nazwa wyświetlana, taka jak `SnapOtter-data`, jest nazwą woluminu Docker.
+Compose zwykle dodaje do nazw woluminów prefiks z nazwą projektu. Rzeczywisty wolumin źródłowy należy ustalić z zamontowanego kontenera, zamiast zakładać, że nazwa wyświetlana, taka jak `SnapOtter-data`, jest nazwą woluminu Docker.
 
 ### Kopia zapasowa bazy danych {#database-backup}
 
-Użyj niestandardowego formatu archiwum PostgreSQL i zweryfikuj archiwum, zanim potraktujesz kopię zapasową jako kompletną:
+Należy użyć niestandardowego formatu archiwum PostgreSQL i zweryfikować archiwum, zanim kopia zostanie uznana za kompletną:
 
 ```bash
 docker exec SnapOtter-postgres \
@@ -195,13 +194,13 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Przetestuj każdą kopię zapasową, przywracając ją do izolowanego stosu, sprawdzając rekordy bazy danych i sumy kontrolne plików oraz uruchamiając aplikację. `tests/qa/backup-restore-drill.sh` repozytorium automatyzuje tę bramkę zwolnienia w stosunku do jawnego `QA_IMAGE`.
+Każdą kopię zapasową należy przetestować, przywracając ją do odizolowanego stosu, sprawdzając rekordy bazy danych i sumy kontrolne plików oraz uruchamiając aplikację. `tests/qa/backup-restore-drill.sh` w repozytorium automatyzuje tę bramkę wydania względem jawnego `QA_IMAGE`.
 
-Jeśli zamiast tego Twoja platforma wykonuje migawki woluminów spójne w czasie awarii, najpierw zatrzymaj cały stos i wykonaj migawkę wszystkich krytycznych woluminów jako jeden zestaw. Surowa kopia katalogu danych PostgreSQL z działającego kontenera nie jest obsługiwaną logiczną kopią zapasową.
+Jeśli platforma wykonuje migawki woluminów spójne po awarii, należy najpierw zatrzymać cały stos i wykonać migawkę wszystkich krytycznych woluminów jako jednego zestawu. Surowa kopia katalogu danych PostgreSQL z działającego kontenera nie jest obsługiwaną logiczną kopią zapasową.
 
-### Kopia zapasowa plików i kolejek {#file-and-queue-backup}
+### Kopia zapasowa plików i kolejki {#file-and-queue-backup}
 
-Wstrzymaj aplikację przed przechwyceniem woluminów plików i kolejek. Użyj `docker inspect`, aby rozwiązać rzeczywistą nazwę woluminu, wymuś na Redis zachowanie bieżącego stanu i zarchiwizuj z zachowaniem własności i uprawnień:
+Aplikację należy wstrzymać przed przechwyceniem woluminów plików i kolejki. Użyć `docker inspect`, aby ustalić rzeczywistą nazwę woluminu, wymusić zapis bieżącego stanu Redis i zarchiwizować z zachowaniem właściciela i uprawnień:
 
 ```bash
 docker stop SnapOtter
@@ -219,28 +218,28 @@ docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
 sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-Uruchom ponownie Redis przed aplikacją. Jeśli celowo wykluczysz `/data/ai`, usuń całe poddrzewo AI, zamiast zachowywać rekord `installed.json` bez jego modeli i środowiska wirtualnego. Przechowuj pliki kopii zapasowych w sposób szyfrowany, z kontrolą dostępu i oddzielnie od hosta, na którym działa SnapOtter.
+Redis należy uruchomić ponownie przed aplikacją. Jeśli `/data/ai` jest celowo pomijane, należy usunąć całe drzewo AI, zamiast zachowywać rekord `installed.json` bez jego modeli lub środowiska wirtualnego. Pliki kopii zapasowych powinny być szyfrowane, objęte kontrolą dostępu i przechowywane oddzielnie od hosta, na którym działa SnapOtter.
 
 ## Artefakty zgodności {#compliance-artifacts}
 
-Każde wydanie SnapOtter zawiera następujące artefakty zabezpieczeń:
+Każde wydanie SnapOtter zawiera następujące artefakty bezpieczeństwa:
 
-| Artefakt | Format | Gdzie to znaleźć |
+| Artefakt | Format | Gdzie go znaleźć |
 |---|---|---|
-| Zwolnij powiązanie tematu | Atest kanoniczny JSON + GitHub | [Wydanie GitHub](https://github.com/snapotter-hq/SnapOtter/releases) zasób: `snapotter-v{version}-release-subjects.json` |
-| Archiwum SBOM | CycloneDX i SPDX JSON | Wydanie zasobów: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Obraz SBOM | CycloneDX i SPDX JSON | Wydanie zasobów: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Skanowanie podatności | Trivy JSON | Zwolnij zasoby z pasującymi prefiksami `archive-linux-{arch}` lub `image-linux-{arch}` |
-| Skanowanie podatności | SARIF | Zakładka [Zabezpieczenia GitHub](https://github.com/snapotter-hq/SnapOtter/security). |
-| Analiza statyczna | CodeQL (JS/TS + Python) | Karta [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), uruchamiana co tydzień + za PR |
-| Przegląd zależności | Natywny GitHub | Kontrola na PR kończy się niepowodzeniem w przypadku dodatków o dużej ważności |
-| Audyt zależności Python | pip-audit | Dziennik przebiegu CI przy każdym naciśnięciu |
+| Powiązanie podmiotu wydania | Kanoniczny JSON + atestacja GitHub | Zasób [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-release-subjects.json` |
+| SBOM archiwum | CycloneDX i SPDX JSON | Zasoby wydania: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| SBOM obrazu | CycloneDX i SPDX JSON | Zasoby wydania: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Skany podatności | Trivy JSON | Zasoby wydania z pasującymi prefiksami `archive-linux-{arch}` lub `image-linux-{arch}` |
+| Skan podatności | SARIF | Karta [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) |
+| Analiza statyczna | CodeQL (JS/TS + Python) | Karta [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), uruchamiana co tydzień i dla każdego PR |
+| Przegląd zależności | Natywny GitHub | Kontrola dla każdego PR, kończy się błędem przy dodaniu zależności o wysokiej ważności |
+| Audyt zależności Python | pip-audit | Log przebiegu CI przy każdym pushu |
 | Polityka bezpieczeństwa | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) w repozytorium |
-| Aktualizacje zależności | Dependabot | Zautomatyzowane cotygodniowe PR dla npm, pip, Docker, Actions |
+| Aktualizacje zależności | Dependabot | Cotygodniowe automatyczne PR dla npm, pip, Docker, Actions |
 
-**Uruchamianie własnego skanowania:**
+**Uruchamianie własnego skanu:**
 
-Pobierz manifest tematu wydania i sprawdź, czy został on potwierdzony w przepływie pracy wydania:
+Należy pobrać manifest podmiotu wydania i zweryfikować, że został poświadczony przez przepływ pracy wydania:
 
 ```bash
 gh attestation verify snapotter-v2.3.0-release-subjects.json \
@@ -248,9 +247,9 @@ gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
 
-Manifest rejestruje oddzielnie `releaseTag`, `releaseCommit` i `workflowTriggerCommit`. Sprawdź, czy `releaseCommit` jest zatwierdzeniem usuniętym z niezmiennego znacznika, a następnie sprawdź skrót SHA-256 archiwum, obrazu, SBOM lub skanu, który wykorzystujesz, względem jego wpisu w `subjects`. To rozróżnienie jest zamierzone: sprawdzenie nowo utworzonego zatwierdzenia wydania nie zmienia tożsamości zatwierdzenia w poświadczeniu OIDC przepływu pracy.
+Manifest zapisuje osobno `releaseTag`, `releaseCommit` i `workflowTriggerCommit`. Należy zweryfikować, że `releaseCommit` jest commitem wyłuskanym z niezmiennego tagu, a następnie zweryfikować skrót SHA-256 archiwum, obrazu, SBOM lub skanu, z którego korzystamy, względem jego wpisu w `subjects`. To rozróżnienie jest zamierzone: pobranie nowo utworzonego commita wydania nie zmienia tożsamości commita w poświadczeniu OIDC przepływu pracy.
 
-Możesz także zeskanować pobrany plik SBOM lub obraz bezpośrednio:
+Można też przeskanować pobrany SBOM lub bezpośrednio obraz:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
@@ -263,6 +262,6 @@ trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 trivy image snapotter/snapotter:2.3.0
 ```
 
-::: info
-Obraz SBOMs i skany odzwierciedlają dokładnie obraz specyficzny dla architektury opublikowany dla tej wersji. Archiwum SBOMs i skany opisują wstępnie zbudowane archiwum osobno. Pakiety modelu AI zainstalowane po wdrożeniu nie są uwzględnione w tych pakietach SBOMs, ponieważ są pobierane w czasie wykonywania.
+::: info 
+SBOM-y i skany obrazów odzwierciedlają dokładnie obraz dla konkretnej architektury opublikowany w danym wydaniu. SBOM-y i skany archiwum opisują osobno gotowe archiwum. Pakiety modeli AI instalowane po wdrożeniu nie są uwzględnione w tych SBOM-ach, ponieważ są pobierane w czasie działania.
 :::

@@ -1,14 +1,14 @@
 ---
 description: "Alle SnapOtter-omgevingsvariabelen met standaardwaarden. Configureer authenticatie, opslag, AI-modellen, analytics en meer."
-i18n_source_hash: a694a81ef7e0
-i18n_provenance: human
-i18n_output_hash: b5bd3b2bd155
+i18n_source_hash: caa895c0ba16
+i18n_provenance: machine
+i18n_output_hash: 4df09c1703e8
 i18n_hash_version: 2
 ---
 
 # Configuratie {#configuration}
 
-Alle configuratie gebeurt via omgevingsvariabelen. Elke variabele heeft een verstandige standaardwaarde, zodat SnapOtter direct werkt zonder er ook maar één in te stellen.
+Alle configuratie verloopt via omgevingsvariabelen. Elke variabele heeft een zinvolle standaardwaarde, dus SnapOtter werkt direct zonder dat u er een instelt.
 
 ## Omgevingsvariabelen {#environment-variables}
 
@@ -17,125 +17,125 @@ Alle configuratie gebeurt via omgevingsvariabelen. Elke variabele heeft een vers
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
 | `PORT` | `1349` | Poort waarop de server luistert. |
-| `BASE_PATH` | (leeg) | Openbaar implementatiepad, bijv. `/snapotter`. Leeg of `/` serveert op de domeinroot. Wordt tijdens runtime toegepast; geen herbouw van de image nodig. |
+| `BASE_PATH` | (leeg) | Openbaar implementatiepad, bijvoorbeeld `/snapotter`. Leeg of `/` serveert op de hoofdmap van het domein. Wordt tijdens runtime toegepast; er is geen nieuwe image-build nodig. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximaal aantal verzoeken per minuut per IP. Stel in op 0 om rate limiting uit te schakelen. |
-| `CORS_ORIGIN` | (leeg) | Door komma's gescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
-| `LOG_LEVEL` | `info` | Uitgebreidheid van logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP via `X-Forwarded-For` mogen zetten. De standaardwaarde gelooft alleen een peer uit een privénetwerk, dus een reverse proxy op een Docker-netwerk of in een LAN wordt vertrouwd en de vervalste header van een publieke client niet. Stel alleen `true` in wanneer er een proxy die jij beheert vóór zit op een openbaar adres. |
+| `CORS_ORIGIN` | (leeg) | Kommagescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
+| `LOG_LEVEL` | `info` | Uitgebreidheid van de logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. De standaardinstelling vertrouwt alleen een peer in een privénetwerk, zodat een reverse proxy op een Docker-netwerk of LAN wordt vertrouwd en een vervalste header van een publieke client niet. Stel `true` alleen in als er een proxy onder uw beheer op een openbaar adres voor staat. |
 
 ### Authenticatie {#authentication}
 
-De twee booleans hieronder accepteren alleen `true` en `false`. Al het andere, `1` of `yes` of `on`, komt niet door de validatie en de server stopt voordat hij begint te luisteren.
+De twee booleans hieronder accepteren alleen `true` en `false`. Al het andere, `1` of `yes` of `on`, mislukt bij de validatie en de server stopt voordat hij gaat luisteren.
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Vereist aanmelden. Stel in op `false` om helemaal zonder accounts te draaien, wat elk verzoek adminrechten geeft, dus houd dat op een vertrouwd netwerk. |
-| `DEFAULT_USERNAME` | `admin` | Gebruikersnaam voor het initiële adminaccount. Wordt alleen bij de eerste keer opstarten gebruikt. |
-| `DEFAULT_PASSWORD` | `admin` | Wachtwoord voor het initiële adminaccount. Wijzig dit na de eerste keer aanmelden. |
+| `AUTH_ENABLED` | `true` | Vereis een login. Stel in op `false` om zonder accounts te draaien, waardoor elk verzoek beheerdersrechten krijgt. Beperk dat dus tot een vertrouwd netwerk. |
+| `DEFAULT_USERNAME` | `admin` | Gebruikersnaam voor het eerste beheerdersaccount. Wordt alleen bij de eerste start gebruikt. |
+| `DEFAULT_PASSWORD` | `admin` | Wachtwoord voor het eerste beheerdersaccount. Wijzig dit na de eerste login. |
 | `MAX_USERS` | `0` (onbeperkt) | Maximaal aantal geregistreerde gebruikersaccounts. Stel in op 0 voor onbeperkt. |
-| `SESSION_DURATION_HOURS` | `168` | Levensduur van de aanmeldsessie in uren (standaard 7 dagen). |
-| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Stel in op `true` om de verplichte wachtwoordwijzigingsprompt bij de eerste aanmelding over te slaan. |
+| `SESSION_DURATION_HOURS` | `168` | Levensduur van een loginsessie in uren (standaard 7 dagen). |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Stel in op `true` om de verplichte wachtwoordwijziging bij de eerste login over te slaan. |
 
 ### Opslag {#storage}
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` of `s3`. S3 en MinIO vereisen een licentie met de s3_storage-functie plus de `S3_*`-variabelen hieronder. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-connectiestring, en de verbinding waarop elk verzoek wordt bediend. Stel vanaf 2.3.0 ook `DATABASE_MIGRATION_URL` in; dan wordt dit de runtime-rol met minimale rechten, met alleen DML op de tabellen van de app en niets anders. De Compose-stack wijst deze naar zijn `postgres`-service; laat hem leeg (samen met `REDIS_URL`) om de ingebedde modus te krijgen. |
-| `DATABASE_MIGRATION_URL` | (leeg) | Beschikbaar vanaf 2.3.0; de image van 2.2.0 negeert hem en vereist dat `DATABASE_URL` de database-eigenaar aanwijst. Bevoorrechte verbinding, alleen gebruikt tijdens het opstarten om migraties uit te voeren en de runtime-rol rechten te geven, en daarna gesloten voordat het eerste verzoek binnenkomt. Laat hem leeg en SnapOtter draait met één rol, waarbij `DATABASE_URL` beide taken doet. Zie [Rollen met minimale rechten](/nl/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Redis-connectiestring (gebruikt voor BullMQ-taakwachtrijen). Compose wijst deze naar zijn `redis`-service. |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Map voor tijdelijke bestanden tijdens de verwerking. Wordt automatisch opgeschoond. De image stelt `/tmp/workspace` in. |
-| `FILES_STORAGE_PATH` | `./data/files` | Map voor persistente gebruikersbestanden (geüploade afbeeldingen, opgeslagen resultaten). De image stelt `/data/files` in. |
+| `STORAGE_MODE` | `local` | `local` of `s3`. S3 en MinIO vereisen een licentie met de functie s3_storage plus de onderstaande `S3_*`-variabelen. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-verbindingsreeks, en de verbinding waarop elk verzoek wordt afgehandeld. Vanaf 2.3.0 geldt: stel ook `DATABASE_MIGRATION_URL` in en dit wordt de runtimerol met minimale rechten, die alleen DML heeft op de tabellen van de app en niets anders. De Compose-stack wijst het naar de service `postgres`; laat het (samen met `REDIS_URL`) ongedefinieerd om de embedded-modus te krijgen. |
+| `DATABASE_MIGRATION_URL` | (leeg) | Bevoorrechte verbinding, alleen tijdens het opstarten gebruikt om migraties uit te voeren en de runtimerol rechten te geven, en gesloten vóór het eerste verzoek. Laat u dit leeg, dan draait SnapOtter met één rol, waarbij `DATABASE_URL` beide taken uitvoert. Zie [Rollen met minimale rechten](/nl/guide/database#least-privilege-roles). |
+| `REDIS_URL` | `redis://localhost:6379` | Redis-verbindingsreeks (gebruikt voor BullMQ-jobwachtrijen). Compose wijst dit naar de service `redis`. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Map voor tijdelijke bestanden tijdens de verwerking. Wordt automatisch opgeruimd. De image stelt `/tmp/workspace` in. |
+| `FILES_STORAGE_PATH` | `./data/files` | Map voor permanente gebruikersbestanden (geüploade afbeeldingen, opgeslagen resultaten). De image stelt `/data/files` in. |
 
 ### S3-objectopslag {#s3-object-storage}
 
-Wordt alleen gelezen wanneer `STORAGE_MODE=s3`. Ontbreekt een van de drie verplichte variabelen, dan mislukt het opstarten met de naam van de variabele die je hebt weggelaten.
+Wordt alleen gelezen wanneer `STORAGE_MODE=s3`. Ontbreekt een van de drie verplichte variabelen, dan mislukt het opstarten met de naam van de variabele die u hebt weggelaten.
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `S3_BUCKET` | (leeg) | Bucket die uploads en uitvoer bevat. Verplicht. |
-| `S3_ACCESS_KEY_ID` | (leeg) | Access key. Verplicht. In de container kun je hem in plaats daarvan koppelen, via `S3_ACCESS_KEY_ID_FILE`. |
-| `S3_SECRET_ACCESS_KEY` | (leeg) | Secret key. Verplicht. Dezelfde bestandsconventie: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_BUCKET` | (leeg) | Bucket met uploads en uitvoer. Verplicht. |
+| `S3_ACCESS_KEY_ID` | (leeg) | Toegangssleutel. Verplicht. In de container kunt u deze in plaats daarvan mounten via `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (leeg) | Geheime sleutel. Verplicht. Zelfde bestandsconventie: `S3_SECRET_ACCESS_KEY_FILE`. |
 | `S3_REGION` | `us-east-1` | Regio van de bucket. |
-| `S3_ENDPOINT` | (leeg) | Aangepast endpoint voor MinIO, R2, Backblaze en andere S3-compatibele opslag. Leeg betekent AWS. |
-| `S3_FORCE_PATH_STYLE` | `false` | Stel in op `true` voor MinIO en al het andere dat `endpoint/bucket/key` wil in plaats van virtual-hostadressering. |
-| `S3_PREFIX` | (leeg) | Sleutelprefix, zodat één bucket meerdere instanties kan bevatten. |
+| `S3_ENDPOINT` | (leeg) | Aangepast eindpunt voor MinIO, R2, Backblaze en andere S3-compatibele opslag. Leeg betekent AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Stel in op `true` voor MinIO en al het andere dat `endpoint/bucket/key` wil in plaats van virtual-host-adressering. |
+| `S3_PREFIX` | (leeg) | Sleutelvoorvoegsel, zodat één bucket meerdere instanties kan bevatten. |
 
 ### Versleuteling in rust {#encryption-at-rest}
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
 | `DATA_ENCRYPTION_KEY` | (leeg) | 64 hexadecimale tekens (32 bytes). Versleutelt gevoelige instellingen die in de database zijn opgeslagen. Alles wat geen 64 hexadecimale tekens is, wordt bij het opstarten geweigerd. |
-| `DATA_ENCRYPTION_KEY_PREVIOUS` | (leeg) | De sleutel waar je vanaf roteert, met dezelfde indeling. Stel beide in tijdens een rotatie zodat bestaande rijen nog steeds ontsleuteld worden, en verwijder deze daarna. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (leeg) | De sleutel waarvan u afstapt, in hetzelfde formaat. Stel beide in tijdens een rotatie zodat bestaande rijen nog kunnen worden ontsleuteld, en verwijder deze daarna. |
 
-### Ingebedde modus {#embedded-mode}
+### Embedded-modus {#embedded-mode}
 
-Draai de image zonder `DATABASE_URL` en zonder `REDIS_URL` en hij start zijn eigen PostgreSQL 17 en Redis binnen de container, gebonden aan loopback, met alle gegevens op het `/data`-volume. Dit herstelt de `docker run`-ervaring met één commando voor snelle start, homelab en upgrades vanaf 1.x. Het is een gemakspad, geen productiedeployment: draai voor productie de Compose-stack met 3 containers met aparte PostgreSQL en Redis. De ingebedde modus vereist dat de container als root draait en is niet compatibel met runtimes met een willekeurige UID (OpenShift, Kubernetes `runAsNonRoot`); gebruik daar Compose.
+Start u de image zonder `DATABASE_URL` en zonder `REDIS_URL`, dan start hij binnen de container zijn eigen PostgreSQL 17 en Redis, gebonden aan loopback, met alle gegevens op het volume `/data`. Dit herstelt de ervaring met één enkel `docker run`-commando voor snel starten, homelab en upgrades vanaf 1.x. Het is een gemaksroute, geen productie-implementatie: draai voor productie de Compose-stack met drie containers en aparte PostgreSQL en Redis. De embedded-modus vereist dat de container als root draait en is niet compatibel met runtimes met willekeurige UID (OpenShift, Kubernetes `runAsNonRoot`); gebruik daar Compose.
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `EMBEDDED` | `auto` | Automatisch ingeschakeld wanneer zowel `DATABASE_URL` als `REDIS_URL` niet zijn ingesteld. Stel in op `0` om het uit te schakelen (de app faalt dan direct als er geen externe `DATABASE_URL`/`REDIS_URL` is ingesteld, in plaats van stilletjes een database binnen de container te starten). |
-| `REDIS_MAXMEMORY` | `512mb` | Geheugenlimiet voor de ingebedde Redis (alleen in de ingebedde modus). Verlaag deze op hosts met beperkt geheugen, zoals een Raspberry Pi. |
-| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Aantal seconden dat het opstarten wacht tot de ingebedde Redis op `PING` antwoordt, voordat het opgeeft. Bij een time-out stopt de container en logt waarom, in plaats van te blijven hangen. Hele seconden van 1 tot 999999; er is geen onbeperkte waarde, omdat eeuwig wachten juist de fout is die deze grens moet voorkomen. Verhoog hem alleen als een trage host ertegenaan loopt. |
-| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Hetzelfde, voor de ingebedde PostgreSQL. De klok start nadat de eerste `initdb` is voltooid, dus de time-out dekt het starten van de server en crashherstel, niet het aanmaken van de initiële database. |
+| `EMBEDDED` | `auto` | Wordt automatisch ingeschakeld wanneer zowel `DATABASE_URL` als `REDIS_URL` niet zijn ingesteld. Stel in op `0` om uit te schakelen (de app stopt dan direct als er geen externe `DATABASE_URL`/`REDIS_URL` is ingesteld, in plaats van stilzwijgend een database in de container te starten). |
+| `REDIS_MAXMEMORY` | `512mb` | Geheugenlimiet voor de embedded Redis (alleen embedded-modus). Verlaag deze op hosts met weinig geheugen, zoals een Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Aantal seconden dat het opstarten wacht tot de embedded Redis antwoordt op `PING` voordat het opgeeft. Bij een time-out stopt de container en logt hij waarom, in plaats van te blijven hangen. Hele seconden van 1 tot 999999; er is geen onbeperkte waarde, omdat eindeloos wachten juist de storing is die deze grens moet voorkomen. Verhoog dit alleen als een trage host de grens bereikt. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Hetzelfde, voor de embedded PostgreSQL. De klok start nadat `initdb` bij de eerste start klaar is, dus hij dekt het starten van de server en het herstel na een crash, niet het aanmaken van de database zelf. |
 
-Upgraden vanaf 1.x: plaats je oude `snapotter.db` op `/data/snapotter.db` in het volume en de ingebedde modus importeert het bij de eerste keer opstarten in de ingebedde PostgreSQL. De import draait één keer; latere opstarts slaan deze over.
+Upgraden vanaf 1.x: plaats uw oude `snapotter.db` op `/data/snapotter.db` in het volume en de embedded-modus importeert het bij de eerste start in de embedded PostgreSQL. De import wordt één keer uitgevoerd; latere starts slaan hem over.
 
-Opmerking over telemetrie: de ingebedde modus erft de analytics-standaard van de image net als elke andere configuratie. De gepubliceerde image wordt geleverd met analytics aan; bouw met `--build-arg SNAPOTTER_ANALYTICS=off`, of gebruik de admin-opt-out in de app, om het uit te schakelen.
+Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de image, net als elke andere configuratie. De gepubliceerde image wordt geleverd met analytics ingeschakeld; bouw met `--build-arg SNAPOTTER_ANALYTICS=off`, of gebruik de opt-out voor beheerders in de app, om dit uit te schakelen.
 
 ### Verwerkingslimieten {#processing-limits}
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `0` (onbeperkt) | Maximale bestandsgrootte per upload in megabytes. Stel in op 0 voor onbeperkt. De gepubliceerde image wordt geleverd met `0`; een build vanaf de broncode begint op 100. |
-| `MAX_BATCH_SIZE` | `0` (onbeperkt) | Maximaal aantal bestanden in één batchverzoek. Stel in op 0 voor onbeperkt. De gepubliceerde image wordt geleverd met `0`; een build vanaf de broncode begint op 100. |
-| `CONCURRENT_JOBS` | `0` (auto) | Aantal batchtaken dat parallel draait. Stel in op 0 om automatisch te detecteren op basis van beschikbare CPU-cores. |
-| `MAX_MEGAPIXELS` | `0` (onbeperkt) | Maximaal toegestane beeldresolutie in megapixels. Stel in op 0 voor onbeperkt. |
-| `MAX_WORKER_THREADS` | `0` (auto) | Maximaal aantal worker-threads voor beeldverwerking. Stel in op 0 om automatisch te detecteren op basis van beschikbare CPU-cores. |
-| `PROCESSING_TIMEOUT_S` | `0` (geen limiet) | Maximale verwerkingstijd per verzoek in seconden. Stel in op 0 voor geen timeout. |
-| `MAX_PIPELINE_STEPS` | `20` | Maximaal aantal stappen in een pijplijn. Stel in op 0 voor geen limiet. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (onbeperkt) | Maximale bestandsgrootte per upload in megabytes. Stel in op 0 voor onbeperkt. De gepubliceerde image levert `0`; een build vanuit de broncode begint op 100. |
+| `MAX_BATCH_SIZE` | `0` (onbeperkt) | Maximaal aantal bestanden in één batchverzoek. Stel in op 0 voor onbeperkt. De gepubliceerde image levert `0`; een build vanuit de broncode begint op 100. |
+| `CONCURRENT_JOBS` | `0` (automatisch) | Aantal batchjobs dat parallel draait. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
+| `MAX_MEGAPIXELS` | `0` (onbeperkt) | Maximaal toegestane afbeeldingsresolutie in megapixels. Stel in op 0 voor onbeperkt. |
+| `MAX_WORKER_THREADS` | `0` (automatisch) | Maximaal aantal workerthreads voor beeldverwerking. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
+| `PROCESSING_TIMEOUT_S` | `0` (geen limiet) | Maximale verwerkingstijd per verzoek in seconden. Stel in op 0 voor geen time-out. |
+| `MAX_PIPELINE_STEPS` | `20` | Maximaal aantal stappen in een pipeline. Stel in op 0 voor geen limiet. |
 | `MAX_CANVAS_PIXELS` | `0` (geen limiet) | Maximale canvasgrootte in pixels voor uitvoerafbeeldingen. Stel in op 0 voor geen limiet. |
-| `MAX_SVG_SIZE_MB` | `50` | Grootste SVG die vóór het opschonen wordt geaccepteerd, in megabytes. `0` gedraagt zich hier anders dan in de rijen eromheen. Het verwijdert de groottelimiet vóór het parsen volledig in plaats van hem te verhogen, dus laat deze ingesteld staan. |
-| `MAX_PDF_PAGES` | `0` (onbeperkt) | Maximaal aantal PDF-pagina's voor PDF-naar-image-conversie. Stel in op 0 voor onbeperkt. |
+| `MAX_SVG_SIZE_MB` | `50` | Grootste SVG die vóór het opschonen wordt geaccepteerd, in megabytes. `0` gedraagt zich hier anders dan in de rijen eromheen. Het verwijdert de groottelimiet vóór het parsen volledig in plaats van die te verhogen, dus laat deze ingesteld. |
+| `MAX_PDF_PAGES` | `0` (onbeperkt) | Maximaal aantal PDF-pagina's voor PDF-naar-afbeelding-conversie. Stel in op 0 voor onbeperkt. |
 
 ### Engines {#engines}
 
-SnapOtter zoekt elk binair bestand voor verwerking op `$PATH` in de container, dus de variabelen blijven leeg tenzij je een eigen build mount.
+SnapOtter zoekt elk verwerkingsprogramma op `$PATH` binnen de container, dus deze blijven leeg tenzij u een eigen build mount.
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `FFMPEG_PATH` | (leeg) | Pad naar het binaire bestand `ffmpeg` achter de video- en audiotools. |
+| `FFMPEG_PATH` | (leeg) | Pad naar het programma `ffmpeg` achter de video- en audiotools. |
 | `FFPROBE_PATH` | (leeg) | Pad naar `ffprobe`, dat mediabestanden leest voordat ze worden verwerkt. Wijs het naar dezelfde build als `FFMPEG_PATH`. |
-| `QPDF_PATH` | (leeg) | Pad naar `qpdf`, gebruikt door de PDF-tools en om geüploade pdf's te controleren. |
+| `QPDF_PATH` | (leeg) | Pad naar `qpdf`, gebruikt door de PDF-tools en om geüploade PDF's te controleren. |
 | `SOFFICE_PATH` | (leeg) | Pad naar `soffice` van LibreOffice, gebruikt voor conversies van kantoordocumenten. |
 | `PDFCPU_PATH` | (leeg) | Pad naar `pdfcpu`, gebruikt door sommige PDF-tools. |
-| `SNAPOTTER_HW_ACCEL` | (leeg) | Familie hardware-video-encoders, `nvenc` of `vaapi`. Leeg codeert in software. |
+| `SNAPOTTER_HW_ACCEL` | (leeg) | Familie van hardwarematige video-encoders, `nvenc` of `vaapi`. Leeg codeert in software. |
 
-`SNAPOTTER_HW_ACCEL` vereist een ffmpeg-build met die encoderfamilie, en de ffmpeg in de image heeft geen van beide. Met de ffmpeg uit de image zelf valt de instelling terug op software-encoding en meldt dat in het opstartlogboek. Om het te gebruiken, mount je je eigen ffmpeg-build, wijs je `FFMPEG_PATH` en `FFPROBE_PATH` ernaar en geef je de container het GPU-apparaat. Stel voor `nvenc` ook `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` in: de image vraagt alleen om `compute,utility`, en zonder `video` mount de NVIDIA-runtime de encodelibrary niet, zodat de encoder wel wordt vermeld maar elke encode mislukt. Een padoverride die niet bestaat of niet uitvoerbaar is, wordt ook in het opstartlogboek genoemd, en elke taak die dat binaire bestand nodig heeft, mislukt totdat je het pad repareert of de variabele leegmaakt.
+`SNAPOTTER_HW_ACCEL` vereist een ffmpeg die met die encoderfamilie is gebouwd, en de ffmpeg in de image heeft geen van beide. Met het eigen programma van de image valt de instelling terug op software-encodering en meldt dat in het opstartlog. Om het te gebruiken mount u uw eigen ffmpeg-build, wijst u `FFMPEG_PATH` en `FFPROBE_PATH` ernaar en geeft u de container het GPU-apparaat. Stel voor `nvenc` ook `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` in: de image vraagt alleen om `compute,utility`, en zonder `video` mount de NVIDIA-runtime de encodeerbibliotheek niet, zodat de encoder wel wordt vermeld maar elke encodering mislukt. Een padoverschrijving die niet bestaat of niet uitvoerbaar is, wordt eveneens in het opstartlog genoemd, en elke job die dat programma nodig heeft mislukt totdat u het pad herstelt of de instelling verwijdert.
 
-De gepubliceerde Compose-bestanden geven alle zes door vanuit `.env`, dus ze daar instellen is voldoende.
+De gepubliceerde Compose-bestanden geven alle zes door vanuit `.env`, dus instellen daar volstaat.
 
-### Opschoning {#cleanup}
+### Opschonen {#cleanup}
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `72` | Hoe lang niet-opgeslagen verwerkingsresultaten (ruwe uploads en tooluitvoer) worden bewaard vóór automatische verwijdering. Bestanden die je expliciet opslaat in de Files-bibliotheek worden niet beïnvloed en blijven bestaan totdat je ze verwijdert. |
+| `FILE_MAX_AGE_HOURS` | `72` | Hoe lang niet-opgeslagen verwerkingsresultaten (ruwe uploads en toolresultaten) worden bewaard vóór automatische verwijdering. Bestanden die u expliciet in de bestandenbibliotheek opslaat, worden niet beïnvloed en blijven bestaan totdat u ze verwijdert. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Hoe vaak de opschoontaak draait. |
 
-### Weergave {#appearance}
+### Uiterlijk {#appearance}
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
 | `DEFAULT_THEME` | `light` | Standaardthema voor nieuwe sessies. `light`, `dark` of `system`. |
 | `DEFAULT_LOCALE` | `en` | Standaardtaal van de interface. |
-| `DEFAULT_TOOL_VIEW` | `sidebar` | Standaard toollay-out. `sidebar` of `fullscreen`. |
+| `DEFAULT_TOOL_VIEW` | `sidebar` | Standaardindeling van de tools. `sidebar` of `fullscreen`. |
 
-### Docker-permissies {#docker-permissions}
+### Docker-rechten {#docker-permissions}
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `PUID` | `999` | Draai het containerproces als deze UID. Stel in om overeen te komen met je hostgebruiker voor bind mounts (`id -u`). |
-| `PGID` | `999` | Draai het containerproces als deze GID. Stel in om overeen te komen met je hostgroep voor bind mounts (`id -g`). |
+| `PUID` | `999` | Draai het containerproces onder deze UID. Stel in op die van uw hostgebruiker voor bind mounts (`id -u`). |
+| `PGID` | `999` | Draai het containerproces onder deze GID. Stel in op die van uw hostgroep voor bind mounts (`id -g`). |
 
 ## Docker-voorbeeld {#docker-example}
 
@@ -168,7 +168,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Wijzig dit voor niet-lokale implementaties
+      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
@@ -202,7 +202,7 @@ volumes:
 
 De Docker Compose-stack gebruikt vier volumes:
 
-- `/data` (app) - AI-modellen, Python-venv en gebruikersbestanden. Koppel dit om geüploade bestanden en geïnstalleerde AI-bundels te behouden bij herstarts.
-- `/tmp/workspace` (app) - Tijdelijke opslag voor bestanden die worden verwerkt. Dit mag vluchtig zijn, maar het koppelen ervan voorkomt dat de beschrijfbare laag van de container volloopt.
-- `SnapOtter-pgdata` (postgres) - PostgreSQL-datamap. Deze bevat alle relationele gegevens (gebruikers, instellingen, pijplijnen, taken, auditlog). Maak een back-up via `pg_dump` of een volumesnapshot.
-- `SnapOtter-redisdata` (redis) - Redis append-only-bestand voor duurzame taakwachtrijen.
+- `/data` (app) - AI-modellen, Python-venv en gebruikersbestanden. Mount dit om geüploade bestanden en geïnstalleerde AI-bundels te behouden na herstarts.
+- `/tmp/workspace` (app) - Tijdelijke opslag voor bestanden die worden verwerkt. Dit mag vluchtig zijn, maar door het te mounten voorkomt u dat de beschrijfbare laag van de container volloopt.
+- `SnapOtter-pgdata` (postgres) - PostgreSQL-gegevensmap. Hierin staan alle relationele gegevens (gebruikers, instellingen, pipelines, jobs, auditlog). Maak een back-up via `pg_dump` of een volume-snapshot.
+- `SnapOtter-redisdata` (redis) - Append-only-bestand van Redis voor duurzame jobwachtrijen.

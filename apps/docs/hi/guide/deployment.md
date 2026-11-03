@@ -1,23 +1,17 @@
 ---
-description: "SnapOtter को Docker के साथ प्रोडक्शन में डिप्लॉय करें। हार्डवेयर आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik, तथा Cloudflare के लिए रिवर्स प्रॉक्सी कॉन्फ़िग।"
-i18n_source_hash: 4cae787c775e
-i18n_provenance: human
-i18n_output_hash: b9a7b7ba3a5a
+description: "SnapOtter को Docker के साथ production में deploy करें। Hardware आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik, व Cloudflare के लिए reverse proxy configs।"
+i18n_source_hash: b8c4ed2cc086
+i18n_provenance: machine
+i18n_output_hash: 375fe96e1668
 i18n_hash_version: 2
 ---
 
 # Deployment {#deployment}
 
-SnapOtter एक 3-कंटेनर Docker Compose स्टैक के रूप में डिप्लॉय होता है: SnapOtter ऐप इमेज, PostgreSQL 17, और Redis 8। ऐप इमेज **linux/amd64** (AI त्वरण के लिए NVIDIA CUDA के साथ) और **linux/arm64** (CPU) को सपोर्ट करती है, इसलिए यह Intel/AMD सर्वरों, Apple Silicon Macs, और Raspberry Pi 4/5 जैसे ARM डिवाइसों पर मूल रूप से चलती है। VA-API, Quick Sync, या OpenCL के माध्यम से Intel/AMD iGPU त्वरण आज AI इन्फ़रेंस के लिए सपोर्ट नहीं किया जाता।
+SnapOtter 3-container Docker Compose stack के रूप में deploy होता है: SnapOtter app image, PostgreSQL 17, और Redis 8। App image **linux/amd64** (AI acceleration के लिए NVIDIA CUDA के साथ) और **linux/arm64** (CPU) को सपोर्ट करती है, इसलिए यह Intel/AMD servers, Apple Silicon Macs, और Raspberry Pi 4/5 जैसे ARM devices पर native रूप से चलती है। VA-API, Quick Sync, या OpenCL के ज़रिए Intel/AMD iGPU acceleration फ़िलहाल AI inference के लिए समर्थित नहीं है।
 
-GPU सेटअप, Docker Compose उदाहरणों, और वर्शन पिनिंग के लिए [Docker Image](./docker-tags) देखें।
+GPU सेटअप, Docker Compose उदाहरणों, और version pinning के लिए [Docker Image](./docker-tags) देखें।
 
-
-<!-- korean-ocr-contract:start -->
-::: info कोरियाई OCR संगतता
-तेज़ OCR `auto`, `en`, `de`, `es`, `fr`, `zh` और `ja` का समर्थन करता है, लेकिन कोरियाई (`ko`) और अरबी (`ar`) का नहीं। कोरियाई और अरबी, दोनों के लिए सटीक OCR पैक और `balanced` या `best` आवश्यक है। पैक आधिकारिक Linux amd64 और arm64 कंटेनरों पर चलता है; NVIDIA होस्ट पर भी OCR CPU पर ही चलता है। असमर्थित सिस्टम स्पष्ट संगतता त्रुटि लौटाते हैं और चुपचाप `fast` पर वापस नहीं जाते। कोरियाई या अरबी के साथ `fast` या पुराने `tesseract` नाम को कतार में डालने से पहले `FEATURE_INCOMPATIBLE` और `fast-korean-unsupported` के साथ अस्वीकार किया जाता है।
-:::
-<!-- korean-ocr-contract:end -->
 ## Quick Start (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -38,7 +32,11 @@ services:
       - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
 
       # --- Database + Queue ---
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Requests are served by a role that can only read and write rows. The
+      # owner connects only during boot, to migrate and to grant. Set
+      # POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD for any non-local deployment.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
 
       # --- Limits (set 0 for unlimited) ---
@@ -53,6 +51,14 @@ services:
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
+
+      # --- Engines (empty = the image's own binaries, see Configuration) ---
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,14 +82,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -114,13 +123,15 @@ volumes:
 docker compose up -d
 ```
 
-इसके बाद ऐप `http://localhost:1349` पर उपलब्ध होता है।
+इसके बाद app `http://localhost:1349` पर उपलब्ध होता है।
 
-> **Docker Hub रेट लिमिट?** GitHub Container Registry से पुल करने के लिए `snapotter/snapotter:latest` को `ghcr.io/snapotter-hq/snapotter:latest` से बदलें। दोनों रजिस्ट्री हर रिलीज़ पर वही इमेज प्राप्त करती हैं।
+ऊपर का stack database owner के रूप में कनेक्ट होता है। SnapOtter 2.3.0 से आप ऐसी role पर requests परोस सकते हैं जो केवल पंक्तियाँ पढ़ और लिख सकती है; [Least-privilege roles](./database#least-privilege-roles) देखें।
+
+> **Docker Hub rate limits?** इसके बजाय GitHub Container Registry से pull करने के लिए `snapotter/snapotter:latest` को `ghcr.io/snapotter-hq/snapotter:latest` से बदलें। दोनों registries को हर release पर वही image मिलती है।
 
 ## Quick Start (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-समर्थित AI टूल पर NVIDIA CUDA त्वरण के लिए (पृष्ठभूमि हटाना, अपस्केलिंग, चेहरा निखारना):
+समर्थित AI tools (background removal, upscaling, face enhancement) पर NVIDIA CUDA acceleration के लिए:
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -138,8 +149,18 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only) and the boot-only owner connection. See the CPU
+      # example above.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
+      # Engines (empty = the image's own binaries, see Configuration)
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,14 +191,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # गैर-स्थानीय तैनाती के लिए इसे बदलें
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -208,45 +232,45 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-### GPU त्वरण सत्यापित करें {#verify-gpu-acceleration}
+### GPU acceleration सत्यापित करें {#verify-gpu-acceleration}
 
-लॉग में CUDA पहचान की जाँच करें:
+Logs में CUDA detection जाँचें:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
 
-यदि `--gpus all` और NVIDIA कंटेनर टूलकिट सही तरीके से सेट होने के बावजूद AI उपकरण CPU पर चलते हैं, तो **सेटिंग्स → AI फीचर्स** से प्रभावित बंडल (उदाहरण के लिए बैकग्राउंड रिमूवल) को फिर से इंस्टॉल करें। इंस्टॉलर ONNX रनटाइम के GPU बिल्ड को पुनर्स्थापित करता है, जिसे केवल CPU बिल्ड किसी अन्य बंडल (जैसे ट्रांसक्रिप्शन) द्वारा खींचा जाता है अन्यथा साझा AI वातावरण में छाया कर सकता है। यदि यूआई से पुनः इंस्टॉल करने से पुरानी छवि पर जीपीयू बहाल नहीं होता है, तो [अंक #490](https://github.com/snapotter-hq/SnapOtter/issues/490) में मैन्युअल मरम्मत देखें।
+यदि `--gpus all` और NVIDIA Container Toolkit सही ढंग से सेट होने के बावजूद AI tools CPU पर चलते हैं, तो प्रभावित bundle (उदाहरण के लिए Background Removal) को **Settings → AI Features** से दोबारा इंस्टॉल करें। Installer ONNX Runtime का GPU build बहाल कर देता है, जिसे किसी अन्य bundle (जैसे transcription) द्वारा खींचा गया CPU-only build साझा AI environment में अन्यथा ढक सकता है। यदि पुरानी image पर UI से दोबारा इंस्टॉल करने से GPU बहाल नहीं होता, तो [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490) में मैन्युअल मरम्मत देखें।
 
 ## Hardware Requirements {#hardware-requirements}
 
-ये संख्याएँ कई तरह के सिस्टमों पर किए गए बेंचमार्क से आती हैं, एक आधुनिक amd64 वर्कस्टेशन (NVIDIA RTX 4070 के साथ) से लेकर एक Raspberry Pi तक, जिनमें से हर एक पर पूरा टूल कैटलॉग चलाया गया और असली न्यूनतम सीमा खोजने के लिए Docker रिसोर्स लिमिट को स्वीप किया गया।
+ये आँकड़े कई तरह के सिस्टमों पर किए गए benchmarks से आते हैं, NVIDIA RTX 4070 वाले आधुनिक amd64 workstation से लेकर Raspberry Pi तक, जिनमें से हर एक पर पूरा tool catalog चलाया गया और असली न्यूनतम सीमा खोजने के लिए Docker resource limits बदलकर देखी गईं।
 
-इन टियरों के छोटे सिरे पर चला रहे हैं (कोई Pi, पुराना लैपटॉप, 2 GB VPS)? [कम संसाधन वाले सेटअप](/hi/guide/low-resource) इन संख्याओं को ट्यून की गई सीमाओं के साथ एक ठोस वॉकथ्रू में बदल देता है।
+इन tiers के छोटे छोर पर चला रहे हैं (Pi, पुराना laptop, 2 GB VPS)? [Low-Resource Setups](/hi/guide/low-resource) इन आँकड़ों को ट्यून की गई सीमाओं के साथ ठोस walkthrough में बदलता है।
 
 ### Quick Reference {#quick-reference}
 
-| टियर | उपयोग परिदृश्य | CPU | RAM | GPU | स्टोरेज |
+| Tier | उपयोग का मामला | CPU | RAM | GPU | Storage |
 |------|----------|-----|-----|-----|---------|
-| न्यूनतम | इमेज, फ़ाइलें, और हल्के PDF टूल; एकल उपयोगकर्ता; छोटे बैच | 2 कोर | 2 GB | कोई नहीं | ~7 GB |
-| अनुशंसित | वीडियो, PDF, और CPU पर AI सहित सभी पाँच मोडैलिटी; बैच; कुछ उपयोगकर्ता | 4 कोर | 4 GB | कोई नहीं | ~25 GB |
-| पूर्ण | GPU AI सहित सब कुछ तेज़ गति से; बड़े बैच; अनेक उपयोगकर्ता | 6-8 कोर | 8 GB | NVIDIA 8 GB+ VRAM (12 GB आरामदायक) | ~35 GB |
+| Minimum | Non-AI tools (image, files, हल्का PDF) के साथ built-in Fast OCR और face detection; एक उपयोगकर्ता; छोटे batches | 2 cores | 2 GB | कोई नहीं | ~7 GB |
+| Recommended | CPU पर video, PDF, और मानक AI bundles सहित सभी पाँच modalities; batches; कुछ उपयोगकर्ता | 4 cores | 4 GB (HQ inpainting के लिए 8 GB) | कोई नहीं | ~25 GB |
+| Full | GPU AI सहित सब कुछ तेज़ गति से; बड़े batches; कई उपयोगकर्ता | 6-8 cores | 8 GB | NVIDIA 8 GB+ VRAM (12 GB आरामदायक) | ~35 GB |
 
-**आर्किटेक्चर: केवल 64-बिट** (`linux/amd64` या `linux/arm64`)। SnapOtter Intel/AMD सर्वरों, Apple Silicon Macs, और 64-बिट ARM बोर्डों पर मूल रूप से चलता है, जिनमें **Raspberry Pi 4 और 5** (4-8 GB) शामिल हैं। यह 32-बिट ARM (`armv7`/`armhf`) पर **नहीं** चलता, इसके लिए कोई इमेज बनाई ही नहीं जाती, और न ही Pi Zero जैसे 512 MB-श्रेणी के बोर्डों पर, जो मेमोरी की न्यूनतम सीमा से नीचे हैं (नीचे देखें)।
+**Architecture: केवल 64-bit** (`linux/amd64` या `linux/arm64`)। SnapOtter Intel/AMD servers, Apple Silicon Macs, और 64-bit ARM boards पर native रूप से चलता है, जिनमें **Raspberry Pi 4 और 5** (4-8 GB) शामिल हैं। यह 32-bit ARM (`armv7`/`armhf`) पर **नहीं** चलता, उसके लिए कोई image नहीं बनाई जाती, और न ही Pi Zero जैसे 512 MB-श्रेणी के boards पर, जो मेमोरी की न्यूनतम सीमा से नीचे हैं (नीचे देखें)।
 
-### Minimum (इमेज, फ़ाइलें, और हल्के PDF टूल; कोई AI नहीं) {#minimum-image-files-and-light-pdf-tools-no-ai}
+### Minimum (image, files, और हल्के PDF tools; AI नहीं) {#minimum-image-files-and-light-pdf-tools-no-ai}
 
-| रिसोर्स | आवश्यकता |
+| Resource | आवश्यकता |
 |---|---|
-| CPU | 2 कोर |
+| CPU | 2 cores |
 | RAM | 2 GB |
-| डिस्क | ~5.5 GB (इमेज) + डेटा वॉल्यूम |
+| Disk | ~5.5 GB (image) + data volume |
 | GPU | आवश्यक नहीं |
 
-सभी 222 गैर-AI कैटलॉग टूल - इमेज (रिसाइज़, क्रॉप, कन्वर्ट, कंप्रेस, एडजस्ट, वॉटरमार्क), वीडियो (ट्रिम, म्यूट, रीमक्स), ऑडियो (कन्वर्ट, नॉर्मलाइज़, ट्रिम), PDF (मर्ज, स्प्लिट, कंप्रेस, रोटेट, प्रोटेक्ट), फ़ाइल रूपांतरण, और समर्पित रूपांतरण प्रीसेट - मामूली हार्डवेयर पर चलते हैं। अधिकांश ऑपरेशन एक बड़ी फ़ाइल पर भी एक सेकंड से काफ़ी कम समय में पूरे हो जाते हैं: एक 2.7 MB इमेज ~0.05 s में रिसाइज़ होती है और ~2 s में WebP में री-एनकोड होती है।
+सभी 222 non-AI catalog tools, image (resize, crop, convert, compress, adjust, watermark), video (trim, mute, remux), audio (convert, normalize, trim), PDF (merge, split, compress, rotate, protect), फ़ाइल रूपांतरण, और समर्पित conversion presets, साधारण hardware पर चलते हैं। ज़्यादातर ऑपरेशन बड़ी फ़ाइल पर भी एक सेकंड से काफ़ी कम में पूरे हो जाते हैं: 2.7 MB की image ~0.05 s में resize होती है और ~2 s में WebP में re-encode हो जाती है।
 
-मेमोरी की न्यूनतम सीमा असली है, यह एक Docker रिसोर्स-लिमिट स्वीप से आती है: **512 MB स्टैक शुरू नहीं कर सकता** (एक अकेली इमेज रिसाइज़ भी मार दी जाती है), **1 GB** एकल-फ़ाइल ऑपरेशन संभालता है पर मल्टी-फ़ाइल बैच में मेमोरी खत्म हो जाती है, और **2 GB / 2 कोर** सबसे छोटा कॉन्फ़िगरेशन है जो बैच को आराम से संभालता है।
+मेमोरी की सीमा असली है, यह Docker resource-limit sweep से निकला है: **512 MB में stack शुरू नहीं हो सकता** (एक image resize भी kill हो जाता है), **1 GB** एकल-फ़ाइल ऑपरेशन सँभाल लेता है लेकिन multi-file batch में मेमोरी खत्म हो जाती है, और **2 GB / 2 cores** वह सबसे छोटा कॉन्फ़िगरेशन है जो non-AI batches को आराम से सँभालता है। Built-in Fast OCR और `face-detection` bundle भी 2 GB में समा जाते हैं, जबकि बड़े AI bundles (Whisper, LaMa/DDColor, rembg, RealESRGAN, photo restoration, और SD1.5 HQ inpainting) को 4 से 8 GB RAM चाहिए और खाली मेमोरी उनकी प्रति-bundle सीमा से कम होने पर उन्हें पहले ही अस्वीकार कर दिया जाता है।
 
 ```yaml
 deploy:
@@ -256,52 +280,53 @@ deploy:
       memory: 2G
 ```
 
-**एकमात्र CPU-भारी अपवाद वीडियो री-एनकोडिंग है।** स्ट्रीम-कॉपी ऑपरेशन (ट्रिम, म्यूट, कंटेनर रीमक्स) तत्काल होते हैं, पर किसी अलग कोडेक में ट्रांसकोडिंग CPU-बद्ध है। एक 1080p / 45-सेकंड क्लिप को VP9 (WebM) में री-एनकोड करने में एक तेज़ आधुनिक CPU पर लगभग **~40 s**, Apple Silicon पर ~45 s, एक पुराने मोबाइल 4-कोर पर ~80 s, और एक पुराने 4-कोर सर्वर पर **~130 s** लगते हैं। यदि आपका वर्कलोड वीडियो-भारी है, तो CPU कोर और क्लॉक स्पीड को प्राथमिकता दें, या कंटेनर की `cpus:` लिमिट बढ़ाएँ, शिप किया गया compose ऐप को डिफ़ॉल्ट रूप से 4 कोर पर सीमित करता है (GPU compose पर 8)।
+**CPU पर भारी पड़ने वाला एकमात्र अपवाद video re-encoding है।** Stream-copy ऑपरेशन (trim, mute, container remux) तुरंत होते हैं, लेकिन किसी दूसरे codec में transcode करना CPU-bound है। 1080p / 45-सेकंड की क्लिप को VP9 (WebM) में re-encode करने में तेज़ आधुनिक CPU पर लगभग **~40 s**, Apple Silicon पर ~45 s, पुराने मोबाइल 4-core पर ~80 s, और पुराने 4-core server पर **~130 s** लगते हैं। यदि आपका workload video-भारी है, तो CPU cores और clock speed को प्राथमिकता दें, या container की `cpus:` सीमा बढ़ाएँ: भेजा गया compose app को डिफ़ॉल्ट रूप से 4 cores पर सीमित करता है (GPU compose पर 8)।
 
-### Recommended (CPU पर AI टूल) {#recommended-ai-tools-on-cpu}
+### Recommended (CPU पर AI tools) {#recommended-ai-tools-on-cpu}
 
-| रिसोर्स | आवश्यकता |
+| Resource | आवश्यकता |
 |---|---|
-| CPU | 4 कोर |
+| CPU | 4 cores |
 | RAM | 4 GB |
-| Disk | 3 जीबी (छवि) + लगभग 20 जीबी (सभी वैकल्पिक एआई पैक) + कार्यक्षेत्र |
-| GPU | आवश्यक नहीं (CPU फ़ॉलबैक) |
+| Disk | 3 GB (image) + लगभग 20 GB (सभी वैकल्पिक AI packs) + workspace |
+| GPU | आवश्यक नहीं (CPU fallback) |
 
-**बड़े AI बंडलों को इंस्टॉल करना और चलाना अनुशंसा को 4 जीबी RAM तक बढ़ा देता है।** कोई वैकल्पिक पैक इंस्टॉल नहीं होने से ऐप लगभग 360 एमबी निष्क्रिय रहता है। लीगेसी Python उपकरण एक sidecar साझा करते हैं, जबकि सटीक OCR सक्रिय अपरिवर्तनीय पीढ़ी पर पिन किए गए एक समर्पित लंबे समय तक चलने वाले dispatcher का उपयोग करता है। सक्रियण से पहले, इंस्टॉलर उम्मीदवार पर एक smoke test चलाता है। इसके बाद यह परमाणु रूप से नए dispatcher पर स्विच हो जाता है और garbage collection से पहले पिछले dispatcher को हटा देता है। प्रत्येक आधिकारिक सटीक-ओसीआर आर्टिफैक्ट को 4 GiB cgroup के अंदर अपनी सबसे खराब स्थिति release suite से गुजरना होगा, जबकि 4 जीबी होस्ट अनुशंसा Node.js एप्लिकेशन, Postgres, Redis, कतारों और समवर्ती कार्य के लिए हेडरूम छोड़ती है।
+**बड़े AI bundles को इंस्टॉल करना और चलाना ही सिफ़ारिश को 4 GB RAM तक पहुँचाता है।** कोई वैकल्पिक pack इंस्टॉल न होने पर app लगभग 360 MB पर idle रहता है। Legacy Python tools एक sidecar साझा करते हैं, जबकि accurate OCR एक समर्पित लंबे समय तक चलने वाला dispatcher उपयोग करता है जो सक्रिय immutable generation से जुड़ा रहता है। Activation से पहले, installer candidate पर smoke test चलाता है। फिर वह atomically नए dispatcher पर स्विच करता है और garbage collection से पहले पिछले dispatcher को drain करता है। हर आधिकारिक accurate-OCR artifact को 4 GiB cgroup के भीतर अपना सबसे बुरे-हाल वाला release suite पास करना होता है, जबकि 4 GB host सिफ़ारिश Node.js application, Postgres, Redis, queues, और एक साथ होने वाले काम के लिए गुंजाइश छोड़ती है।
 
-अधिकांश AI टूल CPU पर पूरी तरह उपयोगी हैं; कुछ को वास्तव में GPU चाहिए। एक आधुनिक 4-कोर CPU पर मापा गया:
+ज़्यादातर AI tools CPU पर पूरी तरह उपयोग योग्य हैं; कुछ को सचमुच GPU चाहिए। आधुनिक 4-core CPU पर मापा गया:
 
-| AI टूल | CPU समय | CPU पर उपयोगी? |
+| AI Tool | CPU समय | क्या CPU पर उपयोग योग्य है? |
 |---|---|---|
-| फ़ेस डिटेक्शन (blur-faces, smart-crop, red-eye), noise-removal | 1 s से कम | हाँ |
-| OCR, ट्रांसक्रिप्शन, सबटाइटल | 1-3 s | हाँ |
-| Colorize, फ़ेस एन्हांसमेंट | ~10 s | हाँ |
-| बैकग्राउंड हटाना / बदलना / ब्लर | ~29 s | हाँ (आपको इंतज़ार करना होगा) |
-| AI अपस्केल (RealESRGAN) | ~33 s छोटी; बड़ी इमेजों पर मिनट | सीमांत, GPU दृढ़ता से अनुशंसित |
-| फ़ोटो रीस्टोरेशन (पूरी पाइपलाइन) | कई मिनट | नहीं, GPU या एक तेज़ मल्टी-कोर CPU चाहिए |
+| Face detection (blur-faces, smart-crop, red-eye), noise-removal | 1 s से कम | हाँ |
+| OCR, transcription, subtitles | 1-3 s | हाँ |
+| Colorize, face enhancement | ~10 s | हाँ |
+| Background removal / replace / blur | ~29 s | हाँ (इंतज़ार करना होगा) |
+| AI upscale (RealESRGAN) | छोटी के लिए ~33 s; बड़ी images पर मिनट | सीमित: GPU की पुरज़ोर सिफ़ारिश |
+| Photo restoration (पूरी pipeline) | कई मिनट | नहीं: GPU या तेज़ many-core CPU चाहिए |
 
-SnapOtter जानबूझकर इन मॉडल डाउनलोड को Docker इमेज में नहीं बेक करता। AI बंडल केवल तभी खींचे जाते हैं जब कोई व्यवस्थापक संबंधित टूल सक्षम करता है, इन्हें स्थायी `/data/ai` वॉल्यूम में संग्रहीत किया जाता है, और उसी मॉडल स्टैक पर निर्भर हर टूल द्वारा साझा किया जाता है। इससे अंतिम कंटेनर इमेज छोटी रहती है, जबकि एक पूर्ण AI इंस्टॉलेशन नीचे दी गई बड़ी स्टोरेज संख्याओं तक पहुँच सकता है।
+SnapOtter जानबूझकर इन model downloads को Docker image में नहीं डालता। AI bundles तभी खींचे जाते हैं जब कोई admin संबंधित tool सक्षम करे, स्थायी `/data/ai` volume में रखे जाते हैं, और उसी model stack पर निर्भर हर tool द्वारा साझा किए जाते हैं। इससे अंतिम container image छोटी रहती है, जबकि पूर्ण AI इंस्टॉलेशन नीचे दी गई बड़ी storage संख्याओं तक पहुँच सकता है।
 
-कुछ टूल एक से अधिक साझा बंडल पर निर्भर होते हैं। उदाहरण के लिए, Passport Photo को `background-removal` और `face-detection` दोनों चाहिए; यदि `background-removal` पहले से इंस्टॉल है, तो Passport Photo सक्षम करने पर केवल गायब `face-detection` बंडल डाउनलोड होता है। यही पुनः उपयोग सभी AI टूलों पर लागू होता है।
+कुछ tools एक से अधिक साझा bundle पर निर्भर करते हैं। उदाहरण के लिए, Passport Photo को `background-removal` और `face-detection` दोनों चाहिए; यदि `background-removal` पहले से इंस्टॉल है, तो Passport Photo सक्षम करने पर केवल छूटा हुआ `face-detection` bundle डाउनलोड होता है। यही पुन: उपयोग सभी AI tools पर लागू होता है।
 
-वैकल्पिक एआई पैक भंडारण अनुमान:
+वैकल्पिक AI pack storage और CPU मेमोरी सीमाएँ (SnapOtter Python sidecar को भेजने से पहले उपलब्ध मेमोरी जाँचता है और खाली मेमोरी bundle की सीमा से कम होने पर रन को तुरंत अस्वीकार कर देता है):
 
-| बंडल | डिस्क आकार |
-|---|---|
-| बैकग्राउंड हटाना | 4-5 GB |
-| अपस्केल + फ़ेस एन्हांस + नॉइज़ हटाना | 5-6 GB |
-| फ़ेस डिटेक्शन | 200-300 MB |
-| ऑब्जेक्ट इरेज़र + Colorize | 1-2 GB |
-| सटीक OCR (`balanced`/`best`) | ~208-234 MiB डाउनलोड / ~409-488 MiB स्थापित |
-| फ़ोटो रीस्टोरेशन | 4-5 GB |
-| प्रतिलिपि | ~600 एमबी |
-| **सभी बंडल** | **~20 जीबी स्थापित** |
+| Bundle | Disk आकार | CPU मेमोरी सीमा |
+|---|---|---|
+| Face detection | 200-300 MB | 2 GB host RAM (~0.5 GB खाली) |
+| Transcription | ~600 MB | 4 GB host RAM (~2 GB खाली) |
+| Object eraser + Colorize | 1-2 GB | 4 GB host RAM (~2 GB खाली) |
+| Accurate OCR (`balanced`/`best`) | ~208-234 MiB download / ~409-488 MiB इंस्टॉल किया हुआ | 4 GiB कॉन्फ़िगर की गई effective memory (`fast` 2 GB पर चलता है) |
+| Background removal | 4-5 GB | 4 GB host RAM (~2.5 GB खाली) |
+| Upscale + Face enhance + Noise removal | 5-6 GB | 4 GB host RAM (~2.5 GB खाली) |
+| Photo restoration | 4-5 GB | 4 GB host RAM (~3 GB खाली) |
+| High-Quality Inpainting (`inpaint-hq`) | 5-7 GB | 8 GB host RAM (~6 GB खाली) |
+| **सभी bundles** | **~25 GB इंस्टॉल किए हुए** | **4 GB (`inpaint-hq` के साथ 8 GB)** |
 
-तेज़ OCR को Tesseract के माध्यम से छवि में बनाया गया है, लगभग 25 MiB जोड़ता है, और वैकल्पिक OCR पैक या इसकी 4 GiB मेमोरी आवश्यकता की आवश्यकता नहीं है। सटीक पैक आधिकारिक Linux amd64 और arm64 कंटेनर में उपलब्ध है और CPU पर ONNX Runtime चलाता है। NVIDIA होस्ट उसी CPU OCR रनटाइम का उपयोग करते हैं, इसलिए OCR CUDA संस्करण या GPU आर्किटेक्चर पर निर्भर नहीं होता है। सटीक रनटाइम के लिए कम से कम 4 GiB प्रभावी मेमोरी की आवश्यकता होती है: कॉन्फ़िगर कंटेनर cgroup सीमा, अन्यथा होस्ट मेमोरी। SnapOtter पैक डाउनलोड करने से पहले हस्ताक्षरित न्यूनतम संगतता से नीचे के सिस्टम को अस्वीकार कर देता है। सटीक-पैक इंस्टॉलेशन को bare-metal/प्रीबिल्ट आर्काइव्स पर भी अस्वीकार कर दिया गया है, जिनके libc और Python ABI की गारंटी नहीं दी जा सकती है।
+Fast OCR Tesseract के ज़रिए image में ही बनी है, लगभग 25 MiB जोड़ती है, और उसे वैकल्पिक OCR pack या उसकी 4 GiB मेमोरी आवश्यकता की ज़रूरत नहीं है। Fast `auto`, `en`, `de`, `es`, `fr`, `zh`, और `ja` को सपोर्ट करता है, लेकिन Korean (`ko`) या Arabic (`ar`) को नहीं। दोनों `balanced` या `best` का उपयोग करते हैं और इसलिए accurate pack की ज़रूरत होती है। Accurate pack आधिकारिक Linux amd64 और arm64 containers में उपलब्ध है और CPU पर ONNX Runtime चलाता है। NVIDIA hosts भी वही CPU OCR runtime उपयोग करते हैं, इसलिए OCR CUDA version या GPU architecture पर निर्भर नहीं करता। Accurate runtime को कम से कम 4 GiB effective memory चाहिए: कॉन्फ़िगर की गई container cgroup सीमा, अन्यथा host memory। SnapOtter pack डाउनलोड करने से पहले उस signed compatibility न्यूनतम से नीचे वाले सिस्टमों को अस्वीकार कर देता है। Accurate-pack इंस्टॉलेशन उन bare-metal/prebuilt archives पर भी अस्वीकार किया जाता है जिनके libc और Python ABI की गारंटी नहीं दी जा सकती। उन असमर्थित hosts पर, Korean और Arabic OCR स्पष्ट असंगति त्रुटि लौटाते हैं और चुपचाप Fast पर कभी नहीं लौटते।
 
-एक ही `DATA_DIR` साझा करने वाली रेप्लिकाओं को समान CPU आर्किटेक्चर का उपयोग करना चाहिए; नोड अफ़िनिटी की मदद से मल्टी-रेप्लिका डिप्लॉयमेंट को संगत नोड पर पिन करें। मिश्रित amd64/arm64 रेप्लिकाओं के लिए अलग-अलग डेटा वॉल्यूम और स्वतंत्र SnapOtter डिप्लॉयमेंट आवश्यक हैं।
+जो replicas एक ही `DATA_DIR` साझा करते हैं उन्हें एक ही CPU architecture का होना चाहिए; multi-replica deployments को node affinity से pin करें। मिश्रित amd64/arm64 replicas को अलग data volumes और स्वतंत्र SnapOtter deployments चाहिए।
 
-सटीक रनटाइम एक सक्रिय पीढ़ी को बनाए रखता है और सक्रियण के बाद इसके डाउनलोड कैश को शुद्ध करता है। इस रिलीज़ के लिए, पहली स्थापना के लिए संग्रह प्लस स्टेजिंग के लिए अस्थायी रूप से लगभग 620-720 MiB की आवश्यकता होती है, और पुरानी पीढ़ी के सक्रिय रहने पर अपग्रेड 1.2 GiB के करीब पहुंच सकता है। इंस्टॉलर डाउनलोड करने या निकालने से पहले हस्ताक्षरित इंडेक्स और वर्तमान पीढ़ियों से सटीक आवश्यकता की गणना करता है, और यदि डेटा वॉल्यूम बहुत छोटा है तो जल्दी विफल हो जाता है।
+Accurate runtime एक सक्रिय generation रखता है और activation के बाद अपना download cache साफ़ कर देता है। इस release के लिए, पहले इंस्टॉल में archive और staging के लिए अस्थायी रूप से लगभग 620-720 MiB चाहिए, और अपग्रेड में, जब तक पुरानी generation सक्रिय रहती है, उपयोग लगभग 1.2 GiB तक पहुँच सकता है। Installer डाउनलोड या extract करने से पहले signed index और मौजूदा generations से सटीक आवश्यकता की गणना करता है, और data volume बहुत छोटा होने पर जल्दी विफल हो जाता है।
 
 ```yaml
 deploy:
@@ -311,32 +336,32 @@ deploy:
       memory: 4G
 ```
 
-### Full (NVIDIA CUDA पर AI टूल) {#full-ai-tools-on-nvidia-cuda}
+### Full (NVIDIA CUDA पर AI tools) {#full-ai-tools-on-nvidia-cuda}
 
-| रिसोर्स | आवश्यकता |
+| Resource | आवश्यकता |
 |---|---|
-| CPU | 6-8 कोर (GPU AI के साथ भी वीडियो तैयारी + समवर्तीता CPU पर चलती है) |
+| CPU | 6-8 cores (GPU AI के साथ भी video prep और concurrency CPU पर चलते हैं) |
 | RAM | 8 GB |
 | GPU | 8+ GB VRAM वाला NVIDIA (12 GB अनुशंसित) |
-| डिस्क | कुल ~35 GB |
+| Disk | कुल ~35 GB |
 
-एक NVIDIA GPU (CUDA) भारी AI मॉडलों को नाटकीय रूप से तेज़ कर देता है। एक RTX 4070 बनाम एक आधुनिक CPU पर मापा गया:
+NVIDIA GPU (CUDA) भारी AI models को नाटकीय रूप से तेज़ कर देता है। RTX 4070 बनाम आधुनिक CPU पर मापा गया:
 
-| AI टूल | GPU के साथ तेज़ी | टिप्पणियाँ |
+| AI Tool | GPU के साथ speedup | नोट्स |
 |---|---|---|
-| AI अपस्केल (RealESRGAN 2×) | **~47×** | सबसे बड़ा फ़ायदा, एक सेकंड से कम बनाम ~33 s (बड़ी इमेजों पर मिनट) |
-| फ़ेस एन्हांसमेंट (CodeFormer) | **~12×** | ~0.9 s बनाम ~11 s |
-| ट्रांसक्रिप्शन (Whisper) | ~4.5× | |
-| बैकग्राउंड हटाना / बदलना / ब्लर | ~4× | GPU पर ~7 s बनाम CPU पर ~29 s |
+| AI upscale (RealESRGAN 2×) | **~47×** | सबसे बड़ा लाभ: एक सेकंड से कम बनाम ~33 s (बड़ी images पर मिनट) |
+| Face enhancement (CodeFormer) | **~12×** | ~0.9 s बनाम ~11 s |
+| Transcription (Whisper) | ~4.5× | |
+| Background removal / replace / blur | ~4× | GPU पर ~7 s बनाम CPU पर ~29 s |
 | Colorize | ~1.8× | |
-| OCR, फ़ेस डिटेक्शन, red-eye, noise-removal | ~1× | CPU पर पहले से तेज़, GPU मदद नहीं करता |
-| फ़ोटो रीस्टोरेशन | कोई नहीं | GPU पर भी CPU-बद्ध (0% GPU उपयोग); यहाँ GPU से ज़्यादा एक तेज़ CPU मायने रखता है |
+| OCR, face detection, red-eye, noise-removal | ~1× | CPU पर पहले से तेज़: GPU से मदद नहीं मिलती |
+| Photo restoration | कोई नहीं | GPU पर भी CPU-bound (0% GPU उपयोग); यहाँ GPU से ज़्यादा तेज़ CPU मायने रखता है |
 
-GPU के लायक टूल हैं **अपस्केल, फ़ेस एन्हांसमेंट, ट्रांसक्रिप्शन, और बैकग्राउंड हटाना**। फ़ेस डिटेक्शन, OCR, और red-eye CPU-बद्ध हैं और पहले से तेज़ हैं, इसलिए GPU कुछ नहीं जोड़ता।
+GPU के लायक tools हैं **upscale, face enhancement, transcription, और background removal**। Face detection, OCR, और red-eye CPU-bound हैं और पहले से तेज़ हैं, इसलिए GPU कुछ नहीं जोड़ता।
 
-फ़ेस एन्हांसमेंट के साथ अपस्केल के दौरान चरम VRAM उपयोग 7.5 GB तक पहुँचता है। एक 6 GB NVIDIA GPU अधिकांश AI टूलों के लिए अलग-अलग काम करता है पर अपस्केल पर विफल होगा। 8-12 GB VRAM सब कुछ संभालता है।
+Face enhancement के साथ upscale के दौरान peak VRAM उपयोग 7.5 GB तक पहुँचता है। 6 GB का NVIDIA GPU ज़्यादातर AI tools के लिए अलग-अलग काम करता है लेकिन upscale पर विफल होगा। 8-12 GB VRAM सब कुछ सँभाल लेता है।
 
-VA-API, Quick Sync, या OpenCL के माध्यम से Intel/AMD iGPU त्वरण आज AI इन्फ़रेंस के लिए सपोर्ट नहीं किया जाता। कंटेनर में `/dev/dri` को मैप करने से AI GPU त्वरण सक्षम नहीं होता; NVIDIA CUDA उपलब्ध न होने पर SnapOtter AI टूलों को CPU पर चलाएगा।
+VA-API, Quick Sync, या OpenCL के ज़रिए Intel/AMD iGPU acceleration फ़िलहाल AI inference के लिए समर्थित नहीं है। `/dev/dri` को container में map करने से AI GPU acceleration सक्षम नहीं होता; NVIDIA CUDA उपलब्ध न होने पर SnapOtter AI tools को CPU पर चलाएगा।
 
 ```yaml
 deploy:
@@ -353,47 +378,47 @@ deploy:
 
 ### Concurrent Users {#concurrent-users}
 
-डिफ़ॉल्ट 4-कोर-सीमित ऐप कंटेनर के विरुद्ध समानांतर इमेज-रिसाइज़ अनुरोध:
+डिफ़ॉल्ट 4-core-सीमित app container पर समानांतर image-resize requests:
 
-| समवर्ती अनुरोध | औसत प्रतिक्रिया समय | त्रुटियाँ |
+| समवर्ती Requests | औसत Response समय | त्रुटियाँ |
 |---|---|---|
 | 1 | 0.4s | 0 |
 | 5 | 1.2s | 0 |
 | 10 | 2.1s | 0 |
 
-जैसे-जैसे वर्कर पूल संतृप्त होता है, प्रतिक्रिया समय बिना किसी त्रुटि के उप-रैखिक रूप से घटता है। ऐप कंटेनर की `cpus:` लिमिट बढ़ाने से (या अधिक कोर वाले होस्ट का उपयोग करने से) यह सीमा ऊपर उठती है। ध्यान दें कि भारी जॉब (वीडियो ट्रांसकोड, CPU AI) अपनी पूरी अवधि के लिए एक वर्कर को पकड़े रखते हैं, इसलिए CPU का आकार अपने अपेक्षित समवर्ती भारी जॉब की संख्या के अनुसार तय करें, केवल अनुरोध संख्या के अनुसार नहीं।
+Worker pool के संतृप्त होने पर response समय बिना त्रुटियों के sub-linear रूप से बिगड़ता है। App container की `cpus:` सीमा बढ़ाने (या अधिक cores वाला host उपयोग करने) से ऊपरी सीमा बढ़ती है। ध्यान दें कि भारी jobs (video transcode, CPU AI) अपनी पूरी अवधि तक एक worker को थामे रखते हैं, इसलिए CPU का आकार केवल requests की संख्या के बजाय अपेक्षित समवर्ती भारी jobs की संख्या के अनुसार तय करें।
 
-### Supported Image Formats {#supported-image-formats}
+### समर्थित Image Formats {#supported-image-formats}
 
-SnapOtter **55+ इनपुट फ़ॉर्मैट** और **14 आउटपुट फ़ॉर्मैट** को सपोर्ट करता है, जिनमें 20+ कैमरा ब्रांडों की RAW फ़ाइलें, पेशेवर फ़ॉर्मैट (PSD, EPS, OpenEXR, HDR), आधुनिक कोडेक (JPEG XL, AVIF, HEIC, QOI), और वैज्ञानिक/गेमिंग फ़ॉर्मैट (FITS, DDS) शामिल हैं।
+SnapOtter **55+ input formats** और **14 output formats** को सपोर्ट करता है, जिनमें 20+ camera brands की RAW फ़ाइलें, professional formats (PSD, EPS, OpenEXR, HDR), आधुनिक codecs (JPEG XL, AVIF, HEIC, QOI), और वैज्ञानिक/gaming formats (FITS, DDS) शामिल हैं।
 
-हर सपोर्टेड फ़ॉर्मैट, उपयोग किए गए डिकोडर, और उपलब्ध क्वालिटी नियंत्रणों के विवरण के लिए [पूर्ण फ़ॉर्मैट सूची](/hi/guide/supported-formats) देखें।
+हर समर्थित format, उपयोग किए गए decoder, और उपलब्ध quality controls के विवरण के लिए [पूरी format सूची](/hi/guide/supported-formats) देखें।
 
-### Known Limitations {#known-limitations}
+### ज्ञात सीमाएँ {#known-limitations}
 
-- **Content-aware resize** caire बाइनरी की एक सीमा के कारण बड़ी इमेजों (>5 MP) पर क्रैश हो जाता है। छोटी इमेजों के साथ ठीक काम करता है।
-- **HEIF डिकोड** में 13-23 सेकंड लगते हैं। HEIC (Apple का वेरिएंट) 0.3-0.9 सेकंड पर बहुत तेज़ है।
-- **Upscale** छोटी इमेजों से परे किसी भी चीज़ के लिए CPU पर टाइम आउट हो जाता है। व्यावहारिक उपयोग के लिए GPU आवश्यक है।
-- **CodeFormer** फ़ेस एन्हांसमेंट GFPGAN से काफ़ी धीमा है (GPU पर 53s बनाम 2s)। अधिकांश उपयोग परिदृश्यों के लिए GFPGAN अनुशंसित है।
+- **Content-aware resize** बड़ी images (>5 MP) पर caire binary की एक सीमा के कारण crash होता है। छोटी images के साथ ठीक काम करता है।
+- **HEIF decode** में 13-23 सेकंड लगते हैं। HEIC (Apple का संस्करण) 0.3-0.9 सेकंड में बहुत तेज़ है।
+- **Upscale** छोटी images से बड़ी किसी भी चीज़ के लिए CPU पर time out हो जाता है। व्यावहारिक उपयोग के लिए GPU आवश्यक है।
+- **CodeFormer** face enhancement GFPGAN से काफ़ी धीमा है (GPU पर 53s बनाम 2s)। ज़्यादातर उपयोग मामलों के लिए GFPGAN की सिफ़ारिश की जाती है।
 
 ## Volumes {#volumes}
 
-| माउंट / वॉल्यूम | उद्देश्य | आवश्यक? |
+| Mount / Volume | उद्देश्य | आवश्यक? |
 |---|---|---|
-| `/data` (ऐप) | AI मॉडल, Python venv, उपयोगकर्ता फ़ाइलें | **हाँ**, इसके बिना फ़ाइल हानि |
-| `/tmp/workspace` (ऐप) | अस्थायी प्रोसेसिंग फ़ाइलें (स्वतः-साफ़) | अनुशंसित |
-| `SnapOtter-pgdata` (postgres) | PostgreSQL डेटा डायरेक्टरी (उपयोगकर्ता, सेटिंग्स, पाइपलाइन, जॉब) | **हाँ**, इसके बिना डेटा हानि |
-| `SnapOtter-redisdata` (redis) | टिकाऊ जॉब क्यू के लिए Redis append-only फ़ाइल | अनुशंसित |
+| `/data` (app) | AI models, Python venv, उपयोगकर्ता फ़ाइलें | **हाँ**, इसके बिना फ़ाइलें खो जाएँगी |
+| `/tmp/workspace` (app) | अस्थायी processing फ़ाइलें (अपने आप साफ़ होती हैं) | अनुशंसित |
+| `SnapOtter-pgdata` (postgres) | PostgreSQL data directory (users, सेटिंग्स, pipelines, jobs) | **हाँ**, इसके बिना डेटा खो जाएगा |
+| `SnapOtter-redisdata` (redis) | Durable job queues के लिए Redis append-only फ़ाइल | अनुशंसित |
 
-### Bind mounts vs. named volumes {#bind-mounts-vs-named-volumes}
+### Bind mounts बनाम named volumes {#bind-mounts-vs-named-volumes}
 
-**नामित वॉल्यूम** (अनुशंसित), Docker स्वचालित रूप से अनुमतियाँ प्रबंधित करता है:
+**Named volumes** (अनुशंसित): Docker permissions अपने आप सँभालता है:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**बाइंड माउंट**, आप अनुमतियाँ प्रबंधित करते हैं। अपने होस्ट उपयोगकर्ता से मिलाने के लिए `PUID`/`PGID` सेट करें:
+**Bind mounts**: permissions आप सँभालते हैं। `PUID`/`PGID` को अपने host उपयोगकर्ता से मिलाकर सेट करें:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -404,13 +429,13 @@ environment:
 
 ### Storage permissions {#storage-permissions}
 
-SnapOtter रनटाइम पर दो स्थानों पर लिखता है: `/data` (उपयोगकर्ता फ़ाइलें, लॉग, AI मॉडल और Python venv) और `/tmp/workspace` (अस्थायी प्रोसेसिंग स्क्रैच)। दोनों उस उपयोगकर्ता द्वारा लिखने योग्य होने चाहिए जिसके रूप में कंटेनर चलता है। यदि कोई एक नहीं है, तो कंटेनर स्टार्टअप पर **तुरंत विफल हो जाता है**, एक संदेश के साथ जो डायरेक्टरी, चल रहे UID/GID, और इसे कैसे ठीक करें बताता है, बजाय "healthy" के रूप में बूट होकर फिर पहले अपलोड पर एक रहस्यमय त्रुटि के साथ विफल होने के।
+SnapOtter runtime पर दो स्थानों पर लिखता है: `/data` (उपयोगकर्ता फ़ाइलें, logs, AI models और Python venv) और `/tmp/workspace` (अस्थायी processing scratch)। दोनों उस उपयोगकर्ता द्वारा writable होने चाहिए जिसके रूप में container चलता है। यदि कोई एक नहीं है, तो container **startup पर तुरंत विफल** हो जाता है और एक संदेश देता है जिसमें directory का नाम, चल रहा UID/GID, और इसे ठीक करने का तरीका होता है, बजाय इसके कि वह "healthy" boot हो और फिर पहले upload पर किसी रहस्यमय त्रुटि के साथ विफल हो। Log directory (`LOG_DIR`, image में `/data/logs`) की जाँच भी हर storage मोड में उसी तरह की जाती है, क्योंकि फ़ाइलें S3 में होने पर भी logs local रहते हैं।
 
-अनुमतियाँ कैसे संभाली जाती हैं यह इस पर निर्भर करता है कि कंटेनर कैसे लॉन्च किया गया है:
+Permissions कैसे सँभाली जाती हैं, यह इस पर निर्भर करता है कि container कैसे शुरू किया गया है:
 
-**डिफ़ॉल्ट (root के रूप में शुरू, `snapotter` पर गिरता है)**, एंट्रीपॉइंट root के रूप में शुरू होता है, माउंट किए गए वॉल्यूम के स्वामित्व को ठीक करता है, फिर `gosu` के माध्यम से अनप्रिविलेज्ड `snapotter` उपयोगकर्ता पर गिर जाता है। नामित वॉल्यूम बिना किसी कॉन्फ़िगरेशन के काम करते हैं। बाइंड माउंट के लिए, `PUID`/`PGID` को अपने होस्ट उपयोगकर्ता (ऊपर) पर सेट करें ताकि यह जो फ़ाइलें लिखे उनका स्वामित्व आपका हो।
+**Default (root के रूप में शुरू होता है, `snapotter` पर आ जाता है)**: entrypoint root के रूप में शुरू होता है, mount किए गए volumes की ownership ठीक करता है, फिर `gosu` के ज़रिए बिना विशेषाधिकार वाले `snapotter` उपयोगकर्ता पर आ जाता है। Named volumes बिना किसी कॉन्फ़िगरेशन के काम करते हैं। Bind mounts के लिए, `PUID`/`PGID` को अपने host उपयोगकर्ता पर सेट करें (ऊपर) ताकि यह जो फ़ाइलें लिखे वे आपके स्वामित्व की हों।
 
-**Kubernetes / OpenShift (`runAsUser` के माध्यम से गैर-root)**, सीधे एक गैर-root उपयोगकर्ता के रूप में लॉन्च होने पर, कंटेनर स्वयं वॉल्यूम को chown नहीं कर सकता, इसलिए ऑर्केस्ट्रेटर को उन्हें लिखने योग्य बनाना होगा। `fsGroup` सेट करें:
+**Kubernetes / OpenShift (`runAsUser` के ज़रिए non-root)**: सीधे non-root उपयोगकर्ता के रूप में शुरू होने पर, container volumes पर खुद chown नहीं कर सकता, इसलिए orchestrator को उन्हें writable बनाना होगा। `fsGroup` सेट करें:
 
 ```yaml
 securityContext:
@@ -419,45 +444,45 @@ securityContext:
   fsGroup: 999        # makes mounted volumes writable by the pod
 ```
 
-इमेज की लिखने योग्य डायरेक्टरियाँ GID 0 द्वारा समूह-स्वामित्व वाली और समूह-लिखने योग्य हैं, इसलिए एक **मनमाने UID** प्लस root अनुपूरक समूह (OpenShift डिफ़ॉल्ट) के साथ चलने वाला पॉड बिना किसी `chown` के लिख सकता है।
+Image की writable directories का group-स्वामित्व GID 0 के पास है और वे group-writable हैं, इसलिए **मनमाने UID** के साथ root supplementary group (OpenShift का डिफ़ॉल्ट) पर चलने वाला pod बिना `chown` के लिख सकता है।
 
-**TrueNAS Scale (और अन्य "विदेशी UID" सेटअप)**, TrueNAS ऐप्स को एक गैर-root उपयोगकर्ता (अक्सर `568:568`) के रूप में चलाता है और एक अलग उपयोगकर्ता के स्वामित्व वाले होस्ट डेटासेट माउंट करता है, इसलिए न तो एंट्रीपॉइंट और न ही `fsGroup` उन्हें स्वयं लिखने योग्य बनाता है। एक चुनें:
+**TrueNAS Scale (और अन्य "foreign UID" सेटअप)**: TrueNAS apps को non-root उपयोगकर्ता (अक्सर `568:568`) के रूप में चलाता है और किसी दूसरे उपयोगकर्ता के स्वामित्व वाले host datasets mount करता है, इसलिए न entrypoint और न `fsGroup` अकेले उन्हें writable बना पाता है। कोई एक चुनें:
 
-- **ऐप को root के रूप में चलाएँ** (अनुशंसित), ऐप के उपयोगकर्ता को अनसेट छोड़ दें या इसे `0` पर सेट करें, और डिफ़ॉल्ट एंट्रीपॉइंट को अनुमतियाँ ठीक करने और `snapotter` पर गिरने दें।
-- **UID `999` के रूप में चलाएँ**, ऐप के उपयोगकर्ता/समूह को `999:999` (SnapOtter का बिल्ट-इन `snapotter` उपयोगकर्ता) पर सेट करें ताकि यह इमेज के स्वामित्व से मेल खाए।
-- होस्ट डेटासेट को उस UID पर **`chown`** करें जिसके रूप में कंटेनर चलता है, TrueNAS शेल से:
+- **App को root के रूप में चलाएँ** (अनुशंसित): app का user अनसेट छोड़ दें या `0` पर सेट करें, और default entrypoint को permissions ठीक करने और `snapotter` पर आने दें।
+- **UID `999` के रूप में चलाएँ**: app का user/group `999:999` पर सेट करें (SnapOtter का built-in `snapotter` उपयोगकर्ता) ताकि वह image की ownership से मेल खाए।
+- **Host dataset पर `chown` करें**, उस UID पर जिसके रूप में container चलता है, TrueNAS shell से:
 
   ```bash
   # Use the UID from the startup error (or run `id` inside the container)
   chown -R 568:568 /mnt/<pool>/<dataset>
   ```
 
-स्टार्टअप त्रुटि उपयोग करने के लिए सटीक UID बताती है, इसलिए सबसे तेज़ रास्ता है ऐप को एक बार शुरू करना, संदेश पढ़ना, फिर तदनुसार `chown` करना (या उपयोगकर्ता समायोजित करना)।
+Startup त्रुटि उपयोग करने के लिए सटीक UID बताती है, इसलिए सबसे तेज़ रास्ता है app को एक बार शुरू करना, संदेश पढ़ना, फिर उसी के अनुसार `chown` करना (या user बदलना)।
 
 ## Environment Variables {#environment-variables}
 
-| वेरिएबल | डिफ़ॉल्ट | विवरण |
+| Variable | Default | विवरण |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | लॉगिन आवश्यकता सक्षम/अक्षम करें |
-| `DEFAULT_USERNAME` | `admin` | प्रारंभिक व्यवस्थापक उपयोगकर्ता नाम |
-| `DEFAULT_PASSWORD` | `admin` | प्रारंभिक व्यवस्थापक पासवर्ड (पहले लॉगिन पर बदलना अनिवार्य) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (असीमित) | प्रति-फ़ाइल अपलोड सीमा MB में। इमेज `0` के साथ आती है; स्रोत से बनाया गया बिल्ड 100 से शुरू होता है |
-| `MAX_BATCH_SIZE` | `0` (असीमित) | प्रति बैच अनुरोध अधिकतम फ़ाइलें। इमेज `0` के साथ आती है; स्रोत से बनाया गया बिल्ड 100 से शुरू होता है |
-| `RATE_LIMIT_PER_MIN` | `1000` | प्रति IP प्रति मिनट API अनुरोध (अक्षम करने के लिए 0 सेट करें) |
+| `AUTH_ENABLED` | `true` | Login आवश्यकता सक्षम/अक्षम करें |
+| `DEFAULT_USERNAME` | `admin` | शुरुआती admin username |
+| `DEFAULT_PASSWORD` | `admin` | शुरुआती admin पासवर्ड (पहले login पर बदलना अनिवार्य) |
+| `MAX_UPLOAD_SIZE_MB` | `0` (असीमित) | MB में प्रति-फ़ाइल upload सीमा। Image `0` के साथ आती है; source build 100 से शुरू होता है |
+| `MAX_BATCH_SIZE` | `0` (असीमित) | प्रति batch request अधिकतम फ़ाइलें। Image `0` के साथ आती है; source build 100 से शुरू होता है |
+| `RATE_LIMIT_PER_MIN` | `1000` | प्रति IP प्रति मिनट API requests (बंद करने के लिए 0 सेट करें) |
 | `MAX_USERS` | `0` (असीमित) | अधिकतम उपयोगकर्ता खाते |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For` के ज़रिए क्लाइंट IP कौन से पीयर सेट कर सकते हैं। डिफ़ॉल्ट रूप से केवल निजी नेटवर्क |
-| `PUID` | `999` | इस UID के रूप में चलाएँ (बाइंड माउंट अनुमतियों के लिए) |
-| `PGID` | `999` | इस GID के रूप में चलाएँ (बाइंड माउंट अनुमतियों के लिए) |
-| `LOG_LEVEL` | `info` | लॉग वर्बोसिटी: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (auto) | अधिकतम समानांतर AI प्रोसेसिंग जॉब |
-| `SESSION_DURATION_HOURS` | `168` | लॉगिन सत्र जीवनकाल (7 दिन) |
-| `CORS_ORIGIN` | (खाली) | अल्पविराम-पृथक अनुमत ऑरिजिन, या समान-ऑरिजिन के लिए खाली |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | कौन से peers `X-Forwarded-For` के ज़रिए client IP सेट कर सकते हैं। डिफ़ॉल्ट रूप से केवल निजी networks |
+| `PUID` | `999` | इस UID के रूप में चलाएँ (bind mount permissions के लिए) |
+| `PGID` | `999` | इस GID के रूप में चलाएँ (bind mount permissions के लिए) |
+| `LOG_LEVEL` | `info` | Log विस्तार स्तर: fatal, error, warn, info, debug, trace |
+| `CONCURRENT_JOBS` | `0` (auto) | अधिकतम समानांतर AI processing jobs |
+| `SESSION_DURATION_HOURS` | `168` | Login session की अवधि (7 दिन) |
+| `CORS_ORIGIN` | (खाली) | अल्पविराम से अलग की गई अनुमत origins, या same-origin के लिए खाली |
 
-### आउटबाउंड प्रॉक्सी और निजी CA {#outbound-proxy-and-private-ca}
+### Outbound proxy और private CA {#outbound-proxy-and-private-ca}
 
-आधिकारिक कंटेनर नोड के पर्यावरण-प्रॉक्सी समर्थन को सक्षम करता है। यदि SnapOtter को कॉर्पोरेट प्रॉक्सी के माध्यम से OCR रनटाइम रिपॉजिटरी या अन्य HTTPS सेवाओं तक पहुंचना है, तो `HTTPS_PROXY` (और जरूरत पड़ने पर `HTTP_PROXY`) सेट करें। `NO_PROXY` को उन होस्ट की अल्पविराम से अलग की गई सूची में सेट करें जिन तक सीधे पहुंचना चाहिए, जैसे Postgres, Redis और आंतरिक ऑब्जेक्ट स्टोरेज।
+आधिकारिक container Node का environment-proxy सपोर्ट सक्षम करता है। यदि SnapOtter को OCR runtime repository या अन्य HTTPS services तक corporate proxy के ज़रिए पहुँचना है, तो `HTTPS_PROXY` सेट करें (और ज़रूरत हो तो `HTTP_PROXY`)। `NO_PROXY` को उन hosts की अल्पविराम से अलग सूची पर सेट करें जिन तक सीधे पहुँचना ज़रूरी है, जैसे Postgres, Redis, और आंतरिक object storage।
 
-यदि प्रॉक्सी या आंतरिक सेवा एक निजी प्रमाणपत्र प्राधिकारी द्वारा हस्ताक्षरित है, तो CA प्रमाणपत्र को केवल पढ़ने के लिए माउंट करें और उस पर `NODE_EXTRA_CA_CERTS` इंगित करें। नोड प्रक्रिया शुरू होने पर फ़ाइल मौजूद होनी चाहिए:
+यदि proxy या कोई आंतरिक service किसी private certificate authority द्वारा signed है, तो CA certificate को read-only mount करें और `NODE_EXTRA_CA_CERTS` को उसकी ओर इंगित करें। Node process शुरू होते समय फ़ाइल मौजूद होनी चाहिए:
 
 ```yaml
 services:
@@ -471,11 +496,11 @@ services:
       - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
 ```
 
-प्रॉक्सी क्रेडेंशियल को Compose फ़ाइल के बाहर रखें (उदाहरण के लिए संरक्षित `.env` फ़ाइल या गुप्त में)। टीएलएस सत्यापन को अक्षम न करें: हस्ताक्षरित OCR सूचकांक रिलीज मेटाडेटा को प्रमाणित करता है, जबकि सामान्य टीएलएस सत्यापन अभी भी परिवहन और हर अन्य आउटबाउंड अनुरोध की सुरक्षा करता है।
+Proxy credentials को Compose फ़ाइल के बाहर रखें (उदाहरण के लिए किसी सुरक्षित `.env` फ़ाइल या secret में)। TLS verification बंद न करें: signed OCR index release metadata को प्रमाणित करता है, जबकि सामान्य TLS validation अब भी transport और हर अन्य outbound request की रक्षा करता है।
 
 ## Health Check {#health-check}
 
-कंटेनर में एक बिल्ट-इन हेल्थ चेक शामिल है:
+Container में built-in health check शामिल है:
 
 ```bash
 # Check container health status
@@ -488,23 +513,23 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy {#reverse-proxy}
 
-`TRUST_PROXY` का डिफ़ॉल्ट `loopback,linklocal,uniquelocal` है, इसलिए SnapOtter `X-Forwarded-For` पर तभी भरोसा करता है जब वह किसी निजी नेटवर्क के पीयर से आया हो। उसी होस्ट पर, किसी Docker नेटवर्क पर या आपके LAN पर मौजूद रिवर्स प्रॉक्सी शुरू से ही भरोसेमंद माना जाता है, यानी रेट लिमिटिंग, लॉगिन की ब्रूट-फ़ोर्स रोक, ऑडिट लॉग और enterprise संस्करण की IP अनुमति-सूची, सभी बिना किसी कॉन्फ़िगरेशन के असली क्लाइंट IP देखते हैं।
+`TRUST_PROXY` का डिफ़ॉल्ट `loopback,linklocal,uniquelocal` है, इसलिए SnapOtter `X-Forwarded-For` पर केवल निजी network के peer से ही भरोसा करता है। उसी host पर, Docker network पर, या आपके LAN पर मौजूद reverse proxy पर बिना किसी सेटअप के भरोसा किया जाता है, यानी rate limiting, login brute-force limiter, audit log, और enterprise IP allowlist सभी बिना किसी कॉन्फ़िगरेशन के असली client IP देखते हैं।
 
-`TRUST_PROXY=true` तभी सेट करें जब आगे लगा प्रॉक्सी SnapOtter तक किसी **सार्वजनिक** पते से पहुँचता हो, जैसे किसी दूसरे नेटवर्क का क्लाउड लोड बैलेंसर। सीधे उजागर इंस्टेंस पर यह मान `request.ip` को हमलावर के नियंत्रण में दे देता है, क्योंकि हेडर बदलता रहने वाला कॉलर हर अनुरोध पर नई रेट-लिमिट गिनती पा जाता है।
+`TRUST_PROXY=true` केवल तभी सेट करें जब सामने वाला proxy SnapOtter तक **सार्वजनिक** पते से पहुँचे, उदाहरण के लिए किसी दूसरे network पर cloud load balancer। सीधे उजागर instance पर वह मान `request.ip` को हमलावर के नियंत्रण में दे देता है, क्योंकि header बदलने वाला caller हर request पर नया rate-limit bucket पा जाता है।
 
-क्लाइंट IP नापने से पहले दो बातें जान लें। macOS और Windows पर Docker Desktop प्रकाशित पोर्ट को यूज़रलैंड प्रॉक्सी के ज़रिए परोसता है, जो हर स्रोत पते को VM गेटवे `192.168.65.1` में बदल देता है; वहाँ `TRUST_PROXY` का कोई भी मान असली क्लाइंट वापस नहीं ला सकता, इसलिए इंटरनेट से जुड़ी हर चीज़ Linux पर तैनात करें। और किसी भी प्लेटफ़ॉर्म पर, प्रकाशित पोर्ट तक `localhost` से पहुँचना आपके क्लाइंट के बजाय ब्रिज गेटवे के रूप में दिखता है, इसलिए localhost से किया गया परीक्षण यह नहीं बताता कि असली क्लाइंट को कैसे गिना जाएगा। `TRUST_PROXY` के मानों की पूरी तालिका और Docker Desktop से जुड़ी चेतावनी [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy) में हैं।
+Client IPs मापने जाने से पहले दो बातें जान लें। macOS और Windows पर Docker Desktop published port को userland proxy के ज़रिए परोसता है जो हर source address को VM gateway `192.168.65.1` में बदल देता है, इसलिए `TRUST_PROXY` का कोई भी मान वहाँ असली client को वापस नहीं ला सकता; इंटरनेट-सामने वाली किसी भी चीज़ के लिए Linux पर deploy करें। और किसी भी platform पर, `localhost` के ज़रिए published port तक पहुँचना आपके client के बजाय bridge gateway के रूप में दिखता है, इसलिए localhost परीक्षण से यह पता नहीं चलता कि असली client को कैसे पहचाना जाता है। `TRUST_PROXY` मानों की पूरी तालिका और Docker Desktop की चेतावनी [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy) में हैं।
 
-नीचे दी गई प्रत्येक प्रॉक्सी के लिए दो चीजें मायने रखती हैं: बड़े अनुरोध निकायों (अपलोड) की अनुमति दें, और प्रतिक्रियाओं को बफर न करें। एक प्रतिक्रिया-बफ़रिंग प्रॉक्सी SSE प्रगति को तोड़ देती है और, अधिक स्पष्ट रूप से, एक बड़ी फ़ाइल डाउनलोड को "शुरू लेकिन कभी ख़त्म नहीं" करती है, क्योंकि प्रॉक्सी इसे आगे बढ़ाने से पहले पूरी फ़ाइल को रखती है। SnapOtter डाउनलोड पर `X-Accel-Buffering: no` भेजता है इसलिए nginx उन्हें स्ट्रीम करता है, भले ही बफ़रिंग कहीं और छोड़ दी गई हो, लेकिन nginx के अलावा अन्य प्रॉक्सी को प्रतिक्रिया बफ़रिंग को स्पष्ट रूप से अक्षम करने की आवश्यकता होती है (नीचे प्रत्येक कॉन्फ़िगरेशन में दिखाया गया है)। यदि कोई डाउनलोड आंशिक रूप से रुक जाता है, तो सामने एक बफ़रिंग प्रॉक्सी जांचने वाली पहली चीज़ है।
+नीचे के हर proxy के लिए दो बातें मायने रखती हैं: बड़े request bodies (uploads) की अनुमति दें, और responses को buffer न करें। Response-buffering वाला proxy SSE progress को तोड़ देता है और, ज़्यादा स्पष्ट रूप से, बड़ी फ़ाइल के download को "शुरू होकर कभी खत्म न होने वाला" बना देता है, क्योंकि proxy पूरी फ़ाइल को आगे भेजने से पहले अपने पास रोक लेता है। SnapOtter downloads पर `X-Accel-Buffering: no` भेजता है ताकि nginx उन्हें stream करे, भले ही कहीं और buffering चालू छूट गई हो, लेकिन nginx के अलावा अन्य proxies में response buffering स्पष्ट रूप से बंद करनी होती है (नीचे हर config में दिखाया गया है)। यदि कोई download बीच में अटक जाए, तो सबसे पहले सामने बैठे buffering proxy को जाँचें।
 
-HSTS पर एक टिप्पणी: API हर प्रतिक्रिया पर स्वयं `Strict-Transport-Security` भेजता है, इसलिए जो प्रॉक्सी प्रतिक्रिया हेडर को आगे पास करती है (नीचे दिए गए सभी कॉन्फ़िग ऐसा ही करते हैं) उसे अपनी ओर से किसी HSTS सेटअप की आवश्यकता नहीं होती। केवल तभी, यदि आपका प्रॉक्सी अपस्ट्रीम प्रतिक्रिया हेडर को हटाने या ओवरराइड करने के लिए कॉन्फ़िगर किया गया है, आपको उस हेडर को सुरक्षित रखना होगा या एज पर दोबारा जोड़ना होगा।
+HSTS पर एक नोट: API हर response पर `Strict-Transport-Security` खुद भेजता है, इसलिए जो proxy response headers को आगे पास करता है (नीचे के सभी configs ऐसा करते हैं) उसे अपने HSTS सेटअप की ज़रूरत नहीं है। केवल तभी जब आपका proxy upstream response headers को हटाने या बदलने के लिए कॉन्फ़िगर किया गया हो, आपको header को सुरक्षित रखना होगा या edge पर दोबारा जोड़ना होगा।
 
 ### Nginx {#nginx}
 
 ```nginx
 server {
-    # संक्षिप्तता के लिए सादा HTTP दिखाया गया है। TLS को अपने ही `listen 443 ssl`
-    # सर्वर ब्लॉक में टर्मिनेट करें; API जो Strict-Transport-Security हेडर भेजता है, वह
-    # हर प्रॉक्सीड प्रतिक्रिया के साथ पास होता है, इसलिए वहाँ add_header ज़रूरी नहीं।
+    # Plain HTTP shown for brevity. Terminate TLS in your own `listen 443 ssl`
+    # server block; the Strict-Transport-Security header the API sends passes
+    # through with every proxied response, so no add_header is needed there.
     listen 80;
     server_name images.example.com;
 
@@ -521,20 +546,26 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # बफ़रिंग के बजाय स्ट्रीम प्रतिक्रियाएँ: SSE प्रगति (बैच, AI, फ़ीचर इंस्टॉल) और बड़ी फ़ाइल डाउनलोड के लिए आवश्यक।
+        # Stream responses instead of buffering: needed for SSE progress
+        # (batch, AI, feature installs) and for large file downloads.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
 }
 ```
 
-### सबपाथ के अंतर्गत परिनियोजन {#subpath}
+### Subpath के अंतर्गत Deploy करना {#subpath}
 
-`https://example.com/snapotter` पर सेवा देने के लिए, SnapOtter कंटेनर के वातावरण में `BASE_PATH=/snapotter` सेट करें और उसे पुनः प्रारंभ करें। आधिकारिक CPU और GPU Compose फ़ाइलें आपके शेल या Compose `.env` फ़ाइल से भी `BASE_PATH` स्वीकार करती हैं। वही इमेज किसी भी पथ पर काम करती है; फ्रंटएंड के किसी पुनर्निर्माण की आवश्यकता नहीं है।
+`https://example.com/snapotter` पर परोसने के लिए, SnapOtter container के environment में
+`BASE_PATH=/snapotter` सेट करें और उसे restart करें। आधिकारिक CPU और GPU Compose
+फ़ाइलें भी आपके shell या Compose `.env` फ़ाइल से `BASE_PATH` स्वीकार करती हैं। वही
+image किसी भी path पर काम करती है; frontend rebuild की ज़रूरत नहीं है।
 
-`BASE_PATH` स्लैश-विभाजित खंड स्वीकार करता है जिनमें अक्षर, अंक, `_`, या `-` हों, जिसमें `/apps/snapotter` जैसे नेस्टेड पथ भी शामिल हैं। अंत में स्लैश वैकल्पिक है। रूट परिनियोजन के लिए इसे खाली छोड़ें (डिफ़ॉल्ट), या `/` सेट करें।
+`BASE_PATH` अक्षरों, अंकों, `_`, या
+`-` वाले slash-से-अलग segments स्वीकार करता है, जिनमें `/apps/snapotter` जैसे nested paths भी शामिल हैं। अंत का slash
+वैकल्पिक है। Root deployment के लिए इसे खाली छोड़ें (डिफ़ॉल्ट), या `/` सेट करें।
 
-अपने मौजूदा Nginx HTTPS सर्वर ब्लॉक में, यह उपयोग करें:
+अपने मौजूदा Nginx HTTPS server block में यह उपयोग करें:
 
 ```nginx
 location = /snapotter {
@@ -553,21 +584,32 @@ location /snapotter/ {
 }
 ```
 
-यह उदाहरण प्रीफ़िक्स बनाए रखता है। ऐसे प्रॉक्सी भी समर्थित हैं जो फ़ॉरवर्ड करने से पहले `/snapotter` हटा देते हैं। आंतरिक health checks `/api/v1/health` का उपयोग जारी रख सकते हैं। OIDC या SAML के लिए, `EXTERNAL_URL=https://example.com/snapotter` भी सेट करें और पहचान प्रदाता के callback URL को क्रमशः `/snapotter/api/auth/oidc/callback` या `/snapotter/api/auth/saml/callback` शामिल करने के लिए अपडेट करें।
+यह उदाहरण prefix को सुरक्षित रखता है। जो proxies forward करने से पहले `/snapotter` को हटा देते हैं वे भी
+समर्थित हैं। आंतरिक health checks `/api/v1/health` का उपयोग जारी रख सकते हैं। OIDC या SAML के लिए, `EXTERNAL_URL=https://example.com/snapotter`
+भी सेट करें और identity provider के
+callback URLs को अपडेट करें ताकि उनमें क्रमशः `/snapotter/api/auth/oidc/callback` या
+`/snapotter/api/auth/saml/callback` शामिल हो।
 
-API स्क्रिप्ट बिना बदलाव के काम करती रहती हैं: API प्रतिक्रियाओं में URL, जैसे किसी टूल का `downloadUrl`, `BASE_PATH` जो भी हो `/api/` से शुरू होते हैं। उन्हें अपने इंस्टेंस के बेस URL (`https://example.com/snapotter` + `/api/v1/download/...`) में जोड़ें, बजाय उन्हें डोमेन रूट के सापेक्ष हल करने के।
+API scripts बिना बदलाव के काम करती रहती हैं: API responses में URLs, जैसे किसी tool का
+`downloadUrl`, `BASE_PATH` चाहे जो हो, `/api/` से शुरू होते हैं। उन्हें domain root के विरुद्ध हल करने के बजाय अपने
+instance के base URL (`https://example.com/snapotter` + `/api/v1/download/...`)
+में जोड़ें।
 
-UI को प्रीफ़िक्स वाले URL (`https://example.com/snapotter`) से खोलें। बिना प्रीफ़िक्स आने वाला ब्राउज़र स्वचालित रूप से वहाँ भेज दिया जाता है; केवल API अनुरोधों से अपेक्षा है कि वे बिना प्रीफ़िक्स ऐप तक पहुँचें। यदि लॉग कहते हैं `Requests arrive under /snapotter/ but BASE_PATH is empty`, तो आपका प्रॉक्सी ऐसा प्रीफ़िक्स फ़ॉरवर्ड कर रहा है जिसे `BASE_PATH` घोषित नहीं करता: `BASE_PATH` को उसी पर सेट करें, या प्रॉक्सी पर प्रीफ़िक्स हटा दें।
+UI को prefix वाले URL (`https://example.com/snapotter`) से खोलें। जो
+browser prefix के बिना पहुँचता है उसे अपने आप वहाँ भेज दिया जाता है; केवल API
+requests के prefix के बिना app तक पहुँचने की अपेक्षा की जाती है। यदि logs में
+`Requests arrive under /snapotter/ but BASE_PATH is empty` दिखे, तो आपका proxy ऐसा prefix forward कर रहा है जिसे `BASE_PATH` घोषित नहीं करता: `BASE_PATH` को उस पर सेट करें,
+या proxy पर prefix हटा दें।
 
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
-1. एक नया Proxy Host जोड़ें
-2. Domain Name को अपने डोमेन पर सेट करें
-3. Scheme को `http` पर, Forward Hostname को `SnapOtter` (या अपने कंटेनर IP) पर, Forward Port को `1349` पर सेट करें
+1. नया Proxy Host जोड़ें
+2. Domain Name को अपने domain पर सेट करें
+3. Scheme को `http` पर, Forward Hostname को `SnapOtter` (या अपने container IP) पर, Forward Port को `1349` पर सेट करें
 4. WebSocket सपोर्ट सक्षम करें
-5. Advanced के अंतर्गत, जोड़ें: `client_max_body_size 500M;` और `proxy_buffering off;`
+5. Advanced के अंतर्गत जोड़ें: `client_max_body_size 500M;` और `proxy_buffering off;`
 
-API का `Strict-Transport-Security` हेडर NPM से ज्यों का त्यों पास हो जाता है; SSL टैब पर HSTS टॉगल उसके ऊपर वैकल्पिक है।
+API का `Strict-Transport-Security` header NPM से ज्यों का त्यों गुज़रता है; SSL टैब पर HSTS टॉगल उसके ऊपर वैकल्पिक है।
 
 ### Traefik {#traefik}
 
@@ -584,7 +626,7 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
-Traefik अपस्ट्रीम प्रतिक्रिया हेडर को बिना बदले आगे भेजता है, इसलिए API का `Strict-Transport-Security` हेडर बिना किसी `headers` मिडलवेयर के ब्राउज़र तक पहुँच जाता है। यदि आपके पास पहले से कोई ऐसा मिडलवेयर है जो प्रतिक्रिया हेडर को फिर से लिखता है, तो सुनिश्चित करें कि वह उस हेडर को अछूता रहने दे।
+Traefik upstream response headers को बिना बदले आगे भेजता है, इसलिए API का `Strict-Transport-Security` header `headers` middleware के बिना browsers तक पहुँचता है। यदि आप पहले से ऐसा middleware चलाते हैं जो response headers को बदलता है, तो सुनिश्चित करें कि वह उस header को अछूता छोड़ता है।
 
 ### Caddy {#caddy}
 
@@ -600,7 +642,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` प्रतिक्रिया बफरिंग को अक्षम कर देता है, जो SSE प्रगति घटनाओं (बैच प्रोसेसिंग, एआई टूल्स, फीचर इंस्टॉल) और बड़ी फ़ाइल डाउनलोड को रोकने के बजाय स्ट्रीम करने के लिए आवश्यक है। विस्तारित टाइमआउट Caddy कनेक्शन को जल्दी बंद किए बिना बड़ी फ़ाइल अपलोड को पूरा करने की अनुमति देता है। Caddy भी API का `Strict-Transport-Security` हेडर बिना छेड़े आगे भेजता है, इसलिए HSTS के लिए किसी `header` निर्देश की आवश्यकता नहीं है।
+`flush_interval -1` response buffering बंद करता है, जो SSE progress events (batch processing, AI tools, feature installs) के लिए और बड़े फ़ाइल downloads के अटकने के बजाय stream होने के लिए आवश्यक है। बढ़ाए गए timeouts बड़े फ़ाइल uploads को Caddy द्वारा connection जल्दी बंद किए बिना पूरा होने देते हैं। Caddy API के `Strict-Transport-Security` header को भी अछूता पास करता है, इसलिए HSTS के लिए किसी `header` directive की ज़रूरत नहीं है।
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -608,59 +650,59 @@ images.example.com {
 cloudflared tunnel --url http://localhost:1349
 ```
 
-नोट: Cloudflare की फ़्री योजनाओं पर 100 MB अपलोड सीमा है। मिलाने के लिए `MAX_UPLOAD_SIZE_MB=100` सेट करें।
+नोट: Cloudflare की free plans पर 100 MB की upload सीमा है। उससे मेल खाने के लिए `MAX_UPLOAD_SIZE_MB=100` सेट करें।
 
-यह टनल API के प्रतिक्रिया हेडर आगे भेजती है, जिनमें `Strict-Transport-Security` भी शामिल है, इसलिए डैशबोर्ड में किसी HSTS कॉन्फ़िगरेशन की आवश्यकता नहीं है (Cloudflare की अपनी एज HSTS सेटिंग उसके ऊपर वैकल्पिक है)।
+Tunnel API के response headers को आगे भेजता है, `Strict-Transport-Security` सहित, इसलिए dashboard में HSTS कॉन्फ़िगरेशन की ज़रूरत नहीं है (Cloudflare की अपनी edge HSTS सेटिंग उसके ऊपर वैकल्पिक है)।
 
 ## Troubleshooting {#troubleshooting}
 
-### पहले स्टार्ट के विफल होने के तुरंत बाद "Postgres not reachable: EAI_AGAIN" {#eai-again-after-failed-first-start}
+### विफल पहले start के तुरंत बाद "Postgres not reachable: EAI_AGAIN" {#eai-again-after-failed-first-start}
 
-यदि बहुत पहला `docker compose up -d` आधे रास्ते में विफल हो जाता है (आम कारण पहले से उपयोग में आ रहा पोर्ट है), तो सादा `up -d` पुनः प्रयास ऐप कंटेनर को compose नेटवर्क से जोड़े बिना शुरू कर सकता है। ऐप फिर इसके साथ क्रैश-लूप करता है:
+यदि बिलकुल पहला `docker compose up -d` बीच में विफल हो जाता है (आम कारण: कोई port पहले से उपयोग में होना), तो सादा `up -d` दोबारा चलाने पर app container compose network से जुड़े बिना शुरू हो सकता है। तब app इस त्रुटि के साथ crash-loop में चला जाता है:
 
 ```
 Postgres not reachable: EAI_AGAIN
 ```
 
-जबकि `docker ps` postgres को स्वस्थ दिखाता है। त्रुटि असली है लेकिन गलत कंटेनर की ओर इशारा करती है: नेटवर्क के बिना `postgres` होस्टनाम के लिए DNS बिल्कुल हल नहीं हो सकता, और रीस्टार्ट नीति वही विफलता अनंत काल तक दोहराती रहती है।
+जबकि `docker ps` में postgres healthy दिखता है। त्रुटि असली है लेकिन गलत container की ओर इशारा करती है: network के बिना, `postgres` hostname का DNS हल हो ही नहीं सकता, और restart policy वही विफलता हमेशा दोहराती रहती है।
 
-पहला स्टार्ट जिस चीज़ से टूटा उसे ठीक करें (आमतौर पर: पोर्ट खाली करें), फिर ऐप कंटेनर को पुनः बनाए जाने के लिए बाध्य करें ताकि वह नेटवर्क से फिर जुड़ जाए:
+जो भी पहले start को तोड़ रहा था उसे ठीक करें (आम तौर पर: port खाली करें), फिर app container को बलपूर्वक दोबारा बनाएँ ताकि वह network से दोबारा जुड़ जाए:
 
 ```bash
 docker compose up -d --force-recreate SnapOtter
 ```
 
-### Windows: दूसरे डिवाइस से पहुँच योग्य, पर PC से ही नहीं {#windows-wsl2-loopback}
+### Windows: अन्य devices से पहुँच योग्य, खुद PC से नहीं {#windows-wsl2-loopback}
 
-WSL2 के अंदर Docker चलाने पर (सामान्य Windows सेटअप), स्टैक आपके नेटवर्क की हर दूसरी मशीन से पहुँच योग्य हो सकता है जबकि Windows होस्ट पर ही `http://localhost:1349` टाइमआउट हो जाता है, भले ही WSL का mirrored networking मोड सक्षम हो। यह पोर्ट Windows `netstat` में कभी नहीं दिखता, और कंटेनर में कोई गड़बड़ नहीं है।
+WSL2 के भीतर चल रहे Docker के साथ (सामान्य Windows सेटअप), stack आपके network की हर दूसरी मशीन से पहुँच योग्य हो सकता है जबकि `http://localhost:1349` खुद Windows host पर time out हो जाता है, WSL का mirrored networking मोड सक्षम होने पर भी। Port Windows के `netstat` में कभी नहीं दिखता, और containers में कुछ गलत नहीं है।
 
-ऐप को किसी दूसरे डिवाइस से खोलें, या distro के अंदर से उसके अपने पते का उपयोग करके खोलें (WSL शेल में `hostname -I`)। यदि आपके WSL संस्करण पर localhost फ़ॉरवर्डिंग संयोग से काम करती है, तो उसे बोनस मानें, न कि ऐसी चीज़ जिस पर निर्भर रहें।
+App को किसी दूसरे device से खोलें, या distro के अंदर से उसके अपने पते का उपयोग करके (WSL shell में `hostname -I`)। यदि आपके WSL version पर localhost forwarding संयोग से काम करता है, तो उसे बोनस मानें, ऐसी चीज़ नहीं जिस पर निर्भर रहा जाए।
 
 ## CI/CD {#ci-cd}
 
-GitHub रिपॉज़िटरी में तीन वर्कफ़्लो हैं:
+GitHub रिपॉज़िटरी में तीन workflows हैं:
 
-- **ci.yml** - हर push और PR पर स्वचालित रूप से चलता है। लिंट, टाइपचेक, टेस्ट, बिल्ड करता है, और Docker इमेज को वैलिडेट करता है (बिना push किए)।
-- **release.yml** - `workflow_dispatch` के माध्यम से मैन्युअल रूप से ट्रिगर होता है। एक वर्शन टैग और GitHub रिलीज़ बनाने के लिए semantic-release चलाता है, फिर एक मल्टी-आर्च Docker इमेज (amd64 + arm64) बनाता है और Docker Hub (`snapotter/snapotter`) तथा GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`) पर push करता है।
-- **deploy-docs.yml** - `main` पर push होने पर इस दस्तावेज़ीकरण साइट को बनाता है और Cloudflare Pages पर डिप्लॉय करता है।
+- **ci.yml**: हर push और PR पर अपने आप चलता है। Lint, typecheck, test, build करता है, और Docker image को (push किए बिना) validate करता है।
+- **release.yml**: `workflow_dispatch` के ज़रिए मैन्युअल रूप से ट्रिगर होता है। Version tag और GitHub release बनाने के लिए semantic-release चलाता है, फिर multi-arch Docker image (amd64 + arm64) बनाता है और Docker Hub (`snapotter/snapotter`) और GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`) पर push करता है।
+- **deploy-docs.yml**: इस documentation साइट को build करता है और `main` पर push होने पर Cloudflare Pages पर deploy करता है।
 
-एक रिलीज़ बनाने के लिए, GitHub UI में **Actions > Release > Run workflow** पर जाएँ, या चलाएँ:
+Release बनाने के लिए, GitHub UI में **Actions > Release > Run workflow** पर जाएँ, या यह चलाएँ:
 
 ```bash
 gh workflow run release.yml
 ```
 
-Semantic-release कमिट इतिहास से वर्शन निर्धारित करता है। `latest` Docker टैग हमेशा सबसे हाल की रिलीज़ की ओर इंगित करता है।
+Semantic-release commit history से version तय करता है। `latest` Docker tag हमेशा सबसे हाल की release की ओर इशारा करता है।
 
 ## Analytics {#analytics}
 
-SnapOtter में बग पकड़ने और फ़ीचर सुधारने में मदद के लिए अनाम उत्पाद एनालिटिक्स (टूल उपयोग पैटर्न, त्रुटि रिपोर्ट) शामिल है। यह डिफ़ॉल्ट रूप से चालू है। आपकी फ़ाइलें, फ़ाइल नाम, और व्यक्तिगत डेटा कभी इसका हिस्सा नहीं होते। SnapOtter एनालिटिक्स अक्षम होने पर भी सामान्य रूप से काम करता है।
+SnapOtter में गुमनाम product analytics (tool उपयोग के पैटर्न, त्रुटि रिपोर्ट) शामिल हैं ताकि bugs पकड़ने और फ़ीचर्स सुधारने में मदद मिले। यह डिफ़ॉल्ट रूप से चालू है। आपकी फ़ाइलें, फ़ाइल नाम, और व्यक्तिगत डेटा इसका हिस्सा कभी नहीं होते। Analytics बंद होने पर भी SnapOtter सामान्य रूप से काम करता है।
 
-### Disabling analytics {#disabling-analytics}
+### Analytics बंद करना {#disabling-analytics}
 
-रनटाइम ऑप्ट-आउट एक-क्लिक व्यवस्थापक टॉगल है। Settings > System > Privacy खोलें और Anonymous Product Analytics बंद कर दें। यह पूरे इंस्टेंस के लिए तुरंत रुक जाता है, किसी रीबिल्ड की आवश्यकता नहीं।
+Runtime opt-out एक-क्लिक वाला admin टॉगल है। Settings > System > Privacy खोलें और Anonymous Product Analytics बंद करें। यह पूरे instance के लिए तुरंत बंद हो जाता है, rebuild की ज़रूरत नहीं।
 
-एक ऐसी इमेज के लिए जो कभी एनालिटिक्स उत्सर्जित नहीं कर सकती, रिपॉज़िटरी क्लोन करके और रीबिल्ड करके बिल्ड-टाइम हार्ड-ऑफ़ सेट करें:
+ऐसी image के लिए जो कभी analytics emit न कर सके, रिपॉज़िटरी को clone करके और rebuild करके build-time hard-off सेट करें:
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -669,7 +711,7 @@ docker compose -f docker/docker-compose.yml build --build-arg SNAPOTTER_ANALYTIC
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-या अपने मौजूदा `docker-compose.yml` में बिल्ड आर्ग जोड़ें:
+या अपने मौजूदा `docker-compose.yml` में build arg जोड़ें:
 
 ```yaml
 services:

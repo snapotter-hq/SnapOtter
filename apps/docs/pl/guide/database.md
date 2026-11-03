@@ -1,8 +1,8 @@
 ---
-description: "Schemat bazy danych PostgreSQL, tabele, migracje i procedury tworzenia kopii zapasowych w SnapOtter."
-i18n_source_hash: 331b11cd21d1
+description: "Schemat bazy danych PostgreSQL, tabele, migracje i procedury tworzenia kopii zapasowych dla SnapOtter."
+i18n_source_hash: 2150213f21da
 i18n_provenance: machine
-i18n_output_hash: a5a489e038ba
+i18n_output_hash: e30652f35103
 i18n_hash_version: 2
 ---
 
@@ -10,19 +10,19 @@ i18n_hash_version: 2
 
 SnapOtter używa PostgreSQL 17 z [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) do trwałego przechowywania danych. Schemat jest zdefiniowany w `apps/api/src/db/schema.ts`.
 
-Połączenie konfiguruje się za pomocą zmiennej środowiskowej `DATABASE_URL` (domyślnie `postgres://snapotter:snapotter@postgres:5432/snapotter`). W Docker Compose kontener Postgres przechowuje swoje dane w nazwanym wolumenie `SnapOtter-pgdata`. Żądania są obsługiwane przez rolę, która może wyłącznie odczytywać i zapisywać wiersze, co opisano poniżej w sekcji [Role o najmniejszych uprawnieniach](#least-privilege-roles).
+Połączenie konfiguruje się zmienną środowiskową `DATABASE_URL` (domyślnie `postgres://snapotter:snapotter@postgres:5432/snapotter`). W Docker Compose kontener Postgres przechowuje dane w nazwanym wolumenie `SnapOtter-pgdata`. Żądania są obsługiwane przez rolę, która może wyłącznie odczytywać i zapisywać wiersze, co opisano poniżej w sekcji [Role o najmniejszych uprawnieniach](#least-privilege-roles).
 
 ## Tabele {#tables}
 
 ### users {#users}
 
-Przechowuje konta użytkowników. Tworzone automatycznie przy pierwszym uruchomieniu na podstawie `DEFAULT_USERNAME` i `DEFAULT_PASSWORD`.
+Przechowuje konta użytkowników. Tworzona automatycznie przy pierwszym uruchomieniu na podstawie `DEFAULT_USERNAME` i `DEFAULT_PASSWORD`.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
 | `id` | uuid | Klucz główny |
 | `username` | varchar | Unikalna, wymagana |
-| `passwordHash` | varchar | Hash scrypt |
+| `passwordHash` | varchar | Skrót scrypt |
 | `role` | varchar | `admin`, `editor` lub `user` |
 | `mustChangePassword` | boolean | Flaga wymuszonego resetu hasła |
 | `createdAt` | timestamp | Czas utworzenia |
@@ -30,7 +30,7 @@ Przechowuje konta użytkowników. Tworzone automatycznie przy pierwszym uruchomi
 
 ### sessions {#sessions}
 
-Aktywne sesje logowania. Każdy wiersz wiąże token sesji z użytkownikiem.
+Aktywne sesje logowania. Każdy wiersz łączy token sesji z użytkownikiem.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
@@ -41,7 +41,7 @@ Aktywne sesje logowania. Każdy wiersz wiąże token sesji z użytkownikiem.
 
 ### teams {#teams}
 
-Grupy służące do organizowania użytkowników. Administratorzy mogą przypisywać użytkowników do zespołów.
+Grupy do organizowania użytkowników. Administratorzy mogą przypisywać użytkowników do zespołów.
 
 | Kolumna | Typ | Opis |
 |--------|------|-------------|
@@ -51,22 +51,22 @@ Grupy służące do organizowania użytkowników. Administratorzy mogą przypisy
 
 ### api_keys {#api-keys}
 
-Klucze API do dostępu programowego. Surowy klucz jest pokazywany jednorazowo podczas tworzenia; przechowywany jest tylko jego hash.
+Klucze API do dostępu programistycznego. Surowy klucz jest pokazywany jednorazowo przy tworzeniu; przechowywany jest tylko jego skrót.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
 | `id` | uuid | Klucz główny |
 | `userId` | uuid | Klucz obcy do `users.id` |
-| `keyHash` | varchar | Hash scrypt klucza |
+| `keyHash` | varchar | Skrót scrypt klucza |
 | `name` | varchar | Etykieta podana przez użytkownika |
 | `createdAt` | timestamp | Czas utworzenia |
-| `lastUsedAt` | timestamp | Aktualizowany przy każdym uwierzytelnionym żądaniu |
+| `lastUsedAt` | timestamp | Aktualizowana przy każdym uwierzytelnionym żądaniu |
 
 Klucze mają prefiks `si_`, po którym następuje 96 znaków szesnastkowych (48 losowych bajtów).
 
 ### pipelines {#pipelines}
 
-Zapisane łańcuchy narzędzi, które użytkownicy tworzą w interfejsie.
+Zapisane łańcuchy narzędzi tworzone przez użytkowników w interfejsie.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
@@ -78,7 +78,7 @@ Zapisane łańcuchy narzędzi, które użytkownicy tworzą w interfejsie.
 
 ### user_files {#user-files}
 
-Trwała biblioteka plików. Zapisana edycja jest domyślnie wstawiana jako niezależny wiersz główny („zapisz jako nowy": `version` 1, `parentId` null, więc oryginał pozostaje na liście) albo jako wersja powiązana z rodzicem, gdy nadpisujesz oryginał (`parentId` ustawiony, `version` zwiększony, zastępując go). Kolumna `toolChain` zapisuje zastosowane narzędzia.
+Trwała biblioteka plików. Zapisana edycja jest domyślnie wstawiana jako niezależny wiersz główny ("zapisz jako nowy": `version` 1, `parentId` null, więc oryginał pozostaje na liście) lub jako wersja powiązana z rodzicem, gdy nadpisywany jest oryginał (`parentId` ustawione, `version` zwiększone, co zastępuje oryginał). Kolumna `toolChain` rejestruje zastosowane narzędzia.
 
 | Kolumna | Typ | Opis |
 |--------|------|-------------|
@@ -91,13 +91,13 @@ Trwała biblioteka plików. Zapisana edycja jest domyślnie wstawiana jako nieza
 | `width` | integer | Szerokość obrazu w px |
 | `height` | integer | Wysokość obrazu w px |
 | `version` | integer | Numer wersji (1 = oryginał) |
-| `parentId` | uuid lub null | Klucz obcy do user_files (wersja rodzica) |
-| `toolChain` | jsonb | Identyfikatory narzędzi zastosowane w kolejności, aby wytworzyć tę wersję |
+| `parentId` | uuid lub null | Klucz obcy do user_files (wersja nadrzędna) |
+| `toolChain` | jsonb | Identyfikatory narzędzi zastosowanych po kolei do utworzenia tej wersji |
 | `createdAt` | timestamp | Czas utworzenia |
 
 ### jobs {#jobs}
 
-Śledzi zadania przetwarzania na potrzeby raportowania postępu i porządkowania.
+Śledzi zadania przetwarzania na potrzeby raportowania postępu i czyszczenia.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
@@ -108,13 +108,13 @@ Trwała biblioteka plików. Zapisana edycja jest domyślnie wstawiana jako nieza
 | `inputFiles` | jsonb | Tablica ścieżek plików wejściowych |
 | `outputPath` | varchar | Ścieżka do pliku wynikowego |
 | `settings` | jsonb | Użyte ustawienia narzędzia |
-| `error` | varchar | Komunikat o błędzie w razie niepowodzenia |
+| `error` | varchar | Komunikat błędu w razie niepowodzenia |
 | `createdAt` | timestamp | Czas utworzenia |
 | `completedAt` | timestamp | Czas zakończenia |
 
 ### settings {#settings}
 
-Magazyn klucz-wartość dla ustawień obowiązujących w całym serwerze, które administratorzy mogą zmieniać z poziomu interfejsu.
+Magazyn klucz-wartość dla ustawień całego serwera, które administratorzy mogą zmieniać w interfejsie.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
@@ -124,7 +124,7 @@ Magazyn klucz-wartość dla ustawień obowiązujących w całym serwerze, które
 
 ### roles {#roles}
 
-Role niestandardowe z uprawnieniami o dużej szczegółowości.
+Role niestandardowe ze szczegółowymi uprawnieniami.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
@@ -148,18 +148,18 @@ Dziennik działań istotnych dla bezpieczeństwa.
 
 ### user_preferences {#user-preferences}
 
-Stan interfejsu dla poszczególnych użytkowników, kluczowany nazwą preferencji. Przechowuje przypięte narzędzia strony głównej, zapisywane przez `PUT /api/v1/preferences`.
+Stan interfejsu dla poszczególnych użytkowników, indeksowany nazwą preferencji. Obsługuje przypięte narzędzia na pulpicie przez `PUT /api/v1/preferences`.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
-| `userId` | text | Klucz obcy do users, kasowanie kaskadowe. Razem z `key` tworzy klucz główny |
-| `key` | text | Nazwa preferencji. Razem z `userId` tworzy klucz główny |
-| `value` | jsonb | Zawartość preferencji |
+| `userId` | text | Klucz obcy do users, usuwany kaskadowo. Klucz główny razem z `key` |
+| `key` | text | Nazwa preferencji. Klucz główny razem z `userId` |
+| `value` | jsonb | Dane preferencji |
 | `updatedAt` | timestamp | Ostatni zapis |
 
 ## Migracje {#migrations}
 
-Drizzle zajmuje się migracjami schematu. Pliki migracji znajdują się w `apps/api/drizzle/`. Podczas developmentu:
+Migracjami schematu zajmuje się Drizzle. Pliki migracji znajdują się w `apps/api/drizzle/`. Podczas programowania:
 
 ```bash
 cd apps/api
@@ -167,53 +167,55 @@ npx drizzle-kit generate   # generate a migration from schema changes
 npx drizzle-kit migrate    # apply pending migrations
 ```
 
-W środowisku produkcyjnym oczekujące migracje są stosowane automatycznie przy uruchomieniu.
+W produkcji oczekujące migracje są stosowane automatycznie przy uruchomieniu.
 
 ## Role o najmniejszych uprawnieniach {#least-privilege-roles}
 
-Dwie role, dwa zadania. `DATABASE_URL` obsługuje żądania i ma uprawnienia `SELECT`, `INSERT`, `UPDATE`, `DELETE` do tabel aplikacji oraz `USAGE` i `SELECT` do ich sekwencji. To cała lista. Nie może utworzyć ani usunąć tabeli, zainstalować rozszerzenia, wykonać `TRUNCATE`, odczytać `pg_authid`, utworzyć bazy danych, zmienić roli ani sięgnąć do schematu `drizzle`, w którym przechowywana jest historia migracji.
+Dwie role, dwa zadania. `DATABASE_URL` obsługuje żądania i ma uprawnienia `SELECT`, `INSERT`, `UPDATE`, `DELETE` do tabel aplikacji oraz `USAGE` i `SELECT` do ich sekwencji. To cała lista. Rola nie może tworzyć ani usuwać tabel, instalować rozszerzeń, `TRUNCATE`, odczytywać `pg_authid`, tworzyć baz danych, zmieniać ról ani dotykać schematu `drizzle`, w którym znajduje się historia migracji.
 
-`DATABASE_MIGRATION_URL` to ta uprzywilejowana. Wykonuje migracje i nadaje uprawnienia roli wykonawczej podczas uruchamiania, a potem zamyka połączenie, zanim zostanie obsłużone jakiekolwiek żądanie.
+`DATABASE_MIGRATION_URL` jest rolą uprzywilejowaną. Uruchamia migracje i nadaje uprawnienia roli uruchomieniowej podczas rozruchu, a następnie zamyka się, zanim obsłużone zostanie jakiekolwiek żądanie.
 
-Compose i obraz all-in-one są już tak skonfigurowane, łącznie z istniejącymi instalacjami. Przy uruchomieniu SnapOtter tworzy rolę wykonawczą, jeśli jej brakuje, nadaje jej uprawnienia, wykonuje migracje, a następnie rozciąga uprawnienia na tabele, które istniały wcześniej. Aktualizacja nie wymaga ręcznego SQL-a.
+Podział jest dostępny od SnapOtter 2.3.0. Od tej wersji pliki Compose w repozytorium i obraz all-in-one są tak skonfigurowane, także dla istniejących instalacji: przy rozruchu SnapOtter tworzy rolę uruchomieniową, jeśli jej brakuje, nadaje jej uprawnienia, wykonuje migracje, a następnie przenosi uprawnienia na tabele, które istniały wcześniej. Aktualizacja nie wymaga ręcznego SQL.
 
-Pozostawienie pustej zmiennej `DATABASE_MIGRATION_URL` uruchamia tryb jednorolowy, w którym `DATABASE_URL` wykonuje oba zadania dokładnie tak jak przed podziałem. Jest to konfiguracja wspierana, a nie wycofywana. Na zarządzanym Postgresie to właściwy wybór, ponieważ tworzenie ról często nie leży w Twojej gestii.
+Obraz 2.2.0 czyta tylko ciąg połączenia roli uruchomieniowej i nigdy nie tworzy drugiej roli, więc po przekazaniu mu podziału nigdy się nie uruchomi: log aplikacji pokazuje niepowodzenie uwierzytelniania hasłem dla tej roli, a log Postgres informuje, że rola nie istnieje. Przed przełączeniem pliku Compose na podział należy zaktualizować obraz do wersji 2.3.0 lub nowszej.
+
+Pozostawienie `DATABASE_MIGRATION_URL` pustego uruchamia aplikację z jedną rolą, a `DATABASE_URL` pełni obie funkcje dokładnie tak jak przed podziałem. Jest to wspierana konfiguracja, a nie przestarzała. To właściwe rozwiązanie w zarządzanym Postgres, gdzie tworzenie ról często nie leży w gestii użytkownika.
 
 ### Zewnętrzny i zarządzany Postgres {#external-and-managed-postgres}
 
-Na RDS, Supabase, Cloud SQL lub dowolnym klastrze, który prowadzisz samodzielnie, podział jest opcjonalny. Rolę wykonawczą tworzysz raz:
+W RDS, Supabase, Cloud SQL lub w dowolnym klastrze prowadzonym samodzielnie podział jest opcjonalny. Rolę uruchomieniową tworzy się jednorazowo:
 
 ```sql
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
 
-Następnie przekaż SnapOtterowi oba ciągi połączenia, wskazujące ten sam host, port i bazę danych:
+Następnie należy przekazać SnapOtter oba ciągi połączenia, wskazujące ten sam host, port i bazę danych:
 
 ```bash
 DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
 DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
 ```
 
-Na tym poprzestań. SnapOtter sam nadaje uprawnienia i nadaje je ponownie po każdej migracji, więc tabela dodana w przyszłym wydaniu zostanie objęta bez uruchamiania SQL-a przez kogokolwiek.
+Na tym koniec. SnapOtter sam nadaje uprawnienia i stosuje je ponownie po każdej migracji, więc tabela dodana w przyszłym wydaniu jest objęta bez uruchamiania dla niej SQL.
 
-Rola wskazana w `DATABASE_MIGRATION_URL` musi być właścicielem tabel SnapOttera, ponieważ uprawnienia do tabeli może nadawać wyłącznie jej właściciel. W istniejącej instalacji oznacza to rolę, na której dotąd działał SnapOtter, a nie nową, utworzoną specjalnie w tym celu. Jeśli wskażesz nową rolę, która nie jest niczego właścicielem, uruchomienie zakończy się błędem mówiącym dokładnie o tym. Potrzebuje ona także uprawnienia `CREATEROLE`, aby tworzyć i utrzymywać rolę wykonawczą, oraz prawa do utworzenia schematu `drizzle`.
+Rola w `DATABASE_MIGRATION_URL` musi być właścicielem tabel SnapOtter, ponieważ tylko właściciel tabeli może nadawać do niej uprawnienia. W istniejącej instalacji oznacza to rolę, jako którą dotąd działał SnapOtter, a nie świeżo utworzoną w tym celu. Wskazanie nowej roli, która nie jest właścicielem niczego, powoduje błąd rozruchu z komunikatem mówiącym dokładnie o tym. Potrzebuje ona także `CREATEROLE`, aby tworzyć i utrzymywać rolę uruchomieniową, oraz prawa do utworzenia schematu `drizzle`.
 
-Podanie tej samej roli w obu adresach URL wyłącza podział, a SnapOtter zapisuje to w dzienniku, zamiast udawać, że jest inaczej. Jeśli Twój dostawca nie daje Ci roli, która jednocześnie jest właścicielem tabel i ma uprawnienie `CREATEROLE`, uruchom tryb jednorolowy.
+Wpisanie tej samej roli w obu adresach URL wyłącza podział, a SnapOtter zapisuje to w logu zamiast udawać coś innego. Jeśli dostawca nie daje roli, która może jednocześnie być właścicielem tabel i mieć `CREATEROLE`, należy uruchomić aplikację z jedną rolą.
 
 ### Dlaczego bit superużytkownika pozostaje nietknięty {#why-the-superuser-bit-is-left-alone}
 
-SnapOtter nigdy sam nie odbiera roli uprawnienia `SUPERUSER`. W instalacji utworzonej przed podziałem `snapotter` jest jedynym superużytkownikiem klastra, a jego degradacja pozostawiłaby klaster bez żadnego, co da się naprawić tylko w trybie jednoużytkownikowym przy zatrzymanym serwerze. Ochronę daje zamiast tego przeniesienie długotrwałego połączenia na rolę o ograniczonych uprawnieniach. Superużytkownik jest w sieci przez kilka sekund uruchamiania, a potem znika.
+SnapOtter nigdy sam nie odbiera `SUPERUSER` żadnej roli. W instalacji utworzonej przed podziałem `snapotter` jest jedynym superużytkownikiem klastra, a jego degradacja pozostawiłaby klaster bez żadnego, co można naprawić tylko w trybie jednoużytkownikowym przy zatrzymanym serwerze. Ochronę zapewnia przeniesienie długotrwałego połączenia na rolę z ograniczeniami. Superużytkownik jest w użyciu przez kilka sekund rozruchu, a potem znika.
 
-Nowe instalacje all-in-one nigdy nie mają tego problemu. Otrzymują trzy role: `postgres` (superużytkownik startowy, nieobecny w żadnym ciągu połączenia używanym przez SnapOttera), `snapotter` (`NOSUPERUSER`, właściciel danych, łączy się tylko przy uruchamianiu) oraz `snapotter_app` (tylko wiersze, obsługuje żądania).
+Nowe instalacje all-in-one nigdy nie mają tego problemu. Dostają trzy role: `postgres` (superużytkownik bootstrap, nieobecny w żadnym ciągu połączenia używanym przez SnapOtter), `snapotter` (`NOSUPERUSER`, jest właścicielem danych, łączy się tylko przy rozruchu) oraz `snapotter_app` (tylko wiersze, obsługuje żądania).
 
-Aby mimo wszystko zdegradować starszą rolę `snapotter`, najpierw utwórz drugiego superużytkownika i zaloguj się na niego, aby potwierdzić, że działa. Następnie `ALTER ROLE snapotter NOSUPERUSER`.
+Aby mimo to zdegradować starszą rolę `snapotter`, należy najpierw utworzyć drugiego superużytkownika i zalogować się jako on, aby potwierdzić, że działa. Następnie `ALTER ROLE snapotter NOSUPERUSER`.
 
-## Utwórz kopię zapasową i przywróć {#backup-and-restore}
+## Kopia zapasowa i przywracanie {#backup-and-restore}
 
-Relacyjna baza danych znajduje się w woluminie `SnapOtter-pgdata` kontenera Postgres, a nie w wolumenie `/data` aplikacji.
+Baza relacyjna znajduje się w wolumenie `SnapOtter-pgdata` kontenera Postgres, a nie w wolumenie `/data` aplikacji.
 
-**Logiczna kopia zapasowa z walidacją (zalecane)**
+**Logiczna kopia zapasowa z walidacją (zalecana)**
 
 ```bash
 # Dump into PostgreSQL's portable custom archive format
@@ -228,11 +230,11 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Oba polecenia łączą się jako `snapotter`, czyli właściciel, i tak powinno pozostać. Rola wykonawcza nie widzi schematu `drizzle`, więc zrzut wykonany na tej roli byłby niekompletny. `--no-owner` sprawia, że właścicielem przywróconych obiektów zostaje ten, kto uruchamia przywracanie, więc uruchomienie go jako właściciel umieszcza własność tam, gdzie oczekują tego nadane uprawnienia. Jedna pułapka na świeżym klastrze: `pg_dump` przenosi uprawnienia, ale nie role, które w nich występują, więc utwórz `snapotter_app` przed przywracaniem, w przeciwnym razie `--exit-on-error` zatrzyma się na pierwszym `GRANT`. Niezależnie od tego SnapOtter ponownie nada uprawnienia przy kolejnym uruchomieniu.
+Oba polecenia łączą się jako `snapotter`, właściciel, i powinny tak pozostać. Rola uruchomieniowa nie widzi schematu `drizzle`, więc zrzut wykonany jako ta rola byłby niekompletny. `--no-owner` pozostawia przywrócone obiekty we władaniu osoby wykonującej przywracanie, więc uruchomienie go jako właściciel ustawia własność tam, gdzie oczekują jej uprawnienia. Jedna pułapka w świeżym klastrze: `pg_dump` zawiera uprawnienia, ale nie role, których dotyczą, więc przed przywracaniem należy utworzyć `snapotter_app`, bo inaczej `--exit-on-error` zatrzyma się na pierwszym `GRANT`. SnapOtter i tak ponownie nadaje uprawnienia przy następnym rozruchu.
 
-Ten zrzut bazy danych nie zawiera zapisanych obiektów biblioteki w `/data/files` ani trwałego stanu BullMQ w Redis. Utwórz kopię zapasową i przywróć te dane, stosując skoordynowaną procedurę w [Bezpieczeństwo i wzmacnianie](/pl/guide/security#backup-and-recovery).
+Ten zrzut bazy danych nie zawiera zapisanych obiektów biblioteki w `/data/files` ani trwałego stanu BullMQ w Redis. Ich kopię zapasową i przywracanie wykonuje się według skoordynowanej procedury opisanej w [Bezpieczeństwo i utwardzanie](/pl/guide/security#backup-and-recovery).
 
-**Migawka zimnego woluminu**
+**Zimna migawka wolumenu**
 
 ```bash
 # Stop every service first, then use your storage platform to snapshot the
@@ -240,8 +242,8 @@ Ten zrzut bazy danych nie zawiera zapisanych obiektów biblioteki w `/data/files
 docker compose -f docker/docker-compose.yml stop
 ```
 
-Nie kopiuj aktywnego katalogu danych PostgreSQL za pomocą `tar`. Twórz przedrostki nazw woluminów według projektu, więc rozpoznaj identyfikatory zamontowanych woluminów z `docker inspect` lub platformy pamięci masowej, zamiast przyjmować dosłowną etykietę `SnapOtter-pgdata`.
+Nie kopiować działającego katalogu danych PostgreSQL za pomocą `tar`. Compose dodaje do nazw wolumenów prefiks projektu, więc identyfikatory zamontowanych wolumenów należy ustalić z `docker inspect` lub z platformy przechowywania danych, zamiast zakładać dosłowną etykietę `SnapOtter-pgdata`.
 
-### Migracja z 1.x (SQLite) {#migrating-from-1-x-sqlite}
+### Migracja z wersji 1.x (SQLite) {#migrating-from-1-x-sqlite}
 
-Aktualizacja z SnapOtter 1.x ma własny przewodnik: zobacz [Aktualizacja z 1.x do 2.0](./upgrading). W skrócie, użyj ponownie istniejącego wolumenu `/data`, a 2.0 automatycznie wykryje i zaimportuje `/data/snapotter.db` przy pierwszym uruchomieniu (lub ustaw `SQLITE_MIGRATE_PATH`, aby wskazać go jawnie). Najpierw utwórz kopię zapasową całego wolumenu `/data`, a nie tylko `snapotter.db`: 1.x używa trybu SQLite WAL, więc zatrzymany kontener często pozostawia większość swoich danych w `snapotter.db-wal` obok niemal pustego `snapotter.db`.
+Aktualizacja z SnapOtter 1.x ma własny przewodnik: zobacz [Aktualizacja z 1.x do 2.0](./upgrading). W skrócie: użyć ponownie istniejącego wolumenu `/data`, a wersja 2.0 automatycznie wykryje i zaimportuje `/data/snapotter.db` przy pierwszym rozruchu (lub ustawić `SQLITE_MIGRATE_PATH`, aby wskazać go jawnie). Najpierw wykonać kopię zapasową całego wolumenu `/data`, a nie tylko `snapotter.db`: wersja 1.x używa trybu WAL SQLite, więc zatrzymany kontener często zostawia większość danych w `snapotter.db-wal` obok niemal pustego `snapotter.db`.
