@@ -570,6 +570,40 @@ function gateRequestsOnOptOut(instance: PostHogInstance): void {
     }
     send(options);
   };
+  gateRetryQueueOnOptOut(instance);
+}
+
+// From 1.438 the batch sender and the retry queue call a module-level request
+// function, so neither goes through _send_request. A failed batch re-sent after
+// an opt-out would reach the host, so the same gate sits on the retry queue's
+// entry point. Every event send passes it: the first attempt, each retry, and
+// the queue's own flush. Dropping with a 4xx makes the SDK discard the batch
+// instead of enqueueing another retry.
+//
+// The production bundle mangles the private field that holds the queue
+// (_retryQueue), but not the retriableRequest method, so the queue is found by
+// that method. If a future release renames it, the retry egress test fails.
+type RetryQueueLike = {
+  retriableRequest: (options: SendOptions, transportOverride?: unknown) => void;
+};
+type SendOptions = { callback?: (response: { statusCode: number }) => void };
+
+function gateRetryQueueOnOptOut(instance: PostHogInstance): void {
+  const queue = Object.values(instance).find(
+    (value): value is RetryQueueLike =>
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as RetryQueueLike).retriableRequest === "function",
+  );
+  if (!queue) return;
+  const retriable = queue.retriableRequest.bind(queue);
+  queue.retriableRequest = (options, transportOverride) => {
+    if (!enabled) {
+      options.callback?.({ statusCode: 400 });
+      return;
+    }
+    retriable(options, transportOverride);
+  };
 }
 
 /** Hard runtime opt-out: stop PostHog and Sentry in this tab without a reload. */
