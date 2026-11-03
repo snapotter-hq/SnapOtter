@@ -6,6 +6,8 @@ describe("buildAsyncAcceptedPayload", () => {
     expect(buildAsyncAcceptedPayload("job-123")).toEqual({
       jobId: "job-123",
       async: true,
+      statusUrl: "/api/v1/jobs/job-123",
+      progressUrl: "/api/v1/jobs/job-123/progress",
     });
   });
 
@@ -15,6 +17,8 @@ describe("buildAsyncAcceptedPayload", () => {
       progressJobId: "progress-456",
       artifactJobId: "artifact-123",
       async: true,
+      statusUrl: "/api/v1/jobs/progress-456",
+      progressUrl: "/api/v1/jobs/progress-456/progress",
     });
   });
 });

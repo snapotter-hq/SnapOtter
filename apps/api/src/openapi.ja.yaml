@@ -22,9 +22,19 @@ servers:
     description: 現在のインスタンス
 tags:
   - name: Tools
-    description: 画像、動画、音声、PDF、ファイルにまたがるファイル処理ツール。それぞれ multipart によるファイルアップロードを受け付け、ダウンロード URL を返します。
+    description: セクションにまとめられていないツールのエンドポイントです。
+  - name: Image
+    description: 画像ツールです。いずれも multipart によるファイルアップロードを受け付け、ダウンロード URL を返します。
+  - name: Video
+    description: 動画ツールです。いずれも multipart によるファイルアップロードを受け付け、ダウンロード URL を返します。
+  - name: Audio
+    description: 音声ツールです。いずれも multipart によるファイルアップロードを受け付け、ダウンロード URL を返します。
+  - name: PDF
+    description: PDF およびドキュメントツールです。いずれも multipart によるファイルアップロードを受け付け、ダウンロード URL を返します。
   - name: Batch
     description: 1 回のリクエストで複数のファイルを 1 つのツールで処理します。
+  - name: Jobs
+    description: 長時間実行ジョブのステータスと進捗です。
   - name: Pipelines
     description: 複数のツールを連結して再利用可能なワークフローにします。
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: '追加のエラー詳細（例: Zod のバリデーションエラー）'
+        code:
+          type: string
+          description: 安定した機械可読なコードです。エラーカタログに掲載されています。
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: サポートとログの照合に使うリクエスト ID です。
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: 保存されているジョブのステータスです。completed、failed、canceled は終了状態です。
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: 'ジョブに結果がある場合に含まれます。形式はツールによって異なります（例: downloadUrl）。キャンセルされたジョブには部分的な結果が含まれることがあります。'
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: このジョブの SSE ストリームです。
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: 画像リサイズ
       description: 画像を特定の寸法または割合でリサイズします。
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: コンテンツ対応リサイズ
       description: シームカービングを用いて画像をリサイズし、重要な特徴を保ちながら賢くコンテンツを削除または挿入します。
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: 画像クロップ
       description: 画像を特定の領域に切り抜きます。
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: 画像回転と反転
       description: 画像を角度で回転させる、または水平方向/垂直方向に反転します。
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: 画像変換
       description: 画像を別のフォーマットに変換します。
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: 画像圧縮
       description: 品質レベルまたは目標サイズによって画像のファイルサイズを削減します。
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: 画像を 20 KB に圧縮
       description: |
         画像を 20 KB の目標サイズに圧縮
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: 画像を 50 KB に圧縮
       description: |
         画像を 50 KB の目標サイズに圧縮
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: 画像を 100 KB に圧縮
       description: |
         画像を 100 KB の目標サイズに圧縮
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: 画像を 200 KB に圧縮
       description: |
         画像を 200 KB の目標サイズに圧縮
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: 画像を 500 KB に圧縮
       description: |
         画像を 500 KB の目標サイズに圧縮
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: 画像メタデータ削除
       description: 画像から EXIF、GPS、ICC、XMP のメタデータを削除します。
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: 枠線とフレーム
       description: 画像に枠線、角丸、余白、影を追加します。
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: スクリーンショットの装飾
       description: |
         スクリーンショットにグラデーション背景、デバイスフレーム、影、透かし、ソーシャルメディア向けサイズを追加します。単色、線形グラデーション、放射状グラデーション、画像、透明の背景に対応します。macOS、Windows、ブラウザー、iPhone、MacBook、iPad のデバイスフレームを含みます。Twitter、LinkedIn、Instagram、Facebook、Product Hunt 向けのソーシャルメディアプリセットを備えます。
@@ -1063,7 +1133,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: 色調整
       description: |
         統合された色調整ツール。明るさ、コントラスト、露出、彩度、色温度、色合い、色相、シャープネス、カラーチャンネル、エフェクトを 1 回の処理で調整します。
@@ -1123,7 +1193,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: 画像をシャープに
       description: 適応的、アンシャープマスク、ハイパスの各手法で画像をシャープ化します。ノイズ低減はオプションです。
       security:
@@ -1183,7 +1253,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: Web 向け最適化
       description: 最新フォーマットへの変換、品質調整、必要に応じたリサイズにより、Web 配信向けに画像を最適化します。
       security:
@@ -1236,7 +1306,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: Web 向け最適化（プレビュー）
       description: |
         パラメーターをリアルタイムに調整するための軽量プレビューエンドポイント。最適化された画像バイナリを（JSON ではなく）直接返します。サイズ情報はレスポンスヘッダーに含まれます。ワークスペースの作成や結果の保存は行いません。
@@ -1297,7 +1367,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: 画像補正
       description: |
         AI による自動画像補正。画像を分析し、選択したシーンモードに基づいて露出、コントラスト、ホワイトバランス、彩度、シャープネス、ノイズの補正を適用します。
@@ -1355,7 +1425,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: 補正のための画像分析
       description: |
         画像を分析し、適用せずに推奨される補正を返します。どのような補正が行われるかをプレビューするのに便利です。
@@ -1406,7 +1476,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: ノイズ除去
       description: |
         Python サイドカーを用いた AI ノイズ除去。クイックプレビューから最高品質まで複数の品質段階に対応します。noise-removal 機能バンドルのインストールが必要です。
@@ -1443,11 +1513,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1483,7 +1564,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: 赤目除去
       description: |
         AI による赤目の検出と除去。顔を検出し、写真の赤目の写り込みを補正します。red-eye-removal 機能バンドルのインストールが必要です。
@@ -1518,11 +1599,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1558,7 +1650,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: 写真の復元
       description: |
         AI による写真復元パイプライン。傷を修復し、顔を補正し、ノイズを除去し、必要に応じて古い写真や傷んだ写真をカラー化します。photo-restoration 機能バンドルのインストールが必要です。
@@ -1596,11 +1688,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1636,7 +1739,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 証明写真 - 分析
       description: |
         証明写真生成のフェーズ 1。顔のランドマークを検出し、背景を除去します。generate フェーズでクライアントが使用するランドマークデータと base64 エンコードされたプレビューを返します。passport-photo 機能バンドルのインストールが必要です。
@@ -1769,7 +1872,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 証明写真 - 生成
       description: |
         証明写真生成のフェーズ 2。analyze フェーズの jobId とランドマークを用いて、指定した国/書類の規格に合わせて写真を切り抜き、リサイズし、並べます。応答は高速です（AI の再実行なし）。
@@ -1910,7 +2013,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: カラー化
       description: |
         AI による写真のカラー化。DDColor（OpenCV DNN フォールバック付き）を用いて白黒またはグレースケールの写真をフルカラーに変換します。colorize 機能バンドルのインストールが必要です。
@@ -1943,11 +2046,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1983,7 +2097,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: 顔の補正
       description: |
         GFPGAN または CodeFormer を用いた AI による顔の補正。画像内の顔を検出し、顔のディテール、肌の質感、鮮明さを向上させます。enhance-faces 機能バンドルのインストールが必要です。
@@ -2018,11 +2132,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2058,7 +2183,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: 画像から Base64
       description: |
         1 つ以上の画像を data URI 付きの Base64 エンコード文字列に変換します。フォーマット変換とリサイズをオプションで行えます。各ファイルについて生の Base64 文字列とそのまま使える data URI の両方を返します。
@@ -2150,7 +2275,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: テキスト透かし
       description: 画像にテキストの透かしを追加します。
       security:
@@ -2203,7 +2328,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: テキストオーバーレイ
       description: 背景ボックス（オプション）付きのスタイル付きテキストオーバーレイを追加します。
       security:
@@ -2257,7 +2382,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: 色の置換
       description: 画像内の特定の色を別の色または透明に置き換えます。
       security:
@@ -2308,7 +2433,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: 色覚多様性シミュレーション
       description: さまざまな種類の色覚特性を持つ人に画像がどう見えるかをシミュレートします。
       security:
@@ -2356,7 +2481,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF ツール
       description: アニメーション GIF のリサイズ、最適化、速度調整、逆再生、フレーム抽出、回転を行います。
       security:
@@ -2420,7 +2545,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: GIF 情報
       description: 寸法、フレーム数、遅延、再生時間を含むアニメーション GIF のメタデータを取得します。
       security: []
@@ -2477,7 +2602,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: スマート切り抜き
       description: 被写体フォーカス、顔フォーカス、自動トリミングの 3 モードを備えたスマート切り抜き。
       security:
@@ -2536,7 +2661,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: 画像から SVG
       description: potrace（白黒）または VTracer（カラー）を用いてラスター画像を SVG ベクター形式に変換します。
       security:
@@ -2591,7 +2716,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG からラスター
       description: SVG ファイルを任意のスケールと DPI でラスター画像フォーマットに変換します。
       security:
@@ -2644,7 +2769,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG からラスター（バッチ）
       description: 複数の SVG ファイルをラスター画像に変換します。ZIP アーカイブを返します。
       security:
@@ -2704,7 +2829,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: 画像から PDF
       description: 1 つ以上の画像を PDF ドキュメントに変換します。
       security:
@@ -2786,7 +2911,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF から画像
       description: PDF のページを画像に変換します。各ページの個別ダウンロードと全ページの ZIP を返します。
       security:
@@ -2875,7 +3000,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: PDF ページ数
       description: PDF ファイルのページ数を取得します。
       security: []
@@ -2914,7 +3039,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: PDF ページのサムネイル
       description: PDF の各ページのサムネイルプレビューを生成します（最大 200 ページ、幅 300px の JPEG）。
       security: []
@@ -2967,7 +3092,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: 画像分割
       description: 画像をタイルのグリッドに分割します。ZIP ファイルを返します。
       security:
@@ -3021,7 +3146,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: 一括リネーム
       description: パターンテンプレートを用いて複数の画像をリネームします。{{index}}、{{padded}}、{{original}} のトークンに対応します。ZIP ファイルを返します。
       security:
@@ -3073,7 +3198,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: ファビコン生成
       description: 画像から完全なファビコンセット（16px から 512px の PNG、ICO、manifest.json）を生成します。ZIP ファイルを返します。
       security:
@@ -3117,7 +3242,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: 画像透かし
       description: 画像の透かしオーバーレイを追加します。
       security:
@@ -3172,7 +3297,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: 画像の合成
       description: ブレンドモードでオーバーレイ画像をベース画像に合成します。
       security:
@@ -3228,7 +3353,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: ミーム生成
       description: |
         テンプレートまたはカスタム画像を用いてミームを作成します。2 つのモードに対応します。(1) テンプレートモード - `templateId` と `textBoxes` を含む JSON ボディを送信します。(2) カスタム画像モード - `file` と `settings` を含む multipart を送信します。
@@ -3467,7 +3592,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: 画像の比較
       description: 2 つの画像を比較し、視覚的な差分レポートを生成します。
       security:
@@ -3534,7 +3659,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: オブジェクト消去
       description: マスクを用いて画像からオブジェクトを消去します。マスクの白い領域が消去する範囲を示します。LaMa インペインティングを使用します。
       security:
@@ -3587,11 +3712,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3627,7 +3763,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: AI キャンバス拡張（実験的）
       description: |
         AI アウトペインティングを用いて画像キャンバスを拡張します。任意の方向に画像を延長し、元の画像となめらかに馴染む新しいコンテンツを生成します。LaMa ベースのアウトペインティングを使用します。ai-canvas-expand 機能バンドルのインストールが必要です。
@@ -3667,11 +3803,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3707,7 +3854,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: コラージュとグリッド
       description: 複数の画像をグリッドコラージュにまとめます。
       security:
@@ -3764,7 +3911,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: 画像を結合
       description: 複数の画像を水平方向、垂直方向、またはグリッドレイアウトで連結します。
       security:
@@ -3823,7 +3970,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: アニメーション画像から背景を削除する
       description: AI (rembg) を使用して、アニメーション化された GIF、WebP、または APNG からフレームごとに背景を削除します。ローカルで実行されます。
       security:
@@ -3869,11 +4016,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3903,7 +4061,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: 背景の除去
       description: AI（rembg）を用いて画像から背景を除去します。ローカルで実行されます。
       security:
@@ -3937,11 +4095,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3977,7 +4146,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: 背景エフェクトの適用
       description: |
         以前に処理した remove-background の結果に、背景の置換またはエフェクトを適用します。事前の POST /api/v1/tools/image/remove-background 呼び出しで得た jobId が必要です。
@@ -4044,7 +4213,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: 偽の透明を修正
       description: |
         以前の背景除去で生じた縁取り、ハロー、半透明のアーティファクトがある「偽の透明」PNG を修正します。BiRefNet HR マッティング（2048x2048）を用いて、設定可能なデフリンジ処理で綺麗なアルファチャンネルを生成します。メモリ不足時は birefnet-general、次いで u2net にフォールバックします。background-removal 機能バンドルのインストールが必要です。
@@ -4078,11 +4247,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4118,7 +4298,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: 画像の拡大
       description: AI（Real-ESRGAN）を用いて画像を拡大します。ローカルで実行されます。
       security:
@@ -4154,11 +4334,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4194,7 +4385,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: 顔と個人情報のぼかし
       description: プライバシー保護のため画像内の顔を検出してぼかします。OpenCV を使用します。ローカルで実行されます。
       security:
@@ -4226,11 +4417,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4266,7 +4468,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / テキスト抽出
       description: |-
         画像からローカルでテキストを抽出します。組み込みの Fast 層は、
@@ -4304,6 +4506,11 @@ paths:
       responses:
         '202':
           description: 検証とキューへの登録後に受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。処理の失敗は、終了時の failed イベントで通知されます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4312,6 +4519,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4355,7 +4568,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: 画像情報
       description: 寸法、フォーマット、色空間、EXIF データを含む画像の詳細なメタデータを取得します。
       security:
@@ -4458,7 +4671,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: カラーパレット
       description: 画像から主要な色を抽出します。
       security:
@@ -4511,7 +4724,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: バーコード読み取り
       description: 画像から QR コードとバーコードを読み取ります。
       security:
@@ -4616,7 +4829,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: 重複の検出
       description: 知覚ハッシュを用いて画像セット内の重複画像を検出します。
       security:
@@ -4719,7 +4932,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: QR コード生成
       description: テキストから QR コード画像を生成します。このツールは multipart ではなく JSON ボディを受け付けます。
       security:
@@ -4782,7 +4995,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: Web ページを画像として取得
       description: Web ページを高品質なスクリーンショット画像として取得します。URL と取得オプションを含む JSON ボディを受け付けます。
       security:
@@ -4868,7 +5081,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: メタデータの確認
       description: 画像内のすべてのメタデータ（EXIF、GPS、ICC、XMP）を削除せずに表示します。
       security:
@@ -4937,7 +5150,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: 画像メタデータ編集
       description: ExifTool を用いて画像内の EXIF、IPTC、GPS などのメタデータフィールドを編集します。
       security:
@@ -5006,7 +5219,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: メタデータの確認（ExifTool）
       description: ExifTool を用いて画像からすべてのメタデータを読み取ります。埋め込まれたすべての EXIF、IPTC、XMP、GPS フィールドを返します。
       security:
@@ -7019,6 +7232,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: ジョブのステータスを取得
+      description: |
+        接続を保持せずに、ジョブの保存済みステータスを返します。202 レスポンスの後はこの API をポーリングするか、進捗ストリームが切れた場合の代替として使用してください。
+
+        `status` は `queued`、`processing`、`completed`、`failed`、`canceled` のいずれかです。`completed`、`failed`、`canceled` は終了状態です。キャンセルされたジョブにも、一部完了した `result` (完了したファイルの ZIP など) が含まれる場合があるため、`result` が存在する場合は必ず確認してください。
+
+        アクセス権は進捗ストリームと同じです。ジョブの所有者、`files:all` を持つユーザー、または機能インストールジョブの場合は `features:manage` を持つユーザーが利用できます。それ以外の呼び出し元には 404 が返されます。
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: 202 レスポンスの jobId です。
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ジョブのステータス
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: 認証情報がないか無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: ジョブが見つからないか、呼び出し元から参照できません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7327,6 +7587,197 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: 製品フィードバックを送信
+      description: サインインしているユーザーからのフィードバックイベントを 1 件記録します。1 分あたり 10 リクエストに制限されています。`accepted` は、サーバーがイベントを記録しなかった場合に false になります。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: フィードバックの送信元です。指定できる値は共有のフィードバック定数で定義されています。
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: フィードバックを処理しました
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: リクエストボディが無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 認証情報がないか無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: レート制限を超えました
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: 利用可能な新しいリリースを取得
+      description: 公開済みの最新リリースが実行中のバージョンより新しい場合はそのリリースを返し、そうでない場合は null を返します。settings:write が必要です。
+      responses:
+        '200':
+          description: 最新リリースです。このインスタンスが最新の場合は null です。
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: 認証情報がないか無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: settings:write 権限がありません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: すべての AI 機能バンドルをリセット
+      description: |
+        AI の仮想環境、モデル、pip キャッシュを削除し、すべてのバンドルを未インストールの状態にします。インストールが自力で回復できない場合に使用してください。バンドルをアンインストールしてもモデルの重みが削除されるだけなので、このリセットは完全なリセットになります。
+
+        レスポンスには、仮想環境がベースイメージから再構築されたかどうか (venvReseeded) が含まれます。バンドルのインストールが実行中の場合は 409 を返します。features:manage が必要です。
+      responses:
+        '200':
+          description: リセットが完了しました
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: 認証情報がないか無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: features:manage 権限がありません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 機能バンドルのインストールが既に実行中です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: ツールに必要なすべての機能バンドルをインストール
+      description: ツールが必要とする各バンドルをキューに追加し、バンドルごとにキューに追加されたか、スキップされたかを報告します。features:manage が必要です。
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: バンドルごとのステータスです。キューに入ったバンドルはそれぞれ statusUrl と progressUrl を持ちます。スキップされたバンドルはどちらも持ちません。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+                        jobId:
+                          type: string
+                        statusUrl:
+                          type: string
+                        progressUrl:
+                          type: string
+        '401':
+          description: 認証情報がないか無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: features:manage 権限がありません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 不明なツールか、ツールがバンドルを必要としません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7366,11 +7817,22 @@ paths:
       responses:
         '202':
           description: インストールを開始またはキューに登録しました
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: SSE でインストールの進捗を確認するためのジョブ ID
@@ -7877,7 +8339,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: 動画の変換
       description: MP4、MOV、WebM、AVI、MKV の間で動画を変換します。
       security:
@@ -7909,11 +8371,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7943,7 +8416,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: 動画の圧縮
       description: 品質を制御しながら動画のファイルサイズを縮小します。
       security:
@@ -7975,11 +8448,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8009,7 +8493,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: 動画のトリミング
       description: 動画からクリップを切り出します。
       security:
@@ -8059,7 +8543,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: 動画のミュート
       description: 動画から音声トラックを削除します。
       security:
@@ -8102,7 +8586,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: 動画から GIF
       description: 動画クリップをアニメーション GIF に変換します。
       security:
@@ -8136,11 +8620,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8170,7 +8665,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: 動画のリサイズ
       description: 動画を新しい解像度またはプリセットサイズにスケールします。
       security:
@@ -8220,7 +8715,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: 動画の切り抜き
       description: 動画から領域を切り抜きます。
       security:
@@ -8271,7 +8766,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: 動画の回転
       description: 動画を回転または反転します。
       security:
@@ -8319,7 +8814,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: FPS の変更
       description: 動画のフレームレートを変更します。
       security:
@@ -8367,7 +8862,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: 動画のカラー
       description: 明るさ、コントラスト、彩度、ガンマを調整します。
       security:
@@ -8418,7 +8913,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: 動画の速度
       description: 動画を速くまたは遅くします。
       security:
@@ -8467,7 +8962,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: 動画の逆再生
       description: 動画クリップを逆再生します。最大 5 分のクリップまでに制限されます。
       security:
@@ -8510,7 +9005,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: 動画音声ノーマライズ
       description: 動画の音声音量を放送標準（EBU R128）に正規化します。
       security:
@@ -8553,7 +9048,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: アスペクトパディング
       description: 目標のアスペクト比に合わせるため単色のバーを追加します。
       security:
@@ -8602,7 +9097,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: ぼかしパディング
       description: バーを動画のぼかしたコピーで埋めます。
       security:
@@ -8651,7 +9146,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: 動画の透かし
       description: 動画フレームにテキストの透かしを焼き込みます。
       security:
@@ -8703,7 +9198,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: 動画の手ブレ補正
       description: 2 パスの手ブレ補正でカメラの揺れを軽減します。
       security:
@@ -8734,11 +9229,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8768,7 +9274,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF から動画
       description: アニメーション GIF を MP4、WebM、MOV の動画に変換します。
       security:
@@ -8816,7 +9322,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: 動画から WebP
       description: 動画クリップをアニメーション WebP 画像に変換します。
       security:
@@ -8867,7 +9373,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: 動画からフレーム
       description: 動画からフレームを画像の ZIP として抽出します。
       security:
@@ -8918,7 +9424,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: 動画の結合
       description: |
         複数の動画クリップを 1 つの MP4 ファイルに結合します。すべての入力は最初の動画の解像度と 30 fps に正規化されます。
@@ -8947,11 +9453,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8981,7 +9498,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: 音声の置換
       description: 動画の音声トラックを別のファイルに差し替えます。
       security:
@@ -9026,7 +9543,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: 字幕の焼き込み
       description: 字幕を動画フレームに恒久的に描画します。
       security:
@@ -9059,11 +9576,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9093,7 +9621,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: 字幕の埋め込み
       description: 字幕トラックを動画コンテナーに多重化します。
       security:
@@ -9143,7 +9671,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: 字幕の抽出
       description: 動画から字幕トラックを SRT ファイルとして取り出します。
       security:
@@ -9186,7 +9714,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: 画像から動画
       description: 画像のセットをスライドショー動画にします。
       security:
@@ -9238,7 +9766,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: 動画メタデータのクリーンアップ
       description: 動画からメタデータを削除し、見つかった内容を報告します。
       security:
@@ -9281,7 +9809,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: 自動字幕
       description: |
         faster-whisper を用いて動画の音声トラックから AI で字幕を生成します。自動検出と 10 の明示的な言語に対応します。transcription 機能バンドルのインストールが必要です。
@@ -9314,11 +9842,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9354,7 +9893,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: 音声の抽出
       description: 動画から音声トラックを取り出します。
       security:
@@ -9402,7 +9941,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声の変換
       description: MP3、WAV、OGG などの間で音声を変換します。
       security:
@@ -9451,7 +9990,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声のトリミング
       description: 音声ファイルから一部分を切り出します。
       security:
@@ -9500,7 +10039,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: 音量調整
       description: 音声の音量を一定のゲインで上げ下げします。
       security:
@@ -9548,7 +10087,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声の正規化
       description: ラウドネスを放送標準レベル（EBU R128、-16 LUFS）に均します。
       security:
@@ -9591,7 +10130,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声のフェード
       description: 音声にフェードインとフェードアウトの効果を加えます。
       security:
@@ -9640,7 +10179,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声の逆再生
       description: 音声を逆再生します。
       security:
@@ -9683,7 +10222,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: 音声の速度
       description: 音声の再生を速くまたは遅くします。
       security:
@@ -9731,7 +10270,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: ピッチシフト
       description: 速度を変えずに半音単位でピッチを上げ下げします。
       security:
@@ -9779,7 +10318,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: 音声チャンネル
       description: モノラルとステレオの間で変換する、または左右のチャンネルを入れ替えます。
       security:
@@ -9827,7 +10366,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: 無音の除去
       description: 音声から無音部分を取り除きます。
       security:
@@ -9876,7 +10415,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: ノイズ低減
       description: FFT ベースのノイズ除去で背景ノイズを軽減します。
       security:
@@ -9924,7 +10463,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声の結合
       description: 複数の音声ファイルを 1 つの連続したトラックに結合します。
       security:
@@ -9974,7 +10513,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声の分割
       description: |
         時間、均等分割、または無音検出によって音声を分割します。セグメントの ZIP アーカイブを指す downloadUrl を含む ToolResponse を返します。
@@ -10027,7 +10566,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: 着信音メーカー
       description: 任意の音声ファイルから着信音クリップ（.m4r）を作成します。
       security:
@@ -10076,7 +10615,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: 波形画像
       description: 音声ファイルから波形の可視化を PNG 画像として生成します。
       security:
@@ -10126,7 +10665,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: 音声メタデータ
       description: |
         音声タグ（ID3）を表示、編集、または削除します。レスポンスには、標準の ToolResponse フィールドに加えて container、durationS、bitrateKbps、tags を含む `metadata` オブジェクトが含まれます。
@@ -10178,7 +10717,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: 音声の文字起こし
       description: |
         faster-whisper を用いた AI による音声からテキストへの文字起こし。プレーンテキスト、SRT、VTT の字幕形式で出力します。transcription 機能バンドルのインストールが必要です。
@@ -10211,11 +10750,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10251,7 +10801,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の結合
       description: 複数の PDF を 1 つに結合します。少なくとも 2 つのファイルが必要です。
       security:
@@ -10296,7 +10846,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の分割
       description: |
         ページを抽出する、またはパーツに分割します。「range」モードでは選択したページを含む単一の PDF を返します。「every」モードでは N ページのチャンクに分割し、パーツを含む ZIP アーカイブを返します。
@@ -10347,7 +10897,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の圧縮
       description: |
         埋め込み画像をダウンサンプリングして PDF のファイルサイズを縮小します。「quality」モードでは 1〜100 のスライダーで画像 DPI を制御します。「targetSize」モードでは二分探索で目標に収まる最高の DPI を見つけます。圧縮によってファイルが大きくなる場合は、元のバイトをそのまま返します。
@@ -10398,7 +10948,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF を 100 KB に圧縮
       description: |
         PDF を 100 KB の目標サイズに圧縮（100 KB、1 KB = 1000 バイト）。
@@ -10433,11 +10983,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10461,7 +11022,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF を 200 KB に圧縮
       description: |
         PDF を 200 KB の目標サイズに圧縮（200 KB、1 KB = 1000 バイト）。
@@ -10496,11 +11057,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10524,7 +11096,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF を 500 KB に圧縮
       description: |
         PDF を 500 KB の目標サイズに圧縮（500 KB、1 KB = 1000 バイト）。
@@ -10559,11 +11131,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10587,7 +11170,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF を 1 MB に圧縮
       description: |
         PDF を 1 MB の目標サイズに圧縮（1000 KB、1 KB = 1000 バイト）。
@@ -10622,11 +11205,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10650,7 +11244,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF を 2 MB に圧縮
       description: |
         PDF を 2 MB の目標サイズに圧縮（2000 KB、1 KB = 1000 バイト）。
@@ -10685,11 +11279,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10713,7 +11318,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の回転
       description: PDF のページを 90、180、270 度回転します。
       security:
@@ -10762,7 +11367,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: ページの抽出
       description: 選択したページを新しい PDF に取り出します。
       security:
@@ -10810,7 +11415,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: ページの削除
       description: PDF から特定のページを削除します。すべてのページを削除することはできません。
       security:
@@ -10858,7 +11463,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の整理
       description: 明示的なページ順でページを並べ替えます。
       security:
@@ -10906,7 +11511,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF マルチツール
       description: 明示的なページ計画から PDF を組み立てます — ページの並べ替え、複製、回転、削除、および 1 回の送信で他の PDF からページを取り込みます。
       security:
@@ -10957,7 +11562,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の保護
       description: AES-256 暗号化によるパスワード保護を追加します。パスワードは監査ログから編集除去されます。
       security:
@@ -11006,7 +11611,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF のロック解除
       description: PDF からパスワード保護を解除します。正しいパスワードを指定する必要があります。パスワードは監査ログから編集除去されます。
       security:
@@ -11054,7 +11659,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の修復
       description: 破損または壊れた PDF の修復を試みます。不正なファイルを許容するため、入力に対する構造検証はスキップされます。
       security:
@@ -11097,7 +11702,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の Web 最適化
       description: 高速な Web 表示（プログレッシブダウンロード）のため PDF をリニアライズします。
       security:
@@ -11140,7 +11745,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF のグレースケール化
       description: PDF 内のすべての色をグレースケールに変換します。
       security:
@@ -11183,7 +11788,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: PDF/A コンバーター
       description: 長期保存のため PDF をアーカイブ用 PDF/A-2 形式に変換します。
       security:
@@ -11226,7 +11831,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の切り抜き
       description: すべてのページを均一な余白で切り抜きます。
       security:
@@ -11274,7 +11879,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: 1枚あたりのページ数 (N-up)
       description: '1 枚のシートに複数ページを配置します（例: 2-up、4-up）。'
       security:
@@ -11322,7 +11927,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の小冊子
       description: 折り畳んで小冊子にするためにページを配置します（両面印刷用の面付け）。
       security:
@@ -11370,7 +11975,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の透かし
       description: PDF のすべてのページにテキストの透かしを追加します。
       security:
@@ -11422,7 +12027,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: PDF のページ番号
       description: PDF のすべてのページにページ番号（「Page N of M」）を追加します。
       security:
@@ -11471,7 +12076,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: ドキュメントの変換
       description: Word、OpenDocument、RTF、プレーンテキストの各形式の間で変換します。
       security:
@@ -11502,11 +12107,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11530,7 +12146,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: プレゼンテーションの変換
       description: PowerPoint と OpenDocument のプレゼンテーション形式の間で変換します。
       security:
@@ -11561,11 +12177,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11589,7 +12216,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: スプレッドシートの変換
       description: Excel、OpenDocument、CSV の各形式の間で変換します。複数シートのワークブックは最初のシートを CSV にエクスポートします。
       security:
@@ -11620,11 +12247,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11648,7 +12286,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel から PDF
       description: スプレッドシートを PDF に変換します。幅の広いシートは複数ページに分割されることがあります。
       security:
@@ -11674,11 +12312,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11702,7 +12351,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word から PDF
       description: Word ドキュメントを PDF に変換します。
       security:
@@ -11728,11 +12377,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11756,7 +12416,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint から PDF
       description: プレゼンテーションを PDF に変換します。
       security:
@@ -11782,11 +12442,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11810,7 +12481,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML から PDF
       description: HTML ファイルを PDF に変換します。プライバシー保護のためリモートリソースは無効化されます。
       security:
@@ -11836,11 +12507,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11864,7 +12546,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown から Word
       description: Markdown ファイルを Word ドキュメント（DOCX）に変換します。
       security:
@@ -11907,7 +12589,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown から HTML
       description: Markdown ファイルを単独の HTML ページに変換します。ソース内のリモート画像は出力でそのまま残されます。
       security:
@@ -11950,7 +12632,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown から PDF
       description: Markdown ファイルをスタイル付きの PDF に変換します。プライバシー保護のためリモートリソースは無効化されます。
       security:
@@ -11976,11 +12658,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12004,7 +12697,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: EPUB から変換
       description: EPUB を PDF、DOCX、HTML、または Markdown に変換します。書籍内のリモートリソースは取得されません。
       security:
@@ -12035,11 +12728,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12063,7 +12767,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: EPUB への変換
       description: Word、Markdown、HTML、プレーンテキストのファイルを EPUB に変換します。
       security:
@@ -12089,11 +12793,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12117,7 +12832,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF のフラット化
       description: フォームと注釈をページコンテンツに焼き込みます。
       security:
@@ -12160,7 +12875,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF の墨消し
       description: テキストの出現箇所を恒久的に削除します（検証済みの真の墨消し）。
       security:
@@ -12215,7 +12930,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF からテキスト
       description: PDF からプレーンテキストを抽出します。
       security:
@@ -12264,7 +12979,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF から Word
       description: テキストベースの PDF に最適です。スキャンされたページには OCR が必要です。
       security:
@@ -12290,11 +13005,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12318,7 +13044,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: PDF メタデータ
       description: PDF ドキュメントのメタデータを読み書きします。
       security:
@@ -12375,7 +13101,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF OCR
       description: |-
         スキャンした PDF ドキュメントからページごとにテキストを抽出します。 Fast は、
@@ -12415,6 +13141,11 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12423,6 +13154,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12472,7 +13209,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: チャートメーカー
       description: CSV または JSON データから棒グラフ、折れ線グラフ、円グラフを作成します。PNG 画像を返します。値セルに数値ではないテキストが含まれているため省略された行がある場合、レスポンスには `chartRows`（{charted, skipped}）が追加されます。空白行はカウントされません。
       security:
@@ -12523,7 +13260,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV から Excel
       description: CSV と Excel（XLSX）の間で双方向に変換します。CSV または TSV ファイルをアップロードすると XLSX が、XLSX ファイルをアップロードすると CSV が得られます。
       security:
@@ -12571,7 +13308,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV から JSON
       description: CSV と JSON の間で双方向に変換します。CSV または TSV ファイルをアップロードすると JSON が、オブジェクトの JSON 配列をアップロードすると CSV が得られます。
       security:
@@ -12619,7 +13356,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON から XML
       description: JSON と XML の間で双方向に変換します。JSON ファイルをアップロードすると XML が、XML ファイルをアップロードすると JSON が得られます。
       security:
@@ -12667,7 +13404,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: CSV の分割
       description: CSV ファイルを行数によって小さなファイルに分割します。パーツを含む ZIP アーカイブを返します。
       security:
@@ -12716,7 +13453,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: CSV の結合
       description: 一致する列を持つ複数の CSV または TSV ファイルを 1 つの結合ファイルにまとめます。すべてのファイルは同じ列ヘッダーを持つ必要があります。
       security:
@@ -12761,7 +13498,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: YAML / JSON 変換
       description: YAML と JSON の間で双方向に変換します。YAML ファイルをアップロードすると JSON が、JSON ファイルをアップロードすると YAML が得られます。
       security:
@@ -12804,7 +13541,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML から CSV
       description: XML ファイルから繰り返し要素を CSV テーブルに抽出します。XML ツリー内で最初のオブジェクト配列を自動的に見つけます。
       security:
@@ -12847,7 +13584,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: ZIP の作成
       description: 複数のファイルを 1 つの ZIP アーカイブにまとめます。重複するファイル名は自動的に重複排除されます。
       security:
@@ -12892,7 +13629,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: ZIP の展開
       description: ZIP アーカイブからファイルを安全に展開します（ボム対策付き）。単一ファイルのアーカイブはそのファイルを直接返し、複数ファイルのアーカイブはフラットな ZIP を返します。
       security:
@@ -12935,7 +13672,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: 背景の置換
       description: |
         AI による背景の置換。被写体の背景を除去し、単色またはグラデーションに合成します。background-removal 機能バンドルのインストールが必要です。
@@ -12973,11 +13710,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13013,7 +13761,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: 背景のぼかし
       description: |
         AI による背景のぼかし。背景を除去し、元画像をぼかし、鮮明な被写体を上に合成します。background-removal 機能バンドルのインストールが必要です。
@@ -13047,11 +13795,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13087,7 +13846,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: バーコード生成
       description: テキストからバーコード画像を生成します。このツールは multipart ではなく JSON ボディを受け付けます。
       security:
@@ -13150,7 +13909,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: 円形切り抜き
       description: 画像を中央の円形に切り抜き、角を透明にします。枠線（オプション）と調整可能なズーム/オフセットに対応します。
       security:
@@ -13204,7 +13963,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: 角丸クロップ
       description: 画像を、透明な角、オプションの境界線、および調整可能なズーム/オフセットを備えた丸い正方形または角形にトリミングします。
       security:
@@ -13260,7 +14019,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: デュオトーン
       description: カスタムのシャドウ色とハイライト色で 2 色のデュオトーン効果を適用します。
       security:
@@ -13310,7 +14069,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: 画像のパディング
       description: 単色、透明、またはぼかし背景で画像を目標のアスペクト比にパディングします。
       security:
@@ -13363,7 +14122,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: モザイク化
       description: 画像全体または特定の矩形領域にモザイク効果を適用します。
       security:
@@ -13416,7 +14175,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: ビネット
       description: 強さ、色、半径、柔らかさ、丸み、中心位置を調整できるビネット効果を追加します。
       security:
@@ -13470,7 +14229,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: GIF/WebP 変換
       description: アニメーション GIF と WebP を相互に変換し、すべてのフレームを保持します。.gif と .webp の入力のみを受け付けます。
       security:
@@ -13520,7 +14279,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: ヒストグラム
       description: |
         画像から RGB ヒストグラムチャートを生成します。PNG ヒストグラム画像に加えて、チャンネルごとの統計と生の 256 ビンヒストグラムデータをレスポンス JSON で返します。
@@ -13652,7 +14411,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: LQIP プレースホルダー
       description: |
         低品質の小さな画像プレースホルダーを生成します。小さな画像ファイルに加えて、base64 data URI、そのまま使える HTML img タグ、CSS background スニペットをレスポンス JSON で返します。
@@ -13729,7 +14488,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: スプライトシート
       description: |
         複数の画像を 1 つのスプライトシートグリッドにまとめます。2〜64 枚の画像を受け付けます。各画像は最初の画像の寸法に合わせてリサイズされます。スプライトシート画像とフレーム座標のメタデータを返します。
@@ -13821,7 +14580,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: 証明写真
       description: |
         2 フェーズの証明写真フロー用のガイダンスエンドポイント。`/api/v1/tools/image/passport-photo/analyze` で画像を分析し、次に `/api/v1/tools/image/passport-photo/generate` で最終的な証明写真を作成します。このベースルートは、必要な機能バンドルがインストールされている場合は 400 のガイダンスエラーを、不足している場合は 501 を返します。
@@ -13850,7 +14609,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: PDF への署名
       description: 正規化されたページ配置を用いて、1 つ以上の署名 PNG 画像を PDF に押印します。
       security:
@@ -13894,11 +14653,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13928,7 +14698,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG から PNG
       description: |
         JPG を PNG に変換
@@ -13989,7 +14759,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG から JPG
       description: |
         PNG を JPG に変換
@@ -14050,7 +14820,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG から WebP
       description: |
         JPG を WebP に変換
@@ -14111,7 +14881,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG から WebP
       description: |
         PNG を WebP に変換
@@ -14172,7 +14942,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP から JPG
       description: |
         WebP を JPG に変換
@@ -14233,7 +15003,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP から PNG
       description: |
         WebP を PNG に変換
@@ -14294,7 +15064,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG から AVIF
       description: |
         JPG を AVIF に変換
@@ -14355,7 +15125,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG から AVIF
       description: |
         PNG を AVIF に変換
@@ -14416,7 +15186,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP から AVIF
       description: |
         WebP を AVIF に変換
@@ -14477,7 +15247,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC から JPG
       description: |
         HEIC を JPG に変換
@@ -14538,7 +15308,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC から PNG
       description: |
         HEIC を PNG に変換
@@ -14599,7 +15369,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC から AVIF
       description: |
         HEIC を AVIF に変換
@@ -14660,7 +15430,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG から GIF
       description: |
         JPG を GIF に変換
@@ -14721,7 +15491,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG から GIF
       description: |
         PNG を GIF に変換
@@ -14782,7 +15552,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF から JPG
       description: |
         GIF を JPG に変換
@@ -14843,7 +15613,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF から PNG
       description: |
         GIF を PNG に変換
@@ -14904,7 +15674,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP から GIF
       description: |
         WebP を GIF に変換
@@ -14965,7 +15735,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG から TIFF
       description: |
         JPG を TIFF に変換
@@ -15026,7 +15796,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG から TIFF
       description: |
         PNG を TIFF に変換
@@ -15087,7 +15857,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF から JPG
       description: |
         TIFF を JPG に変換
@@ -15148,7 +15918,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF から PNG
       description: |
         TIFF を PNG に変換
@@ -15209,7 +15979,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD から JPG
       description: |
         PSD を JPG に変換
@@ -15270,7 +16040,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD から PNG
       description: |
         PSD を PNG に変換
@@ -15331,7 +16101,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG から EPS
       description: |
         PNG を EPS に変換
@@ -15392,7 +16162,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG から EPS
       description: |
         JPG を EPS に変換
@@ -15453,7 +16223,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS から PNG
       description: |
         EPS を PNG に変換
@@ -15514,7 +16284,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS から JPG
       description: |
         EPS を JPG に変換
@@ -15575,7 +16345,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG から SVG
       description: |
         PNG を SVG に変換
@@ -15636,7 +16406,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG から SVG
       description: |
         JPG を SVG に変換
@@ -15697,7 +16467,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF から SVG
       description: |
         TIFF を SVG に変換
@@ -15758,7 +16528,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD から SVG
       description: |
         PSD を SVG に変換
@@ -15819,7 +16589,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS から SVG
       description: |
         EPS を SVG に変換
@@ -15880,7 +16650,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG から PNG
       description: |
         SVG を PNG に変換
@@ -15936,7 +16706,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG から JPG
       description: |
         SVG を JPG に変換
@@ -15992,7 +16762,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG から PDF
       description: |
         JPG を PDF に変換
@@ -16050,7 +16820,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG から PDF
       description: |
         PNG を PDF に変換
@@ -16108,7 +16878,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC から PDF
       description: |
         HEIC を PDF に変換
@@ -16166,7 +16936,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF から PDF
       description: |
         TIFF を PDF に変換
@@ -16224,7 +16994,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP から PDF
       description: |
         WebP を PDF に変換
@@ -16282,7 +17052,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF から PDF
       description: |
         GIF を PDF に変換
@@ -16340,7 +17110,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS から PDF
       description: |
         EPS を PDF に変換
@@ -16398,7 +17168,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF から JPG
       description: |
         PDF を JPG に変換
@@ -16454,7 +17224,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF から PNG
       description: |
         PDF を PNG に変換
@@ -16510,7 +17280,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF から TIFF
       description: |
         PDF を TIFF に変換
@@ -16566,7 +17336,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV から MP4
       description: |
         MOV を MP4 に変換
@@ -16599,11 +17369,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16633,7 +17414,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM から MP4
       description: |
         WEBM を MP4 に変換
@@ -16666,11 +17447,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16700,7 +17492,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV から MP4
       description: |
         MKV を MP4 に変換
@@ -16733,11 +17525,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16767,7 +17570,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI から MP4
       description: |
         AVI を MP4 に変換
@@ -16800,11 +17603,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16834,7 +17648,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 から MOV
       description: |
         MP4 を MOV に変換
@@ -16867,11 +17681,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16901,7 +17726,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 から WEBM
       description: |
         MP4 を WEBM に変換
@@ -16934,11 +17759,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16968,7 +17804,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM から MOV
       description: |
         WEBM を MOV に変換
@@ -17001,11 +17837,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17035,7 +17882,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV から MOV
       description: |
         MKV を MOV に変換
@@ -17068,11 +17915,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17102,7 +17960,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI から MOV
       description: |
         AVI を MOV に変換
@@ -17135,11 +17993,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17169,7 +18038,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 から AVI
       description: |
         MP4 を AVI に変換
@@ -17202,11 +18071,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17236,7 +18116,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV から AVI
       description: |
         MOV を AVI に変換
@@ -17269,11 +18149,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17303,7 +18194,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV から AVI
       description: |
         MKV を AVI に変換
@@ -17336,11 +18227,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17370,7 +18272,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI から MKV
       description: |
         AVI を MKV に変換
@@ -17403,11 +18305,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17437,7 +18350,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 から GIF
       description: |
         MP4 を GIF に変換
@@ -17470,11 +18383,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17504,7 +18428,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV から GIF
       description: |
         MOV を GIF に変換
@@ -17537,11 +18461,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17571,7 +18506,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV から GIF
       description: |
         MKV を GIF に変換
@@ -17604,11 +18539,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17638,7 +18584,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI から GIF
       description: |
         AVI を GIF に変換
@@ -17671,11 +18617,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17705,7 +18662,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF から MP4
       description: |
         GIF を MP4 に変換
@@ -17766,7 +18723,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF から WEBM
       description: |
         GIF を WEBM に変換
@@ -17827,7 +18784,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF から MOV
       description: |
         GIF を MOV に変換
@@ -17888,7 +18845,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 から MP3
       description: |
         MP4 を MP3 に変換
@@ -17949,7 +18906,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV から MP3
       description: |
         MOV を MP3 に変換
@@ -18010,7 +18967,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV から MP3
       description: |
         MKV を MP3 に変換
@@ -18071,7 +19028,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM から MP3
       description: |
         WEBM を MP3 に変換
@@ -18132,7 +19089,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI から MP3
       description: |
         AVI を MP3 に変換
@@ -18193,7 +19150,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 から WAV
       description: |
         MP4 を WAV に変換
@@ -18254,7 +19211,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV から WAV
       description: |
         MOV を WAV に変換
@@ -18315,7 +19272,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 から OGG
       description: |
         MP4 を OGG に変換
@@ -18376,7 +19333,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A から MP3
       description: |
         M4A を MP3 に変換
@@ -18437,7 +19394,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A から WAV
       description: |
         M4A を WAV に変換
@@ -18498,7 +19455,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC から MP3
       description: |
         AAC を MP3 に変換
@@ -18559,7 +19516,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC から WAV
       description: |
         AAC を WAV に変換
@@ -18620,7 +19577,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC から FLAC
       description: |
         AAC を FLAC に変換
@@ -18681,7 +19638,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG から MP3
       description: |
         OGG を MP3 に変換
@@ -18742,7 +19699,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG から WAV
       description: |
         OGG を WAV に変換
@@ -18803,7 +19760,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV から MP3
       description: |
         WAV を MP3 に変換
@@ -18864,7 +19821,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 から WAV
       description: |
         MP3 を WAV に変換
@@ -18925,7 +19882,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC から MP3
       description: |
         FLAC を MP3 に変換
@@ -18986,7 +19943,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel から CSV
       description: |
         Excel を CSV に変換
@@ -19019,11 +19976,22 @@ paths:
       responses:
         '202':
           description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19162,6 +20130,58 @@ paths:
           description: 保留中の登録がないか、本文が無効です
         '401':
           description: TOTP コードが無効です
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: 強制 MFA 登録を完了
+      description: ログイン時に開始された強制登録を確定し、セッションを返します。この呼び出しはセッションによる制限を受けません。有効期間の短い登録トークンがセッションの代わりになります。ここでは TOTP コードのみを受け付け、リカバリーコードは受け付けません。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: 登録が確認され、セッションが作成されました。セッショントークンはログイン時と同じ形式で返されます。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: 登録トークンまたはコードがありません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 登録トークンが無効または期限切れか、コードが正しくありません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 試行回数が多すぎます
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19328,7 +20348,7 @@ paths:
           description: プレビューを生成できませんでした
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: アップロードプレビューの生成
@@ -19677,6 +20697,69 @@ paths:
       responses:
         '200':
           description: SCIM ユーザーを無効化しました
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: SCIM ユーザーを部分更新
+      description: RFC 7644 の PatchOp です。サーバーが許可するパスに対して add、remove、replace をサポートします。ユーザーのパスは操作ごとに検証されます。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: 更新されたリソース
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: PatchOp が無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 認証情報がないか無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: リソースが見つかりません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19742,6 +20825,69 @@ paths:
       responses:
         '204':
           description: SCIM グループを削除しました
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: SCIM グループを部分更新
+      description: RFC 7644 の PatchOp です。サーバーが許可するパスに対して add、remove、replace をサポートします。グループメンバーは操作ごとに検証されます。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: 更新されたリソース
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: PatchOp が無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 認証情報がないか無効です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: リソースが見つかりません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -19988,7 +21134,29 @@ paths:
             type: string
       responses:
         '202':
-          description: エクスポートジョブを開始しました
+          description: エクスポートを開始しました。結果は statusUrl をポーリングして取得してください。同じ URL が Location ヘッダーにも含まれます。
+          headers:
+            Location:
+              description: エクスポートのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: 機能はライセンスされていないか、権限が不足しています
         '404':
@@ -20184,13 +21352,33 @@ x-i18n:
       provenance: machine
       outputHash: 37d81c2053a1
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: f7e07b8200c3
+      outputHash: 13e60ccb69af
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: 9a254d3303c2
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 0ddfa3ca6de8
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: 42b67ea60905
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: ffe06a3feb9f
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: 982478ffabf2
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: bb8a6957e0ad
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21147,6 +22335,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: c2b81c6c48fa
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: c7c2f305352e
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: 056930ca8323
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21179,6 +22375,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: 3207d63d09ce
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: c63e8276384c
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: 366fb070f186
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: 45c710021074
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: c4dd50740005
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: b88bc767d3a3
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: 0d38d5b3c4e0
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: 6930dbf2a2e5
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: 83d2ab85fe13
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22859,6 +24087,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: a3d405bda3ed
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: f3d970beb9fe
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: 3df3fa6aa255
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23075,6 +24311,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: 9c79fc68cd52
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: 7f63a4c62c2c
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: 40edd5d98c06
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23115,6 +24359,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: e456b5d67427
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: '8792391565e5'
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 8bf31c8692fc
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine
@@ -23355,6 +24607,26 @@ x-i18n:
       sourceHash: 9bdf4d2a5c25
       provenance: machine
       outputHash: af39b192d3ac
+    ptr:/components/schemas/Error/properties/code/description:
+      sourceHash: bf339907046a
+      provenance: machine
+      outputHash: c49c73682540
+    ptr:/components/schemas/Error/properties/requestId/description:
+      sourceHash: 7a9822038dbc
+      provenance: machine
+      outputHash: f51758258659
+    ptr:/components/schemas/JobStatus/properties/status/description:
+      sourceHash: c733f9fae6bb
+      provenance: machine
+      outputHash: 5e6ebb143dff
+    ptr:/components/schemas/JobStatus/properties/result/description:
+      sourceHash: 9b7fb1030f61
+      provenance: machine
+      outputHash: 39d5c445fa65
+    ptr:/components/schemas/JobStatus/properties/progressUrl/description:
+      sourceHash: d243642d631c
+      provenance: machine
+      outputHash: 898468af96c2
     ptr:/components/schemas/ToolResponse/properties/jobId/description:
       sourceHash: f93d3d625101
       provenance: machine
@@ -23887,6 +25159,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -23919,6 +25195,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -23951,6 +25231,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24107,6 +25391,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24139,6 +25427,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24767,6 +26059,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24799,6 +26095,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/400/description:
       sourceHash: 91cd364b6a62
       provenance: machine
@@ -24875,6 +26175,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/400/description:
       sourceHash: 7cea57b7cad6
       provenance: machine
@@ -24903,6 +26207,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24955,6 +26263,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24987,6 +26299,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25019,6 +26335,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25047,6 +26367,10 @@ x-i18n:
       sourceHash: 9c0ccc385d27
       provenance: machine
       outputHash: 18c088b39b56
+    ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25999,6 +27323,22 @@ x-i18n:
       sourceHash: 8b99f95b1946
       provenance: machine
       outputHash: 6504db5ce18b
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/parameters/0/description:
+      sourceHash: 105290b108f4
+      provenance: machine
+      outputHash: 01cef6e2f56a
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/200/description:
+      sourceHash: cda9498c937b
+      provenance: machine
+      outputHash: b5304279ebe3
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 9a5cd9377919
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/404/description:
+      sourceHash: 288b3aa41c1f
+      provenance: machine
+      outputHash: 5bb7826f0de0
     ptr:/paths/~1api~1v1~1jobs~1{jobId}~1progress/get/parameters/0/description:
       sourceHash: 3f77c804360b
       provenance: machine
@@ -26099,6 +27439,70 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 687cdf386c50
+    ptr:/paths/~1api~1v1~1feedback/post/requestBody/content/application~1json/schema/properties/source/description:
+      sourceHash: 51f100d50bab
+      provenance: machine
+      outputHash: ac3690b3cf32
+    ptr:/paths/~1api~1v1~1feedback/post/responses/200/description:
+      sourceHash: 8901e89d433e
+      provenance: machine
+      outputHash: 227076d9b21c
+    ptr:/paths/~1api~1v1~1feedback/post/responses/400/description:
+      sourceHash: 5685909cf0a7
+      provenance: machine
+      outputHash: 20239d5c1a64
+    ptr:/paths/~1api~1v1~1feedback/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 9a5cd9377919
+    ptr:/paths/~1api~1v1~1feedback/post/responses/429/description:
+      sourceHash: 95a111e3185e
+      provenance: machine
+      outputHash: a3dc3df40fe3
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
+      sourceHash: 9031d1af7020
+      provenance: machine
+      outputHash: 5889fd269d83
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 9a5cd9377919
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/403/description:
+      sourceHash: 95d513c2ed9a
+      provenance: machine
+      outputHash: 51c128cf4099
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/200/description:
+      sourceHash: 568b126ca48c
+      provenance: machine
+      outputHash: fc74c9209233
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 9a5cd9377919
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 328bae15dcb2
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/409/description:
+      sourceHash: f6fd45eac33e
+      provenance: machine
+      outputHash: 6fb27f6fecc7
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/202/description:
+      sourceHash: 148c1c5a4e39
+      provenance: machine
+      outputHash: b4410aa3510d
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 9a5cd9377919
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 328bae15dcb2
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/404/description:
+      sourceHash: e1208d06faa8
+      provenance: machine
+      outputHash: cac1b840aafc
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -26107,6 +27511,10 @@ x-i18n:
       sourceHash: 356335f30ad9
       provenance: machine
       outputHash: 4999e13e1bc3
+    ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/content/application~1json/schema/properties/jobId/description:
       sourceHash: f77d0d971c51
       provenance: machine
@@ -26335,6 +27743,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26363,6 +27775,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26427,6 +27843,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26667,6 +28087,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26751,6 +28175,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26795,6 +28223,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26895,6 +28327,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27259,6 +28695,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27347,6 +28787,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27371,6 +28815,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27395,6 +28843,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27419,6 +28871,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27443,6 +28899,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27771,6 +29231,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27795,6 +29259,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27819,6 +29287,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27839,6 +29311,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27859,6 +29335,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27879,6 +29359,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27899,6 +29383,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27951,6 +29439,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27975,6 +29467,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27995,6 +29491,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28075,6 +29575,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28123,6 +29627,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28343,6 +29851,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28375,6 +29887,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28731,6 +30247,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -29943,6 +31463,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -29971,6 +31495,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -29999,6 +31527,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30027,6 +31559,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30055,6 +31591,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30083,6 +31623,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30111,6 +31655,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30139,6 +31687,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30167,6 +31719,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30195,6 +31751,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30223,6 +31783,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30251,6 +31815,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30279,6 +31847,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30307,6 +31879,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30335,6 +31911,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30363,6 +31943,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30391,6 +31975,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31007,6 +32595,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31083,6 +32675,22 @@ x-i18n:
       sourceHash: 6db92b87b80d
       provenance: machine
       outputHash: 8a20d036525e
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/200/description:
+      sourceHash: eddcb6a49407
+      provenance: machine
+      outputHash: ec798133d24a
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/400/description:
+      sourceHash: bab4cddd22a1
+      provenance: machine
+      outputHash: 3bfdd09de807
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/401/description:
+      sourceHash: c5292e1d5e33
+      provenance: machine
+      outputHash: c2bedc6437c3
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/429/description:
+      sourceHash: 91434030e947
+      provenance: machine
+      outputHash: 78ec1cbe4470
     ptr:/paths/~1api~1auth~1mfa~1complete/post/responses/200/description:
       sourceHash: 2316b4f3e3ce
       provenance: machine
@@ -31331,6 +32939,22 @@ x-i18n:
       sourceHash: f4dea73b29b6
       provenance: machine
       outputHash: b0ab9c41dc42
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 94a68ade1992
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 8a03fe906eb2
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 9a5cd9377919
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: 3e1fa7b122d1
     ptr:/paths/~1api~1v1~1scim~1v2~1Groups/get/responses/200/description:
       sourceHash: df8e6383d425
       provenance: machine
@@ -31351,6 +32975,22 @@ x-i18n:
       sourceHash: 1212fc1b0593
       provenance: machine
       outputHash: 94eda9899927
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 94a68ade1992
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 8a03fe906eb2
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 9a5cd9377919
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: 3e1fa7b122d1
     ptr:/paths/~1api~1v1~1enterprise~1audit~1export/get/responses/200/description:
       sourceHash: 6215b564a1d4
       provenance: machine
@@ -31500,9 +33140,13 @@ x-i18n:
       provenance: machine
       outputHash: 0f1168c9c53d
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/description:
-      sourceHash: 0af3d2a07c98
+      sourceHash: 52a7b1517297
       provenance: machine
-      outputHash: 5b8525dd7b06
+      outputHash: 8c7714f34f76
+    ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/headers/Location/description:
+      sourceHash: 6f75e9da213c
+      provenance: machine
+      outputHash: 7302e0bb7244
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/403/description:
       sourceHash: 7d67215cdd1a
       provenance: machine

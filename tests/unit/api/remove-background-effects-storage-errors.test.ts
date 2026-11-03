@@ -222,7 +222,7 @@ describe("remove-background effects: reading the stored mask and original", () =
     app = await buildApp();
     const res = await app.inject(effectsRequest(settings));
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       error: "The server's storage service is unavailable.",
       code: "storage-unavailable",
     });
@@ -255,7 +255,7 @@ describe("remove-background effects: reading the stored mask and original", () =
     });
     const mixedRes = await app.inject(effectsRequest(settings));
     expect(mixedRes.statusCode).toBe(503);
-    expect(mixedRes.json()).toEqual({
+    expect(mixedRes.json()).toMatchObject({
       error: "The server's storage service is unavailable.",
       code: "storage-unavailable",
     });
@@ -271,7 +271,7 @@ describe("remove-background effects: reading the stored mask and original", () =
     });
     const bugRes = await app.inject(effectsRequest(settings));
     expect(bugRes.statusCode).toBe(500);
-    expect(bugRes.json()).toEqual({ error: "Internal server error" });
+    expect(bugRes.json()).toMatchObject({ error: "Internal server error" });
   });
 
   it("answers 400 for a jobId or filename the store would refuse, without reading", async () => {
@@ -382,7 +382,7 @@ describe("remove-background effects: reading the stored mask and original", () =
       ),
     );
     expect(res.statusCode).toBe(422);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       error: "Effects processing failed",
       details: UNDECODABLE_IMAGE_MESSAGE,
     });

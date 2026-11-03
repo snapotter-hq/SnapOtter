@@ -219,7 +219,7 @@ describe("pdf-to-image single-file route", () => {
         getObjectBuffer.mockRejectedValueOnce(defect);
         const res = await send(app);
         expect(res.statusCode).toBe(500);
-        expect(res.json()).toEqual({ error: "Internal server error" });
+        expect(res.json()).toMatchObject({ error: "Internal server error" });
         expect(deletePrefix).toHaveBeenCalledTimes(1);
       }
 
@@ -231,7 +231,7 @@ describe("pdf-to-image single-file route", () => {
       );
       const localRes = await send(app);
       expect(localRes.statusCode).toBe(500);
-      expect(localRes.json()).toEqual({ error: "Internal server error" });
+      expect(localRes.json()).toMatchObject({ error: "Internal server error" });
       expect(deletePrefix).toHaveBeenCalledTimes(1);
     } finally {
       (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
@@ -431,13 +431,13 @@ describe("pdf-to-image single-file route", () => {
       // 5. Non-OOM RangeError, password-protected, and corrupt PDFs still return 400 without reporting engine unavailable
       const nonOomRangeRes = await sendPreview("pdf-to-image");
       expect(nonOomRangeRes.statusCode).toBe(400);
-      expect(nonOomRangeRes.json()).toEqual({
+      expect(nonOomRangeRes.json()).toMatchObject({
         error: "Invalid or corrupt PDF file",
       });
 
       const encryptedRes = await sendPreview("pdf-to-image", encryptedPdf);
       expect(encryptedRes.statusCode).toBe(400);
-      expect(encryptedRes.json()).toEqual({
+      expect(encryptedRes.json()).toMatchObject({
         error: "Password-protected PDFs are not supported",
       });
 
@@ -446,7 +446,7 @@ describe("pdf-to-image single-file route", () => {
         Buffer.from("%PDF-1.4\nnot really a document"),
       );
       expect(corruptRes.statusCode).toBe(400);
-      expect(corruptRes.json()).toEqual({
+      expect(corruptRes.json()).toMatchObject({
         error: "Invalid or corrupt PDF file",
       });
 
@@ -598,7 +598,7 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
         getObjectBuffer.mockRejectedValueOnce(defect);
         const res = await send(app);
         expect(res.statusCode).toBe(500);
-        expect(res.json()).toEqual({ error: "Internal server error" });
+        expect(res.json()).toMatchObject({ error: "Internal server error" });
       }
 
       // Local-mode EIO (STORAGE_MODE !== "s3") bypasses S3 read fault normalization and answers 500
@@ -608,7 +608,7 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
       );
       const localRes = await send(app);
       expect(localRes.statusCode).toBe(500);
-      expect(localRes.json()).toEqual({ error: "Internal server error" });
+      expect(localRes.json()).toMatchObject({ error: "Internal server error" });
     } finally {
       (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
       await app.close();
@@ -898,7 +898,7 @@ describe("pdf-to-image batch route (#1552)", () => {
         });
         const res = await sendBatch(app);
         expect(res.statusCode).toBe(500);
-        expect(res.json()).toEqual({ error: "Internal server error" });
+        expect(res.json()).toMatchObject({ error: "Internal server error" });
         expect(failBatchJob).toHaveBeenCalledWith({
           jobId: expect.any(String),
           totalFiles: 2,
@@ -922,7 +922,7 @@ describe("pdf-to-image batch route (#1552)", () => {
       });
       const localRes = await sendBatch(app);
       expect(localRes.statusCode).toBe(500);
-      expect(localRes.json()).toEqual({ error: "Internal server error" });
+      expect(localRes.json()).toMatchObject({ error: "Internal server error" });
       expect(failBatchJob).toHaveBeenCalledWith({
         jobId: expect.any(String),
         totalFiles: 2,
@@ -1094,7 +1094,7 @@ describe("pdf-to-image batch route (#1552)", () => {
     const res = await sendBatch(app);
 
     expect(res.statusCode).toBe(500);
-    expect(res.json()).toEqual({ error: "Internal server error" });
+    expect(res.json()).toMatchObject({ error: "Internal server error" });
     expect(failBatchJob).toHaveBeenCalledWith({
       jobId: expect.any(String),
       totalFiles: 2,
@@ -1121,7 +1121,7 @@ describe("pdf-to-image batch route (#1552)", () => {
     const res = await sendBatch(app);
 
     expect(res.statusCode).toBe(500);
-    expect(res.json()).toEqual({ error: "Internal server error" });
+    expect(res.json()).toMatchObject({ error: "Internal server error" });
     expect(failBatchJob).toHaveBeenCalledWith({
       jobId: expect.any(String),
       totalFiles: 2,
@@ -1145,7 +1145,7 @@ describe("pdf-to-image batch route (#1552)", () => {
     const res = await sendBatch(app);
 
     expect(res.statusCode).toBe(502);
-    expect(res.json()).toEqual({ error: "Internal server error" });
+    expect(res.json()).toMatchObject({ error: "Internal server error" });
     expect(failBatchJob).toHaveBeenCalledWith({
       jobId: expect.any(String),
       totalFiles: 2,

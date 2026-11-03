@@ -8,6 +8,7 @@
  * parent assembles the manifest once all children complete.
  * Returns a ZIP file containing all processed images.
  */
+
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { extname } from "node:path";
@@ -91,6 +92,7 @@ import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
+import { buildAsyncAcceptedPayload } from "./async-response.js";
 import { failBatchJob, updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
 
@@ -406,7 +408,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 existing.toolId === toolId &&
                 existing.userId === userId
               ) {
-                return reply.status(202).send({ jobId: parentId, async: true });
+                return reply.status(202).send(buildAsyncAcceptedPayload(parentId));
               }
               return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
             }
@@ -898,7 +900,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // it. Answer with the async contract instead of a fake failure:
             // the client rides the SSE to the terminal frame, which carries
             // the durable download URL (#750).
-            return reply.status(202).send({ jobId: parentId, async: true });
+            return reply.status(202).send(buildAsyncAcceptedPayload(parentId));
           }
 
           const payload = batchResult.resultPayload as

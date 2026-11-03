@@ -1142,6 +1142,8 @@ describe("createToolRoute", () => {
         progressJobId: clientJobId,
         artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1170,6 +1172,8 @@ describe("createToolRoute", () => {
         progressJobId: clientJobId,
         artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1203,6 +1207,8 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith({
         jobId: artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1234,6 +1240,8 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith({
         jobId: artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1266,6 +1274,8 @@ describe("createToolRoute", () => {
         progressJobId: clientJobId,
         artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 

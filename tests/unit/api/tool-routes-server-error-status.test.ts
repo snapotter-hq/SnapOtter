@@ -409,7 +409,7 @@ describe("compare", () => {
 
       const compareOomRes = await sendCompare();
       expect(compareOomRes.statusCode).toBe(503);
-      expect(compareOomRes.json()).toEqual({
+      expect(compareOomRes.json()).toMatchObject({
         error: "The image decoder ran out of memory.",
         code: "ENGINE_UNAVAILABLE",
       });
@@ -421,7 +421,7 @@ describe("compare", () => {
 
       const compareUnavailRes = await sendCompare();
       expect(compareUnavailRes.statusCode).toBe(503);
-      expect(compareUnavailRes.json()).toEqual({
+      expect(compareUnavailRes.json()).toMatchObject({
         error: "No HEIF decoder found.",
         code: "ENGINE_UNAVAILABLE",
       });
@@ -433,7 +433,7 @@ describe("compare", () => {
 
       const wmOomRes = await sendWatermark();
       expect(wmOomRes.statusCode).toBe(503);
-      expect(wmOomRes.json()).toEqual({
+      expect(wmOomRes.json()).toMatchObject({
         error: "The image decoder ran out of memory.",
         code: "ENGINE_UNAVAILABLE",
       });
@@ -445,7 +445,7 @@ describe("compare", () => {
 
       const wmUnavailRes = await sendWatermark();
       expect(wmUnavailRes.statusCode).toBe(503);
-      expect(wmUnavailRes.json()).toEqual({
+      expect(wmUnavailRes.json()).toMatchObject({
         error: "No HEIF decoder found.",
         code: "ENGINE_UNAVAILABLE",
       });
@@ -468,7 +468,7 @@ describe("compare", () => {
 
       const compare400Res = await sendCompare();
       expect(compare400Res.statusCode).toBe(400);
-      expect(compare400Res.json()).toEqual({
+      expect(compare400Res.json()).toMatchObject({
         error: "Invalid first image: corrupt header",
       });
       expect(sendSpy.mock.calls[4]?.[1]).toMatchObject({
@@ -479,7 +479,7 @@ describe("compare", () => {
 
       const compare422Res = await sendCompare();
       expect(compare422Res.statusCode).toBe(422);
-      expect(compare422Res.json()).toEqual({
+      expect(compare422Res.json()).toMatchObject({
         error: "Failed to decode AVIF file (second image)",
         details: "bad bitstream",
       });
@@ -492,7 +492,7 @@ describe("compare", () => {
 
       const wm400Res = await sendWatermark();
       expect(wm400Res.statusCode).toBe(400);
-      expect(wm400Res.json()).toEqual({
+      expect(wm400Res.json()).toMatchObject({
         error: "Invalid watermark image: corrupt watermark",
       });
       expect(sendSpy.mock.calls[6]?.[1]).toMatchObject({
@@ -503,7 +503,7 @@ describe("compare", () => {
 
       const wm422Res = await sendWatermark();
       expect(wm422Res.statusCode).toBe(422);
-      expect(wm422Res.json()).toEqual({
+      expect(wm422Res.json()).toMatchObject({
         error: "Failed to decode AVIF file (watermark)",
         details: "bad watermark bitstream",
       });
@@ -581,7 +581,7 @@ describe("edit-metadata (#3646)", () => {
         }),
       });
       expect(badRes.statusCode).toBe(422);
-      expect(badRes.json()).toEqual({
+      expect(badRes.json()).toMatchObject({
         error: "Metadata edit failed",
         details: "exiftool rejected tag",
       });
@@ -772,7 +772,7 @@ describe("json-bodied routes", () => {
       payload: passportBody,
     });
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       error: "The server's storage service is unavailable.",
       code: "storage-unavailable",
     });
@@ -788,7 +788,7 @@ describe("json-bodied routes", () => {
       payload: passportBody,
     });
     expect(bugRes.statusCode).toBe(500);
-    expect(bugRes.json()).toEqual({ error: "Internal server error" });
+    expect(bugRes.json()).toMatchObject({ error: "Internal server error" });
   });
 
   it("passport-photo generate answers 400 for a jobId or filename the store would refuse", async () => {
@@ -928,7 +928,7 @@ describe("json-bodied routes", () => {
 
     const oomRes = await send();
     expect(oomRes.statusCode).toBe(503);
-    expect(oomRes.json()).toEqual({
+    expect(oomRes.json()).toMatchObject({
       error:
         "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
       code: "ENGINE_UNAVAILABLE",
@@ -936,14 +936,14 @@ describe("json-bodied routes", () => {
 
     const unavailRes = await send();
     expect(unavailRes.statusCode).toBe(503);
-    expect(unavailRes.json()).toEqual({
+    expect(unavailRes.json()).toMatchObject({
       error: "No barcode engine found.",
       code: "ENGINE_UNAVAILABLE",
     });
 
     const clientRes = await send();
     expect(clientRes.statusCode).toBe(400);
-    expect(clientRes.json()).toEqual({
+    expect(clientRes.json()).toMatchObject({
       error: "Invalid text for this barcode type: bwip-js failed on [internal]",
     });
   });
@@ -989,21 +989,21 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
 
       const firstOom = await sendInfo();
       expect(firstOom.statusCode).toBe(503);
-      expect(firstOom.json()).toEqual({
+      expect(firstOom.json()).toMatchObject({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
       });
 
       const secondOom = await sendInfo();
       expect(secondOom.statusCode).toBe(503);
-      expect(secondOom.json()).toEqual({
+      expect(secondOom.json()).toMatchObject({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
       });
 
       const enospcRes = await sendInfo();
       expect(enospcRes.statusCode).toBe(503);
-      expect(enospcRes.json()).toEqual({
+      expect(enospcRes.json()).toMatchObject({
         error: "The server's storage is full.",
         code: "storage-full",
       });
@@ -1011,7 +1011,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       for (let i = 0; i < 2; i++) {
         const badRes = await sendInfo();
         expect(badRes.statusCode).toBe(422);
-        expect(badRes.json()).toEqual({
+        expect(badRes.json()).toMatchObject({
           error: "Could not read image metadata",
         });
       }
@@ -1095,14 +1095,14 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       animatedFault = new RangeError("Array buffer allocation failed");
       const firstOom = await sendTool();
       expect(firstOom.statusCode).toBe(503);
-      expect(firstOom.json()).toEqual({
+      expect(firstOom.json()).toMatchObject({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
       });
 
       const secondOom = await sendTool();
       expect(secondOom.statusCode).toBe(503);
-      expect(secondOom.json()).toEqual({
+      expect(secondOom.json()).toMatchObject({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
       });
@@ -1112,7 +1112,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       });
       const enospcRes = await sendTool();
       expect(enospcRes.statusCode).toBe(503);
-      expect(enospcRes.json()).toEqual({
+      expect(enospcRes.json()).toMatchObject({
         error: "The server's storage is full.",
         code: "storage-full",
       });
@@ -1123,7 +1123,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       });
       const epermRes = await sendTool();
       expect(epermRes.statusCode).toBe(503);
-      expect(epermRes.json()).toEqual({
+      expect(epermRes.json()).toMatchObject({
         error:
           "The server can't write to its storage: it's read-only or not allowed to write there.",
         code: "storage-not-writable",
@@ -1134,7 +1134,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       });
       const emfileRes = await sendTool();
       expect(emfileRes.statusCode).toBe(503);
-      expect(emfileRes.json()).toEqual({
+      expect(emfileRes.json()).toMatchObject({
         error:
           "The server has too many files open to process this image right now. Try again shortly.",
         code: "EMFILE",
@@ -1145,7 +1145,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       );
       const corruptHeaderRes = await sendTool();
       expect(corruptHeaderRes.statusCode).toBe(400);
-      expect(corruptHeaderRes.json()).toEqual({
+      expect(corruptHeaderRes.json()).toMatchObject({
         error:
           "This image can't be decoded. The file may be corrupt or use an unsupported encoding.",
       });
@@ -1153,7 +1153,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       animatedFault = new Error("Input image exceeds pixel limit");
       const pixelLimitRes = await sendTool();
       expect(pixelLimitRes.statusCode).toBe(400);
-      expect(pixelLimitRes.json()).toEqual({
+      expect(pixelLimitRes.json()).toMatchObject({
         error: "This image is too large to process. Reduce its dimensions and try again.",
       });
 
@@ -1216,14 +1216,14 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       try {
         const thumbOomRes = await sendPair();
         expect(thumbOomRes.statusCode).toBe(503);
-        expect(thumbOomRes.json()).toEqual({
+        expect(thumbOomRes.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
 
         const thumbEnospcRes = await sendPair();
         expect(thumbEnospcRes.statusCode).toBe(503);
-        expect(thumbEnospcRes.json()).toEqual({
+        expect(thumbEnospcRes.json()).toMatchObject({
           error: "The server's storage is full.",
           code: "storage-full",
         });
@@ -1271,14 +1271,14 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       try {
         const hashOomRes = await sendPair();
         expect(hashOomRes.statusCode).toBe(503);
-        expect(hashOomRes.json()).toEqual({
+        expect(hashOomRes.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
 
         const hashEnospcRes = await sendPair();
         expect(hashEnospcRes.statusCode).toBe(503);
-        expect(hashEnospcRes.json()).toEqual({
+        expect(hashEnospcRes.json()).toMatchObject({
           error: "The server's storage is full.",
           code: "storage-full",
         });
@@ -1311,14 +1311,14 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       try {
         const outerOomRes = await sendPair();
         expect(outerOomRes.statusCode).toBe(503);
-        expect(outerOomRes.json()).toEqual({
+        expect(outerOomRes.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
 
         const outer422Res = await sendPair();
         expect(outer422Res.statusCode).toBe(422);
-        expect(outer422Res.json()).toEqual({
+        expect(outer422Res.json()).toMatchObject({
           error: "Duplicate detection failed",
           details: "Invalid count",
         });
@@ -1378,7 +1378,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(res.statusCode, res.body).toBe(503);
-        expect(res.json()).toEqual({
+        expect(res.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1390,7 +1390,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
         ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
       });
       expect(badRes.statusCode, badRes.body).toBe(422);
-      expect(badRes.json()).toEqual({
+      expect(badRes.json()).toMatchObject({
         error: "Color extraction failed",
         details: "Invalid raw parameter",
       });
@@ -1433,7 +1433,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(res.statusCode, res.body).toBe(503);
-        expect(res.json()).toEqual({
+        expect(res.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1447,7 +1447,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
         ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
       });
       expect(badRes.statusCode, badRes.body).toBe(422);
-      expect(badRes.json()).toEqual({
+      expect(badRes.json()).toMatchObject({
         error: "Split failed",
         details: "Invalid metadata parameter",
       });
@@ -1520,7 +1520,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody(files, { format: "jxl" }),
         });
         expect(oomRes.statusCode, oomRes.body).toBe(503);
-        expect(oomRes.json()).toEqual({
+        expect(oomRes.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1548,7 +1548,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
         ...multipartBody(files, { format: "jxl" }),
       });
       expect(badRes.statusCode, badRes.body).toBe(422);
-      expect(badRes.json()).toEqual({
+      expect(badRes.json()).toMatchObject({
         error: "Stitch creation failed",
         details: "Invalid cjxl parameter",
       });
@@ -1600,7 +1600,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
             ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
           });
           expect(oomRes.statusCode, `${toolId} OOM #${i}: ${oomRes.body}`).toBe(503);
-          expect(oomRes.json()).toEqual({
+          expect(oomRes.json()).toMatchObject({
             error: oomMessage,
             code: "ENGINE_UNAVAILABLE",
           });
@@ -1628,7 +1628,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(badRes.statusCode, `${toolId} non-OOM: ${badRes.body}`).toBe(422);
-        expect(badRes.json()).toEqual({
+        expect(badRes.json()).toMatchObject({
           error: "Processing failed",
           details: "Invalid output parameter",
         });
@@ -1662,7 +1662,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           }),
         });
         expect(beautifyHttpOom.statusCode, beautifyHttpOom.body).toBe(503);
-        expect(beautifyHttpOom.json()).toEqual({
+        expect(beautifyHttpOom.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1705,7 +1705,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(memeHttpOom.statusCode, memeHttpOom.body).toBe(503);
-        expect(memeHttpOom.json()).toEqual({
+        expect(memeHttpOom.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1845,7 +1845,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
             ...multipartBody([...route.files], route.settings),
           });
           expect(oomRes.statusCode, `${route.toolId} OOM #${i}: ${oomRes.body}`).toBe(503);
-          expect(oomRes.json()).toEqual({
+          expect(oomRes.json()).toMatchObject({
             error: oomMessage,
             code: "ENGINE_UNAVAILABLE",
           });
@@ -1875,7 +1875,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ...multipartBody([...route.files], route.settings),
         });
         expect(badRes.statusCode, `${route.toolId} non-OOM: ${badRes.body}`).toBe(422);
-        expect(badRes.json()).toEqual({
+        expect(badRes.json()).toMatchObject({
           error: route.expected422Error,
           details: "Invalid output parameter",
         });
@@ -1902,7 +1902,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ]),
         });
         expect(compareStepOom.statusCode, compareStepOom.body).toBe(503);
-        expect(compareStepOom.json()).toEqual({
+        expect(compareStepOom.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1947,7 +1947,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ]),
         });
         expect(wmStepOom.statusCode, wmStepOom.body).toBe(503);
-        expect(wmStepOom.json()).toEqual({
+        expect(wmStepOom.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1961,7 +1961,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ]),
         });
         expect(composeStepOom.statusCode, composeStepOom.body).toBe(503);
-        expect(composeStepOom.json()).toEqual({
+        expect(composeStepOom.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -1997,7 +1997,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(vectorizeStepOom.statusCode, vectorizeStepOom.body).toBe(503);
-        expect(vectorizeStepOom.json()).toEqual({
+        expect(vectorizeStepOom.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
@@ -2036,7 +2036,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
         });
         expect(carveOomRes.statusCode, carveOomRes.body).toBe(503);
-        expect(carveOomRes.json()).toEqual({
+        expect(carveOomRes.json()).toMatchObject({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });

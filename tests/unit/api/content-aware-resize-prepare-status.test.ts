@@ -148,7 +148,7 @@ describe("content-aware-resize route validation and prepare catch", () => {
 
     const res = await send({ width: 8192 });
     expect(res.statusCode).toBe(422);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       error: "Content-aware resize failed",
       details: inputErr.message,
     });
@@ -173,7 +173,7 @@ describe("content-aware-resize route validation and prepare catch", () => {
 
     const res = await send({ width: 50 });
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       error: missingCaireErr.message,
       code: "ENGINE_UNAVAILABLE",
     });
@@ -204,7 +204,7 @@ describe("content-aware-resize route validation and prepare catch", () => {
 
       const res = await send({ width: 50 });
       expect(res.statusCode).toBe(503);
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
       });

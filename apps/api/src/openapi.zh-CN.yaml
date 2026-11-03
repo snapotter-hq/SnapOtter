@@ -22,9 +22,19 @@ servers:
     description: 当前实例
 tags:
   - name: Tools
-    description: 涵盖 image、video、audio、PDF 和 files 的文件处理工具。每个工具接受 multipart 文件上传并返回下载 URL。
+    description: 未归入任何分组的工具端点。
+  - name: Image
+    description: 图像工具。每个工具都接受 multipart 文件上传，并返回下载 URL。
+  - name: Video
+    description: 视频工具。每个工具都接受 multipart 文件上传，并返回下载 URL。
+  - name: Audio
+    description: 音频工具。每个工具都接受 multipart 文件上传，并返回下载 URL。
+  - name: PDF
+    description: PDF 与文档工具。每个工具都接受 multipart 文件上传，并返回下载 URL。
   - name: Batch
     description: 在一次请求中通过某个工具处理多个文件。
+  - name: Jobs
+    description: 长时间运行作业的状态与进度。
   - name: Pipelines
     description: 将多个工具串联成可复用的工作流。
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: 附加的错误详情（例如 Zod 校验错误）
+        code:
+          type: string
+          description: 稳定的机器可读代码，已列入错误目录。
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: 用于支持与日志关联的请求 ID。
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: 已存储的任务状态。completed、failed 和 canceled 为终态。
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: 任务有结果时返回。结构取决于工具，例如 downloadUrl。已取消的任务可能带有部分结果。
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: 该任务的 SSE 流。
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: 调整图片尺寸
       description: 将图像调整为指定尺寸或按百分比缩放。
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: 内容感知缩放
       description: 使用接缝裁剪智能地移除或插入内容，同时保留重要特征，从而调整图像尺寸。
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: 裁剪图片
       description: 将图像裁剪至指定区域。
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: 旋转和翻转图片
       description: 按角度旋转图像或水平/垂直翻转。
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: 转换图片
       description: 将图像转换为其他格式。
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: 压缩图片
       description: 按质量级别或目标大小减小图像文件体积。
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: 将图像压缩至 20 KB
       description: |
         将图像压缩至 20 KB 目标大小
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: 将图像压缩至 50 KB
       description: |
         将图像压缩至 50 KB 目标大小
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: 将图像压缩至 100 KB
       description: |
         将图像压缩至 100 KB 目标大小
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: 将图像压缩至 200 KB
       description: |
         将图像压缩至 200 KB 目标大小
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: 将图像压缩至 500 KB
       description: |
         将图像压缩至 500 KB 目标大小
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: 移除图片元数据
       description: 从图像中移除 EXIF、GPS、ICC 或 XMP 元数据。
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: 边框和相框
       description: 为图像添加边框、圆角、内边距或阴影。
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: 美化截图
       description: |
         为截图添加渐变背景、设备边框、阴影、水印以及社交媒体尺寸。支持纯色、线性渐变、径向渐变、图像和透明背景。包含 macOS、Windows、浏览器、iPhone、MacBook 和 iPad 设备边框。提供 Twitter、LinkedIn、Instagram、Facebook 和 Product Hunt 的社交媒体预设。
@@ -1063,7 +1133,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: 颜色调整
       description: |
         整合式颜色调整工具。在一次处理中调整亮度、对比度、曝光、饱和度、色温、色调、色相、锐度、颜色通道和特效。
@@ -1123,7 +1193,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: 锐化图片
       description: 使用自适应、非锐化蒙版或高通方法锐化图像，可选降噪。
       security:
@@ -1183,7 +1253,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: 为 Web 优化
       description: 通过转换为现代格式、调整质量并可选调整尺寸，优化图像以用于 Web 分发。
       security:
@@ -1236,7 +1306,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: 为 Web 优化（预览）
       description: |
         用于实时参数调整的轻量级预览端点。直接返回优化后的图像二进制数据（而非 JSON）。尺寸信息位于响应头中。不创建工作区，也不持久化结果。
@@ -1297,7 +1367,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: 图像增强
       description: |
         AI 驱动的自动图像增强。分析图像，并根据所选场景模式对曝光、对比度、白平衡、饱和度、锐度和噪点进行校正。
@@ -1355,7 +1425,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: 分析图像以进行增强
       description: |
         分析图像并返回建议的校正，但不实际应用。可用于预览将进行哪些增强。
@@ -1406,7 +1476,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: 降噪
       description: |
         使用 Python sidecar 的 AI 驱动降噪。支持从快速预览到最高质量的多个质量档位。需要安装 noise-removal 功能包。
@@ -1443,11 +1513,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1483,7 +1564,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: 去除红眼
       description: |
         AI 驱动的红眼检测与去除。检测人脸并校正照片中的红眼瑕疵。需要安装 red-eye-removal 功能包。
@@ -1518,11 +1599,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1558,7 +1650,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: 照片修复
       description: |
         AI 驱动的照片修复流程。修复划痕、增强人脸、降噪，并可选地为旧照片或受损照片上色。需要安装 photo-restoration 功能包。
@@ -1596,11 +1688,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1636,7 +1739,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 证件照 - 分析
       description: |
         证件照生成的第 1 阶段。检测人脸特征点并移除背景。返回特征点数据和一张 base64 编码的预览图，供客户端在生成阶段使用。需要安装 passport-photo 功能包。
@@ -1769,7 +1872,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 证件照 - 生成
       description: |
         证件照生成的第 2 阶段。使用分析阶段返回的 jobId 和特征点，按指定的国家/证件规格裁剪、缩放并平铺照片。响应快速（不重新运行 AI）。
@@ -1910,7 +2013,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: 上色
       description: |
         AI 驱动的照片上色。使用 DDColor 并以 OpenCV DNN 作为回退，将黑白或灰度照片转换为全彩。需要安装 colorize 功能包。
@@ -1943,11 +2046,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1983,7 +2097,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: 人脸增强
       description: |
         使用 GFPGAN 或 CodeFormer 的 AI 驱动人脸增强。检测图像中的人脸并增强面部细节、皮肤纹理和清晰度。需要安装 enhance-faces 功能包。
@@ -2018,11 +2132,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2058,7 +2183,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: 图像转 Base64
       description: |
         将一张或多张图像转换为带 data URI 的 Base64 编码字符串。支持可选的格式转换和尺寸调整。为每个文件同时返回原始 Base64 字符串和可直接使用的 data URI。
@@ -2150,7 +2275,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: 文字水印
       description: 为图像添加文字水印。
       security:
@@ -2203,7 +2328,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: 文字叠加
       description: 添加带样式的文字叠加，可选背景框。
       security:
@@ -2257,7 +2382,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: 替换颜色
       description: 将图像中的特定颜色替换为另一种颜色或透明。
       security:
@@ -2308,7 +2433,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: 色盲模拟
       description: 模拟图像在各类色觉缺陷人群眼中的呈现效果。
       security:
@@ -2356,7 +2481,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF 工具
       description: 调整动态 GIF 的尺寸、优化、调速、倒放、提取帧或旋转。
       security:
@@ -2420,7 +2545,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: GIF 信息
       description: 获取动态 GIF 的元数据，包括尺寸、帧数、延迟和时长。
       security: []
@@ -2477,7 +2602,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: 智能裁剪
       description: 支持三种模式的智能裁剪：主体聚焦、人脸聚焦或自动修边。
       security:
@@ -2536,7 +2661,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: 图像转 SVG
       description: 使用 potrace（黑白）或 VTracer（彩色）将位图图像转换为 SVG 矢量格式。
       security:
@@ -2591,7 +2716,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG 转位图
       description: 以自定义缩放比例和 DPI 将 SVG 文件转换为位图图像格式。
       security:
@@ -2644,7 +2769,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG 转位图（批量）
       description: 将多个 SVG 文件转换为位图图像。返回 ZIP 压缩包。
       security:
@@ -2704,7 +2829,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: 图像转 PDF
       description: 将一张或多张图像转换为 PDF 文档。
       security:
@@ -2786,7 +2911,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF 转图像
       description: 将 PDF 页面转换为图像。返回各单页下载以及包含所有页面的 ZIP。
       security:
@@ -2875,7 +3000,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: PDF 页数
       description: 获取 PDF 文件的页数。
       security: []
@@ -2914,7 +3039,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: PDF 页面缩略图
       description: 为 PDF 中的每一页生成缩略图预览（最多 200 页，JPEG，宽 300px）。
       security: []
@@ -2967,7 +3092,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: 分割图片
       description: 将图像分割为网格瓦片。返回 ZIP 文件。
       security:
@@ -3021,7 +3146,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: 批量重命名
       description: 使用模式模板重命名多张图像。支持 {{index}}、{{padded}} 和 {{original}} 令牌。返回 ZIP 文件。
       security:
@@ -3073,7 +3198,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: Favicon 生成器
       description: 从图像生成完整的 favicon 集（16px 到 512px 的 PNG、ICO 和 manifest.json）。返回 ZIP 文件。
       security:
@@ -3117,7 +3242,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: 图像水印
       description: 添加图像水印叠加。
       security:
@@ -3172,7 +3297,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: 图像合成
       description: 使用混合模式将叠加图像合成到底图上。
       security:
@@ -3228,7 +3353,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: 表情包生成器
       description: |
         使用模板或自定义图像创建表情包。支持两种模式：(1) 模板模式 - 发送带有 `templateId` 和 `textBoxes` 的 JSON 请求体。(2) 自定义图像模式 - 发送带有 `file` 和 `settings` 的 multipart。
@@ -3467,7 +3592,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: 图像对比
       description: 对比两张图像并生成可视化差异报告。
       security:
@@ -3534,7 +3659,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: 对象擦除
       description: 使用蒙版从图像中擦除对象。蒙版中的白色区域表示要擦除的区域。使用 LaMa 图像修复。
       security:
@@ -3587,11 +3712,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3627,7 +3763,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: AI 画布扩展（实验性）
       description: |
         使用 AI 外绘扩展图像画布。通过生成与原图无缝融合的新内容，向任意方向扩展图像。使用基于 LaMa 的外绘。需要安装 ai-canvas-expand 功能包。
@@ -3667,11 +3803,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3707,7 +3854,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: 拼贴和网格
       description: 将多张图像组合成网格拼贴。
       security:
@@ -3764,7 +3911,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: 拼接合并图片
       description: 以水平、垂直或网格布局连接多张图像。
       security:
@@ -3823,7 +3970,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: 从动画图像中删除背景
       description: 使用 AI (rembg) 逐帧删除动画 GIF、WebP 或 APNG 中的背景。在本地运行。
       security:
@@ -3869,11 +4016,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3903,7 +4061,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: 移除背景
       description: 使用 AI（rembg）从图像中移除背景。在本地运行。
       security:
@@ -3937,11 +4095,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3977,7 +4146,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: 应用背景特效
       description: |
         对先前处理过的移除背景结果应用背景替换或特效。需要来自先前 POST /api/v1/tools/image/remove-background 调用的 jobId。
@@ -4044,7 +4213,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: 修复伪透明
       description: |
         修复“伪透明”PNG，即先前背景移除留下的边缘、光晕或半透明瑕疵。使用 BiRefNet HR-matting（2048x2048）生成干净的 alpha 通道，并可配置去边处理。在 OOM 时回退到 birefnet-general，再回退到 u2net。需要安装 background-removal 功能包。
@@ -4078,11 +4247,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4118,7 +4298,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: 图像放大
       description: 使用 AI（Real-ESRGAN）放大图像。在本地运行。
       security:
@@ -4154,11 +4334,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4194,7 +4385,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: 模糊人脸和隐私信息
       description: 检测并模糊图像中的人脸以保护隐私。使用 OpenCV。在本地运行。
       security:
@@ -4226,11 +4417,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4266,7 +4468,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / 文字提取
       description: |-
         从本地图像中提取文本。内置的Fast等级用途Tesseract。Balanced和Best使用可选的签名RapidOCR运行时
@@ -4303,6 +4505,11 @@ paths:
       responses:
         '202':
           description: 校验并加入队列后已接受请求。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度；处理失败会在终止的 failed 事件中返回。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4311,6 +4518,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4354,7 +4567,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: 图像信息
       description: 获取图像的详细元数据，包括尺寸、格式、色彩空间和 EXIF 数据。
       security:
@@ -4457,7 +4670,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: 调色板
       description: 从图像中提取主色调。
       security:
@@ -4510,7 +4723,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: 条形码读取
       description: 从图像中读取 QR 码和条形码。
       security:
@@ -4615,7 +4828,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: 查找重复项
       description: 使用感知哈希在一组图像中查找重复图像。
       security:
@@ -4718,7 +4931,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: QR 码生成器
       description: 从文本生成 QR 码图像。此工具接受 JSON 请求体，而非 multipart。
       security:
@@ -4781,7 +4994,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: 将网页捕获为图像
       description: 将网页捕获为高质量截图图像。接受带 URL 和捕获选项的 JSON 请求体。
       security:
@@ -4867,7 +5080,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: 查看元数据
       description: 查看图像中的所有元数据（EXIF、GPS、ICC、XMP），但不移除。
       security:
@@ -4936,7 +5149,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: 编辑图片元数据
       description: 使用 ExifTool 编辑图像中的 EXIF、IPTC、GPS 及其他元数据字段。
       security:
@@ -5005,7 +5218,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: 查看元数据（ExifTool）
       description: 使用 ExifTool 读取图像中的所有元数据。返回所有嵌入的 EXIF、IPTC、XMP 和 GPS 字段。
       security:
@@ -7018,6 +7231,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: 获取作业状态
+      description: |
+        返回作业的已存储状态，不保持连接。收到 202 响应后轮询此接口，或在进度流中断时作为备用方式使用。
+
+        `status` 为 `queued`、`processing`、`completed`、`failed` 或 `canceled` 之一。`completed`、`failed` 和 `canceled` 为终态。已取消的作业仍可能带有部分 `result`（例如已完成文件的 ZIP），因此只要存在 `result`，就应读取它。
+
+        访问权限与进度流一致：作业所有者、拥有 `files:all` 的用户，或针对功能包安装作业拥有 `features:manage` 的用户。其他调用方将收到 404。
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: 来自 202 响应的 jobId。
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 任务状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: 缺少或无效的凭据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 任务不存在，或调用方无权查看
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7326,6 +7586,197 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: 提交产品反馈
+      description: 记录已登录用户提交的一条反馈事件。每分钟限 10 次请求。`accepted` 为 false 表示服务器未记录该事件。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: 反馈的提交位置。可接受的值定义在共享的反馈常量中。
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: 反馈已处理
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: 请求体无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 缺少或无效的凭据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 超出速率限制
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: 获取可用的更新版本
+      description: 当最新已发布版本高于当前运行版本时返回该版本，否则返回 null。需要 settings:write。
+      responses:
+        '200':
+          description: 最新版本；若此实例已是最新版本，则返回 null
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: 缺少或无效的凭据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 缺少 settings:write 权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: 重置所有 AI 功能包
+      description: |
+        清除 AI 虚拟环境、模型和 pip 缓存，并将所有功能包标记为未安装。当安装无法自行恢复时使用。卸载单个功能包只会删除其模型权重，因此此操作为完全重置。
+
+        响应会说明虚拟环境是否已从内置基础环境重新初始化（venvReseeded）。若功能包安装正在进行，则返回 409。需要 features:manage。
+      responses:
+        '200':
+          description: 重置完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: 缺少或无效的凭据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 缺少 features:manage 权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 功能包安装已在进行中
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: 安装工具所需的全部 AI 功能包
+      description: 为工具所需的每个功能包排队安装，并逐个报告是已排队还是已跳过。需要 features:manage。
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: 各功能包的状态。每个已排队的功能包都有各自的 statusUrl 和 progressUrl。已跳过的功能包两者都没有。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+                        jobId:
+                          type: string
+                        statusUrl:
+                          type: string
+                        progressUrl:
+                          type: string
+        '401':
+          description: 缺少或无效的凭据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 缺少 features:manage 权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 工具不存在，或该工具不需要功能包
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7363,11 +7814,22 @@ paths:
       responses:
         '202':
           description: 安装已开始或已加入队列
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: 用于通过 SSE 跟踪安装进度的任务 ID
@@ -7873,7 +8335,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: 转换视频
       description: 在 MP4、MOV、WebM、AVI 和 MKV 之间转换视频。
       security:
@@ -7905,11 +8367,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7939,7 +8412,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: 压缩视频
       description: 在质量可控的前提下减小视频文件体积。
       security:
@@ -7971,11 +8444,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8005,7 +8489,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: 裁剪视频
       description: 从视频中剪出一段片段。
       security:
@@ -8055,7 +8539,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: 视频静音
       description: 从视频中移除音轨。
       security:
@@ -8098,7 +8582,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: 视频转 GIF
       description: 将视频片段转换为动态 GIF。
       security:
@@ -8132,11 +8616,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8166,7 +8661,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: 调整视频尺寸
       description: 将视频缩放到新的分辨率或预设尺寸。
       security:
@@ -8216,7 +8711,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: 裁剪视频
       description: 从视频中裁剪出一块区域。
       security:
@@ -8267,7 +8762,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: 旋转视频
       description: 旋转或翻转视频。
       security:
@@ -8315,7 +8810,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: 更改 FPS
       description: 更改视频的帧率。
       security:
@@ -8363,7 +8858,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: 视频色彩
       description: 调整亮度、对比度、饱和度和 gamma。
       security:
@@ -8414,7 +8909,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: 视频速度
       description: 加速或减慢视频。
       security:
@@ -8463,7 +8958,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: 倒放视频
       description: 倒放视频片段。限于 5 分钟以内的片段。
       security:
@@ -8506,7 +9001,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: 视频音频标准化
       description: 将视频音频音量标准化到广播标准（EBU R128）。
       security:
@@ -8549,7 +9044,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: 宽高比填充
       description: 添加纯色条以适配目标宽高比。
       security:
@@ -8598,7 +9093,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: 模糊填充
       description: 用视频的模糊副本填充边条。
       security:
@@ -8647,7 +9142,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: 视频水印
       description: 将文字水印烧录到视频帧上。
       security:
@@ -8699,7 +9194,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: 稳定视频
       description: 通过两遍稳定处理减少画面抖动。
       security:
@@ -8730,11 +9225,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8764,7 +9270,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF 转视频
       description: 将动态 GIF 转换为 MP4、WebM 或 MOV 视频。
       security:
@@ -8812,7 +9318,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: 视频转 WebP
       description: 将视频片段转换为动态 WebP 图像。
       security:
@@ -8863,7 +9369,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: 视频转帧
       description: 从视频中提取帧，以图像 ZIP 形式返回。
       security:
@@ -8914,7 +9420,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: 合并视频
       description: |
         将多个视频片段合并为一个 MP4 文件。所有输入都会标准化为第一个视频的分辨率和 30 fps。
@@ -8943,11 +9449,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8977,7 +9494,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: 替换音频
       description: 用另一个文件替换视频的音轨。
       security:
@@ -9022,7 +9539,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: 烧录字幕
       description: 将字幕永久渲染到视频帧上。
       security:
@@ -9055,11 +9572,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9089,7 +9617,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: 嵌入字幕
       description: 将字幕轨混合封装到视频容器中。
       security:
@@ -9139,7 +9667,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: 提取字幕
       description: 从视频中提取字幕轨为 SRT 文件。
       security:
@@ -9182,7 +9710,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: 图像转视频
       description: 将一组图像制作成幻灯片视频。
       security:
@@ -9234,7 +9762,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: 清理视频元数据
       description: 去除视频的元数据并报告发现了哪些内容。
       security:
@@ -9277,7 +9805,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: 自动字幕
       description: |
         使用 faster-whisper 从视频音轨 AI 驱动地生成字幕。支持自动检测和 10 种明确指定的语言。需要安装 transcription 功能包。
@@ -9310,11 +9838,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9350,7 +9889,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: 提取音频
       description: 从视频中提取音轨。
       security:
@@ -9398,7 +9937,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: 转换音频
       description: 在 MP3、WAV、OGG 等格式之间转换音频。
       security:
@@ -9447,7 +9986,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: 裁剪音频
       description: 从音频文件中剪出一段。
       security:
@@ -9496,7 +10035,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: 音量调节
       description: 按固定增益增大或减小音频音量。
       security:
@@ -9544,7 +10083,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: 标准化音频
       description: 将响度均衡到广播标准电平（EBU R128，-16 LUFS）。
       security:
@@ -9587,7 +10126,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: 音频淡入淡出
       description: 为音频添加淡入和淡出效果。
       security:
@@ -9636,7 +10175,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: 倒放音频
       description: 倒放音频。
       security:
@@ -9679,7 +10218,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: 音频速度
       description: 加速或减慢音频播放。
       security:
@@ -9727,7 +10266,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: 变调
       description: 在不改变速度的情况下按半音升高或降低音调。
       security:
@@ -9775,7 +10314,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: 音频声道
       description: 在单声道、立体声之间转换，或交换左右声道。
       security:
@@ -9823,7 +10362,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: 去除静音
       description: 去除音频中的静音段。
       security:
@@ -9872,7 +10411,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: 降噪
       description: 使用基于 FFT 的降噪减少背景噪声。
       security:
@@ -9920,7 +10459,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: 合并音频
       description: 将多个音频文件合并为一段连续的音轨。
       security:
@@ -9970,7 +10509,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: 分割音频
       description: |
         按时间、等份或静音检测分割音频。返回一个 ToolResponse，其 downloadUrl 指向包含各分段的 ZIP 压缩包。
@@ -10023,7 +10562,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: 铃声制作器
       description: 从任意音频文件创建铃声片段（.m4r）。
       security:
@@ -10072,7 +10611,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: 波形图像
       description: 从音频文件生成波形可视化 PNG 图像。
       security:
@@ -10122,7 +10661,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: 音频元数据
       description: |
         查看、编辑或去除音频标签（ID3）。响应在标准 ToolResponse 字段之外还包含一个 `metadata` 对象，内含 container、durationS、bitrateKbps 和 tags。
@@ -10174,7 +10713,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: 转录音频
       description: |
         使用 faster-whisper 的 AI 驱动语音转文字转录。输出纯文本、SRT 或 VTT 字幕格式。需要安装 transcription 功能包。
@@ -10207,11 +10746,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10247,7 +10797,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: 合并 PDF
       description: 将多个 PDF 合并为一个。至少需要两个文件。
       security:
@@ -10292,7 +10842,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: 分割 PDF
       description: |
         提取页面或分割成若干部分。在 "range" 模式下返回包含所选页面的单个 PDF。在 "every" 模式下按每 N 页分割成块，并返回包含各部分的 ZIP 压缩包。
@@ -10343,7 +10893,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: 压缩 PDF
       description: |
         通过对嵌入图像降采样来减小 PDF 文件体积。在 "quality" 模式下，1-100 的滑块控制图像 DPI。在 "targetSize" 模式下，二分查找找出适配目标的最高 DPI。如果压缩会使文件变大，则原样返回原始字节。
@@ -10394,7 +10944,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: 将 PDF 压缩至 100 KB
       description: |
         将 PDF 压缩至 100 KB 目标大小（100 KB，其中 1 KB = 1000 字节）。
@@ -10429,11 +10979,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10457,7 +11018,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: 将 PDF 压缩至 200 KB
       description: |
         将 PDF 压缩至 200 KB 目标大小（200 KB，其中 1 KB = 1000 字节）。
@@ -10492,11 +11053,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10520,7 +11092,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: 将 PDF 压缩至 500 KB
       description: |
         将 PDF 压缩至 500 KB 目标大小（500 KB，其中 1 KB = 1000 字节）。
@@ -10555,11 +11127,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10583,7 +11166,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: 将 PDF 压缩至 1 MB
       description: |
         将 PDF 压缩至 1 MB 目标大小（1000 KB，其中 1 KB = 1000 字节）。
@@ -10618,11 +11201,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10646,7 +11240,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: 将 PDF 压缩至 2 MB
       description: |
         将 PDF 压缩至 2 MB 目标大小（2000 KB，其中 1 KB = 1000 字节）。
@@ -10681,11 +11275,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10709,7 +11314,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: 旋转 PDF
       description: 将 PDF 中的页面旋转 90、180 或 270 度。
       security:
@@ -10758,7 +11363,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: 提取页面
       description: 将所选页面提取到一个新的 PDF 中。
       security:
@@ -10806,7 +11411,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: 移除页面
       description: 从 PDF 中删除特定页面。不能删除全部页面。
       security:
@@ -10854,7 +11459,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: 整理 PDF
       description: 按明确的页面顺序重新排序页面。
       security:
@@ -10902,7 +11507,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 多功能工具
       description: 根据明确的页面计划组装 PDF——重新排序、复制、旋转或删除页面，并在一个提交中从额外的 PDF 中提取页面。
       security:
@@ -10953,7 +11558,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: 保护 PDF
       description: 使用 AES-256 加密添加密码保护。密码会在审计日志中被隐去。
       security:
@@ -11002,7 +11607,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: 解锁 PDF
       description: 移除 PDF 的密码保护。必须提供正确的密码。密码会在审计日志中被隐去。
       security:
@@ -11050,7 +11655,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: 修复 PDF
       description: 尝试修复损坏或已破坏的 PDF。对输入跳过结构校验，以允许格式不规范的文件。
       security:
@@ -11093,7 +11698,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: Web 优化 PDF
       description: 线性化 PDF 以实现快速 Web 查看（渐进式下载）。
       security:
@@ -11136,7 +11741,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: 灰度 PDF
       description: 将 PDF 中的所有颜色转换为灰度。
       security:
@@ -11179,7 +11784,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: PDF/A 转换器
       description: 将 PDF 转换为归档用的 PDF/A-2 格式，以便长期保存。
       security:
@@ -11222,7 +11827,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: 裁剪 PDF
       description: 以统一的边距裁剪所有页面。
       security:
@@ -11270,7 +11875,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: 每张纸多页 (N-up)
       description: 每张纸上排布多个页面（例如 2-up、4-up）。
       security:
@@ -11318,7 +11923,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: 小册子 PDF
       description: 排布页面以折叠成小册子（为双面打印进行拼版）。
       security:
@@ -11366,7 +11971,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 水印
       description: 为 PDF 的每一页添加文字水印。
       security:
@@ -11418,7 +12023,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: PDF 页码
       description: 为 PDF 的每一页添加页码（"Page N of M"）。
       security:
@@ -11467,7 +12072,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: 转换文档
       description: 在 Word、OpenDocument、RTF 和纯文本格式之间转换。
       security:
@@ -11498,11 +12103,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11526,7 +12142,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: 转换演示文稿
       description: 在 PowerPoint 和 OpenDocument 演示文稿格式之间转换。
       security:
@@ -11557,11 +12173,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11585,7 +12212,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: 转换电子表格
       description: 在 Excel、OpenDocument 和 CSV 格式之间转换。多工作表工作簿会将第一个工作表导出为 CSV。
       security:
@@ -11616,11 +12243,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11644,7 +12282,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel 转 PDF
       description: 将电子表格转换为 PDF。宽表可能会跨多页分页。
       security:
@@ -11670,11 +12308,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11698,7 +12347,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word 转 PDF
       description: 将 Word 文档转换为 PDF。
       security:
@@ -11724,11 +12373,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11752,7 +12412,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint 转 PDF
       description: 将演示文稿转换为 PDF。
       security:
@@ -11778,11 +12438,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11806,7 +12477,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML 转 PDF
       description: 将 HTML 文件转换为 PDF。出于隐私考虑，远程资源被禁用。
       security:
@@ -11832,11 +12503,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11860,7 +12542,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown 转 Word
       description: 将 Markdown 文件转换为 Word 文档（DOCX）。
       security:
@@ -11903,7 +12585,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown 转 HTML
       description: 将 Markdown 文件转换为独立的 HTML 页面。源中的远程图像在输出中保持原样。
       security:
@@ -11946,7 +12628,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown 转 PDF
       description: 将 Markdown 文件转换为带样式的 PDF。出于隐私考虑，远程资源被禁用。
       security:
@@ -11972,11 +12654,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12000,7 +12693,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: 从 EPUB 转换
       description: 将 EPUB 转换为 PDF、DOCX、HTML 或 Markdown。书中的远程资源不会被获取。
       security:
@@ -12031,11 +12724,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12059,7 +12763,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: 转换为 EPUB
       description: 将 Word、Markdown、HTML 或纯文本文件转换为 EPUB。
       security:
@@ -12085,11 +12789,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12113,7 +12828,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: 扁平化 PDF
       description: 将表单和批注烘焙进页面内容。
       security:
@@ -12156,7 +12871,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: 涂黑 PDF
       description: 永久移除文本出现处（经验证的真正涂黑）。
       security:
@@ -12211,7 +12926,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF 转文本
       description: 从 PDF 中提取纯文本。
       security:
@@ -12260,7 +12975,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF 转 Word
       description: 最适合基于文本的 PDF；扫描页需要 OCR。
       security:
@@ -12286,11 +13001,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12314,7 +13040,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: PDF 元数据
       description: 读取和写入 PDF 文档元数据。
       security:
@@ -12371,7 +13097,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF OCR
       description: |-
         从扫描的 PDF 文档中逐页提取文本。 Fast 使用
@@ -12411,6 +13137,11 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12419,6 +13150,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12468,7 +13205,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: 图表制作器
       description: 根据 CSV 或 JSON 数据创建柱状图、折线图或饼图。返回 PNG 图像。当某行因值单元格包含非数字文本而被遗漏时，响应会添加 `chartRows`（{charted, skipped}）；空行不计入。
       security:
@@ -12519,7 +13256,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV 转 Excel
       description: 在 CSV 和 Excel（XLSX）之间双向转换。上传 CSV 或 TSV 文件以获取 XLSX，或上传 XLSX 文件以获取 CSV。
       security:
@@ -12567,7 +13304,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV 转 JSON
       description: 在 CSV 和 JSON 之间双向转换。上传 CSV 或 TSV 文件以获取 JSON，或上传对象数组 JSON 以获取 CSV。
       security:
@@ -12615,7 +13352,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON 转 XML
       description: 在 JSON 和 XML 之间双向转换。上传 JSON 文件以获取 XML，或上传 XML 文件以获取 JSON。
       security:
@@ -12663,7 +13400,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: 分割 CSV
       description: 按行数将 CSV 文件分割为更小的文件。返回包含各部分的 ZIP 压缩包。
       security:
@@ -12712,7 +13449,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: 合并 CSV
       description: 将列相匹配的多个 CSV 或 TSV 文件合并为一个文件。所有文件必须具有相同的列标题。
       security:
@@ -12757,7 +13494,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: 转换 YAML / JSON
       description: 在 YAML 和 JSON 之间双向转换。上传 YAML 文件以获取 JSON，或上传 JSON 文件以获取 YAML。
       security:
@@ -12800,7 +13537,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML 转 CSV
       description: 从 XML 文件中提取重复元素到 CSV 表格。自动在 XML 树中查找第一个对象数组。
       security:
@@ -12843,7 +13580,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: 创建 ZIP
       description: 将多个文件打包为单个 ZIP 压缩包。重复的文件名会被自动去重。
       security:
@@ -12888,7 +13625,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: 解压 ZIP
       description: 安全地从 ZIP 压缩包中解压文件，并带有炸弹防护。单文件压缩包直接返回该文件；多文件压缩包返回一个扁平的 ZIP。
       security:
@@ -12931,7 +13668,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: 背景替换
       description: |
         AI 驱动的背景替换。移除主体的背景，并将其合成到纯色或渐变背景上。需要安装 background-removal 功能包。
@@ -12969,11 +13706,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13009,7 +13757,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: 背景模糊
       description: |
         AI 驱动的背景模糊。移除背景、模糊原图，并将清晰的主体合成到顶部。需要安装 background-removal 功能包。
@@ -13043,11 +13791,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13083,7 +13842,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: 条形码生成器
       description: 从文本生成条形码图像。此工具接受 JSON 请求体，而非 multipart。
       security:
@@ -13146,7 +13905,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: 圆形裁剪
       description: 将图像裁剪为居中的圆形，四角透明，可选边框，可调整缩放/偏移。
       security:
@@ -13200,7 +13959,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: 圆角裁剪
       description: 将图像裁剪为具有透明角、可选边框和可调节缩放/偏移的圆角正方形或方圆形。
       security:
@@ -13256,7 +14015,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: 双色调
       description: 应用双色调效果，可自定义阴影色和高光色。
       security:
@@ -13306,7 +14065,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: 图像填充
       description: 将图像填充到目标宽高比，背景可为纯色、透明或模糊。
       security:
@@ -13359,7 +14118,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: 像素化
       description: 对整张图像或特定矩形区域应用像素化效果。
       security:
@@ -13412,7 +14171,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: 暗角
       description: 添加暗角效果，可调整强度、颜色、半径、柔和度、圆润度和中心位置。
       security:
@@ -13466,7 +14225,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: GIF/WebP 转换器
       description: 在动态 GIF 与 WebP 之间互转，保留所有帧。仅接受 .gif 和 .webp 输入。
       security:
@@ -13516,7 +14275,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: 直方图
       description: |
         从图像生成 RGB 直方图。返回一张 PNG 直方图图像，外加每通道统计数据和响应 JSON 中的 256 分箱原始直方图数据。
@@ -13648,7 +14407,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: LQIP 占位图
       description: |
         生成一张微小的低质量图像占位图。返回一个小图像文件，外加响应 JSON 中的 base64 data URI、可直接使用的 HTML img 标签和 CSS 背景片段。
@@ -13725,7 +14484,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: 精灵图
       description: |
         将多张图像组合成单张精灵图网格。接受 2 到 64 张图像。每张图像都会被缩放到与第一张图像相同的尺寸。返回精灵图图像外加帧坐标元数据。
@@ -13817,7 +14576,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: 证件照
       description: |
         证件照两阶段流程的指引端点。使用 `/api/v1/tools/image/passport-photo/analyze` 分析图像，然后使用 `/api/v1/tools/image/passport-photo/generate` 创建最终证件照。当所需功能包已安装时，此基础路由返回 400 指引错误；缺失时返回 501。
@@ -13846,7 +14605,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: 签署 PDF
       description: 使用归一化的页面放置位置，将一个或多个签名 PNG 图像盖印到 PDF 上。
       security:
@@ -13890,11 +14649,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13924,7 +14694,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 PNG
       description: |
         将 JPG 转换为 PNG
@@ -13985,7 +14755,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 JPG
       description: |
         将 PNG 转换为 JPG
@@ -14046,7 +14816,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 WebP
       description: |
         将 JPG 转换为 WebP
@@ -14107,7 +14877,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 WebP
       description: |
         将 PNG 转换为 WebP
@@ -14168,7 +14938,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP 转 JPG
       description: |
         将 WebP 转换为 JPG
@@ -14229,7 +14999,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP 转 PNG
       description: |
         将 WebP 转换为 PNG
@@ -14290,7 +15060,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 AVIF
       description: |
         将 JPG 转换为 AVIF
@@ -14351,7 +15121,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 AVIF
       description: |
         将 PNG 转换为 AVIF
@@ -14412,7 +15182,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP 转 AVIF
       description: |
         将 WebP 转换为 AVIF
@@ -14473,7 +15243,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 转 JPG
       description: |
         将 HEIC 转换为 JPG
@@ -14534,7 +15304,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 转 PNG
       description: |
         将 HEIC 转换为 PNG
@@ -14595,7 +15365,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 转 AVIF
       description: |
         将 HEIC 转换为 AVIF
@@ -14656,7 +15426,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 GIF
       description: |
         将 JPG 转换为 GIF
@@ -14717,7 +15487,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 GIF
       description: |
         将 PNG 转换为 GIF
@@ -14778,7 +15548,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF 转 JPG
       description: |
         将 GIF 转换为 JPG
@@ -14839,7 +15609,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF 转 PNG
       description: |
         将 GIF 转换为 PNG
@@ -14900,7 +15670,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP 转 GIF
       description: |
         将 WebP 转换为 GIF
@@ -14961,7 +15731,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 TIFF
       description: |
         将 JPG 转换为 TIFF
@@ -15022,7 +15792,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 TIFF
       description: |
         将 PNG 转换为 TIFF
@@ -15083,7 +15853,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 转 JPG
       description: |
         将 TIFF 转换为 JPG
@@ -15144,7 +15914,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 转 PNG
       description: |
         将 TIFF 转换为 PNG
@@ -15205,7 +15975,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD 转 JPG
       description: |
         将 PSD 转换为 JPG
@@ -15266,7 +16036,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD 转 PNG
       description: |
         将 PSD 转换为 PNG
@@ -15327,7 +16097,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 EPS
       description: |
         将 PNG 转换为 EPS
@@ -15388,7 +16158,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 EPS
       description: |
         将 JPG 转换为 EPS
@@ -15449,7 +16219,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS 转 PNG
       description: |
         将 EPS 转换为 PNG
@@ -15510,7 +16280,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS 转 JPG
       description: |
         将 EPS 转换为 JPG
@@ -15571,7 +16341,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 SVG
       description: |
         将 PNG 转换为 SVG
@@ -15632,7 +16402,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 SVG
       description: |
         将 JPG 转换为 SVG
@@ -15693,7 +16463,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 转 SVG
       description: |
         将 TIFF 转换为 SVG
@@ -15754,7 +16524,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD 转 SVG
       description: |
         将 PSD 转换为 SVG
@@ -15815,7 +16585,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS 转 SVG
       description: |
         将 EPS 转换为 SVG
@@ -15876,7 +16646,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG 转 PNG
       description: |
         将 SVG 转换为 PNG
@@ -15932,7 +16702,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG 转 JPG
       description: |
         将 SVG 转换为 JPG
@@ -15988,7 +16758,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG 转 PDF
       description: |
         将 JPG 转换为 PDF
@@ -16046,7 +16816,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG 转 PDF
       description: |
         将 PNG 转换为 PDF
@@ -16104,7 +16874,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 转 PDF
       description: |
         将 HEIC 转换为 PDF
@@ -16162,7 +16932,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 转 PDF
       description: |
         将 TIFF 转换为 PDF
@@ -16220,7 +16990,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP 转 PDF
       description: |
         将 WebP 转换为 PDF
@@ -16278,7 +17048,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF 转 PDF
       description: |
         将 GIF 转换为 PDF
@@ -16336,7 +17106,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS 转 PDF
       description: |
         将 EPS 转换为 PDF
@@ -16394,7 +17164,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF 转 JPG
       description: |
         将 PDF 转换为 JPG
@@ -16450,7 +17220,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF 转 PNG
       description: |
         将 PDF 转换为 PNG
@@ -16506,7 +17276,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF 转 TIFF
       description: |
         将 PDF 转换为 TIFF
@@ -16562,7 +17332,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV 转 MP4
       description: |
         将 MOV 转换为 MP4
@@ -16595,11 +17365,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16629,7 +17410,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM 转 MP4
       description: |
         将 WEBM 转换为 MP4
@@ -16662,11 +17443,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16696,7 +17488,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV 转 MP4
       description: |
         将 MKV 转换为 MP4
@@ -16729,11 +17521,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16763,7 +17566,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI 转 MP4
       description: |
         将 AVI 转换为 MP4
@@ -16796,11 +17599,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16830,7 +17644,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 转 MOV
       description: |
         将 MP4 转换为 MOV
@@ -16863,11 +17677,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16897,7 +17722,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 转 WEBM
       description: |
         将 MP4 转换为 WEBM
@@ -16930,11 +17755,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16964,7 +17800,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM 转 MOV
       description: |
         将 WEBM 转换为 MOV
@@ -16997,11 +17833,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17031,7 +17878,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV 转 MOV
       description: |
         将 MKV 转换为 MOV
@@ -17064,11 +17911,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17098,7 +17956,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI 转 MOV
       description: |
         将 AVI 转换为 MOV
@@ -17131,11 +17989,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17165,7 +18034,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 转 AVI
       description: |
         将 MP4 转换为 AVI
@@ -17198,11 +18067,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17232,7 +18112,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV 转 AVI
       description: |
         将 MOV 转换为 AVI
@@ -17265,11 +18145,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17299,7 +18190,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV 转 AVI
       description: |
         将 MKV 转换为 AVI
@@ -17332,11 +18223,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17366,7 +18268,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI 转 MKV
       description: |
         将 AVI 转换为 MKV
@@ -17399,11 +18301,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17433,7 +18346,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 转 GIF
       description: |
         将 MP4 转换为 GIF
@@ -17466,11 +18379,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17500,7 +18424,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV 转 GIF
       description: |
         将 MOV 转换为 GIF
@@ -17533,11 +18457,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17567,7 +18502,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV 转 GIF
       description: |
         将 MKV 转换为 GIF
@@ -17600,11 +18535,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17634,7 +18580,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI 转 GIF
       description: |
         将 AVI 转换为 GIF
@@ -17667,11 +18613,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17701,7 +18658,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF 转 MP4
       description: |
         将 GIF 转换为 MP4
@@ -17762,7 +18719,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF 转 WEBM
       description: |
         将 GIF 转换为 WEBM
@@ -17823,7 +18780,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF 转 MOV
       description: |
         将 GIF 转换为 MOV
@@ -17884,7 +18841,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 转 MP3
       description: |
         将 MP4 转换为 MP3
@@ -17945,7 +18902,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV 转 MP3
       description: |
         将 MOV 转换为 MP3
@@ -18006,7 +18963,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV 转 MP3
       description: |
         将 MKV 转换为 MP3
@@ -18067,7 +19024,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM 转 MP3
       description: |
         将 WEBM 转换为 MP3
@@ -18128,7 +19085,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI 转 MP3
       description: |
         将 AVI 转换为 MP3
@@ -18189,7 +19146,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 转 WAV
       description: |
         将 MP4 转换为 WAV
@@ -18250,7 +19207,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV 转 WAV
       description: |
         将 MOV 转换为 WAV
@@ -18311,7 +19268,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 转 OGG
       description: |
         将 MP4 转换为 OGG
@@ -18372,7 +19329,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A 转 MP3
       description: |
         将 M4A 转换为 MP3
@@ -18433,7 +19390,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A 转 WAV
       description: |
         将 M4A 转换为 WAV
@@ -18494,7 +19451,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC 转 MP3
       description: |
         将 AAC 转换为 MP3
@@ -18555,7 +19512,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC 转 WAV
       description: |
         将 AAC 转换为 WAV
@@ -18616,7 +19573,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC 转 FLAC
       description: |
         将 AAC 转换为 FLAC
@@ -18677,7 +19634,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG 转 MP3
       description: |
         将 OGG 转换为 MP3
@@ -18738,7 +19695,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG 转 WAV
       description: |
         将 OGG 转换为 WAV
@@ -18799,7 +19756,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV 转 MP3
       description: |
         将 WAV 转换为 MP3
@@ -18860,7 +19817,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 转 WAV
       description: |
         将 MP3 转换为 WAV
@@ -18921,7 +19878,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC 转 MP3
       description: |
         将 FLAC 转换为 MP3
@@ -18982,7 +19939,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel 转 CSV
       description: |
         将 Excel 转换为 CSV
@@ -19015,11 +19972,22 @@ paths:
       responses:
         '202':
           description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19158,6 +20126,58 @@ paths:
           description: 没有待处理的注册，或请求体无效
         '401':
           description: TOTP 代码无效
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: 完成强制 MFA 注册
+      description: 确认登录时开始的强制注册，并返回一个会话。此调用不受会话限制，短期有效的注册令牌代替会话。此处仅接受 TOTP 验证码，不接受恢复码。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: 注册已确认，会话已创建。会话令牌的返回方式与登录时相同。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: 缺少注册令牌或验证码
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 注册令牌无效或已过期，或验证码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 尝试次数过多
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19324,7 +20344,7 @@ paths:
           description: 无法生成预览
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: 生成上传预览
@@ -19672,6 +20692,69 @@ paths:
       responses:
         '200':
           description: SCIM 用户已停用
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: 部分更新 SCIM 用户
+      description: RFC 7644 PatchOp。支持对服务器允许的路径执行 add、remove 和 replace。用户路径按操作逐一校验。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: 资源已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: PatchOp 无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 缺少或无效的凭据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 资源不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19737,6 +20820,69 @@ paths:
       responses:
         '204':
           description: SCIM 组已删除
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: 部分更新 SCIM 组
+      description: RFC 7644 PatchOp。支持对服务器允许的路径执行 add、remove 和 replace。组成员按操作逐一校验。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: 资源已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: PatchOp 无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 缺少或无效的凭据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 资源不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -19982,7 +21128,29 @@ paths:
             type: string
       responses:
         '202':
-          description: 导出任务已开始
+          description: 导出已开始。请轮询 statusUrl 获取结果。同一 URL 也位于 Location 响应头中。
+          headers:
+            Location:
+              description: 导出任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: 未授权此功能，或权限不足
         '404':
@@ -20178,13 +21346,33 @@ x-i18n:
       provenance: machine
       outputHash: 13e7fd3cd792
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: da272b52f34b
+      outputHash: 37feebafa748
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: 95e7333e81f0
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 726bae36bf64
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: 2f83faf76758
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: e297e82628cc
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: 7dc32b2d08bd
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: 42f628bb9444
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21141,6 +22329,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: e2359e5bb551
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: 8ff7458ccd8e
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: dcbb7ab75848
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21173,6 +22369,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: 0bd7ef5c2bc9
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: 1679454754c0
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: 4f762d9feb19
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: 2000d3254715
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: 3b98a711a205
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: 81a6853171aa
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: 379e0d2ed977
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: ba93093f26cc
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: eff637d44bd4
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22853,6 +24081,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: d7629c943e32
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: e1bb513f9780
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: 4f1816e3618c
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23069,6 +24305,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: 092ee7f684b4
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: a7dd4557f631
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: b3e09ae15133
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23109,6 +24353,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: 73e1301a5e26
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: 274671fa2aaf
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: ec618585e731
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine
@@ -23349,6 +24601,26 @@ x-i18n:
       sourceHash: 9bdf4d2a5c25
       provenance: machine
       outputHash: 9ea143b6c4b5
+    ptr:/components/schemas/Error/properties/code/description:
+      sourceHash: bf339907046a
+      provenance: machine
+      outputHash: 3a6968e9f827
+    ptr:/components/schemas/Error/properties/requestId/description:
+      sourceHash: 7a9822038dbc
+      provenance: machine
+      outputHash: 4e4ec84524d6
+    ptr:/components/schemas/JobStatus/properties/status/description:
+      sourceHash: c733f9fae6bb
+      provenance: machine
+      outputHash: dfcd458836d0
+    ptr:/components/schemas/JobStatus/properties/result/description:
+      sourceHash: 9b7fb1030f61
+      provenance: machine
+      outputHash: '499989588130'
+    ptr:/components/schemas/JobStatus/properties/progressUrl/description:
+      sourceHash: d243642d631c
+      provenance: machine
+      outputHash: f3621ded1ba7
     ptr:/components/schemas/ToolResponse/properties/jobId/description:
       sourceHash: f93d3d625101
       provenance: machine
@@ -23881,6 +25153,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -23913,6 +25189,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -23945,6 +25225,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24101,6 +25385,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24133,6 +25421,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24761,6 +26053,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24793,6 +26089,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/400/description:
       sourceHash: 91cd364b6a62
       provenance: machine
@@ -24869,6 +26169,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/400/description:
       sourceHash: 7cea57b7cad6
       provenance: machine
@@ -24897,6 +26201,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24949,6 +26257,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24981,6 +26293,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25013,6 +26329,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25041,6 +26361,10 @@ x-i18n:
       sourceHash: 9c0ccc385d27
       provenance: machine
       outputHash: bd44bbf2bd09
+    ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25993,6 +27317,22 @@ x-i18n:
       sourceHash: 8b99f95b1946
       provenance: machine
       outputHash: 1c949a56a6d4
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/parameters/0/description:
+      sourceHash: 105290b108f4
+      provenance: machine
+      outputHash: ce6a9d218d2c
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/200/description:
+      sourceHash: cda9498c937b
+      provenance: machine
+      outputHash: f850d949259b
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: ac2dbae284f3
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/404/description:
+      sourceHash: 288b3aa41c1f
+      provenance: machine
+      outputHash: 36387edcfc9c
     ptr:/paths/~1api~1v1~1jobs~1{jobId}~1progress/get/parameters/0/description:
       sourceHash: 3f77c804360b
       provenance: machine
@@ -26093,6 +27433,70 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 7febe43544a1
+    ptr:/paths/~1api~1v1~1feedback/post/requestBody/content/application~1json/schema/properties/source/description:
+      sourceHash: 51f100d50bab
+      provenance: machine
+      outputHash: 2deb33a2bdae
+    ptr:/paths/~1api~1v1~1feedback/post/responses/200/description:
+      sourceHash: 8901e89d433e
+      provenance: machine
+      outputHash: b9550f7a66a2
+    ptr:/paths/~1api~1v1~1feedback/post/responses/400/description:
+      sourceHash: 5685909cf0a7
+      provenance: machine
+      outputHash: 48c23e7c83d3
+    ptr:/paths/~1api~1v1~1feedback/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: ac2dbae284f3
+    ptr:/paths/~1api~1v1~1feedback/post/responses/429/description:
+      sourceHash: 95a111e3185e
+      provenance: machine
+      outputHash: b5719f0f7a64
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
+      sourceHash: 9031d1af7020
+      provenance: machine
+      outputHash: 97da4c37c282
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: ac2dbae284f3
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/403/description:
+      sourceHash: 95d513c2ed9a
+      provenance: machine
+      outputHash: ad17f1a9b714
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/200/description:
+      sourceHash: 568b126ca48c
+      provenance: machine
+      outputHash: df5dd0f95d3f
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: ac2dbae284f3
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 4d69a59bb9f1
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/409/description:
+      sourceHash: f6fd45eac33e
+      provenance: machine
+      outputHash: 2de6e1a3cec4
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/202/description:
+      sourceHash: 148c1c5a4e39
+      provenance: machine
+      outputHash: 4ec045fbe7d2
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: ac2dbae284f3
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 4d69a59bb9f1
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/404/description:
+      sourceHash: e1208d06faa8
+      provenance: machine
+      outputHash: 762479fb829c
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -26101,6 +27505,10 @@ x-i18n:
       sourceHash: 356335f30ad9
       provenance: machine
       outputHash: 862ad844a06b
+    ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/content/application~1json/schema/properties/jobId/description:
       sourceHash: f77d0d971c51
       provenance: machine
@@ -26329,6 +27737,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26357,6 +27769,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26421,6 +27837,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26661,6 +28081,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26745,6 +28169,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26789,6 +28217,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26889,6 +28321,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27253,6 +28689,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27341,6 +28781,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27365,6 +28809,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27389,6 +28837,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27413,6 +28865,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27437,6 +28893,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27765,6 +29225,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27789,6 +29253,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27813,6 +29281,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27833,6 +29305,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27853,6 +29329,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27873,6 +29353,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27893,6 +29377,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27945,6 +29433,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27969,6 +29461,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27989,6 +29485,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28069,6 +29569,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28117,6 +29621,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28337,6 +29845,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28369,6 +29881,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28725,6 +30241,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -29937,6 +31457,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -29965,6 +31489,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -29993,6 +31521,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30021,6 +31553,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30049,6 +31585,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30077,6 +31617,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30105,6 +31649,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30133,6 +31681,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30161,6 +31713,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30189,6 +31745,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30217,6 +31777,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30245,6 +31809,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30273,6 +31841,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30301,6 +31873,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30329,6 +31905,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30357,6 +31937,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30385,6 +31969,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31001,6 +32589,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: d6b58248c775
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 581fd6c43aa2
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31077,6 +32669,22 @@ x-i18n:
       sourceHash: 6db92b87b80d
       provenance: machine
       outputHash: 4327339de8d8
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/200/description:
+      sourceHash: eddcb6a49407
+      provenance: machine
+      outputHash: 8d56ac842527
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/400/description:
+      sourceHash: bab4cddd22a1
+      provenance: machine
+      outputHash: e6e476a078d5
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/401/description:
+      sourceHash: c5292e1d5e33
+      provenance: machine
+      outputHash: b107db64a01d
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/429/description:
+      sourceHash: 91434030e947
+      provenance: machine
+      outputHash: ed109f24b80c
     ptr:/paths/~1api~1auth~1mfa~1complete/post/responses/200/description:
       sourceHash: 2316b4f3e3ce
       provenance: machine
@@ -31325,6 +32933,22 @@ x-i18n:
       sourceHash: f4dea73b29b6
       provenance: machine
       outputHash: 2b39c54f1cbf
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 1e4639af4679
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 7a8362709a50
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: ac2dbae284f3
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: 4aefbe3428ef
     ptr:/paths/~1api~1v1~1scim~1v2~1Groups/get/responses/200/description:
       sourceHash: df8e6383d425
       provenance: machine
@@ -31345,6 +32969,22 @@ x-i18n:
       sourceHash: 1212fc1b0593
       provenance: machine
       outputHash: a1c0ac5bc029
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 1e4639af4679
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 7a8362709a50
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: ac2dbae284f3
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: 4aefbe3428ef
     ptr:/paths/~1api~1v1~1enterprise~1audit~1export/get/responses/200/description:
       sourceHash: 6215b564a1d4
       provenance: machine
@@ -31494,9 +33134,13 @@ x-i18n:
       provenance: machine
       outputHash: 794ac78d2463
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/description:
-      sourceHash: 0af3d2a07c98
+      sourceHash: 52a7b1517297
       provenance: machine
-      outputHash: 4c6901bb9539
+      outputHash: 2d76a32413ee
+    ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/headers/Location/description:
+      sourceHash: 6f75e9da213c
+      provenance: machine
+      outputHash: 59ea2374715d
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/403/description:
       sourceHash: 7d67215cdd1a
       provenance: machine

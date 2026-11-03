@@ -22,9 +22,19 @@ servers:
     description: वर्तमान इंस्टेंस
 tags:
   - name: Tools
-    description: image, video, audio, PDF, और files में फैले फ़ाइल प्रोसेसिंग tools। प्रत्येक एक multipart file upload स्वीकार करता है और एक download URL लौटाता है।
+    description: किसी section के अंतर्गत समूहित न किए गए tool endpoints।
+  - name: Image
+    description: Image tools। हर एक multipart file upload स्वीकार करता है और एक download URL लौटाता है।
+  - name: Video
+    description: Video tools। हर एक multipart file upload स्वीकार करता है और एक download URL लौटाता है।
+  - name: Audio
+    description: Audio tools। हर एक multipart file upload स्वीकार करता है और एक download URL लौटाता है।
+  - name: PDF
+    description: PDF और document tools। हर एक multipart file upload स्वीकार करता है और एक download URL लौटाता है।
   - name: Batch
     description: एक ही request में एक tool के जरिए कई फ़ाइलें प्रोसेस करें।
+  - name: Jobs
+    description: लंबे समय तक चलने वाले jobs की स्थिति और प्रगति।
   - name: Pipelines
     description: 'कई tools को पुन: प्रयोज्य workflows में चेन करें।'
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: अतिरिक्त त्रुटि विवरण (जैसे Zod वैलिडेशन त्रुटियां)
+        code:
+          type: string
+          description: स्थिर machine-readable code। त्रुटि कैटलॉग में सूचीबद्ध।
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: सहायता और लॉग मिलान के लिए Request ID।
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: संग्रहीत job status। completed, failed, और canceled अंतिम स्थितियां हैं।
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: जब job का परिणाम हो, तब मौजूद। इसका ढांचा टूल पर निर्भर करता है, जैसे downloadUrl। रद्द की गई job में आंशिक परिणाम हो सकता है।
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: इस job के लिए SSE स्ट्रीम।
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: इमेज रीसाइज़
       description: एक image का आकार विशिष्ट आयामों में या प्रतिशत के अनुसार बदलें।
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: कंटेंट-अवेयर रीसाइज़
       description: महत्वपूर्ण विशेषताओं को संरक्षित करते हुए बुद्धिमानी से कंटेंट हटाने या जोड़ने के लिए seam carving का उपयोग करके एक image का आकार बदलें।
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: इमेज क्रॉप
       description: एक image को किसी विशिष्ट क्षेत्र तक क्रॉप करें।
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: इमेज रोटेट और फ्लिप
       description: एक image को कोण के अनुसार घुमाएं या क्षैतिज/लंबवत फ़्लिप करें।
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: इमेज कन्वर्ट
       description: एक image को किसी भिन्न format में बदलें।
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: इमेज कंप्रेस
       description: गुणवत्ता स्तर या लक्ष्य आकार के अनुसार image फ़ाइल आकार कम करें।
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: छवि को 20 KB तक संपीड़ित करें
       description: |
         एक छवि को 20 KB के लक्ष्य आकार तक संपीड़ित करें
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: छवि को 50 KB तक संपीड़ित करें
       description: |
         एक छवि को 50 KB के लक्ष्य आकार तक संपीड़ित करें
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: छवि को 100 KB तक संपीड़ित करें
       description: |
         एक छवि को 100 KB के लक्ष्य आकार तक संपीड़ित करें
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: छवि को 200 KB तक संपीड़ित करें
       description: |
         एक छवि को 200 KB के लक्ष्य आकार तक संपीड़ित करें
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: छवि को 500 KB तक संपीड़ित करें
       description: |
         एक छवि को 500 KB के लक्ष्य आकार तक संपीड़ित करें
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: इमेज मेटाडेटा हटाएं
       description: एक image से EXIF, GPS, ICC, या XMP metadata हटाएं।
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: बॉर्डर और फ़्रेम
       description: एक image में बॉर्डर, गोल कोने, पैडिंग, या छाया जोड़ें।
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: स्क्रीनशॉट सुशोभित करें
       description: |
         स्क्रीनशॉट में ग्रेडिएंट बैकग्राउंड, डिवाइस फ़्रेम, छायाएं, वॉटरमार्क, और सोशल
@@ -1067,7 +1137,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: रंग समायोजन
       description: |
         समेकित रंग समायोजन tool। एक ही पास में चमक, कंट्रास्ट, एक्सपोज़र, संतृप्ति, तापमान, टिंट, ह्यू, तीक्ष्णता, रंग चैनल, और प्रभावों को समायोजित करता है।
@@ -1127,7 +1197,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: इमेज शार्पन
       description: वैकल्पिक शोर कमी के साथ adaptive, unsharp mask, या high-pass विधियों का उपयोग करके एक image को तीक्ष्ण करें।
       security:
@@ -1187,7 +1257,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: वेब के लिए अनुकूलित करें
       description: आधुनिक formats में बदलकर, गुणवत्ता समायोजित करके, और वैकल्पिक रूप से आकार बदलकर वेब डिलीवरी के लिए एक image को अनुकूलित करें।
       security:
@@ -1240,7 +1310,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: वेब के लिए अनुकूलित करें (preview)
       description: |
         लाइव पैरामीटर ट्यूनिंग के लिए हल्का preview endpoint।
@@ -1303,7 +1373,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: image संवर्द्धन
       description: |
         AI-संचालित स्वचालित image संवर्द्धन। image का विश्लेषण करता है और चयनित
@@ -1363,7 +1433,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: संवर्द्धन के लिए image विश्लेषण करें
       description: |
         एक image का विश्लेषण करें और सुझाए गए सुधार लागू किए बिना लौटाएं।
@@ -1415,7 +1485,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: शोर हटाना
       description: |
         Python sidecar का उपयोग करके AI-संचालित शोर हटाना। त्वरित preview से
@@ -1454,11 +1524,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1494,7 +1575,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: रेड-आई हटाना
       description: |
         AI-संचालित रेड-आई डिटेक्शन और हटाना। चेहरों का पता लगाता है और तस्वीरों में
@@ -1531,11 +1612,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1571,7 +1663,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: फ़ोटो पुनर्स्थापना
       description: |
         AI-संचालित फ़ोटो पुनर्स्थापना pipeline। खरोंचों की मरम्मत करता है, चेहरों को बेहतर बनाता है,
@@ -1611,11 +1703,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1651,7 +1754,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: पासपोर्ट फ़ोटो - विश्लेषण
       description: |
         पासपोर्ट फ़ोटो जनरेशन का चरण 1। चेहरे के लैंडमार्क का पता लगाता है और
@@ -1787,7 +1890,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: पासपोर्ट फ़ोटो - जनरेट करें
       description: |
         पासपोर्ट फ़ोटो जनरेशन का चरण 2। फ़ोटो को निर्दिष्ट
@@ -1929,7 +2032,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: रंगीन करें
       description: |
         AI-संचालित फ़ोटो रंगीनीकरण। OpenCV DNN fallback के साथ DDColor का उपयोग करके
@@ -1964,11 +2067,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2004,7 +2118,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: चेहरा संवर्द्धन
       description: |
         GFPGAN या CodeFormer का उपयोग करके AI-संचालित चेहरा संवर्द्धन। image में चेहरों
@@ -2041,11 +2155,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2081,7 +2206,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: छवि से Base64
       description: |
         एक या अधिक images को data URIs के साथ Base64-एन्कोडेड strings में बदलें।
@@ -2175,7 +2300,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: टेक्स्ट वॉटरमार्क
       description: एक image में टेक्स्ट वॉटरमार्क जोड़ें।
       security:
@@ -2228,7 +2353,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: टेक्स्ट ओवरले
       description: वैकल्पिक बैकग्राउंड बॉक्स के साथ स्टाइल किया गया टेक्स्ट ओवरले जोड़ें।
       security:
@@ -2282,7 +2407,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: रंग बदलें
       description: एक image में किसी विशिष्ट रंग को अन्य रंग या पारदर्शिता से बदलें।
       security:
@@ -2333,7 +2458,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: वर्णांधता सिमुलेशन
       description: सिमुलेट करें कि विभिन्न प्रकार की रंग दृष्टि कमी वाले लोगों को एक image कैसी दिखती है।
       security:
@@ -2381,7 +2506,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF tools
       description: एनिमेटेड GIFs का आकार बदलें, अनुकूलित करें, गति समायोजित करें, उलटें, फ़्रेम निकालें, या घुमाएं।
       security:
@@ -2445,7 +2570,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: GIF जानकारी
       description: आयाम, फ़्रेम संख्या, विलंब, और अवधि सहित एक एनिमेटेड GIF के बारे में metadata प्राप्त करें।
       security: []
@@ -2502,7 +2627,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: स्मार्ट क्रॉप
       description: तीन मोड के साथ स्मार्ट क्रॉप - विषय फ़ोकस, चेहरा फ़ोकस, या ऑटो ट्रिम।
       security:
@@ -2561,7 +2686,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: छवि से SVG
       description: potrace (B&W) या VTracer (color) का उपयोग करके एक रास्टर image को SVG वेक्टर format में बदलें।
       security:
@@ -2616,7 +2741,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG to raster
       description: कस्टम स्केल और DPI पर एक SVG फ़ाइल को रास्टर image format में बदलें।
       security:
@@ -2669,7 +2794,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG to raster (batch)
       description: कई SVG फ़ाइलों को रास्टर images में बदलें। एक ZIP archive लौटाता है।
       security:
@@ -2729,7 +2854,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: छवि से PDF
       description: एक या अधिक images को एक PDF दस्तावेज़ में बदलें।
       security:
@@ -2811,7 +2936,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF to image
       description: PDF पृष्ठों को images में बदलें। अलग-अलग पृष्ठ downloads और सभी पृष्ठों का एक ZIP लौटाता है।
       security:
@@ -2900,7 +3025,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: PDF पृष्ठ संख्या
       description: एक PDF फ़ाइल में पृष्ठों की संख्या प्राप्त करें।
       security: []
@@ -2939,7 +3064,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: PDF पृष्ठ थंबनेल
       description: एक PDF में प्रत्येक पृष्ठ के लिए थंबनेल preview जनरेट करें (अधिकतम 200 पृष्ठ, JPEG 300px चौड़ा)।
       security: []
@@ -2992,7 +3117,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: इमेज स्प्लिट
       description: एक image को टाइलों के ग्रिड में विभाजित करें। एक ZIP फ़ाइल लौटाता है।
       security:
@@ -3046,7 +3171,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: बल्क नाम बदलें
       description: एक पैटर्न टेम्पलेट का उपयोग करके कई images का नाम बदलें। {{index}}, {{padded}}, और {{original}} टोकन का समर्थन करता है। एक ZIP फ़ाइल लौटाता है।
       security:
@@ -3098,7 +3223,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: Favicon जनरेटर
       description: एक image से एक पूर्ण favicon सेट (16px से 512px PNGs, ICO, और manifest.json) जनरेट करें। एक ZIP फ़ाइल लौटाता है।
       security:
@@ -3142,7 +3267,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: image वॉटरमार्क
       description: एक image वॉटरमार्क ओवरले जोड़ें।
       security:
@@ -3197,7 +3322,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: image कंपोज़िशन
       description: blend modes के साथ एक बेस image पर एक ओवरले image कंपोज़िट करें।
       security:
@@ -3253,7 +3378,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: मीम जनरेटर
       description: |
         टेम्पलेट या कस्टम images का उपयोग करके मीम बनाएं। दो मोड का समर्थन करता है: (1) टेम्पलेट मोड - `templateId` और `textBoxes` के साथ JSON body भेजें। (2) कस्टम image मोड - `file` और `settings` के साथ multipart भेजें।
@@ -3492,7 +3617,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: image तुलना
       description: दो images की तुलना करें और एक विज़ुअल अंतर रिपोर्ट जनरेट करें।
       security:
@@ -3559,7 +3684,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: ऑब्जेक्ट इरेज़र
       description: एक mask का उपयोग करके एक image से ऑब्जेक्ट मिटाएं। mask में सफेद क्षेत्र मिटाने वाले क्षेत्रों को इंगित करते हैं। LaMa inpainting का उपयोग करता है।
       security:
@@ -3612,11 +3737,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3652,7 +3788,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: AI कैनवास विस्तार (प्रायोगिक)
       description: |
         AI outpainting का उपयोग करके एक image कैनवास का विस्तार करें। मूल के साथ
@@ -3695,11 +3831,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3735,7 +3882,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: कोलाज और ग्रिड
       description: कई images को एक ग्रिड कोलाज में संयोजित करें।
       security:
@@ -3792,7 +3939,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: इमेज जोड़ें
       description: कई images को क्षैतिज, लंबवत, या ग्रिड लेआउट में जोड़ें।
       security:
@@ -3851,7 +3998,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: किसी एनिमेटेड छवि से पृष्ठभूमि हटाएँ
       description: AI (rembg) का उपयोग करके एनिमेटेड GIF, WebP, या APNG फ्रेम से पृष्ठभूमि हटाएं। स्थानीय स्तर पर चलता है.
       security:
@@ -3897,11 +4044,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3931,7 +4089,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: बैकग्राउंड हटाएं
       description: AI (rembg) का उपयोग करके एक image से बैकग्राउंड हटाएं। स्थानीय रूप से चलता है।
       security:
@@ -3965,11 +4123,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4005,7 +4174,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: बैकग्राउंड प्रभाव लागू करें
       description: |
         पहले से प्रोसेस किए गए remove-background परिणाम पर बैकग्राउंड प्रतिस्थापन या प्रभाव लागू करें। इसके लिए पूर्व POST /api/v1/tools/image/remove-background कॉल से एक jobId आवश्यक है।
@@ -4072,7 +4241,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: नकली पारदर्शिता ठीक करें
       description: |
         "नकली पारदर्शी" PNGs को ठीक करें जिनमें पिछले बैकग्राउंड हटाने से फ़्रिंजिंग, हेलो, या
@@ -4110,11 +4279,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4150,7 +4330,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: image अपस्केलिंग
       description: AI (Real-ESRGAN) का उपयोग करके एक image को अपस्केल करें। स्थानीय रूप से चलता है।
       security:
@@ -4186,11 +4366,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4226,7 +4417,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: चेहरे और संवेदनशील जानकारी ब्लर करें
       description: गोपनीयता के लिए एक image में चेहरों का पता लगाएं और धुंधला करें। OpenCV का उपयोग करता है। स्थानीय रूप से चलता है।
       security:
@@ -4258,11 +4449,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4298,7 +4500,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / टेक्स्ट निष्कर्षण
       description: |-
         किसी छवि से स्थानीय रूप से टेक्स्ट निकालें. अंतर्निर्मितFastस्तरीय उपयोगTesseract.BalancedऔरBestवैकल्पिक हस्ताक्षरित का उपयोग करेंRapidOCRरनटाइम
@@ -4335,6 +4537,11 @@ paths:
       responses:
         '202':
           description: सत्यापन और कतार में डालने के बाद स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें; प्रोसेसिंग विफलताएं अंतिम failed इवेंट में आती हैं।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4343,6 +4550,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4386,7 +4599,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: image जानकारी
       description: आयाम, format, रंग स्थान, और EXIF डेटा सहित एक image के बारे में विस्तृत metadata प्राप्त करें।
       security:
@@ -4489,7 +4702,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: रंग पैलेट
       description: एक image से प्रमुख रंग निकालें।
       security:
@@ -4542,7 +4755,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: बारकोड रीडर
       description: एक image से QR codes और बारकोड पढ़ें।
       security:
@@ -4647,7 +4860,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: डुप्लिकेट खोजें
       description: perceptual hashing का उपयोग करके एक सेट में डुप्लिकेट images खोजें।
       security:
@@ -4750,7 +4963,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: QR code जनरेटर
       description: टेक्स्ट से एक QR code image जनरेट करें। यह tool एक JSON body स्वीकार करता है, multipart नहीं।
       security:
@@ -4813,7 +5026,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: वेबपेज को image के रूप में कैप्चर करें
       description: एक वेबपेज को उच्च-गुणवत्ता स्क्रीनशॉट image के रूप में कैप्चर करें। एक URL और कैप्चर विकल्पों के साथ एक JSON body स्वीकार करता है।
       security:
@@ -4899,7 +5112,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: metadata निरीक्षण करें
       description: एक image में सभी metadata (EXIF, GPS, ICC, XMP) को हटाए बिना देखें।
       security:
@@ -4968,7 +5181,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: इमेज मेटाडेटा संपादित करें
       description: ExifTool का उपयोग करके एक image में EXIF, IPTC, GPS, और अन्य metadata fields संपादित करें।
       security:
@@ -5037,7 +5250,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: metadata निरीक्षण करें (ExifTool)
       description: ExifTool का उपयोग करके एक image से सभी metadata पढ़ें। सभी एम्बेडेड EXIF, IPTC, XMP, और GPS fields लौटाता है।
       security:
@@ -7052,6 +7265,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: Job की स्थिति प्राप्त करें
+      description: |
+        बिना कनेक्शन खुला रखे job की संग्रहीत स्थिति लौटाता है। 202 प्रतिक्रिया के बाद इसे poll करें, या progress stream बंद होने पर fallback के रूप में इसका उपयोग करें।
+
+        `status` `queued`, `processing`, `completed`, `failed` या `canceled` में से एक है। `completed`, `failed` और `canceled` terminal हैं। Canceled job में फिर भी आंशिक `result` हो सकता है (जैसे पूरी हुई फ़ाइलों का ZIP), इसलिए `result` मौजूद होने पर उसे ज़रूर पढ़ें।
+
+        पहुँच progress stream के अनुसार होती है: job का owner, `files:all` वाला उपयोगकर्ता, या feature-install job के लिए `features:manage` वाला उपयोगकर्ता। कोई अन्य caller 404 पाता है।
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: 202 response से मिला jobId।
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job स्थिति
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: अनुपस्थित या अमान्य credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job नहीं मिली, या कॉल करने वाले को दिखाई नहीं देती
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7365,6 +7625,197 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: Product feedback सबमिट करें
+      description: साइन इन किए गए उपयोगकर्ता से एक feedback event रिकॉर्ड करता है। प्रति मिनट 10 अनुरोधों तक सीमित। `accepted` false होता है जब सर्वर ने event रिकॉर्ड नहीं किया।
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: फ़ीडबैक कहां से दिया गया। स्वीकृत मान shared feedback constants में परिभाषित हैं।
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: फ़ीडबैक संभाल लिया गया
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: अमान्य body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: अनुपस्थित या अमान्य credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: रेट सीमा पार हो गई
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: नया उपलब्ध release प्राप्त करें
+      description: सबसे नया प्रकाशित release तभी लौटाता है जब वह चल रहे version से नया हो, अन्यथा null। settings:write आवश्यक है।
+      responses:
+        '200':
+          description: नवीनतम रिलीज़, या इस इंस्टेंस के अद्यतन होने पर null।
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: अनुपस्थित या अमान्य credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: settings:write permission अनुपस्थित है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: सभी AI feature bundles रीसेट करें
+      description: |
+        AI virtual environment, models और pip cache को मिटाता है, फिर हर bundle को इंस्टॉल नहीं किया हुआ चिह्नित करता है। इसका उपयोग तब करें जब install अपने आप ठीक न हो सके। किसी bundle को uninstall करने पर केवल उसके model weights हटते हैं, इसलिए यह पूरा reset है।
+
+        प्रतिक्रिया बताती है कि venv आधार (baked base) से दोबारा seed हुआ या नहीं (venvReseeded)। bundle install चल रहा हो तो 409 लौटाता है। features:manage आवश्यक है।
+      responses:
+        '200':
+          description: रीसेट पूरा हुआ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: अनुपस्थित या अमान्य credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: features:manage permission अनुपस्थित है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: एक bundle इंस्टॉल पहले से चल रहा है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: किसी tool के लिए आवश्यक हर feature bundle इंस्टॉल करें
+      description: tool को आवश्यक हर bundle को queue में डालता है और हर bundle के लिए बताता है कि वह queue में डाला गया या छोड़ा गया। features:manage आवश्यक है।
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: हर bundle की स्थिति। कतारबद्ध हर bundle का अपना statusUrl और progressUrl होता है। छोड़े गए bundles में दोनों नहीं होते।
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+                        jobId:
+                          type: string
+                        statusUrl:
+                          type: string
+                        progressUrl:
+                          type: string
+        '401':
+          description: अनुपस्थित या अमान्य credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: features:manage permission अनुपस्थित है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: अज्ञात tool, या tool को किसी bundle की आवश्यकता नहीं है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7404,11 +7855,22 @@ paths:
       responses:
         '202':
           description: इंस्टॉलेशन शुरू हुआ या कतार में डाला गया
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: इंस्टॉलेशन प्रगति ट्रैक करने के लिए SSE से जॉब ID
@@ -7918,7 +8380,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: Convert Video
       description: MP4, MOV, WebM, AVI, और MKV के बीच videos बदलें।
       security:
@@ -7950,11 +8412,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7984,7 +8457,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: Compress Video
       description: गुणवत्ता नियंत्रण के साथ video फ़ाइल आकार सिकोड़ें।
       security:
@@ -8016,11 +8489,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8050,7 +8534,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: Trim Video
       description: एक video से एक क्लिप काटें।
       security:
@@ -8100,7 +8584,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: Mute Video
       description: एक video से audio ट्रैक हटाएं।
       security:
@@ -8143,7 +8627,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: वीडियो से GIF
       description: एक video क्लिप को एक एनिमेटेड GIF में बदलें।
       security:
@@ -8177,11 +8661,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8211,7 +8706,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: Resize Video
       description: एक video को नए रिज़ॉल्यूशन या प्रीसेट आकार में स्केल करें।
       security:
@@ -8261,7 +8756,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: Crop Video
       description: एक video से एक क्षेत्र क्रॉप करें।
       security:
@@ -8312,7 +8807,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: Rotate Video
       description: एक video घुमाएं या फ़्लिप करें।
       security:
@@ -8360,7 +8855,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: Change FPS
       description: एक video की फ़्रेम दर बदलें।
       security:
@@ -8408,7 +8903,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: Video Color
       description: चमक, कंट्रास्ट, संतृप्ति, और गामा समायोजित करें।
       security:
@@ -8459,7 +8954,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: Video Speed
       description: एक video की गति बढ़ाएं या घटाएं।
       security:
@@ -8508,7 +9003,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: Reverse Video
       description: एक video क्लिप को पीछे की ओर चलाएं। 5 मिनट तक की क्लिप तक सीमित।
       security:
@@ -8551,7 +9046,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: वीडियो ऑडियो नॉर्मलाइज़
       description: video audio वॉल्यूम को प्रसारण मानक (EBU R128) में सामान्य करें।
       security:
@@ -8594,7 +9089,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: Aspect Pad
       description: एक लक्ष्य आस्पेक्ट अनुपात में फ़िट करने के लिए ठोस-रंग बार जोड़ें।
       security:
@@ -8643,7 +9138,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: Blur Pad
       description: बार को video की एक धुंधली प्रति से भरें।
       security:
@@ -8692,7 +9187,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: Watermark Video
       description: video फ़्रेम पर एक टेक्स्ट वॉटरमार्क बर्न करें।
       security:
@@ -8744,7 +9239,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: Stabilize Video
       description: दो-पास स्थिरीकरण के साथ कैमरा शेक कम करें।
       security:
@@ -8775,11 +9270,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8809,7 +9315,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF to Video
       description: एक एनिमेटेड GIF को एक MP4, WebM, या MOV video में बदलें।
       security:
@@ -8857,7 +9363,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: वीडियो से WebP
       description: एक video क्लिप को एक एनिमेटेड WebP image में बदलें।
       security:
@@ -8908,7 +9414,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: वीडियो से फ़्रेम
       description: एक video से फ़्रेम को images के ZIP के रूप में निकालें।
       security:
@@ -8959,7 +9465,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: Merge Videos
       description: |
         कई video क्लिप को एक MP4 फ़ाइल में जोड़ें। सभी inputs को
@@ -8989,11 +9495,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9023,7 +9540,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: Replace Audio
       description: एक video के audio ट्रैक को किसी अन्य फ़ाइल से स्वैप करें।
       security:
@@ -9068,7 +9585,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: Burn Subtitles
       description: video फ़्रेम पर subtitles को स्थायी रूप से रेंडर करें।
       security:
@@ -9101,11 +9618,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9135,7 +9663,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: Embed Subtitles
       description: video container में एक subtitle ट्रैक mux करें।
       security:
@@ -9185,7 +9713,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: Extract Subtitles
       description: एक video से subtitle ट्रैक को एक SRT फ़ाइल के रूप में निकालें।
       security:
@@ -9228,7 +9756,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: छवियों से वीडियो
       description: images के एक सेट को एक स्लाइडशो video में बदलें।
       security:
@@ -9280,7 +9808,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: Clean Video Metadata
       description: एक video से metadata हटाएं और जो मिला उसकी रिपोर्ट करें।
       security:
@@ -9323,7 +9851,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: Auto Subtitles
       description: |
         faster-whisper का उपयोग करके video audio ट्रैक से AI-संचालित subtitle जनरेशन।
@@ -9358,11 +9886,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9398,7 +9937,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: Extract Audio
       description: एक video से audio ट्रैक निकालें।
       security:
@@ -9446,7 +9985,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: Convert Audio
       description: MP3, WAV, OGG, और अधिक के बीच audio बदलें।
       security:
@@ -9495,7 +10034,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: Trim Audio
       description: एक audio फ़ाइल से एक सेक्शन काटें।
       security:
@@ -9544,7 +10083,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: वॉल्यूम समायोजन
       description: एक निश्चित गेन द्वारा audio वॉल्यूम बढ़ाएं या घटाएं।
       security:
@@ -9592,7 +10131,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: Normalize Audio
       description: प्रसारण मानक स्तरों (EBU R128, -16 LUFS) पर लाउडनेस को समान करें।
       security:
@@ -9635,7 +10174,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: Fade Audio
       description: audio में fade-in और fade-out प्रभाव जोड़ें।
       security:
@@ -9684,7 +10223,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: Reverse Audio
       description: audio को पीछे की ओर चलाएं।
       security:
@@ -9727,7 +10266,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: Audio Speed
       description: audio प्लेबैक की गति बढ़ाएं या घटाएं।
       security:
@@ -9775,7 +10314,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: Pitch Shift
       description: गति बदले बिना सेमीटोन द्वारा पिच बढ़ाएं या घटाएं।
       security:
@@ -9823,7 +10362,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: Audio Channels
       description: मोनो, स्टीरियो के बीच बदलें, या बाएं और दाएं चैनल स्वैप करें।
       security:
@@ -9871,7 +10410,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: Silence Removal
       description: audio से मौन सेक्शन हटाएं।
       security:
@@ -9920,7 +10459,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: Noise Reduction
       description: FFT-आधारित denoising के साथ बैकग्राउंड शोर कम करें।
       security:
@@ -9968,7 +10507,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: Merge Audio
       description: कई audio फ़ाइलों को एक क्रमिक ट्रैक में संयोजित करें।
       security:
@@ -10018,7 +10557,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: Split Audio
       description: |
         audio को समय, समान भागों, या मौन डिटेक्शन के अनुसार विभाजित करें। सेगमेंट के एक ZIP archive की ओर
@@ -10072,7 +10611,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: Ringtone Maker
       description: किसी भी audio फ़ाइल से एक रिंगटोन क्लिप (.m4r) बनाएं।
       security:
@@ -10121,7 +10660,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: Waveform Image
       description: एक audio फ़ाइल से एक वेवफ़ॉर्म विज़ुअलाइज़ेशन को PNG image के रूप में जनरेट करें।
       security:
@@ -10171,7 +10710,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: Audio Metadata
       description: |
         audio टैग (ID3) देखें, संपादित करें, या हटाएं। response में मानक ToolResponse fields के साथ
@@ -10225,7 +10764,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: Transcribe Audio
       description: |
         faster-whisper का उपयोग करके AI-संचालित स्पीच-टू-टेक्स्ट ट्रांसक्रिप्शन।
@@ -10260,11 +10799,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10300,7 +10850,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: Merge PDFs
       description: कई PDFs को एक में संयोजित करें। कम से कम दो फ़ाइलें आवश्यक हैं।
       security:
@@ -10345,7 +10895,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: Split PDF
       description: |
         पृष्ठ निकालें या भागों में विभाजित करें। "range" मोड में चयनित पृष्ठों के साथ एक
@@ -10398,7 +10948,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: Compress PDF
       description: |
         एम्बेडेड images को डाउनसैंपल करके PDF फ़ाइल आकार सिकोड़ें। "quality" मोड में
@@ -10452,7 +11002,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF को 100 KB तक संपीड़ित करें
       description: |
         एक PDF को 100 KB के लक्ष्य आकार तक संपीड़ित करें (100 KB, जहाँ 1 KB = 1000 बाइट्स)।
@@ -10487,11 +11037,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10515,7 +11076,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF को 200 KB तक संपीड़ित करें
       description: |
         एक PDF को 200 KB के लक्ष्य आकार तक संपीड़ित करें (200 KB, जहाँ 1 KB = 1000 बाइट्स)।
@@ -10550,11 +11111,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10578,7 +11150,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF को 500 KB तक संपीड़ित करें
       description: |
         एक PDF को 500 KB के लक्ष्य आकार तक संपीड़ित करें (500 KB, जहाँ 1 KB = 1000 बाइट्स)।
@@ -10613,11 +11185,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10641,7 +11224,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF को 1 MB तक संपीड़ित करें
       description: |
         एक PDF को 1 MB के लक्ष्य आकार तक संपीड़ित करें (1000 KB, जहाँ 1 KB = 1000 बाइट्स)।
@@ -10676,11 +11259,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10704,7 +11298,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF को 2 MB तक संपीड़ित करें
       description: |
         एक PDF को 2 MB के लक्ष्य आकार तक संपीड़ित करें (2000 KB, जहाँ 1 KB = 1000 बाइट्स)।
@@ -10739,11 +11333,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10767,7 +11372,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: Rotate PDF
       description: एक PDF में पृष्ठों को 90, 180, या 270 डिग्री घुमाएं।
       security:
@@ -10816,7 +11421,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: पृष्ठ निकालें
       description: चयनित पृष्ठों को एक नई PDF में खींचें।
       security:
@@ -10864,7 +11469,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: पृष्ठ हटाएं
       description: एक PDF से विशिष्ट पृष्ठ हटाएं। हर पृष्ठ नहीं हटा सकते।
       security:
@@ -10912,7 +11517,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: Organize PDF
       description: 'एक स्पष्ट पृष्ठ क्रम के साथ पृष्ठों को पुन: क्रमबद्ध करें।'
       security:
@@ -10960,7 +11565,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF मल्टी-टूल
       description: स्पष्ट पेज प्लान से एक PDF असेंबल करें - पेजों को पुनः क्रमबद्ध, डुप्लिकेट, घुमाएँ या हटाएँ और अतिरिक्त PDFs से पेज खींचें, एक ही सबमिशन में।
       security:
@@ -11011,7 +11616,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: Protect PDF
       description: AES-256 एन्क्रिप्शन के साथ password सुरक्षा जोड़ें। Passwords audit logs से हटा दिए जाते हैं।
       security:
@@ -11060,7 +11665,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: Unlock PDF
       description: एक PDF से password सुरक्षा हटाएं। सही password प्रदान किया जाना चाहिए। Passwords audit logs से हटा दिए जाते हैं।
       security:
@@ -11108,7 +11713,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: Repair PDF
       description: एक क्षतिग्रस्त या दूषित PDF की मरम्मत का प्रयास करें। विकृत फ़ाइलों की अनुमति देने के लिए input पर संरचनात्मक validation छोड़ दिया जाता है।
       security:
@@ -11151,7 +11756,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: Web-optimize PDF
       description: तेज़ वेब देखने के लिए एक PDF को linearize करें (प्रोग्रेसिव डाउनलोड)।
       security:
@@ -11194,7 +11799,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: Grayscale PDF
       description: एक PDF में सभी रंगों को ग्रेस्केल में बदलें।
       security:
@@ -11237,7 +11842,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: PDF/A कन्वर्टर
       description: दीर्घकालिक संरक्षण के लिए एक PDF को archival PDF/A-2 format में बदलें।
       security:
@@ -11280,7 +11885,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: Crop PDF
       description: एक समान मार्जिन के साथ सभी पृष्ठ क्रॉप करें।
       security:
@@ -11328,7 +11933,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: प्रति शीट पेज (N-up)
       description: प्रति शीट कई पृष्ठ व्यवस्थित करें (उदा. 2-up, 4-up)।
       security:
@@ -11376,7 +11981,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: Booklet PDF
       description: पृष्ठों को एक बुकलेट में मोड़ने के लिए व्यवस्थित करें (डुप्लेक्स प्रिंटिंग के लिए impose करें)।
       security:
@@ -11424,7 +12029,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: Watermark PDF
       description: एक PDF के हर पृष्ठ पर एक टेक्स्ट वॉटरमार्क जोड़ें।
       security:
@@ -11476,7 +12081,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: PDF पृष्ठ संख्या
       description: एक PDF के हर पृष्ठ पर पृष्ठ संख्याएं ("Page N of M") जोड़ें।
       security:
@@ -11525,7 +12130,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: दस्तावेज़ बदलें
       description: Word, OpenDocument, RTF, और सादा टेक्स्ट formats के बीच बदलें।
       security:
@@ -11556,11 +12161,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11584,7 +12200,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: प्रस्तुति बदलें
       description: PowerPoint और OpenDocument प्रस्तुति formats के बीच बदलें।
       security:
@@ -11615,11 +12231,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11643,7 +12270,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: स्प्रेडशीट बदलें
       description: Excel, OpenDocument, और CSV formats के बीच बदलें। मल्टी-शीट workbooks पहली शीट को CSV में निर्यात करते हैं।
       security:
@@ -11674,11 +12301,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11702,7 +12340,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel से PDF
       description: स्प्रेडशीट को PDF में बदलें। चौड़ी शीट कई पृष्ठों में पेजिनेट हो सकती हैं।
       security:
@@ -11728,11 +12366,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11756,7 +12405,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word से PDF
       description: Word दस्तावेज़ों को PDF में बदलें।
       security:
@@ -11782,11 +12431,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11810,7 +12470,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint से PDF
       description: प्रस्तुतियों को PDF में बदलें।
       security:
@@ -11836,11 +12496,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11864,7 +12535,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML to PDF
       description: एक HTML फ़ाइल को PDF में बदलें। गोपनीयता के लिए रिमोट संसाधन अक्षम हैं।
       security:
@@ -11890,11 +12561,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11918,7 +12600,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown से Word
       description: एक Markdown फ़ाइल को एक Word दस्तावेज़ (DOCX) में बदलें।
       security:
@@ -11961,7 +12643,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown से HTML
       description: एक Markdown फ़ाइल को एक स्टैंडअलोन HTML पृष्ठ में बदलें। स्रोत में रिमोट images आउटपुट में यथावत रहती हैं।
       security:
@@ -12004,7 +12686,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown से PDF
       description: एक Markdown फ़ाइल को एक स्टाइल किए गए PDF में बदलें। गोपनीयता के लिए रिमोट संसाधन अक्षम हैं।
       security:
@@ -12030,11 +12712,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12058,7 +12751,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: EPUB से कन्वर्ट
       description: एक EPUB को PDF, DOCX, HTML, या Markdown में बदलें। पुस्तक के भीतर रिमोट संसाधन प्राप्त नहीं किए जाते।
       security:
@@ -12089,11 +12782,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12117,7 +12821,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: EPUB में बदलें
       description: Word, Markdown, HTML, या सादा टेक्स्ट फ़ाइलों को EPUB में बदलें।
       security:
@@ -12143,11 +12847,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12171,7 +12886,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: Flatten PDF
       description: forms और annotations को पृष्ठ सामग्री में बेक करें।
       security:
@@ -12214,7 +12929,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: Redact PDF
       description: टेक्स्ट घटनाओं को स्थायी रूप से हटाएं (सत्यापित सच्चा redaction)।
       security:
@@ -12269,7 +12984,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF to text
       description: एक PDF से सादा टेक्स्ट निकालें।
       security:
@@ -12318,7 +13033,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF to Word
       description: टेक्स्ट-आधारित PDFs के लिए सर्वश्रेष्ठ; स्कैन किए गए पृष्ठों को OCR की आवश्यकता होती है।
       security:
@@ -12344,11 +13059,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12372,7 +13098,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: PDF metadata
       description: PDF दस्तावेज़ metadata पढ़ें और लिखें।
       security:
@@ -12429,7 +13155,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF OCR
       description: |-
         स्कैन किए गए PDF दस्तावेज़ों से पेज दर पेज टेक्स्ट निकालें। Fast का उपयोग करता है
@@ -12469,6 +13195,11 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12477,6 +13208,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12526,7 +13263,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: Chart Maker
       description: CSV या JSON डेटा से बार, लाइन या पाई चार्ट बनाएँ। एक PNG इमेज लौटाता है। जब किसी रो को छोड़ दिया गया क्योंकि उसकी वैल्यू सेल में एक संख्या न होने वाला टेक्स्ट था, तो रिस्पॉन्स में `chartRows` ({charted, skipped}) जुड़ता है; खाली रो नहीं गिने जाते।
       security:
@@ -12577,7 +13314,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV to Excel
       description: CSV और Excel (XLSX) के बीच, दोनों दिशाओं में बदलें। XLSX पाने के लिए एक CSV या TSV फ़ाइल upload करें, या CSV पाने के लिए एक XLSX फ़ाइल upload करें।
       security:
@@ -12625,7 +13362,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV to JSON
       description: CSV और JSON के बीच, दोनों दिशाओं में बदलें। JSON पाने के लिए एक CSV या TSV फ़ाइल upload करें, या CSV पाने के लिए objects का एक JSON array upload करें।
       security:
@@ -12673,7 +13410,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON to XML
       description: JSON और XML के बीच, दोनों दिशाओं में बदलें। XML पाने के लिए एक JSON फ़ाइल upload करें, या JSON पाने के लिए एक XML फ़ाइल upload करें।
       security:
@@ -12721,7 +13458,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: Split CSV
       description: एक CSV फ़ाइल को row संख्या के अनुसार छोटी फ़ाइलों में विभाजित करें। भागों वाला एक ZIP archive लौटाता है।
       security:
@@ -12770,7 +13507,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: Merge CSVs
       description: मेल खाते columns वाली कई CSV या TSV फ़ाइलों को एक मर्ज की गई फ़ाइल में संयोजित करें। सभी फ़ाइलों में समान column हेडर होने चाहिए।
       security:
@@ -12815,7 +13552,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: YAML / JSON कन्वर्ट
       description: YAML और JSON के बीच, दोनों दिशाओं में बदलें। JSON पाने के लिए एक YAML फ़ाइल upload करें, या YAML पाने के लिए एक JSON फ़ाइल upload करें।
       security:
@@ -12858,7 +13595,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML to CSV
       description: एक XML फ़ाइल से दोहराए जाने वाले elements को एक CSV तालिका में निकालें। XML ट्री में objects के पहले array को स्वचालित रूप से ढूँढता है।
       security:
@@ -12901,7 +13638,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: Create ZIP
       description: कई फ़ाइलों को एक ही ZIP archive में बंडल करें। डुप्लिकेट filenames स्वचालित रूप से deduplicate किए जाते हैं।
       security:
@@ -12946,7 +13683,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: Extract ZIP
       description: बम सुरक्षा के साथ एक ZIP archive से फ़ाइलें सुरक्षित रूप से निकालें। एकल-फ़ाइल archives फ़ाइल सीधे लौटाते हैं; मल्टी-फ़ाइल archives एक फ़्लैट ZIP लौटाते हैं।
       security:
@@ -12989,7 +13726,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: बैकग्राउंड बदलें
       description: |
         AI-संचालित बैकग्राउंड प्रतिस्थापन। विषय का बैकग्राउंड हटाता है
@@ -13029,11 +13766,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13069,7 +13817,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: बैकग्राउंड धुंधला करें
       description: |
         AI-संचालित बैकग्राउंड धुंधलापन। बैकग्राउंड हटाता है,
@@ -13105,11 +13853,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13145,7 +13904,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: बारकोड जनरेटर
       description: टेक्स्ट से एक बारकोड image जनरेट करें। यह tool एक JSON body स्वीकार करता है, multipart नहीं।
       security:
@@ -13208,7 +13967,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: सर्कल क्रॉप
       description: एक image को पारदर्शी कोनों, वैकल्पिक बॉर्डर, और समायोज्य ज़ूम/ऑफ़सेट के साथ एक केंद्रित सर्कल में क्रॉप करें।
       security:
@@ -13262,7 +14021,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: गोल कोनों वाला क्रॉप
       description: पारदर्शी कोनों, वैकल्पिक बॉर्डर और समायोज्य ज़ूम/ऑफ़सेट के साथ एक छवि को गोल वर्ग या गोलाकार आकार में काटें।
       security:
@@ -13318,7 +14077,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: Duotone
       description: कस्टम शैडो और हाइलाइट रंगों के साथ एक दो-रंग duotone प्रभाव लागू करें।
       security:
@@ -13368,7 +14127,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: image पैड
       description: एक image को एक ठोस रंग, पारदर्शी, या धुंधले बैकग्राउंड के साथ एक लक्ष्य आस्पेक्ट अनुपात में पैड करें।
       security:
@@ -13421,7 +14180,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: Pixelate
       description: पूरी image या किसी विशिष्ट आयताकार क्षेत्र पर एक पिक्सेलेशन प्रभाव लागू करें।
       security:
@@ -13474,7 +14233,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: Vignette
       description: समायोज्य ताकत, रंग, त्रिज्या, कोमलता, गोलाई, और केंद्र स्थिति के साथ एक vignette प्रभाव जोड़ें।
       security:
@@ -13528,7 +14287,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: GIF/WebP कन्वर्टर
       description: एनिमेटेड GIF को WebP में और इसके विपरीत बदलें, सभी फ़्रेम संरक्षित करते हुए। केवल .gif और .webp inputs स्वीकार करता है।
       security:
@@ -13578,7 +14337,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: Histogram
       description: |
         एक image से एक RGB histogram चार्ट जनरेट करें। response JSON में
@@ -13712,7 +14471,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: LQIP प्लेसहोल्डर
       description: |
         एक छोटा निम्न-गुणवत्ता image प्लेसहोल्डर जनरेट करें। response JSON में एक छोटी image
@@ -13791,7 +14550,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: स्प्राइट शीट
       description: |
         कई images को एक ही sprite sheet ग्रिड में संयोजित करें। 2 से 64 images
@@ -13885,7 +14644,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: Passport Photo
       description: |
         दो-चरण पासपोर्ट फ़ोटो फ़्लो के लिए मार्गदर्शन endpoint। एक image का विश्लेषण करने के लिए
@@ -13916,7 +14675,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: Sign PDF
       description: सामान्यीकृत पृष्ठ प्लेसमेंट का उपयोग करके एक या अधिक signature PNG images को एक PDF पर स्टैंप करें।
       security:
@@ -13960,11 +14719,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13994,7 +14764,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG to PNG
       description: |
         JPG को PNG में बदलें
@@ -14055,7 +14825,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG to JPG
       description: |
         PNG को JPG में बदलें
@@ -14116,7 +14886,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG to WebP
       description: |
         JPG को WebP में बदलें
@@ -14177,7 +14947,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG to WebP
       description: |
         PNG को WebP में बदलें
@@ -14238,7 +15008,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP to JPG
       description: |
         WebP को JPG में बदलें
@@ -14299,7 +15069,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP to PNG
       description: |
         WebP को PNG में बदलें
@@ -14360,7 +15130,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG to AVIF
       description: |
         JPG को AVIF में बदलें
@@ -14421,7 +15191,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG to AVIF
       description: |
         PNG को AVIF में बदलें
@@ -14482,7 +15252,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP to AVIF
       description: |
         WebP को AVIF में बदलें
@@ -14543,7 +15313,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC to JPG
       description: |
         HEIC को JPG में बदलें
@@ -14604,7 +15374,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC to PNG
       description: |
         HEIC को PNG में बदलें
@@ -14665,7 +15435,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC to AVIF
       description: |
         HEIC को AVIF में बदलें
@@ -14726,7 +15496,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG to GIF
       description: |
         JPG को GIF में बदलें
@@ -14787,7 +15557,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG to GIF
       description: |
         PNG को GIF में बदलें
@@ -14848,7 +15618,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF to JPG
       description: |
         GIF को JPG में बदलें
@@ -14909,7 +15679,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF to PNG
       description: |
         GIF को PNG में बदलें
@@ -14970,7 +15740,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP to GIF
       description: |
         WebP को GIF में बदलें
@@ -15031,7 +15801,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG to TIFF
       description: |
         JPG को TIFF में बदलें
@@ -15092,7 +15862,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG to TIFF
       description: |
         PNG को TIFF में बदलें
@@ -15153,7 +15923,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF to JPG
       description: |
         TIFF को JPG में बदलें
@@ -15214,7 +15984,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF to PNG
       description: |
         TIFF को PNG में बदलें
@@ -15275,7 +16045,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD to JPG
       description: |
         PSD को JPG में बदलें
@@ -15336,7 +16106,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD to PNG
       description: |
         PSD को PNG में बदलें
@@ -15397,7 +16167,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG to EPS
       description: |
         PNG को EPS में बदलें
@@ -15458,7 +16228,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG to EPS
       description: |
         JPG को EPS में बदलें
@@ -15519,7 +16289,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS to PNG
       description: |
         EPS को PNG में बदलें
@@ -15580,7 +16350,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS to JPG
       description: |
         EPS को JPG में बदलें
@@ -15641,7 +16411,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG to SVG
       description: |
         PNG को SVG में बदलें
@@ -15702,7 +16472,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG to SVG
       description: |
         JPG को SVG में बदलें
@@ -15763,7 +16533,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF to SVG
       description: |
         TIFF को SVG में बदलें
@@ -15824,7 +16594,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD to SVG
       description: |
         PSD को SVG में बदलें
@@ -15885,7 +16655,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS to SVG
       description: |
         EPS को SVG में बदलें
@@ -15946,7 +16716,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG to PNG
       description: |
         SVG को PNG में बदलें
@@ -16002,7 +16772,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG to JPG
       description: |
         SVG को JPG में बदलें
@@ -16058,7 +16828,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG to PDF
       description: |
         JPG को PDF में बदलें
@@ -16116,7 +16886,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG to PDF
       description: |
         PNG को PDF में बदलें
@@ -16174,7 +16944,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC to PDF
       description: |
         HEIC को PDF में बदलें
@@ -16232,7 +17002,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF to PDF
       description: |
         TIFF को PDF में बदलें
@@ -16290,7 +17060,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP to PDF
       description: |
         WebP को PDF में बदलें
@@ -16348,7 +17118,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF to PDF
       description: |
         GIF को PDF में बदलें
@@ -16406,7 +17176,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS to PDF
       description: |
         EPS को PDF में बदलें
@@ -16464,7 +17234,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF to JPG
       description: |
         PDF को JPG में बदलें
@@ -16520,7 +17290,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF to PNG
       description: |
         PDF को PNG में बदलें
@@ -16576,7 +17346,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF to TIFF
       description: |
         PDF को TIFF में बदलें
@@ -16632,7 +17402,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV to MP4
       description: |
         MOV को MP4 में बदलें
@@ -16665,11 +17435,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16699,7 +17480,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM to MP4
       description: |
         WEBM को MP4 में बदलें
@@ -16732,11 +17513,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16766,7 +17558,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV to MP4
       description: |
         MKV को MP4 में बदलें
@@ -16799,11 +17591,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16833,7 +17636,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI to MP4
       description: |
         AVI को MP4 में बदलें
@@ -16866,11 +17669,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16900,7 +17714,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 to MOV
       description: |
         MP4 को MOV में बदलें
@@ -16933,11 +17747,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16967,7 +17792,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 to WEBM
       description: |
         MP4 को WEBM में बदलें
@@ -17000,11 +17825,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17034,7 +17870,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM to MOV
       description: |
         WEBM को MOV में बदलें
@@ -17067,11 +17903,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17101,7 +17948,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV to MOV
       description: |
         MKV को MOV में बदलें
@@ -17134,11 +17981,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17168,7 +18026,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI to MOV
       description: |
         AVI को MOV में बदलें
@@ -17201,11 +18059,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17235,7 +18104,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 to AVI
       description: |
         MP4 को AVI में बदलें
@@ -17268,11 +18137,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17302,7 +18182,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV to AVI
       description: |
         MOV को AVI में बदलें
@@ -17335,11 +18215,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17369,7 +18260,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV to AVI
       description: |
         MKV को AVI में बदलें
@@ -17402,11 +18293,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17436,7 +18338,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI to MKV
       description: |
         AVI को MKV में बदलें
@@ -17469,11 +18371,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17503,7 +18416,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 to GIF
       description: |
         MP4 को GIF में बदलें
@@ -17536,11 +18449,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17570,7 +18494,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV to GIF
       description: |
         MOV को GIF में बदलें
@@ -17603,11 +18527,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17637,7 +18572,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV to GIF
       description: |
         MKV को GIF में बदलें
@@ -17670,11 +18605,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17704,7 +18650,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI to GIF
       description: |
         AVI को GIF में बदलें
@@ -17737,11 +18683,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17771,7 +18728,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF to MP4
       description: |
         GIF को MP4 में बदलें
@@ -17832,7 +18789,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF to WEBM
       description: |
         GIF को WEBM में बदलें
@@ -17893,7 +18850,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF to MOV
       description: |
         GIF को MOV में बदलें
@@ -17954,7 +18911,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 to MP3
       description: |
         MP4 को MP3 में बदलें
@@ -18015,7 +18972,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV to MP3
       description: |
         MOV को MP3 में बदलें
@@ -18076,7 +19033,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV to MP3
       description: |
         MKV को MP3 में बदलें
@@ -18137,7 +19094,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM to MP3
       description: |
         WEBM को MP3 में बदलें
@@ -18198,7 +19155,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI to MP3
       description: |
         AVI को MP3 में बदलें
@@ -18259,7 +19216,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 to WAV
       description: |
         MP4 को WAV में बदलें
@@ -18320,7 +19277,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV to WAV
       description: |
         MOV को WAV में बदलें
@@ -18381,7 +19338,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 to OGG
       description: |
         MP4 को OGG में बदलें
@@ -18442,7 +19399,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A to MP3
       description: |
         M4A को MP3 में बदलें
@@ -18503,7 +19460,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A to WAV
       description: |
         M4A को WAV में बदलें
@@ -18564,7 +19521,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC to MP3
       description: |
         AAC को MP3 में बदलें
@@ -18625,7 +19582,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC to WAV
       description: |
         AAC को WAV में बदलें
@@ -18686,7 +19643,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC to FLAC
       description: |
         AAC को FLAC में बदलें
@@ -18747,7 +19704,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG to MP3
       description: |
         OGG को MP3 में बदलें
@@ -18808,7 +19765,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG to WAV
       description: |
         OGG को WAV में बदलें
@@ -18869,7 +19826,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV to MP3
       description: |
         WAV को MP3 में बदलें
@@ -18930,7 +19887,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 to WAV
       description: |
         MP3 को WAV में बदलें
@@ -18991,7 +19948,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC to MP3
       description: |
         FLAC को MP3 में बदलें
@@ -19052,7 +20009,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel से CSV
       description: |
         Excel को CSV में बदलें
@@ -19085,11 +20042,22 @@ paths:
       responses:
         '202':
           description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19228,6 +20196,58 @@ paths:
           description: कोई लंबित नामांकन नहीं या अमान्य बॉडी
         '401':
           description: अमान्य TOTP कोड
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: जबरन MFA enrollment पूरा करें
+      description: login पर शुरू हुए जबरन enrollment की पुष्टि करता है और session लौटाता है। इस call के लिए session-gated होना ज़रूरी नहीं है; अल्पकालिक enrollment token session की जगह लेता है। यहाँ केवल TOTP code स्वीकार होता है, recovery code कभी नहीं।
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: नामांकन की पुष्टि हुई और सेशन बनाया गया। सेशन टोकन उसी तरह लौटाया जाता है जैसे login के समय लौटाया जाता है।
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: नामांकन token या code अनुपस्थित है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: अमान्य या समाप्त नामांकन token, या गलत code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: बहुत अधिक प्रयास
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19394,7 +20414,7 @@ paths:
           description: प्रीव्यू नहीं बनाया जा सका
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: upload preview जनरेट करें
@@ -19743,6 +20763,69 @@ paths:
       responses:
         '200':
           description: SCIM उपयोगकर्ता निष्क्रिय किया गया
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: SCIM user को आंशिक रूप से अपडेट करें
+      description: RFC 7644 PatchOp। सर्वर द्वारा अनुमत paths पर add, remove और replace समर्थित हैं। Users paths की validation हर operation के लिए होती है।
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: अपडेट किया गया resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: अमान्य PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: अनुपस्थित या अमान्य credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: resource नहीं मिला
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19808,6 +20891,69 @@ paths:
       responses:
         '204':
           description: SCIM समूह हटाया गया
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: SCIM group को आंशिक रूप से अपडेट करें
+      description: RFC 7644 PatchOp। सर्वर द्वारा अनुमत paths पर add, remove और replace समर्थित हैं। Group members की validation हर operation के लिए होती है।
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: अपडेट किया गया resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: अमान्य PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: अनुपस्थित या अमान्य credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: resource नहीं मिला
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -20054,7 +21200,29 @@ paths:
             type: string
       responses:
         '202':
-          description: निर्यात जॉब शुरू हुआ
+          description: Export शुरू हुआ। परिणाम के लिए statusUrl पर poll करें। वही URL Location header में भी है।
+          headers:
+            Location:
+              description: Export के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: फ़ीचर लाइसेंस प्राप्त नहीं है या अपर्याप्त अनुमतियां
         '404':
@@ -20250,13 +21418,33 @@ x-i18n:
       provenance: machine
       outputHash: 7932bff8e4ea
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: be95104f8946
+      outputHash: ea114f7a7e3d
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: 12b252ccb5b5
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: dafc60d4fe1e
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: 975c7e63c0a0
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: 98d3faeca5af
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: d3d84a4d9068
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: d8b2c82a14bb
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21213,6 +22401,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: de8bf378259a
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: cc22982cd8a3
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: 714db74cd2a5
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21245,6 +22441,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: 0f91db19ca62
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: 6087b9275d86
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: ec04a7eac587
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: 2702ce6c6af3
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: 8c6aec0b8459
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: 5d224789b0ec
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: 629e9ea4aac0
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: 4064f11535d7
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: d911b8dc38c3
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22925,6 +24153,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: 3a7cd229fe75
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: 428c7588bb55
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: d29f17a16f9d
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23141,6 +24377,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: cd7ab2eca83f
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: 821fa64a5d46
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: 19c74896cb52
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23181,6 +24425,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: 48349331e823
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: d9b56df2862c
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 03cea16bd144
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine
@@ -23421,6 +24673,26 @@ x-i18n:
       sourceHash: 9bdf4d2a5c25
       provenance: machine
       outputHash: 7569f47fe5c4
+    ptr:/components/schemas/Error/properties/code/description:
+      sourceHash: bf339907046a
+      provenance: machine
+      outputHash: 320e14173435
+    ptr:/components/schemas/Error/properties/requestId/description:
+      sourceHash: 7a9822038dbc
+      provenance: machine
+      outputHash: 311caff7b2bd
+    ptr:/components/schemas/JobStatus/properties/status/description:
+      sourceHash: c733f9fae6bb
+      provenance: machine
+      outputHash: b61c42bd96d0
+    ptr:/components/schemas/JobStatus/properties/result/description:
+      sourceHash: 9b7fb1030f61
+      provenance: machine
+      outputHash: 7141c98f08f2
+    ptr:/components/schemas/JobStatus/properties/progressUrl/description:
+      sourceHash: d243642d631c
+      provenance: machine
+      outputHash: fff9b8871efc
     ptr:/components/schemas/ToolResponse/properties/jobId/description:
       sourceHash: f93d3d625101
       provenance: machine
@@ -23953,6 +25225,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -23985,6 +25261,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24017,6 +25297,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24173,6 +25457,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24205,6 +25493,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24833,6 +26125,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24865,6 +26161,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/400/description:
       sourceHash: 91cd364b6a62
       provenance: machine
@@ -24941,6 +26241,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/400/description:
       sourceHash: 7cea57b7cad6
       provenance: machine
@@ -24969,6 +26273,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25021,6 +26329,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25053,6 +26365,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25085,6 +26401,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25113,6 +26433,10 @@ x-i18n:
       sourceHash: 9c0ccc385d27
       provenance: machine
       outputHash: 44d139de7c2a
+    ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26065,6 +27389,22 @@ x-i18n:
       sourceHash: 8b99f95b1946
       provenance: machine
       outputHash: 700514536c16
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/parameters/0/description:
+      sourceHash: 105290b108f4
+      provenance: machine
+      outputHash: b15454a6450e
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/200/description:
+      sourceHash: cda9498c937b
+      provenance: machine
+      outputHash: 70998184b171
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: b707d5b9f23b
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/404/description:
+      sourceHash: 288b3aa41c1f
+      provenance: machine
+      outputHash: 71798b6df8c5
     ptr:/paths/~1api~1v1~1jobs~1{jobId}~1progress/get/parameters/0/description:
       sourceHash: 3f77c804360b
       provenance: machine
@@ -26165,6 +27505,70 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: c2cc14123e88
+    ptr:/paths/~1api~1v1~1feedback/post/requestBody/content/application~1json/schema/properties/source/description:
+      sourceHash: 51f100d50bab
+      provenance: machine
+      outputHash: 5217a52f47a2
+    ptr:/paths/~1api~1v1~1feedback/post/responses/200/description:
+      sourceHash: 8901e89d433e
+      provenance: machine
+      outputHash: 78e5e74fd772
+    ptr:/paths/~1api~1v1~1feedback/post/responses/400/description:
+      sourceHash: 5685909cf0a7
+      provenance: machine
+      outputHash: 442c09224d5c
+    ptr:/paths/~1api~1v1~1feedback/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: b707d5b9f23b
+    ptr:/paths/~1api~1v1~1feedback/post/responses/429/description:
+      sourceHash: 95a111e3185e
+      provenance: machine
+      outputHash: 6d7ca9ae8dc1
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
+      sourceHash: 9031d1af7020
+      provenance: machine
+      outputHash: 94a17d64b814
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: b707d5b9f23b
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/403/description:
+      sourceHash: 95d513c2ed9a
+      provenance: machine
+      outputHash: 58fa6d30c118
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/200/description:
+      sourceHash: 568b126ca48c
+      provenance: machine
+      outputHash: b19be90a1b30
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: b707d5b9f23b
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 0bdc91e0fbb5
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/409/description:
+      sourceHash: f6fd45eac33e
+      provenance: machine
+      outputHash: 959bff07749b
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/202/description:
+      sourceHash: 148c1c5a4e39
+      provenance: machine
+      outputHash: 4d2fc15b2b57
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: b707d5b9f23b
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 0bdc91e0fbb5
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/404/description:
+      sourceHash: e1208d06faa8
+      provenance: machine
+      outputHash: 823bf92f235c
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -26173,6 +27577,10 @@ x-i18n:
       sourceHash: 356335f30ad9
       provenance: machine
       outputHash: df0d3589c3b3
+    ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/content/application~1json/schema/properties/jobId/description:
       sourceHash: f77d0d971c51
       provenance: machine
@@ -26401,6 +27809,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26429,6 +27841,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26493,6 +27909,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26733,6 +28153,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26817,6 +28241,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26861,6 +28289,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26961,6 +28393,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27325,6 +28761,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27413,6 +28853,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27437,6 +28881,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27461,6 +28909,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27485,6 +28937,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27509,6 +28965,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27837,6 +29297,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27861,6 +29325,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27885,6 +29353,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27905,6 +29377,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27925,6 +29401,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27945,6 +29425,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27965,6 +29449,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28017,6 +29505,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28041,6 +29533,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28061,6 +29557,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28141,6 +29641,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28189,6 +29693,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28409,6 +29917,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28441,6 +29953,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28797,6 +30313,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30009,6 +31529,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30037,6 +31561,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30065,6 +31593,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30093,6 +31625,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30121,6 +31657,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30149,6 +31689,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30177,6 +31721,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30205,6 +31753,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30233,6 +31785,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30261,6 +31817,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30289,6 +31849,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30317,6 +31881,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30345,6 +31913,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30373,6 +31945,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30401,6 +31977,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30429,6 +32009,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30457,6 +32041,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31073,6 +32661,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31149,6 +32741,22 @@ x-i18n:
       sourceHash: 6db92b87b80d
       provenance: machine
       outputHash: '249673691283'
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/200/description:
+      sourceHash: eddcb6a49407
+      provenance: machine
+      outputHash: 514be37a7196
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/400/description:
+      sourceHash: bab4cddd22a1
+      provenance: machine
+      outputHash: 883f062b9826
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/401/description:
+      sourceHash: c5292e1d5e33
+      provenance: machine
+      outputHash: 15bc866909e1
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/429/description:
+      sourceHash: 91434030e947
+      provenance: machine
+      outputHash: be749cc31f35
     ptr:/paths/~1api~1auth~1mfa~1complete/post/responses/200/description:
       sourceHash: 2316b4f3e3ce
       provenance: machine
@@ -31397,6 +33005,22 @@ x-i18n:
       sourceHash: f4dea73b29b6
       provenance: machine
       outputHash: 1d1065873f78
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 2e53906a69bc
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 85d8b5d5473c
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: b707d5b9f23b
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: d13168b38a04
     ptr:/paths/~1api~1v1~1scim~1v2~1Groups/get/responses/200/description:
       sourceHash: df8e6383d425
       provenance: machine
@@ -31417,6 +33041,22 @@ x-i18n:
       sourceHash: 1212fc1b0593
       provenance: machine
       outputHash: 97d9a75fbebe
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 2e53906a69bc
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 85d8b5d5473c
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: b707d5b9f23b
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: d13168b38a04
     ptr:/paths/~1api~1v1~1enterprise~1audit~1export/get/responses/200/description:
       sourceHash: 6215b564a1d4
       provenance: machine
@@ -31566,9 +33206,13 @@ x-i18n:
       provenance: machine
       outputHash: 1c5e0af7e3cc
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/description:
-      sourceHash: 0af3d2a07c98
+      sourceHash: 52a7b1517297
       provenance: machine
-      outputHash: a528c35e8232
+      outputHash: 0187a061994d
+    ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/headers/Location/description:
+      sourceHash: 6f75e9da213c
+      provenance: machine
+      outputHash: ba35709ce219
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/403/description:
       sourceHash: 7d67215cdd1a
       provenance: machine

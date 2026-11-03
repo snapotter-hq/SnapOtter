@@ -794,7 +794,12 @@ describe("Pipeline batch execution", () => {
 
     const second = await post();
     expect(second.statusCode, second.body.slice(0, 300)).toBe(202);
-    expect(second.json()).toEqual({ jobId: clientJobId, async: true });
+    expect(second.json()).toEqual({
+      jobId: clientJobId,
+      async: true,
+      statusUrl: `/api/v1/jobs/${clientJobId}`,
+      progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+    });
 
     const foreign = await post(await loginAsUser(app));
     expect(foreign.statusCode, foreign.body.slice(0, 300)).toBe(409);

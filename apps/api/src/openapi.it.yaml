@@ -22,9 +22,19 @@ servers:
     description: Istanza corrente
 tags:
   - name: Tools
-    description: Strumenti di elaborazione file per immagini, video, audio, PDF e file. Ognuno accetta un caricamento file multipart e restituisce un URL di download.
+    description: Endpoint degli strumenti non raggruppati in una sezione.
+  - name: Image
+    description: Strumenti per immagini. Ognuno accetta un caricamento file multipart e restituisce un URL di download.
+  - name: Video
+    description: Strumenti per video. Ognuno accetta un caricamento file multipart e restituisce un URL di download.
+  - name: Audio
+    description: Strumenti per audio. Ognuno accetta un caricamento file multipart e restituisce un URL di download.
+  - name: PDF
+    description: Strumenti per PDF e documenti. Ognuno accetta un caricamento file multipart e restituisce un URL di download.
   - name: Batch
     description: Elabora più file tramite uno strumento in un'unica richiesta.
+  - name: Jobs
+    description: Stato e avanzamento dei job di lunga durata.
   - name: Pipelines
     description: Concatena più strumenti in flussi di lavoro riutilizzabili.
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: Dettagli aggiuntivi dell'errore (ad es. errori di validazione Zod)
+        code:
+          type: string
+          description: Codice stabile e leggibile dalla macchina. Elencato nel catalogo degli errori.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: ID della richiesta per l'assistenza e la correlazione dei log.
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: Stato del job memorizzato. completed, failed e canceled sono stati terminali.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Presente quando il job ha un risultato. La struttura dipende dallo strumento, ad esempio downloadUrl. Un job canceled può includere un risultato parziale.
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: Stream SSE per questo job.
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: Ridimensiona Immagine
       description: Ridimensiona un'immagine a dimensioni specifiche o in percentuale.
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: Ridimensionamento content-aware
       description: Ridimensiona un'immagine usando il seam carving per rimuovere o inserire contenuto in modo intelligente, preservando gli elementi importanti.
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: Ritaglia Immagine
       description: Ritaglia un'immagine a una regione specifica.
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: Ruota e capovolgi immagine
       description: Ruota un'immagine di un angolo o capovolgila in orizzontale/verticale.
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: Converti Immagine
       description: Converti un'immagine in un formato diverso.
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: Comprimi Immagine
       description: Riduci la dimensione del file immagine in base al livello di qualità o alla dimensione target.
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: Comprimi l'immagine a 20 KB
       description: |
         Comprimi un'immagine a una dimensione target di 20 KB
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: Comprimi l'immagine a 50 KB
       description: |
         Comprimi un'immagine a una dimensione target di 50 KB
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: Comprimi l'immagine a 100 KB
       description: |
         Comprimi un'immagine a una dimensione target di 100 KB
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: Comprimi l'immagine a 200 KB
       description: |
         Comprimi un'immagine a una dimensione target di 200 KB
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: Comprimi l'immagine a 500 KB
       description: |
         Comprimi un'immagine a una dimensione target di 500 KB
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: Rimuovi metadati immagine
       description: Rimuovi i metadati EXIF, GPS, ICC o XMP da un'immagine.
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: Bordo e cornice
       description: Aggiungi un bordo, angoli arrotondati, spaziatura o ombra a un'immagine.
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: Abbellisci screenshot
       description: |
         Aggiungi sfondi con gradiente, cornici di dispositivi, ombre, filigrane e
@@ -1067,7 +1137,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: Regolazioni colore
       description: |
         Strumento consolidato di regolazione del colore. Regola luminosità, contrasto, esposizione, saturazione, temperatura, tinta, tonalità, nitidezza, canali colore ed effetti in un'unica passata.
@@ -1127,7 +1197,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: Aumenta nitidezza immagine
       description: Aumenta la nitidezza di un'immagine con metodi adattivi, maschera di contrasto o high-pass, con riduzione del rumore opzionale.
       security:
@@ -1187,7 +1257,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: Ottimizza per il web
       description: Ottimizza un'immagine per la distribuzione web convertendola in formati moderni, regolando la qualità e ridimensionandola opzionalmente.
       security:
@@ -1240,7 +1310,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: Ottimizza per il web (anteprima)
       description: |
         Endpoint di anteprima leggero per la regolazione live dei parametri. Restituisce
@@ -1303,7 +1373,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: Miglioramento immagine
       description: |
         Miglioramento automatico dell'immagine basato su AI. Analizza l'immagine e applica
@@ -1363,7 +1433,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: Analizza immagine per il miglioramento
       description: |
         Analizza un'immagine e restituisce le correzioni suggerite senza applicarle.
@@ -1415,7 +1485,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: Rimozione rumore
       description: |
         Rimozione del rumore basata su AI tramite il sidecar Python. Supporta più
@@ -1454,11 +1524,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1494,7 +1575,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: Rimozione occhi rossi
       description: |
         Rilevamento e rimozione degli occhi rossi basati su AI. Rileva i volti e corregge
@@ -1531,11 +1612,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1571,7 +1663,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: Restauro foto
       description: |
         Pipeline di restauro foto basata su AI. Ripara i graffi, migliora i volti,
@@ -1611,11 +1703,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1651,7 +1754,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Foto tessera - analizza
       description: |
         Fase 1 della generazione della foto tessera. Rileva i punti di riferimento del volto e rimuove
@@ -1787,7 +1890,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Foto tessera - genera
       description: |
         Fase 2 della generazione della foto tessera. Usa jobId e i punti di riferimento della
@@ -1930,7 +2033,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: Colorizza
       description: |
         Colorizzazione foto basata su AI. Converte fotografie in bianco e nero o in scala
@@ -1965,11 +2068,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2005,7 +2119,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: Miglioramento volti
       description: |
         Miglioramento dei volti basato su AI con GFPGAN o CodeFormer. Rileva i volti
@@ -2042,11 +2156,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2082,7 +2207,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: Immagine in Base64
       description: |
         Converti una o più immagini in stringhe codificate in Base64 con data URI.
@@ -2176,7 +2301,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: Filigrana di testo
       description: Aggiungi una filigrana di testo a un'immagine.
       security:
@@ -2229,7 +2354,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: Sovrapposizione di testo
       description: Aggiungi una sovrapposizione di testo stilizzata con riquadro di sfondo opzionale.
       security:
@@ -2283,7 +2408,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: Sostituisci colore
       description: Sostituisci un colore specifico in un'immagine con un altro colore o con la trasparenza.
       security:
@@ -2334,7 +2459,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: Simulazione daltonismo
       description: Simula come appare un'immagine alle persone con vari tipi di deficit della visione dei colori.
       security:
@@ -2382,7 +2507,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: Strumenti GIF
       description: Ridimensiona, ottimizza, regola la velocità, inverti, estrai fotogrammi o ruota GIF animate.
       security:
@@ -2446,7 +2571,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: Info GIF
       description: Ottieni i metadati di una GIF animata, tra cui dimensioni, numero di fotogrammi, ritardi e durata.
       security: []
@@ -2503,7 +2628,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: Ritaglio intelligente
       description: 'Ritaglio intelligente con tre modalità: messa a fuoco del soggetto, messa a fuoco del volto o taglio automatico.'
       security:
@@ -2562,7 +2687,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: Immagine in SVG
       description: Converti un'immagine raster nel formato vettoriale SVG usando potrace (B&N) o VTracer (colore).
       security:
@@ -2617,7 +2742,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG in raster
       description: Converti un file SVG in un formato immagine raster con scala e DPI personalizzati.
       security:
@@ -2670,7 +2795,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG in raster (batch)
       description: Converti più file SVG in immagini raster. Restituisce un archivio ZIP.
       security:
@@ -2730,7 +2855,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: Immagine in PDF
       description: Converti una o più immagini in un documento PDF.
       security:
@@ -2812,7 +2937,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF in immagine
       description: Converti le pagine PDF in immagini. Restituisce i download delle singole pagine e uno ZIP di tutte le pagine.
       security:
@@ -2901,7 +3026,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: Numero di pagine PDF
       description: Ottieni il numero di pagine in un file PDF.
       security: []
@@ -2940,7 +3065,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: Miniature pagine PDF
       description: Genera anteprime in miniatura per ogni pagina di un PDF (max 200 pagine, JPEG largo 300px).
       security: []
@@ -2993,7 +3118,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: Dividi immagine
       description: Dividi un'immagine in una griglia di riquadri. Restituisce un file ZIP.
       security:
@@ -3047,7 +3172,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: Rinomina in blocco
       description: Rinomina più immagini usando un modello di pattern. Supporta i token {{index}}, {{padded}} e {{original}}. Restituisce un file ZIP.
       security:
@@ -3099,7 +3224,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: Generatore di favicon
       description: Genera un set completo di favicon (PNG da 16px a 512px, ICO e manifest.json) da un'immagine. Restituisce un file ZIP.
       security:
@@ -3143,7 +3268,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: Filigrana immagine
       description: Aggiungi una sovrapposizione di filigrana immagine.
       security:
@@ -3198,7 +3323,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: Composizione immagini
       description: Componi un'immagine di sovrapposizione su un'immagine di base con modalità di fusione.
       security:
@@ -3254,7 +3379,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: Generatore di meme
       description: |
         Crea meme usando modelli o immagini personalizzate. Supporta due modalità: (1) Modalità modello - invia un corpo JSON con `templateId` e `textBoxes`. (2) Modalità immagine personalizzata - invia multipart con `file` e `settings`.
@@ -3493,7 +3618,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: Confronta immagini
       description: Confronta due immagini e genera un report visivo delle differenze.
       security:
@@ -3560,7 +3685,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: Cancella oggetti
       description: Cancella oggetti da un'immagine usando una maschera. Le aree bianche nella maschera indicano le regioni da cancellare. Usa l'inpainting LaMa.
       security:
@@ -3613,11 +3738,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3653,7 +3789,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: Espansione canvas AI (sperimentale)
       description: |
         Espandi il canvas di un'immagine usando l'outpainting AI. Estende l'immagine in qualsiasi
@@ -3696,11 +3832,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3736,7 +3883,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: Collage e griglia
       description: Combina più immagini in un collage a griglia.
       security:
@@ -3793,7 +3940,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: Unisci immagini
       description: Unisci più immagini in orizzontale, in verticale o in un layout a griglia.
       security:
@@ -3852,7 +3999,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: Rimuovi lo sfondo da un'immagine animata
       description: Rimuovi lo sfondo da un GIF, WebP o APNG animato fotogramma per fotogramma utilizzando l'intelligenza artificiale (rembg). Funziona localmente.
       security:
@@ -3898,11 +4045,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3932,7 +4090,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: Rimuovi sfondo
       description: Rimuovi lo sfondo da un'immagine usando l'AI (rembg). Viene eseguito in locale.
       security:
@@ -3966,11 +4124,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4006,7 +4175,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: Applica effetti di sfondo
       description: |
         Applica la sostituzione dello sfondo o effetti a un risultato di remove-background già elaborato. Richiede un jobId da una precedente chiamata POST /api/v1/tools/image/remove-background.
@@ -4073,7 +4242,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: Correggi trasparenza fittizia
       description: |
         Corregge i PNG con "trasparenza fittizia" che presentano bordi sfrangiati, aloni o artefatti
@@ -4111,11 +4280,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4151,7 +4331,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: Upscaling immagine
       description: Aumenta la risoluzione di un'immagine usando l'AI (Real-ESRGAN). Viene eseguito in locale.
       security:
@@ -4187,11 +4367,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4227,7 +4418,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: Sfoca volti e dati sensibili
       description: Rileva e sfoca i volti in un'immagine per la privacy. Usa OpenCV. Viene eseguito in locale.
       security:
@@ -4259,11 +4450,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4299,7 +4501,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / estrazione testo
       description: |-
         Estrai il testo da un'immagine localmente. Il livello Fast integrato utilizza
@@ -4337,6 +4539,11 @@ paths:
       responses:
         '202':
           description: Accettata dopo la validazione e l'accodamento. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress; gli errori di elaborazione arrivano nell'evento terminale failed.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4345,6 +4552,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4388,7 +4601,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: Info immagine
       description: Ottieni metadati dettagliati su un'immagine, tra cui dimensioni, formato, spazio colore e dati EXIF.
       security:
@@ -4491,7 +4704,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: Palette colori
       description: Estrai i colori dominanti da un'immagine.
       security:
@@ -4544,7 +4757,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: Lettore di codici a barre
       description: Leggi codici QR e codici a barre da un'immagine.
       security:
@@ -4649,7 +4862,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: Trova duplicati
       description: Trova immagini duplicate in un insieme usando l'hashing percettivo.
       security:
@@ -4752,7 +4965,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: Generatore di codici QR
       description: Genera un'immagine di codice QR da un testo. Questo strumento accetta un corpo JSON, non multipart.
       security:
@@ -4815,7 +5028,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: Cattura pagina web come immagine
       description: Cattura una pagina web come screenshot di alta qualità. Accetta un corpo JSON con un URL e opzioni di cattura.
       security:
@@ -4901,7 +5114,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: Ispeziona metadati
       description: Visualizza tutti i metadati (EXIF, GPS, ICC, XMP) in un'immagine senza rimuoverli.
       security:
@@ -4970,7 +5183,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: Modifica metadati immagine
       description: Modifica i campi di metadati EXIF, IPTC, GPS e altri in un'immagine usando ExifTool.
       security:
@@ -5039,7 +5252,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: Ispeziona metadati (ExifTool)
       description: Leggi tutti i metadati da un'immagine usando ExifTool. Restituisce tutti i campi EXIF, IPTC, XMP e GPS incorporati.
       security:
@@ -7054,6 +7267,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: Recupera lo stato del job
+      description: |
+        Restituisce lo stato salvato di un job senza tenere aperta una connessione. Interrogalo dopo una risposta 202, oppure usalo come alternativa quando il flusso di avanzamento si interrompe.
+
+        `status` è uno tra `queued`, `processing`, `completed`, `failed` o `canceled`. `completed`, `failed` e `canceled` sono stati terminali. Un job annullato può comunque contenere un `result` parziale (per esempio uno ZIP dei file completati), quindi leggi `result` ogni volta che è presente.
+
+        L'accesso segue il flusso di avanzamento: il proprietario del job, un utente con `files:all`, oppure un utente con `features:manage` per un job di installazione di un bundle di funzionalità. Qualsiasi altro chiamante riceve 404.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Il jobId della risposta 202.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stato del job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: Credenziali mancanti o non valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job non trovato o non visibile al chiamante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7367,6 +7627,197 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: Invia un feedback sul prodotto
+      description: Registra un evento di feedback dall'utente autenticato. Limite di 10 richieste al minuto. `accepted` è false quando il server non ha registrato l'evento.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: Origine del feedback. I valori accettati sono definiti nelle costanti condivise per il feedback.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Feedback gestito
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: Corpo della richiesta non valido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Credenziali mancanti o non valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Limite di richieste superato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: Recupera la release più recente disponibile
+      description: Restituisce l'ultima release pubblicata se è più recente della versione in esecuzione, altrimenti null. Richiede settings:write.
+      responses:
+        '200':
+          description: Ultima release, oppure null quando questa istanza è aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: Credenziali mancanti o non valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permesso settings:write mancante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: Ripristina tutti i bundle di funzionalità AI
+      description: |
+        Elimina l'ambiente virtuale AI, i modelli e la cache di pip, poi segna ogni bundle come non installato. Usalo quando un'installazione non riesce a recuperare da sola. Disinstallare un bundle rimuove solo i suoi pesi del modello, quindi questo è il ripristino completo.
+
+        La risposta indica se il venv è stato ricreato dalla base incorporata (venvReseeded). Restituisce 409 mentre è in corso un'installazione di un bundle. Richiede features:manage.
+      responses:
+        '200':
+          description: Ripristino completato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: Credenziali mancanti o non valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permesso features:manage mancante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Un'installazione di bundle è già in corso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: Installa tutti i bundle di funzionalità necessari a uno strumento
+      description: Mette in coda ogni bundle richiesto dallo strumento e riporta, per ciascun bundle, se è stato messo in coda o saltato. Richiede features:manage.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Stato per bundle. Ogni bundle accodato ha il proprio statusUrl e progressUrl. I bundle saltati non hanno nessuno dei due.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+                        jobId:
+                          type: string
+                        statusUrl:
+                          type: string
+                        progressUrl:
+                          type: string
+        '401':
+          description: Credenziali mancanti o non valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Permesso features:manage mancante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Strumento sconosciuto, oppure lo strumento non richiede bundle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7406,11 +7857,22 @@ paths:
       responses:
         '202':
           description: Installazione avviata o messa in coda
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: ID job per seguire l'avanzamento dell'installazione via SSE
@@ -7920,7 +8382,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: Converti video
       description: Converti video tra MP4, MOV, WebM, AVI e MKV.
       security:
@@ -7952,11 +8414,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7986,7 +8459,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: Comprimi video
       description: Riduci la dimensione del file video con controllo della qualità.
       security:
@@ -8018,11 +8491,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8052,7 +8536,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: Taglia video
       description: Estrai una clip da un video.
       security:
@@ -8102,7 +8586,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: Disattiva audio video
       description: Rimuovi la traccia audio da un video.
       security:
@@ -8145,7 +8629,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: Video in GIF
       description: Trasforma una clip video in una GIF animata.
       security:
@@ -8179,11 +8663,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8213,7 +8708,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: Ridimensiona video
       description: Scala un video a una nuova risoluzione o a una dimensione preimpostata.
       security:
@@ -8263,7 +8758,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: Ritaglia video
       description: Ritaglia una regione da un video.
       security:
@@ -8314,7 +8809,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: Ruota video
       description: Ruota o capovolgi un video.
       security:
@@ -8362,7 +8857,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: Cambia FPS
       description: Cambia il frame rate di un video.
       security:
@@ -8410,7 +8905,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: Colore video
       description: Regola luminosità, contrasto, saturazione e gamma.
       security:
@@ -8461,7 +8956,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: Velocità video
       description: Accelera o rallenta un video.
       security:
@@ -8510,7 +9005,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: Inverti video
       description: Riproduci una clip video al contrario. Limitato a clip fino a 5 minuti.
       security:
@@ -8553,7 +9048,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: Normalizza Audio del Video
       description: Normalizza il volume audio del video allo standard broadcast (EBU R128).
       security:
@@ -8596,7 +9091,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: Padding proporzioni
       description: Aggiungi barre a tinta unita per adattarsi a un rapporto d'aspetto target.
       security:
@@ -8645,7 +9140,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: Padding sfocato
       description: Riempi le barre con una copia sfocata del video.
       security:
@@ -8694,7 +9189,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: Filigrana video
       description: Incorpora una filigrana di testo sui fotogrammi del video.
       security:
@@ -8746,7 +9241,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: Stabilizza video
       description: Riduci il tremolio della camera con stabilizzazione a due passate.
       security:
@@ -8777,11 +9272,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8811,7 +9317,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF in video
       description: Converti una GIF animata in un video MP4, WebM o MOV.
       security:
@@ -8859,7 +9365,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: Video in WebP
       description: Converti una clip video in un'immagine WebP animata.
       security:
@@ -8910,7 +9416,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: Video in fotogrammi
       description: Estrai i fotogrammi da un video come uno ZIP di immagini.
       security:
@@ -8961,7 +9467,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: Unisci video
       description: |
         Unisci più clip video in un unico file MP4. Tutti gli input vengono
@@ -8991,11 +9497,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9025,7 +9542,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: Sostituisci audio
       description: Sostituisci la traccia audio di un video con un altro file.
       security:
@@ -9070,7 +9587,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: Incorpora sottotitoli
       description: Renderizza in modo permanente i sottotitoli sui fotogrammi del video.
       security:
@@ -9103,11 +9620,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9137,7 +9665,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: Integra sottotitoli
       description: Effettua il mux di una traccia di sottotitoli nel contenitore video.
       security:
@@ -9187,7 +9715,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: Estrai sottotitoli
       description: Estrai la traccia di sottotitoli da un video come file SRT.
       security:
@@ -9230,7 +9758,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: Immagini in video
       description: Trasforma un insieme di immagini in un video presentazione.
       security:
@@ -9282,7 +9810,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: Pulisci metadati video
       description: Rimuovi i metadati da un video e segnala ciò che è stato trovato.
       security:
@@ -9325,7 +9853,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: Sottotitoli automatici
       description: |
         Generazione di sottotitoli basata su AI dalle tracce audio del video usando
@@ -9360,11 +9888,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9400,7 +9939,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: Estrai audio
       description: Estrai la traccia audio da un video.
       security:
@@ -9448,7 +9987,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: Converti audio
       description: Converti audio tra MP3, WAV, OGG e altri.
       security:
@@ -9497,7 +10036,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: Taglia audio
       description: Estrai una sezione da un file audio.
       security:
@@ -9546,7 +10085,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: Regola Volume
       description: Aumenta o diminuisci il volume dell'audio di un guadagno fisso.
       security:
@@ -9594,7 +10133,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: Normalizza audio
       description: Uniforma il volume ai livelli standard broadcast (EBU R128, -16 LUFS).
       security:
@@ -9637,7 +10176,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: Dissolvenza audio
       description: Aggiungi effetti di dissolvenza in entrata e in uscita all'audio.
       security:
@@ -9686,7 +10225,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: Inverti audio
       description: Riproduci l'audio al contrario.
       security:
@@ -9729,7 +10268,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: Velocità audio
       description: Accelera o rallenta la riproduzione audio.
       security:
@@ -9777,7 +10316,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: Cambio tonalità
       description: Alza o abbassa la tonalità di semitoni senza cambiare la velocità.
       security:
@@ -9825,7 +10364,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: Canali audio
       description: Converti tra mono e stereo, o scambia i canali sinistro e destro.
       security:
@@ -9873,7 +10412,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: Rimozione silenzio
       description: Rimuovi le sezioni silenziose dall'audio.
       security:
@@ -9922,7 +10461,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: Riduzione rumore
       description: Riduci il rumore di fondo con la riduzione del rumore basata su FFT.
       security:
@@ -9970,7 +10509,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: Unisci audio
       description: Combina più file audio in un'unica traccia sequenziale.
       security:
@@ -10020,7 +10559,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: Dividi audio
       description: |
         Dividi l'audio per tempo, in parti uguali o per rilevamento del silenzio. Restituisce una
@@ -10074,7 +10613,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: Creatore di suonerie
       description: Crea una clip di suoneria (.m4r) da qualsiasi file audio.
       security:
@@ -10123,7 +10662,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: Immagine forma d'onda
       description: Genera una visualizzazione della forma d'onda come immagine PNG da un file audio.
       security:
@@ -10173,7 +10712,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: Metadati audio
       description: |
         Visualizza, modifica o rimuovi i tag audio (ID3). La risposta include un
@@ -10227,7 +10766,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: Trascrivi audio
       description: |
         Trascrizione speech-to-text basata su AI usando faster-whisper. Produce
@@ -10262,11 +10801,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10302,7 +10852,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: Unisci PDF
       description: Combina più PDF in uno solo. Richiede almeno due file.
       security:
@@ -10347,7 +10897,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: Dividi PDF
       description: |
         Estrai pagine o dividi in parti. In modalità "range" restituisce un unico PDF
@@ -10400,7 +10950,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: Comprimi PDF
       description: |
         Riduci la dimensione del file PDF sottocampionando le immagini incorporate. In modalità "quality"
@@ -10454,7 +11004,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: Comprimi il PDF a 100 KB
       description: |
         Comprimi un PDF a una dimensione target di 100 KB (100 KB, dove 1 KB = 1000 byte).
@@ -10489,11 +11039,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10517,7 +11078,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: Comprimi il PDF a 200 KB
       description: |
         Comprimi un PDF a una dimensione target di 200 KB (200 KB, dove 1 KB = 1000 byte).
@@ -10552,11 +11113,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10580,7 +11152,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: Comprimi il PDF a 500 KB
       description: |
         Comprimi un PDF a una dimensione target di 500 KB (500 KB, dove 1 KB = 1000 byte).
@@ -10615,11 +11187,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10643,7 +11226,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: Comprimi il PDF a 1 MB
       description: |
         Comprimi un PDF a una dimensione target di 1 MB (1000 KB, dove 1 KB = 1000 byte).
@@ -10678,11 +11261,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10706,7 +11300,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: Comprimi il PDF a 2 MB
       description: |
         Comprimi un PDF a una dimensione target di 2 MB (2000 KB, dove 1 KB = 1000 byte).
@@ -10741,11 +11335,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10769,7 +11374,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: Ruota PDF
       description: Ruota le pagine in un PDF di 90, 180 o 270 gradi.
       security:
@@ -10818,7 +11423,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: Estrai pagine
       description: Estrai le pagine selezionate in un nuovo PDF.
       security:
@@ -10866,7 +11471,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: Rimuovi pagine
       description: Elimina pagine specifiche da un PDF. Non è possibile rimuovere tutte le pagine.
       security:
@@ -10914,7 +11519,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: Organizza PDF
       description: Riordina le pagine con un ordine di pagina esplicito.
       security:
@@ -10962,7 +11567,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: Multi-strumento PDF
       description: 'Assembla un PDF da un piano di pagine esplicito: riordina, duplica, ruota o elimina pagine e importa pagine da PDF aggiuntivi, in un''unica richiesta.'
       security:
@@ -11013,7 +11618,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: Proteggi PDF
       description: Aggiungi la protezione con password tramite crittografia AES-256. Le password vengono oscurate dai registri di audit.
       security:
@@ -11062,7 +11667,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: Sblocca PDF
       description: Rimuovi la protezione con password da un PDF. Deve essere fornita la password corretta. Le password vengono oscurate dai registri di audit.
       security:
@@ -11110,7 +11715,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: Ripara PDF
       description: Tenta di riparare un PDF danneggiato o corrotto. La validazione strutturale viene saltata sull'input per consentire file malformati.
       security:
@@ -11153,7 +11758,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: Ottimizza PDF per il web
       description: Linearizza un PDF per una visualizzazione web veloce (download progressivo).
       security:
@@ -11196,7 +11801,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF in scala di grigi
       description: Converti tutti i colori in un PDF in scala di grigi.
       security:
@@ -11239,7 +11844,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: Convertitore PDF/A
       description: Converti un PDF nel formato di archiviazione PDF/A-2 per la conservazione a lungo termine.
       security:
@@ -11282,7 +11887,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: Ritaglia PDF
       description: Ritaglia tutte le pagine con un margine uniforme.
       security:
@@ -11330,7 +11935,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: Pagine per foglio (N-up)
       description: Disponi più pagine per foglio (es. 2-up, 4-up).
       security:
@@ -11378,7 +11983,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: Opuscolo PDF
       description: Disponi le pagine per piegarle in un opuscolo (imposizione per stampa fronte-retro).
       security:
@@ -11426,7 +12031,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: Filigrana PDF
       description: Aggiungi una filigrana di testo a ogni pagina di un PDF.
       security:
@@ -11478,7 +12083,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: Numeri di pagina PDF
       description: Aggiungi i numeri di pagina ("Pagina N di M") a ogni pagina di un PDF.
       security:
@@ -11527,7 +12132,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: Converti documento
       description: Converti tra i formati Word, OpenDocument, RTF e testo semplice.
       security:
@@ -11558,11 +12163,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11586,7 +12202,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: Converti presentazione
       description: Converti tra i formati di presentazione PowerPoint e OpenDocument.
       security:
@@ -11617,11 +12233,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11645,7 +12272,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: Converti foglio di calcolo
       description: Converti tra i formati Excel, OpenDocument e CSV. Le cartelle di lavoro multi-foglio esportano il primo foglio in CSV.
       security:
@@ -11676,11 +12303,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11704,7 +12342,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel in PDF
       description: Converti i fogli di calcolo in PDF. I fogli larghi possono impaginarsi su più pagine.
       security:
@@ -11730,11 +12368,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11758,7 +12407,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word in PDF
       description: Converti i documenti Word in PDF.
       security:
@@ -11784,11 +12433,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11812,7 +12472,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint in PDF
       description: Converti le presentazioni in PDF.
       security:
@@ -11838,11 +12498,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11866,7 +12537,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML in PDF
       description: Converti un file HTML in PDF. Le risorse remote sono disabilitate per la privacy.
       security:
@@ -11892,11 +12563,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11920,7 +12602,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown in Word
       description: Converti un file Markdown in un documento Word (DOCX).
       security:
@@ -11963,7 +12645,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown in HTML
       description: Converti un file Markdown in una pagina HTML autonoma. Le immagini remote nella sorgente vengono lasciate invariate nell'output.
       security:
@@ -12006,7 +12688,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown in PDF
       description: Converti un file Markdown in un PDF stilizzato. Le risorse remote sono disabilitate per la privacy.
       security:
@@ -12032,11 +12714,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12060,7 +12753,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: Converti da EPUB
       description: Converti un EPUB in PDF, DOCX, HTML o Markdown. Le risorse remote all'interno del libro non vengono recuperate.
       security:
@@ -12091,11 +12784,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12119,7 +12823,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: Converti in EPUB
       description: Converti file Word, Markdown, HTML o testo semplice in EPUB.
       security:
@@ -12145,11 +12849,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12173,7 +12888,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: Appiattisci PDF
       description: Incorpora moduli e annotazioni nel contenuto della pagina.
       security:
@@ -12216,7 +12931,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: Oscura PDF
       description: Rimuovi definitivamente le occorrenze di testo (oscuramento reale verificato).
       security:
@@ -12271,7 +12986,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF in testo
       description: Estrai testo semplice da un PDF.
       security:
@@ -12320,7 +13035,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF in Word
       description: Ideale per PDF basati su testo; le pagine scansionate richiedono l'OCR.
       security:
@@ -12346,11 +13061,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12374,7 +13100,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: Metadati PDF
       description: Leggi e scrivi i metadati del documento PDF.
       security:
@@ -12431,7 +13157,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: OCR PDF
       description: |-
         Estrai il testo dai documenti PDF scansionati pagina per pagina. Fast utilizza il file
@@ -12471,6 +13197,11 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12479,6 +13210,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12528,7 +13265,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: Creatore di grafici
       description: Crea grafici a barre, linee o torta a partire da dati CSV o JSON. Restituisce un'immagine PNG. Quando alcune righe vengono omesse perché la loro cella di valore conteneva testo non numerico, la risposta aggiunge `chartRows` ({charted, skipped}); le righe vuote non vengono conteggiate.
       security:
@@ -12579,7 +13316,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV in Excel
       description: Converti tra CSV ed Excel (XLSX), in entrambe le direzioni. Carica un file CSV o TSV per ottenere XLSX, oppure carica un file XLSX per ottenere CSV.
       security:
@@ -12627,7 +13364,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV in JSON
       description: Converti tra CSV e JSON, in entrambe le direzioni. Carica un file CSV o TSV per ottenere JSON, oppure carica un array JSON di oggetti per ottenere CSV.
       security:
@@ -12675,7 +13412,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON in XML
       description: Converti tra JSON e XML, in entrambe le direzioni. Carica un file JSON per ottenere XML, oppure carica un file XML per ottenere JSON.
       security:
@@ -12723,7 +13460,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: Dividi CSV
       description: Dividi un file CSV in file più piccoli in base al numero di righe. Restituisce un archivio ZIP contenente le parti.
       security:
@@ -12772,7 +13509,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: Unisci CSV
       description: Combina più file CSV o TSV con colonne corrispondenti in un unico file unito. Tutti i file devono avere le stesse intestazioni di colonna.
       security:
@@ -12817,7 +13554,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: Converti YAML / JSON
       description: Converti tra YAML e JSON, in entrambe le direzioni. Carica un file YAML per ottenere JSON, oppure carica un file JSON per ottenere YAML.
       security:
@@ -12860,7 +13597,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML in CSV
       description: Estrai elementi ripetuti da un file XML in una tabella CSV. Trova automaticamente il primo array di oggetti nell'albero XML.
       security:
@@ -12903,7 +13640,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: Crea ZIP
       description: Raggruppa più file in un unico archivio ZIP. I nomi di file duplicati vengono deduplicati automaticamente.
       security:
@@ -12948,7 +13685,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: Estrai ZIP
       description: Estrai in sicurezza i file da un archivio ZIP con protezione dalle zip bomb. Gli archivi con un singolo file restituiscono il file direttamente; gli archivi con più file restituiscono uno ZIP piatto.
       security:
@@ -12991,7 +13728,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: Sostituisci sfondo
       description: |
         Sostituzione dello sfondo basata su AI. Rimuove lo sfondo del soggetto
@@ -13031,11 +13768,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13071,7 +13819,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: Sfoca sfondo
       description: |
         Sfocatura dello sfondo basata su AI. Rimuove lo sfondo, sfoca
@@ -13107,11 +13855,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13147,7 +13906,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: Generatore di codici a barre
       description: Genera un'immagine di codice a barre da un testo. Questo strumento accetta un corpo JSON, non multipart.
       security:
@@ -13210,7 +13969,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: Ritaglio circolare
       description: Ritaglia un'immagine in un cerchio centrato con angoli trasparenti, bordo opzionale e zoom/offset regolabili.
       security:
@@ -13264,7 +14023,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: Ritaglio Arrotondato
       description: Ritaglia un'immagine in un quadrato arrotondato o in uno squircle con angoli trasparenti, bordo opzionale e zoom/offset regolabile.
       security:
@@ -13320,7 +14079,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: Duotone
       description: Applica un effetto duotone a due colori con colori personalizzati per ombre e luci.
       security:
@@ -13370,7 +14129,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: Padding immagine
       description: Applica il padding a un'immagine fino a un rapporto d'aspetto target con uno sfondo a tinta unita, trasparente o sfocato.
       security:
@@ -13423,7 +14182,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: Pixella
       description: Applica un effetto di pixelizzazione all'intera immagine o a una regione rettangolare specifica.
       security:
@@ -13476,7 +14235,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: Vignettatura
       description: Aggiungi un effetto di vignettatura con intensità, colore, raggio, morbidezza, rotondità e posizione del centro regolabili.
       security:
@@ -13530,7 +14289,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: Convertitore GIF/WebP
       description: Converti GIF animate in WebP e viceversa, preservando tutti i fotogrammi. Accetta solo input .gif e .webp.
       security:
@@ -13580,7 +14339,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: Istogramma
       description: |
         Genera un grafico a istogramma RGB da un'immagine. Restituisce un'immagine PNG dell'istogramma
@@ -13714,7 +14473,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: Segnaposto LQIP
       description: |
         Genera un piccolo segnaposto immagine a bassa qualità. Restituisce un piccolo file
@@ -13793,7 +14552,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: Sprite sheet
       description: |
         Combina più immagini in un'unica griglia sprite sheet. Accetta
@@ -13888,7 +14647,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: Foto tessera
       description: |
         Endpoint di guida per il flusso in due fasi della foto tessera. Usa
@@ -13921,7 +14680,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: Firma PDF
       description: Applica una o più immagini PNG di firma su un PDF usando posizionamenti di pagina normalizzati.
       security:
@@ -13965,11 +14724,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13999,7 +14769,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG in PNG
       description: |
         Converti JPG in PNG
@@ -14060,7 +14830,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG in JPG
       description: |
         Converti PNG in JPG
@@ -14121,7 +14891,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG in WebP
       description: |
         Converti JPG in WebP
@@ -14182,7 +14952,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG in WebP
       description: |
         Converti PNG in WebP
@@ -14243,7 +15013,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP in JPG
       description: |
         Converti WebP in JPG
@@ -14304,7 +15074,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP in PNG
       description: |
         Converti WebP in PNG
@@ -14365,7 +15135,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG in AVIF
       description: |
         Converti JPG in AVIF
@@ -14426,7 +15196,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG in AVIF
       description: |
         Converti PNG in AVIF
@@ -14487,7 +15257,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP in AVIF
       description: |
         Converti WebP in AVIF
@@ -14548,7 +15318,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC in JPG
       description: |
         Converti HEIC in JPG
@@ -14609,7 +15379,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC in PNG
       description: |
         Converti HEIC in PNG
@@ -14670,7 +15440,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC in AVIF
       description: |
         Converti HEIC in AVIF
@@ -14731,7 +15501,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG in GIF
       description: |
         Converti JPG in GIF
@@ -14792,7 +15562,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG in GIF
       description: |
         Converti PNG in GIF
@@ -14853,7 +15623,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF in JPG
       description: |
         Converti GIF in JPG
@@ -14914,7 +15684,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF in PNG
       description: |
         Converti GIF in PNG
@@ -14975,7 +15745,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP in GIF
       description: |
         Converti WebP in GIF
@@ -15036,7 +15806,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG in TIFF
       description: |
         Converti JPG in TIFF
@@ -15097,7 +15867,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG in TIFF
       description: |
         Converti PNG in TIFF
@@ -15158,7 +15928,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF in JPG
       description: |
         Converti TIFF in JPG
@@ -15219,7 +15989,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF in PNG
       description: |
         Converti TIFF in PNG
@@ -15280,7 +16050,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD in JPG
       description: |
         Converti PSD in JPG
@@ -15341,7 +16111,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD in PNG
       description: |
         Converti PSD in PNG
@@ -15402,7 +16172,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG in EPS
       description: |
         Converti PNG in EPS
@@ -15463,7 +16233,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG in EPS
       description: |
         Converti JPG in EPS
@@ -15524,7 +16294,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS in PNG
       description: |
         Converti EPS in PNG
@@ -15585,7 +16355,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS in JPG
       description: |
         Converti EPS in JPG
@@ -15646,7 +16416,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG in SVG
       description: |
         Converti PNG in SVG
@@ -15707,7 +16477,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG in SVG
       description: |
         Converti JPG in SVG
@@ -15768,7 +16538,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF in SVG
       description: |
         Converti TIFF in SVG
@@ -15829,7 +16599,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD in SVG
       description: |
         Converti PSD in SVG
@@ -15890,7 +16660,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS in SVG
       description: |
         Converti EPS in SVG
@@ -15951,7 +16721,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG in PNG
       description: |
         Converti SVG in PNG
@@ -16007,7 +16777,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG in JPG
       description: |
         Converti SVG in JPG
@@ -16063,7 +16833,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG in PDF
       description: |
         Converti JPG in PDF
@@ -16121,7 +16891,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG in PDF
       description: |
         Converti PNG in PDF
@@ -16179,7 +16949,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC in PDF
       description: |
         Converti HEIC in PDF
@@ -16237,7 +17007,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF in PDF
       description: |
         Converti TIFF in PDF
@@ -16295,7 +17065,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP in PDF
       description: |
         Converti WebP in PDF
@@ -16353,7 +17123,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF in PDF
       description: |
         Converti GIF in PDF
@@ -16411,7 +17181,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS in PDF
       description: |
         Converti EPS in PDF
@@ -16469,7 +17239,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF in JPG
       description: |
         Converti PDF in JPG
@@ -16525,7 +17295,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF in PNG
       description: |
         Converti PDF in PNG
@@ -16581,7 +17351,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF in TIFF
       description: |
         Converti PDF in TIFF
@@ -16637,7 +17407,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV in MP4
       description: |
         Converti MOV in MP4
@@ -16670,11 +17440,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16704,7 +17485,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM in MP4
       description: |
         Converti WEBM in MP4
@@ -16737,11 +17518,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16771,7 +17563,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV in MP4
       description: |
         Converti MKV in MP4
@@ -16804,11 +17596,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16838,7 +17641,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI in MP4
       description: |
         Converti AVI in MP4
@@ -16871,11 +17674,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16905,7 +17719,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 in MOV
       description: |
         Converti MP4 in MOV
@@ -16938,11 +17752,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16972,7 +17797,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 in WEBM
       description: |
         Converti MP4 in WEBM
@@ -17005,11 +17830,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17039,7 +17875,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM in MOV
       description: |
         Converti WEBM in MOV
@@ -17072,11 +17908,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17106,7 +17953,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV in MOV
       description: |
         Converti MKV in MOV
@@ -17139,11 +17986,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17173,7 +18031,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI in MOV
       description: |
         Converti AVI in MOV
@@ -17206,11 +18064,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17240,7 +18109,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 in AVI
       description: |
         Converti MP4 in AVI
@@ -17273,11 +18142,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17307,7 +18187,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV in AVI
       description: |
         Converti MOV in AVI
@@ -17340,11 +18220,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17374,7 +18265,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV in AVI
       description: |
         Converti MKV in AVI
@@ -17407,11 +18298,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17441,7 +18343,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI in MKV
       description: |
         Converti AVI in MKV
@@ -17474,11 +18376,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17508,7 +18421,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 in GIF
       description: |
         Converti MP4 in GIF
@@ -17541,11 +18454,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17575,7 +18499,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV in GIF
       description: |
         Converti MOV in GIF
@@ -17608,11 +18532,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17642,7 +18577,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV in GIF
       description: |
         Converti MKV in GIF
@@ -17675,11 +18610,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17709,7 +18655,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI in GIF
       description: |
         Converti AVI in GIF
@@ -17742,11 +18688,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17776,7 +18733,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF in MP4
       description: |
         Converti GIF in MP4
@@ -17837,7 +18794,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF in WEBM
       description: |
         Converti GIF in WEBM
@@ -17898,7 +18855,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF in MOV
       description: |
         Converti GIF in MOV
@@ -17959,7 +18916,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 in MP3
       description: |
         Converti MP4 in MP3
@@ -18020,7 +18977,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV in MP3
       description: |
         Converti MOV in MP3
@@ -18081,7 +19038,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV in MP3
       description: |
         Converti MKV in MP3
@@ -18142,7 +19099,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM in MP3
       description: |
         Converti WEBM in MP3
@@ -18203,7 +19160,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI in MP3
       description: |
         Converti AVI in MP3
@@ -18264,7 +19221,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 in WAV
       description: |
         Converti MP4 in WAV
@@ -18325,7 +19282,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV in WAV
       description: |
         Converti MOV in WAV
@@ -18386,7 +19343,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 in OGG
       description: |
         Converti MP4 in OGG
@@ -18447,7 +19404,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A in MP3
       description: |
         Converti M4A in MP3
@@ -18508,7 +19465,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A in WAV
       description: |
         Converti M4A in WAV
@@ -18569,7 +19526,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC in MP3
       description: |
         Converti AAC in MP3
@@ -18630,7 +19587,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC in WAV
       description: |
         Converti AAC in WAV
@@ -18691,7 +19648,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC in FLAC
       description: |
         Converti AAC in FLAC
@@ -18752,7 +19709,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG in MP3
       description: |
         Converti OGG in MP3
@@ -18813,7 +19770,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG in WAV
       description: |
         Converti OGG in WAV
@@ -18874,7 +19831,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV in MP3
       description: |
         Converti WAV in MP3
@@ -18935,7 +19892,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 in WAV
       description: |
         Converti MP3 in WAV
@@ -18996,7 +19953,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC in MP3
       description: |
         Converti FLAC in MP3
@@ -19057,7 +20014,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel in CSV
       description: |
         Converti Excel in CSV
@@ -19090,11 +20047,22 @@ paths:
       responses:
         '202':
           description: Accettata per l'elaborazione asincrona. Segui i progressi via SSE a /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL di stato del job (stesso valore di statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19233,6 +20201,58 @@ paths:
           description: Nessuna registrazione in attesa o corpo non valido
         '401':
           description: Codice TOTP non valido
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: Completa una registrazione MFA obbligatoria
+      description: 'Conferma una registrazione obbligatoria avviata al login e restituisce una sessione. La chiamata non richiede una sessione: il token di registrazione a breve durata ne fa le veci. Qui si accetta solo un codice TOTP, mai un codice di recupero.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: Registrazione confermata e sessione creata. Il token di sessione viene restituito come al login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: Token o codice di registrazione mancante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Token di registrazione non valido o scaduto, oppure codice errato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Troppi tentativi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19399,7 +20419,7 @@ paths:
           description: Impossibile generare l'anteprima
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: Genera anteprima caricamento
@@ -19748,6 +20768,69 @@ paths:
       responses:
         '200':
           description: Utente SCIM disattivato
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: Aggiorna parzialmente un utente SCIM
+      description: PatchOp RFC 7644. Supporta add, remove e replace sui percorsi consentiti dal server. I percorsi degli utenti vengono validati per ogni operazione.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Risorsa aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: PatchOp non valido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Credenziali mancanti o non valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Risorsa non trovata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19813,6 +20896,69 @@ paths:
       responses:
         '204':
           description: Gruppo SCIM eliminato
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: Aggiorna parzialmente un gruppo SCIM
+      description: PatchOp RFC 7644. Supporta add, remove e replace sui percorsi consentiti dal server. I membri del gruppo vengono validati per ogni operazione.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Risorsa aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: PatchOp non valido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Credenziali mancanti o non valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Risorsa non trovata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -20059,7 +21205,29 @@ paths:
             type: string
       responses:
         '202':
-          description: Job di esportazione avviato
+          description: Esportazione avviata. Interroga statusUrl per il risultato. Lo stesso URL si trova nell'header Location.
+          headers:
+            Location:
+              description: URL di stato per l'esportazione (stesso valore di statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: Funzionalità non concessa in licenza o permessi insufficienti
         '404':
@@ -20255,13 +21423,33 @@ x-i18n:
       provenance: machine
       outputHash: ee34ec57345d
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: f208935d5af6
+      outputHash: ddb96f186f6f
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: 4469cc68ece8
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: d6afa08cc439
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: bec412e8a3ae
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: f203d9519a78
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: bd8b0bd954e9
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: 756e91f323a8
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21218,6 +22406,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: add966d40462
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: 460306e2a350
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: eb47e5043933
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21250,6 +22446,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: ec479f9399c2
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: dff89812471e
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: 7000cee0dd30
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: cb37a9916031
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: cb21223e6129
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: 147b75f982cf
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: 737a43171e97
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: 85da91c39e84
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: 41c21ae6338d
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22930,6 +24158,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: bfbba7bd6c2c
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: 152abcfd49fa
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: 099cee327afc
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23146,6 +24382,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: ef8e26b7bfe7
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: ffa18af2e405
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: e1b4eb002bdf
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23186,6 +24430,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: 533da715054c
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: 2b58da9b668b
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 30839f405224
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine
@@ -23426,6 +24678,26 @@ x-i18n:
       sourceHash: 9bdf4d2a5c25
       provenance: machine
       outputHash: 2a87ffcac58b
+    ptr:/components/schemas/Error/properties/code/description:
+      sourceHash: bf339907046a
+      provenance: machine
+      outputHash: 52a035ebb692
+    ptr:/components/schemas/Error/properties/requestId/description:
+      sourceHash: 7a9822038dbc
+      provenance: machine
+      outputHash: 355f7051a588
+    ptr:/components/schemas/JobStatus/properties/status/description:
+      sourceHash: c733f9fae6bb
+      provenance: machine
+      outputHash: 07c67a2f4331
+    ptr:/components/schemas/JobStatus/properties/result/description:
+      sourceHash: 9b7fb1030f61
+      provenance: machine
+      outputHash: e01fb8918a78
+    ptr:/components/schemas/JobStatus/properties/progressUrl/description:
+      sourceHash: d243642d631c
+      provenance: machine
+      outputHash: 2b811062ad3c
     ptr:/components/schemas/ToolResponse/properties/jobId/description:
       sourceHash: f93d3d625101
       provenance: machine
@@ -23958,6 +25230,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1noise-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -23990,6 +25266,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1red-eye-removal/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24022,6 +25302,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1restore-photo/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24178,6 +25462,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1colorize/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24210,6 +25498,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1enhance-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24838,6 +26130,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1erase-object/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -24870,6 +26166,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1ai-canvas-expand/post/responses/400/description:
       sourceHash: 91cd364b6a62
       provenance: machine
@@ -24946,6 +26246,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1remove-gif-background/post/responses/400/description:
       sourceHash: 7cea57b7cad6
       provenance: machine
@@ -24974,6 +26278,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1remove-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25026,6 +26334,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1transparency-fixer/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25058,6 +26370,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1upscale/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25090,6 +26406,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1blur-faces/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -25118,6 +26438,10 @@ x-i18n:
       sourceHash: 9c0ccc385d27
       provenance: machine
       outputHash: 5311aafd271b
+    ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1ocr/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26070,6 +27394,22 @@ x-i18n:
       sourceHash: 8b99f95b1946
       provenance: machine
       outputHash: 3565882e282b
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/parameters/0/description:
+      sourceHash: 105290b108f4
+      provenance: machine
+      outputHash: ab8f3daa2432
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/200/description:
+      sourceHash: cda9498c937b
+      provenance: machine
+      outputHash: 67d393e83d82
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 51c81abb3f3d
+    ptr:/paths/~1api~1v1~1jobs~1{jobId}/get/responses/404/description:
+      sourceHash: 288b3aa41c1f
+      provenance: machine
+      outputHash: 08ad24b76272
     ptr:/paths/~1api~1v1~1jobs~1{jobId}~1progress/get/parameters/0/description:
       sourceHash: 3f77c804360b
       provenance: machine
@@ -26170,6 +27510,70 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: bf85c972835b
+    ptr:/paths/~1api~1v1~1feedback/post/requestBody/content/application~1json/schema/properties/source/description:
+      sourceHash: 51f100d50bab
+      provenance: machine
+      outputHash: 238a17c99bd7
+    ptr:/paths/~1api~1v1~1feedback/post/responses/200/description:
+      sourceHash: 8901e89d433e
+      provenance: machine
+      outputHash: 8082500d3ee7
+    ptr:/paths/~1api~1v1~1feedback/post/responses/400/description:
+      sourceHash: 5685909cf0a7
+      provenance: machine
+      outputHash: fc9ffb141a33
+    ptr:/paths/~1api~1v1~1feedback/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 51c81abb3f3d
+    ptr:/paths/~1api~1v1~1feedback/post/responses/429/description:
+      sourceHash: 95a111e3185e
+      provenance: machine
+      outputHash: d32e30e119ea
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
+      sourceHash: 9031d1af7020
+      provenance: machine
+      outputHash: 6ac055c44de9
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 51c81abb3f3d
+    ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/403/description:
+      sourceHash: 95d513c2ed9a
+      provenance: machine
+      outputHash: 38bf0f42d9f9
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/200/description:
+      sourceHash: 568b126ca48c
+      provenance: machine
+      outputHash: 128e1877feee
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 51c81abb3f3d
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 830b09fbf038
+    ptr:/paths/~1api~1v1~1admin~1features~1reset/post/responses/409/description:
+      sourceHash: f6fd45eac33e
+      provenance: machine
+      outputHash: 794ae31b3f49
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/202/description:
+      sourceHash: 148c1c5a4e39
+      provenance: machine
+      outputHash: 700228f3dcf3
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 51c81abb3f3d
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/403/description:
+      sourceHash: a1b22cdecff1
+      provenance: machine
+      outputHash: 830b09fbf038
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/404/description:
+      sourceHash: e1208d06faa8
+      provenance: machine
+      outputHash: 9a17f94d73b6
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -26178,6 +27582,10 @@ x-i18n:
       sourceHash: 356335f30ad9
       provenance: machine
       outputHash: 99742ef7456a
+    ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/202/content/application~1json/schema/properties/jobId/description:
       sourceHash: f77d0d971c51
       provenance: machine
@@ -26406,6 +27814,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1convert-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26434,6 +27846,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1compress-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26498,6 +27914,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1video-to-gif/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26738,6 +28158,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1stabilize-video/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26822,6 +28246,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1merge-videos/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26866,6 +28294,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1burn-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -26966,6 +28398,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1auto-subtitles/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27330,6 +28766,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1audio~1transcribe-audio/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27418,6 +28858,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-100kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27442,6 +28886,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-200kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27466,6 +28914,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-500kb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27490,6 +28942,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-1mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27514,6 +28970,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1compress-pdf-to-2mb/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27842,6 +29302,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1convert-document/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27866,6 +29330,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1convert-presentation/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27890,6 +29358,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1convert-spreadsheet/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27910,6 +29382,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27930,6 +29406,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1word-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27950,6 +29430,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1powerpoint-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -27970,6 +29454,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1html-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28022,6 +29510,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1markdown-to-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28046,6 +29538,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1epub-convert/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28066,6 +29562,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1to-epub/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28146,6 +29646,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-word/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28194,6 +29698,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1ocr-pdf/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28414,6 +29922,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1background-replace/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28446,6 +29958,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1image~1blur-background/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -28802,6 +30318,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1pdf~1sign-pdf/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30014,6 +31534,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30042,6 +31566,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30070,6 +31598,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30098,6 +31630,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mp4/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30126,6 +31662,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30154,6 +31694,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-webm/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30182,6 +31726,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1webm-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30210,6 +31758,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30238,6 +31790,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mov/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30266,6 +31822,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30294,6 +31854,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30322,6 +31886,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-avi/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30350,6 +31918,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-mkv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30378,6 +31950,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30406,6 +31982,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mov-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30434,6 +32014,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1mkv-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -30462,6 +32046,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1video~1avi-to-gif/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31078,6 +32666,10 @@ x-i18n:
       sourceHash: 2480a3a6861c
       provenance: machine
       outputHash: 7dd4e20d1075
+    ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/400/description:
       sourceHash: 40c7209ea5c6
       provenance: machine
@@ -31154,6 +32746,22 @@ x-i18n:
       sourceHash: 6db92b87b80d
       provenance: machine
       outputHash: a6fbc9b00498
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/200/description:
+      sourceHash: eddcb6a49407
+      provenance: machine
+      outputHash: d640918b91d3
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/400/description:
+      sourceHash: bab4cddd22a1
+      provenance: machine
+      outputHash: 2f5b784fd736
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/401/description:
+      sourceHash: c5292e1d5e33
+      provenance: machine
+      outputHash: 990bcf603318
+    ptr:/paths/~1api~1auth~1mfa~1enroll-complete/post/responses/429/description:
+      sourceHash: 91434030e947
+      provenance: machine
+      outputHash: 425695af35d4
     ptr:/paths/~1api~1auth~1mfa~1complete/post/responses/200/description:
       sourceHash: 2316b4f3e3ce
       provenance: machine
@@ -31402,6 +33010,22 @@ x-i18n:
       sourceHash: f4dea73b29b6
       provenance: machine
       outputHash: a8f4045b7bb0
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 54661d3d2e34
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 23b7dfdf6f6d
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 51c81abb3f3d
+    ptr:/paths/~1api~1v1~1scim~1v2~1Users~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: 413c6d433dd2
     ptr:/paths/~1api~1v1~1scim~1v2~1Groups/get/responses/200/description:
       sourceHash: df8e6383d425
       provenance: machine
@@ -31422,6 +33046,22 @@ x-i18n:
       sourceHash: 1212fc1b0593
       provenance: machine
       outputHash: de855c91d48e
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/200/description:
+      sourceHash: 7466a3557c38
+      provenance: machine
+      outputHash: 54661d3d2e34
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/400/description:
+      sourceHash: 07a5f324bcf5
+      provenance: machine
+      outputHash: 23b7dfdf6f6d
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/401/description:
+      sourceHash: b77d04ce5605
+      provenance: machine
+      outputHash: 51c81abb3f3d
+    ptr:/paths/~1api~1v1~1scim~1v2~1Groups~1{id}/patch/responses/404/description:
+      sourceHash: 739e3da4d1b2
+      provenance: machine
+      outputHash: 413c6d433dd2
     ptr:/paths/~1api~1v1~1enterprise~1audit~1export/get/responses/200/description:
       sourceHash: 6215b564a1d4
       provenance: machine
@@ -31571,9 +33211,13 @@ x-i18n:
       provenance: machine
       outputHash: 646289b09bb8
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/description:
-      sourceHash: 0af3d2a07c98
+      sourceHash: 52a7b1517297
       provenance: machine
-      outputHash: 4621b5777b0b
+      outputHash: 7e69fc7f130d
+    ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/202/headers/Location/description:
+      sourceHash: 6f75e9da213c
+      provenance: machine
+      outputHash: 3344e4e167fb
     ptr:/paths/~1api~1v1~1enterprise~1users~1{id}~1export/post/responses/403/description:
       sourceHash: 7d67215cdd1a
       provenance: machine

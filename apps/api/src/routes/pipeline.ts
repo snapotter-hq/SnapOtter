@@ -7,6 +7,7 @@
  * DELETE /api/v1/pipeline/:id      -- Delete a saved pipeline
  * POST   /api/v1/pipeline/batch    -- Batch pipeline execution (ZIP output)
  */
+
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { extname } from "node:path";
@@ -92,6 +93,7 @@ import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "./async-response.js";
 import {
   clearTerminalReplayKey,
   failBatchJob,
@@ -947,7 +949,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // The flow keeps running and the finalize's terminal single
             // frame carries the full result; the client rides the SSE to
             // it instead of being told the run failed (#766).
-            return reply.status(202).send({ jobId: clientJobId ?? jobId, async: true });
+            return reply.status(202).send(buildAsyncAcceptedPayload(clientJobId ?? jobId));
           }
 
           // Check for step failure reported by the finalize handler. A
@@ -1468,7 +1470,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 existing.toolId === "pipeline-batch" &&
                 existing.userId === userId
               ) {
-                return reply.status(202).send({ jobId: parentId, async: true });
+                return reply.status(202).send(buildAsyncAcceptedPayload(parentId));
               }
               return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
             }
@@ -2009,7 +2011,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // The flow keeps running; the finalize persists the ZIP and
             // publishes the terminal frame carrying its download URL, and
             // the pipeline hook speaks the async contract since #766.
-            return reply.status(202).send({ jobId: parentId, async: true });
+            return reply.status(202).send(buildAsyncAcceptedPayload(parentId));
           }
 
           const payload = batchResult.resultPayload as
