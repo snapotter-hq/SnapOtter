@@ -5637,6 +5637,16 @@ export const tr: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Ağ hatası",
+    loadTemplatesFailed: "Şablonlar yüklenemedi",
+    memeGenerationFailed: "Meme oluşturulamadı",
+    loadFilesFailed: "Dosyalar yüklenemedi",
+    deleteFailed: "Silme başarısız oldu",
+    readPdfFailed: "PDF okunamadı",
+    conversionFailed: "Dönüştürme başarısız oldu",
+    installFailed: "Kurulum başlatılamadı",
+    uninstallFailed: "Kaldırma başarısız oldu",
+    resetFailed: "Sıfırlama başarısız oldu",
     codes: {
       FEATURE_NOT_INSTALLED: "Bu özellik henüz yüklenmedi.",
       FEATURE_NOT_LICENSED: "Bu özellik için lisans gerekiyor.",

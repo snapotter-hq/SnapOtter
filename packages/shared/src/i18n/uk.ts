@@ -5640,6 +5640,16 @@ export const uk: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Помилка мережі",
+    loadTemplatesFailed: "Не вдалося завантажити шаблони",
+    memeGenerationFailed: "Не вдалося створити мем",
+    loadFilesFailed: "Не вдалося завантажити файли",
+    deleteFailed: "Не вдалося видалити",
+    readPdfFailed: "Не вдалося прочитати PDF",
+    conversionFailed: "Не вдалося конвертувати",
+    installFailed: "Не вдалося почати встановлення",
+    uninstallFailed: "Не вдалося видалити встановлення",
+    resetFailed: "Не вдалося скинути",
     codes: {
       FEATURE_NOT_INSTALLED: "Цю функцію ще не встановлено.",
       FEATURE_NOT_LICENSED: "Для цієї функції потрібна ліцензія.",

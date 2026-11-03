@@ -5314,6 +5314,16 @@ export const zhTW: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "網路錯誤",
+    loadTemplatesFailed: "無法載入範本",
+    memeGenerationFailed: "迷因產生失敗",
+    loadFilesFailed: "無法載入檔案",
+    deleteFailed: "刪除失敗",
+    readPdfFailed: "無法讀取 PDF",
+    conversionFailed: "轉換失敗",
+    installFailed: "無法開始安裝",
+    uninstallFailed: "解除安裝失敗",
+    resetFailed: "重設失敗",
     codes: {
       FEATURE_NOT_INSTALLED: "此功能尚未安裝。",
       FEATURE_NOT_LICENSED: "此功能需要授權。",

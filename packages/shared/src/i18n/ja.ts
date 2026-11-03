@@ -5578,6 +5578,16 @@ export const ja: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "ネットワークエラー",
+    loadTemplatesFailed: "テンプレートを読み込めませんでした",
+    memeGenerationFailed: "ミームの生成に失敗しました",
+    loadFilesFailed: "ファイルを読み込めませんでした",
+    deleteFailed: "削除に失敗しました",
+    readPdfFailed: "PDFを読み取れませんでした",
+    conversionFailed: "変換に失敗しました",
+    installFailed: "インストールを開始できませんでした",
+    uninstallFailed: "アンインストールに失敗しました",
+    resetFailed: "リセットに失敗しました",
     codes: {
       FEATURE_NOT_INSTALLED: "この機能はまだインストールされていません。",
       FEATURE_NOT_LICENSED: "この機能にはライセンスが必要です。",

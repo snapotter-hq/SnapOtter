@@ -5667,6 +5667,16 @@ export const fr: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Erreur réseau",
+    loadTemplatesFailed: "Impossible de charger les modèles",
+    memeGenerationFailed: "Échec de la création du mème",
+    loadFilesFailed: "Impossible de charger les fichiers",
+    deleteFailed: "Échec de la suppression",
+    readPdfFailed: "Impossible de lire le PDF",
+    conversionFailed: "Échec de la conversion",
+    installFailed: "Impossible de lancer l'installation",
+    uninstallFailed: "Échec de la désinstallation",
+    resetFailed: "Échec de la réinitialisation",
     codes: {
       FEATURE_NOT_INSTALLED: "Cette fonctionnalité n'est pas encore installée.",
       FEATURE_NOT_LICENSED: "Cette fonctionnalité nécessite une licence.",

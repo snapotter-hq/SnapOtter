@@ -5653,6 +5653,16 @@ export const nl: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Netwerkfout",
+    loadTemplatesFailed: "Sjablonen laden mislukt",
+    memeGenerationFailed: "Meme genereren mislukt",
+    loadFilesFailed: "Bestanden laden mislukt",
+    deleteFailed: "Verwijderen mislukt",
+    readPdfFailed: "PDF lezen mislukt",
+    conversionFailed: "Conversie mislukt",
+    installFailed: "Installatie starten mislukt",
+    uninstallFailed: "Verwijderen van de installatie mislukt",
+    resetFailed: "Resetten mislukt",
     codes: {
       FEATURE_NOT_INSTALLED: "Deze functie is nog niet geïnstalleerd.",
       FEATURE_NOT_LICENSED: "Voor deze functie is een licentie nodig.",

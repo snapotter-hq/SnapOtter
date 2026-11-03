@@ -5405,6 +5405,16 @@ export const hi: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "नेटवर्क त्रुटि",
+    loadTemplatesFailed: "टेम्पलेट लोड नहीं हो सके",
+    memeGenerationFailed: "मीम बनाना विफल रहा",
+    loadFilesFailed: "फ़ाइलें लोड नहीं हो सकीं",
+    deleteFailed: "हटाना विफल रहा",
+    readPdfFailed: "PDF पढ़ी नहीं जा सकी",
+    conversionFailed: "रूपांतरण विफल रहा",
+    installFailed: "इंस्टॉलेशन शुरू नहीं हो सका",
+    uninstallFailed: "अनइंस्टॉल विफल रहा",
+    resetFailed: "रीसेट विफल रहा",
     codes: {
       FEATURE_NOT_INSTALLED: "यह सुविधा अभी इंस्टॉल नहीं है।",
       FEATURE_NOT_LICENSED: "इस सुविधा के लिए लाइसेंस चाहिए।",

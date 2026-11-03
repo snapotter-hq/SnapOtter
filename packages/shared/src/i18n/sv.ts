@@ -5625,6 +5625,16 @@ export const sv: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Nätverksfel",
+    loadTemplatesFailed: "Det gick inte att läsa in mallarna",
+    memeGenerationFailed: "Det gick inte att skapa memet",
+    loadFilesFailed: "Det gick inte att läsa in filerna",
+    deleteFailed: "Det gick inte att ta bort",
+    readPdfFailed: "Det gick inte att läsa PDF-filen",
+    conversionFailed: "Konverteringen misslyckades",
+    installFailed: "Det gick inte att starta installationen",
+    uninstallFailed: "Avinstallationen misslyckades",
+    resetFailed: "Återställningen misslyckades",
     codes: {
       FEATURE_NOT_INSTALLED: "Den här funktionen är inte installerad än.",
       FEATURE_NOT_LICENSED: "Den här funktionen kräver en licens.",

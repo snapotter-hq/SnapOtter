@@ -1,8 +1,9 @@
 import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { currentTranslations } from "@/lib/current-translations";
 import { useFileStore } from "@/stores/file-store";
 
 export function isPdfFile(file: File): boolean {
@@ -352,7 +353,11 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
       // differs from it, so clearing it here asked again on every render
       // (#1954). A null pageCount keeps Convert disabled.
       set({
-        error: err instanceof Error ? err.message : "Failed to read PDF",
+        error: userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.readPdfFailed,
+        ),
         pageCount: null,
         thumbnails: [],
         selectedPages: new Set(),
@@ -426,7 +431,11 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
     } catch (err) {
       if (!isLatest() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
-        error: err instanceof Error ? err.message : "Conversion failed",
+        error: userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.conversionFailed,
+        ),
         processing: false,
       });
       return;

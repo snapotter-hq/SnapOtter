@@ -5630,6 +5630,16 @@ export const id: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Kesalahan jaringan",
+    loadTemplatesFailed: "Gagal memuat templat",
+    memeGenerationFailed: "Pembuatan meme gagal",
+    loadFilesFailed: "Gagal memuat file",
+    deleteFailed: "Penghapusan gagal",
+    readPdfFailed: "Gagal membaca PDF",
+    conversionFailed: "Konversi gagal",
+    installFailed: "Gagal memulai instalasi",
+    uninstallFailed: "Pencopotan gagal",
+    resetFailed: "Pengaturan ulang gagal",
     codes: {
       FEATURE_NOT_INSTALLED: "Fitur ini belum terpasang.",
       FEATURE_NOT_LICENSED: "Fitur ini memerlukan lisensi.",

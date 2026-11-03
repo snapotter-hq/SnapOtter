@@ -5536,6 +5536,16 @@ export const th: TranslationKeys = {
     versionLabel: "SnapOtter เวอร์ชัน {version}",
   },
   errors: {
+    networkFailed: "ข้อผิดพลาดของเครือข่าย",
+    loadTemplatesFailed: "โหลดเทมเพลตไม่สำเร็จ",
+    memeGenerationFailed: "สร้างมีมไม่สำเร็จ",
+    loadFilesFailed: "โหลดไฟล์ไม่สำเร็จ",
+    deleteFailed: "ลบไม่สำเร็จ",
+    readPdfFailed: "อ่านไฟล์ PDF ไม่สำเร็จ",
+    conversionFailed: "แปลงไฟล์ไม่สำเร็จ",
+    installFailed: "เริ่มการติดตั้งไม่สำเร็จ",
+    uninstallFailed: "ถอนการติดตั้งไม่สำเร็จ",
+    resetFailed: "รีเซ็ตไม่สำเร็จ",
     codes: {
       FEATURE_NOT_INSTALLED: "ยังไม่ได้ติดตั้งฟีเจอร์นี้",
       FEATURE_NOT_LICENSED: "ฟีเจอร์นี้ต้องมีสิทธิ์การใช้งาน",

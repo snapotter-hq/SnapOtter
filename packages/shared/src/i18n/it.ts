@@ -5649,6 +5649,16 @@ export const it: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Errore di rete",
+    loadTemplatesFailed: "Impossibile caricare i modelli",
+    memeGenerationFailed: "Generazione del meme non riuscita",
+    loadFilesFailed: "Impossibile caricare i file",
+    deleteFailed: "Eliminazione non riuscita",
+    readPdfFailed: "Impossibile leggere il PDF",
+    conversionFailed: "Conversione non riuscita",
+    installFailed: "Impossibile avviare l'installazione",
+    uninstallFailed: "Disinstallazione non riuscita",
+    resetFailed: "Reimpostazione non riuscita",
     codes: {
       FEATURE_NOT_INSTALLED: "Questa funzione non è ancora installata.",
       FEATURE_NOT_LICENSED: "Questa funzione richiede una licenza.",

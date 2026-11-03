@@ -5612,6 +5612,16 @@ export const vi: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Lỗi mạng",
+    loadTemplatesFailed: "Không thể tải mẫu",
+    memeGenerationFailed: "Tạo meme thất bại",
+    loadFilesFailed: "Không thể tải tệp",
+    deleteFailed: "Xóa thất bại",
+    readPdfFailed: "Không thể đọc PDF",
+    conversionFailed: "Chuyển đổi thất bại",
+    installFailed: "Không thể bắt đầu cài đặt",
+    uninstallFailed: "Gỡ cài đặt thất bại",
+    resetFailed: "Đặt lại thất bại",
     codes: {
       FEATURE_NOT_INSTALLED: "Tính năng này chưa được cài đặt.",
       FEATURE_NOT_LICENSED: "Tính năng này cần có giấy phép.",

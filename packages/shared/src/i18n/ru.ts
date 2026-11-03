@@ -5641,6 +5641,16 @@ export const ru: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Ошибка сети",
+    loadTemplatesFailed: "Не удалось загрузить шаблоны",
+    memeGenerationFailed: "Не удалось создать мем",
+    loadFilesFailed: "Не удалось загрузить файлы",
+    deleteFailed: "Не удалось удалить",
+    readPdfFailed: "Не удалось прочитать PDF",
+    conversionFailed: "Ошибка преобразования",
+    installFailed: "Не удалось начать установку",
+    uninstallFailed: "Не удалось удалить",
+    resetFailed: "Не удалось выполнить сброс",
     codes: {
       FEATURE_NOT_INSTALLED: "Эта функция ещё не установлена.",
       FEATURE_NOT_LICENSED: "Для этой функции нужна лицензия.",

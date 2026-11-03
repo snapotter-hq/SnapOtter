@@ -5539,6 +5539,16 @@ export const ko: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "네트워크 오류",
+    loadTemplatesFailed: "템플릿을 불러오지 못했습니다",
+    memeGenerationFailed: "밈 생성에 실패했습니다",
+    loadFilesFailed: "파일을 불러오지 못했습니다",
+    deleteFailed: "삭제에 실패했습니다",
+    readPdfFailed: "PDF를 읽지 못했습니다",
+    conversionFailed: "변환에 실패했습니다",
+    installFailed: "설치를 시작하지 못했습니다",
+    uninstallFailed: "제거에 실패했습니다",
+    resetFailed: "초기화에 실패했습니다",
     codes: {
       FEATURE_NOT_INSTALLED: "이 기능은 아직 설치되지 않았습니다.",
       FEATURE_NOT_LICENSED: "이 기능을 사용하려면 라이선스가 필요합니다.",

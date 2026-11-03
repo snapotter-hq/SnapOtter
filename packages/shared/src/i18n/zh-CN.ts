@@ -5312,6 +5312,16 @@ export const zhCN: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "网络错误",
+    loadTemplatesFailed: "无法加载模板",
+    memeGenerationFailed: "表情包生成失败",
+    loadFilesFailed: "无法加载文件",
+    deleteFailed: "删除失败",
+    readPdfFailed: "无法读取 PDF",
+    conversionFailed: "转换失败",
+    installFailed: "无法开始安装",
+    uninstallFailed: "卸载失败",
+    resetFailed: "重置失败",
     codes: {
       FEATURE_NOT_INSTALLED: "此功能尚未安装。",
       FEATURE_NOT_LICENSED: "此功能需要许可证。",

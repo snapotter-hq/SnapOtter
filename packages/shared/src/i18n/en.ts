@@ -5553,6 +5553,16 @@ export const en = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Network error",
+    loadTemplatesFailed: "Failed to load templates",
+    memeGenerationFailed: "Meme generation failed",
+    loadFilesFailed: "Failed to load files",
+    deleteFailed: "Delete failed",
+    readPdfFailed: "Failed to read PDF",
+    conversionFailed: "Conversion failed",
+    installFailed: "Failed to start installation",
+    uninstallFailed: "Uninstall failed",
+    resetFailed: "Reset failed",
     codes: {
       FEATURE_NOT_INSTALLED: "This feature isn't installed yet.",
       FEATURE_NOT_LICENSED: "This feature needs a license.",

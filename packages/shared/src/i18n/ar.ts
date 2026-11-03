@@ -5578,6 +5578,16 @@ export const ar: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "خطأ في الشبكة",
+    loadTemplatesFailed: "تعذّر تحميل القوالب",
+    memeGenerationFailed: "فشل إنشاء الميم",
+    loadFilesFailed: "تعذّر تحميل الملفات",
+    deleteFailed: "فشل الحذف",
+    readPdfFailed: "تعذّرت قراءة ملف PDF",
+    conversionFailed: "فشل التحويل",
+    installFailed: "تعذّر بدء التثبيت",
+    uninstallFailed: "فشل إلغاء التثبيت",
+    resetFailed: "فشلت إعادة التعيين",
     codes: {
       FEATURE_NOT_INSTALLED: "هذه الميزة غير مثبتة بعد.",
       FEATURE_NOT_LICENSED: "تتطلب هذه الميزة ترخيصًا.",
