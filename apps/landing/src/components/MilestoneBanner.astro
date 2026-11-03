@@ -1,0 +1,32 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { t } from "@/i18n";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
+const RELEASE_VERSION = "v2.3.0";
+const RELEASE_URL = `https://github.com/snapotter-hq/SnapOtter/releases/tag/${RELEASE_VERSION}`;
+
+const thanks = t(locale, "home.milestone.thanksPullsStars");
+---
+
+<a
+  href={RELEASE_URL}
+  target="_blank"
+  rel="noopener noreferrer"
+  class="animate-fade-up group mx-auto mb-6 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-surface px-4 py-2 text-sm text-foreground shadow-lg sm:rounded-full"
+  data-milestone-banner
+>
+  <svg class="hidden h-4 w-4 shrink-0 text-primary sm:block" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 2l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 16.3 6.2 19.8l1.6-6.6L2.6 8.8l6.8-.5z" />
+  </svg>
+  <span class="font-semibold">{thanks}</span>
+  <span>{t(locale, "home.milestone.release", { version: RELEASE_VERSION })}</span>
+  <span class="inline-flex items-center gap-1 font-semibold text-primary-ink group-hover:underline">
+    {t(locale, "home.milestone.cta")}
+    <svg class="h-3.5 w-3.5 rtl:-scale-x-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+  </span>
+</a>
