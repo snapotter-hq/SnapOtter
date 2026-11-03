@@ -141,7 +141,7 @@ test.describe("Landing Homepage", () => {
 
   test("trust signals show stats", async ({ page }) => {
     await expect(page.getByText("Processing Tools")).toBeVisible();
-    await expect(page.getByText("GitHub Stars")).toBeVisible();
+    await expect(page.getByText("GitHub Stars", { exact: true })).toBeVisible();
     await expect(page.getByText("Image Pulls")).toBeVisible();
     await expect(page.getByText("Languages", { exact: true })).toBeVisible();
   });
