@@ -1404,6 +1404,7 @@ export const hi: TranslationKeys = {
       latitude: "अक्षांश",
       longitude: "देशांतर",
       altitudeMeters: "ऊंचाई (मीटर)",
+      altitudePlaceholder: "वैकल्पिक (जैसे 25)",
       removeAllGpsData: "सभी GPS डेटा हटाएं",
       keywords: "कीवर्ड",
       addKeywordPlaceholder: "कीवर्ड जोड़ें और Enter दबाएं",

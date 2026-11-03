@@ -1596,6 +1596,7 @@ export const nl: TranslationKeys = {
       latitude: "Breedtegraad",
       longitude: "Lengtegraad",
       altitudeMeters: "Hoogte (meters)",
+      altitudePlaceholder: "Optioneel (bijv. 25)",
       removeAllGpsData: "Alle GPS-data verwijderen",
       keywords: "Trefwoorden",
       addKeywordPlaceholder: "Trefwoord toevoegen en Enter drukken",
@@ -4202,7 +4203,7 @@ export const nl: TranslationKeys = {
     pdf: "PDF",
     files: "Bestanden",
     toolCount: "{count} tools",
-    heading: "SnapOtter Tools",
+    heading: "SnapOtter-tools",
   },
   fullscreenGrid: {
     searchPlaceholder: "Gereedschap zoeken...",

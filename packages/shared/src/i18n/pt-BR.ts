@@ -1594,6 +1594,7 @@ export const ptBR: TranslationKeys = {
       latitude: "Latitude",
       longitude: "Longitude",
       altitudeMeters: "Altitude (metros)",
+      altitudePlaceholder: "Opcional (ex.: 25)",
       removeAllGpsData: "Remover todos os dados GPS",
       keywords: "Palavras-chave",
       addKeywordPlaceholder: "Adicione palavra-chave e pressione Enter",

@@ -1537,6 +1537,7 @@ export const en = {
       latitude: "Latitude",
       longitude: "Longitude",
       altitudeMeters: "Altitude (meters)",
+      altitudePlaceholder: "Optional (e.g. 25)",
       removeAllGpsData: "Remove all GPS data",
       keywords: "Keywords",
       addKeywordPlaceholder: "Add keyword and press Enter",

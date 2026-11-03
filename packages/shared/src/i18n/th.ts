@@ -1565,6 +1565,7 @@ export const th: TranslationKeys = {
       latitude: "ละติจูด",
       longitude: "ลองจิจูด",
       altitudeMeters: "ระดับความสูง (เมตร)",
+      altitudePlaceholder: "ไม่บังคับ (เช่น 25)",
       removeAllGpsData: "ลบข้อมูล GPS ทั้งหมด",
       keywords: "คำสำคัญ",
       addKeywordPlaceholder: "เพิ่มคำสำคัญแล้วกด Enter",
@@ -5532,7 +5533,7 @@ export const th: TranslationKeys = {
       docsLink: "เอกสารประกอบ",
       apiRefLink: "อ้างอิง API (Swagger)",
     },
-    versionLabel: "SnapOtter v{version}",
+    versionLabel: "SnapOtter เวอร์ชัน {version}",
   },
   errors: {
     generic: "เกิดข้อผิดพลาด",

@@ -1548,6 +1548,7 @@ export const ja: TranslationKeys = {
       latitude: "緯度",
       longitude: "経度",
       altitudeMeters: "高度（メートル）",
+      altitudePlaceholder: "任意（例: 25）",
       removeAllGpsData: "すべてのGPSデータを削除",
       keywords: "キーワード",
       addKeywordPlaceholder: "キーワードを入力してEnter",

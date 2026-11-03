@@ -1591,6 +1591,7 @@ export const pl: TranslationKeys = {
       latitude: "Szerokość geograficzna",
       longitude: "Długość geograficzna",
       altitudeMeters: "Wysokość (metry)",
+      altitudePlaceholder: "Opcjonalnie (np. 25)",
       removeAllGpsData: "Usuń wszystkie dane GPS",
       keywords: "Słowa kluczowe",
       addKeywordPlaceholder: "Dodaj słowo kluczowe i naciśnij Enter",

@@ -1574,6 +1574,7 @@ export const ar: TranslationKeys = {
       latitude: "خط العرض",
       longitude: "خط الطول",
       altitudeMeters: "الارتفاع (بالأمتار)",
+      altitudePlaceholder: "اختياري (مثال: 25)",
       removeAllGpsData: "إزالة جميع بيانات GPS",
       keywords: "الكلمات المفتاحية",
       addKeywordPlaceholder: "أضف كلمة مفتاحية واضغط Enter",

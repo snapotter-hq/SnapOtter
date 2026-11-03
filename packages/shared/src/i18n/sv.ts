@@ -1588,6 +1588,7 @@ export const sv: TranslationKeys = {
       latitude: "Latitud",
       longitude: "Longitud",
       altitudeMeters: "Höjd (meter)",
+      altitudePlaceholder: "Valfritt (t.ex. 25)",
       removeAllGpsData: "Ta bort all GPS-data",
       keywords: "Nyckelord",
       addKeywordPlaceholder: "Lägg till nyckelord och tryck Enter",

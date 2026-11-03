@@ -1591,6 +1591,7 @@ export const uk: TranslationKeys = {
       latitude: "Широта",
       longitude: "Довгота",
       altitudeMeters: "Висота (метри)",
+      altitudePlaceholder: "Необов’язково (наприклад, 25)",
       removeAllGpsData: "Видалити всі GPS-дані",
       keywords: "Ключові слова",
       addKeywordPlaceholder: "Додайте ключове слово та натисніть Enter",

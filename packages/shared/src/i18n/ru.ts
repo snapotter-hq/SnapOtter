@@ -1593,6 +1593,7 @@ export const ru: TranslationKeys = {
       latitude: "Широта",
       longitude: "Долгота",
       altitudeMeters: "Высота (метры)",
+      altitudePlaceholder: "Необязательно (например, 25)",
       removeAllGpsData: "Удалить все GPS-данные",
       keywords: "Ключевые слова",
       addKeywordPlaceholder: "Добавьте ключевое слово и нажмите Enter",

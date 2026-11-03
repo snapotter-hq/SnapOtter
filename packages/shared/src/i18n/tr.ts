@@ -1592,6 +1592,7 @@ export const tr: TranslationKeys = {
       latitude: "Enlem",
       longitude: "Boylam",
       altitudeMeters: "Yükseklik (metre)",
+      altitudePlaceholder: "İsteğe bağlı (örn. 25)",
       removeAllGpsData: "Tüm GPS verilerini kaldır",
       keywords: "Anahtar Kelimeler",
       addKeywordPlaceholder: "Anahtar kelime ekleyin ve Enter'a basın",

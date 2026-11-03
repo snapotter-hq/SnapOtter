@@ -1352,6 +1352,7 @@ export const zhTW: TranslationKeys = {
       latitude: "緯度",
       longitude: "經度",
       altitudeMeters: "海拔（公尺）",
+      altitudePlaceholder: "選填（例如 25）",
       removeAllGpsData: "移除所有GPS資料",
       keywords: "關鍵字",
       addKeywordPlaceholder: "加入關鍵字並按Enter",

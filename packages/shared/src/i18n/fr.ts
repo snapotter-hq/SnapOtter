@@ -1600,6 +1600,7 @@ export const fr: TranslationKeys = {
       latitude: "Latitude",
       longitude: "Longitude",
       altitudeMeters: "Altitude (mètres)",
+      altitudePlaceholder: "Facultatif (ex. 25)",
       removeAllGpsData: "Supprimer toutes les données GPS",
       keywords: "Mots-clés",
       addKeywordPlaceholder: "Ajoutez un mot-clé et appuyez sur Entrée",

@@ -1588,6 +1588,7 @@ export const id: TranslationKeys = {
       latitude: "Lintang",
       longitude: "Bujur",
       altitudeMeters: "Ketinggian (meter)",
+      altitudePlaceholder: "Opsional (misalnya 25)",
       removeAllGpsData: "Hapus semua data GPS",
       keywords: "Kata Kunci",
       addKeywordPlaceholder: "Tambahkan kata kunci dan tekan Enter",

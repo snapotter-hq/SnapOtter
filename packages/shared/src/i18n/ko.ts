@@ -1528,6 +1528,7 @@ export const ko: TranslationKeys = {
       latitude: "위도",
       longitude: "경도",
       altitudeMeters: "고도 (미터)",
+      altitudePlaceholder: "선택 사항(예: 25)",
       removeAllGpsData: "모든 GPS 데이터 제거",
       keywords: "키워드",
       addKeywordPlaceholder: "키워드를 입력하고 Enter를 누르세요",

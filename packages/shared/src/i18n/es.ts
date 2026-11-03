@@ -145,7 +145,7 @@ export const es: TranslationKeys = {
     importantAreas: {
       images: "Imágenes",
       pdf_docs: "PDF/documentos",
-      video_audio: "Video/audio",
+      video_audio: "Vídeo/audio",
       batch_workflows: "Flujos por lotes",
       ai_tools: "Herramientas de IA",
     },
@@ -207,7 +207,7 @@ export const es: TranslationKeys = {
   },
   modalities: {
     image: "Imagen",
-    video: "Video",
+    video: "Vídeo",
     audio: "Audio",
     documentsAndFiles: "PDF y archivos",
   },
@@ -1579,6 +1579,7 @@ export const es: TranslationKeys = {
       latitude: "Latitud",
       longitude: "Longitud",
       altitudeMeters: "Altitud (metros)",
+      altitudePlaceholder: "Opcional (p. ej. 25)",
       removeAllGpsData: "Eliminar todos los datos GPS",
       keywords: "Palabras clave",
       addKeywordPlaceholder: "Agregar palabra clave y presionar Enter",

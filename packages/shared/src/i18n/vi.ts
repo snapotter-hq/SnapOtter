@@ -1588,6 +1588,7 @@ export const vi: TranslationKeys = {
       latitude: "Vĩ độ",
       longitude: "Kinh độ",
       altitudeMeters: "Độ cao (mét)",
+      altitudePlaceholder: "Tùy chọn (ví dụ: 25)",
       removeAllGpsData: "Xóa tất cả dữ liệu GPS",
       keywords: "Từ khóa",
       addKeywordPlaceholder: "Thêm từ khóa và nhấn Enter",
@@ -3051,7 +3052,7 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang áp dụng duotone",
       presetNames: {
         classic: "Cổ điển",
-        noir: "Noir",
+        noir: "Đen trắng",
         sepia: "Nâu đỏ",
         midnight: "Nửa đêm",
         sunset: "Hoàng hôn",

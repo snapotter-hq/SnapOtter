@@ -1598,6 +1598,7 @@ export const de: TranslationKeys = {
       latitude: "Breitengrad",
       longitude: "Längengrad",
       altitudeMeters: "Höhe (Meter)",
+      altitudePlaceholder: "Optional (z. B. 25)",
       removeAllGpsData: "Alle GPS-Daten entfernen",
       keywords: "Schlüsselwörter",
       addKeywordPlaceholder: "Schlüsselwort eingeben und Enter drücken",
@@ -2046,7 +2047,7 @@ export const de: TranslationKeys = {
     },
     "enhance-faces": {
       subtle: "Dezent",
-      maximum: "Maximum",
+      maximum: "Maximal",
       fewerFaces: "Weniger Gesichter",
       moreFaces: "Mehr Gesichter",
       onlyEnhanceMainFace: "Nur Hauptgesicht verbessern",
@@ -2160,7 +2161,7 @@ export const de: TranslationKeys = {
       quick: "Schnell",
       balanced: "Ausgewogen",
       quality: "Qualität",
-      maximum: "Maximum",
+      maximum: "Maximal",
       quickDesc: "Schnell, ressourcenschonend",
       balancedDesc: "Gute Qualität, moderate Geschwindigkeit",
       qualityDesc: "AI-gestützt, langsam",
@@ -4370,7 +4371,7 @@ export const de: TranslationKeys = {
       fill: "Füllung",
       stroke: "Kontur",
       strokeWidth: "Breite",
-      cornerRadius: "Radius",
+      cornerRadius: "Eckenradius",
       sides: "Seiten",
       points: "Punkte",
       dashStyle: "Strichart",
@@ -4504,7 +4505,7 @@ export const de: TranslationKeys = {
     },
     panels: {
       adjustments: {
-        auto: "Auto",
+        auto: "Automatisch",
         channelRed: "Rot",
         channelGreen: "Grün",
         channelBlue: "Blau",

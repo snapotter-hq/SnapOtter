@@ -1352,6 +1352,7 @@ export const zhCN: TranslationKeys = {
       latitude: "纬度",
       longitude: "经度",
       altitudeMeters: "海拔（米）",
+      altitudePlaceholder: "可选（例如 25）",
       removeAllGpsData: "移除所有 GPS 数据",
       keywords: "关键词",
       addKeywordPlaceholder: "添加关键词并按回车",
