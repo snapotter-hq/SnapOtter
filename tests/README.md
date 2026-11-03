@@ -23,7 +23,7 @@ tests/
     tools/                 # Per-tool integration tests
   e2e/                     # Playwright specs (main app, Chromium primary)
   e2e-analytics/           # Analytics flow e2e specs
-  e2e-docker/              # Docker container e2e specs
+  e2e-docker/              # External-server e2e specs (historical directory name)
   e2e-docs/                # VitePress docs site e2e specs
   e2e-editor/              # Konva image editor e2e specs
   e2e-landing/             # Astro landing site e2e specs
@@ -169,8 +169,9 @@ pnpm vitest run tests/unit/fixtures
 pnpm test:e2e                # Main app (chromium + serial + visual projects)
 pnpm test:e2e:landing        # Landing site
 pnpm test:e2e:docs           # VitePress docs
-pnpm test:e2e:analytics      # Analytics flows
-pnpm test:docker             # Full Docker container test
+pnpm test:e2e:analytics      # Local analytics flows (starts local dev servers)
+pnpm test:e2e:external       # Complete browser suite against a running external server
+pnpm test:docker             # Compose-backed tests (starts the test infrastructure)
 
 # Editor e2e (no root alias)
 pnpm playwright test --config playwright.editor.config.ts
@@ -178,6 +179,19 @@ pnpm playwright test --config playwright.editor.config.ts
 # Single e2e spec
 pnpm playwright test tests/e2e/my-test.spec.ts
 ```
+
+`pnpm test:e2e:external` runs the complete `tests/e2e-docker` browser suite,
+including analytics and non-analytics tool tests. Start a compatible application
+separately before running it, commonly in a separately started container. The
+default target is `http://localhost:1349`; override it with `BASE_URL`:
+
+```bash
+BASE_URL=http://127.0.0.1:1349 pnpm test:e2e:external
+```
+
+This command neither starts Docker nor proves that the target is containerized.
+An unavailable target fails the Playwright run. Use `pnpm test:e2e:analytics` for
+local analytics flows, or `pnpm test:docker` to launch the Compose test infrastructure.
 
 ### Environment Requirements
 
