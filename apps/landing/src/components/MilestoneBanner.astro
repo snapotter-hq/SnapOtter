@@ -17,10 +17,10 @@ const thanks = t(locale, "home.milestone.thanksPullsStars");
   href={RELEASE_URL}
   target="_blank"
   rel="noopener noreferrer"
-  class="animate-fade-up group mx-auto mb-6 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-surface px-4 py-2 text-sm text-foreground shadow-lg sm:rounded-full"
+  class="milestone-banner animate-fade-up group relative mx-auto mb-6 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 overflow-hidden rounded-2xl px-4 py-2 text-sm text-foreground shadow-lg sm:rounded-full"
   data-milestone-banner
 >
-  <svg class="hidden h-4 w-4 shrink-0 text-primary sm:block" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <svg class="milestone-star hidden h-4 w-4 shrink-0 text-primary sm:block" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
     <path d="M12 2l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 16.3 6.2 19.8l1.6-6.6L2.6 8.8l6.8-.5z" />
   </svg>
   <span class="font-semibold">{thanks}</span>
@@ -30,3 +30,112 @@ const thanks = t(locale, "home.milestone.thanksPullsStars");
     <svg class="h-3.5 w-3.5 rtl:-scale-x-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
   </span>
 </a>
+
+<style>
+  /* An orange gradient ring and a light sweep make the banner read as an
+     event without changing its text colors (orange stays a fill here). */
+  .milestone-banner {
+    border: 2px solid transparent;
+    background:
+      linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+      linear-gradient(
+          120deg,
+          var(--color-primary-dark),
+          var(--color-primary-light),
+          var(--color-primary),
+          var(--color-primary-light),
+          var(--color-primary-dark)
+        )
+        border-box;
+    background-size: 100% 100%, 300% 100%;
+    box-shadow:
+      0 0 0 4px rgb(255 255 255 / 0.25),
+      0 10px 30px -10px color-mix(in srgb, var(--color-primary-dark) 70%, transparent);
+    animation:
+      milestone-ring 6s linear infinite,
+      milestone-glow 3.6s ease-in-out 1s infinite,
+      fadeUp 0.7s ease-out both;
+  }
+
+  .milestone-banner::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      color-mix(in srgb, var(--color-primary-light) 35%, transparent) 42%,
+      color-mix(in srgb, var(--color-primary-light) 60%, transparent) 50%,
+      color-mix(in srgb, var(--color-primary-light) 35%, transparent) 58%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    animation: milestone-shine 3.6s ease-in-out 1s infinite;
+  }
+
+  /* Keep the text above the sweep so it never washes out. */
+  .milestone-banner > :global(*) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .milestone-star {
+    animation: milestone-twinkle 3.6s ease-in-out 1s infinite;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-primary) 70%, transparent));
+  }
+
+  @keyframes milestone-ring {
+    to {
+      background-position: 0 0, 300% 0;
+    }
+  }
+
+  @keyframes milestone-shine {
+    0% {
+      transform: translateX(-120%);
+    }
+    45%,
+    100% {
+      transform: translateX(120%);
+    }
+  }
+
+  @keyframes milestone-glow {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 4px rgb(255 255 255 / 0.25),
+        0 10px 30px -10px color-mix(in srgb, var(--color-primary-dark) 70%, transparent);
+    }
+    25% {
+      box-shadow:
+        0 0 0 6px rgb(255 255 255 / 0.45),
+        0 0 28px 4px rgb(255 255 255 / 0.55);
+    }
+  }
+
+  @keyframes milestone-twinkle {
+    0%,
+    100% {
+      transform: scale(1) rotate(0deg);
+    }
+    20% {
+      transform: scale(1.3) rotate(18deg);
+    }
+    40% {
+      transform: scale(1) rotate(0deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .milestone-banner,
+    .milestone-star {
+      animation: none;
+    }
+    .milestone-banner::after {
+      display: none;
+    }
+  }
+</style>
